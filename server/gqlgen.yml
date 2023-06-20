@@ -1,0 +1,33 @@
+# Refer to https://gqlgen.com/config/
+# for detailed .gqlgen.yml documentation.
+
+schema:
+  - ./schemas/_shared.graphql
+  - ./schemas/user.graphql
+  - ./schemas/workspace.graphql
+exec:
+  filename: internal/adapter/gql/generated.go
+model:
+  filename: internal/adapter/gql/gqlmodel/models_gen.go
+resolver:
+  filename: internal/adapter/gql/resolver.go
+  type: Resolver
+models:
+  Me:
+    fields:
+      workspaces:
+        resolver: true
+      myWorkspace:
+        resolver: true
+  WorkspaceUserMember:
+    fields:
+      user:
+        resolver: true
+  DateTime:
+    model: github.com/99designs/gqlgen/graphql.Time
+  FileSize:
+    model: github.com/99designs/gqlgen/graphql.Int64
+  Cursor:
+    model: github.com/reearth/reearthx/usecasex.Cursor
+  ID:
+    model: github.com/reearth/reearth-account/internal/adapter/gql/gqlmodel.ID
