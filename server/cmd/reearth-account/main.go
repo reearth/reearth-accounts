@@ -1,12 +1,7 @@
 package main
 
-import (
-	"github.com/reearth/reearth-account/internal/account"
-	"github.com/reearth/reearthx/log"
-)
+import "github.com/reearth/reearth-account/internal/app"
 
 func main() {
-	if err := account.StartServer(); err != nil {
-		log.Fatal(err)
-	}
+	app.Start(debug)
 }
