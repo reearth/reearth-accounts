@@ -4,7 +4,7 @@ ARG REV
 ARG VERSION
 
 RUN apk add --update --no-cache git ca-certificates build-base
-COPY go.mod go.sum main.go /app/
+COPY go.mod go.sum /app/
 WORKDIR /app
 RUN go mod download
 COPY cmd/ /app/cmd/
