@@ -9,7 +9,7 @@ require (
 	github.com/kelseyhightower/envconfig v1.4.0
 	github.com/labstack/echo/v4 v4.7.2
 	github.com/ravilushqa/otelgqlgen v0.8.0
-	github.com/reearth/reearthx v0.0.0-20230612064320-fb0732d17c6e
+	github.com/reearth/reearthx v0.0.0-20230728095451-b9d255b762d5
 	github.com/samber/lo v1.27.0
 	github.com/stretchr/testify v1.8.0
 	github.com/vektah/dataloaden v0.3.0
