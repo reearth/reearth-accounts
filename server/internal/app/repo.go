@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/reearth/reearth-account/internal/infrastructure/auth0"
 	"github.com/reearth/reearthx/account/accountinfrastructure/accountmongo"
 	"github.com/reearth/reearthx/account/accountusecase/accountgateway"
 	"github.com/reearth/reearthx/account/accountusecase/accountrepo"
@@ -22,16 +23,17 @@ func initReposAndGateways(ctx context.Context, conf *Config, debug bool) (*accou
 			ApplyURI(conf.DB).
 			SetConnectTimeout(time.Second*10))
 	if err != nil {
-		log.Fatalln(fmt.Sprintf("repo initialization error: %+v", err))
+		log.Fatalc(ctx, fmt.Sprintf("repo initialization error: %+v", err))
 	}
 
-	acRepos, err := accountmongo.New(ctx, client, "reearth-account", true)
+	acRepos, err := accountmongo.New(ctx, client, "reearth-account", true, false)
 	if err != nil {
-		log.Fatalln(fmt.Sprintf("Failed to init mongo: %+v", err))
+		log.Fatalc(ctx, fmt.Sprintf("Failed to init mongo: %+v", err))
 	}
 
 	acGateways := &accountgateway.Container{
-		Mailer: mailer.New(ctx, &mailer.Config{}),
+		Mailer:        mailer.New(ctx, &mailer.Config{}),
+		Authenticator: auth0.New(conf.Auth0.Domain, conf.Auth0.ClientID, conf.Auth0.ClientSecret),
 	}
 
 	return acRepos, acGateways

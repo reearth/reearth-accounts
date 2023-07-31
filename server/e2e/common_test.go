@@ -35,7 +35,7 @@ func StartServerAndRepos(t *testing.T, cfg *app.Config, useMongo bool, seeder Se
 
 	if useMongo {
 		db := mongotest.Connect(t)(t)
-		accountRepos = lo.Must(accountmongo.New(ctx, db.Client(), db.Name(), false))
+		accountRepos = lo.Must(accountmongo.New(ctx, db.Client(), db.Name(), false, false))
 	} else {
 		accountRepos = accountmemory.New()
 	}

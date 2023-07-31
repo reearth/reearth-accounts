@@ -18,7 +18,7 @@ import (
 
 func initEcho(ctx context.Context, cfg *ServerConfig) *echo.Echo {
 	if cfg.Config == nil {
-		log.Fatalln("ServerConfig.Config is nil")
+		log.Fatalc(ctx, "ServerConfig.Config is nil")
 	}
 
 	e := echo.New()
@@ -83,7 +83,7 @@ func initEcho(ctx context.Context, cfg *ServerConfig) *echo.Echo {
 	api := e.Group("/api")
 	jwt, err := appx.AuthMiddleware(cfg.Config.Auths(), authInfoKey{}, false)
 	if err != nil {
-		log.Panicln(err)
+		log.Panicc(ctx, err)
 	}
 	api.Use(
 		echo.WrapMiddleware(jwt),

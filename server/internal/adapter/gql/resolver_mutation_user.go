@@ -11,7 +11,10 @@ import (
 )
 
 func (r *mutationResolver) UpdateMe(ctx context.Context, input gqlmodel.UpdateMeInput) (*gqlmodel.UpdateMePayload, error) {
-	lang := language.Make(*input.Lang)
+	var lang language.Tag
+	if input.Lang != nil {
+		lang = language.Make(*input.Lang)
+	}
 	res, err := usecases(ctx).User.UpdateMe(ctx, accountinterfaces.UpdateMeParam{
 		Name:                 input.Name,
 		Email:                input.Email,
