@@ -23,6 +23,14 @@ type AddIntegrationToWorkspaceInput struct {
 	Role          Role `json:"role"`
 }
 
+type AddRoleInput struct {
+	Name string `json:"name"`
+}
+
+type AddRolePayload struct {
+	Role *RoleForAuthorization `json:"role"`
+}
+
 type AddUsersToWorkspaceInput struct {
 	WorkspaceID ID             `json:"workspaceId"`
 	Users       []*MemberInput `json:"users"`
@@ -30,6 +38,16 @@ type AddUsersToWorkspaceInput struct {
 
 type AddUsersToWorkspacePayload struct {
 	Workspace *Workspace `json:"workspace"`
+}
+
+type CheckPermissionInput struct {
+	Service  string `json:"service"`
+	Resource string `json:"resource"`
+	Action   string `json:"action"`
+}
+
+type CheckPermissionPayload struct {
+	Allowed bool `json:"allowed"`
 }
 
 type CreateWorkspaceInput struct {
@@ -56,6 +74,10 @@ type DeleteWorkspacePayload struct {
 	WorkspaceID ID `json:"workspaceId"`
 }
 
+type GetUsersWithRolesPayload struct {
+	UsersWithRoles []*UserWithRoles `json:"usersWithRoles"`
+}
+
 type Me struct {
 	ID            ID           `json:"id"`
 	Name          string       `json:"name"`
@@ -73,6 +95,18 @@ type MemberInput struct {
 	Role   Role `json:"role"`
 }
 
+type Mutation struct {
+}
+
+type Permittable struct {
+	ID      ID   `json:"id"`
+	UserID  ID   `json:"userId"`
+	RoleIds []ID `json:"roleIds"`
+}
+
+type Query struct {
+}
+
 type RemoveIntegrationFromWorkspaceInput struct {
 	WorkspaceID   ID `json:"workspaceId"`
 	IntegrationID ID `json:"integrationId"`
@@ -86,9 +120,26 @@ type RemoveMyAuthInput struct {
 	Auth string `json:"auth"`
 }
 
+type RemoveRoleInput struct {
+	ID ID `json:"id"`
+}
+
+type RemoveRolePayload struct {
+	ID ID `json:"id"`
+}
+
 type RemoveUserFromWorkspaceInput struct {
 	WorkspaceID ID `json:"workspaceId"`
 	UserID      ID `json:"userId"`
+}
+
+type RoleForAuthorization struct {
+	ID   ID     `json:"id"`
+	Name string `json:"name"`
+}
+
+type RolesPayload struct {
+	Roles []*RoleForAuthorization `json:"roles"`
 }
 
 type UpdateIntegrationOfWorkspaceInput struct {
@@ -98,12 +149,12 @@ type UpdateIntegrationOfWorkspaceInput struct {
 }
 
 type UpdateMeInput struct {
-	Name                 *string `json:"name"`
-	Email                *string `json:"email"`
-	Lang                 *string `json:"lang"`
-	Theme                *Theme  `json:"theme"`
-	Password             *string `json:"password"`
-	PasswordConfirmation *string `json:"passwordConfirmation"`
+	Name                 *string `json:"name,omitempty"`
+	Email                *string `json:"email,omitempty"`
+	Lang                 *string `json:"lang,omitempty"`
+	Theme                *Theme  `json:"theme,omitempty"`
+	Password             *string `json:"password,omitempty"`
+	PasswordConfirmation *string `json:"passwordConfirmation,omitempty"`
 }
 
 type UpdateMePayload struct {
@@ -112,6 +163,24 @@ type UpdateMePayload struct {
 
 type UpdateMemberOfWorkspacePayload struct {
 	Workspace *Workspace `json:"workspace"`
+}
+
+type UpdatePermittableInput struct {
+	UserID  ID   `json:"userId"`
+	RoleIds []ID `json:"roleIds"`
+}
+
+type UpdatePermittablePayload struct {
+	Permittable *Permittable `json:"permittable"`
+}
+
+type UpdateRoleInput struct {
+	ID   ID     `json:"id"`
+	Name string `json:"name"`
+}
+
+type UpdateRolePayload struct {
+	Role *RoleForAuthorization `json:"role"`
 }
 
 type UpdateUserOfWorkspaceInput struct {
@@ -138,6 +207,11 @@ type User struct {
 func (User) IsNode()        {}
 func (this User) GetID() ID { return this.ID }
 
+type UserWithRoles struct {
+	User  *User                   `json:"user"`
+	Roles []*RoleForAuthorization `json:"roles"`
+}
+
 type Workspace struct {
 	ID       ID                `json:"id"`
 	Name     string            `json:"name"`
@@ -153,7 +227,7 @@ type WorkspaceIntegrationMember struct {
 	Role          Role  `json:"role"`
 	Active        bool  `json:"active"`
 	InvitedByID   ID    `json:"invitedById"`
-	InvitedBy     *User `json:"invitedBy"`
+	InvitedBy     *User `json:"invitedBy,omitempty"`
 }
 
 func (WorkspaceIntegrationMember) IsWorkspaceMember() {}
@@ -161,7 +235,7 @@ func (WorkspaceIntegrationMember) IsWorkspaceMember() {}
 type WorkspaceUserMember struct {
 	UserID ID    `json:"userId"`
 	Role   Role  `json:"role"`
-	User   *User `json:"user"`
+	User   *User `json:"user,omitempty"`
 }
 
 func (WorkspaceUserMember) IsWorkspaceMember() {}

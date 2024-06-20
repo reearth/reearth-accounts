@@ -27,12 +27,13 @@ type Config struct {
 	Cert       CertConfig
 	Policy     PolicyConfig
 
-	Auth     AuthConfigs
-	Auth_ISS string
-	Auth_AUD string
-	Auth_ALG *string
-	Auth_TTL *int
-	Auth0    Auth0Config
+	// auth
+	Auth     AuthConfigs `pp:",omitempty"`
+	Auth_ISS string      `pp:",omitempty"`
+	Auth_AUD string      `pp:",omitempty"`
+	Auth_ALG *string     `pp:",omitempty"`
+	Auth_TTL *int        `pp:",omitempty"`
+	Auth0    Auth0Config `pp:",omitempty"`
 
 	GraphQL GraphQLConfig
 
@@ -42,6 +43,9 @@ type Config struct {
 	Reearth_Web    string
 	Reearth_GCS    string
 	Published_Host string
+
+	// cerbos
+	CerbosHost string `envconfig:"CERBOS_HOST" default:"localhost:3593"`
 }
 
 type AuthConfig struct {

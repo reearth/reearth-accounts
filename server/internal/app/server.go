@@ -6,7 +6,10 @@ import (
 	"os"
 	"os/signal"
 
+	"github.com/cerbos/cerbos-sdk-go/cerbos"
 	"github.com/labstack/echo/v4"
+	infraCerbos "github.com/reearth/reearth-account/internal/infrastructure/cerbos"
+	"github.com/reearth/reearth-account/internal/usecase/repo"
 	"github.com/reearth/reearthx/account/accountusecase/accountgateway"
 	"github.com/reearth/reearthx/account/accountusecase/accountrepo"
 	"github.com/reearth/reearthx/log"
@@ -25,14 +28,23 @@ func Start(debug bool) {
 	log.Infof("config: %s", conf.Print())
 
 	// Init repositories
-	repos, gateways := initReposAndGateways(ctx, conf, debug)
+	repos, accountRepos, gateways := initReposAndGateways(ctx, conf, debug)
+
+	// Cerbos
+	cerbosClient, err := cerbos.New(conf.CerbosHost, cerbos.WithPlaintext())
+	if err != nil {
+		log.Fatalf("Failed to create cerbos client: %v", err)
+	}
+	cerbosAdapter := infraCerbos.NewCerbosAdapter(cerbosClient)
 
 	// Start web server
 	NewServer(ctx, &ServerConfig{
-		Config:   conf,
-		Debug:    debug,
-		Repos:    repos,
-		Gateways: gateways,
+		Config:        conf,
+		Debug:         debug,
+		Repos:         repos,
+		AccountRepos:  accountRepos,
+		Gateways:      gateways,
+		CerbosAdapter: cerbosAdapter,
 	}).Run(ctx)
 }
 
@@ -42,10 +54,12 @@ type WebServer struct {
 }
 
 type ServerConfig struct {
-	Config   *Config
-	Debug    bool
-	Repos    *accountrepo.Container
-	Gateways *accountgateway.Container
+	Config        *Config
+	Debug         bool
+	Repos         *repo.Container
+	AccountRepos  *accountrepo.Container
+	Gateways      *accountgateway.Container
+	CerbosAdapter *infraCerbos.CerbosAdapter
 }
 
 func NewServer(ctx context.Context, cfg *ServerConfig) *WebServer {

@@ -1,0 +1,43 @@
+type RoleForAuthorization {
+  id: ID!
+  name: String!
+}
+
+type RolesPayload {
+  roles: [RoleForAuthorization!]!
+}
+
+input AddRoleInput {
+  name: String!
+}
+
+input UpdateRoleInput {
+  id: ID!
+  name: String!
+}
+
+input RemoveRoleInput {
+  id: ID!
+}
+
+type AddRolePayload {
+  role: RoleForAuthorization!
+}
+
+type UpdateRolePayload {
+  role: RoleForAuthorization!
+}
+
+type RemoveRolePayload {
+  id: ID!
+}
+
+extend type Query {
+  roles: RolesPayload!
+}
+
+extend type Mutation {
+  addRole(input: AddRoleInput!): AddRolePayload
+  updateRole(input: UpdateRoleInput!): UpdateRolePayload
+  removeRole(input: RemoveRoleInput!): RemoveRolePayload
+}

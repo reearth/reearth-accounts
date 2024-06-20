@@ -94,7 +94,9 @@ func baseSeederWorkspace(ctx context.Context, r *accountrepo.Container) error {
 }
 
 type GraphQLRequest struct {
-	Query string `json:"query"`
+	OperationName string         `json:"operationName"`
+	Query         string         `json:"query"`
+	Variables     map[string]any `json:"variables"`
 }
 
 func TestCreateWorkspace(t *testing.T) {
