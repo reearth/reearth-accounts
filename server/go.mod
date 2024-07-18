@@ -1,22 +1,22 @@
 module github.com/reearth/reearth-account
 
-go 1.20
+go 1.22.5
 
 require (
-	github.com/99designs/gqlgen v0.17.20
-	github.com/gavv/httpexpect/v2 v2.15.0
+	github.com/99designs/gqlgen v0.17.49
+	github.com/gavv/httpexpect/v2 v2.16.0
 	github.com/joho/godotenv v1.5.1
 	github.com/kelseyhightower/envconfig v1.4.0
-	github.com/labstack/echo/v4 v4.7.2
-	github.com/ravilushqa/otelgqlgen v0.8.0
+	github.com/labstack/echo/v4 v4.12.0
+	github.com/ravilushqa/otelgqlgen v0.16.0
 	github.com/reearth/reearthx v0.0.0-20230728095451-b9d255b762d5
-	github.com/samber/lo v1.27.0
-	github.com/stretchr/testify v1.8.0
+	github.com/samber/lo v1.46.0
+	github.com/stretchr/testify v1.9.0
 	github.com/vektah/dataloaden v0.3.0
-	github.com/vektah/gqlparser/v2 v2.5.1
-	go.mongodb.org/mongo-driver v1.10.1
-	golang.org/x/net v0.7.0
-	golang.org/x/text v0.7.0
+	github.com/vektah/gqlparser/v2 v2.5.16
+	go.mongodb.org/mongo-driver v1.16.0
+	golang.org/x/net v0.27.0
+	golang.org/x/text v0.16.0
 )
 
 require (
