@@ -1,5 +1,6 @@
-# reearth-account
+# reearth-dashboard
 
-Account service for Re:Earth and Re:Earth CMS
-
-- Share the same user and workspace across multiple services.
+- Dashboard Screen
+- Account management
+- Permission management
+- Billing management
