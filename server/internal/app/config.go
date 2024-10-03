@@ -19,8 +19,8 @@ const configPrefix = "reearth"
 type Config struct {
 	Port    string `default:"8090" envconfig:"PORT"`
 	Dev     bool
-	DB      string `default:"mongodb://localhost"`
-	Origins []string
+	DB      string   `default:"mongodb://localhost" envconfig:"REEARTH_DB" `
+	Origins []string `envconfig:"REEARTH_DASHBOARD_ORIGINS"`
 	Host    string
 
 	GCPProject string `envconfig:"GOOGLE_CLOUD_PROJECT"`
@@ -45,7 +45,7 @@ type Config struct {
 	Published_Host string
 
 	// cerbos
-	CerbosHost string `envconfig:"CERBOS_HOST" default:"localhost:3593"`
+	CerbosHost string `default:"localhost:3593" envconfig:"CERBOS_HOST" `
 }
 
 type AuthConfig struct {
