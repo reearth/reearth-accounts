@@ -1,0 +1,39 @@
+name: deploy-server-dev
+on:
+  workflow_dispatch:
+concurrency:
+  group: ${{ github.workflow }}
+  cancel-in-progress: true
+env:
+  IMAGE: reearth/reearth-dashboard:nightly
+  IMAGE_GCP: us-central1-docker.pkg.dev/reearth-oss/reearth/reearth-dashboard:nightly
+  GCP_REGION: asia-northeast1
+  GCS_BUCKET_PATH: gs://cerbos-oss-policyfile-bucket
+jobs:
+  deploy_test:
+    name: Deploy app to test env
+    runs-on: ubuntu-latest
+    if: github.event.repository.full_name == 'reearth/reearth-dashboard'
+    steps:
+      - uses: google-github-actions/auth@v0
+        with:
+          credentials_json: ${{ secrets.GCP_SA_KEY }}
+      - name: Set up Cloud SDK
+        uses: google-github-actions/setup-gcloud@v0
+      - name: Configure docker
+        run: gcloud auth configure-docker us-central1-docker.pkg.dev --quiet
+      - name: docker push
+        run: |
+          docker pull $IMAGE
+          docker tag $IMAGE $IMAGE_GCP
+          docker push $IMAGE_GCP
+      - name: Deploy to Cloud Run
+        run: |
+          gcloud run deploy reearth-dashboard \
+            --image $IMAGE_GCP \
+            --region $GCP_REGION \
+            --platform managed \
+            --quiet
+      - name: Sync policyfiles to Cloud Storage
+        run: |
+          gsutil -m rsync -r -d ./policies $GCS_BUCKET_PATH

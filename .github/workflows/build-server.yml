@@ -9,7 +9,7 @@ jobs:
     name: Build and push Docker image
     runs-on: ubuntu-latest
     env:
-      IMAGE_NAME: ghcr.io/reearth/reearth-account:latest
+      IMAGE_NAME: reearth/reearth-dashboard:nightly
     steps:
       - name: Checkout
         uses: actions/checkout@v3
@@ -17,7 +17,12 @@ jobs:
         uses: docker/setup-qemu-action@v2
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v2
-      - name: Build and load docker image
+      - name: Login to DockerHub
+        uses: docker/login-action@v2
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+      - name: Build and push Docker image
         uses: docker/build-push-action@v3
         with:
           context: ./server
@@ -26,12 +31,12 @@ jobs:
           tags: ${{ env.IMAGE_NAME }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
-          push: false
-      - name: Save docker image
-        run: docker save ${{ env.IMAGE_NAME }} | gzip > reearth-account-docker.tar.gz
-      - name: Save imaged to artifact
-        uses: actions/upload-artifact@v3
-        with:
-          name: reearth-account-docker
-          path: reearth-account-docker.tar.gz
-          if-no-files-found: error
+          push: true
+      # - name: Save docker image
+      #   run: docker save ${{ env.IMAGE_NAME }} | gzip > reearth-dashboard-docker.tar.gz
+      # - name: Save imaged to artifact
+      #   uses: actions/upload-artifact@v3
+      #   with:
+      #     name: reearth-dashboard-docker
+      #     path: reearth-dashboard-docker.tar.gz
+      #     if-no-files-found: error
