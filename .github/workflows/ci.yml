@@ -21,6 +21,7 @@ jobs:
             .github/workflows/ci.yml
             .github/workflows/ci-server.yml
             .github/workflows/build-server.yml
+            .github/workflows/deploy_server_dev.yml
   ci-server:
     needs: prepare
     if: needs.prepare.outputs.server == 'true'
@@ -36,11 +37,11 @@ jobs:
     needs: ci-server
     if: ${{ success() && github.event_name == 'push' && github.ref_name == 'main' }}
     uses: ./.github/workflows/build-server.yml
-  # deploy-server-dev:
-  #   needs: build-server
-  #   runs-on: ubuntu-latest
-  #   steps:
-  #     - name: Dispatch deployment
-  #       uses: peter-evans/repository-dispatch@v2
-  #       with:
-  #         event-type: deploy-server-dev
+  deploy-server-dev:
+    needs: build-server
+    runs-on: ubuntu-latest
+    steps:
+      - name: Dispatch deployment
+        uses: peter-evans/repository-dispatch@v2
+        with:
+          event-type: deploy-server-dev
