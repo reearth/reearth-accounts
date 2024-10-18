@@ -36,7 +36,7 @@ func authMiddleware(cfg *ServerConfig) func(http.Handler) http.Handler {
 
 		// load user by sub
 		if usr == nil && ai.Sub != "" {
-			existingUsr, err := cfg.Repos.User.FindBySub(ctx, ai.Sub)
+			existingUsr, err := cfg.AccountRepos.User.FindBySub(ctx, ai.Sub)
 			if err == nil && existingUsr != nil {
 				usr = existingUsr
 			}
@@ -59,7 +59,7 @@ func isDebugUserExists(req *http.Request, cfg *ServerConfig, ctx context.Context
 		var existingUsr *user.User
 
 		if uID, err := accountdomain.UserIDFrom(userID); err == nil {
-			u, err := cfg.Repos.User.FindByID(ctx, uID)
+			u, err := cfg.AccountRepos.User.FindByID(ctx, uID)
 			if err == nil {
 				existingUsr = u
 			}
@@ -78,7 +78,7 @@ func generateUserOperator(ctx context.Context, cfg *ServerConfig, u *user.User) 
 
 	uid := u.ID()
 
-	w, err := cfg.Repos.Workspace.FindByUser(ctx, uid)
+	w, err := cfg.AccountRepos.Workspace.FindByUser(ctx, uid)
 	if err != nil {
 		return nil, err
 	}

@@ -19,20 +19,21 @@ const configPrefix = "reearth"
 type Config struct {
 	Port    string `default:"8090" envconfig:"PORT"`
 	Dev     bool
-	DB      string `default:"mongodb://localhost"`
-	Origins []string
+	DB      string   `default:"mongodb://localhost" envconfig:"REEARTH_DB" `
+	Origins []string `envconfig:"REEARTH_DASHBOARD_ORIGINS"`
 	Host    string
 
 	GCPProject string `envconfig:"GOOGLE_CLOUD_PROJECT"`
 	Cert       CertConfig
 	Policy     PolicyConfig
 
-	Auth     AuthConfigs
-	Auth_ISS string
-	Auth_AUD string
-	Auth_ALG *string
-	Auth_TTL *int
-	Auth0    Auth0Config
+	// auth
+	Auth     AuthConfigs `pp:",omitempty"`
+	Auth_ISS string      `pp:",omitempty"`
+	Auth_AUD string      `pp:",omitempty"`
+	Auth_ALG *string     `pp:",omitempty"`
+	Auth_TTL *int        `pp:",omitempty"`
+	Auth0    Auth0Config `pp:",omitempty"`
 
 	GraphQL GraphQLConfig
 
@@ -42,6 +43,9 @@ type Config struct {
 	Reearth_Web    string
 	Reearth_GCS    string
 	Published_Host string
+
+	// cerbos
+	CerbosHost string `default:"localhost:3593" envconfig:"CERBOS_HOST" `
 }
 
 type AuthConfig struct {

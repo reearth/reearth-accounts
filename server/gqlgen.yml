@@ -3,6 +3,9 @@
 
 schema:
   - ./schemas/_shared.graphql
+  - ./schemas/cerbos.graphql
+  - ./schemas/role.graphql
+  - ./schemas/permittable.graphql
   - ./schemas/user.graphql
   - ./schemas/workspace.graphql
 exec:

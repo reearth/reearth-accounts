@@ -6,8 +6,16 @@ import (
 	"net/http"
 	"testing"
 
+	"github.com/cerbos/cerbos-sdk-go/cerbos"
+
 	httpexpect "github.com/gavv/httpexpect/v2"
+	"github.com/labstack/gommon/log"
 	"github.com/reearth/reearth-account/internal/app"
+	infraCerbos "github.com/reearth/reearth-account/internal/infrastructure/cerbos"
+	"github.com/reearth/reearth-account/internal/infrastructure/memory"
+	mongorepo "github.com/reearth/reearth-account/internal/infrastructure/mongo"
+	"github.com/reearth/reearth-account/internal/usecase/repo"
+	"github.com/reearth/reearthx/account/accountdomain/user"
 	"github.com/reearth/reearthx/account/accountinfrastructure/accountmemory"
 	"github.com/reearth/reearthx/account/accountinfrastructure/accountmongo"
 	"github.com/reearth/reearthx/account/accountusecase/accountgateway"
@@ -15,6 +23,10 @@ import (
 	"github.com/reearth/reearthx/mailer"
 	"github.com/reearth/reearthx/mongox/mongotest"
 	"github.com/samber/lo"
+)
+
+var (
+	uID = user.NewID()
 )
 
 type Seeder func(ctx context.Context, r *accountrepo.Container) error
@@ -32,12 +44,20 @@ func StartServerAndRepos(t *testing.T, cfg *app.Config, useMongo bool, seeder Se
 	ctx := context.Background()
 
 	var accountRepos *accountrepo.Container
+	var repos *repo.Container
 
 	if useMongo {
-		db := mongotest.Connect(t)(t)
-		accountRepos = lo.Must(accountmongo.New(ctx, db.Client(), db.Name(), false, false))
+		db := mongorepo.Connect(t)(t)
+		accountRepos = lo.Must(accountmongo.New(ctx, db.Client(), db.Name(), false, false, nil))
+
+		var err error
+		repos, err = mongorepo.New(ctx, db, accountRepos, false)
+		if err != nil {
+			log.Fatalf("Failed to init mongo: %+v\n", err)
+		}
 	} else {
 		accountRepos = accountmemory.New()
+		repos = memory.New()
 	}
 
 	if seeder != nil {
@@ -46,10 +66,20 @@ func StartServerAndRepos(t *testing.T, cfg *app.Config, useMongo bool, seeder Se
 		}
 	}
 
-	return StartServerWithRepos(t, cfg, accountRepos), accountRepos
+	return StartServerWithRepos(
+		t,
+		cfg,
+		repos,
+		accountRepos,
+	), accountRepos
 }
 
-func StartServerWithRepos(t *testing.T, cfg *app.Config, accountrepos *accountrepo.Container) *httpexpect.Expect {
+func StartServerWithRepos(
+	t *testing.T,
+	cfg *app.Config,
+	repos *repo.Container,
+	accountrepos *accountrepo.Container,
+) *httpexpect.Expect {
 	t.Helper()
 
 	if testing.Short() {
@@ -62,13 +92,22 @@ func StartServerWithRepos(t *testing.T, cfg *app.Config, accountrepos *accountre
 		t.Fatalf("server failed to listen: %v", err)
 	}
 
+	// Cerbos
+	cerbosClient, err := cerbos.New(cfg.CerbosHost, cerbos.WithPlaintext())
+	if err != nil {
+		log.Fatalf("Failed to create cerbos client: %v", err)
+	}
+	cerbosAdapter := infraCerbos.NewCerbosAdapter(cerbosClient)
+
 	srv := app.NewServer(ctx, &app.ServerConfig{
-		Config: cfg,
-		Repos:  accountrepos,
+		Config:       cfg,
+		Repos:        repos,
+		AccountRepos: accountrepos,
 		Gateways: &accountgateway.Container{
 			Mailer: mailer.New(ctx, &mailer.Config{}),
 		},
-		Debug: true,
+		Debug:         true,
+		CerbosAdapter: cerbosAdapter,
 	})
 
 	ch := make(chan error)

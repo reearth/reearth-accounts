@@ -72,8 +72,12 @@ func initEcho(ctx context.Context, cfg *ServerConfig) *echo.Echo {
 		log.Printf("gql: GraphQL Playground is available")
 	}
 
-	usecaseMiddleware := UsecaseMiddleware(cfg.Repos,
+	usecaseMiddleware := UsecaseMiddleware(
+		cfg.Repos,
+		cfg.AccountRepos,
 		cfg.Gateways,
+		nil,
+		cfg.CerbosAdapter,
 		interactor.ContainerConfig{
 			SignupSecret:    cfg.Config.SignupSecret,
 			AuthSrvUIDomain: cfg.Config.HostWeb,

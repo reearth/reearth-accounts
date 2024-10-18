@@ -1,0 +1,13 @@
+input CheckPermissionInput {
+  service: String!
+  resource: String!
+  action: String!
+}
+
+type CheckPermissionPayload {
+  allowed: Boolean!
+}
+
+extend type Query {
+  checkPermission(input: CheckPermissionInput!): CheckPermissionPayload
+}

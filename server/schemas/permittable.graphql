@@ -1,0 +1,31 @@
+type UserWithRoles {
+  user: User!
+  roles: [RoleForAuthorization!]!
+}
+
+type Permittable {
+  id: ID!
+  userId: ID!
+  roleIds: [ID!]!
+}
+
+type GetUsersWithRolesPayload {
+  usersWithRoles: [UserWithRoles!]!
+}
+
+input UpdatePermittableInput {
+  userId: ID!
+  roleIds: [ID!]!
+}
+
+type UpdatePermittablePayload {
+  permittable: Permittable!
+}
+
+extend type Query {
+  getUsersWithRoles: GetUsersWithRolesPayload
+}
+
+extend type Mutation {
+  updatePermittable(input: UpdatePermittableInput!): UpdatePermittablePayload
+}

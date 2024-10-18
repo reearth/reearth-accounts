@@ -18,6 +18,39 @@ import (
 	"golang.org/x/text/language"
 )
 
+func baseSeederOneUser(ctx context.Context, r *accountrepo.Container) error {
+	auth := user.ReearthSub(uId.String())
+	u := user.New().ID(uId).
+		Name("e2e").
+		Email("e2e@e2e.com").
+		Auths([]user.Auth{*auth}).
+		Theme(user.ThemeDark).
+		Lang(language.Japanese).
+		Workspace(wId).
+		MustBuild()
+	if err := r.User.Save(ctx, u); err != nil {
+		return err
+	}
+	roleOwner := workspace.Member{
+		Role:      workspace.RoleOwner,
+		InvitedBy: uId,
+	}
+
+	w := workspace.New().ID(wId).
+		Name("e2e").
+		Members(map[idx.ID[accountdomain.User]]workspace.Member{
+			uId: roleOwner,
+		}).
+		Integrations(map[idx.ID[accountdomain.Integration]]workspace.Member{
+			iId: roleOwner,
+		}).
+		MustBuild()
+	if err := r.Workspace.Save(ctx, w); err != nil {
+		return err
+	}
+	return nil
+}
+
 func baseSeederUser(ctx context.Context, r *accountrepo.Container) error {
 	auth := user.ReearthSub(uId.String())
 	u := user.New().ID(uId).

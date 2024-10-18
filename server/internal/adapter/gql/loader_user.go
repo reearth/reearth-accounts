@@ -24,7 +24,7 @@ func (c *UserLoader) Fetch(ctx context.Context, ids []gqlmodel.ID) ([]*gqlmodel.
 		return nil, []error{err}
 	}
 
-	res, err := c.usecase.Fetch(ctx, uids, getOperator(ctx))
+	res, err := c.usecase.FetchByID(ctx, uids)
 	if err != nil {
 		return nil, []error{err}
 	}
@@ -38,12 +38,12 @@ func (c *UserLoader) Fetch(ctx context.Context, ids []gqlmodel.ID) ([]*gqlmodel.
 }
 
 func (c *UserLoader) SearchUser(ctx context.Context, nameOrEmail string) (*gqlmodel.User, error) {
-	res, err := c.usecase.SearchUser(ctx, nameOrEmail, getOperator(ctx))
+	res, err := c.usecase.SearchUser(ctx, nameOrEmail)
 	if err != nil {
 		return nil, err
 	}
 
-	return gqlmodel.ToUser(res), nil
+	return gqlmodel.ToUserFromSimple(res), nil
 }
 
 // data loader
