@@ -9,7 +9,7 @@ jobs:
     name: Build and push Docker image
     runs-on: ubuntu-latest
     env:
-      IMAGE_NAME: reearth/reearth-dashboard:nightly
+      IMAGE_NAME: reearth/reearth-dashboard-api:nightly
     steps:
       - name: Checkout
         uses: actions/checkout@v3
@@ -33,10 +33,10 @@ jobs:
           cache-to: type=gha,mode=max
           push: true
       # - name: Save docker image
-      #   run: docker save ${{ env.IMAGE_NAME }} | gzip > reearth-dashboard-docker.tar.gz
+      #   run: docker save ${{ env.IMAGE_NAME }} | gzip > reearth-dashboard-api-docker.tar.gz
       # - name: Save imaged to artifact
       #   uses: actions/upload-artifact@v3
       #   with:
-      #     name: reearth-dashboard-docker
-      #     path: reearth-dashboard-docker.tar.gz
+      #     name: reearth-dashboard-api-docker
+      #     path: reearth-dashboard-api-docker.tar.gz
       #     if-no-files-found: error
