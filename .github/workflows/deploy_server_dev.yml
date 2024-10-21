@@ -5,10 +5,11 @@ concurrency:
   group: ${{ github.workflow }}
   cancel-in-progress: true
 env:
-  IMAGE: reearth/reearth-dashboard-api:nightly
-  IMAGE_GCP: us-central1-docker.pkg.dev/reearth-oss/reearth/reearth-dashboard-api:nightly
+  IMAGE_DASHBOARD_API: reearth/reearth-dashboard-api:nightly
+  IMAGE_GCP_DASHBOARD_API: us-central1-docker.pkg.dev/reearth-oss/reearth/reearth-dashboard-api:nightly
+  IMAGE_CERBOS: reearth/cerbos:nightly
+  IMAGE_GCP_CERBOS: us-central1-docker.pkg.dev/reearth-oss/reearth/cerbos:nightly
   GCP_REGION: asia-northeast1
-  GCS_BUCKET_PATH: gs://cerbos-oss-policyfile-bucket
 jobs:
   deploy_test:
     name: Deploy app to test env
@@ -22,18 +23,28 @@ jobs:
         uses: google-github-actions/setup-gcloud@v0
       - name: Configure docker
         run: gcloud auth configure-docker us-central1-docker.pkg.dev --quiet
-      - name: docker push
+      - name: docker push for dashboard api
         run: |
-          docker pull $IMAGE
-          docker tag $IMAGE $IMAGE_GCP
-          docker push $IMAGE_GCP
-      - name: Deploy to Cloud Run
+          docker pull $IMAGE_DASHBOARD_API
+          docker tag $IMAGE_DASHBOARD_API $IMAGE_GCP_DASHBOARD_API
+          docker push $IMAGE_GCP_DASHBOARD_API
+      - name: docker push for cerbos
+        run: |
+          docker pull $IMAGE_CERBOS
+          docker tag $IMAGE_CERBOS $IMAGE_GCP_CERBOS
+          docker push $IMAGE_GCP_CERBOS
+      - name: Deploy to Cloud Run for dashboard api
         run: |
           gcloud run deploy reearth-dashboard-api \
-            --image $IMAGE_GCP \
+            --image $IMAGE_GCP_DASHBOARD_API \
             --region $GCP_REGION \
             --platform managed \
             --quiet
-      - name: Sync policyfiles to Cloud Storage
+      - name: Deploy to Cloud Run for cerbos
         run: |
-          gsutil -m rsync -r -d ./policies $GCS_BUCKET_PATH
+          gcloud run deploy cerbos \
+            --image $IMAGE_GCP_CERBOS \
+            --region $GCP_REGION \
+            --platform managed \
+            --quiet
+
