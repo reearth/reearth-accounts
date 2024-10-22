@@ -1,0 +1,60 @@
+name: build-deploy-server
+on:
+  workflow_call:
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.workflow_run.head_branch }}
+  cancel-in-progress: true
+env:
+  IMAGE_DASHBOARD_API: reearth/reearth-dashboard-api:nightly
+  IMAGE_GCP_DASHBOARD_API: us-central1-docker.pkg.dev/reearth-oss/reearth/reearth-dashboard-api:nightly
+  GCP_REGION: asia-northeast1
+jobs:
+  build-and-push-docker-image:
+    name: Build and push Docker image
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v3
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@v2
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v2
+      - name: Login to DockerHub
+        uses: docker/login-action@v2
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+      - name: Build and push Docker image for dashboard api
+        uses: docker/build-push-action@v3
+        with:
+          context: ./server
+          platforms: linux/amd64
+          load: true
+          tags: ${{ env.IMAGE_DASHBOARD_API }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+          push: true
+  deploy-to-cloud-run:
+    name: Deploy app to test env
+    runs-on: ubuntu-latest
+    if: github.event.repository.full_name == 'reearth/reearth-dashboard'
+    steps:
+      - uses: google-github-actions/auth@v0
+        with:
+          credentials_json: ${{ secrets.GCP_SA_KEY }}
+      - name: Set up Cloud SDK
+        uses: google-github-actions/setup-gcloud@v0
+      - name: Configure docker
+        run: gcloud auth configure-docker us-central1-docker.pkg.dev --quiet
+      - name: docker push for dashboard api
+        run: |
+          docker pull $IMAGE_DASHBOARD_API
+          docker tag $IMAGE_DASHBOARD_API $IMAGE_GCP_DASHBOARD_API
+          docker push $IMAGE_GCP_DASHBOARD_API
+      - name: Deploy to Cloud Run for dashboard api
+        run: |
+          gcloud run deploy reearth-dashboard-api \
+            --image $IMAGE_GCP_DASHBOARD_API \
+            --region $GCP_REGION \
+            --platform managed \
+            --quiet

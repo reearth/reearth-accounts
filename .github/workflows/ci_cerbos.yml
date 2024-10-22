@@ -1,0 +1,15 @@
+name: ci-cerbos
+on:
+  workflow_call:
+env:
+  GO_VERSION: "1.20"
+jobs:
+  ci-cerbos-lint:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      - uses: cerbos/cerbos-setup-action@v1
+        with:
+          version: latest
+      - name: Validate Cerbos policies
+        run: cerbos compile ./policies
