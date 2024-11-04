@@ -36,10 +36,12 @@ jobs:
     needs: prepare
     if: needs.prepare.outputs.server == 'true'
     uses: ./.github/workflows/ci_server.yml
+    secrets: inherit
   ci-cerbos:
     needs: prepare
     if: needs.prepare.outputs.cerbos == 'true'
     uses: ./.github/workflows/ci_cerbos.yml
+    secrets: inherit
   ci:
     runs-on: ubuntu-latest
     needs:
