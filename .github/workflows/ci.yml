@@ -56,9 +56,11 @@ jobs:
       - ci-server
     if: ${{ success() && needs.ci-server.result == 'success' && github.event_name == 'push' && github.ref_name == 'main' }}
     uses: ./.github/workflows/build_deploy_server.yml
+    secrets: inherit
   build-deploy-cerbos:
     needs:
       - ci
       - ci-cerbos
     if: ${{ success() && needs.ci-cerbos.result == 'success' && github.event_name == 'push' && github.ref_name == 'main' }}
     uses: ./.github/workflows/build_deploy_cerbos.yml
+    secrets: inherit
