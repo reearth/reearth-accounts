@@ -5,7 +5,7 @@ import (
 
 	"golang.org/x/text/language"
 
-	"github.com/reearth/reearth-account/internal/usecase/interfaces"
+	"github.com/eukarya-inc/reearth-dashboard/internal/usecase/interfaces"
 	"github.com/reearth/reearthx/account/accountdomain/user"
 
 	"github.com/reearth/reearthx/account/accountusecase"

@@ -7,7 +7,7 @@ import (
 	"net/http"
 	"testing"
 
-	"github.com/reearth/reearth-account/internal/app"
+	"github.com/eukarya-inc/reearth-dashboard/internal/app"
 	"github.com/reearth/reearthx/account/accountdomain"
 	"github.com/reearth/reearthx/account/accountdomain/user"
 	"github.com/reearth/reearthx/account/accountdomain/workspace"

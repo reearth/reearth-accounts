@@ -1,4 +1,4 @@
-module github.com/reearth/reearth-account
+module github.com/eukarya-inc/reearth-dashboard
 
 go 1.20
 
@@ -22,6 +22,7 @@ require (
 	golang.org/x/exp v0.0.0-20240325151524-a685a6edb6d8
 	golang.org/x/net v0.26.0
 	golang.org/x/text v0.16.0
+	gopkg.in/yaml.v2 v2.4.0
 )
 
 require (
@@ -155,7 +156,6 @@ require (
 	gopkg.in/fsnotify.v1 v1.4.7 // indirect
 	gopkg.in/go-jose/go-jose.v2 v2.6.2 // indirect
 	gopkg.in/tomb.v1 v1.0.0-20141024135613-dd632973f1e7 // indirect
-	gopkg.in/yaml.v2 v2.4.0 // indirect
 	gopkg.in/yaml.v3 v3.0.1 // indirect
 	moul.io/http2curl/v2 v2.3.0 // indirect
 )

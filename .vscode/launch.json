@@ -7,7 +7,7 @@
       "request": "launch",
       "mode": "auto",
       "cwd": "${workspaceRoot}/server",
-      "program": "${workspaceRoot}/server/cmd/reearth-account",
+      "program": "${workspaceRoot}/server/cmd/reearth-dashboard",
       "envFile": "${workspaceRoot}/server/.env",
       "env": {},
       "args": []

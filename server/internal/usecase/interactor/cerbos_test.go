@@ -5,12 +5,12 @@ import (
 	"testing"
 
 	"github.com/cerbos/cerbos-sdk-go/cerbos"
-	infraCerbos "github.com/reearth/reearth-account/internal/infrastructure/cerbos"
-	"github.com/reearth/reearth-account/internal/infrastructure/memory"
-	"github.com/reearth/reearth-account/internal/usecase/interfaces"
-	"github.com/reearth/reearth-account/pkg/id"
-	"github.com/reearth/reearth-account/pkg/permittable"
-	"github.com/reearth/reearth-account/pkg/role"
+	infraCerbos "github.com/eukarya-inc/reearth-dashboard/internal/infrastructure/cerbos"
+	"github.com/eukarya-inc/reearth-dashboard/internal/infrastructure/memory"
+	"github.com/eukarya-inc/reearth-dashboard/internal/usecase/interfaces"
+	"github.com/eukarya-inc/reearth-dashboard/pkg/id"
+	"github.com/eukarya-inc/reearth-dashboard/pkg/permittable"
+	"github.com/eukarya-inc/reearth-dashboard/pkg/role"
 	"github.com/reearth/reearthx/account/accountdomain/user"
 	"github.com/stretchr/testify/assert"
 )

@@ -3,8 +3,8 @@ package gql
 import (
 	"context"
 
-	"github.com/reearth/reearth-account/internal/adapter/gql/gqlmodel"
-	"github.com/reearth/reearth-account/internal/usecase/interfaces"
+	"github.com/eukarya-inc/reearth-dashboard/internal/adapter/gql/gqlmodel"
+	"github.com/eukarya-inc/reearth-dashboard/internal/usecase/interfaces"
 )
 
 func (r *queryResolver) CheckPermission(ctx context.Context, input gqlmodel.CheckPermissionInput) (*gqlmodel.CheckPermissionPayload, error) {

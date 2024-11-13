@@ -8,13 +8,13 @@ import (
 
 	"github.com/cerbos/cerbos-sdk-go/cerbos"
 
+	"github.com/eukarya-inc/reearth-dashboard/internal/app"
+	infraCerbos "github.com/eukarya-inc/reearth-dashboard/internal/infrastructure/cerbos"
+	"github.com/eukarya-inc/reearth-dashboard/internal/infrastructure/memory"
+	mongorepo "github.com/eukarya-inc/reearth-dashboard/internal/infrastructure/mongo"
+	"github.com/eukarya-inc/reearth-dashboard/internal/usecase/repo"
 	httpexpect "github.com/gavv/httpexpect/v2"
 	"github.com/labstack/gommon/log"
-	"github.com/reearth/reearth-account/internal/app"
-	infraCerbos "github.com/reearth/reearth-account/internal/infrastructure/cerbos"
-	"github.com/reearth/reearth-account/internal/infrastructure/memory"
-	mongorepo "github.com/reearth/reearth-account/internal/infrastructure/mongo"
-	"github.com/reearth/reearth-account/internal/usecase/repo"
 	"github.com/reearth/reearthx/account/accountdomain/user"
 	"github.com/reearth/reearthx/account/accountinfrastructure/accountmemory"
 	"github.com/reearth/reearthx/account/accountinfrastructure/accountmongo"

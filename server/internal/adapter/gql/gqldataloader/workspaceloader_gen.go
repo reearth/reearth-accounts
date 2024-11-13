@@ -6,7 +6,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/reearth/reearth-account/internal/adapter/gql/gqlmodel"
+	"github.com/eukarya-inc/reearth-dashboard/internal/adapter/gql/gqlmodel"
 )
 
 // WorkspaceLoaderConfig captures the config to create a new WorkspaceLoader
