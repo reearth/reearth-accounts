@@ -7,9 +7,9 @@ import (
 	"os/signal"
 
 	"github.com/cerbos/cerbos-sdk-go/cerbos"
+	infraCerbos "github.com/eukarya-inc/reearth-dashboard/internal/infrastructure/cerbos"
+	"github.com/eukarya-inc/reearth-dashboard/internal/usecase/repo"
 	"github.com/labstack/echo/v4"
-	infraCerbos "github.com/reearth/reearth-account/internal/infrastructure/cerbos"
-	"github.com/reearth/reearth-account/internal/usecase/repo"
 	"github.com/reearth/reearthx/account/accountusecase/accountgateway"
 	"github.com/reearth/reearthx/account/accountusecase/accountrepo"
 	"github.com/reearth/reearthx/log"

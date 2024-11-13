@@ -1,8 +1,8 @@
 package gqlmodel
 
 import (
-	"github.com/reearth/reearth-account/pkg/permittable"
-	"github.com/reearth/reearth-account/pkg/role"
+	"github.com/eukarya-inc/reearth-dashboard/pkg/permittable"
+	"github.com/eukarya-inc/reearth-dashboard/pkg/role"
 	"github.com/reearth/reearthx/account/accountdomain/user"
 )
 

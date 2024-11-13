@@ -1,5 +1,5 @@
 run-app:
-	go run ./cmd/reearth-account
+	go run ./cmd/reearth-dashboard
 
 run-cerbos:
 	docker compose -f ../docker-compose.yml up -d reearth-cerbos

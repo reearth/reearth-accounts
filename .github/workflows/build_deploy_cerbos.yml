@@ -37,7 +37,7 @@ jobs:
   deploy-to-cloud-run:
     name: Deploy app to test env
     runs-on: ubuntu-latest
-    if: github.event.repository.full_name == 'reearth/reearth-dashboard'
+    if: github.event.repository.full_name == 'eukarya-inc/reearth-dashboard'
     steps:
       - uses: google-github-actions/auth@v0
         with:

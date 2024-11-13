@@ -1,7 +1,7 @@
 package permittable
 
 import (
-	"github.com/reearth/reearth-account/pkg/id"
+	"github.com/eukarya-inc/reearth-dashboard/pkg/id"
 )
 
 type ID = id.PermittableID

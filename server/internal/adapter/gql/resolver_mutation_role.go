@@ -3,9 +3,9 @@ package gql
 import (
 	"context"
 
-	"github.com/reearth/reearth-account/internal/adapter/gql/gqlmodel"
-	"github.com/reearth/reearth-account/internal/usecase/interfaces"
-	"github.com/reearth/reearth-account/pkg/id"
+	"github.com/eukarya-inc/reearth-dashboard/internal/adapter/gql/gqlmodel"
+	"github.com/eukarya-inc/reearth-dashboard/internal/usecase/interfaces"
+	"github.com/eukarya-inc/reearth-dashboard/pkg/id"
 )
 
 func (r *mutationResolver) AddRole(ctx context.Context, input gqlmodel.AddRoleInput) (*gqlmodel.AddRolePayload, error) {

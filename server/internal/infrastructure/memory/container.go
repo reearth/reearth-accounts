@@ -1,7 +1,7 @@
 package memory
 
 import (
-	"github.com/reearth/reearth-account/internal/usecase/repo"
+	"github.com/eukarya-inc/reearth-dashboard/internal/usecase/repo"
 	"github.com/reearth/reearthx/usecasex"
 )
 

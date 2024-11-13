@@ -3,11 +3,11 @@ package app
 import (
 	"context"
 
+	"github.com/eukarya-inc/reearth-dashboard/internal/adapter"
+	infraCerbos "github.com/eukarya-inc/reearth-dashboard/internal/infrastructure/cerbos"
+	"github.com/eukarya-inc/reearth-dashboard/internal/usecase/interactor"
+	"github.com/eukarya-inc/reearth-dashboard/internal/usecase/repo"
 	"github.com/labstack/echo/v4"
-	"github.com/reearth/reearth-account/internal/adapter"
-	infraCerbos "github.com/reearth/reearth-account/internal/infrastructure/cerbos"
-	"github.com/reearth/reearth-account/internal/usecase/interactor"
-	"github.com/reearth/reearth-account/internal/usecase/repo"
 	"github.com/reearth/reearthx/account/accountusecase/accountgateway"
 	"github.com/reearth/reearthx/account/accountusecase/accountinteractor"
 	"github.com/reearth/reearthx/account/accountusecase/accountrepo"

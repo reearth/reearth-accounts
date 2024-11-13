@@ -4,8 +4,7 @@ import (
 	"context"
 	"time"
 
-	"github.com/reearth/reearth-account/internal/usecase/interfaces"
-
+	"github.com/eukarya-inc/reearth-dashboard/internal/usecase/interfaces"
 )
 
 const (

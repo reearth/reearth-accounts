@@ -33,4 +33,4 @@ models:
   Cursor:
     model: github.com/reearth/reearthx/usecasex.Cursor
   ID:
-    model: github.com/reearth/reearth-account/internal/adapter/gql/gqlmodel.ID
+    model: github.com/eukarya-inc/reearth-dashboard/internal/adapter/gql/gqlmodel.ID

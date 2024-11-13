@@ -6,8 +6,8 @@ autonumber
 
 actor user
 participant browser
-participant accountServer as reearth-account server
-participant accountDB as reearth-account DB
+participant accountServer as reearth-dashboard server
+participant accountDB as reearth-dashboard DB
 participant cerbos as cerbos server
 participant visualizerServer as reearth-visualizer server
 participant visualizerDB as reearth-visualizer DB
