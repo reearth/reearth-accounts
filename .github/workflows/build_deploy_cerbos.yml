@@ -1,60 +1,120 @@
 name: build-deploy-cerbos
 on:
   workflow_call:
+    inputs:
+      sha_short:
+        required: true
+        type: string
+      new_tag:
+        required: true
+        type: string
+      new_tag_short:
+        required: true
+        type: string
+      name:
+        required: true
+        type: string
+      sha:
+        required: true
+        type: string
+
 concurrency:
   group: ${{ github.workflow }}-${{ github.event.workflow_run.head_branch }}
   cancel-in-progress: true
-env:
-  IMAGE_CERBOS: reearth/cerbos:nightly
-  IMAGE_GCP_CERBOS: us-central1-docker.pkg.dev/reearth-oss/reearth/cerbos:nightly
-  GCP_REGION: asia-northeast1
+
 jobs:
   build-and-push-docker-image:
     name: Build and push Docker image
     runs-on: ubuntu-latest
+    if: ${{ inputs.name != 'blank' || inputs.new_tag != 'blank' }}
+    env:
+      IMAGE_NAME: reearth/cerbos
     steps:
       - name: Checkout
         uses: actions/checkout@v3
+
       - name: Set up QEMU
         uses: docker/setup-qemu-action@v2
+
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v2
+
       - name: Login to DockerHub
         uses: docker/login-action@v2
         with:
           username: ${{ secrets.DOCKERHUB_USER }}
           password: ${{ secrets.DOCKERHUB_PASSWORD }}
+
+      - name: Determine Build Options
+        id: options
+        run: |
+          TAG="${{ inputs.new_tag_short != 'blank' && inputs.new_tag_short || '' }}"
+          NAME="${{ inputs.name }}"
+          SHA="${{ inputs.sha_short }}"
+
+          if [[ -n "$TAG" ]]; then
+            PLATFORMS="linux/amd64,linux/arm64"
+            VERSION="$TAG"
+            TAGS="$IMAGE_NAME:$TAG"
+
+            if [[ ! "$TAG" =~ '-' ]]; then
+              TAGS+=",${IMAGE_NAME}:${TAG%.*}"
+              TAGS+=",${IMAGE_NAME}:${TAG%%.*}"
+              TAGS+=",${IMAGE_NAME}:latest"
+            fi
+          else
+            PLATFORMS="linux/amd64"
+            VERSION="$SHA"
+            TAGS="$IMAGE_NAME:$NAME"
+          fi
+
+          echo "platforms=$PLATFORMS" >> $GITHUB_OUTPUT
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
+          echo "tags=$TAGS" >> $GITHUB_OUTPUT
+
       - name: Build and push Docker image for Cerbos
         uses: docker/build-push-action@v3
         with:
           context: ./cerbos
-          platforms: linux/amd64
+          platforms: ${{ steps.options.outputs.platforms }}
           load: true
-          tags: ${{ env.IMAGE_CERBOS }}
+          tags: ${{ steps.options.outputs.tags }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
           push: true
+
   deploy-to-cloud-run:
-    name: Deploy app to test env
+    name: Deploy to Cloud Run (Nightly)
+    needs:  build-and-push-docker-image
     runs-on: ubuntu-latest
-    if: github.event.repository.full_name == 'eukarya-inc/reearth-dashboard'
+    if: ${{ inputs.name == 'nightly' }}
+    env:
+      IMAGE: reearth/cerbos:nightly
+      IMAGE_GCP: us-central1-docker.pkg.dev/reearth-oss/reearth/cerbos:nightly
+      GCP_REGION: us-central1
+      CLOUD_RUN_SERVICE: cerbos
     steps:
-      - uses: google-github-actions/auth@v0
+      - name: Authenticate to Google Cloud
+        uses: google-github-actions/auth@v1
         with:
           credentials_json: ${{ secrets.GCP_SA_KEY }}
+
       - name: Set up Cloud SDK
-        uses: google-github-actions/setup-gcloud@v0
+        uses: google-github-actions/setup-gcloud@v1
+
       - name: Configure docker
         run: gcloud auth configure-docker us-central1-docker.pkg.dev --quiet
+
       - name: docker push for cerbos
         run: |
-          docker pull $IMAGE_CERBOS
-          docker tag $IMAGE_CERBOS $IMAGE_GCP_CERBOS
-          docker push $IMAGE_GCP_CERBOS
+          docker pull $IMAGE
+          docker tag $IMAGE $IMAGE_GCP
+          docker push $IMAGE_GCP
+
       - name: Deploy to Cloud Run for cerbos
         run: |
-          gcloud run deploy cerbos \
-            --image $IMAGE_GCP_CERBOS \
+          gcloud run deploy $CLOUD_RUN_SERVICE \
+            --image $IMAGE_GCP \
             --region $GCP_REGION \
             --platform managed \
             --quiet

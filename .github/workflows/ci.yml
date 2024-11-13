@@ -103,4 +103,10 @@ jobs:
       - ci-collect-info
     if: ${{ success() && needs.prepare.outputs.cerbos == 'true' && github.event_name == 'push' && (github.ref_name == 'main' || github.ref_name == 'release' || startsWith(github.ref_name, 'release/')) }}
     uses: ./.github/workflows/build_deploy_cerbos.yml
+    with:
+      sha_short: ${{ needs.ci-collect-info.outputs.sha_short }}
+      new_tag: ${{ needs.ci-collect-info.outputs.new_tag }}
+      new_tag_short: ${{ needs.ci-collect-info.outputs.new_tag_short }}
+      name: ${{ needs.ci-collect-info.outputs.name }}
+      sha: ${{ github.sha }}
     secrets: inherit
