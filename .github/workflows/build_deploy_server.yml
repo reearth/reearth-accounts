@@ -42,7 +42,7 @@ jobs:
       - name: Authenticate to Google Cloud
         uses: google-github-actions/auth@v1
         with:
-          credentials_json: ${{ secrets.GCP_SA_KEY }}
+          credentials_json: ${{ secrets.GCP_SA_KEY_REEARTH_OSS }}
 
       - name: Configure docker for GCP
         run: gcloud auth configure-docker us-central1-docker.pkg.dev --quiet
@@ -99,7 +99,7 @@ jobs:
       - name: Authenticate to Google Cloud
         uses: google-github-actions/auth@v1
         with:
-          credentials_json: ${{ secrets.GCP_SA_KEY }}
+          credentials_json: ${{ secrets.GCP_SA_KEY_REEARTH_OSS }}
 
       - name: Set up Cloud SDK
         uses: google-github-actions/setup-gcloud@v1
