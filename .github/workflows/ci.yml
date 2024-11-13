@@ -1,7 +1,7 @@
 name: ci
 on:
   push:
-    branches: [main]
+    branches: [main, release/*, release]
   pull_request:
 jobs:
   prepare:
@@ -42,17 +42,65 @@ jobs:
     if: '!failure()'
     steps:
       - run: echo OK
+  ci-collect-info:
+    name: Collect information
+    needs: ci
+    if: '!failure()'
+    runs-on: ubuntu-latest
+    outputs:
+      sha_short: ${{ steps.info.outputs.sha_short || 'blank' }}
+      new_tag: ${{ steps.info.outputs.new_tag || 'blank' }}
+      new_tag_short: ${{ steps.info.outputs.new_tag_short || 'blank' }}
+      name: ${{ steps.info.outputs.name || 'blank' }}
+    steps:
+      - name: checkout
+        uses: actions/checkout@v4
+      - name: Fetch tags
+        run: git fetch --prune --unshallow --tags
+      - name: Get info
+        id: info
+        env:
+          BRANCH: ${{github.ref_name}}
+        run: |
+          echo "sha_short=$(git rev-parse --short HEAD)" >> $GITHUB_OUTPUT
+          echo "BRANCH=$BRANCH"
+          if [[ "$BRANCH" = "release" || "$BRANCH" = "release/"* ]]; then
+            TAG=$(git tag --points-at HEAD)
+            if [[ ! -z "$TAG" ]]; then
+              echo "new_tag=$TAG" >> $GITHUB_OUTPUT
+              echo "new_tag_short=${TAG#v}" >> $GITHUB_OUTPUT
+            else
+              echo "name=rc" >> $GITHUB_OUTPUT
+            fi
+          else
+            echo "name=nightly" >> $GITHUB_OUTPUT
+          fi
+      - name: Show info
+        env:
+          SHA_SHORT: ${{ steps.info.outputs.sha_short }}
+          NEW_TAG: ${{ steps.info.outputs.new_tag }}
+          NEW_TAG_SHORT: ${{ steps.info.outputs.new_tag_short }}
+          NAME: ${{ steps.info.outputs.name }}
+        run: echo "sha_short=$SHA_SHORT, new_tag=$NEW_TAG, new_tag_short=$NEW_TAG_SHORT, name=$NAME"
   build-deploy-server:
     needs:
       - ci
       - ci-server
-    if: ${{ success() && needs.ci-server.result == 'success' && github.event_name == 'push' && github.ref_name == 'main' }}
+      - ci-collect-info
+    if: ${{ success() && needs.ci-server.result == 'success' && github.event_name == 'push' && (github.ref_name == 'main' || github.ref_name == 'release' || startsWith(github.ref_name, 'release/')) }}
     uses: ./.github/workflows/build_deploy_server.yml
+    with:
+      sha_short: ${{ needs.ci-collect-info.outputs.sha_short }}
+      new_tag: ${{ needs.ci-collect-info.outputs.new_tag }}
+      new_tag_short: ${{ needs.ci-collect-info.outputs.new_tag_short }}
+      name: ${{ needs.ci-collect-info.outputs.name }}
+      sha: ${{ github.sha }}
     secrets: inherit
   build-deploy-cerbos:
     needs:
       - prepare
       - ci
-    if: ${{ success() && github.event_name == 'push' && github.ref_name == 'main' && needs.prepare.outputs.cerbos == 'true' }}
+      - ci-collect-info
+    if: ${{ success() && needs.prepare.outputs.cerbos == 'true' && github.event_name == 'push' && (github.ref_name == 'main' || github.ref_name == 'release' || startsWith(github.ref_name, 'release/')) }}
     uses: ./.github/workflows/build_deploy_cerbos.yml
     secrets: inherit
