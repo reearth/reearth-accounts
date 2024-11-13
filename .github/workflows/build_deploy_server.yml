@@ -28,7 +28,7 @@ jobs:
     runs-on: ubuntu-latest
     if: ${{ inputs.name != 'blank' || inputs.new_tag != 'blank' }}
     env:
-      IMAGE_NAME: reearth/reearth-dashboard-api
+      IMAGE_NAME: us-central1-docker.pkg.dev/reearth-oss/reearth/reearth-dashboard-api
     steps:
       - name: Checkout
         uses: actions/checkout@v3
@@ -39,11 +39,13 @@ jobs:
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v2
 
-      - name: Login to DockerHub
-        uses: docker/login-action@v2
+      - name: Authenticate to Google Cloud
+        uses: google-github-actions/auth@v1
         with:
-          username: ${{ secrets.DOCKERHUB_USER }}
-          password: ${{ secrets.DOCKERHUB_PASSWORD }}
+          credentials_json: ${{ secrets.GCP_SA_KEY }}
+
+      - name: Configure docker for GCP
+        run: gcloud auth configure-docker us-central1-docker.pkg.dev --quiet
 
       - name: Determine Build Options
         id: options
@@ -90,8 +92,7 @@ jobs:
     runs-on: ubuntu-latest
     if: ${{ inputs.name == 'nightly' }}
     env:
-      IMAGE: reearth/reearth-dashboard-api:nightly
-      IMAGE_GCP: us-central1-docker.pkg.dev/reearth-oss/reearth/reearth-dashboard-api:nightly
+      IMAGE: us-central1-docker.pkg.dev/reearth-oss/reearth/reearth-dashboard-api:nightly
       GCP_REGION: us-central1
       CLOUD_RUN_SERVICE: reearth-dashboard-api
     steps:
@@ -106,16 +107,10 @@ jobs:
       - name: Configure docker
         run: gcloud auth configure-docker us-central1-docker.pkg.dev --quiet
 
-      - name: docker push for dashboard api
-        run: |
-          docker pull $IMAGE
-          docker tag $IMAGE $IMAGE_GCP
-          docker push $IMAGE_GCP
-
       - name: Deploy to Cloud Run for dashboard api
         run: |
           gcloud run deploy $CLOUD_RUN_SERVICE \
-            --image $IMAGE_GCP \
+            --image $IMAGE \
             --region $GCP_REGION \
             --platform managed \
             --quiet
