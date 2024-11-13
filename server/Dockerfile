@@ -4,22 +4,22 @@ ARG VERSION
 
 RUN apk add --update --no-cache git ca-certificates build-base
 
-WORKDIR /reearth-dashboard
+WORKDIR /reearth-dashboard-api
 
-COPY go.mod go.sum main.go /reearth-dashboard/
+COPY go.mod go.sum main.go /reearth-dashboard-api/
 RUN go mod download
 
-COPY cmd/ /reearth-dashboard/cmd/
-COPY pkg/ /reearth-dashboard/pkg/
-COPY internal/ /reearth-dashboard/internal/
+COPY cmd/ /reearth-dashboard-api/cmd/
+COPY pkg/ /reearth-dashboard-api/pkg/
+COPY internal/ /reearth-dashboard-api/internal/
 
-RUN CGO_ENABLED=0 go build -tags "${TAG}" "-ldflags=-X main.version=${VERSION} -s -w -buildid=" -trimpath ./cmd/reearth-dashboard
+RUN CGO_ENABLED=0 go build -o reearth-dashboard-api -tags "${TAG}" "-ldflags=-X main.version=${VERSION} -s -w -buildid=" -trimpath ./cmd/reearth-dashboard
 
 FROM scratch
 
 COPY --from=build /etc/ssl/certs/ca-certificates.crt /etc/ssl/certs/ca-certificates.crt
-COPY --from=build /reearth-dashboard/reearth-dashboard /reearth-dashboard/reearth-dashboard
+COPY --from=build /reearth-dashboard-api/reearth-dashboard-api /reearth-dashboard-api/reearth-dashboard-api
 
-WORKDIR /reearth-dashboard
+WORKDIR /reearth-dashboard-api
 
-CMD ["./reearth-dashboard"]
+CMD ["./reearth-dashboard-api"]
