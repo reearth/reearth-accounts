@@ -3,12 +3,23 @@ on:
   push:
     branches: [main, release/*, release]
   pull_request:
+  workflow_dispatch:
+    inputs:
+      force_deploy_server:
+        description: 'Force server deploy'
+        type: boolean
+        default: false
+      force_deploy_cerbos:
+        description: 'Force cerbos deploy'
+        type: boolean
+        default: false
+
 jobs:
   prepare:
     runs-on: ubuntu-latest
     outputs:
-      server: ${{ steps.server.outputs.any_changed }}
-      cerbos: ${{ steps.cerbos.outputs.any_changed }}
+      server: ${{ steps.server.outputs.any_changed || inputs.force_deploy_server }}
+      cerbos: ${{ steps.cerbos.outputs.any_changed || inputs.force_deploy_cerbos }}
     steps:
       - uses: actions/checkout@v3
         with:
@@ -84,10 +95,17 @@ jobs:
         run: echo "sha_short=$SHA_SHORT, new_tag=$NEW_TAG, new_tag_short=$NEW_TAG_SHORT, name=$NAME"
   build-deploy-server:
     needs:
+      - prepare
       - ci
       - ci-server
       - ci-collect-info
-    if: ${{ success() && needs.ci-server.result == 'success' && github.event_name == 'push' && (github.ref_name == 'main' || github.ref_name == 'release' || startsWith(github.ref_name, 'release/')) }}
+    if: |
+      success() &&
+      needs.ci-server.result == 'success' &&
+      (
+        (github.event_name == 'push' && (github.ref_name == 'main' || github.ref_name == 'release' || startsWith(github.ref_name, 'release/'))) ||
+        (github.event_name == 'workflow_dispatch' && needs.prepare.outputs.server == 'true')
+      )
     uses: ./.github/workflows/build_deploy_server.yml
     with:
       sha_short: ${{ needs.ci-collect-info.outputs.sha_short }}
@@ -101,7 +119,12 @@ jobs:
       - prepare
       - ci
       - ci-collect-info
-    if: ${{ success() && needs.prepare.outputs.cerbos == 'true' && github.event_name == 'push' && (github.ref_name == 'main' || github.ref_name == 'release' || startsWith(github.ref_name, 'release/')) }}
+    if: |
+      success() &&
+      (
+        (needs.prepare.outputs.cerbos == 'true' && github.event_name == 'push' && (github.ref_name == 'main' || github.ref_name == 'release' || startsWith(github.ref_name, 'release/'))) ||
+        (github.event_name == 'workflow_dispatch' && needs.prepare.outputs.cerbos == 'true')
+      )
     uses: ./.github/workflows/build_deploy_cerbos.yml
     with:
       sha_short: ${{ needs.ci-collect-info.outputs.sha_short }}
