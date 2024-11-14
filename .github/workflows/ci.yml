@@ -41,6 +41,10 @@ jobs:
             cerbos/**
             .github/workflows/ci.yml
             .github/workflows/build_deploy_cerbos.yml
+      - name: Check server output
+        run: echo "server=${{ steps.server.outputs.any_changed || inputs.force_deploy_server }}"
+      - name: Check cerbos output
+        run: echo "cerbos=${{ steps.cerbos.outputs.any_changed || inputs.force_deploy_cerbos }}"
   ci-server:
     needs: prepare
     if: needs.prepare.outputs.server == 'true'
