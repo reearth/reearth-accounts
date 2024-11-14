@@ -1,0 +1,3 @@
+server:
+  httpListenAddr: ":3593"
+  grpcListenAddr: ":3593"
