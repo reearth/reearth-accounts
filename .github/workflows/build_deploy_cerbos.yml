@@ -113,5 +113,4 @@ jobs:
             --region $GCP_REGION \
             --platform managed \
             --port 3593 \
-            --set-env-vars="CERBOS_SERVER_HTTP_LISTEN_ADDR=:3593" \
             --quiet
