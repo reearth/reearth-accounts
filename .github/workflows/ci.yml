@@ -45,6 +45,8 @@ jobs:
         run: echo "server=${{ steps.server.outputs.any_changed || inputs.force_deploy_server }}"
       - name: Check cerbos output
         run: echo "cerbos=${{ steps.cerbos.outputs.any_changed || inputs.force_deploy_cerbos }}"
+      - name: Check event_name
+        run: echo "event_name=${{ github.event_name }}"
   ci-server:
     needs: prepare
     if: needs.prepare.outputs.server == 'true'
