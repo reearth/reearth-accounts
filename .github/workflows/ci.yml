@@ -106,7 +106,7 @@ jobs:
       - ci-server
       - ci-collect-info
     if: |
-      success() &&
+      !failure() &&
       needs.ci-server.result == 'success' &&
       (
         (github.event_name == 'push' && (github.ref_name == 'main' || github.ref_name == 'release' || startsWith(github.ref_name, 'release/'))) ||
@@ -126,7 +126,7 @@ jobs:
       - ci
       - ci-collect-info
     if: |
-      success() &&
+      !failure() &&
       (
         (needs.prepare.outputs.cerbos == 'true' && github.event_name == 'push' && (github.ref_name == 'main' || github.ref_name == 'release' || startsWith(github.ref_name, 'release/'))) ||
         (github.event_name == 'workflow_dispatch' && needs.prepare.outputs.cerbos == 'true')
