@@ -112,4 +112,5 @@ jobs:
             --image $IMAGE \
             --region $GCP_REGION \
             --platform managed \
+            --port 3593 \
             --quiet

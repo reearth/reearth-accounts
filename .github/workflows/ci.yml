@@ -18,8 +18,8 @@ jobs:
   prepare:
     runs-on: ubuntu-latest
     outputs:
-      server: ${{ steps.server.outputs.any_changed || inputs.force_deploy_server }}
-      cerbos: ${{ steps.cerbos.outputs.any_changed || inputs.force_deploy_cerbos }}
+      server: ${{ steps.server.outputs.any_changed }}
+      cerbos: ${{ steps.cerbos.outputs.any_changed }}
     steps:
       - uses: actions/checkout@v3
         with:
@@ -41,6 +41,10 @@ jobs:
             cerbos/**
             .github/workflows/ci.yml
             .github/workflows/build_deploy_cerbos.yml
+      - name: Check server output
+        run: echo "server=${{ steps.server.outputs.any_changed }}"
+      - name: Check cerbos output
+        run: echo "cerbos=${{ steps.cerbos.outputs.any_changed }}"
   ci-server:
     needs: prepare
     if: needs.prepare.outputs.server == 'true'
@@ -100,11 +104,11 @@ jobs:
       - ci-server
       - ci-collect-info
     if: |
-      success() &&
+      !failure() &&
       needs.ci-server.result == 'success' &&
       (
         (github.event_name == 'push' && (github.ref_name == 'main' || github.ref_name == 'release' || startsWith(github.ref_name, 'release/'))) ||
-        (github.event_name == 'workflow_dispatch' && needs.prepare.outputs.server == 'true')
+        inputs.force_deploy_server
       )
     uses: ./.github/workflows/build_deploy_server.yml
     with:
@@ -120,10 +124,10 @@ jobs:
       - ci
       - ci-collect-info
     if: |
-      success() &&
+      !failure() &&
       (
         (needs.prepare.outputs.cerbos == 'true' && github.event_name == 'push' && (github.ref_name == 'main' || github.ref_name == 'release' || startsWith(github.ref_name, 'release/'))) ||
-        (github.event_name == 'workflow_dispatch' && needs.prepare.outputs.cerbos == 'true')
+        inputs.force_deploy_cerbos
       )
     uses: ./.github/workflows/build_deploy_cerbos.yml
     with:
