@@ -15,5 +15,6 @@ type Container struct {
 	Workspace   accountinterfaces.Workspace
 	Cerbos      Cerbos
 	Role        Role
+	Group       Group
 	Permittable Permittable
 }
