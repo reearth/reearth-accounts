@@ -28,7 +28,7 @@ func Start(debug bool) {
 	log.Infof("config: %s", conf.Print())
 
 	// Init repositories
-	repos, accountRepos, gateways := initReposAndGateways(ctx, conf, debug)
+	repos, accountRepos, gateways := initReposAndGateways(ctx, conf)
 
 	// Cerbos
 	cerbosClient, err := cerbos.New(conf.CerbosHost, cerbos.WithPlaintext())
