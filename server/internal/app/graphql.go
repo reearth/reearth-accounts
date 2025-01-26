@@ -77,7 +77,7 @@ func GraphqlAPI(conf GraphQLConfig, dev bool) echo.HandlerFunc {
 func gqlErrorPresenter(dev bool) graphql.ErrorPresenterFunc {
 	return func(ctx context.Context, e error) *gqlerror.Error {
 		if dev {
-			return gqlerror.ErrorPathf(graphql.GetFieldContext(ctx).Path(), e.Error())
+			return gqlerror.ErrorPathf(graphql.GetFieldContext(ctx).Path(), "%s", e.Error())
 		}
 
 		return graphql.DefaultErrorPresenter(ctx, e)
