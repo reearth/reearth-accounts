@@ -1,0 +1,43 @@
+type Group {
+  id: ID!
+  name: String!
+}
+
+type GroupsPayload {
+  groups: [Group!]!
+}
+
+input AddGroupInput {
+  name: String!
+}
+
+input UpdateGroupInput {
+  id: ID!
+  name: String!
+}
+
+input RemoveGroupInput {
+  id: ID!
+}
+
+type AddGroupPayload {
+  group: Group!
+}
+
+type UpdateGroupPayload {
+  group: Group!
+}
+
+type RemoveGroupPayload {
+  id: ID!
+}
+
+extend type Query {
+  groups: GroupsPayload!
+}
+
+extend type Mutation {
+  addGroup(input: AddGroupInput!): AddGroupPayload
+  updateGroup(input: UpdateGroupInput!): UpdateGroupPayload
+  removeGroup(input: RemoveGroupInput!): RemoveGroupPayload
+}

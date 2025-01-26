@@ -17,6 +17,14 @@ type WorkspaceMember interface {
 	IsWorkspaceMember()
 }
 
+type AddGroupInput struct {
+	Name string `json:"name"`
+}
+
+type AddGroupPayload struct {
+	Group *Group `json:"group"`
+}
+
 type AddIntegrationToWorkspaceInput struct {
 	WorkspaceID   ID   `json:"workspaceId"`
 	IntegrationID ID   `json:"integrationId"`
@@ -78,6 +86,15 @@ type GetUsersWithRolesPayload struct {
 	UsersWithRoles []*UserWithRoles `json:"usersWithRoles"`
 }
 
+type Group struct {
+	ID   ID     `json:"id"`
+	Name string `json:"name"`
+}
+
+type GroupsPayload struct {
+	Groups []*Group `json:"groups"`
+}
+
 type Me struct {
 	ID            ID           `json:"id"`
 	Name          string       `json:"name"`
@@ -105,6 +122,14 @@ type Permittable struct {
 }
 
 type Query struct {
+}
+
+type RemoveGroupInput struct {
+	ID ID `json:"id"`
+}
+
+type RemoveGroupPayload struct {
+	ID ID `json:"id"`
 }
 
 type RemoveIntegrationFromWorkspaceInput struct {
@@ -140,6 +165,15 @@ type RoleForAuthorization struct {
 
 type RolesPayload struct {
 	Roles []*RoleForAuthorization `json:"roles"`
+}
+
+type UpdateGroupInput struct {
+	ID   ID     `json:"id"`
+	Name string `json:"name"`
+}
+
+type UpdateGroupPayload struct {
+	Group *Group `json:"group"`
 }
 
 type UpdateIntegrationOfWorkspaceInput struct {
