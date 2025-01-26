@@ -1,6 +1,6 @@
 module github.com/eukarya-inc/reearth-dashboard
 
-go 1.20
+go 1.23.5
 
 require (
 	github.com/99designs/gqlgen v0.17.49
