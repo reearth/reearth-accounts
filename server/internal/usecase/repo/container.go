@@ -6,6 +6,7 @@ import (
 
 type Container struct {
 	Role        Role
+	Group       Group
 	Permittable Permittable
 	Transaction usecasex.Transaction
 }
