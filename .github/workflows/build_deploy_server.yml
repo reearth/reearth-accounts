@@ -116,7 +116,7 @@ jobs:
       - name: Tag docker image for Google Cloud Artifact Registry
         run: docker tag $IMAGE_NAME_GHCR $IMAGE_NAME_GAR
 
-      - name: Push docker images
+      - name: Push docker image to Google Cloud Artifact Registry
         run: docker push $IMAGE_NAME_GAR
 
       - name: Deploy to Cloud Run for dashboard api (Nightly)
