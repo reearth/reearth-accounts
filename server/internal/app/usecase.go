@@ -4,7 +4,7 @@ import (
 	"context"
 
 	"github.com/eukarya-inc/reearth-dashboard/internal/adapter"
-	infraCerbos "github.com/eukarya-inc/reearth-dashboard/internal/infrastructure/cerbos"
+	"github.com/eukarya-inc/reearth-dashboard/internal/usecase/gateway"
 	"github.com/eukarya-inc/reearth-dashboard/internal/usecase/interactor"
 	"github.com/eukarya-inc/reearth-dashboard/internal/usecase/repo"
 	"github.com/labstack/echo/v4"
@@ -18,7 +18,7 @@ func UsecaseMiddleware(
 	acr *accountrepo.Container,
 	acg *accountgateway.Container,
 	enforcer accountinteractor.WorkspaceMemberCountEnforcer,
-	cerbosAdapter *infraCerbos.CerbosAdapter,
+	cerbosAdapter gateway.CerbosGateway,
 	config interactor.ContainerConfig) echo.MiddlewareFunc {
 	return ContextMiddleware(func(ctx context.Context) context.Context {
 		var acr2 *accountrepo.Container

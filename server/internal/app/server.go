@@ -8,6 +8,7 @@ import (
 
 	"github.com/cerbos/cerbos-sdk-go/cerbos"
 	infraCerbos "github.com/eukarya-inc/reearth-dashboard/internal/infrastructure/cerbos"
+	"github.com/eukarya-inc/reearth-dashboard/internal/usecase/gateway"
 	"github.com/eukarya-inc/reearth-dashboard/internal/usecase/repo"
 	"github.com/labstack/echo/v4"
 	"github.com/reearth/reearthx/account/accountusecase/accountgateway"
@@ -59,7 +60,7 @@ type ServerConfig struct {
 	Repos         *repo.Container
 	AccountRepos  *accountrepo.Container
 	Gateways      *accountgateway.Container
-	CerbosAdapter *infraCerbos.CerbosAdapter
+	CerbosAdapter gateway.CerbosGateway
 }
 
 func NewServer(ctx context.Context, cfg *ServerConfig) *WebServer {

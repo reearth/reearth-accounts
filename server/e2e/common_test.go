@@ -12,6 +12,7 @@ import (
 	infraCerbos "github.com/eukarya-inc/reearth-dashboard/internal/infrastructure/cerbos"
 	"github.com/eukarya-inc/reearth-dashboard/internal/infrastructure/memory"
 	mongorepo "github.com/eukarya-inc/reearth-dashboard/internal/infrastructure/mongo"
+	"github.com/eukarya-inc/reearth-dashboard/internal/usecase/gateway"
 	"github.com/eukarya-inc/reearth-dashboard/internal/usecase/repo"
 	httpexpect "github.com/gavv/httpexpect/v2"
 	"github.com/labstack/gommon/log"
@@ -93,11 +94,14 @@ func StartServerWithRepos(
 	}
 
 	// Cerbos
-	cerbosClient, err := cerbos.New(cfg.CerbosHost, cerbos.WithPlaintext())
-	if err != nil {
-		log.Fatalf("Failed to create cerbos client: %v", err)
+	var cerbosAdapter gateway.CerbosGateway
+	if cfg.CerbosHost != "" {
+		cerbosClient, err := cerbos.New(cfg.CerbosHost, cerbos.WithPlaintext())
+		if err != nil {
+			log.Fatalf("Failed to create cerbos client: %v", err)
+		}
+		cerbosAdapter = infraCerbos.NewCerbosAdapter(cerbosClient)
 	}
-	cerbosAdapter := infraCerbos.NewCerbosAdapter(cerbosClient)
 
 	srv := app.NewServer(ctx, &app.ServerConfig{
 		Config:       cfg,

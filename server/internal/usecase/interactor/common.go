@@ -4,7 +4,6 @@ import (
 	"context"
 
 	"github.com/cerbos/cerbos-sdk-go/cerbos"
-	infraCerbos "github.com/eukarya-inc/reearth-dashboard/internal/infrastructure/cerbos"
 	"github.com/eukarya-inc/reearth-dashboard/internal/usecase/gateway"
 	"github.com/eukarya-inc/reearth-dashboard/internal/usecase/interfaces"
 	"github.com/eukarya-inc/reearth-dashboard/internal/usecase/repo"
@@ -23,7 +22,7 @@ func NewContainer(
 	acr *accountrepo.Container,
 	acg *accountgateway.Container,
 	enforcer accountinteractor.WorkspaceMemberCountEnforcer,
-	cerbosAdapter *infraCerbos.CerbosAdapter,
+	cerbosAdapter gateway.CerbosGateway,
 	config ContainerConfig) interfaces.Container {
 	return interfaces.Container{
 		User:        accountinteractor.NewUser(acr, acg, config.SignupSecret, config.AuthSrvUIDomain),
