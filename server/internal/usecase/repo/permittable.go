@@ -8,6 +8,7 @@ import (
 	"github.com/reearth/reearthx/account/accountdomain/user"
 )
 
+//go:generate mockgen -source=./permittable.go -destination=./mock_repo/mock_permittable.go -package mock_repo
 type Permittable interface {
 	FindByUserID(context.Context, user.ID) (*permittable.Permittable, error)
 	FindByUserIDs(context.Context, user.IDList) (permittable.List, error)
