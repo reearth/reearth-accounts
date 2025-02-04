@@ -4,6 +4,7 @@
 schema:
   - ./schemas/_shared.graphql
   - ./schemas/cerbos.graphql
+  - ./schemas/group.graphql
   - ./schemas/role.graphql
   - ./schemas/permittable.graphql
   - ./schemas/user.graphql
