@@ -7,17 +7,22 @@ jobs:
   ci-server-lint:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v3
-      - uses: actions/setup-go@v4
+      - name: checkout
+        uses: actions/checkout@v3
+
+      - name: setup go
+        uses: actions/setup-go@v4
         with:
           go-version: ${{ env.GO_VERSION }}
           cache: false
+
       - name: golangci-lint
         uses: golangci/golangci-lint-action@v6
         with:
           version: v1.63.4
           working-directory: server
           args: --timeout=5m
+
   ci-server-test:
     runs-on: ubuntu-latest
     services:
@@ -26,8 +31,11 @@ jobs:
         ports:
           - 27017:27017
     steps:
-      - uses: actions/checkout@v3
-      - uses: actions/setup-go@v4
+      - name: checkout
+        uses: actions/checkout@v3
+
+      - name: setup go
+        uses: actions/setup-go@v4
         with:
           go-version: ${{ env.GO_VERSION }}
           cache-dependency-path: server/go.sum
