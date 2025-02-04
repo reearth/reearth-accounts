@@ -54,7 +54,6 @@ func TestPermittableDocument_NewPermittableConsumer(t *testing.T) {
 	}
 
 	for _, tc := range tests {
-		tc := tc
 		t.Run(tc.name, func(t *testing.T) {
 			t.Parallel()
 			c := NewPermittableConsumer()
@@ -106,7 +105,6 @@ func TestPermittableDocument_NewPermittable(t *testing.T) {
 	}
 
 	for _, tc := range tests {
-		tc := tc
 		t.Run(tc.name, func(t *testing.T) {
 			t.Parallel()
 			got, got1 := NewPermittable(tc.args.p)
@@ -180,7 +178,6 @@ func TestPermittableDocument_Model(t *testing.T) {
 	}
 
 	for _, tc := range tests {
-		tc := tc
 		t.Run(tc.name, func(t *testing.T) {
 			r, err := tc.doc.Model()
 

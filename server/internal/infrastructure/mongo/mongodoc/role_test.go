@@ -51,7 +51,6 @@ func TestRoleDocument_NewRoleConsumer(t *testing.T) {
 	}
 
 	for _, tc := range tests {
-		tc := tc
 		t.Run(tc.name, func(t *testing.T) {
 			t.Parallel()
 			c := NewRoleConsumer()
@@ -98,7 +97,6 @@ func TestRoleDocument_NewRole(t *testing.T) {
 	}
 
 	for _, tc := range tests {
-		tc := tc
 		t.Run(tc.name, func(t *testing.T) {
 			t.Parallel()
 			got, got1 := NewRole(tc.args.r)
@@ -138,7 +136,6 @@ func TestRoleDocument_Model(t *testing.T) {
 	}
 
 	for _, tc := range tests {
-		tc := tc
 		t.Run(tc.name, func(t *testing.T) {
 			r, err := tc.doc.Model()
 

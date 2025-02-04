@@ -2,9 +2,8 @@ package memory
 
 import (
 	"context"
+	"slices"
 	"sync"
-
-	"golang.org/x/exp/slices"
 
 	"github.com/eukarya-inc/reearth-dashboard/pkg/id"
 	"github.com/eukarya-inc/reearth-dashboard/pkg/permittable"

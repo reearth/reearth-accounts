@@ -20,7 +20,7 @@ import (
 
 const databaseName = "reearth-account"
 
-func initReposAndGateways(ctx context.Context, conf *Config, debug bool) (*repo.Container, *accountrepo.Container, *accountgateway.Container) {
+func initReposAndGateways(ctx context.Context, conf *Config) (*repo.Container, *accountrepo.Container, *accountgateway.Container) {
 	// Mongo
 	client, err := mongo.Connect(
 		ctx,

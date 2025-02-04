@@ -58,7 +58,6 @@ func TestBuilder_Build(t *testing.T) {
 	}
 
 	for _, tt := range tests {
-		tt := tt
 		t.Run(tt.Name, func(t *testing.T) {
 			t.Parallel()
 			res, err := New().
@@ -119,7 +118,6 @@ func TestBuilder_MustBuild(t *testing.T) {
 	}
 
 	for _, tt := range tests {
-		tt := tt
 		t.Run(tt.Name, func(t *testing.T) {
 			t.Parallel()
 
