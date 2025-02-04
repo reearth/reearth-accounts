@@ -39,10 +39,23 @@ func checkPermission(e *httpexpect.Expect, service string, resource string, acti
 }
 
 func TestCheckPermission(t *testing.T) {
-	// check permission with no permittable
+	// Start Cerbos container
+	cerbosContainer, err := newCerbosContainer()
+	if err != nil {
+		t.Fatalf("failed to start cerbos container: %v", err)
+	}
+	defer func() {
+		if err := cerbosContainer.terminate(); err != nil {
+			t.Errorf("failed to terminate container: %v", err)
+		}
+	}()
+
+	// Start server
 	e, _ := StartServer(t, &app.Config{
-		CerbosHost: "localhost:3593",
+		CerbosHost: cerbosContainer.getAddress(),
 	}, true, baseSeederOneUser)
+
+	// check permission with no permittable
 	_, res1 := checkPermission(e, "service", "resource", "read")
 	res1.Object().
 		Value("data").Object().
@@ -51,8 +64,7 @@ func TestCheckPermission(t *testing.T) {
 
 	// Add role and permittable
 	_, _, roleId1 := addRole(e, "role1")
-	_, _, roleId2 := addRole(e, "role2")
-	_, _, _ = updatePermittable(e, uId.String(), []string{roleId1, roleId2})
+	_, _, _ = updatePermittable(e, uId.String(), []string{roleId1})
 
 	// check permission with permittable
 	_, res2 := checkPermission(e, "service", "resource", "read")

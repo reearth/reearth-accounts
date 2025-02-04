@@ -45,7 +45,7 @@ type Config struct {
 	Published_Host string
 
 	// cerbos
-	CerbosHost string `default:"localhost:3593" envconfig:"CERBOS_HOST" `
+	CerbosHost string `envconfig:"CERBOS_HOST"`
 }
 
 type AuthConfig struct {

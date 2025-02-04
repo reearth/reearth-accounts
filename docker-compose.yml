@@ -1,8 +1,8 @@
 services:
   reearth-cerbos:
-    image: ghcr.io/cerbos/cerbos:0.36.0
+    image: cerbos/cerbos:0.40.0
+    command: server --config=/policies/.cerbos.yaml
     ports:
-      - 3592:3592
       - 3593:3593
     volumes:
-      - ./policies:/policies
+      - ./server/e2e/testdata/policies:/policies
