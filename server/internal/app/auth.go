@@ -17,7 +17,7 @@ const debugUserHeader = "X-Reearth-Debug-User"
 type authInfoKey struct{}
 
 func authMiddleware(cfg *ServerConfig) func(http.Handler) http.Handler {
-	return appx.ContextMiddlewareBy(func(req *http.Request) context.Context {
+	return appx.ContextMiddlewareBy(func(w http.ResponseWriter, req *http.Request) context.Context {
 		ctx := req.Context()
 
 		var usr *user.User
