@@ -33,7 +33,6 @@ jobs:
     steps:
       - name: checkout
         uses: actions/checkout@v4
-
       - name: setup go
         uses: actions/setup-go@v5
         with:
@@ -44,3 +43,10 @@ jobs:
         run: go test ./... -v -race
         env:
           REEARTH_DB: mongodb://localhost
+      - name: Run go generate
+        run: |
+          make generate
+        working-directory: server
+      - name: Check for changes in generated files
+        run: |
+          git diff --exit-code
