@@ -12,6 +12,11 @@ help:
 	@echo "  gql               Generate GraphQL code include dataloader"
 	@echo "  generate          Run go generate"
 
+TARGET_TEST :=./...
+REEARTH_DB := mongodb://localhost
+test:
+	REEARTH_DB=${REEARTH_DB} go test ./... -run ${TARGET_TEST}
+
 AIR_BIN := $(shell which air)
 MOCKGEN_BIN := $(shell which mockgen)
 dev-install:

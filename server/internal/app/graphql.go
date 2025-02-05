@@ -14,6 +14,7 @@ import (
 
 	"github.com/labstack/echo/v4"
 	"github.com/ravilushqa/otelgqlgen"
+	"github.com/vektah/gqlparser/v2/ast"
 	"github.com/vektah/gqlparser/v2/gqlerror"
 )
 
@@ -39,25 +40,20 @@ func GraphqlAPI(conf GraphQLConfig, dev bool) echo.HandlerFunc {
 		MaxUploadSize: maxUploadSize,
 		MaxMemory:     maxMemorySize,
 	})
-	srv.SetQueryCache(lru.New(1000))
-	srv.Use(extension.Introspection{})
-	srv.Use(extension.AutomaticPersistedQuery{
-		Cache: lru.New(100),
-	})
-
+	srv.SetQueryCache(lru.New[*ast.QueryDocument](1000))
 	srv.Use(otelgqlgen.Middleware())
 
 	if conf.ComplexityLimit > 0 {
 		srv.Use(extension.FixedComplexityLimit(conf.ComplexityLimit))
 	}
 
+	srv.Use(extension.AutomaticPersistedQuery{
+		Cache: lru.New[string](30),
+	})
+
 	if dev {
 		srv.Use(extension.Introspection{})
 	}
-
-	srv.Use(extension.AutomaticPersistedQuery{
-		Cache: lru.New(30),
-	})
 
 	return func(c echo.Context) error {
 		req := c.Request()
