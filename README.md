@@ -1,6 +1,3 @@
-# reearth-dashboard
+# reearth-accounts 
 
-- Dashboard Screen
 - Account management
-- Permission management
-- Billing management
