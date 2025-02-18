@@ -31,6 +31,15 @@ func Start(debug bool) {
 	// Init repositories
 	repos, accountRepos, gateways := initReposAndGateways(ctx, conf)
 
+	// Check if migration mode
+	// Once the permission check migration is complete, it will be deleted.
+	if os.Getenv("RUN_MIGRATION") == "true" {
+		if err := runMigration(ctx, conf, repos, accountRepos); err != nil {
+			log.Fatal(err)
+		}
+		return
+	}
+
 	// Cerbos
 	cerbosClient, err := cerbos.New(conf.CerbosHost, cerbos.WithPlaintext())
 	if err != nil {
