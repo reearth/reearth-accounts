@@ -8,9 +8,11 @@ import (
 	"github.com/eukarya-inc/reearth-dashboard/pkg/id"
 	"github.com/eukarya-inc/reearth-dashboard/pkg/permittable"
 	"github.com/eukarya-inc/reearth-dashboard/pkg/role"
+	"github.com/reearth/reearthx/account/accountdomain/user"
 	"github.com/reearth/reearthx/account/accountdomain/workspace"
 	"github.com/reearth/reearthx/account/accountusecase/accountrepo"
 	"github.com/reearth/reearthx/log"
+	"github.com/reearth/reearthx/rerror"
 )
 
 func runMigration(ctx context.Context, conf *Config, repos *repo.Container, acRepos *accountrepo.Container) error {
@@ -91,7 +93,12 @@ func processWorkspaceMembers(ctx context.Context, repos *repo.Container, w *work
 
 	// Process integrations
 	for _, integrationID := range members.IntegrationIDs() {
-		if err := ensureMaintainerRole(ctx, repos, integrationID, maintainerRoleID); err != nil {
+		userID, err := user.IDFrom(integrationID.String())
+		if err != nil {
+			log.Errorf("Failed to process integration %s: %v", integrationID, err)
+			continue
+		}
+		if err := ensureMaintainerRole(ctx, repos, userID, maintainerRoleID); err != nil {
 			log.Errorf("Failed to process integration %s: %v", integrationID, err)
 		}
 	}
@@ -99,17 +106,13 @@ func processWorkspaceMembers(ctx context.Context, repos *repo.Container, w *work
 	return nil
 }
 
-func ensureMaintainerRole(ctx context.Context, repos *repo.Container, userOrIntegrationID any, maintainerRoleID role.ID) error {
+func ensureMaintainerRole(ctx context.Context, repos *repo.Container, userID user.ID, maintainerRoleID role.ID) error {
 	var p *permittable.Permittable
 	var err error
 
-	switch id := userOrIntegrationID.(type) {
-	case workspace.UserID:
-		p, err = repos.Permittable.FindByUserID(ctx, id)
-	case workspace.IntegrationID:
-		p, err = repos.Permittable.FindByIntegrationID(ctx, id)
-	default:
-		return fmt.Errorf("unsupported type: %T", userOrIntegrationID)
+	p, err = repos.Permittable.FindByUserID(ctx, userID)
+	if err != nil && err != rerror.ErrNotFound {
+		return err
 	}
 
 	if hasRole(p, maintainerRoleID) {
@@ -117,18 +120,11 @@ func ensureMaintainerRole(ctx context.Context, repos *repo.Container, userOrInte
 	}
 
 	if p == nil {
-		builder := permittable.New().
+		p, err = permittable.New().
 			NewID().
-			RoleIDs([]id.RoleID{maintainerRoleID})
-
-		switch id := userOrIntegrationID.(type) {
-		case workspace.UserID:
-			builder.UserID(id)
-		case workspace.IntegrationID:
-			builder.IntegrationID(id)
-		}
-
-		p, err = builder.Build()
+			UserID(userID).
+			RoleIDs([]id.RoleID{maintainerRoleID}).
+			Build()
 		if err != nil {
 			return err
 		}
