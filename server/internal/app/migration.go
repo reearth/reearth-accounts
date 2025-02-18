@@ -15,7 +15,7 @@ import (
 	"github.com/reearth/reearthx/rerror"
 )
 
-func runMigration(ctx context.Context, conf *Config, repos *repo.Container, acRepos *accountrepo.Container) error {
+func runMigration(ctx context.Context, repos *repo.Container, acRepos *accountrepo.Container) error {
 	log.Info("Starting migration...")
 
 	// check and create maintainer role

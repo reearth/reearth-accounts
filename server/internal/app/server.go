@@ -34,7 +34,7 @@ func Start(debug bool) {
 	// Check if migration mode
 	// Once the permission check migration is complete, it will be deleted.
 	if os.Getenv("RUN_MIGRATION") == "true" {
-		if err := runMigration(ctx, conf, repos, accountRepos); err != nil {
+		if err := runMigration(ctx, repos, accountRepos); err != nil {
 			log.Fatal(err)
 		}
 		return
