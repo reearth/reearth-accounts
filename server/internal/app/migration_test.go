@@ -95,7 +95,10 @@ func TestRunMigration(t *testing.T) {
 			name: "should not duplicate maintainer role when it already exists",
 			setup: func(ctx context.Context, repos *repo.Container, acRepos *accountrepo.Container) {
 				existingRole, _ := role.New().NewID().Name("maintainer").Build()
-				repos.Role.Save(ctx, *existingRole)
+				err = repos.Role.Save(ctx, *existingRole)
+				if err != nil {
+					t.Fatal(err)
+				}
 
 				userRepo := accountrepo.NewMultiUser(accountmemory.NewUserWith(u1, u2, u3))
 				workspaceRepo := accountmemory.NewWorkspaceWith(w1, w2)
@@ -110,14 +113,20 @@ func TestRunMigration(t *testing.T) {
 			name: "should not add maintainer role if user already has it",
 			setup: func(ctx context.Context, repos *repo.Container, acRepos *accountrepo.Container) {
 				existingRole, _ := role.New().NewID().Name("maintainer").Build()
-				repos.Role.Save(ctx, *existingRole)
+				err = repos.Role.Save(ctx, *existingRole)
+				if err != nil {
+					t.Fatal(err)
+				}
 
 				p, _ := permittable.New().
 					NewID().
 					UserID(uId1).
 					RoleIDs([]id.RoleID{existingRole.ID()}).
 					Build()
-				repos.Permittable.Save(ctx, *p)
+				err = repos.Permittable.Save(ctx, *p)
+				if err != nil {
+					t.Fatal(err)
+				}
 
 				userRepo := accountrepo.NewMultiUser(accountmemory.NewUserWith(u1, u2, u3))
 				workspaceRepo := accountmemory.NewWorkspaceWith(w1, w2)
@@ -136,14 +145,20 @@ func TestRunMigration(t *testing.T) {
 			name: "should add maintainer role when user has other roles",
 			setup: func(ctx context.Context, repos *repo.Container, acRepos *accountrepo.Container) {
 				otherRole, _ := role.New().NewID().Name("other_role").Build()
-				repos.Role.Save(ctx, *otherRole)
+				err = repos.Role.Save(ctx, *otherRole)
+				if err != nil {
+					t.Fatal(err)
+				}
 
 				p, _ := permittable.New().
 					NewID().
 					UserID(uId1).
 					RoleIDs([]id.RoleID{otherRole.ID()}).
 					Build()
-				repos.Permittable.Save(ctx, *p)
+				err = repos.Permittable.Save(ctx, *p)
+				if err != nil {
+					t.Fatal(err)
+				}
 
 				userRepo := accountrepo.NewMultiUser(accountmemory.NewUserWith(u1, u2, u3))
 				workspaceRepo := accountmemory.NewWorkspaceWith(w1, w2)
