@@ -88,34 +88,7 @@ func TestRunMigration(t *testing.T) {
 				acRepos.Workspace = workspaceRepo
 			},
 			assert: func(t *testing.T, ctx context.Context, repos *repo.Container) {
-				// role
-				roles, err := repos.Role.FindAll(ctx)
-				assert.NoError(t, err)
-				assert.Equal(t, 1, len(roles))
-				maintainerRole := roles[0]
-				assert.Equal(t, "maintainer", maintainerRole.Name())
-
-				// permittable
-				permittables, err := repos.Permittable.FindByUserIDs(ctx, user.IDList{uId1, uId2, uId3, iUserId1, iUserId2, iUserId3})
-				assert.NoError(t, err)
-				assert.Equal(t, 6, len(permittables))
-
-				// userID
-				userIds := make(user.IDList, 0, len(permittables))
-				for _, p := range permittables {
-					userIds = append(userIds, p.UserID())
-				}
-				assert.Contains(t, userIds, uId1)
-				assert.Contains(t, userIds, uId2)
-				assert.Contains(t, userIds, uId3)
-				assert.Contains(t, userIds, iUserId1)
-				assert.Contains(t, userIds, iUserId2)
-				assert.Contains(t, userIds, iUserId3)
-
-				// role assignment
-				for _, p := range permittables {
-					assert.Contains(t, p.RoleIDs(), maintainerRole.ID())
-				}
+				assertPermittablesAndRoles(t, ctx, repos, user.IDList{uId1, uId2, uId3, iUserId1, iUserId2, iUserId3})
 			},
 		},
 		{
@@ -124,17 +97,13 @@ func TestRunMigration(t *testing.T) {
 				existingRole, _ := role.New().NewID().Name("maintainer").Build()
 				repos.Role.Save(ctx, *existingRole)
 
-				userRepo := accountrepo.NewMultiUser(accountmemory.NewUserWith(u1))
-				workspaceRepo := accountmemory.NewWorkspaceWith(w1)
+				userRepo := accountrepo.NewMultiUser(accountmemory.NewUserWith(u1, u2, u3))
+				workspaceRepo := accountmemory.NewWorkspaceWith(w1, w2)
 				acRepos.User = userRepo
 				acRepos.Workspace = workspaceRepo
 			},
 			assert: func(t *testing.T, ctx context.Context, repos *repo.Container) {
-				// role
-				roles, err := repos.Role.FindAll(ctx)
-				assert.NoError(t, err)
-				assert.Equal(t, 1, len(roles))
-				assert.Equal(t, "maintainer", roles[0].Name())
+				assertPermittablesAndRoles(t, ctx, repos, user.IDList{uId1, uId2, uId3, iUserId1, iUserId2, iUserId3})
 			},
 		},
 		{
@@ -150,8 +119,8 @@ func TestRunMigration(t *testing.T) {
 					Build()
 				repos.Permittable.Save(ctx, *p)
 
-				userRepo := accountrepo.NewMultiUser(accountmemory.NewUserWith(u1))
-				workspaceRepo := accountmemory.NewWorkspaceWith(w1)
+				userRepo := accountrepo.NewMultiUser(accountmemory.NewUserWith(u1, u2, u3))
+				workspaceRepo := accountmemory.NewWorkspaceWith(w1, w2)
 				acRepos.User = userRepo
 				acRepos.Workspace = workspaceRepo
 			},
@@ -159,6 +128,8 @@ func TestRunMigration(t *testing.T) {
 				permittable, err := repos.Permittable.FindByUserID(ctx, uId1)
 				assert.NoError(t, err)
 				assert.Equal(t, 1, len(permittable.RoleIDs()))
+
+				assertPermittablesAndRoles(t, ctx, repos, user.IDList{uId1, uId2, uId3, iUserId1, iUserId2, iUserId3})
 			},
 		},
 		{
@@ -174,8 +145,8 @@ func TestRunMigration(t *testing.T) {
 					Build()
 				repos.Permittable.Save(ctx, *p)
 
-				userRepo := accountrepo.NewMultiUser(accountmemory.NewUserWith(u1))
-				workspaceRepo := accountmemory.NewWorkspaceWith(w1)
+				userRepo := accountrepo.NewMultiUser(accountmemory.NewUserWith(u1, u2, u3))
+				workspaceRepo := accountmemory.NewWorkspaceWith(w1, w2)
 				acRepos.User = userRepo
 				acRepos.Workspace = workspaceRepo
 			},
@@ -188,15 +159,7 @@ func TestRunMigration(t *testing.T) {
 				assert.NoError(t, err)
 				assert.Equal(t, 2, len(permittable.RoleIDs()))
 
-				var maintainerRole *role.Role
-				for _, r := range roles {
-					if r.Name() == "maintainer" {
-						maintainerRole = r
-						break
-					}
-				}
-				assert.NotNil(t, maintainerRole)
-				assert.Contains(t, permittable.RoleIDs(), maintainerRole.ID())
+				assertPermittablesAndRoles(t, ctx, repos, user.IDList{uId1, uId2, uId3, iUserId1, iUserId2, iUserId3})
 			},
 		},
 	}
@@ -222,5 +185,40 @@ func TestRunMigration(t *testing.T) {
 				tt.assert(t, ctx, memoryRepo)
 			}
 		})
+	}
+}
+
+func assertPermittablesAndRoles(t *testing.T, ctx context.Context, repos *repo.Container, expectedUserIDs user.IDList) {
+	// role
+	roles, err := repos.Role.FindAll(ctx)
+	assert.NoError(t, err)
+	var maintainerRole *role.Role
+	for _, r := range roles {
+		if r.Name() == "maintainer" {
+			if maintainerRole != nil {
+				t.Fatal("maintainer role already exists")
+			}
+			maintainerRole = r
+		}
+	}
+	assert.NotNil(t, maintainerRole)
+
+	// permittable
+	permittables, err := repos.Permittable.FindByUserIDs(ctx, expectedUserIDs)
+	assert.NoError(t, err)
+	assert.Equal(t, len(expectedUserIDs), len(permittables))
+
+	// userID
+	userIds := make(user.IDList, 0, len(permittables))
+	for _, p := range permittables {
+		userIds = append(userIds, p.UserID())
+	}
+	for _, expectedID := range expectedUserIDs {
+		assert.Contains(t, userIds, expectedID)
+	}
+
+	// role assignment
+	for _, p := range permittables {
+		assert.Contains(t, p.RoleIDs(), maintainerRole.ID())
 	}
 }
