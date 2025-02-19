@@ -34,17 +34,20 @@ func runMigration(ctx context.Context, repos *repo.Container, acRepos *accountre
 	}
 
 	if maintainerRole == nil {
-		r1, err := role.New().
+		r, err := role.New().
 			NewID().
 			Name("maintainer").
 			Build()
 		if err != nil {
 			return fmt.Errorf("failed to create maintainer role domain: %w", err)
 		}
-		err = repos.Role.Save(ctx, *r1)
+
+		err = repos.Role.Save(ctx, *r)
 		if err != nil {
 			return fmt.Errorf("failed to save maintainer role: %w", err)
 		}
+
+		maintainerRole = r
 		log.Info("Created maintainer role")
 	}
 
