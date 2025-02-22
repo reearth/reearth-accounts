@@ -4,11 +4,11 @@ import (
 	"context"
 	"testing"
 
-	"github.com/eukarya-inc/reearth-dashboard/internal/infrastructure/memory"
-	"github.com/eukarya-inc/reearth-dashboard/internal/usecase/interfaces"
-	"github.com/eukarya-inc/reearth-dashboard/pkg/id"
-	"github.com/eukarya-inc/reearth-dashboard/pkg/permittable"
-	"github.com/eukarya-inc/reearth-dashboard/pkg/role"
+	"github.com/eukarya-inc/reearth-accounts/internal/infrastructure/memory"
+	"github.com/eukarya-inc/reearth-accounts/internal/usecase/interfaces"
+	"github.com/eukarya-inc/reearth-accounts/pkg/id"
+	"github.com/eukarya-inc/reearth-accounts/pkg/permittable"
+	"github.com/eukarya-inc/reearth-accounts/pkg/role"
 	"github.com/reearth/reearthx/account/accountdomain/user"
 	"github.com/stretchr/testify/assert"
 )

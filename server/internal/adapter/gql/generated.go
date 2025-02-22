@@ -13,7 +13,7 @@ import (
 
 	"github.com/99designs/gqlgen/graphql"
 	"github.com/99designs/gqlgen/graphql/introspection"
-	"github.com/eukarya-inc/reearth-dashboard/internal/adapter/gql/gqlmodel"
+	"github.com/eukarya-inc/reearth-accounts/internal/adapter/gql/gqlmodel"
 	gqlparser "github.com/vektah/gqlparser/v2"
 	"github.com/vektah/gqlparser/v2/ast"
 )

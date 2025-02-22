@@ -8,7 +8,7 @@ import (
 
 	"github.com/99designs/gqlgen/graphql/playground"
 
-	"github.com/eukarya-inc/reearth-dashboard/internal/usecase/interactor"
+	"github.com/eukarya-inc/reearth-accounts/internal/usecase/interactor"
 	"github.com/labstack/echo/v4"
 	"github.com/labstack/echo/v4/middleware"
 	"github.com/reearth/reearthx/appx"

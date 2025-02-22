@@ -7,9 +7,9 @@ import (
 
 	"github.com/cerbos/cerbos-sdk-go/cerbos"
 	effectv1 "github.com/cerbos/cerbos/api/genpb/cerbos/effect/v1"
-	"github.com/eukarya-inc/reearth-dashboard/internal/usecase/gateway"
-	"github.com/eukarya-inc/reearth-dashboard/internal/usecase/interfaces"
-	"github.com/eukarya-inc/reearth-dashboard/internal/usecase/repo"
+	"github.com/eukarya-inc/reearth-accounts/internal/usecase/gateway"
+	"github.com/eukarya-inc/reearth-accounts/internal/usecase/interfaces"
+	"github.com/eukarya-inc/reearth-accounts/internal/usecase/repo"
 	"github.com/reearth/reearthx/account/accountdomain/user"
 	"github.com/reearth/reearthx/rerror"
 )

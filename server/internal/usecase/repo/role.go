@@ -3,8 +3,8 @@ package repo
 import (
 	"context"
 
-	"github.com/eukarya-inc/reearth-dashboard/pkg/id"
-	"github.com/eukarya-inc/reearth-dashboard/pkg/role"
+	"github.com/eukarya-inc/reearth-accounts/pkg/id"
+	"github.com/eukarya-inc/reearth-accounts/pkg/role"
 )
 
 //go:generate mockgen -source=./role.go -destination=./mock_repo/mock_role.go -package mock_repo

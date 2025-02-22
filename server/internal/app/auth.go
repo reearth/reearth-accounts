@@ -4,7 +4,7 @@ import (
 	"context"
 	"net/http"
 
-	"github.com/eukarya-inc/reearth-dashboard/internal/adapter"
+	"github.com/eukarya-inc/reearth-accounts/internal/adapter"
 	"github.com/reearth/reearthx/account/accountdomain"
 	"github.com/reearth/reearthx/account/accountdomain/user"
 	"github.com/reearth/reearthx/account/accountdomain/workspace"

@@ -3,10 +3,10 @@ package app
 import (
 	"context"
 
-	"github.com/eukarya-inc/reearth-dashboard/internal/adapter"
-	"github.com/eukarya-inc/reearth-dashboard/internal/usecase/gateway"
-	"github.com/eukarya-inc/reearth-dashboard/internal/usecase/interactor"
-	"github.com/eukarya-inc/reearth-dashboard/internal/usecase/repo"
+	"github.com/eukarya-inc/reearth-accounts/internal/adapter"
+	"github.com/eukarya-inc/reearth-accounts/internal/usecase/gateway"
+	"github.com/eukarya-inc/reearth-accounts/internal/usecase/interactor"
+	"github.com/eukarya-inc/reearth-accounts/internal/usecase/repo"
 	"github.com/labstack/echo/v4"
 	"github.com/reearth/reearthx/account/accountusecase/accountgateway"
 	"github.com/reearth/reearthx/account/accountusecase/accountinteractor"

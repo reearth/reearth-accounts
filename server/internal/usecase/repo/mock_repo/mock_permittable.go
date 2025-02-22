@@ -13,8 +13,8 @@ import (
 	context "context"
 	reflect "reflect"
 
-	id "github.com/eukarya-inc/reearth-dashboard/pkg/id"
-	permittable "github.com/eukarya-inc/reearth-dashboard/pkg/permittable"
+	id "github.com/eukarya-inc/reearth-accounts/pkg/id"
+	permittable "github.com/eukarya-inc/reearth-accounts/pkg/permittable"
 	user "github.com/reearth/reearthx/account/accountdomain/user"
 	gomock "go.uber.org/mock/gomock"
 )
