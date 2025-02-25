@@ -119,21 +119,6 @@ jobs:
       - name: Push docker image to Google Cloud Artifact Registry
         run: docker push $IMAGE_NAME_GAR
 
-      - name: Update Migration Job
-        run: |
-          gcloud run jobs update migration-job \
-            --image $IMAGE_NAME_GAR \
-            --region $GCP_REGION \
-            --set-env-vars="RUN_MIGRATION=true" \
-            --quiet
-
-      - name: Execute Migration Job
-        run: |
-          gcloud run jobs execute migration-job \
-            --region $GCP_REGION \
-            --wait \
-            --quiet
-
       - name: Deploy to Cloud Run for dashboard api (Nightly)
         run: |
           gcloud run deploy $CLOUD_RUN_SERVICE \
