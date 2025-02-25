@@ -11,7 +11,7 @@ jobs:
     name: Run migration (Nightly)
     runs-on: ubuntu-latest
     env:
-      IMAGE_NAME_GAR: us-central1-docker.pkg.dev/reearth-oss/reearth/reearth-dashboard-api:nightly
+      IMAGE_NAME_GAR: us-central1-docker.pkg.dev/reearth-oss/reearth/reearth-accounts-api:nightly
       GCP_REGION: us-central1
     steps:
       - name: Authenticate to Google Cloud
