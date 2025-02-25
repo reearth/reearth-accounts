@@ -1,0 +1,35 @@
+name: run-migration
+on:
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref_name }}
+  cancel-in-progress: true
+
+jobs:
+  migrate:
+    name: Run migration (Nightly)
+    runs-on: ubuntu-latest
+    env:
+      IMAGE_NAME_GAR: us-central1-docker.pkg.dev/reearth-oss/reearth/reearth-dashboard-api:nightly
+      GCP_REGION: us-central1
+    steps:
+      - name: Authenticate to Google Cloud
+        uses: google-github-actions/auth@v2
+        with:
+          credentials_json: ${{ secrets.GCP_SA_KEY_REEARTH_OSS }}
+
+      - name: Update Migration Job
+        run: |
+          gcloud run jobs update migration-job \
+            --image $IMAGE_NAME_GAR \
+            --region $GCP_REGION \
+            --set-env-vars="RUN_MIGRATION=true" \
+            --quiet
+
+      - name: Execute Migration Job
+        run: |
+          gcloud run jobs execute migration-job \
+            --region $GCP_REGION \
+            --wait \
+            --quiet
