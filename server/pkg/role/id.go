@@ -1,7 +1,7 @@
 package role
 
 import (
-	"github.com/eukarya-inc/reearth-dashboard/pkg/id"
+	"github.com/eukarya-inc/reearth-accounts/pkg/id"
 )
 
 type ID = id.RoleID

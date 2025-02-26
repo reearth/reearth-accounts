@@ -28,7 +28,7 @@ jobs:
     runs-on: ubuntu-latest
     if: ${{ inputs.name != 'blank' || inputs.new_tag != 'blank' }}
     env:
-      IMAGE_NAME_GHCR_BASE: ghcr.io/eukarya-inc/reearth/reearth-dashboard-api
+      IMAGE_NAME_GHCR_BASE: ghcr.io/eukarya-inc/reearth/reearth-accounts-api
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -73,7 +73,7 @@ jobs:
           echo "version=$VERSION" >> $GITHUB_OUTPUT
           echo "tags=$TAGS" >> $GITHUB_OUTPUT
 
-      - name: Build and push Docker image for dashboard api
+      - name: Build and push Docker image for accounts api
         uses: docker/build-push-action@v6
         with:
           context: ./server
@@ -90,10 +90,10 @@ jobs:
     runs-on: ubuntu-latest
     if: ${{ inputs.name == 'nightly' }}
     env:
-      IMAGE_NAME_GHCR: ghcr.io/eukarya-inc/reearth/reearth-dashboard-api:nightly
-      IMAGE_NAME_GAR: us-central1-docker.pkg.dev/reearth-oss/reearth/reearth-dashboard-api:nightly
+      IMAGE_NAME_GHCR: ghcr.io/eukarya-inc/reearth/reearth-accounts-api:nightly
+      IMAGE_NAME_GAR: us-central1-docker.pkg.dev/reearth-oss/reearth/reearth-accounts-api:nightly
       GCP_REGION: us-central1
-      CLOUD_RUN_SERVICE: reearth-dashboard-api
+      CLOUD_RUN_SERVICE: reearth-accounts-api
     steps:
       - name: Log in to GitHub Container Registry
         uses: docker/login-action@v3
@@ -119,7 +119,22 @@ jobs:
       - name: Push docker image to Google Cloud Artifact Registry
         run: docker push $IMAGE_NAME_GAR
 
-      - name: Deploy to Cloud Run for dashboard api (Nightly)
+      - name: Update Migration Job
+        run: |
+          gcloud run jobs update migration-job \
+            --image $IMAGE_NAME_GAR \
+            --region $GCP_REGION \
+            --set-env-vars="RUN_MIGRATION=true" \
+            --quiet
+
+      - name: Execute Migration Job
+        run: |
+          gcloud run jobs execute migration-job \
+            --region $GCP_REGION \
+            --wait \
+            --quiet
+
+      - name: Deploy to Cloud Run for accounts api (Nightly)
         run: |
           gcloud run deploy $CLOUD_RUN_SERVICE \
             --image $IMAGE_NAME_GAR \

@@ -1,4 +1,4 @@
-module github.com/eukarya-inc/reearth-dashboard
+module github.com/eukarya-inc/reearth-accounts
 
 go 1.23.5
 

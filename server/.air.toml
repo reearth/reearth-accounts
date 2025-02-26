@@ -4,7 +4,7 @@ tmp_dir = "tmp"
 
 [build]
 # execute command
-cmd = "go build -o ./tmp/api ./cmd/reearth-dashboard"
+cmd = "go build -o ./tmp/api ./cmd/reearth-accounts"
 bin = "tmp/api"
 full_bin = "tmp/api"
 delay = 1000 # ms

@@ -37,7 +37,7 @@ dev: dev-install
 	air
 
 run-app:
-	go run ./cmd/reearth-dashboard
+	go run ./cmd/reearth-accounts
 
 run-cerbos:
 	docker compose -f ../docker-compose.yml up -d reearth-cerbos

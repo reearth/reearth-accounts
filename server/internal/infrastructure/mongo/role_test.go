@@ -4,8 +4,8 @@ import (
 	"context"
 	"testing"
 
-	"github.com/eukarya-inc/reearth-dashboard/pkg/id"
-	"github.com/eukarya-inc/reearth-dashboard/pkg/role"
+	"github.com/eukarya-inc/reearth-accounts/pkg/id"
+	"github.com/eukarya-inc/reearth-accounts/pkg/role"
 	"github.com/reearth/reearthx/mongox"
 	"github.com/stretchr/testify/assert"
 	"go.mongodb.org/mongo-driver/bson"

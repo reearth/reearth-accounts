@@ -4,10 +4,10 @@ import (
 	"context"
 	"errors"
 
-	"github.com/eukarya-inc/reearth-dashboard/internal/usecase/interfaces"
-	"github.com/eukarya-inc/reearth-dashboard/internal/usecase/repo"
-	"github.com/eukarya-inc/reearth-dashboard/pkg/id"
-	"github.com/eukarya-inc/reearth-dashboard/pkg/role"
+	"github.com/eukarya-inc/reearth-accounts/internal/usecase/interfaces"
+	"github.com/eukarya-inc/reearth-accounts/internal/usecase/repo"
+	"github.com/eukarya-inc/reearth-accounts/pkg/id"
+	"github.com/eukarya-inc/reearth-accounts/pkg/role"
 	"github.com/reearth/reearthx/rerror"
 	"github.com/reearth/reearthx/usecasex"
 )

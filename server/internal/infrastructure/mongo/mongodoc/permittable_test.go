@@ -6,8 +6,8 @@ import (
 
 	"github.com/reearth/reearthx/account/accountdomain/user"
 
-	"github.com/eukarya-inc/reearth-dashboard/pkg/id"
-	"github.com/eukarya-inc/reearth-dashboard/pkg/permittable"
+	"github.com/eukarya-inc/reearth-accounts/pkg/id"
+	"github.com/eukarya-inc/reearth-accounts/pkg/permittable"
 	"github.com/samber/lo"
 	"github.com/stretchr/testify/assert"
 	"go.mongodb.org/mongo-driver/bson"

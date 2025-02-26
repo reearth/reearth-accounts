@@ -4,7 +4,7 @@ import (
 	"net/http"
 	"testing"
 
-	"github.com/eukarya-inc/reearth-dashboard/internal/app"
+	"github.com/eukarya-inc/reearth-accounts/internal/app"
 	httpexpect "github.com/gavv/httpexpect/v2"
 )
 

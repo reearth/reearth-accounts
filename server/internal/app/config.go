@@ -20,7 +20,7 @@ type Config struct {
 	Port    string `default:"8090" envconfig:"PORT"`
 	Dev     bool
 	DB      string   `default:"mongodb://localhost" envconfig:"REEARTH_DB" `
-	Origins []string `envconfig:"REEARTH_DASHBOARD_ORIGINS"`
+	Origins []string `envconfig:"REEARTH_ACCOUNTS_ORIGINS"`
 	Host    string
 
 	GCPProject string `envconfig:"GOOGLE_CLOUD_PROJECT"`
