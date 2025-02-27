@@ -21,15 +21,14 @@ jobs:
 
       - name: Update Migration Job
         run: |
-          gcloud run jobs update migration-job \
+          gcloud run jobs update reearth-accounts-migration \
             --image $IMAGE_NAME_GAR \
             --region $GCP_REGION \
-            --set-env-vars="RUN_MIGRATION=true" \
             --quiet
 
       - name: Execute Migration Job
         run: |
-          gcloud run jobs execute migration-job \
+          gcloud run jobs execute reearth-accounts-migration \
             --region $GCP_REGION \
             --wait \
             --quiet
