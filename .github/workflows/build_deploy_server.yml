@@ -98,7 +98,7 @@ jobs:
         uses: google-github-actions/auth@v2
         with:
           service_account: ${{ secrets.GCP_SERVICE_ACCOUNT }}
-          workload_identity_provider: ${{ secrets.WORKLOAD_IDENTITY_PROVIDER }}
+          workload_identity_provider: ${{ secrets.GCP_WORKLOAD_IDENTITY_PROVIDER }}
 
       - name: Configure docker for GCP
         run: gcloud auth configure-docker us-central1-docker.pkg.dev --quiet
