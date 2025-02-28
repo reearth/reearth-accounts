@@ -88,6 +88,9 @@ jobs:
     needs:  build-and-push-docker-image
     runs-on: ubuntu-latest
     if: ${{ inputs.name == 'nightly' }}
+    permissions:
+      contents: read
+      id-token: write
     env:
       IMAGE: reearth/reearth-accounts-api:nightly
       IMAGE_GCP: us-central1-docker.pkg.dev/reearth-oss/reearth/reearth-accounts-api:nightly
