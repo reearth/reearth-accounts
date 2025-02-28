@@ -7,10 +7,10 @@ import (
 	"os/signal"
 
 	"github.com/cerbos/cerbos-sdk-go/cerbos"
-	infraCerbos "github.com/eukarya-inc/reearth-accounts/internal/infrastructure/cerbos"
-	"github.com/eukarya-inc/reearth-accounts/internal/usecase/gateway"
-	"github.com/eukarya-inc/reearth-accounts/internal/usecase/repo"
 	"github.com/labstack/echo/v4"
+	infraCerbos "github.com/reearth/reearth-accounts/internal/infrastructure/cerbos"
+	"github.com/reearth/reearth-accounts/internal/usecase/gateway"
+	"github.com/reearth/reearth-accounts/internal/usecase/repo"
 	"github.com/reearth/reearthx/account/accountusecase/accountgateway"
 	"github.com/reearth/reearthx/account/accountusecase/accountrepo"
 	"github.com/reearth/reearthx/log"

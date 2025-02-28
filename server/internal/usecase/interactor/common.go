@@ -4,9 +4,9 @@ import (
 	"context"
 
 	"github.com/cerbos/cerbos-sdk-go/cerbos"
-	"github.com/eukarya-inc/reearth-accounts/internal/usecase/gateway"
-	"github.com/eukarya-inc/reearth-accounts/internal/usecase/interfaces"
-	"github.com/eukarya-inc/reearth-accounts/internal/usecase/repo"
+	"github.com/reearth/reearth-accounts/internal/usecase/gateway"
+	"github.com/reearth/reearth-accounts/internal/usecase/interfaces"
+	"github.com/reearth/reearth-accounts/internal/usecase/repo"
 	"github.com/reearth/reearthx/account/accountusecase/accountgateway"
 	"github.com/reearth/reearthx/account/accountusecase/accountinteractor"
 	"github.com/reearth/reearthx/account/accountusecase/accountrepo"

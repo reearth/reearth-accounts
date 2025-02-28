@@ -3,9 +3,9 @@ package mongo
 import (
 	"context"
 
-	"github.com/eukarya-inc/reearth-accounts/internal/infrastructure/mongo/mongodoc"
-	"github.com/eukarya-inc/reearth-accounts/pkg/id"
-	"github.com/eukarya-inc/reearth-accounts/pkg/role"
+	"github.com/reearth/reearth-accounts/internal/infrastructure/mongo/mongodoc"
+	"github.com/reearth/reearth-accounts/pkg/id"
+	"github.com/reearth/reearth-accounts/pkg/role"
 	"github.com/reearth/reearthx/mongox"
 	"go.mongodb.org/mongo-driver/bson"
 )
