@@ -1,8 +1,8 @@
 package mongodoc
 
 import (
-	"github.com/eukarya-inc/reearth-accounts/pkg/id"
-	permittable "github.com/eukarya-inc/reearth-accounts/pkg/permittable"
+	"github.com/reearth/reearth-accounts/pkg/id"
+	permittable "github.com/reearth/reearth-accounts/pkg/permittable"
 	"github.com/reearth/reearthx/account/accountdomain/user"
 )
 

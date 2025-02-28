@@ -4,8 +4,8 @@ import (
 	"context"
 	"testing"
 
-	"github.com/eukarya-inc/reearth-accounts/pkg/id"
-	"github.com/eukarya-inc/reearth-accounts/pkg/permittable"
+	"github.com/reearth/reearth-accounts/pkg/id"
+	"github.com/reearth/reearth-accounts/pkg/permittable"
 	"github.com/reearth/reearthx/account/accountdomain/user"
 	"github.com/stretchr/testify/assert"
 )

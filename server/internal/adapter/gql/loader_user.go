@@ -3,8 +3,8 @@ package gql
 import (
 	"context"
 
-	"github.com/eukarya-inc/reearth-accounts/internal/adapter/gql/gqldataloader"
-	"github.com/eukarya-inc/reearth-accounts/internal/adapter/gql/gqlmodel"
+	"github.com/reearth/reearth-accounts/internal/adapter/gql/gqldataloader"
+	"github.com/reearth/reearth-accounts/internal/adapter/gql/gqlmodel"
 	"github.com/reearth/reearthx/account/accountdomain"
 	"github.com/reearth/reearthx/account/accountusecase/accountinterfaces"
 	"github.com/reearth/reearthx/util"

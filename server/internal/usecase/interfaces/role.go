@@ -3,8 +3,8 @@ package interfaces
 import (
 	"context"
 
-	"github.com/eukarya-inc/reearth-accounts/pkg/id"
-	"github.com/eukarya-inc/reearth-accounts/pkg/role"
+	"github.com/reearth/reearth-accounts/pkg/id"
+	"github.com/reearth/reearth-accounts/pkg/role"
 )
 
 type AddRoleParam struct {

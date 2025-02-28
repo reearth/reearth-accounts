@@ -1,6 +1,6 @@
 package gqlmodel
 
-import "github.com/eukarya-inc/reearth-accounts/pkg/role"
+import "github.com/reearth/reearth-accounts/pkg/role"
 
 func ToRoles(roles role.List) []*RoleForAuthorization {
 	res := make([]*RoleForAuthorization, 0, len(roles))

@@ -6,7 +6,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/eukarya-inc/reearth-accounts/internal/adapter/gql/gqlmodel"
+	"github.com/reearth/reearth-accounts/internal/adapter/gql/gqlmodel"
 )
 
 // UserLoaderConfig captures the config to create a new UserLoader

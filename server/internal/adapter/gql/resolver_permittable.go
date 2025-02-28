@@ -3,7 +3,7 @@ package gql
 import (
 	"context"
 
-	"github.com/eukarya-inc/reearth-accounts/internal/adapter/gql/gqlmodel"
+	"github.com/reearth/reearth-accounts/internal/adapter/gql/gqlmodel"
 )
 
 func (r *queryResolver) GetUsersWithRoles(ctx context.Context) (*gqlmodel.GetUsersWithRolesPayload, error) {

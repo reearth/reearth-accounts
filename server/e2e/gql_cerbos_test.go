@@ -4,8 +4,8 @@ import (
 	"net/http"
 	"testing"
 
-	"github.com/eukarya-inc/reearth-accounts/internal/app"
 	httpexpect "github.com/gavv/httpexpect/v2"
+	"github.com/reearth/reearth-accounts/internal/app"
 )
 
 func checkPermission(e *httpexpect.Expect, service string, resource string, action string) (GraphQLRequest, *httpexpect.Value) {

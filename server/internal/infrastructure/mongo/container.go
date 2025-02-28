@@ -3,7 +3,7 @@ package mongo
 import (
 	"context"
 
-	"github.com/eukarya-inc/reearth-accounts/internal/usecase/repo"
+	"github.com/reearth/reearth-accounts/internal/usecase/repo"
 	"github.com/reearth/reearthx/account/accountusecase/accountrepo"
 	"github.com/reearth/reearthx/log"
 	"github.com/reearth/reearthx/mongox"

@@ -3,7 +3,7 @@ package gql
 import (
 	"context"
 
-	"github.com/eukarya-inc/reearth-accounts/internal/adapter/gql/gqlmodel"
+	"github.com/reearth/reearth-accounts/internal/adapter/gql/gqlmodel"
 	"golang.org/x/text/language"
 
 	"github.com/reearth/reearthx/account/accountdomain"
