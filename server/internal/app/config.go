@@ -19,7 +19,7 @@ const configPrefix = "reearth"
 type Config struct {
 	Port    string `default:"8090" envconfig:"PORT"`
 	Dev     bool
-	DB      string   `default:"mongodb://localhost" envconfig:"REEARTH_DB" `
+	DB      string   `default:"mongodb://localhost" envconfig:"REEARTH_ACCOUNTS_DB"`
 	Origins []string `envconfig:"REEARTH_ACCOUNTS_ORIGINS"`
 	Host    string
 
