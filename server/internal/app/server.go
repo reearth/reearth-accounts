@@ -41,7 +41,12 @@ func Start(debug bool) {
 	}
 
 	// Cerbos
-	cerbosClient, err := cerbos.New(conf.CerbosHost)
+	var opts []cerbos.Opt
+	if os.Getenv("REEARTH_ACCOUNTS_DEV") == "true" {
+		opts = append(opts, cerbos.WithPlaintext())
+	}
+
+	cerbosClient, err := cerbos.New(conf.CerbosHost, opts...)
 	if err != nil {
 		log.Fatalf("Failed to create cerbos client: %v", err)
 	}
