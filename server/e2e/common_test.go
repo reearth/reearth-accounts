@@ -96,7 +96,7 @@ func StartServerWithRepos(
 	// Cerbos
 	var cerbosAdapter gateway.CerbosGateway
 	if cfg.CerbosHost != "" {
-		cerbosClient, err := cerbos.New(cfg.CerbosHost, cerbos.WithPlaintext())
+		cerbosClient, err := cerbos.New(cfg.CerbosHost)
 		if err != nil {
 			log.Fatalf("Failed to create cerbos client: %v", err)
 		}

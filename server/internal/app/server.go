@@ -41,7 +41,7 @@ func Start(debug bool) {
 	}
 
 	// Cerbos
-	cerbosClient, err := cerbos.New(conf.CerbosHost, cerbos.WithPlaintext())
+	cerbosClient, err := cerbos.New(conf.CerbosHost)
 	if err != nil {
 		log.Fatalf("Failed to create cerbos client: %v", err)
 	}
