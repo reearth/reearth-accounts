@@ -24,7 +24,7 @@ import (
 func TestNewCerbos(t *testing.T) {
 	memory := memory.New()
 
-	cerbosClient, err := cerbos.New("localhost:3593")
+	cerbosClient, err := cerbos.New("localhost:3593", cerbos.WithPlaintext())
 	if err != nil {
 		t.Fatal(err)
 	}
