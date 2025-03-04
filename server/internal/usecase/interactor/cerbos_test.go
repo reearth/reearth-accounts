@@ -38,7 +38,6 @@ func TestCheckPermission(t *testing.T) {
 	// prepare
 	ctx := context.Background()
 	uid := user.NewID()
-	u := user.New().ID(uid).Name("hoge").Email("abc@bb.cc").MustBuild()
 	r := role.New().NewID().Name("role1").MustBuild()
 	rs := role.List{r}
 	p := permittable.New().
@@ -87,7 +86,7 @@ func TestCheckPermission(t *testing.T) {
 				},
 			}, nil)
 
-		res, err := c.CheckPermission(ctx, param, u)
+		res, err := c.CheckPermission(ctx, uid, param)
 		assert.NoError(t, err)
 		assert.NotNil(t, res)
 		assert.True(t, res.Allowed)
@@ -114,7 +113,7 @@ func TestCheckPermission(t *testing.T) {
 				},
 			}, nil)
 
-		res, err := c.CheckPermission(ctx, param, u)
+		res, err := c.CheckPermission(ctx, uid, param)
 		assert.NoError(t, err)
 		assert.NotNil(t, res)
 		assert.False(t, res.Allowed)
@@ -125,7 +124,7 @@ func TestCheckPermission(t *testing.T) {
 			FindByUserID(gomock.Any(), uid).
 			Return(nil, errors.New("db error"))
 
-		res, err := c.CheckPermission(ctx, param, u)
+		res, err := c.CheckPermission(ctx, uid, param)
 		assert.Error(t, err)
 		assert.Nil(t, res)
 	})
@@ -135,7 +134,7 @@ func TestCheckPermission(t *testing.T) {
 			FindByUserID(gomock.Any(), uid).
 			Return(nil, nil)
 
-		res, err := c.CheckPermission(ctx, param, u)
+		res, err := c.CheckPermission(ctx, uid, param)
 		assert.NoError(t, err)
 		assert.NotNil(t, res)
 		assert.False(t, res.Allowed)
@@ -149,7 +148,7 @@ func TestCheckPermission(t *testing.T) {
 			FindByIDs(gomock.Any(), p.RoleIDs()).
 			Return(nil, errors.New("db error"))
 
-		res, err := c.CheckPermission(ctx, param, u)
+		res, err := c.CheckPermission(ctx, uid, param)
 		assert.Error(t, err)
 		assert.Nil(t, res)
 	})
@@ -165,7 +164,7 @@ func TestCheckPermission(t *testing.T) {
 			CheckPermissions(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).
 			Return(nil, errors.New("cerbos error"))
 
-		res, err := c.CheckPermission(ctx, param, u)
+		res, err := c.CheckPermission(ctx, uid, param)
 		assert.Error(t, err)
 		assert.Nil(t, res)
 	})
@@ -181,7 +180,7 @@ func TestCheckPermission(t *testing.T) {
 			CheckPermissions(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).
 			Return(nil, nil)
 
-		res, err := c.CheckPermission(ctx, param, u)
+		res, err := c.CheckPermission(ctx, uid, param)
 		assert.ErrorIs(t, err, interfaces.ErrOperationDenied)
 		assert.Nil(t, res)
 	})
@@ -207,7 +206,7 @@ func TestCheckPermission(t *testing.T) {
 				},
 			}, nil)
 
-		res, err := c.CheckPermission(ctx, param, u)
+		res, err := c.CheckPermission(ctx, uid, param)
 		assert.NoError(t, err)
 		assert.NotNil(t, res)
 		assert.False(t, res.Allowed)

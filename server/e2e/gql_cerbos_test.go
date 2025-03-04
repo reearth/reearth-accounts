@@ -8,7 +8,7 @@ import (
 	"github.com/reearth/reearth-accounts/internal/app"
 )
 
-func checkPermission(e *httpexpect.Expect, service string, resource string, action string) (GraphQLRequest, *httpexpect.Value) {
+func checkPermission(e *httpexpect.Expect, userId string, service string, resource string, action string) (GraphQLRequest, *httpexpect.Value) {
 	checkPermissionRequestBody := GraphQLRequest{
 		OperationName: "CheckPermission",
 		Query: `query CheckPermission($input: CheckPermissionInput!) {
@@ -18,6 +18,7 @@ func checkPermission(e *httpexpect.Expect, service string, resource string, acti
 		}`,
 		Variables: map[string]any{
 			"input": map[string]any{
+				"userId":   userId,
 				"service":  service,
 				"resource": resource,
 				"action":   action,
@@ -56,7 +57,7 @@ func TestCheckPermission(t *testing.T) {
 	}, true, baseSeederOneUser)
 
 	// check permission with no permittable
-	_, res1 := checkPermission(e, "service", "resource", "read")
+	_, res1 := checkPermission(e, uId.String(), "service", "resource", "read")
 	res1.Object().
 		Value("data").Object().
 		Value("checkPermission").Object().
@@ -67,14 +68,14 @@ func TestCheckPermission(t *testing.T) {
 	_, _, _ = updatePermittable(e, uId.String(), []string{roleId1})
 
 	// check permission with permittable
-	_, res2 := checkPermission(e, "service", "resource", "read")
+	_, res2 := checkPermission(e, uId.String(), "service", "resource", "read")
 	res2.Object().
 		Value("data").Object().
 		Value("checkPermission").Object().
 		Value("allowed").Boolean().IsTrue()
 
 	// check permission with permittable but allowed is false
-	_, res3 := checkPermission(e, "service", "resource", "edit")
+	_, res3 := checkPermission(e, uId.String(), "service", "resource", "edit")
 	res3.Object().
 		Value("data").Object().
 		Value("checkPermission").Object().
