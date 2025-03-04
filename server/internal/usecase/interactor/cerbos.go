@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"log"
 
 	"github.com/cerbos/cerbos-sdk-go/cerbos"
 	effectv1 "github.com/cerbos/cerbos/api/genpb/cerbos/effect/v1"
@@ -28,8 +29,8 @@ func NewCerbos(cerbos gateway.CerbosGateway, r *repo.Container) interfaces.Cerbo
 	}
 }
 
-func (i *Cerbos) CheckPermission(ctx context.Context, param interfaces.CheckPermissionParam, user *user.User) (*interfaces.CheckPermissionResult, error) {
-	permittable, err := i.permittableRepo.FindByUserID(ctx, user.ID())
+func (i *Cerbos) CheckPermission(ctx context.Context, userId user.ID, param interfaces.CheckPermissionParam) (*interfaces.CheckPermissionResult, error) {
+	permittable, err := i.permittableRepo.FindByUserID(ctx, userId)
 	if err != nil && !errors.Is(err, rerror.ErrNotFound) {
 		return nil, err
 	}
@@ -49,10 +50,10 @@ func (i *Cerbos) CheckPermission(ctx context.Context, param interfaces.CheckPerm
 		roleNames = append(roleNames, role.Name())
 	}
 
-	principal := cerbos.NewPrincipal(user.ID().String(), roleNames...)
+	principal := cerbos.NewPrincipal(userId.String(), roleNames...)
 
 	resourceKind := fmt.Sprintf("%s:%s", param.Service, param.Resource)
-	resourceId := fmt.Sprintf("%s:%s:%s:%s", user.ID().String(), param.Service, param.Resource, param.Action)
+	resourceId := fmt.Sprintf("%s:%s:%s:%s", userId.String(), param.Service, param.Resource, param.Action)
 	resource := cerbos.NewResource(resourceKind, resourceId)
 	resources := []*cerbos.Resource{resource}
 
@@ -66,9 +67,11 @@ func (i *Cerbos) CheckPermission(ctx context.Context, param interfaces.CheckPerm
 
 	allowed := false
 	for _, result := range resp.Results {
+		log.Printf("Result for resource %s: %+v", result.Resource.Id, result)
+
 		actionResult, exists := result.Actions[param.Action]
 		if !exists {
-			fmt.Printf("Action %s not found in result.Actions\n", param.Action)
+			log.Printf("Action %s not found in result.Actions\n", param.Action)
 			continue
 		}
 		if actionResult == effectv1.Effect_EFFECT_ALLOW {
@@ -77,6 +80,7 @@ func (i *Cerbos) CheckPermission(ctx context.Context, param interfaces.CheckPerm
 		}
 	}
 
+	log.Printf("Final permission result for user %s: %v", userId.String(), allowed)
 	return &interfaces.CheckPermissionResult{
 		Allowed: allowed,
 	}, nil

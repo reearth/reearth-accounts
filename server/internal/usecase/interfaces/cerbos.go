@@ -17,5 +17,5 @@ type CheckPermissionResult struct {
 }
 
 type Cerbos interface {
-	CheckPermission(ctx context.Context, param CheckPermissionParam, user *user.User) (*CheckPermissionResult, error)
+	CheckPermission(ctx context.Context, userId user.ID, param CheckPermissionParam) (*CheckPermissionResult, error)
 }
