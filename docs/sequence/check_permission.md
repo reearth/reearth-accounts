@@ -15,11 +15,10 @@ participant cerbos as cerbos server
 user ->>+ browser :create project
 browser ->>+ flowServer :Request to create project
 flowServer ->>+ accountsServer :Request to check permittion
-note over flowServer, accountsServer: header: access_token, body: {service:"flow", resource: "project", action: "edit"}
-accountsServer ->>+ accountsServer :Get user_id from access_token
-accountsServer ->>+ accountDB :Get role_ids from permittable table based on user_id
+note over flowServer, accountsServer: header: access_token, body: {userId: "userId", service:"flow", resource: "project", action: "edit"}
+accountsServer ->>+ accountDB :Get role_ids from permittable collection based on user_id
 accountDB ->>+ accountsServer :return
-accountsServer ->>+ accountDB :Get role_names from role table based on role_ids
+accountsServer ->>+ accountDB :Get role_names from role collection based on role_ids
 accountDB ->>+ accountsServer :return
 accountsServer ->>+ cerbos :Request to check permittion
 note over accountsServer, cerbos: {service:"flow", resource: "project", action: "edit", roles: ["role1"]}
