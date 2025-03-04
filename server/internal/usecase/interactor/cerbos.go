@@ -67,7 +67,7 @@ func (i *Cerbos) CheckPermission(ctx context.Context, userId user.ID, param inte
 
 	allowed := false
 	for _, result := range resp.Results {
-		log.Printf("Result for resource %s: %+v", result.Resource.Id, result)
+		log.Printf("Result Actions: %+v", result.Actions)
 
 		actionResult, exists := result.Actions[param.Action]
 		if !exists {
