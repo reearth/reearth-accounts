@@ -1,4 +1,4 @@
-name: run-migration
+name: run-migration-plateau-dev
 on:
   workflow_dispatch:
 
@@ -8,14 +8,14 @@ concurrency:
 
 jobs:
   migrate:
-    name: Run migration (Nightly)
+    name: Run migration For Plateau Dev
     runs-on: ubuntu-latest
     permissions:
       contents: read
       id-token: write
     env:
-      IMAGE_NAME_GAR: us-central1-docker.pkg.dev/reearth-oss/reearth/reearth-accounts-api:nightly
-      GCP_REGION: us-central1
+      IMAGE_NAME_GAR: asia-northeast1-docker.pkg.dev/reearth-plateau-dev/reearth-plateau/reearth-accounts-api:latest
+      GCP_REGION: asia-northeast1
     steps:
       - name: Authenticate to Google Cloud
         uses: google-github-actions/auth@v2
