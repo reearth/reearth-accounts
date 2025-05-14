@@ -7,6 +7,8 @@ import (
 
 func New() *repo.Container {
 	return &repo.Container{
+		User:        NewUser(),
+		Workspace:   NewWorkspace(),
 		Role:        NewRole(),
 		Permittable: NewPermittable(),
 		Transaction: &usecasex.NopTransaction{},
