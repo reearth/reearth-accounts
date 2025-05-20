@@ -4,7 +4,7 @@ import (
 	"testing"
 
 	"github.com/reearth/reearth-accounts/pkg/id"
-	"github.com/reearth/reearthx/account/accountdomain/user"
+	"github.com/reearth/reearth-accounts/pkg/user"
 	"github.com/stretchr/testify/assert"
 )
 

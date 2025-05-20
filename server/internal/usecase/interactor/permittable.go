@@ -8,8 +8,7 @@ import (
 	"github.com/reearth/reearth-accounts/internal/usecase/repo"
 	"github.com/reearth/reearth-accounts/pkg/permittable"
 	"github.com/reearth/reearth-accounts/pkg/role"
-	"github.com/reearth/reearthx/account/accountdomain/user"
-	"github.com/reearth/reearthx/account/accountusecase/accountrepo"
+	"github.com/reearth/reearth-accounts/pkg/user"
 	"github.com/reearth/reearthx/rerror"
 	"github.com/reearth/reearthx/usecasex"
 )
@@ -17,11 +16,11 @@ import (
 type Permittable struct {
 	permittableRepo repo.Permittable
 	roleRepo        repo.Role
-	userRepo        accountrepo.User
+	userRepo        repo.User
 	transaction     usecasex.Transaction
 }
 
-func NewPermittable(r *repo.Container, acr *accountrepo.Container) interfaces.Permittable {
+func NewPermittable(r *repo.Container, acr *repo.Container) interfaces.Permittable {
 	return &Permittable{
 		permittableRepo: r.Permittable,
 		roleRepo:        r.Role,

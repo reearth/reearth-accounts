@@ -4,14 +4,13 @@ import (
 	"context"
 
 	"github.com/reearth/reearth-accounts/internal/usecase/repo"
-	"github.com/reearth/reearthx/account/accountusecase/accountrepo"
 	"github.com/reearth/reearthx/log"
 	"github.com/reearth/reearthx/mongox"
 	"github.com/reearth/reearthx/util"
 	"go.mongodb.org/mongo-driver/mongo"
 )
 
-func New(ctx context.Context, db *mongo.Database, account *accountrepo.Container, useTransaction bool) (*repo.Container, error) {
+func New(ctx context.Context, db *mongo.Database, account *repo.Container, useTransaction bool) (*repo.Container, error) {
 	client := mongox.NewClientWithDatabase(db)
 	if useTransaction {
 		client = client.WithTransaction()

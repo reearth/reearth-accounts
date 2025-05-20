@@ -11,7 +11,7 @@ import (
 	"github.com/reearth/reearth-accounts/internal/usecase/gateway"
 	"github.com/reearth/reearth-accounts/internal/usecase/interfaces"
 	"github.com/reearth/reearth-accounts/internal/usecase/repo"
-	"github.com/reearth/reearthx/account/accountdomain/user"
+	"github.com/reearth/reearth-accounts/pkg/user"
 	"github.com/reearth/reearthx/rerror"
 )
 

@@ -1,7 +1,6 @@
 package interfaces
 
 import (
-	"github.com/reearth/reearthx/account/accountusecase/accountinterfaces"
 	"github.com/reearth/reearthx/i18n"
 	"github.com/reearth/reearthx/rerror"
 )
@@ -12,8 +11,8 @@ var (
 )
 
 type Container struct {
-	User        accountinterfaces.User
-	Workspace   accountinterfaces.Workspace
+	User        User
+	Workspace   Workspace
 	Cerbos      Cerbos
 	Role        Role
 	Permittable Permittable

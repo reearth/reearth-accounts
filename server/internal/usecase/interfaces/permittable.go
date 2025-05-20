@@ -5,7 +5,7 @@ import (
 
 	"github.com/reearth/reearth-accounts/pkg/permittable"
 	"github.com/reearth/reearth-accounts/pkg/role"
-	"github.com/reearth/reearthx/account/accountdomain/user"
+	"github.com/reearth/reearth-accounts/pkg/user"
 )
 
 type UpdatePermittableParam struct {
