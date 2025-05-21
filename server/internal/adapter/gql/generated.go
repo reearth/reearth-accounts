@@ -79,6 +79,7 @@ type ComplexityRoot struct {
 	Me struct {
 		Auths         func(childComplexity int) int
 		Email         func(childComplexity int) int
+		Host          func(childComplexity int) int
 		ID            func(childComplexity int) int
 		Lang          func(childComplexity int) int
 		MyWorkspace   func(childComplexity int) int
@@ -89,22 +90,31 @@ type ComplexityRoot struct {
 	}
 
 	Mutation struct {
-		AddIntegrationToWorkspace      func(childComplexity int, input gqlmodel.AddIntegrationToWorkspaceInput) int
-		AddRole                        func(childComplexity int, input gqlmodel.AddRoleInput) int
-		AddUsersToWorkspace            func(childComplexity int, input gqlmodel.AddUsersToWorkspaceInput) int
-		CreateWorkspace                func(childComplexity int, input gqlmodel.CreateWorkspaceInput) int
-		DeleteMe                       func(childComplexity int, input gqlmodel.DeleteMeInput) int
-		DeleteWorkspace                func(childComplexity int, input gqlmodel.DeleteWorkspaceInput) int
-		RemoveIntegrationFromWorkspace func(childComplexity int, input gqlmodel.RemoveIntegrationFromWorkspaceInput) int
-		RemoveMyAuth                   func(childComplexity int, input gqlmodel.RemoveMyAuthInput) int
-		RemoveRole                     func(childComplexity int, input gqlmodel.RemoveRoleInput) int
-		RemoveUserFromWorkspace        func(childComplexity int, input gqlmodel.RemoveUserFromWorkspaceInput) int
-		UpdateIntegrationOfWorkspace   func(childComplexity int, input gqlmodel.UpdateIntegrationOfWorkspaceInput) int
-		UpdateMe                       func(childComplexity int, input gqlmodel.UpdateMeInput) int
-		UpdatePermittable              func(childComplexity int, input gqlmodel.UpdatePermittableInput) int
-		UpdateRole                     func(childComplexity int, input gqlmodel.UpdateRoleInput) int
-		UpdateUserOfWorkspace          func(childComplexity int, input gqlmodel.UpdateUserOfWorkspaceInput) int
-		UpdateWorkspace                func(childComplexity int, input gqlmodel.UpdateWorkspaceInput) int
+		AddIntegrationToWorkspace        func(childComplexity int, input gqlmodel.AddIntegrationToWorkspaceInput) int
+		AddRole                          func(childComplexity int, input gqlmodel.AddRoleInput) int
+		AddUsersToWorkspace              func(childComplexity int, input gqlmodel.AddUsersToWorkspaceInput) int
+		CreateVerification               func(childComplexity int, input gqlmodel.CreateVerificationInput) int
+		CreateWorkspace                  func(childComplexity int, input gqlmodel.CreateWorkspaceInput) int
+		DeleteMe                         func(childComplexity int, input gqlmodel.DeleteMeInput) int
+		DeleteWorkspace                  func(childComplexity int, input gqlmodel.DeleteWorkspaceInput) int
+		FindOrCreate                     func(childComplexity int, input gqlmodel.FindOrCreateInput) int
+		PasswordReset                    func(childComplexity int, input gqlmodel.PasswordResetInput) int
+		RemoveIntegrationFromWorkspace   func(childComplexity int, input gqlmodel.RemoveIntegrationFromWorkspaceInput) int
+		RemoveIntegrationsFromWorkspace  func(childComplexity int, input gqlmodel.RemoveIntegrationsFromWorkspaceInput) int
+		RemoveMultipleUsersFromWorkspace func(childComplexity int, input gqlmodel.RemoveMultipleUsersFromWorkspaceInput) int
+		RemoveMyAuth                     func(childComplexity int, input gqlmodel.RemoveMyAuthInput) int
+		RemoveRole                       func(childComplexity int, input gqlmodel.RemoveRoleInput) int
+		RemoveUserFromWorkspace          func(childComplexity int, input gqlmodel.RemoveUserFromWorkspaceInput) int
+		SignUp                           func(childComplexity int, input gqlmodel.SignUpInput) int
+		SignUpOidc                       func(childComplexity int, input gqlmodel.SignupOIDCInput) int
+		StartPasswordReset               func(childComplexity int, input gqlmodel.StartPasswordResetInput) int
+		UpdateIntegrationOfWorkspace     func(childComplexity int, input gqlmodel.UpdateIntegrationOfWorkspaceInput) int
+		UpdateMe                         func(childComplexity int, input gqlmodel.UpdateMeInput) int
+		UpdatePermittable                func(childComplexity int, input gqlmodel.UpdatePermittableInput) int
+		UpdateRole                       func(childComplexity int, input gqlmodel.UpdateRoleInput) int
+		UpdateUserOfWorkspace            func(childComplexity int, input gqlmodel.UpdateUserOfWorkspaceInput) int
+		UpdateWorkspace                  func(childComplexity int, input gqlmodel.UpdateWorkspaceInput) int
+		VerifyUser                       func(childComplexity int, input gqlmodel.VerifyUserInput) int
 	}
 
 	Permittable struct {
@@ -115,6 +125,7 @@ type ComplexityRoot struct {
 
 	Query struct {
 		CheckPermission   func(childComplexity int, input gqlmodel.CheckPermissionInput) int
+		FindByUser        func(childComplexity int, userID gqlmodel.ID) int
 		GetUsersWithRoles func(childComplexity int) int
 		Me                func(childComplexity int) int
 		Node              func(childComplexity int, id gqlmodel.ID, typeArg gqlmodel.NodeType) int
@@ -123,7 +134,15 @@ type ComplexityRoot struct {
 		SearchUser        func(childComplexity int, nameOrEmail string) int
 	}
 
+	RemoveIntegrationsFromWorkspacePayload struct {
+		Workspace func(childComplexity int) int
+	}
+
 	RemoveMemberFromWorkspacePayload struct {
+		Workspace func(childComplexity int) int
+	}
+
+	RemoveMultipleMembersFromWorkspacePayload struct {
 		Workspace func(childComplexity int) int
 	}
 
@@ -161,9 +180,18 @@ type ComplexityRoot struct {
 	}
 
 	User struct {
-		Email func(childComplexity int) int
-		ID    func(childComplexity int) int
-		Name  func(childComplexity int) int
+		Auths     func(childComplexity int) int
+		Email     func(childComplexity int) int
+		Host      func(childComplexity int) int
+		ID        func(childComplexity int) int
+		Lang      func(childComplexity int) int
+		Name      func(childComplexity int) int
+		Theme     func(childComplexity int) int
+		Workspace func(childComplexity int) int
+	}
+
+	UserPayload struct {
+		User func(childComplexity int) int
 	}
 
 	UserWithRoles struct {
@@ -187,6 +215,7 @@ type ComplexityRoot struct {
 	}
 
 	WorkspaceUserMember struct {
+		Host   func(childComplexity int) int
 		Role   func(childComplexity int) int
 		User   func(childComplexity int) int
 		UserID func(childComplexity int) int
@@ -205,13 +234,22 @@ type MutationResolver interface {
 	UpdateMe(ctx context.Context, input gqlmodel.UpdateMeInput) (*gqlmodel.UpdateMePayload, error)
 	RemoveMyAuth(ctx context.Context, input gqlmodel.RemoveMyAuthInput) (*gqlmodel.UpdateMePayload, error)
 	DeleteMe(ctx context.Context, input gqlmodel.DeleteMeInput) (*gqlmodel.DeleteMePayload, error)
+	SignUp(ctx context.Context, input gqlmodel.SignUpInput) (*gqlmodel.UserPayload, error)
+	SignUpOidc(ctx context.Context, input gqlmodel.SignupOIDCInput) (*gqlmodel.UserPayload, error)
+	VerifyUser(ctx context.Context, input gqlmodel.VerifyUserInput) (*gqlmodel.UserPayload, error)
+	FindOrCreate(ctx context.Context, input gqlmodel.FindOrCreateInput) (*gqlmodel.UserPayload, error)
+	CreateVerification(ctx context.Context, input gqlmodel.CreateVerificationInput) (*bool, error)
+	StartPasswordReset(ctx context.Context, input gqlmodel.StartPasswordResetInput) (*bool, error)
+	PasswordReset(ctx context.Context, input gqlmodel.PasswordResetInput) (*bool, error)
 	CreateWorkspace(ctx context.Context, input gqlmodel.CreateWorkspaceInput) (*gqlmodel.CreateWorkspacePayload, error)
 	DeleteWorkspace(ctx context.Context, input gqlmodel.DeleteWorkspaceInput) (*gqlmodel.DeleteWorkspacePayload, error)
 	UpdateWorkspace(ctx context.Context, input gqlmodel.UpdateWorkspaceInput) (*gqlmodel.UpdateWorkspacePayload, error)
 	AddUsersToWorkspace(ctx context.Context, input gqlmodel.AddUsersToWorkspaceInput) (*gqlmodel.AddUsersToWorkspacePayload, error)
 	AddIntegrationToWorkspace(ctx context.Context, input gqlmodel.AddIntegrationToWorkspaceInput) (*gqlmodel.AddUsersToWorkspacePayload, error)
 	RemoveUserFromWorkspace(ctx context.Context, input gqlmodel.RemoveUserFromWorkspaceInput) (*gqlmodel.RemoveMemberFromWorkspacePayload, error)
+	RemoveMultipleUsersFromWorkspace(ctx context.Context, input gqlmodel.RemoveMultipleUsersFromWorkspaceInput) (*gqlmodel.RemoveMultipleMembersFromWorkspacePayload, error)
 	RemoveIntegrationFromWorkspace(ctx context.Context, input gqlmodel.RemoveIntegrationFromWorkspaceInput) (*gqlmodel.RemoveMemberFromWorkspacePayload, error)
+	RemoveIntegrationsFromWorkspace(ctx context.Context, input gqlmodel.RemoveIntegrationsFromWorkspaceInput) (*gqlmodel.RemoveIntegrationsFromWorkspacePayload, error)
 	UpdateUserOfWorkspace(ctx context.Context, input gqlmodel.UpdateUserOfWorkspaceInput) (*gqlmodel.UpdateMemberOfWorkspacePayload, error)
 	UpdateIntegrationOfWorkspace(ctx context.Context, input gqlmodel.UpdateIntegrationOfWorkspaceInput) (*gqlmodel.UpdateMemberOfWorkspacePayload, error)
 }
@@ -223,6 +261,7 @@ type QueryResolver interface {
 	GetUsersWithRoles(ctx context.Context) (*gqlmodel.GetUsersWithRolesPayload, error)
 	Me(ctx context.Context) (*gqlmodel.Me, error)
 	SearchUser(ctx context.Context, nameOrEmail string) (*gqlmodel.User, error)
+	FindByUser(ctx context.Context, userID gqlmodel.ID) ([]*gqlmodel.Workspace, error)
 }
 type WorkspaceUserMemberResolver interface {
 	User(ctx context.Context, obj *gqlmodel.WorkspaceUserMember) (*gqlmodel.User, error)
@@ -310,6 +349,13 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 
 		return e.complexity.Me.Email(childComplexity), true
 
+	case "Me.host":
+		if e.complexity.Me.Host == nil {
+			break
+		}
+
+		return e.complexity.Me.Host(childComplexity), true
+
 	case "Me.id":
 		if e.complexity.Me.ID == nil {
 			break
@@ -395,6 +441,18 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 
 		return e.complexity.Mutation.AddUsersToWorkspace(childComplexity, args["input"].(gqlmodel.AddUsersToWorkspaceInput)), true
 
+	case "Mutation.createVerification":
+		if e.complexity.Mutation.CreateVerification == nil {
+			break
+		}
+
+		args, err := ec.field_Mutation_createVerification_args(context.TODO(), rawArgs)
+		if err != nil {
+			return 0, false
+		}
+
+		return e.complexity.Mutation.CreateVerification(childComplexity, args["input"].(gqlmodel.CreateVerificationInput)), true
+
 	case "Mutation.createWorkspace":
 		if e.complexity.Mutation.CreateWorkspace == nil {
 			break
@@ -431,6 +489,30 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 
 		return e.complexity.Mutation.DeleteWorkspace(childComplexity, args["input"].(gqlmodel.DeleteWorkspaceInput)), true
 
+	case "Mutation.findOrCreate":
+		if e.complexity.Mutation.FindOrCreate == nil {
+			break
+		}
+
+		args, err := ec.field_Mutation_findOrCreate_args(context.TODO(), rawArgs)
+		if err != nil {
+			return 0, false
+		}
+
+		return e.complexity.Mutation.FindOrCreate(childComplexity, args["input"].(gqlmodel.FindOrCreateInput)), true
+
+	case "Mutation.passwordReset":
+		if e.complexity.Mutation.PasswordReset == nil {
+			break
+		}
+
+		args, err := ec.field_Mutation_passwordReset_args(context.TODO(), rawArgs)
+		if err != nil {
+			return 0, false
+		}
+
+		return e.complexity.Mutation.PasswordReset(childComplexity, args["input"].(gqlmodel.PasswordResetInput)), true
+
 	case "Mutation.removeIntegrationFromWorkspace":
 		if e.complexity.Mutation.RemoveIntegrationFromWorkspace == nil {
 			break
@@ -442,6 +524,30 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 		}
 
 		return e.complexity.Mutation.RemoveIntegrationFromWorkspace(childComplexity, args["input"].(gqlmodel.RemoveIntegrationFromWorkspaceInput)), true
+
+	case "Mutation.removeIntegrationsFromWorkspace":
+		if e.complexity.Mutation.RemoveIntegrationsFromWorkspace == nil {
+			break
+		}
+
+		args, err := ec.field_Mutation_removeIntegrationsFromWorkspace_args(context.TODO(), rawArgs)
+		if err != nil {
+			return 0, false
+		}
+
+		return e.complexity.Mutation.RemoveIntegrationsFromWorkspace(childComplexity, args["input"].(gqlmodel.RemoveIntegrationsFromWorkspaceInput)), true
+
+	case "Mutation.removeMultipleUsersFromWorkspace":
+		if e.complexity.Mutation.RemoveMultipleUsersFromWorkspace == nil {
+			break
+		}
+
+		args, err := ec.field_Mutation_removeMultipleUsersFromWorkspace_args(context.TODO(), rawArgs)
+		if err != nil {
+			return 0, false
+		}
+
+		return e.complexity.Mutation.RemoveMultipleUsersFromWorkspace(childComplexity, args["input"].(gqlmodel.RemoveMultipleUsersFromWorkspaceInput)), true
 
 	case "Mutation.removeMyAuth":
 		if e.complexity.Mutation.RemoveMyAuth == nil {
@@ -478,6 +584,42 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 		}
 
 		return e.complexity.Mutation.RemoveUserFromWorkspace(childComplexity, args["input"].(gqlmodel.RemoveUserFromWorkspaceInput)), true
+
+	case "Mutation.signUp":
+		if e.complexity.Mutation.SignUp == nil {
+			break
+		}
+
+		args, err := ec.field_Mutation_signUp_args(context.TODO(), rawArgs)
+		if err != nil {
+			return 0, false
+		}
+
+		return e.complexity.Mutation.SignUp(childComplexity, args["input"].(gqlmodel.SignUpInput)), true
+
+	case "Mutation.signUpOIDC":
+		if e.complexity.Mutation.SignUpOidc == nil {
+			break
+		}
+
+		args, err := ec.field_Mutation_signUpOIDC_args(context.TODO(), rawArgs)
+		if err != nil {
+			return 0, false
+		}
+
+		return e.complexity.Mutation.SignUpOidc(childComplexity, args["input"].(gqlmodel.SignupOIDCInput)), true
+
+	case "Mutation.startPasswordReset":
+		if e.complexity.Mutation.StartPasswordReset == nil {
+			break
+		}
+
+		args, err := ec.field_Mutation_startPasswordReset_args(context.TODO(), rawArgs)
+		if err != nil {
+			return 0, false
+		}
+
+		return e.complexity.Mutation.StartPasswordReset(childComplexity, args["input"].(gqlmodel.StartPasswordResetInput)), true
 
 	case "Mutation.updateIntegrationOfWorkspace":
 		if e.complexity.Mutation.UpdateIntegrationOfWorkspace == nil {
@@ -551,6 +693,18 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 
 		return e.complexity.Mutation.UpdateWorkspace(childComplexity, args["input"].(gqlmodel.UpdateWorkspaceInput)), true
 
+	case "Mutation.verifyUser":
+		if e.complexity.Mutation.VerifyUser == nil {
+			break
+		}
+
+		args, err := ec.field_Mutation_verifyUser_args(context.TODO(), rawArgs)
+		if err != nil {
+			return 0, false
+		}
+
+		return e.complexity.Mutation.VerifyUser(childComplexity, args["input"].(gqlmodel.VerifyUserInput)), true
+
 	case "Permittable.id":
 		if e.complexity.Permittable.ID == nil {
 			break
@@ -583,6 +737,18 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 		}
 
 		return e.complexity.Query.CheckPermission(childComplexity, args["input"].(gqlmodel.CheckPermissionInput)), true
+
+	case "Query.findByUser":
+		if e.complexity.Query.FindByUser == nil {
+			break
+		}
+
+		args, err := ec.field_Query_findByUser_args(context.TODO(), rawArgs)
+		if err != nil {
+			return 0, false
+		}
+
+		return e.complexity.Query.FindByUser(childComplexity, args["userId"].(gqlmodel.ID)), true
 
 	case "Query.getUsersWithRoles":
 		if e.complexity.Query.GetUsersWithRoles == nil {
@@ -641,12 +807,26 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 
 		return e.complexity.Query.SearchUser(childComplexity, args["nameOrEmail"].(string)), true
 
+	case "RemoveIntegrationsFromWorkspacePayload.workspace":
+		if e.complexity.RemoveIntegrationsFromWorkspacePayload.Workspace == nil {
+			break
+		}
+
+		return e.complexity.RemoveIntegrationsFromWorkspacePayload.Workspace(childComplexity), true
+
 	case "RemoveMemberFromWorkspacePayload.workspace":
 		if e.complexity.RemoveMemberFromWorkspacePayload.Workspace == nil {
 			break
 		}
 
 		return e.complexity.RemoveMemberFromWorkspacePayload.Workspace(childComplexity), true
+
+	case "RemoveMultipleMembersFromWorkspacePayload.workspace":
+		if e.complexity.RemoveMultipleMembersFromWorkspacePayload.Workspace == nil {
+			break
+		}
+
+		return e.complexity.RemoveMultipleMembersFromWorkspacePayload.Workspace(childComplexity), true
 
 	case "RemoveRolePayload.id":
 		if e.complexity.RemoveRolePayload.ID == nil {
@@ -711,12 +891,26 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 
 		return e.complexity.UpdateWorkspacePayload.Workspace(childComplexity), true
 
+	case "User.auths":
+		if e.complexity.User.Auths == nil {
+			break
+		}
+
+		return e.complexity.User.Auths(childComplexity), true
+
 	case "User.email":
 		if e.complexity.User.Email == nil {
 			break
 		}
 
 		return e.complexity.User.Email(childComplexity), true
+
+	case "User.host":
+		if e.complexity.User.Host == nil {
+			break
+		}
+
+		return e.complexity.User.Host(childComplexity), true
 
 	case "User.id":
 		if e.complexity.User.ID == nil {
@@ -725,12 +919,40 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 
 		return e.complexity.User.ID(childComplexity), true
 
+	case "User.lang":
+		if e.complexity.User.Lang == nil {
+			break
+		}
+
+		return e.complexity.User.Lang(childComplexity), true
+
 	case "User.name":
 		if e.complexity.User.Name == nil {
 			break
 		}
 
 		return e.complexity.User.Name(childComplexity), true
+
+	case "User.theme":
+		if e.complexity.User.Theme == nil {
+			break
+		}
+
+		return e.complexity.User.Theme(childComplexity), true
+
+	case "User.workspace":
+		if e.complexity.User.Workspace == nil {
+			break
+		}
+
+		return e.complexity.User.Workspace(childComplexity), true
+
+	case "UserPayload.user":
+		if e.complexity.UserPayload.User == nil {
+			break
+		}
+
+		return e.complexity.UserPayload.User(childComplexity), true
 
 	case "UserWithRoles.roles":
 		if e.complexity.UserWithRoles.Roles == nil {
@@ -809,6 +1031,13 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 
 		return e.complexity.WorkspaceIntegrationMember.Role(childComplexity), true
 
+	case "WorkspaceUserMember.host":
+		if e.complexity.WorkspaceUserMember.Host == nil {
+			break
+		}
+
+		return e.complexity.WorkspaceUserMember.Host(childComplexity), true
+
 	case "WorkspaceUserMember.role":
 		if e.complexity.WorkspaceUserMember.Role == nil {
 			break
@@ -842,20 +1071,29 @@ func (e *executableSchema) Exec(ctx context.Context) graphql.ResponseHandler {
 		ec.unmarshalInputAddRoleInput,
 		ec.unmarshalInputAddUsersToWorkspaceInput,
 		ec.unmarshalInputCheckPermissionInput,
+		ec.unmarshalInputCreateVerificationInput,
 		ec.unmarshalInputCreateWorkspaceInput,
 		ec.unmarshalInputDeleteMeInput,
 		ec.unmarshalInputDeleteWorkspaceInput,
+		ec.unmarshalInputFindOrCreateInput,
 		ec.unmarshalInputMemberInput,
+		ec.unmarshalInputPasswordResetInput,
 		ec.unmarshalInputRemoveIntegrationFromWorkspaceInput,
+		ec.unmarshalInputRemoveIntegrationsFromWorkspaceInput,
+		ec.unmarshalInputRemoveMultipleUsersFromWorkspaceInput,
 		ec.unmarshalInputRemoveMyAuthInput,
 		ec.unmarshalInputRemoveRoleInput,
 		ec.unmarshalInputRemoveUserFromWorkspaceInput,
+		ec.unmarshalInputSignUpInput,
+		ec.unmarshalInputSignupOIDCInput,
+		ec.unmarshalInputStartPasswordResetInput,
 		ec.unmarshalInputUpdateIntegrationOfWorkspaceInput,
 		ec.unmarshalInputUpdateMeInput,
 		ec.unmarshalInputUpdatePermittableInput,
 		ec.unmarshalInputUpdateRoleInput,
 		ec.unmarshalInputUpdateUserOfWorkspaceInput,
 		ec.unmarshalInputUpdateWorkspaceInput,
+		ec.unmarshalInputVerifyUserInput,
 	)
 	first := true
 
@@ -1078,6 +1316,11 @@ extend type Mutation {
   id: ID!
   name: String!
   email: String!
+  lang: Lang!
+  theme: Theme!
+  host: String
+  workspace: ID!
+  auths: [String!]!
 }
 
 type Me {
@@ -1086,10 +1329,53 @@ type Me {
   email: String!
   lang: Lang!
   theme: Theme!
+  host: String
   myWorkspaceId: ID!
   auths: [String!]!
   workspaces: [Workspace!]!
   myWorkspace: Workspace!
+}
+
+input SignUpInput {
+  id: ID!
+  workspaceID: ID!
+  name: String!
+  email: String!
+  password: String!
+  secret: String
+  lang: Lang
+  theme: Theme
+  mockAuth: Boolean
+}
+
+input SignupOIDCInput {
+  name: String!
+  email: String!
+  sub: String!
+  secret: String
+}
+
+input FindOrCreateInput {
+  sub: String!
+  iss: String!
+  token: String!
+}
+
+input VerifyUserInput {
+  code: String!
+}
+
+input CreateVerificationInput {
+  email: String!
+}
+
+input StartPasswordResetInput {
+  email: String!
+}
+
+input PasswordResetInput {
+  password: String!
+  token: String!
 }
 
 input UpdateMeInput {
@@ -1114,6 +1400,10 @@ extend type Query {
   searchUser(nameOrEmail: String!): User
 }
 
+type UserPayload {
+  user: User!
+}
+
 type UpdateMePayload {
   me: Me!
 }
@@ -1126,6 +1416,13 @@ extend type Mutation {
   updateMe(input: UpdateMeInput!): UpdateMePayload
   removeMyAuth(input: RemoveMyAuthInput!): UpdateMePayload
   deleteMe(input: DeleteMeInput!): DeleteMePayload
+  signUp(input: SignUpInput!): UserPayload
+  signUpOIDC(input: SignupOIDCInput!): UserPayload
+  verifyUser(input: VerifyUserInput!): UserPayload
+  findOrCreate(input: FindOrCreateInput!): UserPayload
+  createVerification(input: CreateVerificationInput!): Boolean
+  startPasswordReset(input: StartPasswordResetInput!): Boolean
+  passwordReset(input: PasswordResetInput!): Boolean
 }
 `, BuiltIn: false},
 	{Name: "../../../schemas/workspace.graphql", Input: `type Workspace implements Node {
@@ -1140,6 +1437,7 @@ union WorkspaceMember = WorkspaceUserMember | WorkspaceIntegrationMember
 type WorkspaceUserMember {
     userId: ID!
     role: Role!
+    host: String
     user: User
 }
 
@@ -1192,9 +1490,19 @@ input RemoveUserFromWorkspaceInput {
     userId: ID!
 }
 
+input RemoveMultipleUsersFromWorkspaceInput {
+    workspaceId: ID!
+    userIds: [ID!]!
+}
+
 input RemoveIntegrationFromWorkspaceInput {
     workspaceId: ID!
     integrationId: ID!
+}
+
+input RemoveIntegrationsFromWorkspaceInput {
+    workspaceId: ID!
+    integrationIds: [ID!]!
 }
 
 input UpdateUserOfWorkspaceInput {
@@ -1231,12 +1539,24 @@ type RemoveMemberFromWorkspacePayload {
     workspace: Workspace!
 }
 
+type RemoveIntegrationsFromWorkspacePayload {
+    workspace: Workspace!
+}
+
+type RemoveMultipleMembersFromWorkspacePayload {
+    workspace: Workspace!
+}
+
 type UpdateMemberOfWorkspacePayload {
     workspace: Workspace!
 }
 
 type DeleteWorkspacePayload {
     workspaceId: ID!
+}
+
+extend type Query {
+    findByUser(userId: ID!): [Workspace]
 }
 
 extend type Mutation {
@@ -1246,7 +1566,9 @@ extend type Mutation {
     addUsersToWorkspace(input: AddUsersToWorkspaceInput!): AddUsersToWorkspacePayload
     addIntegrationToWorkspace(input: AddIntegrationToWorkspaceInput!): AddUsersToWorkspacePayload
     removeUserFromWorkspace(input: RemoveUserFromWorkspaceInput!): RemoveMemberFromWorkspacePayload
+    removeMultipleUsersFromWorkspace(input: RemoveMultipleUsersFromWorkspaceInput!): RemoveMultipleMembersFromWorkspacePayload
     removeIntegrationFromWorkspace(input: RemoveIntegrationFromWorkspaceInput!): RemoveMemberFromWorkspacePayload
+    removeIntegrationsFromWorkspace(input: RemoveIntegrationsFromWorkspaceInput!): RemoveIntegrationsFromWorkspacePayload
     updateUserOfWorkspace(input: UpdateUserOfWorkspaceInput!): UpdateMemberOfWorkspacePayload
     updateIntegrationOfWorkspace(input: UpdateIntegrationOfWorkspaceInput!): UpdateMemberOfWorkspacePayload
 }`, BuiltIn: false},
@@ -1341,6 +1663,34 @@ func (ec *executionContext) field_Mutation_addUsersToWorkspace_argsInput(
 	return zeroVal, nil
 }
 
+func (ec *executionContext) field_Mutation_createVerification_args(ctx context.Context, rawArgs map[string]any) (map[string]any, error) {
+	var err error
+	args := map[string]any{}
+	arg0, err := ec.field_Mutation_createVerification_argsInput(ctx, rawArgs)
+	if err != nil {
+		return nil, err
+	}
+	args["input"] = arg0
+	return args, nil
+}
+func (ec *executionContext) field_Mutation_createVerification_argsInput(
+	ctx context.Context,
+	rawArgs map[string]any,
+) (gqlmodel.CreateVerificationInput, error) {
+	if _, ok := rawArgs["input"]; !ok {
+		var zeroVal gqlmodel.CreateVerificationInput
+		return zeroVal, nil
+	}
+
+	ctx = graphql.WithPathContext(ctx, graphql.NewPathWithField("input"))
+	if tmp, ok := rawArgs["input"]; ok {
+		return ec.unmarshalNCreateVerificationInput2githubᚗcomᚋreearthᚋreearthᚑaccountsᚋinternalᚋadapterᚋgqlᚋgqlmodelᚐCreateVerificationInput(ctx, tmp)
+	}
+
+	var zeroVal gqlmodel.CreateVerificationInput
+	return zeroVal, nil
+}
+
 func (ec *executionContext) field_Mutation_createWorkspace_args(ctx context.Context, rawArgs map[string]any) (map[string]any, error) {
 	var err error
 	args := map[string]any{}
@@ -1425,6 +1775,62 @@ func (ec *executionContext) field_Mutation_deleteWorkspace_argsInput(
 	return zeroVal, nil
 }
 
+func (ec *executionContext) field_Mutation_findOrCreate_args(ctx context.Context, rawArgs map[string]any) (map[string]any, error) {
+	var err error
+	args := map[string]any{}
+	arg0, err := ec.field_Mutation_findOrCreate_argsInput(ctx, rawArgs)
+	if err != nil {
+		return nil, err
+	}
+	args["input"] = arg0
+	return args, nil
+}
+func (ec *executionContext) field_Mutation_findOrCreate_argsInput(
+	ctx context.Context,
+	rawArgs map[string]any,
+) (gqlmodel.FindOrCreateInput, error) {
+	if _, ok := rawArgs["input"]; !ok {
+		var zeroVal gqlmodel.FindOrCreateInput
+		return zeroVal, nil
+	}
+
+	ctx = graphql.WithPathContext(ctx, graphql.NewPathWithField("input"))
+	if tmp, ok := rawArgs["input"]; ok {
+		return ec.unmarshalNFindOrCreateInput2githubᚗcomᚋreearthᚋreearthᚑaccountsᚋinternalᚋadapterᚋgqlᚋgqlmodelᚐFindOrCreateInput(ctx, tmp)
+	}
+
+	var zeroVal gqlmodel.FindOrCreateInput
+	return zeroVal, nil
+}
+
+func (ec *executionContext) field_Mutation_passwordReset_args(ctx context.Context, rawArgs map[string]any) (map[string]any, error) {
+	var err error
+	args := map[string]any{}
+	arg0, err := ec.field_Mutation_passwordReset_argsInput(ctx, rawArgs)
+	if err != nil {
+		return nil, err
+	}
+	args["input"] = arg0
+	return args, nil
+}
+func (ec *executionContext) field_Mutation_passwordReset_argsInput(
+	ctx context.Context,
+	rawArgs map[string]any,
+) (gqlmodel.PasswordResetInput, error) {
+	if _, ok := rawArgs["input"]; !ok {
+		var zeroVal gqlmodel.PasswordResetInput
+		return zeroVal, nil
+	}
+
+	ctx = graphql.WithPathContext(ctx, graphql.NewPathWithField("input"))
+	if tmp, ok := rawArgs["input"]; ok {
+		return ec.unmarshalNPasswordResetInput2githubᚗcomᚋreearthᚋreearthᚑaccountsᚋinternalᚋadapterᚋgqlᚋgqlmodelᚐPasswordResetInput(ctx, tmp)
+	}
+
+	var zeroVal gqlmodel.PasswordResetInput
+	return zeroVal, nil
+}
+
 func (ec *executionContext) field_Mutation_removeIntegrationFromWorkspace_args(ctx context.Context, rawArgs map[string]any) (map[string]any, error) {
 	var err error
 	args := map[string]any{}
@@ -1450,6 +1856,62 @@ func (ec *executionContext) field_Mutation_removeIntegrationFromWorkspace_argsIn
 	}
 
 	var zeroVal gqlmodel.RemoveIntegrationFromWorkspaceInput
+	return zeroVal, nil
+}
+
+func (ec *executionContext) field_Mutation_removeIntegrationsFromWorkspace_args(ctx context.Context, rawArgs map[string]any) (map[string]any, error) {
+	var err error
+	args := map[string]any{}
+	arg0, err := ec.field_Mutation_removeIntegrationsFromWorkspace_argsInput(ctx, rawArgs)
+	if err != nil {
+		return nil, err
+	}
+	args["input"] = arg0
+	return args, nil
+}
+func (ec *executionContext) field_Mutation_removeIntegrationsFromWorkspace_argsInput(
+	ctx context.Context,
+	rawArgs map[string]any,
+) (gqlmodel.RemoveIntegrationsFromWorkspaceInput, error) {
+	if _, ok := rawArgs["input"]; !ok {
+		var zeroVal gqlmodel.RemoveIntegrationsFromWorkspaceInput
+		return zeroVal, nil
+	}
+
+	ctx = graphql.WithPathContext(ctx, graphql.NewPathWithField("input"))
+	if tmp, ok := rawArgs["input"]; ok {
+		return ec.unmarshalNRemoveIntegrationsFromWorkspaceInput2githubᚗcomᚋreearthᚋreearthᚑaccountsᚋinternalᚋadapterᚋgqlᚋgqlmodelᚐRemoveIntegrationsFromWorkspaceInput(ctx, tmp)
+	}
+
+	var zeroVal gqlmodel.RemoveIntegrationsFromWorkspaceInput
+	return zeroVal, nil
+}
+
+func (ec *executionContext) field_Mutation_removeMultipleUsersFromWorkspace_args(ctx context.Context, rawArgs map[string]any) (map[string]any, error) {
+	var err error
+	args := map[string]any{}
+	arg0, err := ec.field_Mutation_removeMultipleUsersFromWorkspace_argsInput(ctx, rawArgs)
+	if err != nil {
+		return nil, err
+	}
+	args["input"] = arg0
+	return args, nil
+}
+func (ec *executionContext) field_Mutation_removeMultipleUsersFromWorkspace_argsInput(
+	ctx context.Context,
+	rawArgs map[string]any,
+) (gqlmodel.RemoveMultipleUsersFromWorkspaceInput, error) {
+	if _, ok := rawArgs["input"]; !ok {
+		var zeroVal gqlmodel.RemoveMultipleUsersFromWorkspaceInput
+		return zeroVal, nil
+	}
+
+	ctx = graphql.WithPathContext(ctx, graphql.NewPathWithField("input"))
+	if tmp, ok := rawArgs["input"]; ok {
+		return ec.unmarshalNRemoveMultipleUsersFromWorkspaceInput2githubᚗcomᚋreearthᚋreearthᚑaccountsᚋinternalᚋadapterᚋgqlᚋgqlmodelᚐRemoveMultipleUsersFromWorkspaceInput(ctx, tmp)
+	}
+
+	var zeroVal gqlmodel.RemoveMultipleUsersFromWorkspaceInput
 	return zeroVal, nil
 }
 
@@ -1534,6 +1996,90 @@ func (ec *executionContext) field_Mutation_removeUserFromWorkspace_argsInput(
 	}
 
 	var zeroVal gqlmodel.RemoveUserFromWorkspaceInput
+	return zeroVal, nil
+}
+
+func (ec *executionContext) field_Mutation_signUpOIDC_args(ctx context.Context, rawArgs map[string]any) (map[string]any, error) {
+	var err error
+	args := map[string]any{}
+	arg0, err := ec.field_Mutation_signUpOIDC_argsInput(ctx, rawArgs)
+	if err != nil {
+		return nil, err
+	}
+	args["input"] = arg0
+	return args, nil
+}
+func (ec *executionContext) field_Mutation_signUpOIDC_argsInput(
+	ctx context.Context,
+	rawArgs map[string]any,
+) (gqlmodel.SignupOIDCInput, error) {
+	if _, ok := rawArgs["input"]; !ok {
+		var zeroVal gqlmodel.SignupOIDCInput
+		return zeroVal, nil
+	}
+
+	ctx = graphql.WithPathContext(ctx, graphql.NewPathWithField("input"))
+	if tmp, ok := rawArgs["input"]; ok {
+		return ec.unmarshalNSignupOIDCInput2githubᚗcomᚋreearthᚋreearthᚑaccountsᚋinternalᚋadapterᚋgqlᚋgqlmodelᚐSignupOIDCInput(ctx, tmp)
+	}
+
+	var zeroVal gqlmodel.SignupOIDCInput
+	return zeroVal, nil
+}
+
+func (ec *executionContext) field_Mutation_signUp_args(ctx context.Context, rawArgs map[string]any) (map[string]any, error) {
+	var err error
+	args := map[string]any{}
+	arg0, err := ec.field_Mutation_signUp_argsInput(ctx, rawArgs)
+	if err != nil {
+		return nil, err
+	}
+	args["input"] = arg0
+	return args, nil
+}
+func (ec *executionContext) field_Mutation_signUp_argsInput(
+	ctx context.Context,
+	rawArgs map[string]any,
+) (gqlmodel.SignUpInput, error) {
+	if _, ok := rawArgs["input"]; !ok {
+		var zeroVal gqlmodel.SignUpInput
+		return zeroVal, nil
+	}
+
+	ctx = graphql.WithPathContext(ctx, graphql.NewPathWithField("input"))
+	if tmp, ok := rawArgs["input"]; ok {
+		return ec.unmarshalNSignUpInput2githubᚗcomᚋreearthᚋreearthᚑaccountsᚋinternalᚋadapterᚋgqlᚋgqlmodelᚐSignUpInput(ctx, tmp)
+	}
+
+	var zeroVal gqlmodel.SignUpInput
+	return zeroVal, nil
+}
+
+func (ec *executionContext) field_Mutation_startPasswordReset_args(ctx context.Context, rawArgs map[string]any) (map[string]any, error) {
+	var err error
+	args := map[string]any{}
+	arg0, err := ec.field_Mutation_startPasswordReset_argsInput(ctx, rawArgs)
+	if err != nil {
+		return nil, err
+	}
+	args["input"] = arg0
+	return args, nil
+}
+func (ec *executionContext) field_Mutation_startPasswordReset_argsInput(
+	ctx context.Context,
+	rawArgs map[string]any,
+) (gqlmodel.StartPasswordResetInput, error) {
+	if _, ok := rawArgs["input"]; !ok {
+		var zeroVal gqlmodel.StartPasswordResetInput
+		return zeroVal, nil
+	}
+
+	ctx = graphql.WithPathContext(ctx, graphql.NewPathWithField("input"))
+	if tmp, ok := rawArgs["input"]; ok {
+		return ec.unmarshalNStartPasswordResetInput2githubᚗcomᚋreearthᚋreearthᚑaccountsᚋinternalᚋadapterᚋgqlᚋgqlmodelᚐStartPasswordResetInput(ctx, tmp)
+	}
+
+	var zeroVal gqlmodel.StartPasswordResetInput
 	return zeroVal, nil
 }
 
@@ -1705,6 +2251,34 @@ func (ec *executionContext) field_Mutation_updateWorkspace_argsInput(
 	return zeroVal, nil
 }
 
+func (ec *executionContext) field_Mutation_verifyUser_args(ctx context.Context, rawArgs map[string]any) (map[string]any, error) {
+	var err error
+	args := map[string]any{}
+	arg0, err := ec.field_Mutation_verifyUser_argsInput(ctx, rawArgs)
+	if err != nil {
+		return nil, err
+	}
+	args["input"] = arg0
+	return args, nil
+}
+func (ec *executionContext) field_Mutation_verifyUser_argsInput(
+	ctx context.Context,
+	rawArgs map[string]any,
+) (gqlmodel.VerifyUserInput, error) {
+	if _, ok := rawArgs["input"]; !ok {
+		var zeroVal gqlmodel.VerifyUserInput
+		return zeroVal, nil
+	}
+
+	ctx = graphql.WithPathContext(ctx, graphql.NewPathWithField("input"))
+	if tmp, ok := rawArgs["input"]; ok {
+		return ec.unmarshalNVerifyUserInput2githubᚗcomᚋreearthᚋreearthᚑaccountsᚋinternalᚋadapterᚋgqlᚋgqlmodelᚐVerifyUserInput(ctx, tmp)
+	}
+
+	var zeroVal gqlmodel.VerifyUserInput
+	return zeroVal, nil
+}
+
 func (ec *executionContext) field_Query___type_args(ctx context.Context, rawArgs map[string]any) (map[string]any, error) {
 	var err error
 	args := map[string]any{}
@@ -1758,6 +2332,34 @@ func (ec *executionContext) field_Query_checkPermission_argsInput(
 	}
 
 	var zeroVal gqlmodel.CheckPermissionInput
+	return zeroVal, nil
+}
+
+func (ec *executionContext) field_Query_findByUser_args(ctx context.Context, rawArgs map[string]any) (map[string]any, error) {
+	var err error
+	args := map[string]any{}
+	arg0, err := ec.field_Query_findByUser_argsUserID(ctx, rawArgs)
+	if err != nil {
+		return nil, err
+	}
+	args["userId"] = arg0
+	return args, nil
+}
+func (ec *executionContext) field_Query_findByUser_argsUserID(
+	ctx context.Context,
+	rawArgs map[string]any,
+) (gqlmodel.ID, error) {
+	if _, ok := rawArgs["userId"]; !ok {
+		var zeroVal gqlmodel.ID
+		return zeroVal, nil
+	}
+
+	ctx = graphql.WithPathContext(ctx, graphql.NewPathWithField("userId"))
+	if tmp, ok := rawArgs["userId"]; ok {
+		return ec.unmarshalNID2githubᚗcomᚋreearthᚋreearthᚑaccountsᚋinternalᚋadapterᚋgqlᚋgqlmodelᚐID(ctx, tmp)
+	}
+
+	var zeroVal gqlmodel.ID
 	return zeroVal, nil
 }
 
@@ -2571,6 +3173,47 @@ func (ec *executionContext) fieldContext_Me_theme(_ context.Context, field graph
 	return fc, nil
 }
 
+func (ec *executionContext) _Me_host(ctx context.Context, field graphql.CollectedField, obj *gqlmodel.Me) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_Me_host(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (any, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.Host, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		return graphql.Null
+	}
+	res := resTmp.(*string)
+	fc.Result = res
+	return ec.marshalOString2ᚖstring(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_Me_host(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "Me",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type String does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
 func (ec *executionContext) _Me_myWorkspaceId(ctx context.Context, field graphql.CollectedField, obj *gqlmodel.Me) (ret graphql.Marshaler) {
 	fc, err := ec.fieldContext_Me_myWorkspaceId(ctx, field)
 	if err != nil {
@@ -3159,6 +3802,386 @@ func (ec *executionContext) fieldContext_Mutation_deleteMe(ctx context.Context, 
 	return fc, nil
 }
 
+func (ec *executionContext) _Mutation_signUp(ctx context.Context, field graphql.CollectedField) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_Mutation_signUp(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (any, error) {
+		ctx = rctx // use context from middleware stack in children
+		return ec.resolvers.Mutation().SignUp(rctx, fc.Args["input"].(gqlmodel.SignUpInput))
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		return graphql.Null
+	}
+	res := resTmp.(*gqlmodel.UserPayload)
+	fc.Result = res
+	return ec.marshalOUserPayload2ᚖgithubᚗcomᚋreearthᚋreearthᚑaccountsᚋinternalᚋadapterᚋgqlᚋgqlmodelᚐUserPayload(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_Mutation_signUp(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "Mutation",
+		Field:      field,
+		IsMethod:   true,
+		IsResolver: true,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			switch field.Name {
+			case "user":
+				return ec.fieldContext_UserPayload_user(ctx, field)
+			}
+			return nil, fmt.Errorf("no field named %q was found under type UserPayload", field.Name)
+		},
+	}
+	defer func() {
+		if r := recover(); r != nil {
+			err = ec.Recover(ctx, r)
+			ec.Error(ctx, err)
+		}
+	}()
+	ctx = graphql.WithFieldContext(ctx, fc)
+	if fc.Args, err = ec.field_Mutation_signUp_args(ctx, field.ArgumentMap(ec.Variables)); err != nil {
+		ec.Error(ctx, err)
+		return fc, err
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _Mutation_signUpOIDC(ctx context.Context, field graphql.CollectedField) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_Mutation_signUpOIDC(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (any, error) {
+		ctx = rctx // use context from middleware stack in children
+		return ec.resolvers.Mutation().SignUpOidc(rctx, fc.Args["input"].(gqlmodel.SignupOIDCInput))
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		return graphql.Null
+	}
+	res := resTmp.(*gqlmodel.UserPayload)
+	fc.Result = res
+	return ec.marshalOUserPayload2ᚖgithubᚗcomᚋreearthᚋreearthᚑaccountsᚋinternalᚋadapterᚋgqlᚋgqlmodelᚐUserPayload(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_Mutation_signUpOIDC(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "Mutation",
+		Field:      field,
+		IsMethod:   true,
+		IsResolver: true,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			switch field.Name {
+			case "user":
+				return ec.fieldContext_UserPayload_user(ctx, field)
+			}
+			return nil, fmt.Errorf("no field named %q was found under type UserPayload", field.Name)
+		},
+	}
+	defer func() {
+		if r := recover(); r != nil {
+			err = ec.Recover(ctx, r)
+			ec.Error(ctx, err)
+		}
+	}()
+	ctx = graphql.WithFieldContext(ctx, fc)
+	if fc.Args, err = ec.field_Mutation_signUpOIDC_args(ctx, field.ArgumentMap(ec.Variables)); err != nil {
+		ec.Error(ctx, err)
+		return fc, err
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _Mutation_verifyUser(ctx context.Context, field graphql.CollectedField) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_Mutation_verifyUser(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (any, error) {
+		ctx = rctx // use context from middleware stack in children
+		return ec.resolvers.Mutation().VerifyUser(rctx, fc.Args["input"].(gqlmodel.VerifyUserInput))
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		return graphql.Null
+	}
+	res := resTmp.(*gqlmodel.UserPayload)
+	fc.Result = res
+	return ec.marshalOUserPayload2ᚖgithubᚗcomᚋreearthᚋreearthᚑaccountsᚋinternalᚋadapterᚋgqlᚋgqlmodelᚐUserPayload(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_Mutation_verifyUser(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "Mutation",
+		Field:      field,
+		IsMethod:   true,
+		IsResolver: true,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			switch field.Name {
+			case "user":
+				return ec.fieldContext_UserPayload_user(ctx, field)
+			}
+			return nil, fmt.Errorf("no field named %q was found under type UserPayload", field.Name)
+		},
+	}
+	defer func() {
+		if r := recover(); r != nil {
+			err = ec.Recover(ctx, r)
+			ec.Error(ctx, err)
+		}
+	}()
+	ctx = graphql.WithFieldContext(ctx, fc)
+	if fc.Args, err = ec.field_Mutation_verifyUser_args(ctx, field.ArgumentMap(ec.Variables)); err != nil {
+		ec.Error(ctx, err)
+		return fc, err
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _Mutation_findOrCreate(ctx context.Context, field graphql.CollectedField) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_Mutation_findOrCreate(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (any, error) {
+		ctx = rctx // use context from middleware stack in children
+		return ec.resolvers.Mutation().FindOrCreate(rctx, fc.Args["input"].(gqlmodel.FindOrCreateInput))
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		return graphql.Null
+	}
+	res := resTmp.(*gqlmodel.UserPayload)
+	fc.Result = res
+	return ec.marshalOUserPayload2ᚖgithubᚗcomᚋreearthᚋreearthᚑaccountsᚋinternalᚋadapterᚋgqlᚋgqlmodelᚐUserPayload(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_Mutation_findOrCreate(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "Mutation",
+		Field:      field,
+		IsMethod:   true,
+		IsResolver: true,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			switch field.Name {
+			case "user":
+				return ec.fieldContext_UserPayload_user(ctx, field)
+			}
+			return nil, fmt.Errorf("no field named %q was found under type UserPayload", field.Name)
+		},
+	}
+	defer func() {
+		if r := recover(); r != nil {
+			err = ec.Recover(ctx, r)
+			ec.Error(ctx, err)
+		}
+	}()
+	ctx = graphql.WithFieldContext(ctx, fc)
+	if fc.Args, err = ec.field_Mutation_findOrCreate_args(ctx, field.ArgumentMap(ec.Variables)); err != nil {
+		ec.Error(ctx, err)
+		return fc, err
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _Mutation_createVerification(ctx context.Context, field graphql.CollectedField) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_Mutation_createVerification(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (any, error) {
+		ctx = rctx // use context from middleware stack in children
+		return ec.resolvers.Mutation().CreateVerification(rctx, fc.Args["input"].(gqlmodel.CreateVerificationInput))
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		return graphql.Null
+	}
+	res := resTmp.(*bool)
+	fc.Result = res
+	return ec.marshalOBoolean2ᚖbool(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_Mutation_createVerification(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "Mutation",
+		Field:      field,
+		IsMethod:   true,
+		IsResolver: true,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type Boolean does not have child fields")
+		},
+	}
+	defer func() {
+		if r := recover(); r != nil {
+			err = ec.Recover(ctx, r)
+			ec.Error(ctx, err)
+		}
+	}()
+	ctx = graphql.WithFieldContext(ctx, fc)
+	if fc.Args, err = ec.field_Mutation_createVerification_args(ctx, field.ArgumentMap(ec.Variables)); err != nil {
+		ec.Error(ctx, err)
+		return fc, err
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _Mutation_startPasswordReset(ctx context.Context, field graphql.CollectedField) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_Mutation_startPasswordReset(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (any, error) {
+		ctx = rctx // use context from middleware stack in children
+		return ec.resolvers.Mutation().StartPasswordReset(rctx, fc.Args["input"].(gqlmodel.StartPasswordResetInput))
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		return graphql.Null
+	}
+	res := resTmp.(*bool)
+	fc.Result = res
+	return ec.marshalOBoolean2ᚖbool(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_Mutation_startPasswordReset(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "Mutation",
+		Field:      field,
+		IsMethod:   true,
+		IsResolver: true,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type Boolean does not have child fields")
+		},
+	}
+	defer func() {
+		if r := recover(); r != nil {
+			err = ec.Recover(ctx, r)
+			ec.Error(ctx, err)
+		}
+	}()
+	ctx = graphql.WithFieldContext(ctx, fc)
+	if fc.Args, err = ec.field_Mutation_startPasswordReset_args(ctx, field.ArgumentMap(ec.Variables)); err != nil {
+		ec.Error(ctx, err)
+		return fc, err
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _Mutation_passwordReset(ctx context.Context, field graphql.CollectedField) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_Mutation_passwordReset(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (any, error) {
+		ctx = rctx // use context from middleware stack in children
+		return ec.resolvers.Mutation().PasswordReset(rctx, fc.Args["input"].(gqlmodel.PasswordResetInput))
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		return graphql.Null
+	}
+	res := resTmp.(*bool)
+	fc.Result = res
+	return ec.marshalOBoolean2ᚖbool(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_Mutation_passwordReset(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "Mutation",
+		Field:      field,
+		IsMethod:   true,
+		IsResolver: true,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type Boolean does not have child fields")
+		},
+	}
+	defer func() {
+		if r := recover(); r != nil {
+			err = ec.Recover(ctx, r)
+			ec.Error(ctx, err)
+		}
+	}()
+	ctx = graphql.WithFieldContext(ctx, fc)
+	if fc.Args, err = ec.field_Mutation_passwordReset_args(ctx, field.ArgumentMap(ec.Variables)); err != nil {
+		ec.Error(ctx, err)
+		return fc, err
+	}
+	return fc, nil
+}
+
 func (ec *executionContext) _Mutation_createWorkspace(ctx context.Context, field graphql.CollectedField) (ret graphql.Marshaler) {
 	fc, err := ec.fieldContext_Mutation_createWorkspace(ctx, field)
 	if err != nil {
@@ -3495,6 +4518,62 @@ func (ec *executionContext) fieldContext_Mutation_removeUserFromWorkspace(ctx co
 	return fc, nil
 }
 
+func (ec *executionContext) _Mutation_removeMultipleUsersFromWorkspace(ctx context.Context, field graphql.CollectedField) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_Mutation_removeMultipleUsersFromWorkspace(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (any, error) {
+		ctx = rctx // use context from middleware stack in children
+		return ec.resolvers.Mutation().RemoveMultipleUsersFromWorkspace(rctx, fc.Args["input"].(gqlmodel.RemoveMultipleUsersFromWorkspaceInput))
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		return graphql.Null
+	}
+	res := resTmp.(*gqlmodel.RemoveMultipleMembersFromWorkspacePayload)
+	fc.Result = res
+	return ec.marshalORemoveMultipleMembersFromWorkspacePayload2ᚖgithubᚗcomᚋreearthᚋreearthᚑaccountsᚋinternalᚋadapterᚋgqlᚋgqlmodelᚐRemoveMultipleMembersFromWorkspacePayload(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_Mutation_removeMultipleUsersFromWorkspace(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "Mutation",
+		Field:      field,
+		IsMethod:   true,
+		IsResolver: true,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			switch field.Name {
+			case "workspace":
+				return ec.fieldContext_RemoveMultipleMembersFromWorkspacePayload_workspace(ctx, field)
+			}
+			return nil, fmt.Errorf("no field named %q was found under type RemoveMultipleMembersFromWorkspacePayload", field.Name)
+		},
+	}
+	defer func() {
+		if r := recover(); r != nil {
+			err = ec.Recover(ctx, r)
+			ec.Error(ctx, err)
+		}
+	}()
+	ctx = graphql.WithFieldContext(ctx, fc)
+	if fc.Args, err = ec.field_Mutation_removeMultipleUsersFromWorkspace_args(ctx, field.ArgumentMap(ec.Variables)); err != nil {
+		ec.Error(ctx, err)
+		return fc, err
+	}
+	return fc, nil
+}
+
 func (ec *executionContext) _Mutation_removeIntegrationFromWorkspace(ctx context.Context, field graphql.CollectedField) (ret graphql.Marshaler) {
 	fc, err := ec.fieldContext_Mutation_removeIntegrationFromWorkspace(ctx, field)
 	if err != nil {
@@ -3545,6 +4624,62 @@ func (ec *executionContext) fieldContext_Mutation_removeIntegrationFromWorkspace
 	}()
 	ctx = graphql.WithFieldContext(ctx, fc)
 	if fc.Args, err = ec.field_Mutation_removeIntegrationFromWorkspace_args(ctx, field.ArgumentMap(ec.Variables)); err != nil {
+		ec.Error(ctx, err)
+		return fc, err
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _Mutation_removeIntegrationsFromWorkspace(ctx context.Context, field graphql.CollectedField) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_Mutation_removeIntegrationsFromWorkspace(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (any, error) {
+		ctx = rctx // use context from middleware stack in children
+		return ec.resolvers.Mutation().RemoveIntegrationsFromWorkspace(rctx, fc.Args["input"].(gqlmodel.RemoveIntegrationsFromWorkspaceInput))
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		return graphql.Null
+	}
+	res := resTmp.(*gqlmodel.RemoveIntegrationsFromWorkspacePayload)
+	fc.Result = res
+	return ec.marshalORemoveIntegrationsFromWorkspacePayload2ᚖgithubᚗcomᚋreearthᚋreearthᚑaccountsᚋinternalᚋadapterᚋgqlᚋgqlmodelᚐRemoveIntegrationsFromWorkspacePayload(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_Mutation_removeIntegrationsFromWorkspace(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "Mutation",
+		Field:      field,
+		IsMethod:   true,
+		IsResolver: true,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			switch field.Name {
+			case "workspace":
+				return ec.fieldContext_RemoveIntegrationsFromWorkspacePayload_workspace(ctx, field)
+			}
+			return nil, fmt.Errorf("no field named %q was found under type RemoveIntegrationsFromWorkspacePayload", field.Name)
+		},
+	}
+	defer func() {
+		if r := recover(); r != nil {
+			err = ec.Recover(ctx, r)
+			ec.Error(ctx, err)
+		}
+	}()
+	ctx = graphql.WithFieldContext(ctx, fc)
+	if fc.Args, err = ec.field_Mutation_removeIntegrationsFromWorkspace_args(ctx, field.ArgumentMap(ec.Variables)); err != nil {
 		ec.Error(ctx, err)
 		return fc, err
 	}
@@ -4094,6 +5229,8 @@ func (ec *executionContext) fieldContext_Query_me(_ context.Context, field graph
 				return ec.fieldContext_Me_lang(ctx, field)
 			case "theme":
 				return ec.fieldContext_Me_theme(ctx, field)
+			case "host":
+				return ec.fieldContext_Me_host(ctx, field)
 			case "myWorkspaceId":
 				return ec.fieldContext_Me_myWorkspaceId(ctx, field)
 			case "auths":
@@ -4151,6 +5288,16 @@ func (ec *executionContext) fieldContext_Query_searchUser(ctx context.Context, f
 				return ec.fieldContext_User_name(ctx, field)
 			case "email":
 				return ec.fieldContext_User_email(ctx, field)
+			case "lang":
+				return ec.fieldContext_User_lang(ctx, field)
+			case "theme":
+				return ec.fieldContext_User_theme(ctx, field)
+			case "host":
+				return ec.fieldContext_User_host(ctx, field)
+			case "workspace":
+				return ec.fieldContext_User_workspace(ctx, field)
+			case "auths":
+				return ec.fieldContext_User_auths(ctx, field)
 			}
 			return nil, fmt.Errorf("no field named %q was found under type User", field.Name)
 		},
@@ -4163,6 +5310,68 @@ func (ec *executionContext) fieldContext_Query_searchUser(ctx context.Context, f
 	}()
 	ctx = graphql.WithFieldContext(ctx, fc)
 	if fc.Args, err = ec.field_Query_searchUser_args(ctx, field.ArgumentMap(ec.Variables)); err != nil {
+		ec.Error(ctx, err)
+		return fc, err
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _Query_findByUser(ctx context.Context, field graphql.CollectedField) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_Query_findByUser(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (any, error) {
+		ctx = rctx // use context from middleware stack in children
+		return ec.resolvers.Query().FindByUser(rctx, fc.Args["userId"].(gqlmodel.ID))
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		return graphql.Null
+	}
+	res := resTmp.([]*gqlmodel.Workspace)
+	fc.Result = res
+	return ec.marshalOWorkspace2ᚕᚖgithubᚗcomᚋreearthᚋreearthᚑaccountsᚋinternalᚋadapterᚋgqlᚋgqlmodelᚐWorkspace(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_Query_findByUser(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "Query",
+		Field:      field,
+		IsMethod:   true,
+		IsResolver: true,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			switch field.Name {
+			case "id":
+				return ec.fieldContext_Workspace_id(ctx, field)
+			case "name":
+				return ec.fieldContext_Workspace_name(ctx, field)
+			case "members":
+				return ec.fieldContext_Workspace_members(ctx, field)
+			case "personal":
+				return ec.fieldContext_Workspace_personal(ctx, field)
+			}
+			return nil, fmt.Errorf("no field named %q was found under type Workspace", field.Name)
+		},
+	}
+	defer func() {
+		if r := recover(); r != nil {
+			err = ec.Recover(ctx, r)
+			ec.Error(ctx, err)
+		}
+	}()
+	ctx = graphql.WithFieldContext(ctx, fc)
+	if fc.Args, err = ec.field_Query_findByUser_args(ctx, field.ArgumentMap(ec.Variables)); err != nil {
 		ec.Error(ctx, err)
 		return fc, err
 	}
@@ -4300,6 +5509,60 @@ func (ec *executionContext) fieldContext_Query___schema(_ context.Context, field
 	return fc, nil
 }
 
+func (ec *executionContext) _RemoveIntegrationsFromWorkspacePayload_workspace(ctx context.Context, field graphql.CollectedField, obj *gqlmodel.RemoveIntegrationsFromWorkspacePayload) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_RemoveIntegrationsFromWorkspacePayload_workspace(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (any, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.Workspace, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		if !graphql.HasFieldError(ctx, fc) {
+			ec.Errorf(ctx, "must not be null")
+		}
+		return graphql.Null
+	}
+	res := resTmp.(*gqlmodel.Workspace)
+	fc.Result = res
+	return ec.marshalNWorkspace2ᚖgithubᚗcomᚋreearthᚋreearthᚑaccountsᚋinternalᚋadapterᚋgqlᚋgqlmodelᚐWorkspace(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_RemoveIntegrationsFromWorkspacePayload_workspace(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "RemoveIntegrationsFromWorkspacePayload",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			switch field.Name {
+			case "id":
+				return ec.fieldContext_Workspace_id(ctx, field)
+			case "name":
+				return ec.fieldContext_Workspace_name(ctx, field)
+			case "members":
+				return ec.fieldContext_Workspace_members(ctx, field)
+			case "personal":
+				return ec.fieldContext_Workspace_personal(ctx, field)
+			}
+			return nil, fmt.Errorf("no field named %q was found under type Workspace", field.Name)
+		},
+	}
+	return fc, nil
+}
+
 func (ec *executionContext) _RemoveMemberFromWorkspacePayload_workspace(ctx context.Context, field graphql.CollectedField, obj *gqlmodel.RemoveMemberFromWorkspacePayload) (ret graphql.Marshaler) {
 	fc, err := ec.fieldContext_RemoveMemberFromWorkspacePayload_workspace(ctx, field)
 	if err != nil {
@@ -4334,6 +5597,60 @@ func (ec *executionContext) _RemoveMemberFromWorkspacePayload_workspace(ctx cont
 func (ec *executionContext) fieldContext_RemoveMemberFromWorkspacePayload_workspace(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
 	fc = &graphql.FieldContext{
 		Object:     "RemoveMemberFromWorkspacePayload",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			switch field.Name {
+			case "id":
+				return ec.fieldContext_Workspace_id(ctx, field)
+			case "name":
+				return ec.fieldContext_Workspace_name(ctx, field)
+			case "members":
+				return ec.fieldContext_Workspace_members(ctx, field)
+			case "personal":
+				return ec.fieldContext_Workspace_personal(ctx, field)
+			}
+			return nil, fmt.Errorf("no field named %q was found under type Workspace", field.Name)
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _RemoveMultipleMembersFromWorkspacePayload_workspace(ctx context.Context, field graphql.CollectedField, obj *gqlmodel.RemoveMultipleMembersFromWorkspacePayload) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_RemoveMultipleMembersFromWorkspacePayload_workspace(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (any, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.Workspace, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		if !graphql.HasFieldError(ctx, fc) {
+			ec.Errorf(ctx, "must not be null")
+		}
+		return graphql.Null
+	}
+	res := resTmp.(*gqlmodel.Workspace)
+	fc.Result = res
+	return ec.marshalNWorkspace2ᚖgithubᚗcomᚋreearthᚋreearthᚑaccountsᚋinternalᚋadapterᚋgqlᚋgqlmodelᚐWorkspace(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_RemoveMultipleMembersFromWorkspacePayload_workspace(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "RemoveMultipleMembersFromWorkspacePayload",
 		Field:      field,
 		IsMethod:   false,
 		IsResolver: false,
@@ -4585,6 +5902,8 @@ func (ec *executionContext) fieldContext_UpdateMePayload_me(_ context.Context, f
 				return ec.fieldContext_Me_lang(ctx, field)
 			case "theme":
 				return ec.fieldContext_Me_theme(ctx, field)
+			case "host":
+				return ec.fieldContext_Me_host(ctx, field)
 			case "myWorkspaceId":
 				return ec.fieldContext_Me_myWorkspaceId(ctx, field)
 			case "auths":
@@ -4942,6 +6261,285 @@ func (ec *executionContext) fieldContext_User_email(_ context.Context, field gra
 	return fc, nil
 }
 
+func (ec *executionContext) _User_lang(ctx context.Context, field graphql.CollectedField, obj *gqlmodel.User) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_User_lang(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (any, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.Lang, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		if !graphql.HasFieldError(ctx, fc) {
+			ec.Errorf(ctx, "must not be null")
+		}
+		return graphql.Null
+	}
+	res := resTmp.(string)
+	fc.Result = res
+	return ec.marshalNLang2string(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_User_lang(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "User",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type Lang does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _User_theme(ctx context.Context, field graphql.CollectedField, obj *gqlmodel.User) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_User_theme(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (any, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.Theme, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		if !graphql.HasFieldError(ctx, fc) {
+			ec.Errorf(ctx, "must not be null")
+		}
+		return graphql.Null
+	}
+	res := resTmp.(gqlmodel.Theme)
+	fc.Result = res
+	return ec.marshalNTheme2githubᚗcomᚋreearthᚋreearthᚑaccountsᚋinternalᚋadapterᚋgqlᚋgqlmodelᚐTheme(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_User_theme(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "User",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type Theme does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _User_host(ctx context.Context, field graphql.CollectedField, obj *gqlmodel.User) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_User_host(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (any, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.Host, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		return graphql.Null
+	}
+	res := resTmp.(*string)
+	fc.Result = res
+	return ec.marshalOString2ᚖstring(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_User_host(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "User",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type String does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _User_workspace(ctx context.Context, field graphql.CollectedField, obj *gqlmodel.User) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_User_workspace(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (any, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.Workspace, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		if !graphql.HasFieldError(ctx, fc) {
+			ec.Errorf(ctx, "must not be null")
+		}
+		return graphql.Null
+	}
+	res := resTmp.(gqlmodel.ID)
+	fc.Result = res
+	return ec.marshalNID2githubᚗcomᚋreearthᚋreearthᚑaccountsᚋinternalᚋadapterᚋgqlᚋgqlmodelᚐID(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_User_workspace(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "User",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type ID does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _User_auths(ctx context.Context, field graphql.CollectedField, obj *gqlmodel.User) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_User_auths(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (any, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.Auths, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		if !graphql.HasFieldError(ctx, fc) {
+			ec.Errorf(ctx, "must not be null")
+		}
+		return graphql.Null
+	}
+	res := resTmp.([]string)
+	fc.Result = res
+	return ec.marshalNString2ᚕstringᚄ(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_User_auths(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "User",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type String does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _UserPayload_user(ctx context.Context, field graphql.CollectedField, obj *gqlmodel.UserPayload) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_UserPayload_user(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (any, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.User, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		if !graphql.HasFieldError(ctx, fc) {
+			ec.Errorf(ctx, "must not be null")
+		}
+		return graphql.Null
+	}
+	res := resTmp.(*gqlmodel.User)
+	fc.Result = res
+	return ec.marshalNUser2ᚖgithubᚗcomᚋreearthᚋreearthᚑaccountsᚋinternalᚋadapterᚋgqlᚋgqlmodelᚐUser(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_UserPayload_user(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "UserPayload",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			switch field.Name {
+			case "id":
+				return ec.fieldContext_User_id(ctx, field)
+			case "name":
+				return ec.fieldContext_User_name(ctx, field)
+			case "email":
+				return ec.fieldContext_User_email(ctx, field)
+			case "lang":
+				return ec.fieldContext_User_lang(ctx, field)
+			case "theme":
+				return ec.fieldContext_User_theme(ctx, field)
+			case "host":
+				return ec.fieldContext_User_host(ctx, field)
+			case "workspace":
+				return ec.fieldContext_User_workspace(ctx, field)
+			case "auths":
+				return ec.fieldContext_User_auths(ctx, field)
+			}
+			return nil, fmt.Errorf("no field named %q was found under type User", field.Name)
+		},
+	}
+	return fc, nil
+}
+
 func (ec *executionContext) _UserWithRoles_user(ctx context.Context, field graphql.CollectedField, obj *gqlmodel.UserWithRoles) (ret graphql.Marshaler) {
 	fc, err := ec.fieldContext_UserWithRoles_user(ctx, field)
 	if err != nil {
@@ -4987,6 +6585,16 @@ func (ec *executionContext) fieldContext_UserWithRoles_user(_ context.Context, f
 				return ec.fieldContext_User_name(ctx, field)
 			case "email":
 				return ec.fieldContext_User_email(ctx, field)
+			case "lang":
+				return ec.fieldContext_User_lang(ctx, field)
+			case "theme":
+				return ec.fieldContext_User_theme(ctx, field)
+			case "host":
+				return ec.fieldContext_User_host(ctx, field)
+			case "workspace":
+				return ec.fieldContext_User_workspace(ctx, field)
+			case "auths":
+				return ec.fieldContext_User_auths(ctx, field)
 			}
 			return nil, fmt.Errorf("no field named %q was found under type User", field.Name)
 		},
@@ -5438,6 +7046,16 @@ func (ec *executionContext) fieldContext_WorkspaceIntegrationMember_invitedBy(_ 
 				return ec.fieldContext_User_name(ctx, field)
 			case "email":
 				return ec.fieldContext_User_email(ctx, field)
+			case "lang":
+				return ec.fieldContext_User_lang(ctx, field)
+			case "theme":
+				return ec.fieldContext_User_theme(ctx, field)
+			case "host":
+				return ec.fieldContext_User_host(ctx, field)
+			case "workspace":
+				return ec.fieldContext_User_workspace(ctx, field)
+			case "auths":
+				return ec.fieldContext_User_auths(ctx, field)
 			}
 			return nil, fmt.Errorf("no field named %q was found under type User", field.Name)
 		},
@@ -5533,6 +7151,47 @@ func (ec *executionContext) fieldContext_WorkspaceUserMember_role(_ context.Cont
 	return fc, nil
 }
 
+func (ec *executionContext) _WorkspaceUserMember_host(ctx context.Context, field graphql.CollectedField, obj *gqlmodel.WorkspaceUserMember) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_WorkspaceUserMember_host(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (any, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.Host, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		return graphql.Null
+	}
+	res := resTmp.(*string)
+	fc.Result = res
+	return ec.marshalOString2ᚖstring(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_WorkspaceUserMember_host(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "WorkspaceUserMember",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type String does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
 func (ec *executionContext) _WorkspaceUserMember_user(ctx context.Context, field graphql.CollectedField, obj *gqlmodel.WorkspaceUserMember) (ret graphql.Marshaler) {
 	fc, err := ec.fieldContext_WorkspaceUserMember_user(ctx, field)
 	if err != nil {
@@ -5575,6 +7234,16 @@ func (ec *executionContext) fieldContext_WorkspaceUserMember_user(_ context.Cont
 				return ec.fieldContext_User_name(ctx, field)
 			case "email":
 				return ec.fieldContext_User_email(ctx, field)
+			case "lang":
+				return ec.fieldContext_User_lang(ctx, field)
+			case "theme":
+				return ec.fieldContext_User_theme(ctx, field)
+			case "host":
+				return ec.fieldContext_User_host(ctx, field)
+			case "workspace":
+				return ec.fieldContext_User_workspace(ctx, field)
+			case "auths":
+				return ec.fieldContext_User_auths(ctx, field)
 			}
 			return nil, fmt.Errorf("no field named %q was found under type User", field.Name)
 		},
@@ -7683,6 +9352,33 @@ func (ec *executionContext) unmarshalInputCheckPermissionInput(ctx context.Conte
 	return it, nil
 }
 
+func (ec *executionContext) unmarshalInputCreateVerificationInput(ctx context.Context, obj any) (gqlmodel.CreateVerificationInput, error) {
+	var it gqlmodel.CreateVerificationInput
+	asMap := map[string]any{}
+	for k, v := range obj.(map[string]any) {
+		asMap[k] = v
+	}
+
+	fieldsInOrder := [...]string{"email"}
+	for _, k := range fieldsInOrder {
+		v, ok := asMap[k]
+		if !ok {
+			continue
+		}
+		switch k {
+		case "email":
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("email"))
+			data, err := ec.unmarshalNString2string(ctx, v)
+			if err != nil {
+				return it, err
+			}
+			it.Email = data
+		}
+	}
+
+	return it, nil
+}
+
 func (ec *executionContext) unmarshalInputCreateWorkspaceInput(ctx context.Context, obj any) (gqlmodel.CreateWorkspaceInput, error) {
 	var it gqlmodel.CreateWorkspaceInput
 	asMap := map[string]any{}
@@ -7764,6 +9460,47 @@ func (ec *executionContext) unmarshalInputDeleteWorkspaceInput(ctx context.Conte
 	return it, nil
 }
 
+func (ec *executionContext) unmarshalInputFindOrCreateInput(ctx context.Context, obj any) (gqlmodel.FindOrCreateInput, error) {
+	var it gqlmodel.FindOrCreateInput
+	asMap := map[string]any{}
+	for k, v := range obj.(map[string]any) {
+		asMap[k] = v
+	}
+
+	fieldsInOrder := [...]string{"sub", "iss", "token"}
+	for _, k := range fieldsInOrder {
+		v, ok := asMap[k]
+		if !ok {
+			continue
+		}
+		switch k {
+		case "sub":
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("sub"))
+			data, err := ec.unmarshalNString2string(ctx, v)
+			if err != nil {
+				return it, err
+			}
+			it.Sub = data
+		case "iss":
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("iss"))
+			data, err := ec.unmarshalNString2string(ctx, v)
+			if err != nil {
+				return it, err
+			}
+			it.Iss = data
+		case "token":
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("token"))
+			data, err := ec.unmarshalNString2string(ctx, v)
+			if err != nil {
+				return it, err
+			}
+			it.Token = data
+		}
+	}
+
+	return it, nil
+}
+
 func (ec *executionContext) unmarshalInputMemberInput(ctx context.Context, obj any) (gqlmodel.MemberInput, error) {
 	var it gqlmodel.MemberInput
 	asMap := map[string]any{}
@@ -7798,6 +9535,40 @@ func (ec *executionContext) unmarshalInputMemberInput(ctx context.Context, obj a
 	return it, nil
 }
 
+func (ec *executionContext) unmarshalInputPasswordResetInput(ctx context.Context, obj any) (gqlmodel.PasswordResetInput, error) {
+	var it gqlmodel.PasswordResetInput
+	asMap := map[string]any{}
+	for k, v := range obj.(map[string]any) {
+		asMap[k] = v
+	}
+
+	fieldsInOrder := [...]string{"password", "token"}
+	for _, k := range fieldsInOrder {
+		v, ok := asMap[k]
+		if !ok {
+			continue
+		}
+		switch k {
+		case "password":
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("password"))
+			data, err := ec.unmarshalNString2string(ctx, v)
+			if err != nil {
+				return it, err
+			}
+			it.Password = data
+		case "token":
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("token"))
+			data, err := ec.unmarshalNString2string(ctx, v)
+			if err != nil {
+				return it, err
+			}
+			it.Token = data
+		}
+	}
+
+	return it, nil
+}
+
 func (ec *executionContext) unmarshalInputRemoveIntegrationFromWorkspaceInput(ctx context.Context, obj any) (gqlmodel.RemoveIntegrationFromWorkspaceInput, error) {
 	var it gqlmodel.RemoveIntegrationFromWorkspaceInput
 	asMap := map[string]any{}
@@ -7826,6 +9597,74 @@ func (ec *executionContext) unmarshalInputRemoveIntegrationFromWorkspaceInput(ct
 				return it, err
 			}
 			it.IntegrationID = data
+		}
+	}
+
+	return it, nil
+}
+
+func (ec *executionContext) unmarshalInputRemoveIntegrationsFromWorkspaceInput(ctx context.Context, obj any) (gqlmodel.RemoveIntegrationsFromWorkspaceInput, error) {
+	var it gqlmodel.RemoveIntegrationsFromWorkspaceInput
+	asMap := map[string]any{}
+	for k, v := range obj.(map[string]any) {
+		asMap[k] = v
+	}
+
+	fieldsInOrder := [...]string{"workspaceId", "integrationIds"}
+	for _, k := range fieldsInOrder {
+		v, ok := asMap[k]
+		if !ok {
+			continue
+		}
+		switch k {
+		case "workspaceId":
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("workspaceId"))
+			data, err := ec.unmarshalNID2githubᚗcomᚋreearthᚋreearthᚑaccountsᚋinternalᚋadapterᚋgqlᚋgqlmodelᚐID(ctx, v)
+			if err != nil {
+				return it, err
+			}
+			it.WorkspaceID = data
+		case "integrationIds":
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("integrationIds"))
+			data, err := ec.unmarshalNID2ᚕgithubᚗcomᚋreearthᚋreearthᚑaccountsᚋinternalᚋadapterᚋgqlᚋgqlmodelᚐIDᚄ(ctx, v)
+			if err != nil {
+				return it, err
+			}
+			it.IntegrationIds = data
+		}
+	}
+
+	return it, nil
+}
+
+func (ec *executionContext) unmarshalInputRemoveMultipleUsersFromWorkspaceInput(ctx context.Context, obj any) (gqlmodel.RemoveMultipleUsersFromWorkspaceInput, error) {
+	var it gqlmodel.RemoveMultipleUsersFromWorkspaceInput
+	asMap := map[string]any{}
+	for k, v := range obj.(map[string]any) {
+		asMap[k] = v
+	}
+
+	fieldsInOrder := [...]string{"workspaceId", "userIds"}
+	for _, k := range fieldsInOrder {
+		v, ok := asMap[k]
+		if !ok {
+			continue
+		}
+		switch k {
+		case "workspaceId":
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("workspaceId"))
+			data, err := ec.unmarshalNID2githubᚗcomᚋreearthᚋreearthᚑaccountsᚋinternalᚋadapterᚋgqlᚋgqlmodelᚐID(ctx, v)
+			if err != nil {
+				return it, err
+			}
+			it.WorkspaceID = data
+		case "userIds":
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("userIds"))
+			data, err := ec.unmarshalNID2ᚕgithubᚗcomᚋreearthᚋreearthᚑaccountsᚋinternalᚋadapterᚋgqlᚋgqlmodelᚐIDᚄ(ctx, v)
+			if err != nil {
+				return it, err
+			}
+			it.UserIds = data
 		}
 	}
 
@@ -7914,6 +9753,164 @@ func (ec *executionContext) unmarshalInputRemoveUserFromWorkspaceInput(ctx conte
 				return it, err
 			}
 			it.UserID = data
+		}
+	}
+
+	return it, nil
+}
+
+func (ec *executionContext) unmarshalInputSignUpInput(ctx context.Context, obj any) (gqlmodel.SignUpInput, error) {
+	var it gqlmodel.SignUpInput
+	asMap := map[string]any{}
+	for k, v := range obj.(map[string]any) {
+		asMap[k] = v
+	}
+
+	fieldsInOrder := [...]string{"id", "workspaceID", "name", "email", "password", "secret", "lang", "theme", "mockAuth"}
+	for _, k := range fieldsInOrder {
+		v, ok := asMap[k]
+		if !ok {
+			continue
+		}
+		switch k {
+		case "id":
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("id"))
+			data, err := ec.unmarshalNID2githubᚗcomᚋreearthᚋreearthᚑaccountsᚋinternalᚋadapterᚋgqlᚋgqlmodelᚐID(ctx, v)
+			if err != nil {
+				return it, err
+			}
+			it.ID = data
+		case "workspaceID":
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("workspaceID"))
+			data, err := ec.unmarshalNID2githubᚗcomᚋreearthᚋreearthᚑaccountsᚋinternalᚋadapterᚋgqlᚋgqlmodelᚐID(ctx, v)
+			if err != nil {
+				return it, err
+			}
+			it.WorkspaceID = data
+		case "name":
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("name"))
+			data, err := ec.unmarshalNString2string(ctx, v)
+			if err != nil {
+				return it, err
+			}
+			it.Name = data
+		case "email":
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("email"))
+			data, err := ec.unmarshalNString2string(ctx, v)
+			if err != nil {
+				return it, err
+			}
+			it.Email = data
+		case "password":
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("password"))
+			data, err := ec.unmarshalNString2string(ctx, v)
+			if err != nil {
+				return it, err
+			}
+			it.Password = data
+		case "secret":
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("secret"))
+			data, err := ec.unmarshalOString2ᚖstring(ctx, v)
+			if err != nil {
+				return it, err
+			}
+			it.Secret = data
+		case "lang":
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("lang"))
+			data, err := ec.unmarshalOLang2ᚖstring(ctx, v)
+			if err != nil {
+				return it, err
+			}
+			it.Lang = data
+		case "theme":
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("theme"))
+			data, err := ec.unmarshalOTheme2ᚖgithubᚗcomᚋreearthᚋreearthᚑaccountsᚋinternalᚋadapterᚋgqlᚋgqlmodelᚐTheme(ctx, v)
+			if err != nil {
+				return it, err
+			}
+			it.Theme = data
+		case "mockAuth":
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("mockAuth"))
+			data, err := ec.unmarshalOBoolean2ᚖbool(ctx, v)
+			if err != nil {
+				return it, err
+			}
+			it.MockAuth = data
+		}
+	}
+
+	return it, nil
+}
+
+func (ec *executionContext) unmarshalInputSignupOIDCInput(ctx context.Context, obj any) (gqlmodel.SignupOIDCInput, error) {
+	var it gqlmodel.SignupOIDCInput
+	asMap := map[string]any{}
+	for k, v := range obj.(map[string]any) {
+		asMap[k] = v
+	}
+
+	fieldsInOrder := [...]string{"name", "email", "sub", "secret"}
+	for _, k := range fieldsInOrder {
+		v, ok := asMap[k]
+		if !ok {
+			continue
+		}
+		switch k {
+		case "name":
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("name"))
+			data, err := ec.unmarshalNString2string(ctx, v)
+			if err != nil {
+				return it, err
+			}
+			it.Name = data
+		case "email":
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("email"))
+			data, err := ec.unmarshalNString2string(ctx, v)
+			if err != nil {
+				return it, err
+			}
+			it.Email = data
+		case "sub":
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("sub"))
+			data, err := ec.unmarshalNString2string(ctx, v)
+			if err != nil {
+				return it, err
+			}
+			it.Sub = data
+		case "secret":
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("secret"))
+			data, err := ec.unmarshalOString2ᚖstring(ctx, v)
+			if err != nil {
+				return it, err
+			}
+			it.Secret = data
+		}
+	}
+
+	return it, nil
+}
+
+func (ec *executionContext) unmarshalInputStartPasswordResetInput(ctx context.Context, obj any) (gqlmodel.StartPasswordResetInput, error) {
+	var it gqlmodel.StartPasswordResetInput
+	asMap := map[string]any{}
+	for k, v := range obj.(map[string]any) {
+		asMap[k] = v
+	}
+
+	fieldsInOrder := [...]string{"email"}
+	for _, k := range fieldsInOrder {
+		v, ok := asMap[k]
+		if !ok {
+			continue
+		}
+		switch k {
+		case "email":
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("email"))
+			data, err := ec.unmarshalNString2string(ctx, v)
+			if err != nil {
+				return it, err
+			}
+			it.Email = data
 		}
 	}
 
@@ -8160,6 +10157,33 @@ func (ec *executionContext) unmarshalInputUpdateWorkspaceInput(ctx context.Conte
 				return it, err
 			}
 			it.Name = data
+		}
+	}
+
+	return it, nil
+}
+
+func (ec *executionContext) unmarshalInputVerifyUserInput(ctx context.Context, obj any) (gqlmodel.VerifyUserInput, error) {
+	var it gqlmodel.VerifyUserInput
+	asMap := map[string]any{}
+	for k, v := range obj.(map[string]any) {
+		asMap[k] = v
+	}
+
+	fieldsInOrder := [...]string{"code"}
+	for _, k := range fieldsInOrder {
+		v, ok := asMap[k]
+		if !ok {
+			continue
+		}
+		switch k {
+		case "code":
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("code"))
+			data, err := ec.unmarshalNString2string(ctx, v)
+			if err != nil {
+				return it, err
+			}
+			it.Code = data
 		}
 	}
 
@@ -8529,6 +10553,8 @@ func (ec *executionContext) _Me(ctx context.Context, sel ast.SelectionSet, obj *
 			if out.Values[i] == graphql.Null {
 				atomic.AddUint32(&out.Invalids, 1)
 			}
+		case "host":
+			out.Values[i] = ec._Me_host(ctx, field, obj)
 		case "myWorkspaceId":
 			out.Values[i] = ec._Me_myWorkspaceId(ctx, field, obj)
 			if out.Values[i] == graphql.Null {
@@ -8681,6 +10707,34 @@ func (ec *executionContext) _Mutation(ctx context.Context, sel ast.SelectionSet)
 			out.Values[i] = ec.OperationContext.RootResolverMiddleware(innerCtx, func(ctx context.Context) (res graphql.Marshaler) {
 				return ec._Mutation_deleteMe(ctx, field)
 			})
+		case "signUp":
+			out.Values[i] = ec.OperationContext.RootResolverMiddleware(innerCtx, func(ctx context.Context) (res graphql.Marshaler) {
+				return ec._Mutation_signUp(ctx, field)
+			})
+		case "signUpOIDC":
+			out.Values[i] = ec.OperationContext.RootResolverMiddleware(innerCtx, func(ctx context.Context) (res graphql.Marshaler) {
+				return ec._Mutation_signUpOIDC(ctx, field)
+			})
+		case "verifyUser":
+			out.Values[i] = ec.OperationContext.RootResolverMiddleware(innerCtx, func(ctx context.Context) (res graphql.Marshaler) {
+				return ec._Mutation_verifyUser(ctx, field)
+			})
+		case "findOrCreate":
+			out.Values[i] = ec.OperationContext.RootResolverMiddleware(innerCtx, func(ctx context.Context) (res graphql.Marshaler) {
+				return ec._Mutation_findOrCreate(ctx, field)
+			})
+		case "createVerification":
+			out.Values[i] = ec.OperationContext.RootResolverMiddleware(innerCtx, func(ctx context.Context) (res graphql.Marshaler) {
+				return ec._Mutation_createVerification(ctx, field)
+			})
+		case "startPasswordReset":
+			out.Values[i] = ec.OperationContext.RootResolverMiddleware(innerCtx, func(ctx context.Context) (res graphql.Marshaler) {
+				return ec._Mutation_startPasswordReset(ctx, field)
+			})
+		case "passwordReset":
+			out.Values[i] = ec.OperationContext.RootResolverMiddleware(innerCtx, func(ctx context.Context) (res graphql.Marshaler) {
+				return ec._Mutation_passwordReset(ctx, field)
+			})
 		case "createWorkspace":
 			out.Values[i] = ec.OperationContext.RootResolverMiddleware(innerCtx, func(ctx context.Context) (res graphql.Marshaler) {
 				return ec._Mutation_createWorkspace(ctx, field)
@@ -8705,9 +10759,17 @@ func (ec *executionContext) _Mutation(ctx context.Context, sel ast.SelectionSet)
 			out.Values[i] = ec.OperationContext.RootResolverMiddleware(innerCtx, func(ctx context.Context) (res graphql.Marshaler) {
 				return ec._Mutation_removeUserFromWorkspace(ctx, field)
 			})
+		case "removeMultipleUsersFromWorkspace":
+			out.Values[i] = ec.OperationContext.RootResolverMiddleware(innerCtx, func(ctx context.Context) (res graphql.Marshaler) {
+				return ec._Mutation_removeMultipleUsersFromWorkspace(ctx, field)
+			})
 		case "removeIntegrationFromWorkspace":
 			out.Values[i] = ec.OperationContext.RootResolverMiddleware(innerCtx, func(ctx context.Context) (res graphql.Marshaler) {
 				return ec._Mutation_removeIntegrationFromWorkspace(ctx, field)
+			})
+		case "removeIntegrationsFromWorkspace":
+			out.Values[i] = ec.OperationContext.RootResolverMiddleware(innerCtx, func(ctx context.Context) (res graphql.Marshaler) {
+				return ec._Mutation_removeIntegrationsFromWorkspace(ctx, field)
 			})
 		case "updateUserOfWorkspace":
 			out.Values[i] = ec.OperationContext.RootResolverMiddleware(innerCtx, func(ctx context.Context) (res graphql.Marshaler) {
@@ -8944,6 +11006,25 @@ func (ec *executionContext) _Query(ctx context.Context, sel ast.SelectionSet) gr
 			}
 
 			out.Concurrently(i, func(ctx context.Context) graphql.Marshaler { return rrm(innerCtx) })
+		case "findByUser":
+			field := field
+
+			innerFunc := func(ctx context.Context, _ *graphql.FieldSet) (res graphql.Marshaler) {
+				defer func() {
+					if r := recover(); r != nil {
+						ec.Error(ctx, ec.Recover(ctx, r))
+					}
+				}()
+				res = ec._Query_findByUser(ctx, field)
+				return res
+			}
+
+			rrm := func(ctx context.Context) graphql.Marshaler {
+				return ec.OperationContext.RootResolverMiddleware(ctx,
+					func(ctx context.Context) graphql.Marshaler { return innerFunc(ctx, out) })
+			}
+
+			out.Concurrently(i, func(ctx context.Context) graphql.Marshaler { return rrm(innerCtx) })
 		case "__type":
 			out.Values[i] = ec.OperationContext.RootResolverMiddleware(innerCtx, func(ctx context.Context) (res graphql.Marshaler) {
 				return ec._Query___type(ctx, field)
@@ -8952,6 +11033,45 @@ func (ec *executionContext) _Query(ctx context.Context, sel ast.SelectionSet) gr
 			out.Values[i] = ec.OperationContext.RootResolverMiddleware(innerCtx, func(ctx context.Context) (res graphql.Marshaler) {
 				return ec._Query___schema(ctx, field)
 			})
+		default:
+			panic("unknown field " + strconv.Quote(field.Name))
+		}
+	}
+	out.Dispatch(ctx)
+	if out.Invalids > 0 {
+		return graphql.Null
+	}
+
+	atomic.AddInt32(&ec.deferred, int32(len(deferred)))
+
+	for label, dfs := range deferred {
+		ec.processDeferredGroup(graphql.DeferredGroup{
+			Label:    label,
+			Path:     graphql.GetPath(ctx),
+			FieldSet: dfs,
+			Context:  ctx,
+		})
+	}
+
+	return out
+}
+
+var removeIntegrationsFromWorkspacePayloadImplementors = []string{"RemoveIntegrationsFromWorkspacePayload"}
+
+func (ec *executionContext) _RemoveIntegrationsFromWorkspacePayload(ctx context.Context, sel ast.SelectionSet, obj *gqlmodel.RemoveIntegrationsFromWorkspacePayload) graphql.Marshaler {
+	fields := graphql.CollectFields(ec.OperationContext, sel, removeIntegrationsFromWorkspacePayloadImplementors)
+
+	out := graphql.NewFieldSet(fields)
+	deferred := make(map[string]*graphql.FieldSet)
+	for i, field := range fields {
+		switch field.Name {
+		case "__typename":
+			out.Values[i] = graphql.MarshalString("RemoveIntegrationsFromWorkspacePayload")
+		case "workspace":
+			out.Values[i] = ec._RemoveIntegrationsFromWorkspacePayload_workspace(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
 		default:
 			panic("unknown field " + strconv.Quote(field.Name))
 		}
@@ -8988,6 +11108,45 @@ func (ec *executionContext) _RemoveMemberFromWorkspacePayload(ctx context.Contex
 			out.Values[i] = graphql.MarshalString("RemoveMemberFromWorkspacePayload")
 		case "workspace":
 			out.Values[i] = ec._RemoveMemberFromWorkspacePayload_workspace(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		default:
+			panic("unknown field " + strconv.Quote(field.Name))
+		}
+	}
+	out.Dispatch(ctx)
+	if out.Invalids > 0 {
+		return graphql.Null
+	}
+
+	atomic.AddInt32(&ec.deferred, int32(len(deferred)))
+
+	for label, dfs := range deferred {
+		ec.processDeferredGroup(graphql.DeferredGroup{
+			Label:    label,
+			Path:     graphql.GetPath(ctx),
+			FieldSet: dfs,
+			Context:  ctx,
+		})
+	}
+
+	return out
+}
+
+var removeMultipleMembersFromWorkspacePayloadImplementors = []string{"RemoveMultipleMembersFromWorkspacePayload"}
+
+func (ec *executionContext) _RemoveMultipleMembersFromWorkspacePayload(ctx context.Context, sel ast.SelectionSet, obj *gqlmodel.RemoveMultipleMembersFromWorkspacePayload) graphql.Marshaler {
+	fields := graphql.CollectFields(ec.OperationContext, sel, removeMultipleMembersFromWorkspacePayloadImplementors)
+
+	out := graphql.NewFieldSet(fields)
+	deferred := make(map[string]*graphql.FieldSet)
+	for i, field := range fields {
+		switch field.Name {
+		case "__typename":
+			out.Values[i] = graphql.MarshalString("RemoveMultipleMembersFromWorkspacePayload")
+		case "workspace":
+			out.Values[i] = ec._RemoveMultipleMembersFromWorkspacePayload_workspace(ctx, field, obj)
 			if out.Values[i] == graphql.Null {
 				out.Invalids++
 			}
@@ -9357,6 +11516,67 @@ func (ec *executionContext) _User(ctx context.Context, sel ast.SelectionSet, obj
 			if out.Values[i] == graphql.Null {
 				out.Invalids++
 			}
+		case "lang":
+			out.Values[i] = ec._User_lang(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "theme":
+			out.Values[i] = ec._User_theme(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "host":
+			out.Values[i] = ec._User_host(ctx, field, obj)
+		case "workspace":
+			out.Values[i] = ec._User_workspace(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "auths":
+			out.Values[i] = ec._User_auths(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		default:
+			panic("unknown field " + strconv.Quote(field.Name))
+		}
+	}
+	out.Dispatch(ctx)
+	if out.Invalids > 0 {
+		return graphql.Null
+	}
+
+	atomic.AddInt32(&ec.deferred, int32(len(deferred)))
+
+	for label, dfs := range deferred {
+		ec.processDeferredGroup(graphql.DeferredGroup{
+			Label:    label,
+			Path:     graphql.GetPath(ctx),
+			FieldSet: dfs,
+			Context:  ctx,
+		})
+	}
+
+	return out
+}
+
+var userPayloadImplementors = []string{"UserPayload"}
+
+func (ec *executionContext) _UserPayload(ctx context.Context, sel ast.SelectionSet, obj *gqlmodel.UserPayload) graphql.Marshaler {
+	fields := graphql.CollectFields(ec.OperationContext, sel, userPayloadImplementors)
+
+	out := graphql.NewFieldSet(fields)
+	deferred := make(map[string]*graphql.FieldSet)
+	for i, field := range fields {
+		switch field.Name {
+		case "__typename":
+			out.Values[i] = graphql.MarshalString("UserPayload")
+		case "user":
+			out.Values[i] = ec._UserPayload_user(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
 		default:
 			panic("unknown field " + strconv.Quote(field.Name))
 		}
@@ -9555,6 +11775,8 @@ func (ec *executionContext) _WorkspaceUserMember(ctx context.Context, sel ast.Se
 			if out.Values[i] == graphql.Null {
 				atomic.AddUint32(&out.Invalids, 1)
 			}
+		case "host":
+			out.Values[i] = ec._WorkspaceUserMember_host(ctx, field, obj)
 		case "user":
 			field := field
 
@@ -9981,6 +12203,11 @@ func (ec *executionContext) unmarshalNCheckPermissionInput2githubᚗcomᚋreeart
 	return res, graphql.ErrorOnPath(ctx, err)
 }
 
+func (ec *executionContext) unmarshalNCreateVerificationInput2githubᚗcomᚋreearthᚋreearthᚑaccountsᚋinternalᚋadapterᚋgqlᚋgqlmodelᚐCreateVerificationInput(ctx context.Context, v any) (gqlmodel.CreateVerificationInput, error) {
+	res, err := ec.unmarshalInputCreateVerificationInput(ctx, v)
+	return res, graphql.ErrorOnPath(ctx, err)
+}
+
 func (ec *executionContext) unmarshalNCreateWorkspaceInput2githubᚗcomᚋreearthᚋreearthᚑaccountsᚋinternalᚋadapterᚋgqlᚋgqlmodelᚐCreateWorkspaceInput(ctx context.Context, v any) (gqlmodel.CreateWorkspaceInput, error) {
 	res, err := ec.unmarshalInputCreateWorkspaceInput(ctx, v)
 	return res, graphql.ErrorOnPath(ctx, err)
@@ -9993,6 +12220,11 @@ func (ec *executionContext) unmarshalNDeleteMeInput2githubᚗcomᚋreearthᚋree
 
 func (ec *executionContext) unmarshalNDeleteWorkspaceInput2githubᚗcomᚋreearthᚋreearthᚑaccountsᚋinternalᚋadapterᚋgqlᚋgqlmodelᚐDeleteWorkspaceInput(ctx context.Context, v any) (gqlmodel.DeleteWorkspaceInput, error) {
 	res, err := ec.unmarshalInputDeleteWorkspaceInput(ctx, v)
+	return res, graphql.ErrorOnPath(ctx, err)
+}
+
+func (ec *executionContext) unmarshalNFindOrCreateInput2githubᚗcomᚋreearthᚋreearthᚑaccountsᚋinternalᚋadapterᚋgqlᚋgqlmodelᚐFindOrCreateInput(ctx context.Context, v any) (gqlmodel.FindOrCreateInput, error) {
+	res, err := ec.unmarshalInputFindOrCreateInput(ctx, v)
 	return res, graphql.ErrorOnPath(ctx, err)
 }
 
@@ -10101,6 +12333,11 @@ func (ec *executionContext) marshalNNodeType2githubᚗcomᚋreearthᚋreearthᚑ
 	return v
 }
 
+func (ec *executionContext) unmarshalNPasswordResetInput2githubᚗcomᚋreearthᚋreearthᚑaccountsᚋinternalᚋadapterᚋgqlᚋgqlmodelᚐPasswordResetInput(ctx context.Context, v any) (gqlmodel.PasswordResetInput, error) {
+	res, err := ec.unmarshalInputPasswordResetInput(ctx, v)
+	return res, graphql.ErrorOnPath(ctx, err)
+}
+
 func (ec *executionContext) marshalNPermittable2ᚖgithubᚗcomᚋreearthᚋreearthᚑaccountsᚋinternalᚋadapterᚋgqlᚋgqlmodelᚐPermittable(ctx context.Context, sel ast.SelectionSet, v *gqlmodel.Permittable) graphql.Marshaler {
 	if v == nil {
 		if !graphql.HasFieldError(ctx, graphql.GetFieldContext(ctx)) {
@@ -10113,6 +12350,16 @@ func (ec *executionContext) marshalNPermittable2ᚖgithubᚗcomᚋreearthᚋreea
 
 func (ec *executionContext) unmarshalNRemoveIntegrationFromWorkspaceInput2githubᚗcomᚋreearthᚋreearthᚑaccountsᚋinternalᚋadapterᚋgqlᚋgqlmodelᚐRemoveIntegrationFromWorkspaceInput(ctx context.Context, v any) (gqlmodel.RemoveIntegrationFromWorkspaceInput, error) {
 	res, err := ec.unmarshalInputRemoveIntegrationFromWorkspaceInput(ctx, v)
+	return res, graphql.ErrorOnPath(ctx, err)
+}
+
+func (ec *executionContext) unmarshalNRemoveIntegrationsFromWorkspaceInput2githubᚗcomᚋreearthᚋreearthᚑaccountsᚋinternalᚋadapterᚋgqlᚋgqlmodelᚐRemoveIntegrationsFromWorkspaceInput(ctx context.Context, v any) (gqlmodel.RemoveIntegrationsFromWorkspaceInput, error) {
+	res, err := ec.unmarshalInputRemoveIntegrationsFromWorkspaceInput(ctx, v)
+	return res, graphql.ErrorOnPath(ctx, err)
+}
+
+func (ec *executionContext) unmarshalNRemoveMultipleUsersFromWorkspaceInput2githubᚗcomᚋreearthᚋreearthᚑaccountsᚋinternalᚋadapterᚋgqlᚋgqlmodelᚐRemoveMultipleUsersFromWorkspaceInput(ctx context.Context, v any) (gqlmodel.RemoveMultipleUsersFromWorkspaceInput, error) {
+	res, err := ec.unmarshalInputRemoveMultipleUsersFromWorkspaceInput(ctx, v)
 	return res, graphql.ErrorOnPath(ctx, err)
 }
 
@@ -10207,6 +12454,21 @@ func (ec *executionContext) marshalNRolesPayload2ᚖgithubᚗcomᚋreearthᚋree
 		return graphql.Null
 	}
 	return ec._RolesPayload(ctx, sel, v)
+}
+
+func (ec *executionContext) unmarshalNSignUpInput2githubᚗcomᚋreearthᚋreearthᚑaccountsᚋinternalᚋadapterᚋgqlᚋgqlmodelᚐSignUpInput(ctx context.Context, v any) (gqlmodel.SignUpInput, error) {
+	res, err := ec.unmarshalInputSignUpInput(ctx, v)
+	return res, graphql.ErrorOnPath(ctx, err)
+}
+
+func (ec *executionContext) unmarshalNSignupOIDCInput2githubᚗcomᚋreearthᚋreearthᚑaccountsᚋinternalᚋadapterᚋgqlᚋgqlmodelᚐSignupOIDCInput(ctx context.Context, v any) (gqlmodel.SignupOIDCInput, error) {
+	res, err := ec.unmarshalInputSignupOIDCInput(ctx, v)
+	return res, graphql.ErrorOnPath(ctx, err)
+}
+
+func (ec *executionContext) unmarshalNStartPasswordResetInput2githubᚗcomᚋreearthᚋreearthᚑaccountsᚋinternalᚋadapterᚋgqlᚋgqlmodelᚐStartPasswordResetInput(ctx context.Context, v any) (gqlmodel.StartPasswordResetInput, error) {
+	res, err := ec.unmarshalInputStartPasswordResetInput(ctx, v)
+	return res, graphql.ErrorOnPath(ctx, err)
 }
 
 func (ec *executionContext) unmarshalNString2string(ctx context.Context, v any) (string, error) {
@@ -10358,6 +12620,11 @@ func (ec *executionContext) marshalNUserWithRoles2ᚖgithubᚗcomᚋreearthᚋre
 		return graphql.Null
 	}
 	return ec._UserWithRoles(ctx, sel, v)
+}
+
+func (ec *executionContext) unmarshalNVerifyUserInput2githubᚗcomᚋreearthᚋreearthᚑaccountsᚋinternalᚋadapterᚋgqlᚋgqlmodelᚐVerifyUserInput(ctx context.Context, v any) (gqlmodel.VerifyUserInput, error) {
+	res, err := ec.unmarshalInputVerifyUserInput(ctx, v)
+	return res, graphql.ErrorOnPath(ctx, err)
 }
 
 func (ec *executionContext) marshalNWorkspace2githubᚗcomᚋreearthᚋreearthᚑaccountsᚋinternalᚋadapterᚋgqlᚋgqlmodelᚐWorkspace(ctx context.Context, sel ast.SelectionSet, v gqlmodel.Workspace) graphql.Marshaler {
@@ -10871,11 +13138,25 @@ func (ec *executionContext) marshalONode2ᚕgithubᚗcomᚋreearthᚋreearthᚑa
 	return ret
 }
 
+func (ec *executionContext) marshalORemoveIntegrationsFromWorkspacePayload2ᚖgithubᚗcomᚋreearthᚋreearthᚑaccountsᚋinternalᚋadapterᚋgqlᚋgqlmodelᚐRemoveIntegrationsFromWorkspacePayload(ctx context.Context, sel ast.SelectionSet, v *gqlmodel.RemoveIntegrationsFromWorkspacePayload) graphql.Marshaler {
+	if v == nil {
+		return graphql.Null
+	}
+	return ec._RemoveIntegrationsFromWorkspacePayload(ctx, sel, v)
+}
+
 func (ec *executionContext) marshalORemoveMemberFromWorkspacePayload2ᚖgithubᚗcomᚋreearthᚋreearthᚑaccountsᚋinternalᚋadapterᚋgqlᚋgqlmodelᚐRemoveMemberFromWorkspacePayload(ctx context.Context, sel ast.SelectionSet, v *gqlmodel.RemoveMemberFromWorkspacePayload) graphql.Marshaler {
 	if v == nil {
 		return graphql.Null
 	}
 	return ec._RemoveMemberFromWorkspacePayload(ctx, sel, v)
+}
+
+func (ec *executionContext) marshalORemoveMultipleMembersFromWorkspacePayload2ᚖgithubᚗcomᚋreearthᚋreearthᚑaccountsᚋinternalᚋadapterᚋgqlᚋgqlmodelᚐRemoveMultipleMembersFromWorkspacePayload(ctx context.Context, sel ast.SelectionSet, v *gqlmodel.RemoveMultipleMembersFromWorkspacePayload) graphql.Marshaler {
+	if v == nil {
+		return graphql.Null
+	}
+	return ec._RemoveMultipleMembersFromWorkspacePayload(ctx, sel, v)
 }
 
 func (ec *executionContext) marshalORemoveRolePayload2ᚖgithubᚗcomᚋreearthᚋreearthᚑaccountsᚋinternalᚋadapterᚋgqlᚋgqlmodelᚐRemoveRolePayload(ctx context.Context, sel ast.SelectionSet, v *gqlmodel.RemoveRolePayload) graphql.Marshaler {
@@ -10957,6 +13238,61 @@ func (ec *executionContext) marshalOUser2ᚖgithubᚗcomᚋreearthᚋreearthᚑa
 		return graphql.Null
 	}
 	return ec._User(ctx, sel, v)
+}
+
+func (ec *executionContext) marshalOUserPayload2ᚖgithubᚗcomᚋreearthᚋreearthᚑaccountsᚋinternalᚋadapterᚋgqlᚋgqlmodelᚐUserPayload(ctx context.Context, sel ast.SelectionSet, v *gqlmodel.UserPayload) graphql.Marshaler {
+	if v == nil {
+		return graphql.Null
+	}
+	return ec._UserPayload(ctx, sel, v)
+}
+
+func (ec *executionContext) marshalOWorkspace2ᚕᚖgithubᚗcomᚋreearthᚋreearthᚑaccountsᚋinternalᚋadapterᚋgqlᚋgqlmodelᚐWorkspace(ctx context.Context, sel ast.SelectionSet, v []*gqlmodel.Workspace) graphql.Marshaler {
+	if v == nil {
+		return graphql.Null
+	}
+	ret := make(graphql.Array, len(v))
+	var wg sync.WaitGroup
+	isLen1 := len(v) == 1
+	if !isLen1 {
+		wg.Add(len(v))
+	}
+	for i := range v {
+		i := i
+		fc := &graphql.FieldContext{
+			Index:  &i,
+			Result: &v[i],
+		}
+		ctx := graphql.WithFieldContext(ctx, fc)
+		f := func(i int) {
+			defer func() {
+				if r := recover(); r != nil {
+					ec.Error(ctx, ec.Recover(ctx, r))
+					ret = nil
+				}
+			}()
+			if !isLen1 {
+				defer wg.Done()
+			}
+			ret[i] = ec.marshalOWorkspace2ᚖgithubᚗcomᚋreearthᚋreearthᚑaccountsᚋinternalᚋadapterᚋgqlᚋgqlmodelᚐWorkspace(ctx, sel, v[i])
+		}
+		if isLen1 {
+			f(i)
+		} else {
+			go f(i)
+		}
+
+	}
+	wg.Wait()
+
+	return ret
+}
+
+func (ec *executionContext) marshalOWorkspace2ᚖgithubᚗcomᚋreearthᚋreearthᚑaccountsᚋinternalᚋadapterᚋgqlᚋgqlmodelᚐWorkspace(ctx context.Context, sel ast.SelectionSet, v *gqlmodel.Workspace) graphql.Marshaler {
+	if v == nil {
+		return graphql.Null
+	}
+	return ec._Workspace(ctx, sel, v)
 }
 
 func (ec *executionContext) marshalO__EnumValue2ᚕgithubᚗcomᚋ99designsᚋgqlgenᚋgraphqlᚋintrospectionᚐEnumValueᚄ(ctx context.Context, sel ast.SelectionSet, v []introspection.EnumValue) graphql.Marshaler {

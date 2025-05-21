@@ -2,6 +2,11 @@ type User implements Node {
   id: ID!
   name: String!
   email: String!
+  lang: Lang!
+  theme: Theme!
+  host: String
+  workspace: ID!
+  auths: [String!]!
 }
 
 type Me {
@@ -10,10 +15,53 @@ type Me {
   email: String!
   lang: Lang!
   theme: Theme!
+  host: String
   myWorkspaceId: ID!
   auths: [String!]!
   workspaces: [Workspace!]!
   myWorkspace: Workspace!
+}
+
+input SignUpInput {
+  id: ID!
+  workspaceID: ID!
+  name: String!
+  email: String!
+  password: String!
+  secret: String
+  lang: Lang
+  theme: Theme
+  mockAuth: Boolean
+}
+
+input SignupOIDCInput {
+  name: String!
+  email: String!
+  sub: String!
+  secret: String
+}
+
+input FindOrCreateInput {
+  sub: String!
+  iss: String!
+  token: String!
+}
+
+input VerifyUserInput {
+  code: String!
+}
+
+input CreateVerificationInput {
+  email: String!
+}
+
+input StartPasswordResetInput {
+  email: String!
+}
+
+input PasswordResetInput {
+  password: String!
+  token: String!
 }
 
 input UpdateMeInput {
@@ -38,6 +86,10 @@ extend type Query {
   searchUser(nameOrEmail: String!): User
 }
 
+type UserPayload {
+  user: User!
+}
+
 type UpdateMePayload {
   me: Me!
 }
@@ -50,4 +102,11 @@ extend type Mutation {
   updateMe(input: UpdateMeInput!): UpdateMePayload
   removeMyAuth(input: RemoveMyAuthInput!): UpdateMePayload
   deleteMe(input: DeleteMeInput!): DeleteMePayload
+  signUp(input: SignUpInput!): UserPayload
+  signUpOIDC(input: SignupOIDCInput!): UserPayload
+  verifyUser(input: VerifyUserInput!): UserPayload
+  findOrCreate(input: FindOrCreateInput!): UserPayload
+  createVerification(input: CreateVerificationInput!): Boolean
+  startPasswordReset(input: StartPasswordResetInput!): Boolean
+  passwordReset(input: PasswordResetInput!): Boolean
 }

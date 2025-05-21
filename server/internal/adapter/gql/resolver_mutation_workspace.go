@@ -93,6 +93,13 @@ func (r *mutationResolver) RemoveUserFromWorkspace(ctx context.Context, input gq
 	return &gqlmodel.RemoveMemberFromWorkspacePayload{Workspace: gqlmodel.ToWorkspace(res)}, nil
 }
 
+// Temporary stub implementation to satisfy gqlgen after migrating GraphQL files from reearthx/account.
+// This resolver was added to avoid compile-time errors.
+// Will be implemented if needed, or removed if unused after migration.
+func (r *mutationResolver) RemoveMultipleUsersFromWorkspace(ctx context.Context, input gqlmodel.RemoveMultipleUsersFromWorkspaceInput) (*gqlmodel.RemoveMultipleMembersFromWorkspacePayload, error) {
+	return nil, nil
+}
+
 func (r *mutationResolver) RemoveIntegrationFromWorkspace(ctx context.Context, input gqlmodel.RemoveIntegrationFromWorkspaceInput) (*gqlmodel.RemoveMemberFromWorkspacePayload, error) {
 	wId, iId, err := gqlmodel.ToID2[id.Workspace, id.Integration](input.WorkspaceID, input.IntegrationID)
 	if err != nil {
@@ -105,6 +112,13 @@ func (r *mutationResolver) RemoveIntegrationFromWorkspace(ctx context.Context, i
 	}
 
 	return &gqlmodel.RemoveMemberFromWorkspacePayload{Workspace: gqlmodel.ToWorkspace(res)}, nil
+}
+
+// Temporary stub implementation to satisfy gqlgen after migrating GraphQL files from reearthx/account.
+// This resolver was added to avoid compile-time errors.
+// Will be implemented if needed, or removed if unused after migration.
+func (r *mutationResolver) RemoveIntegrationsFromWorkspace(ctx context.Context, input gqlmodel.RemoveIntegrationsFromWorkspaceInput) (*gqlmodel.RemoveIntegrationsFromWorkspacePayload, error) {
+	return nil, nil
 }
 
 func (r *mutationResolver) UpdateUserOfWorkspace(ctx context.Context, input gqlmodel.UpdateUserOfWorkspaceInput) (*gqlmodel.UpdateMemberOfWorkspacePayload, error) {

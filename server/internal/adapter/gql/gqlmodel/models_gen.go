@@ -51,6 +51,10 @@ type CheckPermissionPayload struct {
 	Allowed bool `json:"allowed"`
 }
 
+type CreateVerificationInput struct {
+	Email string `json:"email"`
+}
+
 type CreateWorkspaceInput struct {
 	Name string `json:"name"`
 }
@@ -75,6 +79,12 @@ type DeleteWorkspacePayload struct {
 	WorkspaceID ID `json:"workspaceId"`
 }
 
+type FindOrCreateInput struct {
+	Sub   string `json:"sub"`
+	Iss   string `json:"iss"`
+	Token string `json:"token"`
+}
+
 type GetUsersWithRolesPayload struct {
 	UsersWithRoles []*UserWithRoles `json:"usersWithRoles"`
 }
@@ -85,6 +95,7 @@ type Me struct {
 	Email         string       `json:"email"`
 	Lang          string       `json:"lang"`
 	Theme         Theme        `json:"theme"`
+	Host          *string      `json:"host,omitempty"`
 	MyWorkspaceID ID           `json:"myWorkspaceId"`
 	Auths         []string     `json:"auths"`
 	Workspaces    []*Workspace `json:"workspaces"`
@@ -97,6 +108,11 @@ type MemberInput struct {
 }
 
 type Mutation struct {
+}
+
+type PasswordResetInput struct {
+	Password string `json:"password"`
+	Token    string `json:"token"`
 }
 
 type Permittable struct {
@@ -113,8 +129,26 @@ type RemoveIntegrationFromWorkspaceInput struct {
 	IntegrationID ID `json:"integrationId"`
 }
 
+type RemoveIntegrationsFromWorkspaceInput struct {
+	WorkspaceID    ID   `json:"workspaceId"`
+	IntegrationIds []ID `json:"integrationIds"`
+}
+
+type RemoveIntegrationsFromWorkspacePayload struct {
+	Workspace *Workspace `json:"workspace"`
+}
+
 type RemoveMemberFromWorkspacePayload struct {
 	Workspace *Workspace `json:"workspace"`
+}
+
+type RemoveMultipleMembersFromWorkspacePayload struct {
+	Workspace *Workspace `json:"workspace"`
+}
+
+type RemoveMultipleUsersFromWorkspaceInput struct {
+	WorkspaceID ID   `json:"workspaceId"`
+	UserIds     []ID `json:"userIds"`
 }
 
 type RemoveMyAuthInput struct {
@@ -141,6 +175,29 @@ type RoleForAuthorization struct {
 
 type RolesPayload struct {
 	Roles []*RoleForAuthorization `json:"roles"`
+}
+
+type SignUpInput struct {
+	ID          ID      `json:"id"`
+	WorkspaceID ID      `json:"workspaceID"`
+	Name        string  `json:"name"`
+	Email       string  `json:"email"`
+	Password    string  `json:"password"`
+	Secret      *string `json:"secret,omitempty"`
+	Lang        *string `json:"lang,omitempty"`
+	Theme       *Theme  `json:"theme,omitempty"`
+	MockAuth    *bool   `json:"mockAuth,omitempty"`
+}
+
+type SignupOIDCInput struct {
+	Name   string  `json:"name"`
+	Email  string  `json:"email"`
+	Sub    string  `json:"sub"`
+	Secret *string `json:"secret,omitempty"`
+}
+
+type StartPasswordResetInput struct {
+	Email string `json:"email"`
 }
 
 type UpdateIntegrationOfWorkspaceInput struct {
@@ -200,17 +257,30 @@ type UpdateWorkspacePayload struct {
 }
 
 type User struct {
-	ID    ID     `json:"id"`
-	Name  string `json:"name"`
-	Email string `json:"email"`
+	ID        ID       `json:"id"`
+	Name      string   `json:"name"`
+	Email     string   `json:"email"`
+	Lang      string   `json:"lang"`
+	Theme     Theme    `json:"theme"`
+	Host      *string  `json:"host,omitempty"`
+	Workspace ID       `json:"workspace"`
+	Auths     []string `json:"auths"`
 }
 
 func (User) IsNode()        {}
 func (this User) GetID() ID { return this.ID }
 
+type UserPayload struct {
+	User *User `json:"user"`
+}
+
 type UserWithRoles struct {
 	User  *User                   `json:"user"`
 	Roles []*RoleForAuthorization `json:"roles"`
+}
+
+type VerifyUserInput struct {
+	Code string `json:"code"`
 }
 
 type Workspace struct {
@@ -234,9 +304,10 @@ type WorkspaceIntegrationMember struct {
 func (WorkspaceIntegrationMember) IsWorkspaceMember() {}
 
 type WorkspaceUserMember struct {
-	UserID ID    `json:"userId"`
-	Role   Role  `json:"role"`
-	User   *User `json:"user,omitempty"`
+	UserID ID      `json:"userId"`
+	Role   Role    `json:"role"`
+	Host   *string `json:"host,omitempty"`
+	User   *User   `json:"user,omitempty"`
 }
 
 func (WorkspaceUserMember) IsWorkspaceMember() {}
