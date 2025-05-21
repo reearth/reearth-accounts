@@ -214,9 +214,9 @@ func TestMe(t *testing.T) {
 	o.Value("myWorkspaceId").String().IsEqual(wId.String())
 }
 
-func TestSearchUser(t *testing.T) {
+func TestUserByNameOrEmail(t *testing.T) {
 	e, _ := StartServer(t, &app.Config{}, true, baseSeederUser)
-	query := fmt.Sprintf(` { searchUser(nameOrEmail: "%s"){ id name email } }`, "e2e")
+	query := fmt.Sprintf(` { userByNameOrEmail(nameOrEmail: "%s"){ id name email } }`, "e2e")
 	request := GraphQLRequest{
 		Query: query,
 	}
@@ -228,7 +228,7 @@ func TestSearchUser(t *testing.T) {
 		WithHeader("authorization", "Bearer test").
 		WithHeader("Content-Type", "application/json").
 		WithHeader("X-Reearth-Debug-User", uId.String()).
-		WithBytes(jsonData).Expect().Status(http.StatusOK).JSON().Object().Value("data").Object().Value("searchUser").Object()
+		WithBytes(jsonData).Expect().Status(http.StatusOK).JSON().Object().Value("data").Object().Value("userByNameOrEmail").Object()
 	o.Value("id").String().IsEqual(uId.String())
 	o.Value("name").String().IsEqual("e2e")
 	o.Value("email").String().IsEqual("e2e@e2e.com")
