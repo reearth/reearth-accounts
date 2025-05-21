@@ -10,16 +10,26 @@ import (
 	"go.mongodb.org/mongo-driver/mongo"
 )
 
-func New(ctx context.Context, db *mongo.Database, account *repo.Container, useTransaction bool) (*repo.Container, error) {
+func New(ctx context.Context, db *mongo.Database, useTransaction, needCompat bool, users []repo.User) (*repo.Container, error) {
 	client := mongox.NewClientWithDatabase(db)
 	if useTransaction {
 		client = client.WithTransaction()
 	}
 
+	var ws repo.Workspace
+	if needCompat {
+		ws = NewWorkspaceCompat(client)
+	} else {
+		ws = NewWorkspace(client)
+	}
+
 	c := &repo.Container{
+		User:        NewUser(client),
+		Workspace:   ws,
 		Role:        NewRole(client),
 		Permittable: NewPermittable(client),
 		Transaction: client.Transaction(),
+		Users:       users,
 	}
 
 	// init

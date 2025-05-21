@@ -11,8 +11,7 @@ import (
 	"sync"
 	"time"
 
-	
-	"github.com/reearth/reearthx/account/accountusecase/accountgateway"
+	"github.com/reearth/reearth-accounts/internal/usecase/gateway"
 	"github.com/reearth/reearthx/i18n"
 	"github.com/reearth/reearthx/log"
 	"github.com/reearth/reearthx/rerror"
@@ -47,13 +46,13 @@ type response struct {
 	ErrorDescription string `json:"error_description"`
 }
 
-func (u response) Into() accountgateway.AuthenticatorUser {
+func (u response) Into() gateway.AuthenticatorUser {
 	name := u.UserName
 	if name == "" {
 		name = u.Name
 	}
 
-	return accountgateway.AuthenticatorUser{
+	return gateway.AuthenticatorUser{
 		ID:            u.ID,
 		Name:          name,
 		Email:         u.Email,
@@ -76,7 +75,7 @@ func New(domain, clientID, clientSecret string) *Auth0 {
 	}
 }
 
-func (a *Auth0) UpdateUser(ctx context.Context, p accountgateway.AuthenticatorUpdateUserParam) (data accountgateway.AuthenticatorUser, err error) {
+func (a *Auth0) UpdateUser(ctx context.Context, p gateway.AuthenticatorUpdateUserParam) (data gateway.AuthenticatorUser, err error) {
 	err = a.updateToken()
 	if err != nil {
 		return

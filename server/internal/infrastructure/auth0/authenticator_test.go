@@ -10,7 +10,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/reearth/reearthx/account/accountusecase/accountgateway"
+	"github.com/reearth/reearth-accounts/internal/usecase/gateway"
 
 	"github.com/stretchr/testify/assert"
 )
@@ -53,12 +53,12 @@ func TestAuth0(t *testing.T) {
 	a.current = func() time.Time { return current }
 
 	newEmail := "xxxxx"
-	r, err := a.UpdateUser(context.Background(), accountgateway.AuthenticatorUpdateUserParam{
+	r, err := a.UpdateUser(context.Background(), gateway.AuthenticatorUpdateUserParam{
 		ID:    userID,
 		Email: &newEmail,
 	})
 	assert.NoError(t, err)
-	assert.Equal(t, accountgateway.AuthenticatorUser{
+	assert.Equal(t, gateway.AuthenticatorUser{
 		ID:            userID,
 		Email:         newEmail,
 		EmailVerified: true,
