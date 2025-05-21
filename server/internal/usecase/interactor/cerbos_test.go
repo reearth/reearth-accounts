@@ -30,7 +30,7 @@ func TestNewCerbos(t *testing.T) {
 	}
 	cerbosAdapter := infraCerbos.NewCerbosAdapter(cerbosClient)
 
-	c := NewCerbos(cerbosAdapter, memory)
+	c := NewCerbos(memory, cerbosAdapter)
 	assert.NotNil(t, c)
 }
 

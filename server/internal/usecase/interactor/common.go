@@ -16,17 +16,16 @@ type ContainerConfig struct {
 
 func NewContainer(
 	r *repo.Container,
-	acr *repo.Container,
 	acg *gateway.Container,
 	enforcer WorkspaceMemberCountEnforcer,
 	cerbosAdapter gateway.CerbosGateway,
 	config ContainerConfig) interfaces.Container {
 	return interfaces.Container{
-		User:        NewUser(acr, acg, config.SignupSecret, config.AuthSrvUIDomain),
-		Workspace:   NewWorkspace(acr, enforcer),
-		Cerbos:      NewCerbos(cerbosAdapter, r),
+		User:        NewUser(r, acg, config.SignupSecret, config.AuthSrvUIDomain),
+		Workspace:   NewWorkspace(r, enforcer),
+		Cerbos:      NewCerbos(r, cerbosAdapter),
 		Role:        NewRole(r),
-		Permittable: NewPermittable(r, acr),
+		Permittable: NewPermittable(r),
 	}
 }
 

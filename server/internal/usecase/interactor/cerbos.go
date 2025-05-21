@@ -21,7 +21,7 @@ type Cerbos struct {
 	permittableRepo repo.Permittable
 }
 
-func NewCerbos(cerbos gateway.CerbosGateway, r *repo.Container) interfaces.Cerbos {
+func NewCerbos(r *repo.Container, cerbos gateway.CerbosGateway) interfaces.Cerbos {
 	return &Cerbos{
 		cerbos:          cerbos,
 		roleRepo:        r.Role,

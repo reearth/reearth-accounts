@@ -20,11 +20,11 @@ type Permittable struct {
 	transaction     usecasex.Transaction
 }
 
-func NewPermittable(r *repo.Container, acr *repo.Container) interfaces.Permittable {
+func NewPermittable(r *repo.Container) interfaces.Permittable {
 	return &Permittable{
 		permittableRepo: r.Permittable,
 		roleRepo:        r.Role,
-		userRepo:        acr.User,
+		userRepo:        r.User,
 		transaction:     r.Transaction,
 	}
 }
