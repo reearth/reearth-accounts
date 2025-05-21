@@ -5,21 +5,21 @@ import (
 
 	"github.com/reearth/reearth-accounts/internal/adapter/gql/gqldataloader"
 	"github.com/reearth/reearth-accounts/internal/adapter/gql/gqlmodel"
-	"github.com/reearth/reearthx/account/accountdomain"
-	"github.com/reearth/reearthx/account/accountusecase/accountinterfaces"
+	"github.com/reearth/reearth-accounts/internal/usecase/interfaces"
+	"github.com/reearth/reearth-accounts/pkg/id"
 	"github.com/reearth/reearthx/util"
 )
 
 type UserLoader struct {
-	usecase accountinterfaces.User
+	usecase interfaces.User
 }
 
-func NewUserLoader(usecase accountinterfaces.User) *UserLoader {
+func NewUserLoader(usecase interfaces.User) *UserLoader {
 	return &UserLoader{usecase: usecase}
 }
 
 func (c *UserLoader) Fetch(ctx context.Context, ids []gqlmodel.ID) ([]*gqlmodel.User, []error) {
-	uids, err := util.TryMap(ids, gqlmodel.ToID[accountdomain.User])
+	uids, err := util.TryMap(ids, gqlmodel.ToID[id.User])
 	if err != nil {
 		return nil, []error{err}
 	}

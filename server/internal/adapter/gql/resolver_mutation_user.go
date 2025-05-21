@@ -4,10 +4,9 @@ import (
 	"context"
 
 	"github.com/reearth/reearth-accounts/internal/adapter/gql/gqlmodel"
+	"github.com/reearth/reearth-accounts/internal/usecase/interfaces"
+	"github.com/reearth/reearth-accounts/pkg/id"
 	"golang.org/x/text/language"
-
-	"github.com/reearth/reearthx/account/accountdomain"
-	"github.com/reearth/reearthx/account/accountusecase/accountinterfaces"
 )
 
 func (r *mutationResolver) UpdateMe(ctx context.Context, input gqlmodel.UpdateMeInput) (*gqlmodel.UpdateMePayload, error) {
@@ -15,7 +14,7 @@ func (r *mutationResolver) UpdateMe(ctx context.Context, input gqlmodel.UpdateMe
 	if input.Lang != nil {
 		lang = language.Make(*input.Lang)
 	}
-	res, err := usecases(ctx).User.UpdateMe(ctx, accountinterfaces.UpdateMeParam{
+	res, err := usecases(ctx).User.UpdateMe(ctx, interfaces.UpdateMeParam{
 		Name:                 input.Name,
 		Email:                input.Email,
 		Lang:                 &lang,
@@ -40,7 +39,7 @@ func (r *mutationResolver) RemoveMyAuth(ctx context.Context, input gqlmodel.Remo
 }
 
 func (r *mutationResolver) DeleteMe(ctx context.Context, input gqlmodel.DeleteMeInput) (*gqlmodel.DeleteMePayload, error) {
-	uid, err := gqlmodel.ToID[accountdomain.User](input.UserID)
+	uid, err := gqlmodel.ToID[id.User](input.UserID)
 	if err != nil {
 		return nil, err
 	}

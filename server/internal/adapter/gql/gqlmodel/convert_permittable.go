@@ -3,7 +3,7 @@ package gqlmodel
 import (
 	"github.com/reearth/reearth-accounts/pkg/permittable"
 	"github.com/reearth/reearth-accounts/pkg/role"
-	"github.com/reearth/reearthx/account/accountdomain/user"
+	"github.com/reearth/reearth-accounts/pkg/user"
 )
 
 func ToUsersWithRoles(users user.List, userRoleMap map[user.ID]role.List) []*UserWithRoles {
