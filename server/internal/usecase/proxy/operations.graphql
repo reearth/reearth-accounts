@@ -30,14 +30,8 @@ query UserByIDs($id: [ID!]!) {
   }
 }
 
-query UserByNameOrEmail($nameOrEmail: String!) {
-  userByNameOrEmail(nameOrEmail: $nameOrEmail) {
-     ...FragmentUser
-  }
-}
-
-query SearchUser($keyword: String!) {
-  searchUser(keyword: $keyword) {
+query SearchUser($nameOrEmail: String!) {
+  searchUser(nameOrEmail: $nameOrEmail) {
      ...FragmentUser
   }
 }
