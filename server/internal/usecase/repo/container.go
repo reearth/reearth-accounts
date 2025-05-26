@@ -7,5 +7,7 @@ import (
 type Container struct {
 	Role        Role
 	Permittable Permittable
+	User        User
+	Workspace   Workspace
 	Transaction usecasex.Transaction
 }

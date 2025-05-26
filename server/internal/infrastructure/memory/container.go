@@ -10,5 +10,7 @@ func New() *repo.Container {
 		Role:        NewRole(),
 		Permittable: NewPermittable(),
 		Transaction: &usecasex.NopTransaction{},
+		User:        NewUser(),
+		Workspace:   NewWorkspace(),
 	}
 }

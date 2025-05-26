@@ -21,6 +21,8 @@ func New(ctx context.Context, db *mongo.Database, account *accountrepo.Container
 		Role:        NewRole(client),
 		Permittable: NewPermittable(client),
 		Transaction: client.Transaction(),
+		User:        NewUser(client),
+		Workspace:   NewWorkspace(client),
 	}
 
 	// init

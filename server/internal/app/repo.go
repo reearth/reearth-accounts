@@ -14,6 +14,7 @@ import (
 	"github.com/reearth/reearthx/log"
 	"github.com/reearth/reearthx/mailer"
 	"github.com/reearth/reearthx/mongox"
+	"go.mongodb.org/mongo-driver/event"
 	"go.mongodb.org/mongo-driver/mongo"
 	"go.mongodb.org/mongo-driver/mongo/options"
 )
@@ -21,12 +22,19 @@ import (
 const databaseName = "reearth-account"
 
 func initReposAndGateways(ctx context.Context, conf *Config) (*repo.Container, *accountrepo.Container, *accountgateway.Container) {
+	monitor := &event.CommandMonitor{
+		Started: func(ctx context.Context, evt *event.CommandStartedEvent) {
+			fmt.Printf("[MongoDB Command] %s: %v\n", evt.CommandName, evt.Command)
+		},
+	}
+
 	// Mongo
 	client, err := mongo.Connect(
 		ctx,
 		options.Client().
 			ApplyURI(conf.DB).
-			SetConnectTimeout(time.Second*10))
+			SetConnectTimeout(time.Second*10).
+			SetMonitor(monitor))
 	if err != nil {
 		log.Fatalc(ctx, fmt.Sprintf("repo initialization error: %+v", err))
 	}

@@ -2,12 +2,16 @@ package app
 
 import (
 	"context"
+	"errors"
 	"fmt"
+	"strings"
 
 	"github.com/reearth/reearth-accounts/internal/usecase/repo"
 	"github.com/reearth/reearth-accounts/pkg/id"
 	"github.com/reearth/reearth-accounts/pkg/permittable"
 	"github.com/reearth/reearth-accounts/pkg/role"
+	userPkg "github.com/reearth/reearth-accounts/pkg/user"
+	workspacePkg "github.com/reearth/reearth-accounts/pkg/workspace"
 	"github.com/reearth/reearthx/account/accountdomain/user"
 	"github.com/reearth/reearthx/account/accountdomain/workspace"
 	"github.com/reearth/reearthx/account/accountusecase/accountrepo"
@@ -77,6 +81,15 @@ func runMigration(ctx context.Context, repos *repo.Container, acRepos *accountre
 			if err := processWorkspaceMembers(ctx, repos, w, maintainerRole.ID()); err != nil {
 				log.Errorf("Failed to process workspace %s: %v", w.ID, err)
 			}
+
+			if wsErr := workspaceMigration(ctx, repos, workspacePkg.ID(w.ID())); wsErr != nil {
+				log.Errorf("Failed to migrate workspace %s: %v", w.ID(), wsErr)
+				continue
+			}
+		}
+
+		if userErr := userMigration(ctx, repos, userPkg.ID(u.ID())); userErr != nil && !errors.Is(userErr, rerror.ErrAlreadyExists) {
+			log.Errorf("Failed to add alias for user %s: %v", u.ID(), userErr)
 		}
 	}
 
@@ -154,4 +167,66 @@ func hasRole(p *permittable.Permittable, roleID role.ID) bool {
 		}
 	}
 	return false
+}
+
+func userMigration(ctx context.Context, repos *repo.Container, userID userPkg.ID) error {
+	usr, err := repos.User.FindByID(ctx, userID)
+	if err != nil {
+		return fmt.Errorf("failed to find user %s: %w", userID, err)
+	}
+
+	if usr == nil {
+		return fmt.Errorf("user %s not found", userID)
+	}
+
+	alias := strings.Split(usr.Email(), "@")[0]
+	if usr.Alias() == "" {
+		usr.SetAlias(alias)
+	}
+
+	if usr.Metadata() == nil {
+		usr.SetMetadata(userPkg.NewMetadata())
+	}
+
+	err = repos.User.Save(ctx, usr)
+	if err != nil {
+		return fmt.Errorf("failed to save user %s with alias: %w", userID, err)
+	}
+
+	return nil
+}
+
+func workspaceMigration(ctx context.Context, repos *repo.Container, wsID workspacePkg.ID) error {
+	ws, err := repos.Workspace.FindByID(ctx, wsID)
+	if err != nil {
+		return fmt.Errorf("failed to find workspace %s: %w", wsID, err)
+	}
+
+	if ws == nil {
+		return fmt.Errorf("workspace %s not found", wsID)
+	}
+
+	if ws.Email() == "" {
+		ws.UpdateEmail("")
+	}
+
+	if ws.BillingEmail() == "" {
+		ws.UpdateBillingEmail("")
+	}
+
+	if ws.Alias() == "" {
+		alias := strings.ToLower(strings.ReplaceAll(ws.Name(), " ", "-"))
+		ws.UpdateAlias(alias)
+	}
+
+	if ws.Metadata() == nil {
+		ws.SetMetadata(workspacePkg.NewMetadata())
+	}
+
+	err = repos.Workspace.Save(ctx, ws)
+	if err != nil {
+		return fmt.Errorf("failed to save workspace %s with alias: %w", ws.ID(), err)
+	}
+
+	return nil
 }
