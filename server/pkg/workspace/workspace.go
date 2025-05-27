@@ -1,19 +1,17 @@
 package workspace
 
 import (
-	"github.com/reearth/reearthx/account/accountdomain/workspace"
 	"github.com/reearth/reearthx/util"
 )
 
 type Workspace struct {
-	id           ID
-	name         string
-	alias        string
-	email        string
-	billingEmail string
-	metadata     *Metadata
-	members      *workspace.Members
-	location     string
+	id       ID
+	name     string
+	alias    string
+	email    string
+	metadata *Metadata
+	members  *Members
+	policy   *PolicyID
 }
 
 func (w *Workspace) ID() ID {
@@ -32,31 +30,16 @@ func (w *Workspace) Email() string {
 	return w.email
 }
 
-func (w *Workspace) BillingEmail() string {
-	return w.billingEmail
-}
-
 func (w *Workspace) Metadata() *Metadata {
 	return w.metadata
 }
 
-func (w *Workspace) Members() *workspace.Members {
+func (w *Workspace) Members() *Members {
 	return w.members
 }
 
 func (w *Workspace) IsPersonal() bool {
 	return w.members.Fixed()
-}
-
-func (w *Workspace) Location() string {
-	return w.location
-}
-
-func (w *Workspace) LocationOr(def string) string {
-	if w.location == "" {
-		return def
-	}
-	return w.location
 }
 
 func (w *Workspace) Rename(name string) {
@@ -71,10 +54,21 @@ func (w *Workspace) UpdateEmail(email string) {
 	w.email = email
 }
 
-func (w *Workspace) UpdateBillingEmail(billingEmail string) {
-	w.billingEmail = billingEmail
-}
-
 func (w *Workspace) SetMetadata(metadata *Metadata) {
 	w.metadata = util.CloneRef(metadata)
+}
+
+func (w *Workspace) Policy() *PolicyID {
+	return util.CloneRef(w.policy)
+}
+
+func (w *Workspace) PolicytOr(def PolicyID) PolicyID {
+	if w.policy == nil {
+		return def
+	}
+	return *w.policy
+}
+
+func (w *Workspace) SetPolicy(policy *PolicyID) {
+	w.policy = util.CloneRef(policy)
 }

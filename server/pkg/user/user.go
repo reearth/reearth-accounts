@@ -22,6 +22,7 @@ type User struct {
 	theme         user.Theme
 	verification  *user.Verification
 	passwordReset *user.PasswordReset
+	host          string
 }
 
 var ErrInvalidName = errors.New("invalid user name")
@@ -155,4 +156,18 @@ func (u *User) AddAuth(a user.Auth) bool {
 		return true
 	}
 	return false
+}
+
+func (u *User) Host() string {
+	if u == nil {
+		return ""
+	}
+	return u.host
+}
+
+func (u *User) SetHost(host string) {
+	if u == nil {
+		return
+	}
+	u.host = host
 }

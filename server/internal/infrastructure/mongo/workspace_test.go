@@ -21,6 +21,9 @@ func TestWorkspace_FindByID(t *testing.T) {
 		metadata := workspace.NewMetadata()
 		metadata.SetDescription("Test description")
 		metadata.SetWebsite("https://example.com")
+		metadata.SetLocation("Test location")
+		metadata.SetBillingEmail("billing@mail.com")
+		metadata.SetPhotoURL("https://example.com/photo.jpg")
 
 		ws, err := workspace.New().
 			ID(id.NewWorkspaceID()).
@@ -41,5 +44,8 @@ func TestWorkspace_FindByID(t *testing.T) {
 		assert.NotNil(t, got.Metadata())
 		assert.Equal(t, ws.Metadata().Description(), got.Metadata().Description())
 		assert.Equal(t, ws.Metadata().Website(), got.Metadata().Website())
+		assert.Equal(t, ws.Metadata().Location(), got.Metadata().Location())
+		assert.Equal(t, ws.Metadata().BillingEmail(), got.Metadata().BillingEmail())
+		assert.Equal(t, ws.Metadata().PhotoURL(), got.Metadata().PhotoURL())
 	})
 }

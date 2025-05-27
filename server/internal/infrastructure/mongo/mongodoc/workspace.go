@@ -2,9 +2,8 @@ package mongodoc
 
 import (
 	"github.com/reearth/reearth-accounts/pkg/workspace"
-	"github.com/reearth/reearthx/account/accountdomain"
-	acWorkspace "github.com/reearth/reearthx/account/accountdomain/workspace"
 	"github.com/reearth/reearthx/mongox"
+	"github.com/samber/lo"
 )
 
 type WorkspaceMemberDocument struct {
@@ -14,8 +13,11 @@ type WorkspaceMemberDocument struct {
 }
 
 type WorkspaceMetadataDocument struct {
-	Description string
-	Website     string
+	Description  string
+	Website      string
+	Location     string
+	BillingEmail string
+	PhotoURL     string
 }
 
 type WorkspaceDocument struct {
@@ -23,12 +25,11 @@ type WorkspaceDocument struct {
 	Name         string
 	Alias        string
 	Email        string
-	BillingEmail string
 	Metadata     *WorkspaceMetadataDocument
 	Members      map[string]WorkspaceMemberDocument
 	Integrations map[string]WorkspaceMemberDocument
 	Personal     bool
-	Location     string `bson:",omitempty"`
+	Policy       string `bson:",omitempty"`
 }
 
 func NewWorkspace(ws *workspace.Workspace) (*WorkspaceDocument, string) {
@@ -54,8 +55,11 @@ func NewWorkspace(ws *workspace.Workspace) (*WorkspaceDocument, string) {
 	var metadataDoc *WorkspaceMetadataDocument
 	if ws.Metadata() != nil {
 		metadataDoc = &WorkspaceMetadataDocument{
-			Description: ws.Metadata().Description(),
-			Website:     ws.Metadata().Website(),
+			Description:  ws.Metadata().Description(),
+			Website:      ws.Metadata().Website(),
+			Location:     ws.Metadata().Location(),
+			BillingEmail: ws.Metadata().BillingEmail(),
+			PhotoURL:     ws.Metadata().PhotoURL(),
 		}
 	}
 
@@ -64,12 +68,11 @@ func NewWorkspace(ws *workspace.Workspace) (*WorkspaceDocument, string) {
 		Name:         ws.Name(),
 		Alias:        ws.Alias(),
 		Email:        ws.Email(),
-		BillingEmail: ws.BillingEmail(),
 		Metadata:     metadataDoc,
 		Members:      membersDoc,
 		Integrations: integrationsDoc,
 		Personal:     ws.IsPersonal(),
-		Location:     ws.LocationOr(""),
+		Policy:       lo.FromPtr(ws.Policy()).String(),
 	}, wId
 }
 
@@ -79,45 +82,50 @@ func (w *WorkspaceDocument) Model() (*workspace.Workspace, error) {
 		return nil, err
 	}
 
-	members := map[accountdomain.UserID]acWorkspace.Member{}
+	members := map[workspace.UserID]workspace.Member{}
 	if w.Members != nil {
 		for uId, m := range w.Members {
-			uid, err := accountdomain.UserIDFrom(uId)
+			uid, err := workspace.UserIDFrom(uId)
 			if err != nil {
 				return nil, err
 			}
 
-			inviterID, err := accountdomain.UserIDFrom(m.InvitedBy)
+			inviterID, err := workspace.UserIDFrom(m.InvitedBy)
 			if err != nil {
 				return nil, err
 			}
 
-			members[uid] = acWorkspace.Member{
-				Role:      acWorkspace.Role(m.Role),
+			members[uid] = workspace.Member{
+				Role:      workspace.Role(m.Role),
 				Disabled:  m.Disabled,
 				InvitedBy: inviterID,
 			}
 		}
 	}
 
-	integrations := map[accountdomain.IntegrationID]acWorkspace.Member{}
+	integrations := map[workspace.IntegrationID]workspace.Member{}
 	if w.Integrations != nil {
 		for iId, integrationDoc := range w.Integrations {
-			iId, err := accountdomain.IntegrationIDFrom(iId)
+			iId, err := workspace.IntegrationIDFrom(iId)
 			if err != nil {
 				return nil, err
 			}
-			integrations[iId] = acWorkspace.Member{
-				Role:      acWorkspace.Role(integrationDoc.Role),
+			integrations[iId] = workspace.Member{
+				Role:      workspace.Role(integrationDoc.Role),
 				Disabled:  integrationDoc.Disabled,
-				InvitedBy: accountdomain.MustUserID(integrationDoc.InvitedBy),
+				InvitedBy: workspace.MustUserID(integrationDoc.InvitedBy),
 			}
 		}
 	}
 
+	var policy *workspace.PolicyID
+	if w.Policy != "" {
+		policy = workspace.PolicyID(w.Policy).Ref()
+	}
+
 	var metadata *workspace.Metadata
 	if w.Metadata != nil {
-		metadata = workspace.MetadataFrom(w.Metadata.Description, w.Metadata.Website)
+		metadata = workspace.MetadataFrom(w.Metadata.Description, w.Metadata.Website, w.Metadata.Location, w.Metadata.BillingEmail, w.Metadata.PhotoURL)
 	}
 
 	return workspace.New().
@@ -125,12 +133,11 @@ func (w *WorkspaceDocument) Model() (*workspace.Workspace, error) {
 		Name(w.Name).
 		Alias(w.Alias).
 		Email(w.Email).
-		BillingEmail(w.BillingEmail).
 		Metadata(metadata).
 		Members(members).
 		Integrations(integrations).
 		Personal(w.Personal).
-		Location(w.Location).
+		Policy(policy).
 		Build()
 }
 

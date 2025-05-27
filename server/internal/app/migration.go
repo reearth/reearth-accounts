@@ -210,10 +210,6 @@ func workspaceMigration(ctx context.Context, repos *repo.Container, wsID workspa
 		ws.UpdateEmail("")
 	}
 
-	if ws.BillingEmail() == "" {
-		ws.UpdateBillingEmail("")
-	}
-
 	if ws.Alias() == "" {
 		alias := strings.ToLower(strings.ReplaceAll(ws.Name(), " ", "-"))
 		ws.UpdateAlias(alias)

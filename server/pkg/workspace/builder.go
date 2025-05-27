@@ -2,13 +2,13 @@ package workspace
 
 import (
 	"github.com/reearth/reearth-accounts/pkg/id"
-	"github.com/reearth/reearthx/account/accountdomain/workspace"
+	"github.com/reearth/reearthx/util"
 )
 
 type Builder struct {
 	w            *Workspace
-	members      map[workspace.UserID]workspace.Member
-	integrations map[workspace.IntegrationID]workspace.Member
+	members      map[UserID]Member
+	integrations map[IntegrationID]Member
 	personal     bool
 	err          error
 }
@@ -26,14 +26,16 @@ func (b *Builder) Build() (*Workspace, error) {
 	}
 
 	if b.members == nil && b.integrations == nil {
-		b.w.members = workspace.NewMembers()
+		b.w.members = NewMembers()
 	} else {
-		b.w.members = workspace.NewMembersWith(b.members, b.integrations, false)
+		b.w.members = NewMembersWith(b.members, b.integrations, false)
 	}
 
 	if b.w.metadata != nil {
 		b.w.SetMetadata(b.w.metadata)
 	}
+
+	b.w.members.fixed = b.personal
 	return b.w, nil
 }
 
@@ -75,22 +77,17 @@ func (b *Builder) Email(email string) *Builder {
 	return b
 }
 
-func (b *Builder) BillingEmail(billingEmail string) *Builder {
-	b.w.billingEmail = billingEmail
-	return b
-}
-
 func (b *Builder) Metadata(metadata *Metadata) *Builder {
 	b.w.metadata = metadata
 	return b
 }
 
-func (b *Builder) Members(members map[workspace.UserID]workspace.Member) *Builder {
+func (b *Builder) Members(members map[UserID]Member) *Builder {
 	b.members = members
 	return b
 }
 
-func (b *Builder) Integrations(integrations map[workspace.IntegrationID]workspace.Member) *Builder {
+func (b *Builder) Integrations(integrations map[IntegrationID]Member) *Builder {
 	b.integrations = integrations
 	return b
 }
@@ -100,7 +97,7 @@ func (b *Builder) Personal(p bool) *Builder {
 	return b
 }
 
-func (b *Builder) Location(location string) *Builder {
-	b.w.location = location
+func (b *Builder) Policy(p *PolicyID) *Builder {
+	b.w.policy = util.CloneRef(p)
 	return b
 }
