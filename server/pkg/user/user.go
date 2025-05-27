@@ -22,7 +22,6 @@ type User struct {
 	theme         user.Theme
 	verification  *user.Verification
 	passwordReset *user.PasswordReset
-	host          string
 }
 
 var ErrInvalidName = errors.New("invalid user name")

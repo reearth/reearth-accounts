@@ -10,7 +10,6 @@ type Builder struct {
 	u            *User
 	err          error
 	passwordText string
-	email        string
 }
 
 func New() *Builder {
