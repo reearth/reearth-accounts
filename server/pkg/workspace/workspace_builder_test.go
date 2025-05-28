@@ -3,7 +3,7 @@ package workspace
 import (
 	"testing"
 
-	accountsid "github.com/reearth/reearth-accounts/pkg/id"
+	accountsid "github.com/reearth/reearth-accounts/server/pkg/id"
 	"github.com/reearth/reearthx/idx"
 	"github.com/stretchr/testify/assert"
 )

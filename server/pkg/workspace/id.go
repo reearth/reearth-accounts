@@ -1,6 +1,6 @@
 package workspace
 
-import "github.com/reearth/reearth-accounts/pkg/id"
+import "github.com/reearth/reearth-accounts/server/pkg/id"
 
 type ID = id.WorkspaceID
 type IDList = id.WorkspaceIDList

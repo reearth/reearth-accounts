@@ -4,7 +4,7 @@ import (
 	"context"
 	"errors"
 
-	"github.com/reearth/reearth-accounts/pkg/user"
+	"github.com/reearth/reearth-accounts/server/pkg/user"
 	"github.com/reearth/reearthx/rerror"
 )
 

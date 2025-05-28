@@ -1,7 +1,7 @@
 package workspace
 
 import (
-	"github.com/reearth/reearth-accounts/pkg/user"
+	"github.com/reearth/reearth-accounts/server/pkg/user"
 	"golang.org/x/text/language"
 )
 
