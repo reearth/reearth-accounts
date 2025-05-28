@@ -5,8 +5,8 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/reearth/reearth-accounts/server/internal/infrastructure/auth0"
-	mongorepo "github.com/reearth/reearth-accounts/server/internal/infrastructure/mongo"
+	"github.com/reearth/reearth-accounts/server/pkg/infrastructure/auth0"
+	mongorepo "github.com/reearth/reearth-accounts/server/pkg/infrastructure/mongo"
 	"github.com/reearth/reearth-accounts/server/pkg/usecase/gateway"
 	"github.com/reearth/reearth-accounts/server/pkg/usecase/repo"
 	"github.com/reearth/reearthx/log"

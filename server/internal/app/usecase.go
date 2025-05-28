@@ -5,8 +5,8 @@ import (
 
 	"github.com/labstack/echo/v4"
 	"github.com/reearth/reearth-accounts/server/internal/adapter"
-	"github.com/reearth/reearth-accounts/server/internal/usecase/interactor"
 	"github.com/reearth/reearth-accounts/server/pkg/usecase/gateway"
+	"github.com/reearth/reearth-accounts/server/pkg/usecase/interactor"
 	"github.com/reearth/reearth-accounts/server/pkg/usecase/repo"
 )
 

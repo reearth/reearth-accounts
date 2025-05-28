@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"regexp"
 
-	"github.com/reearth/reearth-accounts/server/internal/infrastructure/mongo/mongodoc"
+	"github.com/reearth/reearth-accounts/server/pkg/infrastructure/mongo/mongodoc"
 	"github.com/reearth/reearth-accounts/server/pkg/usecase/repo"
 	"github.com/reearth/reearth-accounts/server/pkg/user"
 	"github.com/reearth/reearthx/mongox"

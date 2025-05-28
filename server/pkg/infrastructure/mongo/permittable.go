@@ -3,8 +3,8 @@ package mongo
 import (
 	"context"
 
-	"github.com/reearth/reearth-accounts/server/internal/infrastructure/mongo/mongodoc"
 	"github.com/reearth/reearth-accounts/server/pkg/id"
+	"github.com/reearth/reearth-accounts/server/pkg/infrastructure/mongo/mongodoc"
 	"github.com/reearth/reearth-accounts/server/pkg/permittable"
 	"github.com/reearth/reearth-accounts/server/pkg/user"
 	"github.com/reearth/reearthx/mongox"
