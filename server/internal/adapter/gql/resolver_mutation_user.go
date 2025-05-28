@@ -4,10 +4,9 @@ import (
 	"context"
 
 	"github.com/reearth/reearth-accounts/internal/adapter/gql/gqlmodel"
+	"github.com/reearth/reearth-accounts/internal/usecase/interfaces"
+	"github.com/reearth/reearth-accounts/pkg/id"
 	"golang.org/x/text/language"
-
-	"github.com/reearth/reearthx/account/accountdomain"
-	"github.com/reearth/reearthx/account/accountusecase/accountinterfaces"
 )
 
 func (r *mutationResolver) UpdateMe(ctx context.Context, input gqlmodel.UpdateMeInput) (*gqlmodel.UpdateMePayload, error) {
@@ -15,7 +14,7 @@ func (r *mutationResolver) UpdateMe(ctx context.Context, input gqlmodel.UpdateMe
 	if input.Lang != nil {
 		lang = language.Make(*input.Lang)
 	}
-	res, err := usecases(ctx).User.UpdateMe(ctx, accountinterfaces.UpdateMeParam{
+	res, err := usecases(ctx).User.UpdateMe(ctx, interfaces.UpdateMeParam{
 		Name:                 input.Name,
 		Email:                input.Email,
 		Lang:                 &lang,
@@ -40,7 +39,7 @@ func (r *mutationResolver) RemoveMyAuth(ctx context.Context, input gqlmodel.Remo
 }
 
 func (r *mutationResolver) DeleteMe(ctx context.Context, input gqlmodel.DeleteMeInput) (*gqlmodel.DeleteMePayload, error) {
-	uid, err := gqlmodel.ToID[accountdomain.User](input.UserID)
+	uid, err := gqlmodel.ToID[id.User](input.UserID)
 	if err != nil {
 		return nil, err
 	}
@@ -50,4 +49,53 @@ func (r *mutationResolver) DeleteMe(ctx context.Context, input gqlmodel.DeleteMe
 	}
 
 	return &gqlmodel.DeleteMePayload{UserID: input.UserID}, nil
+}
+
+// Temporary stub implementation to satisfy gqlgen after migrating GraphQL files from reearthx/account.
+// This resolver was added to avoid compile-time errors.
+// Will be implemented if needed, or removed if unused after migration.
+func (r *mutationResolver) SignUp(ctx context.Context, input gqlmodel.SignUpInput) (*gqlmodel.UserPayload, error) {
+	return nil, nil
+}
+
+// Temporary stub implementation to satisfy gqlgen after migrating GraphQL files from reearthx/account.
+// This resolver was added to avoid compile-time errors.
+// Will be implemented if needed, or removed if unused after migration.
+func (r *mutationResolver) SignUpOidc(ctx context.Context, input gqlmodel.SignupOIDCInput) (*gqlmodel.UserPayload, error) {
+	return nil, nil
+}
+
+// Temporary stub implementation to satisfy gqlgen after migrating GraphQL files from reearthx/account.
+// This resolver was added to avoid compile-time errors.
+// Will be implemented if needed, or removed if unused after migration.
+func (r *mutationResolver) VerifyUser(ctx context.Context, input gqlmodel.VerifyUserInput) (*gqlmodel.UserPayload, error) {
+	return nil, nil
+}
+
+// Temporary stub implementation to satisfy gqlgen after migrating GraphQL files from reearthx/account.
+// This resolver was added to avoid compile-time errors.
+// Will be implemented if needed, or removed if unused after migration.
+func (r *mutationResolver) FindOrCreate(ctx context.Context, input gqlmodel.FindOrCreateInput) (*gqlmodel.UserPayload, error) {
+	return nil, nil
+}
+
+// Temporary stub implementation to satisfy gqlgen after migrating GraphQL files from reearthx/account.
+// This resolver was added to avoid compile-time errors.
+// Will be implemented if needed, or removed if unused after migration.
+func (r *mutationResolver) CreateVerification(ctx context.Context, input gqlmodel.CreateVerificationInput) (*bool, error) {
+	return nil, nil
+}
+
+// Temporary stub implementation to satisfy gqlgen after migrating GraphQL files from reearthx/account.
+// This resolver was added to avoid compile-time errors.
+// Will be implemented if needed, or removed if unused after migration.
+func (r *mutationResolver) StartPasswordReset(ctx context.Context, input gqlmodel.StartPasswordResetInput) (*bool, error) {
+	return nil, nil
+}
+
+// Temporary stub implementation to satisfy gqlgen after migrating GraphQL files from reearthx/account.
+// This resolver was added to avoid compile-time errors.
+// Will be implemented if needed, or removed if unused after migration.
+func (r *mutationResolver) PasswordReset(ctx context.Context, input gqlmodel.PasswordResetInput) (*bool, error) {
+	return nil, nil
 }

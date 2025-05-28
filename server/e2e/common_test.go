@@ -16,53 +16,44 @@ import (
 	mongorepo "github.com/reearth/reearth-accounts/internal/infrastructure/mongo"
 	"github.com/reearth/reearth-accounts/internal/usecase/gateway"
 	"github.com/reearth/reearth-accounts/internal/usecase/repo"
-	"github.com/reearth/reearthx/account/accountdomain/user"
-	"github.com/reearth/reearthx/account/accountinfrastructure/accountmemory"
-	"github.com/reearth/reearthx/account/accountinfrastructure/accountmongo"
-	"github.com/reearth/reearthx/account/accountusecase/accountgateway"
-	"github.com/reearth/reearthx/account/accountusecase/accountrepo"
+	"github.com/reearth/reearth-accounts/pkg/user"
 	"github.com/reearth/reearthx/mailer"
 	"github.com/reearth/reearthx/mongox/mongotest"
-	"github.com/samber/lo"
 )
 
 var (
 	uID = user.NewID()
 )
 
-type Seeder func(ctx context.Context, r *accountrepo.Container) error
+type Seeder func(ctx context.Context, r *repo.Container) error
 
 func init() {
 	mongotest.Env = "REEARTH_DB"
 }
 
-func StartServer(t *testing.T, cfg *app.Config, useMongo bool, seeder Seeder) (*httpexpect.Expect, *accountrepo.Container) {
+func StartServer(t *testing.T, cfg *app.Config, useMongo bool, seeder Seeder) (*httpexpect.Expect, *repo.Container) {
 	e, r := StartServerAndRepos(t, cfg, useMongo, seeder)
 	return e, r
 }
 
-func StartServerAndRepos(t *testing.T, cfg *app.Config, useMongo bool, seeder Seeder) (*httpexpect.Expect, *accountrepo.Container) {
+func StartServerAndRepos(t *testing.T, cfg *app.Config, useMongo bool, seeder Seeder) (*httpexpect.Expect, *repo.Container) {
 	ctx := context.Background()
-
-	var accountRepos *accountrepo.Container
 	var repos *repo.Container
 
 	if useMongo {
 		db := mongorepo.Connect(t)(t)
-		accountRepos = lo.Must(accountmongo.New(ctx, db.Client(), db.Name(), false, false, nil))
 
 		var err error
-		repos, err = mongorepo.New(ctx, db, accountRepos, false)
+		repos, err = mongorepo.New(ctx, db, false, false, nil)
 		if err != nil {
 			log.Fatalf("Failed to init mongo: %+v\n", err)
 		}
 	} else {
-		accountRepos = accountmemory.New()
 		repos = memory.New()
 	}
 
 	if seeder != nil {
-		if err := seeder(ctx, accountRepos); err != nil {
+		if err := seeder(ctx, repos); err != nil {
 			t.Fatalf("failed to seed the db: %s", err)
 		}
 	}
@@ -71,15 +62,13 @@ func StartServerAndRepos(t *testing.T, cfg *app.Config, useMongo bool, seeder Se
 		t,
 		cfg,
 		repos,
-		accountRepos,
-	), accountRepos
+	), repos
 }
 
 func StartServerWithRepos(
 	t *testing.T,
 	cfg *app.Config,
 	repos *repo.Container,
-	accountrepos *accountrepo.Container,
 ) *httpexpect.Expect {
 	t.Helper()
 
@@ -104,10 +93,9 @@ func StartServerWithRepos(
 	}
 
 	srv := app.NewServer(ctx, &app.ServerConfig{
-		Config:       cfg,
-		Repos:        repos,
-		AccountRepos: accountrepos,
-		Gateways: &accountgateway.Container{
+		Config: cfg,
+		Repos:  repos,
+		Gateways: &gateway.Container{
 			Mailer: mailer.New(ctx, &mailer.Config{}),
 		},
 		Debug:         true,

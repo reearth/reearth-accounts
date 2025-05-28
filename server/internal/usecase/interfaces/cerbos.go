@@ -3,7 +3,7 @@ package interfaces
 import (
 	"context"
 
-	"github.com/reearth/reearthx/account/accountdomain/user"
+	"github.com/reearth/reearth-accounts/pkg/user"
 )
 
 type CheckPermissionParam struct {

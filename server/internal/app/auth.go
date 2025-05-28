@@ -5,10 +5,10 @@ import (
 	"net/http"
 
 	"github.com/reearth/reearth-accounts/internal/adapter"
-	"github.com/reearth/reearthx/account/accountdomain"
-	"github.com/reearth/reearthx/account/accountdomain/user"
-	"github.com/reearth/reearthx/account/accountdomain/workspace"
-	"github.com/reearth/reearthx/account/accountusecase"
+	"github.com/reearth/reearth-accounts/internal/usecase"
+	"github.com/reearth/reearth-accounts/pkg/id"
+	"github.com/reearth/reearth-accounts/pkg/user"
+	"github.com/reearth/reearth-accounts/pkg/workspace"
 	"github.com/reearth/reearthx/appx"
 )
 
@@ -36,7 +36,7 @@ func authMiddleware(cfg *ServerConfig) func(http.Handler) http.Handler {
 
 		// load user by sub
 		if usr == nil && ai.Sub != "" {
-			existingUsr, err := cfg.AccountRepos.User.FindBySub(ctx, ai.Sub)
+			existingUsr, err := cfg.Repos.User.FindBySub(ctx, ai.Sub)
 			if err == nil && existingUsr != nil {
 				usr = existingUsr
 			}
@@ -58,8 +58,8 @@ func isDebugUserExists(req *http.Request, cfg *ServerConfig, ctx context.Context
 	if userID := req.Header.Get(debugUserHeader); userID != "" {
 		var existingUsr *user.User
 
-		if uID, err := accountdomain.UserIDFrom(userID); err == nil {
-			u, err := cfg.AccountRepos.User.FindByID(ctx, uID)
+		if uID, err := id.UserIDFrom(userID); err == nil {
+			u, err := cfg.Repos.User.FindByID(ctx, uID)
 			if err == nil {
 				existingUsr = u
 			}
@@ -71,14 +71,14 @@ func isDebugUserExists(req *http.Request, cfg *ServerConfig, ctx context.Context
 	return nil
 }
 
-func generateUserOperator(ctx context.Context, cfg *ServerConfig, u *user.User) (*accountusecase.Operator, error) {
+func generateUserOperator(ctx context.Context, cfg *ServerConfig, u *user.User) (*usecase.Operator, error) {
 	if u == nil {
 		return nil, nil
 	}
 
 	uid := u.ID()
 
-	w, err := cfg.AccountRepos.Workspace.FindByUser(ctx, uid)
+	w, err := cfg.Repos.Workspace.FindByUser(ctx, uid)
 	if err != nil {
 		return nil, err
 	}
@@ -88,7 +88,7 @@ func generateUserOperator(ctx context.Context, cfg *ServerConfig, u *user.User) 
 	mw := w.FilterByUserRole(uid, workspace.RoleMaintainer).IDs()
 	ow := w.FilterByUserRole(uid, workspace.RoleOwner).IDs()
 
-	return &accountusecase.Operator{
+	return &usecase.Operator{
 		User: &uid,
 
 		ReadableWorkspaces:     rw,

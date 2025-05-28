@@ -6,11 +6,10 @@ import (
 	"github.com/reearth/reearth-accounts/internal/adapter/gql/gqlmodel"
 	"github.com/reearth/reearth-accounts/internal/usecase/interfaces"
 	"github.com/reearth/reearth-accounts/pkg/id"
-	"github.com/reearth/reearthx/account/accountdomain"
 )
 
 func (r *mutationResolver) UpdatePermittable(ctx context.Context, input gqlmodel.UpdatePermittableInput) (*gqlmodel.UpdatePermittablePayload, error) {
-	userId, err := gqlmodel.ToID[accountdomain.User](input.UserID)
+	userId, err := gqlmodel.ToID[id.User](input.UserID)
 	if err != nil {
 		return nil, err
 	}

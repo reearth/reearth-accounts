@@ -16,7 +16,7 @@ import (
 	"github.com/reearth/reearth-accounts/pkg/id"
 	"github.com/reearth/reearth-accounts/pkg/permittable"
 	"github.com/reearth/reearth-accounts/pkg/role"
-	"github.com/reearth/reearthx/account/accountdomain/user"
+	"github.com/reearth/reearth-accounts/pkg/user"
 	"github.com/stretchr/testify/assert"
 	"go.uber.org/mock/gomock"
 )
@@ -30,7 +30,7 @@ func TestNewCerbos(t *testing.T) {
 	}
 	cerbosAdapter := infraCerbos.NewCerbosAdapter(cerbosClient)
 
-	c := NewCerbos(cerbosAdapter, memory)
+	c := NewCerbos(memory, cerbosAdapter)
 	assert.NotNil(t, c)
 }
 

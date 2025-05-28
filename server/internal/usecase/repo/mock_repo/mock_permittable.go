@@ -15,7 +15,7 @@ import (
 
 	id "github.com/reearth/reearth-accounts/pkg/id"
 	permittable "github.com/reearth/reearth-accounts/pkg/permittable"
-	user "github.com/reearth/reearthx/account/accountdomain/user"
+	user "github.com/reearth/reearth-accounts/pkg/user"
 	gomock "go.uber.org/mock/gomock"
 )
 
