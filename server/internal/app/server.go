@@ -8,9 +8,9 @@ import (
 
 	"github.com/cerbos/cerbos-sdk-go/cerbos"
 	"github.com/labstack/echo/v4"
-	infraCerbos "github.com/reearth/reearth-accounts/server/internal/infrastructure/cerbos"
-	"github.com/reearth/reearth-accounts/server/internal/usecase/gateway"
-	"github.com/reearth/reearth-accounts/server/internal/usecase/repo"
+	infraCerbos "github.com/reearth/reearth-accounts/server/pkg/infrastructure/cerbos"
+	"github.com/reearth/reearth-accounts/server/pkg/usecase/gateway"
+	"github.com/reearth/reearth-accounts/server/pkg/usecase/repo"
 	"github.com/reearth/reearthx/log"
 	"golang.org/x/net/http2"
 )

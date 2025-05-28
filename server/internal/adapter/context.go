@@ -5,8 +5,8 @@ import (
 
 	"golang.org/x/text/language"
 
-	"github.com/reearth/reearth-accounts/server/internal/usecase"
-	"github.com/reearth/reearth-accounts/server/internal/usecase/interfaces"
+	"github.com/reearth/reearth-accounts/server/pkg/usecase"
+	"github.com/reearth/reearth-accounts/server/pkg/usecase/interfaces"
 	"github.com/reearth/reearth-accounts/server/pkg/user"
 	"github.com/reearth/reearthx/appx"
 )

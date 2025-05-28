@@ -7,8 +7,8 @@ import (
 
 	"github.com/reearth/reearth-accounts/server/internal/infrastructure/auth0"
 	mongorepo "github.com/reearth/reearth-accounts/server/internal/infrastructure/mongo"
-	"github.com/reearth/reearth-accounts/server/internal/usecase/gateway"
-	"github.com/reearth/reearth-accounts/server/internal/usecase/repo"
+	"github.com/reearth/reearth-accounts/server/pkg/usecase/gateway"
+	"github.com/reearth/reearth-accounts/server/pkg/usecase/repo"
 	"github.com/reearth/reearthx/log"
 	"github.com/reearth/reearthx/mailer"
 	"github.com/reearth/reearthx/mongox"

@@ -4,8 +4,8 @@ import (
 	"context"
 
 	"github.com/reearth/reearth-accounts/server/internal/adapter/gql/gqlmodel"
-	"github.com/reearth/reearth-accounts/server/internal/usecase/interfaces"
 	"github.com/reearth/reearth-accounts/server/pkg/id"
+	"github.com/reearth/reearth-accounts/server/pkg/usecase/interfaces"
 	"golang.org/x/text/language"
 )
 

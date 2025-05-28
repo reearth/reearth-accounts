@@ -4,7 +4,7 @@ import (
 	"context"
 
 	"github.com/reearth/reearth-accounts/server/internal/adapter/gql/gqlmodel"
-	"github.com/reearth/reearth-accounts/server/internal/usecase/interfaces"
+	"github.com/reearth/reearth-accounts/server/pkg/usecase/interfaces"
 	"github.com/reearth/reearth-accounts/server/pkg/user"
 )
 
