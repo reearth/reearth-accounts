@@ -5,7 +5,7 @@ import (
 
 	"github.com/reearth/reearth-accounts/internal/adapter/gql/gqlmodel"
 	"github.com/reearth/reearth-accounts/internal/usecase/interfaces"
-	"github.com/reearth/reearthx/account/accountdomain/user"
+	"github.com/reearth/reearth-accounts/pkg/user"
 )
 
 func (r *queryResolver) CheckPermission(ctx context.Context, input gqlmodel.CheckPermissionInput) (*gqlmodel.CheckPermissionPayload, error) {

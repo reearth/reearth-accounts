@@ -3,11 +3,17 @@ package mongodoc
 import (
 	"time"
 
+	"github.com/reearth/reearth-accounts/pkg/id"
 	"github.com/reearth/reearth-accounts/pkg/user"
 	"github.com/reearth/reearthx/account/accountdomain"
 	acUser "github.com/reearth/reearthx/account/accountdomain/user"
 	"github.com/reearth/reearthx/mongox"
 )
+
+type PasswordResetDocument struct {
+	Token     string
+	CreatedAt time.Time
+}
 
 type UserDocument struct {
 	ID            string                 `bson:"id"`
@@ -106,7 +112,7 @@ func NewUser(usr user.User) (*UserDocument, string) {
 }
 
 func (d *UserDocument) Model() (*user.User, error) {
-	uid, err := user.IDFrom(d.ID)
+	uid, err := id.UserIDFrom(d.ID)
 	if err != nil {
 		return nil, err
 	}
@@ -116,16 +122,14 @@ func (d *UserDocument) Model() (*user.User, error) {
 		wid = d.Team
 	}
 
-	tid, err := accountdomain.WorkspaceIDFrom(wid)
+	tid, err := id.WorkspaceIDFrom(wid)
 	if err != nil {
 		return nil, err
 	}
 
 	auths := make([]acUser.Auth, 0, len(d.Subs))
-	for _, sub := range d.Subs {
-		auths = append(auths, acUser.Auth{
-			Sub: sub,
-		})
+	for _, s := range d.Subs {
+		auths = append(auths, user.AuthFrom(s))
 	}
 
 	var v *acUser.Verification
@@ -156,6 +160,7 @@ func (d *UserDocument) Model() (*user.User, error) {
 		PasswordReset(d.PasswordReset.Model()).
 		Theme(acUser.Theme(d.Theme)).
 		Build()
+
 	if err != nil {
 		return nil, err
 	}

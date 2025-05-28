@@ -5,7 +5,7 @@ import (
 
 	"github.com/reearth/reearth-accounts/pkg/id"
 	"github.com/reearth/reearth-accounts/pkg/permittable"
-	"github.com/reearth/reearthx/account/accountdomain/user"
+	"github.com/reearth/reearth-accounts/pkg/user"
 )
 
 //go:generate mockgen -source=./permittable.go -destination=./mock_repo/mock_permittable.go -package mock_repo

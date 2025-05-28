@@ -2,11 +2,17 @@ package user
 
 import (
 	"errors"
-	"slices"
+	"net/mail"
 
-	"github.com/reearth/reearthx/account/accountdomain"
 	"github.com/reearth/reearthx/account/accountdomain/user"
+	"github.com/reearth/reearthx/util"
+	"golang.org/x/exp/slices"
 	"golang.org/x/text/language"
+)
+
+var (
+	ErrInvalidEmail = errors.New("invalid email")
+	ErrInvalidName = errors.New("invalid user name")
 )
 
 type User struct {
@@ -15,17 +21,15 @@ type User struct {
 	alias         string
 	email         string
 	metadata      *Metadata
-	password      user.EncodedPassword
-	workspace     accountdomain.WorkspaceID
-	auths         []user.Auth
+	password      EncodedPassword
+	workspace     WorkspaceID
+	auths         []Auth
 	lang          language.Tag
-	theme         user.Theme
-	verification  *user.Verification
-	passwordReset *user.PasswordReset
+	theme         Theme
+	verification  *Verification
+	passwordReset *PasswordReset
 	host          string
 }
-
-var ErrInvalidName = errors.New("invalid user name")
 
 func (u *User) ID() ID {
 	if u == nil {
@@ -46,6 +50,13 @@ func (u *User) Alias() string {
 		return ""
 	}
 	return u.alias
+}
+
+func (u *User) DisplayName() string {
+	if u.displayName == "" {
+		return u.name
+	}
+	return u.displayName
 }
 
 func (u *User) Email() string {
@@ -76,10 +87,7 @@ func (u *User) SetMetadata(metadata *Metadata) {
 	u.metadata = metadata
 }
 
-func (u *User) Workspace() accountdomain.WorkspaceID {
-	if u == nil {
-		return accountdomain.WorkspaceID{}
-	}
+func (u *User) Workspace() WorkspaceID {
 	return u.workspace
 }
 
@@ -147,7 +155,19 @@ func (u *User) ContainAuth(a user.Auth) bool {
 	return false
 }
 
-func (u *User) AddAuth(a user.Auth) bool {
+func (u *User) HasAuthProvider(p string) bool {
+	if u == nil {
+		return false
+	}
+	for _, b := range u.auths {
+		if b.Provider == p {
+			return true
+		}
+	}
+	return false
+}
+
+func (u *User) AddAuth(a Auth) bool {
 	if u == nil {
 		return false
 	}
@@ -158,16 +178,100 @@ func (u *User) AddAuth(a user.Auth) bool {
 	return false
 }
 
-func (u *User) Host() string {
-	if u == nil {
-		return ""
+func (u *User) RemoveAuth(a Auth) bool {
+	if u == nil || a.IsAuth0() {
+		return false
 	}
+	for i, b := range u.auths {
+		if a == b {
+			u.auths = append(u.auths[:i], u.auths[i+1:]...)
+			return true
+		}
+	}
+	return false
+}
+
+func (u *User) GetAuthByProvider(provider string) *Auth {
+	if u == nil || u.auths == nil {
+		return nil
+	}
+	for _, b := range u.auths {
+		if provider == b.Provider {
+			return &b
+		}
+	}
+	return nil
+}
+
+func (u *User) RemoveAuthByProvider(provider string) bool {
+	if u == nil || provider == "auth0" {
+		return false
+	}
+	for i, b := range u.auths {
+		if provider == b.Provider {
+			u.auths = append(u.auths[:i], u.auths[i+1:]...)
+			return true
+		}
+	}
+	return false
+}
+
+func (u *User) ClearAuths() {
+	u.auths = nil
+}
+
+func (u *User) SetPassword(pass string) error {
+	p, err := NewEncodedPassword(pass)
+	if err != nil {
+		return err
+	}
+	u.password = p
+	return nil
+}
+
+func (u *User) MatchPassword(pass string) (bool, error) {
+	if u == nil {
+		return false, nil
+	}
+	return u.password.Verify(pass)
+}
+
+func (u *User) PasswordReset() *PasswordReset {
+	return u.passwordReset
+}
+
+func (u *User) SetPasswordReset(pr *PasswordReset) {
+	u.passwordReset = pr.Clone()
+}
+
+func (u *User) SetVerification(v *Verification) {
+	u.verification = v
+}
+
+func (u *User) Host() string {
 	return u.host
 }
 
-func (u *User) SetHost(host string) {
-	if u == nil {
-		return
+func (u *User) Clone() *User {
+	return &User{
+		id:            u.id,
+		name:          u.name,
+		displayName:   u.displayName,
+		email:         u.email,
+		password:      u.password,
+		workspace:     u.workspace,
+		auths:         slices.Clone(u.auths),
+		lang:          u.lang,
+		theme:         u.theme,
+		verification:  util.CloneRef(u.verification),
+		passwordReset: util.CloneRef(u.passwordReset),
 	}
-	u.host = host
 }
+
+func (u *User) WithHost(host string) *User {
+	d := u.Clone()
+	d.host = host
+	return d
+}
+
+type List []*User

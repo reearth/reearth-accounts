@@ -74,7 +74,6 @@ func initEcho(ctx context.Context, cfg *ServerConfig) *echo.Echo {
 
 	usecaseMiddleware := UsecaseMiddleware(
 		cfg.Repos,
-		cfg.AccountRepos,
 		cfg.Gateways,
 		nil,
 		cfg.CerbosAdapter,

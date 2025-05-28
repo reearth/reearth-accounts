@@ -1,0 +1,204 @@
+query Me {
+  me {
+    id
+  }
+}
+
+fragment FragmentUser on User {
+    id
+    name
+    email
+    lang
+    theme
+    workspace
+    auths
+}
+
+
+
+query UserByIDs($id: [ID!]!) {
+  nodes(id: $id, type: USER) {
+    ... on User {
+        id
+        name
+        email
+        lang
+        theme
+        workspace
+        auths
+    }
+  }
+}
+
+query UserByNameOrEmail($nameOrEmail: String!) {
+  userByNameOrEmail(nameOrEmail: $nameOrEmail) {
+     ...FragmentUser
+  }
+}
+
+query SearchUser($keyword: String!) {
+  searchUser(keyword: $keyword) {
+     ...FragmentUser
+  }
+}
+
+mutation SignUp($input: SignUpInput!) {
+    signUp(input: $input) {
+        user {...FragmentUser}
+    }
+}
+
+mutation SignupOIDC($input: SignupOIDCInput!) {
+    signUpOIDC(input: $input) {
+        user {...FragmentUser}
+    }
+}
+
+mutation VerifyUser($input: VerifyUserInput!) {
+    verifyUser(input: $input) {
+        user {...FragmentUser}
+    }
+}
+
+mutation FindOrCreate($input: FindOrCreateInput!) {
+    findOrCreate(input: $input) {
+        user {...FragmentUser}
+    }
+}
+
+mutation CreateVerification($input: CreateVerificationInput!) {
+    createVerification(input: $input)
+}
+
+mutation StartPasswordReset($input: StartPasswordResetInput!) {
+    startPasswordReset(input: $input)
+}
+
+mutation PasswordReset($input: PasswordResetInput!) {
+    passwordReset(input: $input)
+}
+
+query WorkspaceByIDs($id: [ID!]!) {
+  nodes(id: $id, type: WORKSPACE) {
+    ... on Workspace { ...FragmentWorkspace}
+  }
+}
+
+fragment FragmentMe on Me {
+    id
+    name
+    email
+    lang
+    theme
+    myWorkspaceId
+    auths
+}
+
+
+mutation RemoveMyAuth($input: RemoveMyAuthInput!) {
+    removeMyAuth(input: $input) {
+        me {...FragmentMe}
+    }
+}
+
+mutation UpdateMe($input: UpdateMeInput!) {
+    updateMe(input: $input) {
+        me {...FragmentMe}
+    }
+}
+
+mutation DeleteMe($input: DeleteMeInput!) {
+    deleteMe(input: $input) {
+        userId
+    }
+}
+
+fragment FragmentWorkspace on Workspace {
+    id
+    name
+    personal
+    members {
+        ... on WorkspaceUserMember {
+            userId
+            role
+        }
+        ... on WorkspaceIntegrationMember {
+            integrationId
+            role
+            active
+            invitedById
+        }
+    }
+}
+
+query FindByUser($userId: ID!) {
+    findByUser(userId: $userId) {
+        ...FragmentWorkspace
+    }
+}
+
+mutation CreateWorkspace($input: CreateWorkspaceInput!) {
+    createWorkspace(input: $input) {
+        workspace{...FragmentWorkspace}
+    }
+}
+
+mutation DeleteWorkspace($input: DeleteWorkspaceInput!) {
+    deleteWorkspace(input: $input) {
+        workspaceId
+    }
+}
+
+mutation UpdateWorkspace($input: UpdateWorkspaceInput!) {
+    updateWorkspace(input: $input) {
+        workspace{...FragmentWorkspace}
+    }
+}
+
+mutation AddUsersToWorkspace($input: AddUsersToWorkspaceInput!) {
+    addUsersToWorkspace(input: $input) {
+        workspace{...FragmentWorkspace}
+    }
+}
+
+mutation AddIntegrationToWorkspace($input: AddIntegrationToWorkspaceInput!) {
+    addIntegrationToWorkspace(input: $input) {
+        workspace{...FragmentWorkspace}
+    }
+}
+
+mutation RemoveUserFromWorkspace($input: RemoveUserFromWorkspaceInput!) {
+    removeUserFromWorkspace(input: $input) {
+        workspace{...FragmentWorkspace}
+    }
+}
+
+mutation RemoveMultipleUsersFromWorkspace($input: RemoveMultipleUsersFromWorkspaceInput!) {
+    removeMultipleUsersFromWorkspace(input: $input) {
+        workspace {...FragmentWorkspace}
+    }
+}
+
+mutation RemoveIntegrationFromWorkspace($input: RemoveIntegrationFromWorkspaceInput!) {
+    removeIntegrationFromWorkspace(input: $input) {
+        workspace{...FragmentWorkspace}
+    }
+}
+
+mutation RemoveIntegrationsFromWorkspace($input: RemoveIntegrationsFromWorkspaceInput!) {
+    removeIntegrationsFromWorkspace(input: $input) {
+        workspace{...FragmentWorkspace}
+    }
+}
+
+mutation UpdateUserOfWorkspace($input: UpdateUserOfWorkspaceInput!) {
+    updateUserOfWorkspace(input: $input) {
+        workspace{...FragmentWorkspace}
+    }
+}
+
+mutation UpdateIntegrationOfWorkspace($input: UpdateIntegrationOfWorkspaceInput!) {
+    updateIntegrationOfWorkspace(input: $input) {
+        workspace{...FragmentWorkspace}
+    }
+}

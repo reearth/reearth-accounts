@@ -10,16 +10,13 @@ import (
 	"github.com/reearth/reearth-accounts/pkg/id"
 	"github.com/reearth/reearth-accounts/pkg/permittable"
 	"github.com/reearth/reearth-accounts/pkg/role"
-	userPkg "github.com/reearth/reearth-accounts/pkg/user"
-	workspacePkg "github.com/reearth/reearth-accounts/pkg/workspace"
-	"github.com/reearth/reearthx/account/accountdomain/user"
-	"github.com/reearth/reearthx/account/accountdomain/workspace"
-	"github.com/reearth/reearthx/account/accountusecase/accountrepo"
+	"github.com/reearth/reearth-accounts/pkg/user"
+	"github.com/reearth/reearth-accounts/pkg/workspace"
 	"github.com/reearth/reearthx/log"
 	"github.com/reearth/reearthx/rerror"
 )
 
-func runMigration(ctx context.Context, repos *repo.Container, acRepos *accountrepo.Container) error {
+func runMigration(ctx context.Context, repos *repo.Container) error {
 	log.Info("Starting migration...")
 
 	// check and create maintainer role
@@ -56,7 +53,7 @@ func runMigration(ctx context.Context, repos *repo.Container, acRepos *accountre
 	}
 
 	// get all users
-	users, err := acRepos.User.FindAll(ctx)
+	users, err := repos.User.FindAll(ctx)
 	if err != nil {
 		return fmt.Errorf("failed to get users: %w", err)
 	}
@@ -65,7 +62,7 @@ func runMigration(ctx context.Context, repos *repo.Container, acRepos *accountre
 
 	// get all workspaces for each user
 	for _, u := range users {
-		workspaces, err := acRepos.Workspace.FindByUser(ctx, u.ID())
+		workspaces, err := repos.Workspace.FindByUser(ctx, u.ID())
 		if err != nil {
 			log.Errorf("Failed to get workspaces for user %s: %v", u.ID, err)
 			continue

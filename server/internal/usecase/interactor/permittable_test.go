@@ -4,26 +4,25 @@ import (
 	"context"
 	"testing"
 
-	"github.com/reearth/reearth-accounts/internal/infrastructure/memory"
+	accountmemory "github.com/reearth/reearth-accounts/internal/infrastructure/memory"
 	"github.com/reearth/reearth-accounts/internal/usecase/interfaces"
+	"github.com/reearth/reearth-accounts/internal/usecase/repo"
 	"github.com/reearth/reearth-accounts/pkg/id"
 	"github.com/reearth/reearth-accounts/pkg/permittable"
 	"github.com/reearth/reearth-accounts/pkg/role"
-	"github.com/reearth/reearthx/account/accountdomain/user"
-	"github.com/reearth/reearthx/account/accountinfrastructure/accountmemory"
-	"github.com/reearth/reearthx/account/accountusecase/accountrepo"
+	"github.com/reearth/reearth-accounts/pkg/user"
 	"github.com/stretchr/testify/assert"
 )
 
 func TestGetUsersWithRoles(t *testing.T) {
 	// prepare
 	ctx := context.Background()
-	memory := memory.New()
+	memory := accountmemory.New()
 	uid1 := user.NewID()
 	uid2 := user.NewID()
 	u1 := user.New().ID(uid1).Name("hoge").Email("abc@bb.cc").MustBuild()
 	u2 := user.New().ID(uid2).Name("foo").Email("cba@bb.cc").MustBuild()
-	userRepo := accountrepo.NewMultiUser(
+	userRepo := repo.NewMultiUser(
 		accountmemory.NewUserWith(u1, u2),
 	)
 	p := &Permittable{
@@ -80,10 +79,10 @@ func TestGetUsersWithRoles(t *testing.T) {
 func TestUpdatePermittable(t *testing.T) {
 	// prepare
 	ctx := context.Background()
-	memory := memory.New()
+	memory := accountmemory.New()
 	uid1 := user.NewID()
 	u1 := user.New().ID(uid1).Name("hoge").Email("abc@bb.cc").MustBuild()
-	userRepo := accountrepo.NewMultiUser(
+	userRepo := repo.NewMultiUser(
 		accountmemory.NewUserWith(u1),
 	)
 	p := &Permittable{

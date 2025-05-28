@@ -8,17 +8,17 @@ import (
 	"testing"
 
 	"github.com/reearth/reearth-accounts/internal/app"
-	"github.com/reearth/reearthx/account/accountdomain"
-	"github.com/reearth/reearthx/account/accountdomain/user"
-	"github.com/reearth/reearthx/account/accountdomain/workspace"
-	"github.com/reearth/reearthx/account/accountusecase/accountrepo"
+	"github.com/reearth/reearth-accounts/internal/usecase/repo"
+	"github.com/reearth/reearth-accounts/pkg/id"
+	"github.com/reearth/reearth-accounts/pkg/user"
+	"github.com/reearth/reearth-accounts/pkg/workspace"
 	"github.com/reearth/reearthx/idx"
 	"github.com/reearth/reearthx/rerror"
 	"github.com/stretchr/testify/assert"
 	"golang.org/x/text/language"
 )
 
-func baseSeederOneUser(ctx context.Context, r *accountrepo.Container) error {
+func baseSeederOneUser(ctx context.Context, r *repo.Container) error {
 	auth := user.ReearthSub(uId.String())
 	u := user.New().ID(uId).
 		Name("e2e").
@@ -38,10 +38,10 @@ func baseSeederOneUser(ctx context.Context, r *accountrepo.Container) error {
 
 	w := workspace.New().ID(wId).
 		Name("e2e").
-		Members(map[idx.ID[accountdomain.User]]workspace.Member{
+		Members(map[idx.ID[id.User]]workspace.Member{
 			uId: roleOwner,
 		}).
-		Integrations(map[idx.ID[accountdomain.Integration]]workspace.Member{
+		Integrations(map[idx.ID[id.Integration]]workspace.Member{
 			iId: roleOwner,
 		}).
 		MustBuild()
@@ -51,7 +51,7 @@ func baseSeederOneUser(ctx context.Context, r *accountrepo.Container) error {
 	return nil
 }
 
-func baseSeederUser(ctx context.Context, r *accountrepo.Container) error {
+func baseSeederUser(ctx context.Context, r *repo.Container) error {
 	auth := user.ReearthSub(uId.String())
 	u := user.New().ID(uId).
 		Name("e2e").
@@ -91,10 +91,10 @@ func baseSeederUser(ctx context.Context, r *accountrepo.Container) error {
 
 	w := workspace.New().ID(wId).
 		Name("e2e").
-		Members(map[idx.ID[accountdomain.User]]workspace.Member{
+		Members(map[idx.ID[id.User]]workspace.Member{
 			uId: roleOwner,
 		}).
-		Integrations(map[idx.ID[accountdomain.Integration]]workspace.Member{
+		Integrations(map[idx.ID[id.Integration]]workspace.Member{
 			iId: roleOwner,
 		}).
 		MustBuild()
@@ -104,11 +104,11 @@ func baseSeederUser(ctx context.Context, r *accountrepo.Container) error {
 
 	w2 := workspace.New().ID(wId2).
 		Name("e2e2").
-		Members(map[idx.ID[accountdomain.User]]workspace.Member{
+		Members(map[idx.ID[id.User]]workspace.Member{
 			uId:  roleOwner,
 			uId3: roleReader,
 		}).
-		Integrations(map[idx.ID[accountdomain.Integration]]workspace.Member{
+		Integrations(map[idx.ID[id.Integration]]workspace.Member{
 			iId: roleOwner,
 		}).
 		MustBuild()
@@ -214,9 +214,9 @@ func TestMe(t *testing.T) {
 	o.Value("myWorkspaceId").String().IsEqual(wId.String())
 }
 
-func TestSearchUser(t *testing.T) {
+func TestUserByNameOrEmail(t *testing.T) {
 	e, _ := StartServer(t, &app.Config{}, true, baseSeederUser)
-	query := fmt.Sprintf(` { searchUser(nameOrEmail: "%s"){ id name email } }`, "e2e")
+	query := fmt.Sprintf(` { userByNameOrEmail(nameOrEmail: "%s"){ id name email } }`, "e2e")
 	request := GraphQLRequest{
 		Query: query,
 	}
@@ -228,7 +228,7 @@ func TestSearchUser(t *testing.T) {
 		WithHeader("authorization", "Bearer test").
 		WithHeader("Content-Type", "application/json").
 		WithHeader("X-Reearth-Debug-User", uId.String()).
-		WithBytes(jsonData).Expect().Status(http.StatusOK).JSON().Object().Value("data").Object().Value("searchUser").Object()
+		WithBytes(jsonData).Expect().Status(http.StatusOK).JSON().Object().Value("data").Object().Value("userByNameOrEmail").Object()
 	o.Value("id").String().IsEqual(uId.String())
 	o.Value("name").String().IsEqual("e2e")
 	o.Value("email").String().IsEqual("e2e@e2e.com")

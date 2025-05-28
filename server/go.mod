@@ -4,6 +4,7 @@ go 1.23.5
 
 require (
 	github.com/99designs/gqlgen v0.17.64
+	github.com/Khan/genqlient v0.8.1
 	github.com/cerbos/cerbos-sdk-go v0.2.13
 	github.com/cerbos/cerbos/api/genpb v0.40.0
 	github.com/gavv/httpexpect/v2 v2.15.0
@@ -21,6 +22,8 @@ require (
 	github.com/vektah/gqlparser/v2 v2.5.22
 	go.mongodb.org/mongo-driver v1.17.2
 	go.uber.org/mock v0.5.0
+	golang.org/x/crypto v0.32.0
+	golang.org/x/exp v0.0.0-20250128182459-e0ece0dbea4c
 	golang.org/x/net v0.34.0
 	golang.org/x/text v0.22.0
 )
@@ -40,6 +43,8 @@ require (
 	github.com/Microsoft/go-winio v0.6.2 // indirect
 	github.com/agnivade/levenshtein v1.2.1 // indirect
 	github.com/ajg/form v1.5.1 // indirect
+	github.com/alexflint/go-arg v1.5.1 // indirect
+	github.com/alexflint/go-scalar v1.2.0 // indirect
 	github.com/andybalholm/brotli v1.0.4 // indirect
 	github.com/antlr4-go/antlr/v4 v4.13.1 // indirect
 	github.com/auth0/go-jwt-middleware/v2 v2.2.2 // indirect
@@ -57,6 +62,7 @@ require (
 	github.com/aws/aws-sdk-go-v2/service/ssooidc v1.28.13 // indirect
 	github.com/aws/aws-sdk-go-v2/service/sts v1.33.13 // indirect
 	github.com/aws/smithy-go v1.22.2 // indirect
+	github.com/bmatcuk/doublestar/v4 v4.6.1 // indirect
 	github.com/bufbuild/protovalidate-go v0.9.1 // indirect
 	github.com/cenkalti/backoff/v4 v4.3.0 // indirect
 	github.com/containerd/continuity v0.4.4 // indirect
@@ -171,8 +177,6 @@ require (
 	go.uber.org/atomic v1.11.0 // indirect
 	go.uber.org/multierr v1.11.0 // indirect
 	go.uber.org/zap v1.27.0 // indirect
-	golang.org/x/crypto v0.32.0 // indirect
-	golang.org/x/exp v0.0.0-20250128182459-e0ece0dbea4c // indirect
 	golang.org/x/mod v0.23.0 // indirect
 	golang.org/x/oauth2 v0.26.0 // indirect
 	golang.org/x/sync v0.11.0 // indirect

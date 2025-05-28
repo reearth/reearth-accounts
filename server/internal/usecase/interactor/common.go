@@ -7,9 +7,6 @@ import (
 	"github.com/reearth/reearth-accounts/internal/usecase/gateway"
 	"github.com/reearth/reearth-accounts/internal/usecase/interfaces"
 	"github.com/reearth/reearth-accounts/internal/usecase/repo"
-	"github.com/reearth/reearthx/account/accountusecase/accountgateway"
-	"github.com/reearth/reearthx/account/accountusecase/accountinteractor"
-	"github.com/reearth/reearthx/account/accountusecase/accountrepo"
 )
 
 type ContainerConfig struct {
@@ -19,17 +16,16 @@ type ContainerConfig struct {
 
 func NewContainer(
 	r *repo.Container,
-	acr *accountrepo.Container,
-	acg *accountgateway.Container,
-	enforcer accountinteractor.WorkspaceMemberCountEnforcer,
+	acg *gateway.Container,
+	enforcer WorkspaceMemberCountEnforcer,
 	cerbosAdapter gateway.CerbosGateway,
 	config ContainerConfig) interfaces.Container {
 	return interfaces.Container{
-		User:        accountinteractor.NewUser(acr, acg, config.SignupSecret, config.AuthSrvUIDomain),
-		Workspace:   accountinteractor.NewWorkspace(acr, enforcer),
-		Cerbos:      NewCerbos(cerbosAdapter, r),
+		User:        NewUser(r, acg, config.SignupSecret, config.AuthSrvUIDomain),
+		Workspace:   NewWorkspace(r, enforcer),
+		Cerbos:      NewCerbos(r, cerbosAdapter),
 		Role:        NewRole(r),
-		Permittable: NewPermittable(r, acr),
+		Permittable: NewPermittable(r),
 	}
 }
 

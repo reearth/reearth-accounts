@@ -10,6 +10,7 @@ union WorkspaceMember = WorkspaceUserMember | WorkspaceIntegrationMember
 type WorkspaceUserMember {
     userId: ID!
     role: Role!
+    host: String
     user: User
 }
 
@@ -62,9 +63,19 @@ input RemoveUserFromWorkspaceInput {
     userId: ID!
 }
 
+input RemoveMultipleUsersFromWorkspaceInput {
+    workspaceId: ID!
+    userIds: [ID!]!
+}
+
 input RemoveIntegrationFromWorkspaceInput {
     workspaceId: ID!
     integrationId: ID!
+}
+
+input RemoveIntegrationsFromWorkspaceInput {
+    workspaceId: ID!
+    integrationIds: [ID!]!
 }
 
 input UpdateUserOfWorkspaceInput {
@@ -101,12 +112,24 @@ type RemoveMemberFromWorkspacePayload {
     workspace: Workspace!
 }
 
+type RemoveIntegrationsFromWorkspacePayload {
+    workspace: Workspace!
+}
+
+type RemoveMultipleMembersFromWorkspacePayload {
+    workspace: Workspace!
+}
+
 type UpdateMemberOfWorkspacePayload {
     workspace: Workspace!
 }
 
 type DeleteWorkspacePayload {
     workspaceId: ID!
+}
+
+extend type Query {
+    findByUser(userId: ID!): [Workspace]
 }
 
 extend type Mutation {
@@ -116,7 +139,9 @@ extend type Mutation {
     addUsersToWorkspace(input: AddUsersToWorkspaceInput!): AddUsersToWorkspacePayload
     addIntegrationToWorkspace(input: AddIntegrationToWorkspaceInput!): AddUsersToWorkspacePayload
     removeUserFromWorkspace(input: RemoveUserFromWorkspaceInput!): RemoveMemberFromWorkspacePayload
+    removeMultipleUsersFromWorkspace(input: RemoveMultipleUsersFromWorkspaceInput!): RemoveMultipleMembersFromWorkspacePayload
     removeIntegrationFromWorkspace(input: RemoveIntegrationFromWorkspaceInput!): RemoveMemberFromWorkspacePayload
+    removeIntegrationsFromWorkspace(input: RemoveIntegrationsFromWorkspaceInput!): RemoveIntegrationsFromWorkspacePayload
     updateUserOfWorkspace(input: UpdateUserOfWorkspaceInput!): UpdateMemberOfWorkspacePayload
     updateIntegrationOfWorkspace(input: UpdateIntegrationOfWorkspaceInput!): UpdateMemberOfWorkspacePayload
 }

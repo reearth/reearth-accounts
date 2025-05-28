@@ -1,6 +1,7 @@
 package mongodoc
 
 import (
+	"github.com/reearth/reearth-accounts/pkg/id"
 	"github.com/reearth/reearth-accounts/pkg/workspace"
 	"github.com/reearth/reearthx/mongox"
 	"github.com/samber/lo"
@@ -76,81 +77,88 @@ func NewWorkspace(ws *workspace.Workspace) (*WorkspaceDocument, string) {
 	}, wId
 }
 
-func (w *WorkspaceDocument) Model() (*workspace.Workspace, error) {
-	tid, err := workspace.IDFrom(w.ID)
+func (d *WorkspaceDocument) Model() (*workspace.Workspace, error) {
+	tid, err := id.WorkspaceIDFrom(d.ID)
 	if err != nil {
 		return nil, err
 	}
 
-	members := map[workspace.UserID]workspace.Member{}
-	if w.Members != nil {
-		for uId, m := range w.Members {
-			uid, err := workspace.UserIDFrom(uId)
+	members := map[id.UserID]workspace.Member{}
+	if d.Members != nil {
+		for uid, member := range d.Members {
+			uid, err := id.UserIDFrom(uid)
 			if err != nil {
 				return nil, err
 			}
-
-			inviterID, err := workspace.UserIDFrom(m.InvitedBy)
+			inviterID, err := id.UserIDFrom(member.InvitedBy)
 			if err != nil {
-				return nil, err
+				inviterID = uid
 			}
 
 			members[uid] = workspace.Member{
-				Role:      workspace.Role(m.Role),
-				Disabled:  m.Disabled,
+				Role:      workspace.Role(member.Role),
+				Disabled:  member.Disabled,
 				InvitedBy: inviterID,
 			}
 		}
 	}
 
-	integrations := map[workspace.IntegrationID]workspace.Member{}
-	if w.Integrations != nil {
-		for iId, integrationDoc := range w.Integrations {
-			iId, err := workspace.IntegrationIDFrom(iId)
+	integrations := map[id.IntegrationID]workspace.Member{}
+	if d.Integrations != nil {
+		for iId, integrationDoc := range d.Integrations {
+			iId, err := id.IntegrationIDFrom(iId)
 			if err != nil {
 				return nil, err
 			}
 			integrations[iId] = workspace.Member{
 				Role:      workspace.Role(integrationDoc.Role),
 				Disabled:  integrationDoc.Disabled,
-				InvitedBy: workspace.MustUserID(integrationDoc.InvitedBy),
+				InvitedBy: id.MustUserID(integrationDoc.InvitedBy),
 			}
 		}
 	}
 
 	var policy *workspace.PolicyID
-	if w.Policy != "" {
-		policy = workspace.PolicyID(w.Policy).Ref()
+	if d.Policy != "" {
+		policy = workspace.PolicyID(d.Policy).Ref()
 	}
 
 	var metadata *workspace.Metadata
-	if w.Metadata != nil {
+	if d.Metadata != nil {
 		metadata = workspace.MetadataFrom(w.Metadata.Description, w.Metadata.Website, w.Metadata.Location, w.Metadata.BillingEmail, w.Metadata.PhotoURL)
 	}
 
 	return workspace.New().
 		ID(tid).
-		Name(w.Name).
-		Alias(w.Alias).
-		Email(w.Email).
+		Name(d.Name).
+		Alias(d.Alias).
+		Email(d.Email).
 		Metadata(metadata).
 		Members(members).
 		Integrations(integrations).
-		Personal(w.Personal).
+		Personal(d.Personal).
 		Policy(policy).
 		Build()
 }
 
-type WorkspaceConsumer = mongox.SliceFuncConsumer[*WorkspaceDocument, *workspace.Workspace]
+func NewWorkspaces(workspaces []*workspace.Workspace) ([]*WorkspaceDocument, []string) {
+	res := make([]*WorkspaceDocument, 0, len(workspaces))
+	ids := make([]string, 0, len(workspaces))
+	for _, d := range workspaces {
+		if d == nil {
+			continue
+		}
+		r, wId := NewWorkspace(d)
+		res = append(res, r)
+		ids = append(ids, wId)
+	}
+	return res, ids
+}
+
+type WorkspaceConsumer = Consumer[*WorkspaceDocument, *workspace.Workspace]
 
 func NewWorkspaceConsumer() *WorkspaceConsumer {
-	return mongox.NewSliceFuncConsumer[*WorkspaceDocument, *workspace.Workspace](
-		func(d *WorkspaceDocument) (*workspace.Workspace, error) {
-			m, err := d.Model()
-			if err != nil {
-				return nil, err
-			}
-			return m, nil
-		},
-	)
+	return NewConsumer[*WorkspaceDocument, *workspace.Workspace](func(a *workspace.Workspace) bool {
+		return true
+	})
 }

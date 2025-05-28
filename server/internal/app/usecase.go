@@ -8,27 +8,23 @@ import (
 	"github.com/reearth/reearth-accounts/internal/usecase/gateway"
 	"github.com/reearth/reearth-accounts/internal/usecase/interactor"
 	"github.com/reearth/reearth-accounts/internal/usecase/repo"
-	"github.com/reearth/reearthx/account/accountusecase/accountgateway"
-	"github.com/reearth/reearthx/account/accountusecase/accountinteractor"
-	"github.com/reearth/reearthx/account/accountusecase/accountrepo"
 )
 
 func UsecaseMiddleware(
 	r *repo.Container,
-	acr *accountrepo.Container,
-	acg *accountgateway.Container,
-	enforcer accountinteractor.WorkspaceMemberCountEnforcer,
+	acg *gateway.Container,
+	enforcer interactor.WorkspaceMemberCountEnforcer,
 	cerbosAdapter gateway.CerbosGateway,
 	config interactor.ContainerConfig) echo.MiddlewareFunc {
 	return ContextMiddleware(func(ctx context.Context) context.Context {
-		var acr2 *accountrepo.Container
+		var r2 *repo.Container
 		if op := adapter.Operator(ctx); op != nil {
 			// apply filters to repos
-			acr2 = acr.Filtered(accountrepo.WorkspaceFilterFromOperator(op))
+			r2 = r.Filtered(repo.WorkspaceFilterFromOperator(op))
 		} else {
-			acr2 = acr
+			r2 = r
 		}
-		uc := interactor.NewContainer(r, acr2, acg, enforcer, cerbosAdapter, config)
+		uc := interactor.NewContainer(r2, acg, enforcer, cerbosAdapter, config)
 		ctx = adapter.AttachUsecases(ctx, &uc)
 		return ctx
 	})

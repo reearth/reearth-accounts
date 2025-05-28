@@ -2,7 +2,6 @@ package workspace
 
 import (
 	"fmt"
-	"maps"
 	"sort"
 	"sync"
 
@@ -10,6 +9,7 @@ import (
 	"github.com/reearth/reearthx/i18n"
 	"github.com/reearth/reearthx/rerror"
 	"github.com/samber/lo"
+	"golang.org/x/exp/maps"
 )
 
 var (

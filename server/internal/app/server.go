@@ -11,8 +11,6 @@ import (
 	infraCerbos "github.com/reearth/reearth-accounts/internal/infrastructure/cerbos"
 	"github.com/reearth/reearth-accounts/internal/usecase/gateway"
 	"github.com/reearth/reearth-accounts/internal/usecase/repo"
-	"github.com/reearth/reearthx/account/accountusecase/accountgateway"
-	"github.com/reearth/reearthx/account/accountusecase/accountrepo"
 	"github.com/reearth/reearthx/log"
 	"golang.org/x/net/http2"
 )
@@ -29,12 +27,12 @@ func Start(debug bool) {
 	log.Infof("config: %s", conf.Print())
 
 	// Init repositories
-	repos, accountRepos, gateways := initReposAndGateways(ctx, conf)
+	repos, gateways := initReposAndGateways(ctx, conf)
 
 	// Check if migration mode
 	// Once the permission check migration is complete, it will be deleted.
 	if os.Getenv("RUN_MIGRATION") == "true" {
-		if err := runMigration(ctx, repos, accountRepos); err != nil {
+		if err := runMigration(ctx, repos); err != nil {
 			log.Fatal(err)
 		}
 		return
@@ -57,7 +55,6 @@ func Start(debug bool) {
 		Config:        conf,
 		Debug:         debug,
 		Repos:         repos,
-		AccountRepos:  accountRepos,
 		Gateways:      gateways,
 		CerbosAdapter: cerbosAdapter,
 	}).Run(ctx)
@@ -72,8 +69,7 @@ type ServerConfig struct {
 	Config        *Config
 	Debug         bool
 	Repos         *repo.Container
-	AccountRepos  *accountrepo.Container
-	Gateways      *accountgateway.Container
+	Gateways      *gateway.Container
 	CerbosAdapter gateway.CerbosGateway
 }
 
