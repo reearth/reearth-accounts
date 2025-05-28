@@ -9,8 +9,8 @@ import (
 	"github.com/99designs/gqlgen/graphql/handler/extension"
 	"github.com/99designs/gqlgen/graphql/handler/lru"
 	"github.com/99designs/gqlgen/graphql/handler/transport"
-	"github.com/reearth/reearth-accounts/internal/adapter"
-	"github.com/reearth/reearth-accounts/internal/adapter/gql"
+	"github.com/reearth/reearth-accounts/server/internal/adapter"
+	"github.com/reearth/reearth-accounts/server/internal/adapter/gql"
 
 	"github.com/labstack/echo/v4"
 	"github.com/ravilushqa/otelgqlgen"
