@@ -15,17 +15,19 @@ import (
 	"github.com/reearth/reearthx/idx"
 	"github.com/reearth/reearthx/rerror"
 	"github.com/stretchr/testify/assert"
-	"golang.org/x/text/language"
 )
 
 func baseSeederOneUser(ctx context.Context, r *repo.Container) error {
 	auth := user.ReearthSub(uId.String())
+	metadata := user.NewMetadata()
+	metadata.LangFrom("ja")
+	metadata.SetTheme(user.ThemeDark)
+
 	u := user.New().ID(uId).
 		Name("e2e").
 		Email("e2e@e2e.com").
 		Auths([]user.Auth{*auth}).
-		Theme(user.ThemeDark).
-		Lang(language.Japanese).
+		Metadata(metadata).
 		Workspace(wId).
 		MustBuild()
 	if err := r.User.Save(ctx, u); err != nil {
@@ -53,12 +55,15 @@ func baseSeederOneUser(ctx context.Context, r *repo.Container) error {
 
 func baseSeederUser(ctx context.Context, r *repo.Container) error {
 	auth := user.ReearthSub(uId.String())
+	metadata := user.NewMetadata()
+	metadata.LangFrom("ja")
+	metadata.SetTheme(user.ThemeDark)
+
 	u := user.New().ID(uId).
 		Name("e2e").
 		Email("e2e@e2e.com").
 		Auths([]user.Auth{*auth}).
-		Theme(user.ThemeDark).
-		Lang(language.Japanese).
+		Metadata(metadata).
 		Workspace(wId).
 		MustBuild()
 	if err := r.User.Save(ctx, u); err != nil {
