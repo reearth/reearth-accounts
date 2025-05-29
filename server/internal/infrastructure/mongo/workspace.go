@@ -9,8 +9,6 @@ import (
 	"github.com/reearth/reearth-accounts/pkg/id"
 	"github.com/reearth/reearth-accounts/pkg/user"
 	"github.com/reearth/reearth-accounts/pkg/workspace"
-	"github.com/reearth/reearthx/account/accountdomain"
-	"github.com/reearth/reearthx/account/accountusecase/accountrepo"
 	"github.com/reearth/reearthx/mongox"
 	"github.com/reearth/reearthx/rerror"
 	"github.com/reearth/reearthx/usecasex"

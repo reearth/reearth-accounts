@@ -39,11 +39,6 @@ func TestBuilder_Name(t *testing.T) {
 	assert.Equal(t, "xxx", w.w.name)
 }
 
-func TestBuilder_DisplayName(t *testing.T) {
-	w := New().DisplayName("xxx")
-	assert.Equal(t, "xxx", w.w.displayName)
-}
-
 func TestBuilder_Build(t *testing.T) {
 	m := map[UserID]Member{NewUserID(): {Role: RoleOwner}}
 	i := map[IntegrationID]Member{NewIntegrationID(): {Role: RoleOwner}}

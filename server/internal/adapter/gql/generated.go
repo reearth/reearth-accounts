@@ -186,9 +186,18 @@ type ComplexityRoot struct {
 		Host      func(childComplexity int) int
 		ID        func(childComplexity int) int
 		Lang      func(childComplexity int) int
+		Metadata  func(childComplexity int) int
 		Name      func(childComplexity int) int
 		Theme     func(childComplexity int) int
 		Workspace func(childComplexity int) int
+	}
+
+	UserMetadata struct {
+		Description func(childComplexity int) int
+		Lang        func(childComplexity int) int
+		PhotoURL    func(childComplexity int) int
+		Theme       func(childComplexity int) int
+		Website     func(childComplexity int) int
 	}
 
 	UserPayload struct {
@@ -940,6 +949,13 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 
 		return e.complexity.User.Lang(childComplexity), true
 
+	case "User.metadata":
+		if e.complexity.User.Metadata == nil {
+			break
+		}
+
+		return e.complexity.User.Metadata(childComplexity), true
+
 	case "User.name":
 		if e.complexity.User.Name == nil {
 			break
@@ -960,6 +976,41 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 		}
 
 		return e.complexity.User.Workspace(childComplexity), true
+
+	case "UserMetadata.description":
+		if e.complexity.UserMetadata.Description == nil {
+			break
+		}
+
+		return e.complexity.UserMetadata.Description(childComplexity), true
+
+	case "UserMetadata.lang":
+		if e.complexity.UserMetadata.Lang == nil {
+			break
+		}
+
+		return e.complexity.UserMetadata.Lang(childComplexity), true
+
+	case "UserMetadata.photoURL":
+		if e.complexity.UserMetadata.PhotoURL == nil {
+			break
+		}
+
+		return e.complexity.UserMetadata.PhotoURL(childComplexity), true
+
+	case "UserMetadata.theme":
+		if e.complexity.UserMetadata.Theme == nil {
+			break
+		}
+
+		return e.complexity.UserMetadata.Theme(childComplexity), true
+
+	case "UserMetadata.website":
+		if e.complexity.UserMetadata.Website == nil {
+			break
+		}
+
+		return e.complexity.UserMetadata.Website(childComplexity), true
 
 	case "UserPayload.user":
 		if e.complexity.UserPayload.User == nil {
@@ -1335,6 +1386,7 @@ extend type Mutation {
   host: String
   workspace: ID!
   auths: [String!]!
+  metadata: UserMetadata!
 }
 
 type Me {
@@ -1348,6 +1400,14 @@ type Me {
   auths: [String!]!
   workspaces: [Workspace!]!
   myWorkspace: Workspace!
+}
+
+type UserMetadata {
+  description: String
+  website: String
+  photoURL: String
+  lang: Lang!
+  theme: Theme!
 }
 
 input SignUpInput {
@@ -5341,6 +5401,8 @@ func (ec *executionContext) fieldContext_Query_userByNameOrEmail(ctx context.Con
 				return ec.fieldContext_User_workspace(ctx, field)
 			case "auths":
 				return ec.fieldContext_User_auths(ctx, field)
+			case "metadata":
+				return ec.fieldContext_User_metadata(ctx, field)
 			}
 			return nil, fmt.Errorf("no field named %q was found under type User", field.Name)
 		},
@@ -5414,6 +5476,8 @@ func (ec *executionContext) fieldContext_Query_searchUser(ctx context.Context, f
 				return ec.fieldContext_User_workspace(ctx, field)
 			case "auths":
 				return ec.fieldContext_User_auths(ctx, field)
+			case "metadata":
+				return ec.fieldContext_User_metadata(ctx, field)
 			}
 			return nil, fmt.Errorf("no field named %q was found under type User", field.Name)
 		},
@@ -6594,6 +6658,273 @@ func (ec *executionContext) fieldContext_User_auths(_ context.Context, field gra
 	return fc, nil
 }
 
+func (ec *executionContext) _User_metadata(ctx context.Context, field graphql.CollectedField, obj *gqlmodel.User) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_User_metadata(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (any, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.Metadata, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		if !graphql.HasFieldError(ctx, fc) {
+			ec.Errorf(ctx, "must not be null")
+		}
+		return graphql.Null
+	}
+	res := resTmp.(*gqlmodel.UserMetadata)
+	fc.Result = res
+	return ec.marshalNUserMetadata2ᚖgithubᚗcomᚋreearthᚋreearthᚑaccountsᚋinternalᚋadapterᚋgqlᚋgqlmodelᚐUserMetadata(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_User_metadata(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "User",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			switch field.Name {
+			case "description":
+				return ec.fieldContext_UserMetadata_description(ctx, field)
+			case "website":
+				return ec.fieldContext_UserMetadata_website(ctx, field)
+			case "photoURL":
+				return ec.fieldContext_UserMetadata_photoURL(ctx, field)
+			case "lang":
+				return ec.fieldContext_UserMetadata_lang(ctx, field)
+			case "theme":
+				return ec.fieldContext_UserMetadata_theme(ctx, field)
+			}
+			return nil, fmt.Errorf("no field named %q was found under type UserMetadata", field.Name)
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _UserMetadata_description(ctx context.Context, field graphql.CollectedField, obj *gqlmodel.UserMetadata) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_UserMetadata_description(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (any, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.Description, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		return graphql.Null
+	}
+	res := resTmp.(*string)
+	fc.Result = res
+	return ec.marshalOString2ᚖstring(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_UserMetadata_description(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "UserMetadata",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type String does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _UserMetadata_website(ctx context.Context, field graphql.CollectedField, obj *gqlmodel.UserMetadata) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_UserMetadata_website(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (any, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.Website, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		return graphql.Null
+	}
+	res := resTmp.(*string)
+	fc.Result = res
+	return ec.marshalOString2ᚖstring(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_UserMetadata_website(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "UserMetadata",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type String does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _UserMetadata_photoURL(ctx context.Context, field graphql.CollectedField, obj *gqlmodel.UserMetadata) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_UserMetadata_photoURL(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (any, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.PhotoURL, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		return graphql.Null
+	}
+	res := resTmp.(*string)
+	fc.Result = res
+	return ec.marshalOString2ᚖstring(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_UserMetadata_photoURL(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "UserMetadata",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type String does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _UserMetadata_lang(ctx context.Context, field graphql.CollectedField, obj *gqlmodel.UserMetadata) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_UserMetadata_lang(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (any, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.Lang, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		if !graphql.HasFieldError(ctx, fc) {
+			ec.Errorf(ctx, "must not be null")
+		}
+		return graphql.Null
+	}
+	res := resTmp.(string)
+	fc.Result = res
+	return ec.marshalNLang2string(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_UserMetadata_lang(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "UserMetadata",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type Lang does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _UserMetadata_theme(ctx context.Context, field graphql.CollectedField, obj *gqlmodel.UserMetadata) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_UserMetadata_theme(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (any, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.Theme, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		if !graphql.HasFieldError(ctx, fc) {
+			ec.Errorf(ctx, "must not be null")
+		}
+		return graphql.Null
+	}
+	res := resTmp.(gqlmodel.Theme)
+	fc.Result = res
+	return ec.marshalNTheme2githubᚗcomᚋreearthᚋreearthᚑaccountsᚋinternalᚋadapterᚋgqlᚋgqlmodelᚐTheme(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_UserMetadata_theme(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "UserMetadata",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type Theme does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
 func (ec *executionContext) _UserPayload_user(ctx context.Context, field graphql.CollectedField, obj *gqlmodel.UserPayload) (ret graphql.Marshaler) {
 	fc, err := ec.fieldContext_UserPayload_user(ctx, field)
 	if err != nil {
@@ -6649,6 +6980,8 @@ func (ec *executionContext) fieldContext_UserPayload_user(_ context.Context, fie
 				return ec.fieldContext_User_workspace(ctx, field)
 			case "auths":
 				return ec.fieldContext_User_auths(ctx, field)
+			case "metadata":
+				return ec.fieldContext_User_metadata(ctx, field)
 			}
 			return nil, fmt.Errorf("no field named %q was found under type User", field.Name)
 		},
@@ -6711,6 +7044,8 @@ func (ec *executionContext) fieldContext_UserWithRoles_user(_ context.Context, f
 				return ec.fieldContext_User_workspace(ctx, field)
 			case "auths":
 				return ec.fieldContext_User_auths(ctx, field)
+			case "metadata":
+				return ec.fieldContext_User_metadata(ctx, field)
 			}
 			return nil, fmt.Errorf("no field named %q was found under type User", field.Name)
 		},
@@ -7172,6 +7507,8 @@ func (ec *executionContext) fieldContext_WorkspaceIntegrationMember_invitedBy(_ 
 				return ec.fieldContext_User_workspace(ctx, field)
 			case "auths":
 				return ec.fieldContext_User_auths(ctx, field)
+			case "metadata":
+				return ec.fieldContext_User_metadata(ctx, field)
 			}
 			return nil, fmt.Errorf("no field named %q was found under type User", field.Name)
 		},
@@ -7360,6 +7697,8 @@ func (ec *executionContext) fieldContext_WorkspaceUserMember_user(_ context.Cont
 				return ec.fieldContext_User_workspace(ctx, field)
 			case "auths":
 				return ec.fieldContext_User_auths(ctx, field)
+			case "metadata":
+				return ec.fieldContext_User_metadata(ctx, field)
 			}
 			return nil, fmt.Errorf("no field named %q was found under type User", field.Name)
 		},
@@ -11676,6 +12015,61 @@ func (ec *executionContext) _User(ctx context.Context, sel ast.SelectionSet, obj
 			if out.Values[i] == graphql.Null {
 				out.Invalids++
 			}
+		case "metadata":
+			out.Values[i] = ec._User_metadata(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		default:
+			panic("unknown field " + strconv.Quote(field.Name))
+		}
+	}
+	out.Dispatch(ctx)
+	if out.Invalids > 0 {
+		return graphql.Null
+	}
+
+	atomic.AddInt32(&ec.deferred, int32(len(deferred)))
+
+	for label, dfs := range deferred {
+		ec.processDeferredGroup(graphql.DeferredGroup{
+			Label:    label,
+			Path:     graphql.GetPath(ctx),
+			FieldSet: dfs,
+			Context:  ctx,
+		})
+	}
+
+	return out
+}
+
+var userMetadataImplementors = []string{"UserMetadata"}
+
+func (ec *executionContext) _UserMetadata(ctx context.Context, sel ast.SelectionSet, obj *gqlmodel.UserMetadata) graphql.Marshaler {
+	fields := graphql.CollectFields(ec.OperationContext, sel, userMetadataImplementors)
+
+	out := graphql.NewFieldSet(fields)
+	deferred := make(map[string]*graphql.FieldSet)
+	for i, field := range fields {
+		switch field.Name {
+		case "__typename":
+			out.Values[i] = graphql.MarshalString("UserMetadata")
+		case "description":
+			out.Values[i] = ec._UserMetadata_description(ctx, field, obj)
+		case "website":
+			out.Values[i] = ec._UserMetadata_website(ctx, field, obj)
+		case "photoURL":
+			out.Values[i] = ec._UserMetadata_photoURL(ctx, field, obj)
+		case "lang":
+			out.Values[i] = ec._UserMetadata_lang(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "theme":
+			out.Values[i] = ec._UserMetadata_theme(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
 		default:
 			panic("unknown field " + strconv.Quote(field.Name))
 		}
@@ -12748,6 +13142,16 @@ func (ec *executionContext) marshalNUser2ᚖgithubᚗcomᚋreearthᚋreearthᚑa
 		return graphql.Null
 	}
 	return ec._User(ctx, sel, v)
+}
+
+func (ec *executionContext) marshalNUserMetadata2ᚖgithubᚗcomᚋreearthᚋreearthᚑaccountsᚋinternalᚋadapterᚋgqlᚋgqlmodelᚐUserMetadata(ctx context.Context, sel ast.SelectionSet, v *gqlmodel.UserMetadata) graphql.Marshaler {
+	if v == nil {
+		if !graphql.HasFieldError(ctx, graphql.GetFieldContext(ctx)) {
+			ec.Errorf(ctx, "the requested element is null which the schema does not allow")
+		}
+		return graphql.Null
+	}
+	return ec._UserMetadata(ctx, sel, v)
 }
 
 func (ec *executionContext) marshalNUserWithRoles2ᚕᚖgithubᚗcomᚋreearthᚋreearthᚑaccountsᚋinternalᚋadapterᚋgqlᚋgqlmodelᚐUserWithRolesᚄ(ctx context.Context, sel ast.SelectionSet, v []*gqlmodel.UserWithRoles) graphql.Marshaler {

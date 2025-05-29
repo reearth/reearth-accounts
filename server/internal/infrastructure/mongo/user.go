@@ -2,7 +2,6 @@ package mongo
 
 import (
 	"context"
-	"fmt"
 	"regexp"
 
 	"github.com/reearth/reearth-accounts/internal/infrastructure/mongo/mongodoc"
@@ -171,7 +170,7 @@ func (u *User) Create(ctx context.Context, usr *user.User) error {
 }
 
 func (u *User) Save(ctx context.Context, usr *user.User) error {
-	doc, uId := mongodoc.NewUser(*usr)
+	doc, uId := mongodoc.NewUser(usr)
 	return u.client.SaveOne(ctx, uId, doc)
 }
 
@@ -188,7 +187,7 @@ func (u *User) find(ctx context.Context, filter any, options ...*options.FindOpt
 }
 
 func (u *User) findOne(ctx context.Context, filter any) (*user.User, error) {
-	c := mongodoc.NewUserConsumer()
+	c := mongodoc.NewUserConsumer(u.host)
 	if err := u.client.FindOne(ctx, filter, c); err != nil {
 		return nil, err
 	}

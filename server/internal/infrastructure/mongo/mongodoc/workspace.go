@@ -3,7 +3,6 @@ package mongodoc
 import (
 	"github.com/reearth/reearth-accounts/pkg/id"
 	"github.com/reearth/reearth-accounts/pkg/workspace"
-	"github.com/reearth/reearthx/mongox"
 	"github.com/samber/lo"
 )
 
@@ -34,7 +33,6 @@ type WorkspaceDocument struct {
 }
 
 func NewWorkspace(ws *workspace.Workspace) (*WorkspaceDocument, string) {
-	wId := ws.ID().String()
 	membersDoc := map[string]WorkspaceMemberDocument{}
 	for uId, m := range ws.Members().Users() {
 		membersDoc[uId.String()] = WorkspaceMemberDocument{
@@ -60,10 +58,10 @@ func NewWorkspace(ws *workspace.Workspace) (*WorkspaceDocument, string) {
 			Website:      ws.Metadata().Website(),
 			Location:     ws.Metadata().Location(),
 			BillingEmail: ws.Metadata().BillingEmail(),
-			PhotoURL:     ws.Metadata().PhotoURL(),
 		}
 	}
 
+	wId := ws.ID().String()
 	return &WorkspaceDocument{
 		ID:           wId,
 		Name:         ws.Name(),
@@ -94,7 +92,6 @@ func (d *WorkspaceDocument) Model() (*workspace.Workspace, error) {
 			if err != nil {
 				inviterID = uid
 			}
-
 			members[uid] = workspace.Member{
 				Role:      workspace.Role(member.Role),
 				Disabled:  member.Disabled,
@@ -125,7 +122,7 @@ func (d *WorkspaceDocument) Model() (*workspace.Workspace, error) {
 
 	var metadata *workspace.Metadata
 	if d.Metadata != nil {
-		metadata = workspace.MetadataFrom(w.Metadata.Description, w.Metadata.Website, w.Metadata.Location, w.Metadata.BillingEmail, w.Metadata.PhotoURL)
+		metadata = workspace.MetadataFrom(d.Metadata.Description, d.Metadata.Website, d.Metadata.Location, d.Metadata.BillingEmail, d.Metadata.PhotoURL)
 	}
 
 	return workspace.New().

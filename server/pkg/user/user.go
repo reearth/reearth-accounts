@@ -4,15 +4,12 @@ import (
 	"errors"
 	"net/mail"
 
-	"github.com/reearth/reearthx/account/accountdomain/user"
 	"github.com/reearth/reearthx/util"
 	"golang.org/x/exp/slices"
-	"golang.org/x/text/language"
 )
 
 var (
 	ErrInvalidEmail = errors.New("invalid email")
-	ErrInvalidName = errors.New("invalid user name")
 )
 
 type User struct {
@@ -24,8 +21,6 @@ type User struct {
 	password      EncodedPassword
 	workspace     WorkspaceID
 	auths         []Auth
-	lang          language.Tag
-	theme         Theme
 	verification  *Verification
 	passwordReset *PasswordReset
 	host          string
@@ -45,6 +40,13 @@ func (u *User) Name() string {
 	return u.name
 }
 
+func (u *User) SetName(name string) {
+	if u == nil {
+		return
+	}
+	u.name = name
+}
+
 func (u *User) Alias() string {
 	if u == nil {
 		return ""
@@ -52,11 +54,11 @@ func (u *User) Alias() string {
 	return u.alias
 }
 
-func (u *User) DisplayName() string {
-	if u.displayName == "" {
-		return u.name
+func (u *User) SetAlias(alias string) {
+	if u == nil {
+		return
 	}
-	return u.displayName
+	u.alias = alias
 }
 
 func (u *User) Email() string {
@@ -66,11 +68,12 @@ func (u *User) Email() string {
 	return u.email
 }
 
-func (u *User) SetAlias(alias string) {
-	if u == nil {
-		return
+func (u *User) SetEmail(email string) error {
+	if _, err := mail.ParseAddress(email); err != nil {
+		return ErrInvalidEmail
 	}
-	u.alias = alias
+	u.email = email
+	return nil
 }
 
 func (u *User) Metadata() *Metadata {
@@ -91,11 +94,19 @@ func (u *User) Workspace() WorkspaceID {
 	return u.workspace
 }
 
-func (u *User) Verification() *user.Verification {
+func (u *User) UpdateWorkspace(workspace WorkspaceID) {
+	u.workspace = workspace
+}
+
+func (u *User) Verification() *Verification {
 	if u == nil {
 		return nil
 	}
 	return u.verification
+}
+
+func (u *User) SetVerification(v *Verification) {
+	u.verification = v
 }
 
 func (u *User) Password() []byte {
@@ -106,7 +117,7 @@ func (u *User) Password() []byte {
 }
 
 func (u *User) SetPassword(pass string) error {
-	p, err := user.NewEncodedPassword(pass)
+	p, err := NewEncodedPassword(pass)
 	if err != nil {
 		return err
 	}
@@ -115,35 +126,25 @@ func (u *User) SetPassword(pass string) error {
 	return nil
 }
 
-func (u *User) PasswordReset() *user.PasswordReset {
+func (u *User) PasswordReset() *PasswordReset {
 	if u == nil {
 		return nil
 	}
 	return u.passwordReset
 }
 
-func (u *User) Lang() language.Tag {
-	if u == nil {
-		return language.Und
-	}
-	return u.lang
+func (u *User) SetPasswordReset(pr *PasswordReset) {
+	u.passwordReset = pr.Clone()
 }
 
-func (u *User) Theme() user.Theme {
-	if u == nil {
-		return user.ThemeDefault
-	}
-	return u.theme
-}
-
-func (u *User) Auths() []user.Auth {
+func (u *User) Auths() Auths {
 	if u == nil {
 		return nil
 	}
 	return slices.Clone(u.auths)
 }
 
-func (u *User) ContainAuth(a user.Auth) bool {
+func (u *User) ContainAuth(a Auth) bool {
 	if u == nil {
 		return false
 	}
@@ -220,32 +221,11 @@ func (u *User) ClearAuths() {
 	u.auths = nil
 }
 
-func (u *User) SetPassword(pass string) error {
-	p, err := NewEncodedPassword(pass)
-	if err != nil {
-		return err
-	}
-	u.password = p
-	return nil
-}
-
 func (u *User) MatchPassword(pass string) (bool, error) {
 	if u == nil {
 		return false, nil
 	}
 	return u.password.Verify(pass)
-}
-
-func (u *User) PasswordReset() *PasswordReset {
-	return u.passwordReset
-}
-
-func (u *User) SetPasswordReset(pr *PasswordReset) {
-	u.passwordReset = pr.Clone()
-}
-
-func (u *User) SetVerification(v *Verification) {
-	u.verification = v
 }
 
 func (u *User) Host() string {
@@ -256,13 +236,12 @@ func (u *User) Clone() *User {
 	return &User{
 		id:            u.id,
 		name:          u.name,
-		displayName:   u.displayName,
+		alias:         u.alias,
 		email:         u.email,
 		password:      u.password,
 		workspace:     u.workspace,
 		auths:         slices.Clone(u.auths),
-		lang:          u.lang,
-		theme:         u.theme,
+		metadata:      util.CloneRef(u.metadata),
 		verification:  util.CloneRef(u.verification),
 		passwordReset: util.CloneRef(u.passwordReset),
 	}

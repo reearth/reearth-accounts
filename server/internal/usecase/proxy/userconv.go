@@ -34,9 +34,13 @@ func MeToUser(me FragmentMe) (*user.User, error) {
 		auths[i] = user.AuthFrom(me.Auths[i])
 	}
 
+	metadata := user.NewMetadata()
+	metadata.LangFrom(me.Lang)
+	metadata.SetTheme(user.ThemeFrom(me.Theme))
+
 	u, err := user.New().ID(id).Name(me.Name).
-		Email(me.Email).LangFrom(me.Lang).
-		Theme(user.ThemeFrom(me.Theme)).
+		Email(me.Email).
+		Metadata(metadata).
 		Auths(auths).
 		Workspace(wid).Build()
 	if err != nil {
@@ -61,9 +65,13 @@ func FragmentToUser(me FragmentUser) (*user.User, error) {
 		auths[i] = user.AuthFrom(me.Auths[i])
 	}
 
+	metadata := user.NewMetadata()
+	metadata.LangFrom(me.Lang)
+	metadata.SetTheme(user.ThemeFrom(me.Theme))
+
 	u, err := user.New().ID(id).Name(me.Name).
-		Email(me.Email).LangFrom(me.Lang).
-		Theme(user.ThemeFrom(me.Theme)).
+		Email(me.Email).
+		Metadata(metadata).
 		Auths(auths).
 		Workspace(wid).Build()
 	if err != nil {
@@ -101,9 +109,14 @@ func UserByIDsNodesUserTo(r *UserByIDsNodesUser) (*user.User, error) {
 	for i := range r.Auths {
 		auths[i] = user.AuthFrom(r.Auths[i])
 	}
+
+	metadata := user.NewMetadata()
+	metadata.LangFrom(r.Lang)
+	metadata.SetTheme(user.ThemeFrom(r.Theme))
+
 	return user.New().ID(id).Name(r.Name).
-		Email(r.Email).LangFrom(r.Lang).
-		Theme(user.ThemeFrom(r.Theme)).
+		Email(r.Email).
+		Metadata(metadata).
 		Auths(auths).
 		Workspace(wid).Build()
 }

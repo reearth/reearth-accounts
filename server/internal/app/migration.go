@@ -76,16 +76,16 @@ func runMigration(ctx context.Context, repos *repo.Container) error {
 
 			// Process workspace members and integrations
 			if err := processWorkspaceMembers(ctx, repos, w, maintainerRole.ID()); err != nil {
-				log.Errorf("Failed to process workspace %s: %v", w.ID, err)
+				log.Errorf("Failed to process workspace %s: %v", w.ID(), err)
 			}
 
-			if wsErr := workspaceMigration(ctx, repos, workspacePkg.ID(w.ID())); wsErr != nil {
+			if wsErr := workspaceMigration(ctx, repos, w.ID()); wsErr != nil {
 				log.Errorf("Failed to migrate workspace %s: %v", w.ID(), wsErr)
 				continue
 			}
 		}
 
-		if userErr := userMigration(ctx, repos, userPkg.ID(u.ID())); userErr != nil && !errors.Is(userErr, rerror.ErrAlreadyExists) {
+		if userErr := userMigration(ctx, repos, u.ID()); userErr != nil && !errors.Is(userErr, rerror.ErrAlreadyExists) {
 			log.Errorf("Failed to add alias for user %s: %v", u.ID(), userErr)
 		}
 	}
@@ -166,7 +166,7 @@ func hasRole(p *permittable.Permittable, roleID role.ID) bool {
 	return false
 }
 
-func userMigration(ctx context.Context, repos *repo.Container, userID userPkg.ID) error {
+func userMigration(ctx context.Context, repos *repo.Container, userID user.ID) error {
 	usr, err := repos.User.FindByID(ctx, userID)
 	if err != nil {
 		return fmt.Errorf("failed to find user %s: %w", userID, err)
@@ -182,7 +182,7 @@ func userMigration(ctx context.Context, repos *repo.Container, userID userPkg.ID
 	}
 
 	if usr.Metadata() == nil {
-		usr.SetMetadata(userPkg.NewMetadata())
+		usr.SetMetadata(user.NewMetadata())
 	}
 
 	err = repos.User.Save(ctx, usr)
@@ -193,7 +193,7 @@ func userMigration(ctx context.Context, repos *repo.Container, userID userPkg.ID
 	return nil
 }
 
-func workspaceMigration(ctx context.Context, repos *repo.Container, wsID workspacePkg.ID) error {
+func workspaceMigration(ctx context.Context, repos *repo.Container, wsID workspace.ID) error {
 	ws, err := repos.Workspace.FindByID(ctx, wsID)
 	if err != nil {
 		return fmt.Errorf("failed to find workspace %s: %w", wsID, err)
@@ -213,7 +213,7 @@ func workspaceMigration(ctx context.Context, repos *repo.Container, wsID workspa
 	}
 
 	if ws.Metadata() == nil {
-		ws.SetMetadata(workspacePkg.NewMetadata())
+		ws.SetMetadata(workspace.NewMetadata())
 	}
 
 	err = repos.Workspace.Save(ctx, ws)

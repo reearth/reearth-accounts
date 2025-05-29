@@ -7,6 +7,7 @@ type User implements Node {
   host: String
   workspace: ID!
   auths: [String!]!
+  metadata: UserMetadata!
 }
 
 type Me {
@@ -20,6 +21,14 @@ type Me {
   auths: [String!]!
   workspaces: [Workspace!]!
   myWorkspace: Workspace!
+}
+
+type UserMetadata {
+  description: String
+  website: String
+  photoURL: String
+  lang: Lang!
+  theme: Theme!
 }
 
 input SignUpInput {

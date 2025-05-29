@@ -14,8 +14,6 @@ type Container struct {
 	Workspace   Workspace
 	Role        Role
 	Permittable Permittable
-	User        User
-	Workspace   Workspace
 	Transaction usecasex.Transaction
 	Users       []User
 }

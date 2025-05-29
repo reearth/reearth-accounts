@@ -34,13 +34,16 @@ func Init(p InitParams) (*user.User, *Workspace, error) {
 		p.Sub = user.GenReearthSub(p.UserID.String())
 	}
 
+	metadata := user.NewMetadata()
+	metadata.LangFrom(p.Lang.String())
+	metadata.SetTheme(*p.Theme)
+
 	b := user.New().
 		ID(*p.UserID).
 		Name(p.Name).
 		Email(p.Email).
-		Auths([]user.Auth{*p.Sub}).
-		Lang(*p.Lang).
-		Theme(*p.Theme)
+		Metadata(metadata).
+		Auths([]user.Auth{*p.Sub})
 	if p.Password != nil {
 		b = b.PasswordPlainText(*p.Password)
 	}

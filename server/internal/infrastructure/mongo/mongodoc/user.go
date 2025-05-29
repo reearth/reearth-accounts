@@ -5,15 +5,8 @@ import (
 
 	"github.com/reearth/reearth-accounts/pkg/id"
 	"github.com/reearth/reearth-accounts/pkg/user"
-	"github.com/reearth/reearthx/account/accountdomain"
-	acUser "github.com/reearth/reearthx/account/accountdomain/user"
 	"github.com/reearth/reearthx/mongox"
 )
-
-type PasswordResetDocument struct {
-	Token     string
-	CreatedAt time.Time
-}
 
 type UserDocument struct {
 	ID            string                 `bson:"id"`
@@ -41,6 +34,8 @@ type UserMetadataDoc struct {
 	PhotoURL    string
 	Description string
 	Website     string
+	Lang        string
+	Theme       string
 }
 
 type PasswordResetDocument struct {
@@ -50,17 +45,17 @@ type PasswordResetDocument struct {
 
 type UserConsumer = mongox.SliceFuncConsumer[*UserDocument, *user.User]
 
-func NewUserConsumer() *UserConsumer {
+func NewUserConsumer(host string) *UserConsumer {
 	return mongox.NewSliceFuncConsumer(func(d *UserDocument) (*user.User, error) {
 		m, err := d.Model()
 		if err != nil {
 			return nil, err
 		}
-		return m, nil
+		return m.WithHost(host), nil
 	})
 }
 
-func NewUser(usr user.User) (*UserDocument, string) {
+func NewUser(usr *user.User) (*UserDocument, string) {
 	id := usr.ID().String()
 
 	auths := usr.Auths()
@@ -93,6 +88,8 @@ func NewUser(usr user.User) (*UserDocument, string) {
 			PhotoURL:    usr.Metadata().PhotoURL(),
 			Description: usr.Metadata().Description(),
 			Website:     usr.Metadata().Website(),
+			Lang:        usr.Metadata().Lang().String(),
+			Theme:       string(usr.Metadata().Theme()),
 		}
 	}
 	return &UserDocument{
@@ -102,8 +99,6 @@ func NewUser(usr user.User) (*UserDocument, string) {
 		Email:         usr.Email(),
 		Subs:          authsdoc,
 		Workspace:     usr.Workspace().String(),
-		Lang:          usr.Lang().String(),
-		Theme:         string(usr.Theme()),
 		Password:      usr.Password(),
 		PasswordReset: pwdResetDoc,
 		Verification:  verificationDoc,
@@ -127,14 +122,14 @@ func (d *UserDocument) Model() (*user.User, error) {
 		return nil, err
 	}
 
-	auths := make([]acUser.Auth, 0, len(d.Subs))
+	auths := make([]user.Auth, 0, len(d.Subs))
 	for _, s := range d.Subs {
 		auths = append(auths, user.AuthFrom(s))
 	}
 
-	var v *acUser.Verification
+	var v *user.Verification
 	if d.Verification != nil {
-		v = acUser.VerificationFrom(
+		v = user.VerificationFrom(
 			d.Verification.Code,
 			d.Verification.Expiration,
 			d.Verification.Verified,
@@ -143,7 +138,12 @@ func (d *UserDocument) Model() (*user.User, error) {
 
 	var metadata *user.Metadata
 	if d.Metadata != nil {
-		metadata = user.MetadataFrom(d.Metadata.PhotoURL, d.Metadata.Description, d.Metadata.Website)
+		metadata = user.NewMetadata()
+		metadata.SetDescription(d.Metadata.Description)
+		metadata.SetWebsite(d.Metadata.Website)
+		metadata.SetPhotoURL(d.Metadata.PhotoURL)
+		metadata.LangFrom(d.Metadata.Lang)
+		metadata.SetTheme(user.Theme(d.Metadata.Theme))
 	}
 
 	usr, err := user.New().
@@ -154,11 +154,9 @@ func (d *UserDocument) Model() (*user.User, error) {
 		Alias(d.Alias).
 		Auths(auths).
 		Workspace(tid).
-		LangFrom(d.Lang).
 		Verification(v).
 		EncodedPassword(d.Password).
 		PasswordReset(d.PasswordReset.Model()).
-		Theme(acUser.Theme(d.Theme)).
 		Build()
 
 	if err != nil {
@@ -168,11 +166,11 @@ func (d *UserDocument) Model() (*user.User, error) {
 	return usr, nil
 }
 
-func (d *PasswordResetDocument) Model() *acUser.PasswordReset {
+func (d *PasswordResetDocument) Model() *user.PasswordReset {
 	if d == nil {
 		return nil
 	}
-	return &acUser.PasswordReset{
+	return &user.PasswordReset{
 		Token:     d.Token,
 		CreatedAt: d.CreatedAt,
 	}

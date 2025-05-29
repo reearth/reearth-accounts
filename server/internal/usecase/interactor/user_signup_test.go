@@ -59,6 +59,7 @@ func TestUser_Signup(t *testing.T) {
 					Workspace(tid).
 					Name("NAME").
 					Auths(u.Auths()).
+					Metadata(u.Metadata()).
 					Email("aaa@bbb.com").
 					PasswordPlainText("PAss00!!").
 					Verification(user.VerificationFrom(mockcode, mocktime.Add(24*time.Hour), false)).
@@ -136,6 +137,7 @@ func TestUser_Signup(t *testing.T) {
 					Workspace(tid).
 					Name("NAME").
 					Auths(u.Auths()).
+					Metadata(u.Metadata()).
 					Email("aaa@bbb.com").
 					PasswordPlainText("PAss00!!").
 					Verification(user.VerificationFrom(mockcode, mocktime.Add(24*time.Hour), false)).
@@ -167,6 +169,10 @@ func TestUser_Signup(t *testing.T) {
 				Theme:       user.ThemeDark.Ref(),
 			},
 			wantUser: func(u *user.User) *user.User {
+				metadata := user.NewMetadata()
+				metadata.LangFrom(language.Japanese.String())
+				metadata.SetTheme(user.ThemeDark)
+
 				return user.New().
 					ID(uid).
 					Workspace(tid).
@@ -174,8 +180,7 @@ func TestUser_Signup(t *testing.T) {
 					Auths(u.Auths()).
 					Email("aaa@bbb.com").
 					PasswordPlainText("PAss00!!").
-					Lang(language.Japanese).
-					Theme(user.ThemeDark).
+					Metadata(metadata).
 					Verification(user.VerificationFrom(mockcode, mocktime.Add(24*time.Hour), false)).
 					MustBuild()
 			},

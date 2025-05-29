@@ -6,7 +6,6 @@ import (
 
 	"github.com/reearth/reearthx/idx"
 	"github.com/stretchr/testify/assert"
-	"golang.org/x/text/language"
 )
 
 func TestBuilder_ID(t *testing.T) {
@@ -35,11 +34,6 @@ func TestBuilder_Name(t *testing.T) {
 	assert.Equal(t, "xxx", b.Name())
 }
 
-func TestBuilder_DisplayName(t *testing.T) {
-	b := New().NewID().Name("aaa").DisplayName("xxx").Email("aaa@bbb.com").MustBuild()
-	assert.Equal(t, "xxx", b.DisplayName())
-}
-
 func TestBuilder_Workspace(t *testing.T) {
 	tid := NewWorkspaceID()
 	b := New().NewID().Name("aaa").Email("aaa@bbb.com").Workspace(tid).MustBuild()
@@ -66,44 +60,6 @@ func TestBuilder_Email(t *testing.T) {
 	assert.Equal(t, "xx@yy.zz", b.Email())
 }
 
-func TestBuilder_Lang(t *testing.T) {
-	l := language.Make("en")
-	b := New().NewID().Name("aaa").Email("aaa@bbb.com").Lang(l).MustBuild()
-	assert.Equal(t, l, b.Lang())
-}
-
-func TestBuilder_LangFrom(t *testing.T) {
-	tests := []struct {
-		Name, Lang string
-		Expected   language.Tag
-	}{
-		{
-			Name:     "success creating language",
-			Lang:     "en",
-			Expected: language.Make("en"),
-		},
-		{
-			Name:     "empty language and empty tag",
-			Lang:     "",
-			Expected: language.Tag{},
-		},
-		{
-			Name:     "empty tag of parse err",
-			Lang:     "xxxxxxxxxxx",
-			Expected: language.Tag{},
-		},
-	}
-
-	for _, tc := range tests {
-		tc := tc
-		t.Run(tc.Name, func(t *testing.T) {
-			t.Parallel()
-			b := New().NewID().Name("aaa").Email("aaa@bbb.com").LangFrom(tc.Lang).MustBuild()
-			assert.Equal(t, tc.Expected, b.Lang())
-		})
-	}
-}
-
 func TestNew(t *testing.T) {
 	b := New()
 	assert.NotNil(t, b)
@@ -118,12 +74,20 @@ func TestBuilder_Build(t *testing.T) {
 	wid := NewWorkspaceID()
 	pass := MustEncodedPassword("abcDEF0!")
 
+	metadata := NewMetadata()
+	metadata.SetDescription("description")
+	metadata.SetWebsite("website")
+	metadata.SetPhotoURL("photo url")
+	metadata.LangFrom("en")
+	metadata.SetTheme(ThemeDefault)
+
 	type args struct {
 		Name, Lang, Email string
 		ID                ID
 		Workspace         WorkspaceID
 		Auths             []Auth
 		PasswordBin       []byte
+		Metadata          *Metadata
 	}
 
 	tests := []struct {
@@ -147,6 +111,7 @@ func TestBuilder_Build(t *testing.T) {
 						Sub:      "sss",
 					},
 				},
+				Metadata: metadata,
 			},
 			Expected: &User{
 				id:        uid,
@@ -155,8 +120,7 @@ func TestBuilder_Build(t *testing.T) {
 				name:      "xxx",
 				password:  pass,
 				auths:     []Auth{{Provider: "ppp", Sub: "sss"}},
-				lang:      language.English,
-				theme:     ThemeDefault,
+				metadata:  metadata,
 			},
 		}, {
 			Name:     "failed invalid id",
@@ -174,7 +138,7 @@ func TestBuilder_Build(t *testing.T) {
 				EncodedPassword(pass).
 				Name(tt.Args.Name).
 				Auths(tt.Args.Auths).
-				LangFrom(tt.Args.Lang).
+				Metadata(tt.Args.Metadata).
 				Email(tt.Args.Email).
 				Workspace(tt.Args.Workspace).
 				Build()
@@ -195,12 +159,20 @@ func TestBuilder_MustBuild(t *testing.T) {
 	wid := NewWorkspaceID()
 	pass := MustEncodedPassword("abcDEF0!")
 
+	metadata := NewMetadata()
+	metadata.SetDescription("description")
+	metadata.SetWebsite("website")
+	metadata.SetPhotoURL("photo url")
+	metadata.LangFrom("en")
+	metadata.SetTheme(ThemeDefault)
+
 	type args struct {
 		Name, Lang, Email string
 		ID                ID
 		Workspace         WorkspaceID
 		PasswordBin       []byte
 		Auths             []Auth
+		Metadata          *Metadata
 	}
 
 	tests := []struct {
@@ -224,6 +196,7 @@ func TestBuilder_MustBuild(t *testing.T) {
 						Sub:      "sss",
 					},
 				},
+				Metadata: metadata,
 			},
 			Expected: &User{
 				id:        uid,
@@ -232,8 +205,7 @@ func TestBuilder_MustBuild(t *testing.T) {
 				name:      "xxx",
 				password:  pass,
 				auths:     []Auth{{Provider: "ppp", Sub: "sss"}},
-				lang:      language.English,
-				theme:     ThemeDefault,
+				metadata:  metadata,
 			},
 		}, {
 			Name: "failed invalid id",
@@ -253,7 +225,7 @@ func TestBuilder_MustBuild(t *testing.T) {
 					EncodedPassword(pass).
 					Name(tt.Args.Name).
 					Auths(tt.Args.Auths).
-					LangFrom(tt.Args.Lang).
+					Metadata(tt.Args.Metadata).
 					Email(tt.Args.Email).
 					Workspace(tt.Args.Workspace).
 					MustBuild()

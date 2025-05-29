@@ -3,8 +3,6 @@ package adapter
 import (
 	"context"
 
-	"golang.org/x/text/language"
-
 	"github.com/reearth/reearth-accounts/internal/usecase"
 	"github.com/reearth/reearth-accounts/internal/usecase/interfaces"
 	"github.com/reearth/reearth-accounts/pkg/user"
@@ -40,24 +38,6 @@ func User(ctx context.Context) *user.User {
 		}
 	}
 	return nil
-}
-
-func Lang(ctx context.Context, lang *language.Tag) string {
-	if lang != nil && !lang.IsRoot() {
-		return lang.String()
-	}
-
-	u := User(ctx)
-	if u == nil {
-		return "en" // default language
-	}
-
-	l := u.Lang()
-	if l.IsRoot() {
-		return "en" // default language
-	}
-
-	return l.String()
 }
 
 func Operator(ctx context.Context) *usecase.Operator {

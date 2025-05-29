@@ -2,10 +2,8 @@ package memory
 
 import (
 	"context"
-	"sync"
 	"strings"
 
-	"github.com/reearth/reearth-accounts/pkg/id"
 	"github.com/reearth/reearth-accounts/internal/usecase/repo"
 	"github.com/reearth/reearth-accounts/pkg/user"
 	"github.com/reearth/reearthx/rerror"
