@@ -74,7 +74,7 @@ func runMigration(ctx context.Context, repos *repo.Container) error {
 
 			// Process workspace members and integrations
 			if err := processWorkspaceMembers(ctx, repos, w, maintainerRole.ID()); err != nil {
-				log.Errorf("Failed to process workspace %s: %v", w.ID, err)
+				log.Errorf("Failed to process workspace %s: %v", w.ID(), err)
 			}
 		}
 	}

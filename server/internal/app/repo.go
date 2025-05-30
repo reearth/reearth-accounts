@@ -2,8 +2,6 @@ package app
 
 import (
 	"context"
-	"fmt"
-	"time"
 
 	"github.com/reearth/reearth-accounts/internal/infrastructure/auth0"
 	mongorepo "github.com/reearth/reearth-accounts/internal/infrastructure/mongo"
@@ -13,22 +11,11 @@ import (
 	"github.com/reearth/reearthx/mailer"
 	"github.com/reearth/reearthx/mongox"
 	"go.mongodb.org/mongo-driver/mongo"
-	"go.mongodb.org/mongo-driver/mongo/options"
 )
 
 const databaseName = "reearth-account"
 
-func initReposAndGateways(ctx context.Context, conf *Config) (*repo.Container, *gateway.Container) {
-	// Mongo
-	client, err := mongo.Connect(
-		ctx,
-		options.Client().
-			ApplyURI(conf.DB).
-			SetConnectTimeout(time.Second*10))
-	if err != nil {
-		log.Fatalc(ctx, fmt.Sprintf("repo initialization error: %+v", err))
-	}
-
+func initReposAndGateways(ctx context.Context, client *mongo.Client, conf *Config) (*repo.Container, *gateway.Container) {
 	txAvailable := mongox.IsTransactionAvailable(conf.DB)
 
 	repos, err := mongorepo.New(ctx, client.Database(databaseName), txAvailable, false, []repo.User{})

@@ -14,8 +14,12 @@ var NewUserID = id.NewUserID
 var NewIntegrationID = id.NewIntegrationID
 
 var IDFrom = id.WorkspaceIDFrom
+var UserIDFrom = id.UserIDFrom
+var IntegrationIDFrom = id.IntegrationIDFrom
 
 var IDFromRef = id.WorkspaceIDFromRef
+
+var MustUserID = id.MustUserID
 
 var ErrInvalidID = id.ErrInvalidID
 

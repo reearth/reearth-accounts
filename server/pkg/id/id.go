@@ -52,9 +52,18 @@ type PermittableIDList = idx.List[Permittable]
 
 var RoleIDListFrom = idx.ListFrom[Role]
 var PermittableIDListFrom = idx.ListFrom[Permittable]
+var UserIDListFrom = idx.ListFrom[User]
+var WorkspaceIDListFrom = idx.ListFrom[Workspace]
+var IntegrationIDListFrom = idx.ListFrom[Integration]
 
 type RoleIDSet = idx.Set[Role]
 type PermittableIDSet = idx.Set[Permittable]
+type UserIDSet = idx.Set[User]
+type WorkspaceIDSet = idx.Set[Workspace]
+type IntegrationIDSet = idx.Set[Integration]
 
 var NewRoleIDSet = idx.NewSet[Role]
 var NewPermittableIDSet = idx.NewSet[Permittable]
+var NewUserIDSet = idx.NewSet[User]
+var NewWorkspaceIDSet = idx.NewSet[Workspace]
+var NewIntegrationIDSet = idx.NewSet[Integration]

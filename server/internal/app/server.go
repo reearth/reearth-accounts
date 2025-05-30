@@ -2,16 +2,23 @@ package app
 
 import (
 	"context"
+	"fmt"
 	"net"
 	"os"
 	"os/signal"
+	"time"
 
 	"github.com/cerbos/cerbos-sdk-go/cerbos"
 	"github.com/labstack/echo/v4"
 	infraCerbos "github.com/reearth/reearth-accounts/internal/infrastructure/cerbos"
+	mongorepo "github.com/reearth/reearth-accounts/internal/infrastructure/mongo"
+	"github.com/reearth/reearth-accounts/internal/infrastructure/mongo/migration"
 	"github.com/reearth/reearth-accounts/internal/usecase/gateway"
 	"github.com/reearth/reearth-accounts/internal/usecase/repo"
 	"github.com/reearth/reearthx/log"
+	"github.com/reearth/reearthx/mongox"
+	"go.mongodb.org/mongo-driver/mongo"
+	"go.mongodb.org/mongo-driver/mongo/options"
 	"golang.org/x/net/http2"
 )
 
@@ -26,14 +33,36 @@ func Start(debug bool) {
 	}
 	log.Infof("config: %s", conf.Print())
 
+	// Init MongoDB client
+	client, err := mongo.Connect(
+		ctx,
+		options.Client().
+			ApplyURI(conf.DB).
+			SetConnectTimeout(time.Second*10))
+	if err != nil {
+		log.Fatalc(ctx, fmt.Sprintf("repo initialization error: %+v", err))
+	}
+
 	// Init repositories
-	repos, gateways := initReposAndGateways(ctx, conf)
+	repos, gateways := initReposAndGateways(ctx, client, conf)
 
 	// Check if migration mode
 	// Once the permission check migration is complete, it will be deleted.
 	if os.Getenv("RUN_MIGRATION") == "true" {
-		if err := runMigration(ctx, repos); err != nil {
-			log.Fatal(err)
+		clientx := mongox.NewClient("reearth-account", client)
+		db := clientx.Database()
+
+		lock, lockErr := mongorepo.NewLock(db.Collection("locks"))
+		if lockErr != nil {
+			log.Fatalf("failed to create lock: %v", lockErr)
+		}
+
+		if migrationErr := runMigration(ctx, repos); migrationErr != nil {
+			log.Fatal(migrationErr)
+		}
+
+		if migrationErr := migration.Do(ctx, clientx, mongorepo.NewConfig(db.Collection("config"), lock)); err != nil {
+			log.Fatalf("failed to run migration: %v", migrationErr)
 		}
 		return
 	}

@@ -14,9 +14,7 @@ func TestWorkspace_ID(t *testing.T) {
 func TestWorkspace_Name(t *testing.T) {
 	assert.Equal(t, "x", (&Workspace{name: "x"}).Name())
 }
-func TestWorkspace_DisplayName(t *testing.T) {
-	assert.Equal(t, "x", (&Workspace{displayName: "x"}).DisplayName())
-}
+
 func TestWorkspace_Members(t *testing.T) {
 	m := NewMembersWith(map[UserID]Member{
 		NewUserID(): {Role: RoleOwner},
@@ -36,12 +34,6 @@ func TestWorkspace_Rename(t *testing.T) {
 	w := &Workspace{}
 	w.Rename("a")
 	assert.Equal(t, "a", w.name)
-}
-
-func TestWorkspace_UpdateDisplayName(t *testing.T) {
-	w := &Workspace{}
-	w.UpdateDisplayName("a")
-	assert.Equal(t, "a", w.displayName)
 }
 
 func TestWorkspace_Policy(t *testing.T) {

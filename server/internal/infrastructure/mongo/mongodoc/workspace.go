@@ -12,15 +12,24 @@ type WorkspaceMemberDocument struct {
 	Disabled  bool
 }
 
+type WorkspaceMetadataDocument struct {
+	BillingEmail string
+	Description  string
+	Location     string
+	PhotoURL     string
+	Website      string
+}
+
 type WorkspaceDocument struct {
+	Alias        string
+	Email        string
 	ID           string
-	Name         string
-	DisplayName  string
-	Members      map[string]WorkspaceMemberDocument
 	Integrations map[string]WorkspaceMemberDocument
+	Members      map[string]WorkspaceMemberDocument
+	Metadata     *WorkspaceMetadataDocument
+	Name         string
 	Personal     bool
 	Policy       string `bson:",omitempty"`
-	Location     string `bson:",omitempty"`
 }
 
 func NewWorkspace(ws *workspace.Workspace) (*WorkspaceDocument, string) {
@@ -42,15 +51,28 @@ func NewWorkspace(ws *workspace.Workspace) (*WorkspaceDocument, string) {
 		}
 	}
 
+	var metadataDoc *WorkspaceMetadataDocument
+	if ws.Metadata() != nil {
+		metadataDoc = &WorkspaceMetadataDocument{
+			BillingEmail: ws.Metadata().BillingEmail(),
+			Description:  ws.Metadata().Description(),
+			Location:     ws.Metadata().Location(),
+			PhotoURL:     ws.Metadata().PhotoURL(),
+			Website:      ws.Metadata().Website(),
+		}
+	}
+
 	wId := ws.ID().String()
 	return &WorkspaceDocument{
+		Alias:        ws.Alias(),
+		Email:        ws.Email(),
 		ID:           wId,
-		Name:         ws.Name(),
-		Members:      membersDoc,
 		Integrations: integrationsDoc,
+		Members:      membersDoc,
+		Metadata:     metadataDoc,
+		Name:         ws.Name(),
 		Personal:     ws.IsPersonal(),
 		Policy:       lo.FromPtr(ws.Policy()).String(),
-		Location:     ws.Location(),
 	}, wId
 }
 
@@ -99,15 +121,21 @@ func (d *WorkspaceDocument) Model() (*workspace.Workspace, error) {
 		policy = workspace.PolicyID(d.Policy).Ref()
 	}
 
+	var metadata *workspace.Metadata
+	if d.Metadata != nil {
+		metadata = workspace.MetadataFrom(d.Metadata.Description, d.Metadata.Website, d.Metadata.Location, d.Metadata.BillingEmail, d.Metadata.PhotoURL)
+	}
+
 	return workspace.New().
 		ID(tid).
 		Name(d.Name).
-		DisplayName(d.DisplayName).
+		Alias(d.Alias).
+		Email(d.Email).
+		Metadata(metadata).
 		Members(members).
 		Integrations(integrations).
 		Personal(d.Personal).
 		Policy(policy).
-		Location(d.Location).
 		Build()
 }
 

@@ -5,6 +5,7 @@ go 1.23.5
 require (
 	github.com/99designs/gqlgen v0.17.64
 	github.com/Khan/genqlient v0.8.1
+	github.com/avast/retry-go/v4 v4.6.1
 	github.com/cerbos/cerbos-sdk-go v0.2.13
 	github.com/cerbos/cerbos/api/genpb v0.40.0
 	github.com/gavv/httpexpect/v2 v2.15.0
@@ -16,6 +17,7 @@ require (
 	github.com/ravilushqa/otelgqlgen v0.17.0
 	github.com/reearth/reearthx v0.0.0-20250130135542-7860571926f2
 	github.com/samber/lo v1.49.1
+	github.com/square/mongo-lock v0.0.0-20230808145049-cfcf499f6bf0
 	github.com/stretchr/testify v1.10.0
 	github.com/testcontainers/testcontainers-go v0.35.0
 	github.com/vektah/dataloaden v0.3.0

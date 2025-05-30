@@ -33,6 +33,10 @@ func (b *Builder) Build() (*Workspace, error) {
 	} else {
 		b.w.members = NewMembersWith(b.members, b.integrations, false)
 	}
+
+	if b.w.metadata != nil {
+		b.w.SetMetadata(b.w.metadata)
+	}
 	b.w.members.fixed = b.personal
 	return b.w, nil
 }
@@ -65,8 +69,18 @@ func (b *Builder) Name(name string) *Builder {
 	return b
 }
 
-func (b *Builder) DisplayName(displayName string) *Builder {
-	b.w.displayName = displayName
+func (b *Builder) Alias(alias string) *Builder {
+	b.w.alias = alias
+	return b
+}
+
+func (b *Builder) Email(email string) *Builder {
+	b.w.email = email
+	return b
+}
+
+func (b *Builder) Metadata(metadata *Metadata) *Builder {
+	b.w.metadata = metadata
 	return b
 }
 
@@ -82,11 +96,6 @@ func (b *Builder) Integrations(integrations map[IntegrationID]Member) *Builder {
 
 func (b *Builder) Personal(p bool) *Builder {
 	b.personal = p
-	return b
-}
-
-func (b *Builder) Location(location string) *Builder {
-	b.w.location = location
 	return b
 }
 

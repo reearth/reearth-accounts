@@ -2,7 +2,6 @@ package mongo
 
 import (
 	"context"
-	"fmt"
 	"regexp"
 
 	"github.com/reearth/reearth-accounts/internal/infrastructure/mongo/mongodoc"
@@ -22,40 +21,44 @@ var (
 )
 
 type User struct {
-	client *mongox.Collection
+	client *mongox.ClientCollection
 	host   string
 }
 
-func NewUser(client *mongox.Client) repo.User {
-	return &User{client: client.WithCollection("user")}
+func NewUser(client *mongox.Client) *User {
+	return &User{
+		client: client.WithCollection("user"),
+	}
 }
 
 func NewUserWithHost(client *mongox.Client, host string) repo.User {
 	return &User{client: client.WithCollection("user"), host: host}
 }
 
-func (r *User) Init() error {
-	return createIndexes(context.Background(), r.client, userIndexes, userUniqueIndexes)
+func (u *User) Init() error {
+	return createIndexes(context.Background(), u.client, userIndexes, userUniqueIndexes)
 }
 
-func (r *User) FindAll(ctx context.Context) (user.List, error) {
-	res, err := r.find(ctx, bson.M{})
+func (u *User) FindAll(ctx context.Context) (user.List, error) {
+	res, err := u.find(ctx, bson.M{})
 	if err != nil {
 		return nil, err
 	}
 	return res, nil
 }
 
-func (r *User) FindByID(ctx context.Context, id2 user.ID) (*user.User, error) {
-	return r.findOne(ctx, bson.M{"id": id2.String()})
+func (u *User) FindByID(ctx context.Context, id user.ID) (*user.User, error) {
+	return u.findOne(ctx, bson.M{
+		"id": id.String(),
+	})
 }
 
-func (r *User) FindByIDs(ctx context.Context, ids user.IDList) (user.List, error) {
+func (u *User) FindByIDs(ctx context.Context, ids user.IDList) (user.List, error) {
 	if len(ids) == 0 {
 		return nil, nil
 	}
 
-	res, err := r.find(ctx, bson.M{
+	res, err := u.find(ctx, bson.M{
 		"id": bson.M{"$in": ids.Strings()},
 	})
 	if err != nil {
@@ -64,8 +67,8 @@ func (r *User) FindByIDs(ctx context.Context, ids user.IDList) (user.List, error
 	return filterUsers(ids, res), nil
 }
 
-func (r *User) FindBySub(ctx context.Context, auth0sub string) (*user.User, error) {
-	return r.findOne(ctx, bson.M{
+func (u *User) FindBySub(ctx context.Context, auth0sub string) (*user.User, error) {
+	return u.findOne(ctx, bson.M{
 		"$or": []bson.M{
 			{
 				"subs": bson.M{
@@ -86,16 +89,16 @@ func (r *User) FindBySub(ctx context.Context, auth0sub string) (*user.User, erro
 	})
 }
 
-func (r *User) FindByEmail(ctx context.Context, email string) (*user.User, error) {
-	return r.findOne(ctx, bson.M{"email": email})
+func (u *User) FindByEmail(ctx context.Context, email string) (*user.User, error) {
+	return u.findOne(ctx, bson.M{"email": email})
 }
 
-func (r *User) FindByName(ctx context.Context, name string) (*user.User, error) {
-	return r.findOne(ctx, bson.M{"name": name})
+func (u *User) FindByName(ctx context.Context, name string) (*user.User, error) {
+	return u.findOne(ctx, bson.M{"name": name})
 }
 
-func (r *User) FindByNameOrEmail(ctx context.Context, nameOrEmail string) (*user.User, error) {
-	return r.findOne(ctx, bson.M{
+func (u *User) FindByNameOrEmail(ctx context.Context, nameOrEmail string) (*user.User, error) {
+	return u.findOne(ctx, bson.M{
 		"$or": []bson.M{
 			{"email": nameOrEmail},
 			{"name": nameOrEmail},
@@ -103,32 +106,32 @@ func (r *User) FindByNameOrEmail(ctx context.Context, nameOrEmail string) (*user
 	})
 }
 
-func (r *User) SearchByKeyword(ctx context.Context, keyword string) (user.List, error) {
+func (u *User) SearchByKeyword(ctx context.Context, keyword string) (user.List, error) {
 	if len(keyword) < 3 {
 		return nil, nil
 	}
 	regex := bson.M{"$regex": primitive.Regex{Pattern: regexp.QuoteMeta(keyword), Options: "i"}}
-	return r.find(ctx,
+	return u.find(ctx,
 		bson.M{"$or": []bson.M{{"email": regex}, {"name": regex}}},
 		options.Find().SetLimit(10).SetSort(bson.M{"name": 1}),
 	)
 }
 
-func (r *User) FindByVerification(ctx context.Context, code string) (*user.User, error) {
-	return r.findOne(ctx, bson.M{
+func (u *User) FindByVerification(ctx context.Context, code string) (*user.User, error) {
+	return u.findOne(ctx, bson.M{
 		"verification.code": code,
 	})
 }
 
-func (r *User) FindByPasswordResetRequest(ctx context.Context, pwdResetToken string) (*user.User, error) {
-	return r.findOne(ctx, bson.M{
+func (u *User) FindByPasswordResetRequest(ctx context.Context, pwdResetToken string) (*user.User, error) {
+	return u.findOne(ctx, bson.M{
 		"passwordreset.token": pwdResetToken,
 	})
 }
 
-func (r *User) FindBySubOrCreate(ctx context.Context, u *user.User, sub string) (*user.User, error) {
-	userDoc, _ := mongodoc.NewUser(u)
-	if err := r.client.Client().FindOneAndUpdate(
+func (u *User) FindBySubOrCreate(ctx context.Context, usr *user.User, sub string) (*user.User, error) {
+	userDoc, _ := mongodoc.NewUser(usr)
+	if err := u.client.Client().FindOneAndUpdate(
 		ctx,
 		bson.M{
 			"$or": []bson.M{
@@ -152,9 +155,9 @@ func (r *User) FindBySubOrCreate(ctx context.Context, u *user.User, sub string) 
 	return userDoc.Model()
 }
 
-func (r *User) Create(ctx context.Context, user *user.User) error {
-	doc, _ := mongodoc.NewUser(user)
-	if _, err := r.client.Client().InsertOne(
+func (u *User) Create(ctx context.Context, usr *user.User) error {
+	doc, _ := mongodoc.NewUser(usr)
+	if _, err := u.client.Client().InsertOne(
 		ctx,
 		doc,
 	); err != nil {
@@ -166,29 +169,26 @@ func (r *User) Create(ctx context.Context, user *user.User) error {
 	return nil
 }
 
-func (r *User) Save(ctx context.Context, user *user.User) error {
-	if user.Host() != "" {
-		return fmt.Errorf("cannot save an user on the different tenant(host=%s)", user.Host())
-	}
-	doc, id := mongodoc.NewUser(user)
-	return r.client.SaveOne(ctx, id, doc)
+func (u *User) Save(ctx context.Context, usr *user.User) error {
+	doc, uId := mongodoc.NewUser(usr)
+	return u.client.SaveOne(ctx, uId, doc)
 }
 
-func (r *User) Remove(ctx context.Context, user user.ID) error {
-	return r.client.RemoveOne(ctx, bson.M{"id": user.String()})
+func (u *User) Remove(ctx context.Context, usr user.ID) error {
+	return u.client.RemoveOne(ctx, bson.M{"id": usr.String()})
 }
 
-func (r *User) find(ctx context.Context, filter any, options ...*options.FindOptions) (user.List, error) {
-	c := mongodoc.NewUserConsumer(r.host)
-	if err := r.client.Find(ctx, filter, c, options...); err != nil {
+func (u *User) find(ctx context.Context, filter any, options ...*options.FindOptions) (user.List, error) {
+	c := mongodoc.NewUserConsumer(u.host)
+	if err := u.client.Find(ctx, filter, c, options...); err != nil {
 		return nil, err
 	}
 	return c.Result, nil
 }
 
-func (r *User) findOne(ctx context.Context, filter any) (*user.User, error) {
-	c := mongodoc.NewUserConsumer(r.host)
-	if err := r.client.FindOne(ctx, filter, c); err != nil {
+func (u *User) findOne(ctx context.Context, filter any) (*user.User, error) {
+	c := mongodoc.NewUserConsumer(u.host)
+	if err := u.client.FindOne(ctx, filter, c); err != nil {
 		return nil, err
 	}
 	return c.Result[0], nil

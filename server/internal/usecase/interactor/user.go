@@ -132,7 +132,7 @@ func (i *User) UpdateMe(ctx context.Context, p interfaces.UpdateMeParam, operato
 
 		if p.Name != nil && *p.Name != u.Name() {
 			oldName := u.Name()
-			u.UpdateName(*p.Name)
+			u.SetName(*p.Name)
 
 			workspace, err = i.repos.Workspace.FindByID(ctx, u.Workspace())
 			if err != nil && !errors.Is(err, rerror.ErrNotFound) {
@@ -147,15 +147,19 @@ func (i *User) UpdateMe(ctx context.Context, p interfaces.UpdateMeParam, operato
 			}
 		}
 		if p.Email != nil {
-			if err := u.UpdateEmail(*p.Email); err != nil {
+			if err := u.SetEmail(*p.Email); err != nil {
 				return nil, err
 			}
 		}
-		if p.Lang != nil {
-			u.UpdateLang(*p.Lang)
-		}
-		if p.Theme != nil {
-			u.UpdateTheme(*p.Theme)
+
+		if u.Metadata() != nil {
+			if p.Lang != nil {
+				u.Metadata().LangFrom(p.Lang.String())
+			}
+
+			if p.Theme != nil {
+				u.Metadata().SetTheme(*p.Theme)
+			}
 		}
 
 		if p.Password != nil && u.HasAuthProvider("reearth") {
