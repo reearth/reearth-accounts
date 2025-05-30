@@ -5,12 +5,12 @@ import (
 )
 
 type Workspace struct {
-	id       ID
-	name     string
 	alias    string
 	email    string
-	metadata *Metadata
+	id       ID
 	members  *Members
+	metadata *Metadata
+	name     string
 	policy   *PolicyID
 }
 

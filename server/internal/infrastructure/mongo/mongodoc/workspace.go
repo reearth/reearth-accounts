@@ -13,21 +13,21 @@ type WorkspaceMemberDocument struct {
 }
 
 type WorkspaceMetadataDocument struct {
-	Description  string
-	Website      string
-	Location     string
 	BillingEmail string
+	Description  string
+	Location     string
 	PhotoURL     string
+	Website      string
 }
 
 type WorkspaceDocument struct {
-	ID           string
-	Name         string
 	Alias        string
 	Email        string
-	Metadata     *WorkspaceMetadataDocument
-	Members      map[string]WorkspaceMemberDocument
+	ID           string
 	Integrations map[string]WorkspaceMemberDocument
+	Members      map[string]WorkspaceMemberDocument
+	Metadata     *WorkspaceMetadataDocument
+	Name         string
 	Personal     bool
 	Policy       string `bson:",omitempty"`
 }
@@ -54,22 +54,23 @@ func NewWorkspace(ws *workspace.Workspace) (*WorkspaceDocument, string) {
 	var metadataDoc *WorkspaceMetadataDocument
 	if ws.Metadata() != nil {
 		metadataDoc = &WorkspaceMetadataDocument{
-			Description:  ws.Metadata().Description(),
-			Website:      ws.Metadata().Website(),
-			Location:     ws.Metadata().Location(),
 			BillingEmail: ws.Metadata().BillingEmail(),
+			Description:  ws.Metadata().Description(),
+			Location:     ws.Metadata().Location(),
+			PhotoURL:     ws.Metadata().PhotoURL(),
+			Website:      ws.Metadata().Website(),
 		}
 	}
 
 	wId := ws.ID().String()
 	return &WorkspaceDocument{
-		ID:           wId,
-		Name:         ws.Name(),
 		Alias:        ws.Alias(),
 		Email:        ws.Email(),
-		Metadata:     metadataDoc,
-		Members:      membersDoc,
+		ID:           wId,
 		Integrations: integrationsDoc,
+		Members:      membersDoc,
+		Metadata:     metadataDoc,
+		Name:         ws.Name(),
 		Personal:     ws.IsPersonal(),
 		Policy:       lo.FromPtr(ws.Policy()).String(),
 	}, wId

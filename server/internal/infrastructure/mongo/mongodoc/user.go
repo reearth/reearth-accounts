@@ -9,19 +9,19 @@ import (
 )
 
 type UserDocument struct {
-	ID            string                 `bson:"id"`
+	Alias         string `bson:"alias"`
+	Email         string `bson:"email"`
+	ID            string `bson:"id"`
+	Lang          string `bson:"lang"`
+	Metadata      *UserMetadataDoc
 	Name          string                 `bson:"name"`
-	Alias         string                 `bson:"alias"`
-	Email         string                 `bson:"email"`
-	Subs          []string               `bson:"subs"`
-	Workspace     string                 `bson:"workspace"`
-	Team          string                 `bson:",omitempty"`
-	Lang          string                 `bson:"lang"`
-	Theme         string                 `bson:"theme"`
 	Password      []byte                 `bson:"password"`
 	PasswordReset *PasswordResetDocument `bson:"passwordReset,omitempty"`
+	Subs          []string               `bson:"subs"`
+	Team          string                 `bson:",omitempty"`
+	Theme         string                 `bson:"theme"`
 	Verification  *UserVerificationDoc
-	Metadata      *UserMetadataDoc
+	Workspace     string `bson:"workspace"`
 }
 
 type UserVerificationDoc struct {
@@ -31,16 +31,16 @@ type UserVerificationDoc struct {
 }
 
 type UserMetadataDoc struct {
-	PhotoURL    string
 	Description string
-	Website     string
 	Lang        string
+	PhotoURL    string
 	Theme       string
+	Website     string
 }
 
 type PasswordResetDocument struct {
-	Token     string
 	CreatedAt time.Time
+	Token     string
 }
 
 type UserConsumer = mongox.SliceFuncConsumer[*UserDocument, *user.User]
