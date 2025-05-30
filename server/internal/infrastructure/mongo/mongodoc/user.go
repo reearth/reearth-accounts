@@ -13,7 +13,7 @@ type UserDocument struct {
 	Email         string `bson:"email"`
 	ID            string `bson:"id"`
 	Lang          string `bson:"lang"`
-	Metadata      *UserMetadataDoc
+	Metadata      *UserMetadataDocument
 	Name          string                 `bson:"name"`
 	Password      []byte                 `bson:"password"`
 	PasswordReset *PasswordResetDocument `bson:"passwordReset,omitempty"`
@@ -30,7 +30,7 @@ type UserVerificationDoc struct {
 	Verified   bool
 }
 
-type UserMetadataDoc struct {
+type UserMetadataDocument struct {
 	Description string
 	Lang        string
 	PhotoURL    string
@@ -82,9 +82,9 @@ func NewUser(usr *user.User) (*UserDocument, string) {
 		}
 	}
 
-	metadataDoc := &UserMetadataDoc{}
+	metadataDoc := &UserMetadataDocument{}
 	if usr.Metadata() != nil {
-		metadataDoc = &UserMetadataDoc{
+		metadataDoc = &UserMetadataDocument{
 			PhotoURL:    usr.Metadata().PhotoURL(),
 			Description: usr.Metadata().Description(),
 			Website:     usr.Metadata().Website(),
@@ -93,16 +93,16 @@ func NewUser(usr *user.User) (*UserDocument, string) {
 		}
 	}
 	return &UserDocument{
-		ID:            id,
-		Name:          usr.Name(),
 		Alias:         usr.Alias(),
 		Email:         usr.Email(),
-		Subs:          authsdoc,
-		Workspace:     usr.Workspace().String(),
+		ID:            id,
+		Metadata:      metadataDoc,
+		Name:          usr.Name(),
 		Password:      usr.Password(),
 		PasswordReset: pwdResetDoc,
+		Subs:          authsdoc,
 		Verification:  verificationDoc,
-		Metadata:      metadataDoc,
+		Workspace:     usr.Workspace().String(),
 	}, id
 }
 
