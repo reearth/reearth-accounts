@@ -35,8 +35,11 @@ func MeToUser(me FragmentMe) (*user.User, error) {
 	}
 
 	metadata := user.NewMetadata()
-	metadata.LangFrom(me.Lang)
-	metadata.SetTheme(user.ThemeFrom(me.Theme))
+	metadata.LangFrom(me.Metadata.Lang)
+	metadata.SetDescription(me.Metadata.Description)
+	metadata.SetPhotoURL(me.Metadata.PhotoURL)
+	metadata.SetTheme(user.ThemeFrom(me.Metadata.Theme))
+	metadata.SetWebsite(me.Metadata.Website)
 
 	u, err := user.New().ID(id).Name(me.Name).
 		Email(me.Email).
@@ -66,8 +69,11 @@ func FragmentToUser(me FragmentUser) (*user.User, error) {
 	}
 
 	metadata := user.NewMetadata()
-	metadata.LangFrom(me.Lang)
-	metadata.SetTheme(user.ThemeFrom(me.Theme))
+	metadata.LangFrom(me.Metadata.Lang)
+	metadata.SetDescription(me.Metadata.Description)
+	metadata.SetPhotoURL(me.Metadata.PhotoURL)
+	metadata.SetTheme(user.ThemeFrom(me.Metadata.Theme))
+	metadata.SetWebsite(me.Metadata.Website)
 
 	u, err := user.New().ID(id).Name(me.Name).
 		Email(me.Email).
@@ -111,8 +117,11 @@ func UserByIDsNodesUserTo(r *UserByIDsNodesUser) (*user.User, error) {
 	}
 
 	metadata := user.NewMetadata()
-	metadata.LangFrom(r.Lang)
-	metadata.SetTheme(user.ThemeFrom(r.Theme))
+	metadata.LangFrom(r.Metadata.Lang)
+	metadata.SetDescription(r.Metadata.Description)
+	metadata.SetPhotoURL(r.Metadata.PhotoURL)
+	metadata.SetTheme(user.ThemeFrom(r.Metadata.Theme))
+	metadata.SetWebsite(r.Metadata.Website)
 
 	return user.New().ID(id).Name(r.Name).
 		Email(r.Email).

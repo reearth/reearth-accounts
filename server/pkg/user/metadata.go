@@ -3,11 +3,11 @@ package user
 import "golang.org/x/text/language"
 
 type Metadata struct {
-	photoURL    string
 	description string
-	website     string
 	lang        language.Tag
+	photoURL    string
 	theme       Theme
+	website     string
 }
 
 func NewMetadata() *Metadata {
@@ -16,11 +16,11 @@ func NewMetadata() *Metadata {
 
 func MetadataFrom(photoURL, description, website string, lang language.Tag, theme Theme) *Metadata {
 	return &Metadata{
-		photoURL:    photoURL,
 		description: description,
-		website:     website,
 		lang:        lang,
+		photoURL:    photoURL,
 		theme:       theme,
+		website:     website,
 	}
 }
 
