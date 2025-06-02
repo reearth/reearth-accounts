@@ -17,8 +17,21 @@ var (
 	ErrWorkspaceWithProjects        = rerror.NewE(i18n.T("target workspace still has some project"))
 )
 
+type FetchByUserWithPaginationParam struct {
+	Page int64
+	Size int64
+}
+
+type FetchByUserWithPaginationResult struct {
+	Workspaces workspace.List
+	TotalCount int
+}
+
 type Workspace interface {
 	Fetch(context.Context, workspace.IDList, *usecase.Operator) (workspace.List, error)
+	FetchByID(context.Context, workspace.ID) (*workspace.Workspace, error)
+	FetchByName(context.Context, string) (*workspace.Workspace, error)
+	FetchByUserWithPagination(context.Context, user.ID, FetchByUserWithPaginationParam) (FetchByUserWithPaginationResult, error)
 	FindByUser(context.Context, user.ID, *usecase.Operator) (workspace.List, error)
 	Create(context.Context, string, user.ID, *usecase.Operator) (*workspace.Workspace, error)
 	Update(context.Context, workspace.ID, string, *usecase.Operator) (*workspace.Workspace, error)

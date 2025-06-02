@@ -109,6 +109,18 @@ func ToWorkspace(t *workspace.Workspace) *Workspace {
 	}
 }
 
+func ToWorkspaces(ws workspace.List) []*Workspace {
+	if ws == nil {
+		return nil
+	}
+
+	workspaces := make([]*Workspace, 0, len(ws))
+	for _, w := range ws {
+		workspaces = append(workspaces, ToWorkspace(w))
+	}
+	return workspaces
+}
+
 func FromRole(r Role) workspace.Role {
 	switch r {
 	case RoleReader:

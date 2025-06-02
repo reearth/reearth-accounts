@@ -123,15 +123,18 @@ type ComplexityRoot struct {
 	}
 
 	Query struct {
-		CheckPermission   func(childComplexity int, input gqlmodel.CheckPermissionInput) int
-		FindByUser        func(childComplexity int, userID gqlmodel.ID) int
-		GetUsersWithRoles func(childComplexity int) int
-		Me                func(childComplexity int) int
-		Node              func(childComplexity int, id gqlmodel.ID, typeArg gqlmodel.NodeType) int
-		Nodes             func(childComplexity int, id []gqlmodel.ID, typeArg gqlmodel.NodeType) int
-		Roles             func(childComplexity int) int
-		SearchUser        func(childComplexity int, keyword string) int
-		UserByNameOrEmail func(childComplexity int, nameOrEmail string) int
+		CheckPermission          func(childComplexity int, input gqlmodel.CheckPermissionInput) int
+		FindByID                 func(childComplexity int, id gqlmodel.ID) int
+		FindByName               func(childComplexity int, name string) int
+		FindByUser               func(childComplexity int, userID gqlmodel.ID) int
+		FindByUserWithPagination func(childComplexity int, userID gqlmodel.ID, pagination gqlmodel.Pagination) int
+		GetUsersWithRoles        func(childComplexity int) int
+		Me                       func(childComplexity int) int
+		Node                     func(childComplexity int, id gqlmodel.ID, typeArg gqlmodel.NodeType) int
+		Nodes                    func(childComplexity int, id []gqlmodel.ID, typeArg gqlmodel.NodeType) int
+		Roles                    func(childComplexity int) int
+		SearchUser               func(childComplexity int, keyword string) int
+		UserByNameOrEmail        func(childComplexity int, nameOrEmail string) int
 	}
 
 	RemoveIntegrationsFromWorkspacePayload struct {
@@ -236,6 +239,11 @@ type ComplexityRoot struct {
 		User   func(childComplexity int) int
 		UserID func(childComplexity int) int
 	}
+
+	WorkspacesWithPagination struct {
+		TotalCount func(childComplexity int) int
+		Workspaces func(childComplexity int) int
+	}
 }
 
 type MeResolver interface {
@@ -278,7 +286,10 @@ type QueryResolver interface {
 	Me(ctx context.Context) (*gqlmodel.Me, error)
 	UserByNameOrEmail(ctx context.Context, nameOrEmail string) (*gqlmodel.User, error)
 	SearchUser(ctx context.Context, keyword string) ([]*gqlmodel.User, error)
+	FindByID(ctx context.Context, id gqlmodel.ID) (*gqlmodel.Workspace, error)
+	FindByName(ctx context.Context, name string) (*gqlmodel.Workspace, error)
 	FindByUser(ctx context.Context, userID gqlmodel.ID) ([]*gqlmodel.Workspace, error)
+	FindByUserWithPagination(ctx context.Context, userID gqlmodel.ID, pagination gqlmodel.Pagination) (*gqlmodel.WorkspacesWithPagination, error)
 }
 type WorkspaceUserMemberResolver interface {
 	User(ctx context.Context, obj *gqlmodel.WorkspaceUserMember) (*gqlmodel.User, error)
@@ -748,6 +759,30 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 
 		return e.complexity.Query.CheckPermission(childComplexity, args["input"].(gqlmodel.CheckPermissionInput)), true
 
+	case "Query.findByID":
+		if e.complexity.Query.FindByID == nil {
+			break
+		}
+
+		args, err := ec.field_Query_findByID_args(context.TODO(), rawArgs)
+		if err != nil {
+			return 0, false
+		}
+
+		return e.complexity.Query.FindByID(childComplexity, args["id"].(gqlmodel.ID)), true
+
+	case "Query.findByName":
+		if e.complexity.Query.FindByName == nil {
+			break
+		}
+
+		args, err := ec.field_Query_findByName_args(context.TODO(), rawArgs)
+		if err != nil {
+			return 0, false
+		}
+
+		return e.complexity.Query.FindByName(childComplexity, args["name"].(string)), true
+
 	case "Query.findByUser":
 		if e.complexity.Query.FindByUser == nil {
 			break
@@ -759,6 +794,18 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 		}
 
 		return e.complexity.Query.FindByUser(childComplexity, args["userId"].(gqlmodel.ID)), true
+
+	case "Query.findByUserWithPagination":
+		if e.complexity.Query.FindByUserWithPagination == nil {
+			break
+		}
+
+		args, err := ec.field_Query_findByUserWithPagination_args(context.TODO(), rawArgs)
+		if err != nil {
+			return 0, false
+		}
+
+		return e.complexity.Query.FindByUserWithPagination(childComplexity, args["userId"].(gqlmodel.ID), args["pagination"].(gqlmodel.Pagination)), true
 
 	case "Query.getUsersWithRoles":
 		if e.complexity.Query.GetUsersWithRoles == nil {
@@ -1151,6 +1198,20 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 
 		return e.complexity.WorkspaceUserMember.UserID(childComplexity), true
 
+	case "WorkspacesWithPagination.totalCount":
+		if e.complexity.WorkspacesWithPagination.TotalCount == nil {
+			break
+		}
+
+		return e.complexity.WorkspacesWithPagination.TotalCount(childComplexity), true
+
+	case "WorkspacesWithPagination.workspaces":
+		if e.complexity.WorkspacesWithPagination.Workspaces == nil {
+			break
+		}
+
+		return e.complexity.WorkspacesWithPagination.Workspaces(childComplexity), true
+
 	}
 	return 0, false
 }
@@ -1169,6 +1230,7 @@ func (e *executableSchema) Exec(ctx context.Context) graphql.ResponseHandler {
 		ec.unmarshalInputDeleteWorkspaceInput,
 		ec.unmarshalInputFindOrCreateInput,
 		ec.unmarshalInputMemberInput,
+		ec.unmarshalInputPagination,
 		ec.unmarshalInputPasswordResetInput,
 		ec.unmarshalInputRemoveIntegrationFromWorkspaceInput,
 		ec.unmarshalInputRemoveIntegrationsFromWorkspaceInput,
@@ -1557,6 +1619,11 @@ type WorkspaceMetadata {
     photoURL: String
 }
 
+type WorkspacesWithPagination {
+    workspaces: [Workspace!]!
+    totalCount: Int!
+}
+
 enum Role {
     # a role who can read project
     READER
@@ -1566,6 +1633,11 @@ enum Role {
     OWNER
     # a eole who can maintain a project
     MAINTAINER
+}
+
+input Pagination {
+    page: Int!
+    size: Int!
 }
 
 input CreateWorkspaceInput {
@@ -1664,7 +1736,10 @@ type DeleteWorkspacePayload {
 }
 
 extend type Query {
+    findByID(id: ID!): Workspace
+    findByName(name: String!): Workspace
     findByUser(userId: ID!): [Workspace]
+    findByUserWithPagination(userId: ID!, pagination: Pagination!): WorkspacesWithPagination!
 }
 
 extend type Mutation {
@@ -2440,6 +2515,113 @@ func (ec *executionContext) field_Query_checkPermission_argsInput(
 	}
 
 	var zeroVal gqlmodel.CheckPermissionInput
+	return zeroVal, nil
+}
+
+func (ec *executionContext) field_Query_findByID_args(ctx context.Context, rawArgs map[string]any) (map[string]any, error) {
+	var err error
+	args := map[string]any{}
+	arg0, err := ec.field_Query_findByID_argsID(ctx, rawArgs)
+	if err != nil {
+		return nil, err
+	}
+	args["id"] = arg0
+	return args, nil
+}
+func (ec *executionContext) field_Query_findByID_argsID(
+	ctx context.Context,
+	rawArgs map[string]any,
+) (gqlmodel.ID, error) {
+	if _, ok := rawArgs["id"]; !ok {
+		var zeroVal gqlmodel.ID
+		return zeroVal, nil
+	}
+
+	ctx = graphql.WithPathContext(ctx, graphql.NewPathWithField("id"))
+	if tmp, ok := rawArgs["id"]; ok {
+		return ec.unmarshalNID2githubᚗcomᚋreearthᚋreearthᚑaccountsᚋinternalᚋadapterᚋgqlᚋgqlmodelᚐID(ctx, tmp)
+	}
+
+	var zeroVal gqlmodel.ID
+	return zeroVal, nil
+}
+
+func (ec *executionContext) field_Query_findByName_args(ctx context.Context, rawArgs map[string]any) (map[string]any, error) {
+	var err error
+	args := map[string]any{}
+	arg0, err := ec.field_Query_findByName_argsName(ctx, rawArgs)
+	if err != nil {
+		return nil, err
+	}
+	args["name"] = arg0
+	return args, nil
+}
+func (ec *executionContext) field_Query_findByName_argsName(
+	ctx context.Context,
+	rawArgs map[string]any,
+) (string, error) {
+	if _, ok := rawArgs["name"]; !ok {
+		var zeroVal string
+		return zeroVal, nil
+	}
+
+	ctx = graphql.WithPathContext(ctx, graphql.NewPathWithField("name"))
+	if tmp, ok := rawArgs["name"]; ok {
+		return ec.unmarshalNString2string(ctx, tmp)
+	}
+
+	var zeroVal string
+	return zeroVal, nil
+}
+
+func (ec *executionContext) field_Query_findByUserWithPagination_args(ctx context.Context, rawArgs map[string]any) (map[string]any, error) {
+	var err error
+	args := map[string]any{}
+	arg0, err := ec.field_Query_findByUserWithPagination_argsUserID(ctx, rawArgs)
+	if err != nil {
+		return nil, err
+	}
+	args["userId"] = arg0
+	arg1, err := ec.field_Query_findByUserWithPagination_argsPagination(ctx, rawArgs)
+	if err != nil {
+		return nil, err
+	}
+	args["pagination"] = arg1
+	return args, nil
+}
+func (ec *executionContext) field_Query_findByUserWithPagination_argsUserID(
+	ctx context.Context,
+	rawArgs map[string]any,
+) (gqlmodel.ID, error) {
+	if _, ok := rawArgs["userId"]; !ok {
+		var zeroVal gqlmodel.ID
+		return zeroVal, nil
+	}
+
+	ctx = graphql.WithPathContext(ctx, graphql.NewPathWithField("userId"))
+	if tmp, ok := rawArgs["userId"]; ok {
+		return ec.unmarshalNID2githubᚗcomᚋreearthᚋreearthᚑaccountsᚋinternalᚋadapterᚋgqlᚋgqlmodelᚐID(ctx, tmp)
+	}
+
+	var zeroVal gqlmodel.ID
+	return zeroVal, nil
+}
+
+func (ec *executionContext) field_Query_findByUserWithPagination_argsPagination(
+	ctx context.Context,
+	rawArgs map[string]any,
+) (gqlmodel.Pagination, error) {
+	if _, ok := rawArgs["pagination"]; !ok {
+		var zeroVal gqlmodel.Pagination
+		return zeroVal, nil
+	}
+
+	ctx = graphql.WithPathContext(ctx, graphql.NewPathWithField("pagination"))
+	if tmp, ok := rawArgs["pagination"]; ok {
+		return ec.unmarshalNPagination2githubᚗcomᚋreearthᚋreearthᚑaccountsᚋinternalᚋadapterᚋgqlᚋgqlmodelᚐPagination(ctx, tmp)
+	}
+
+	var zeroVal gqlmodel.Pagination
 	return zeroVal, nil
 }
 
@@ -5495,6 +5677,134 @@ func (ec *executionContext) fieldContext_Query_searchUser(ctx context.Context, f
 	return fc, nil
 }
 
+func (ec *executionContext) _Query_findByID(ctx context.Context, field graphql.CollectedField) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_Query_findByID(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (any, error) {
+		ctx = rctx // use context from middleware stack in children
+		return ec.resolvers.Query().FindByID(rctx, fc.Args["id"].(gqlmodel.ID))
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		return graphql.Null
+	}
+	res := resTmp.(*gqlmodel.Workspace)
+	fc.Result = res
+	return ec.marshalOWorkspace2ᚖgithubᚗcomᚋreearthᚋreearthᚑaccountsᚋinternalᚋadapterᚋgqlᚋgqlmodelᚐWorkspace(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_Query_findByID(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "Query",
+		Field:      field,
+		IsMethod:   true,
+		IsResolver: true,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			switch field.Name {
+			case "id":
+				return ec.fieldContext_Workspace_id(ctx, field)
+			case "name":
+				return ec.fieldContext_Workspace_name(ctx, field)
+			case "members":
+				return ec.fieldContext_Workspace_members(ctx, field)
+			case "metadata":
+				return ec.fieldContext_Workspace_metadata(ctx, field)
+			case "personal":
+				return ec.fieldContext_Workspace_personal(ctx, field)
+			}
+			return nil, fmt.Errorf("no field named %q was found under type Workspace", field.Name)
+		},
+	}
+	defer func() {
+		if r := recover(); r != nil {
+			err = ec.Recover(ctx, r)
+			ec.Error(ctx, err)
+		}
+	}()
+	ctx = graphql.WithFieldContext(ctx, fc)
+	if fc.Args, err = ec.field_Query_findByID_args(ctx, field.ArgumentMap(ec.Variables)); err != nil {
+		ec.Error(ctx, err)
+		return fc, err
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _Query_findByName(ctx context.Context, field graphql.CollectedField) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_Query_findByName(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (any, error) {
+		ctx = rctx // use context from middleware stack in children
+		return ec.resolvers.Query().FindByName(rctx, fc.Args["name"].(string))
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		return graphql.Null
+	}
+	res := resTmp.(*gqlmodel.Workspace)
+	fc.Result = res
+	return ec.marshalOWorkspace2ᚖgithubᚗcomᚋreearthᚋreearthᚑaccountsᚋinternalᚋadapterᚋgqlᚋgqlmodelᚐWorkspace(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_Query_findByName(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "Query",
+		Field:      field,
+		IsMethod:   true,
+		IsResolver: true,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			switch field.Name {
+			case "id":
+				return ec.fieldContext_Workspace_id(ctx, field)
+			case "name":
+				return ec.fieldContext_Workspace_name(ctx, field)
+			case "members":
+				return ec.fieldContext_Workspace_members(ctx, field)
+			case "metadata":
+				return ec.fieldContext_Workspace_metadata(ctx, field)
+			case "personal":
+				return ec.fieldContext_Workspace_personal(ctx, field)
+			}
+			return nil, fmt.Errorf("no field named %q was found under type Workspace", field.Name)
+		},
+	}
+	defer func() {
+		if r := recover(); r != nil {
+			err = ec.Recover(ctx, r)
+			ec.Error(ctx, err)
+		}
+	}()
+	ctx = graphql.WithFieldContext(ctx, fc)
+	if fc.Args, err = ec.field_Query_findByName_args(ctx, field.ArgumentMap(ec.Variables)); err != nil {
+		ec.Error(ctx, err)
+		return fc, err
+	}
+	return fc, nil
+}
+
 func (ec *executionContext) _Query_findByUser(ctx context.Context, field graphql.CollectedField) (ret graphql.Marshaler) {
 	fc, err := ec.fieldContext_Query_findByUser(ctx, field)
 	if err != nil {
@@ -5553,6 +5863,67 @@ func (ec *executionContext) fieldContext_Query_findByUser(ctx context.Context, f
 	}()
 	ctx = graphql.WithFieldContext(ctx, fc)
 	if fc.Args, err = ec.field_Query_findByUser_args(ctx, field.ArgumentMap(ec.Variables)); err != nil {
+		ec.Error(ctx, err)
+		return fc, err
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _Query_findByUserWithPagination(ctx context.Context, field graphql.CollectedField) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_Query_findByUserWithPagination(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (any, error) {
+		ctx = rctx // use context from middleware stack in children
+		return ec.resolvers.Query().FindByUserWithPagination(rctx, fc.Args["userId"].(gqlmodel.ID), fc.Args["pagination"].(gqlmodel.Pagination))
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		if !graphql.HasFieldError(ctx, fc) {
+			ec.Errorf(ctx, "must not be null")
+		}
+		return graphql.Null
+	}
+	res := resTmp.(*gqlmodel.WorkspacesWithPagination)
+	fc.Result = res
+	return ec.marshalNWorkspacesWithPagination2ᚖgithubᚗcomᚋreearthᚋreearthᚑaccountsᚋinternalᚋadapterᚋgqlᚋgqlmodelᚐWorkspacesWithPagination(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_Query_findByUserWithPagination(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "Query",
+		Field:      field,
+		IsMethod:   true,
+		IsResolver: true,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			switch field.Name {
+			case "workspaces":
+				return ec.fieldContext_WorkspacesWithPagination_workspaces(ctx, field)
+			case "totalCount":
+				return ec.fieldContext_WorkspacesWithPagination_totalCount(ctx, field)
+			}
+			return nil, fmt.Errorf("no field named %q was found under type WorkspacesWithPagination", field.Name)
+		},
+	}
+	defer func() {
+		if r := recover(); r != nil {
+			err = ec.Recover(ctx, r)
+			ec.Error(ctx, err)
+		}
+	}()
+	ctx = graphql.WithFieldContext(ctx, fc)
+	if fc.Args, err = ec.field_Query_findByUserWithPagination_args(ctx, field.ArgumentMap(ec.Variables)); err != nil {
 		ec.Error(ctx, err)
 		return fc, err
 	}
@@ -7881,6 +8252,106 @@ func (ec *executionContext) fieldContext_WorkspaceUserMember_user(_ context.Cont
 	return fc, nil
 }
 
+func (ec *executionContext) _WorkspacesWithPagination_workspaces(ctx context.Context, field graphql.CollectedField, obj *gqlmodel.WorkspacesWithPagination) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_WorkspacesWithPagination_workspaces(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (any, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.Workspaces, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		if !graphql.HasFieldError(ctx, fc) {
+			ec.Errorf(ctx, "must not be null")
+		}
+		return graphql.Null
+	}
+	res := resTmp.([]*gqlmodel.Workspace)
+	fc.Result = res
+	return ec.marshalNWorkspace2ᚕᚖgithubᚗcomᚋreearthᚋreearthᚑaccountsᚋinternalᚋadapterᚋgqlᚋgqlmodelᚐWorkspaceᚄ(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_WorkspacesWithPagination_workspaces(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "WorkspacesWithPagination",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			switch field.Name {
+			case "id":
+				return ec.fieldContext_Workspace_id(ctx, field)
+			case "name":
+				return ec.fieldContext_Workspace_name(ctx, field)
+			case "members":
+				return ec.fieldContext_Workspace_members(ctx, field)
+			case "metadata":
+				return ec.fieldContext_Workspace_metadata(ctx, field)
+			case "personal":
+				return ec.fieldContext_Workspace_personal(ctx, field)
+			}
+			return nil, fmt.Errorf("no field named %q was found under type Workspace", field.Name)
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _WorkspacesWithPagination_totalCount(ctx context.Context, field graphql.CollectedField, obj *gqlmodel.WorkspacesWithPagination) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_WorkspacesWithPagination_totalCount(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (any, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.TotalCount, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		if !graphql.HasFieldError(ctx, fc) {
+			ec.Errorf(ctx, "must not be null")
+		}
+		return graphql.Null
+	}
+	res := resTmp.(int)
+	fc.Result = res
+	return ec.marshalNInt2int(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_WorkspacesWithPagination_totalCount(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "WorkspacesWithPagination",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type Int does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
 func (ec *executionContext) ___Directive_name(ctx context.Context, field graphql.CollectedField, obj *introspection.Directive) (ret graphql.Marshaler) {
 	fc, err := ec.fieldContext___Directive_name(ctx, field)
 	if err != nil {
@@ -10165,6 +10636,40 @@ func (ec *executionContext) unmarshalInputMemberInput(ctx context.Context, obj a
 	return it, nil
 }
 
+func (ec *executionContext) unmarshalInputPagination(ctx context.Context, obj any) (gqlmodel.Pagination, error) {
+	var it gqlmodel.Pagination
+	asMap := map[string]any{}
+	for k, v := range obj.(map[string]any) {
+		asMap[k] = v
+	}
+
+	fieldsInOrder := [...]string{"page", "size"}
+	for _, k := range fieldsInOrder {
+		v, ok := asMap[k]
+		if !ok {
+			continue
+		}
+		switch k {
+		case "page":
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("page"))
+			data, err := ec.unmarshalNInt2int(ctx, v)
+			if err != nil {
+				return it, err
+			}
+			it.Page = data
+		case "size":
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("size"))
+			data, err := ec.unmarshalNInt2int(ctx, v)
+			if err != nil {
+				return it, err
+			}
+			it.Size = data
+		}
+	}
+
+	return it, nil
+}
+
 func (ec *executionContext) unmarshalInputPasswordResetInput(ctx context.Context, obj any) (gqlmodel.PasswordResetInput, error) {
 	var it gqlmodel.PasswordResetInput
 	asMap := map[string]any{}
@@ -11653,6 +12158,44 @@ func (ec *executionContext) _Query(ctx context.Context, sel ast.SelectionSet) gr
 			}
 
 			out.Concurrently(i, func(ctx context.Context) graphql.Marshaler { return rrm(innerCtx) })
+		case "findByID":
+			field := field
+
+			innerFunc := func(ctx context.Context, _ *graphql.FieldSet) (res graphql.Marshaler) {
+				defer func() {
+					if r := recover(); r != nil {
+						ec.Error(ctx, ec.Recover(ctx, r))
+					}
+				}()
+				res = ec._Query_findByID(ctx, field)
+				return res
+			}
+
+			rrm := func(ctx context.Context) graphql.Marshaler {
+				return ec.OperationContext.RootResolverMiddleware(ctx,
+					func(ctx context.Context) graphql.Marshaler { return innerFunc(ctx, out) })
+			}
+
+			out.Concurrently(i, func(ctx context.Context) graphql.Marshaler { return rrm(innerCtx) })
+		case "findByName":
+			field := field
+
+			innerFunc := func(ctx context.Context, _ *graphql.FieldSet) (res graphql.Marshaler) {
+				defer func() {
+					if r := recover(); r != nil {
+						ec.Error(ctx, ec.Recover(ctx, r))
+					}
+				}()
+				res = ec._Query_findByName(ctx, field)
+				return res
+			}
+
+			rrm := func(ctx context.Context) graphql.Marshaler {
+				return ec.OperationContext.RootResolverMiddleware(ctx,
+					func(ctx context.Context) graphql.Marshaler { return innerFunc(ctx, out) })
+			}
+
+			out.Concurrently(i, func(ctx context.Context) graphql.Marshaler { return rrm(innerCtx) })
 		case "findByUser":
 			field := field
 
@@ -11663,6 +12206,28 @@ func (ec *executionContext) _Query(ctx context.Context, sel ast.SelectionSet) gr
 					}
 				}()
 				res = ec._Query_findByUser(ctx, field)
+				return res
+			}
+
+			rrm := func(ctx context.Context) graphql.Marshaler {
+				return ec.OperationContext.RootResolverMiddleware(ctx,
+					func(ctx context.Context) graphql.Marshaler { return innerFunc(ctx, out) })
+			}
+
+			out.Concurrently(i, func(ctx context.Context) graphql.Marshaler { return rrm(innerCtx) })
+		case "findByUserWithPagination":
+			field := field
+
+			innerFunc := func(ctx context.Context, fs *graphql.FieldSet) (res graphql.Marshaler) {
+				defer func() {
+					if r := recover(); r != nil {
+						ec.Error(ctx, ec.Recover(ctx, r))
+					}
+				}()
+				res = ec._Query_findByUserWithPagination(ctx, field)
+				if res == graphql.Null {
+					atomic.AddUint32(&fs.Invalids, 1)
+				}
 				return res
 			}
 
@@ -12583,6 +13148,50 @@ func (ec *executionContext) _WorkspaceUserMember(ctx context.Context, sel ast.Se
 	return out
 }
 
+var workspacesWithPaginationImplementors = []string{"WorkspacesWithPagination"}
+
+func (ec *executionContext) _WorkspacesWithPagination(ctx context.Context, sel ast.SelectionSet, obj *gqlmodel.WorkspacesWithPagination) graphql.Marshaler {
+	fields := graphql.CollectFields(ec.OperationContext, sel, workspacesWithPaginationImplementors)
+
+	out := graphql.NewFieldSet(fields)
+	deferred := make(map[string]*graphql.FieldSet)
+	for i, field := range fields {
+		switch field.Name {
+		case "__typename":
+			out.Values[i] = graphql.MarshalString("WorkspacesWithPagination")
+		case "workspaces":
+			out.Values[i] = ec._WorkspacesWithPagination_workspaces(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "totalCount":
+			out.Values[i] = ec._WorkspacesWithPagination_totalCount(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		default:
+			panic("unknown field " + strconv.Quote(field.Name))
+		}
+	}
+	out.Dispatch(ctx)
+	if out.Invalids > 0 {
+		return graphql.Null
+	}
+
+	atomic.AddInt32(&ec.deferred, int32(len(deferred)))
+
+	for label, dfs := range deferred {
+		ec.processDeferredGroup(graphql.DeferredGroup{
+			Label:    label,
+			Path:     graphql.GetPath(ctx),
+			FieldSet: dfs,
+			Context:  ctx,
+		})
+	}
+
+	return out
+}
+
 var __DirectiveImplementors = []string{"__Directive"}
 
 func (ec *executionContext) ___Directive(ctx context.Context, sel ast.SelectionSet, obj *introspection.Directive) graphql.Marshaler {
@@ -13026,6 +13635,21 @@ func (ec *executionContext) marshalNID2ᚕgithubᚗcomᚋreearthᚋreearthᚑacc
 	return ret
 }
 
+func (ec *executionContext) unmarshalNInt2int(ctx context.Context, v any) (int, error) {
+	res, err := graphql.UnmarshalInt(v)
+	return res, graphql.ErrorOnPath(ctx, err)
+}
+
+func (ec *executionContext) marshalNInt2int(ctx context.Context, sel ast.SelectionSet, v int) graphql.Marshaler {
+	res := graphql.MarshalInt(v)
+	if res == graphql.Null {
+		if !graphql.HasFieldError(ctx, graphql.GetFieldContext(ctx)) {
+			ec.Errorf(ctx, "the requested element is null which the schema does not allow")
+		}
+	}
+	return res
+}
+
 func (ec *executionContext) unmarshalNLang2string(ctx context.Context, v any) (string, error) {
 	res, err := graphql.UnmarshalString(v)
 	return res, graphql.ErrorOnPath(ctx, err)
@@ -13081,6 +13705,11 @@ func (ec *executionContext) unmarshalNNodeType2githubᚗcomᚋreearthᚋreearth�
 
 func (ec *executionContext) marshalNNodeType2githubᚗcomᚋreearthᚋreearthᚑaccountsᚋinternalᚋadapterᚋgqlᚋgqlmodelᚐNodeType(ctx context.Context, sel ast.SelectionSet, v gqlmodel.NodeType) graphql.Marshaler {
 	return v
+}
+
+func (ec *executionContext) unmarshalNPagination2githubᚗcomᚋreearthᚋreearthᚑaccountsᚋinternalᚋadapterᚋgqlᚋgqlmodelᚐPagination(ctx context.Context, v any) (gqlmodel.Pagination, error) {
+	res, err := ec.unmarshalInputPagination(ctx, v)
+	return res, graphql.ErrorOnPath(ctx, err)
 }
 
 func (ec *executionContext) unmarshalNPasswordResetInput2githubᚗcomᚋreearthᚋreearthᚑaccountsᚋinternalᚋadapterᚋgqlᚋgqlmodelᚐPasswordResetInput(ctx context.Context, v any) (gqlmodel.PasswordResetInput, error) {
@@ -13551,6 +14180,20 @@ func (ec *executionContext) marshalNWorkspaceMetadata2ᚖgithubᚗcomᚋreearth�
 		return graphql.Null
 	}
 	return ec._WorkspaceMetadata(ctx, sel, v)
+}
+
+func (ec *executionContext) marshalNWorkspacesWithPagination2githubᚗcomᚋreearthᚋreearthᚑaccountsᚋinternalᚋadapterᚋgqlᚋgqlmodelᚐWorkspacesWithPagination(ctx context.Context, sel ast.SelectionSet, v gqlmodel.WorkspacesWithPagination) graphql.Marshaler {
+	return ec._WorkspacesWithPagination(ctx, sel, &v)
+}
+
+func (ec *executionContext) marshalNWorkspacesWithPagination2ᚖgithubᚗcomᚋreearthᚋreearthᚑaccountsᚋinternalᚋadapterᚋgqlᚋgqlmodelᚐWorkspacesWithPagination(ctx context.Context, sel ast.SelectionSet, v *gqlmodel.WorkspacesWithPagination) graphql.Marshaler {
+	if v == nil {
+		if !graphql.HasFieldError(ctx, graphql.GetFieldContext(ctx)) {
+			ec.Errorf(ctx, "the requested element is null which the schema does not allow")
+		}
+		return graphql.Null
+	}
+	return ec._WorkspacesWithPagination(ctx, sel, v)
 }
 
 func (ec *executionContext) marshalN__Directive2githubᚗcomᚋ99designsᚋgqlgenᚋgraphqlᚋintrospectionᚐDirective(ctx context.Context, sel ast.SelectionSet, v introspection.Directive) graphql.Marshaler {

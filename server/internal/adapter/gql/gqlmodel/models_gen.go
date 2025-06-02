@@ -109,6 +109,11 @@ type MemberInput struct {
 type Mutation struct {
 }
 
+type Pagination struct {
+	Page int `json:"page"`
+	Size int `json:"size"`
+}
+
 type PasswordResetInput struct {
 	Password string `json:"password"`
 	Token    string `json:"token"`
@@ -326,6 +331,11 @@ type WorkspaceUserMember struct {
 }
 
 func (WorkspaceUserMember) IsWorkspaceMember() {}
+
+type WorkspacesWithPagination struct {
+	Workspaces []*Workspace `json:"workspaces"`
+	TotalCount int          `json:"totalCount"`
+}
 
 type NodeType string
 

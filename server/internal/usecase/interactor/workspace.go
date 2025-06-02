@@ -9,6 +9,7 @@ import (
 	"github.com/reearth/reearth-accounts/internal/usecase/interfaces"
 	"github.com/reearth/reearth-accounts/internal/usecase/repo"
 	"github.com/reearth/reearth-accounts/pkg/id"
+	"github.com/reearth/reearth-accounts/pkg/pagination"
 	"github.com/reearth/reearth-accounts/pkg/permittable"
 	"github.com/reearth/reearth-accounts/pkg/role"
 	"github.com/reearth/reearth-accounts/pkg/user"
@@ -40,9 +41,29 @@ func (i *Workspace) Fetch(ctx context.Context, ids workspace.IDList, operator *u
 	return filterWorkspaces(res, operator, err, false, true)
 }
 
+func (i *Workspace) FetchByID(ctx context.Context, id workspace.ID) (*workspace.Workspace, error) {
+	return i.repos.Workspace.FindByID(ctx, id)
+}
+
+func (i *Workspace) FetchByName(ctx context.Context, name string) (*workspace.Workspace, error) {
+	return i.repos.Workspace.FindByName(ctx, name)
+}
+
 func (i *Workspace) FindByUser(ctx context.Context, id workspace.UserID, operator *usecase.Operator) (workspace.List, error) {
 	res, err := i.repos.Workspace.FindByUser(ctx, id)
 	return filterWorkspaces(res, operator, err, true, true)
+}
+
+func (i *Workspace) FetchByUserWithPagination(ctx context.Context, userID workspace.UserID, input interfaces.FetchByUserWithPaginationParam) (interfaces.FetchByUserWithPaginationResult, error) {
+	workspaces, pageInfo, err := i.repos.Workspace.FindByUserWithPagination(ctx, userID, pagination.ToPagination(input.Page, input.Size))
+	if err != nil {
+		return interfaces.FetchByUserWithPaginationResult{}, err
+	}
+
+	return interfaces.FetchByUserWithPaginationResult{
+		Workspaces: workspace.List(workspaces),
+		TotalCount: int(pageInfo.TotalCount),
+	}, nil
 }
 
 func (i *Workspace) Create(ctx context.Context, name string, firstUser workspace.UserID, operator *usecase.Operator) (_ *workspace.Workspace, err error) {
