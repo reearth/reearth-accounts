@@ -1,20 +1,60 @@
 name: run-migration
 on:
   workflow_dispatch:
+    inputs:
+      environment:
+        description: 'Environment'
+        required: true
+        type: choice
+        options:
+          - oss
+          - dev
+          - prod
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref_name }}
   cancel-in-progress: true
 
 jobs:
-  migrate:
-    name: Run migration (Nightly)
+  migrate-oss:
+    if: ${{ inputs.environment == 'oss' }}
+    name: Run migration on OSS (Nightly)
     runs-on: ubuntu-latest
     permissions:
       contents: read
       id-token: write
     env:
       IMAGE_NAME_GAR: us-central1-docker.pkg.dev/reearth-oss/reearth/reearth-accounts-api:nightly
+      GCP_REGION: us-central1
+    steps:
+      - name: Authenticate to Google Cloud
+        uses: google-github-actions/auth@v2
+        with:
+          service_account: ${{ secrets.GC_SA_EMAIL }}
+          workload_identity_provider: ${{ secrets.GC_WORKLOAD_IDENTITY_PROVIDER }}
+
+      - name: Update Migration Job
+        run: |
+          gcloud run jobs update reearth-accounts-migration \
+            --image $IMAGE_NAME_GAR \
+            --region $GCP_REGION \
+            --quiet
+
+      - name: Execute Migration Job
+        run: |
+          gcloud run jobs execute reearth-accounts-migration \
+            --region $GCP_REGION \
+            --wait \
+            --quiet
+  migrate-dev:
+    if: ${{ inputs.environment == 'dev' }}
+    name: Run migration on Dev (Nightly)
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      id-token: write
+    env:
+      IMAGE_NAME_GAR: us-central1-docker.pkg.dev/reearth-dev/reearth/reearth-accounts-api:nightly
       GCP_REGION: us-central1
     steps:
       - name: Authenticate to Google Cloud
