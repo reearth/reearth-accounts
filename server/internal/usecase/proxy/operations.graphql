@@ -8,8 +8,13 @@ fragment FragmentUser on User {
     id
     name
     email
-    lang
-    theme
+    metadata {
+        description
+        lang
+        photoURL
+        theme
+        website
+    }
     workspace
     auths
 }
@@ -22,8 +27,13 @@ query UserByIDs($id: [ID!]!) {
         id
         name
         email
-        lang
-        theme
+        metadata {
+            description
+            lang
+            photoURL
+            theme
+            website
+        }
         workspace
         auths
     }
@@ -88,8 +98,13 @@ fragment FragmentMe on Me {
     id
     name
     email
-    lang
-    theme
+    metadata {
+        description
+        lang
+        photoURL
+        theme
+        website
+    }
     myWorkspaceId
     auths
 }

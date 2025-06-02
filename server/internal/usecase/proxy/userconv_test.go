@@ -7,7 +7,6 @@ import (
 
 	"github.com/reearth/reearth-accounts/pkg/id"
 	"github.com/reearth/reearth-accounts/pkg/user"
-	"golang.org/x/text/language"
 )
 
 func TestUserByIDsResponseTo(t *testing.T) {
@@ -19,10 +18,25 @@ func TestUserByIDsResponseTo(t *testing.T) {
 		Email:     "email@example.com",
 		Workspace: ws.String(),
 		Typename:  "User",
+		Metadata: UserByIDsNodesUserMetadata{
+			Description: "description",
+			Lang:        "ja",
+			PhotoURL:    "https://example.com/photo.jpg",
+			Theme:       "dark",
+			Website:     "https://example.com",
+		},
 	}
+	metadata := user.NewMetadata()
+	metadata.LangFrom(u.Metadata.Lang)
+	metadata.SetDescription(u.Metadata.Description)
+	metadata.SetPhotoURL(u.Metadata.PhotoURL)
+	metadata.SetTheme(user.ThemeFrom(u.Metadata.Theme))
+	metadata.SetWebsite(u.Metadata.Website)
+
 	us := user.New().ID(uid).Name("name").
 		Email("email@example.com").
 		Workspace(ws).
+		Metadata(metadata).
 		MustBuild()
 
 	type args struct {
@@ -139,6 +153,14 @@ func TestSimpleUserByIDsResponseTo(t *testing.T) {
 func TestMeToUser(t *testing.T) {
 	uid := id.NewUserID()
 	wid := id.NewWorkspaceID()
+
+	metadata := user.NewMetadata()
+	metadata.LangFrom("ja")
+	metadata.SetDescription("description")
+	metadata.SetPhotoURL("https://example.com/photo.jpg")
+	metadata.SetTheme("dark")
+	metadata.SetWebsite("https://example.com")
+
 	type args struct {
 		me FragmentMe
 	}
@@ -152,17 +174,22 @@ func TestMeToUser(t *testing.T) {
 			name: "ok",
 			args: args{
 				FragmentMe{
-					Id:            uid.String(),
-					Name:          "name",
-					Email:         "test@exmple.com",
-					Lang:          "ja",
-					Theme:         "dark",
+					Id:    uid.String(),
+					Name:  "name",
+					Email: "test@exmple.com",
+					Metadata: FragmentMeMetadataUserMetadata{
+						Description: "description",
+						Lang:        "ja",
+						PhotoURL:    "https://example.com/photo.jpg",
+						Theme:       "dark",
+						Website:     "https://example.com",
+					},
 					MyWorkspaceId: wid.String(),
 					Auths:         []string{"foo|bar"},
 				},
 			},
 			want: user.New().ID(uid).Name("name").
-				Email("test@exmple.com").LangFrom("ja").Theme(user.ThemeDark).
+				Email("test@exmple.com").Metadata(metadata).
 				Workspace(wid).Auths([]user.Auth{{Provider: "foo", Sub: "foo|bar"}}).MustBuild(),
 			wantErr: false,
 		},
@@ -184,20 +211,33 @@ func TestMeToUser(t *testing.T) {
 func TestFragmentToUser(t *testing.T) {
 	uid := id.NewUserID()
 	ws := id.NewWorkspaceID()
+
 	u := FragmentUser{
 		Id:        uid.String(),
 		Name:      "name",
 		Email:     "email@example.com",
 		Workspace: ws.String(),
-		Lang:      "ja",
-		Theme:     "DARK",
 		Auths:     []string{"sub"},
+		Metadata: FragmentUserMetadata{
+			Description: "description",
+			Lang:        "ja",
+			PhotoURL:    "https://example.com/photo.jpg",
+			Theme:       "dark",
+			Website:     "https://example.com",
+		},
 	}
 	auth := user.AuthFrom("sub")
+
+	metadata := user.NewMetadata()
+	metadata.LangFrom(u.Metadata.Lang)
+	metadata.SetDescription(u.Metadata.Description)
+	metadata.SetPhotoURL(u.Metadata.PhotoURL)
+	metadata.SetTheme(user.ThemeFrom(u.Metadata.Theme))
+	metadata.SetWebsite(u.Metadata.Website)
+
 	us := user.New().ID(uid).Name("name").
 		Email("email@example.com").
-		Lang(language.Japanese).
-		Theme(user.ThemeDark).
+		Metadata(metadata).
 		Auths([]user.Auth{auth}).
 		Workspace(ws).
 		MustBuild()
@@ -242,10 +282,25 @@ func TestUserByIDsNodesNodeTo(t *testing.T) {
 		Email:     "email@example.com",
 		Workspace: ws.String(),
 		Typename:  "User",
+		Metadata: UserByIDsNodesUserMetadata{
+			Description: "description",
+			Lang:        "ja",
+			PhotoURL:    "https://example.com/photo.jpg",
+			Theme:       "dark",
+			Website:     "https://example.com",
+		},
 	}
+	metadata := user.NewMetadata()
+	metadata.LangFrom(u.Metadata.Lang)
+	metadata.SetDescription(u.Metadata.Description)
+	metadata.SetPhotoURL(u.Metadata.PhotoURL)
+	metadata.SetTheme(user.ThemeFrom(u.Metadata.Theme))
+	metadata.SetWebsite(u.Metadata.Website)
+
 	us := user.New().ID(uid).Name("name").
 		Email("email@example.com").
 		Workspace(ws).
+		Metadata(metadata).
 		MustBuild()
 
 	type args struct {
@@ -289,10 +344,24 @@ func TestUserByIDsNodesUserTo(t *testing.T) {
 		Email:     "email@example.com",
 		Workspace: ws.String(),
 		Typename:  "User",
+		Metadata: UserByIDsNodesUserMetadata{
+			Description: "description",
+			Lang:        "ja",
+			PhotoURL:    "https://example.com/photo.jpg",
+			Theme:       "dark",
+			Website:     "https://example.com",
+		},
 	}
+	metadata := user.NewMetadata()
+	metadata.LangFrom(u.Metadata.Lang)
+	metadata.SetDescription(u.Metadata.Description)
+	metadata.SetPhotoURL(u.Metadata.PhotoURL)
+	metadata.SetTheme(user.ThemeFrom(u.Metadata.Theme))
+	metadata.SetWebsite(u.Metadata.Website)
 	us := user.New().ID(uid).Name("name").
 		Email("email@example.com").
 		Workspace(ws).
+		Metadata(metadata).
 		MustBuild()
 	type args struct {
 		r *UserByIDsNodesUser

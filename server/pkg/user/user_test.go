@@ -11,42 +11,46 @@ import (
 func TestUser(t *testing.T) {
 	u := &User{
 		id:        NewID(),
-		workspace: NewWorkspaceID(),
 		name:      "xxx",
-		lang:      language.Make("en"),
+		alias:     "xxx",
 		email:     "ff@xx.zz",
+		metadata:  NewMetadata(),
+		password:  nil,
+		workspace: NewWorkspaceID(),
 		auths: []Auth{{
 			Provider: "aaa",
 			Sub:      "sss",
 		}},
-		theme: ThemeDark,
+		verification:  nil,
+		passwordReset: nil,
+		host:          "",
 	}
 
 	assert.Equal(t, u.id, u.ID())
 	assert.Equal(t, "xxx", u.Name())
-	assert.Equal(t, "xxx", u.DisplayName())
+	assert.Equal(t, "xxx", u.Alias())
 	assert.Equal(t, u.workspace, u.Workspace())
 	assert.Equal(t, Auths([]Auth{{
 		Provider: "aaa",
 		Sub:      "sss",
 	}}), u.Auths())
 	assert.Equal(t, "ff@xx.zz", u.Email())
-	assert.Equal(t, language.Make("en"), u.Lang())
-	assert.Equal(t, ThemeDark, u.Theme())
 
-	u.UpdateName("a")
+	u.SetName("a")
 	assert.Equal(t, "a", u.name)
-	assert.Equal(t, "", u.displayName)
-	assert.Equal(t, "a", u.DisplayName())
-	assert.ErrorContains(t, u.UpdateEmail("ab"), "invalid email")
-	assert.NoError(t, u.UpdateEmail("a@example.com"))
+	assert.ErrorContains(t, u.SetEmail("ab"), "invalid email")
+	assert.NoError(t, u.SetEmail("a@example.com"))
 	assert.Equal(t, "a@example.com", u.email)
-	u.UpdateLang(language.Und)
-	assert.Equal(t, language.Und, u.lang)
-	u.UpdateTheme(ThemeLight)
-	assert.Equal(t, ThemeLight, u.theme)
-	u.UpdateDisplayName("displayName")
-	assert.Equal(t, "displayName", u.displayName)
+	u.Metadata().SetLang(language.Und)
+	assert.Equal(t, language.Und, u.metadata.lang)
+	u.Metadata().SetTheme(ThemeLight)
+	assert.Equal(t, ThemeLight, u.metadata.theme)
+	u.SetAlias("alias")
+	assert.Equal(t, "alias", u.alias)
+	u.Metadata().SetPhotoURL("photo url")
+	u.Metadata().SetDescription("description")
+	u.Metadata().SetWebsite("website")
+	assert.Equal(t, u.metadata, u.Metadata())
 
 	wid := NewWorkspaceID()
 	u.UpdateWorkspace(wid)

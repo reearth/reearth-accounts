@@ -2,24 +2,30 @@ type User implements Node {
   id: ID!
   name: String!
   email: String!
-  lang: Lang!
-  theme: Theme!
   host: String
   workspace: ID!
   auths: [String!]!
+  metadata: UserMetadata!
 }
 
 type Me {
   id: ID!
   name: String!
   email: String!
-  lang: Lang!
-  theme: Theme!
+  metadata: UserMetadata!
   host: String
   myWorkspaceId: ID!
   auths: [String!]!
   workspaces: [Workspace!]!
   myWorkspace: Workspace!
+}
+
+type UserMetadata {
+  description: String!
+  lang: Lang!
+  photoURL: String!
+  theme: Theme!
+  website: String!
 }
 
 input SignUpInput {

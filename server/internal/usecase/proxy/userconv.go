@@ -34,9 +34,16 @@ func MeToUser(me FragmentMe) (*user.User, error) {
 		auths[i] = user.AuthFrom(me.Auths[i])
 	}
 
+	metadata := user.NewMetadata()
+	metadata.LangFrom(me.Metadata.Lang)
+	metadata.SetDescription(me.Metadata.Description)
+	metadata.SetPhotoURL(me.Metadata.PhotoURL)
+	metadata.SetTheme(user.ThemeFrom(me.Metadata.Theme))
+	metadata.SetWebsite(me.Metadata.Website)
+
 	u, err := user.New().ID(id).Name(me.Name).
-		Email(me.Email).LangFrom(me.Lang).
-		Theme(user.ThemeFrom(me.Theme)).
+		Email(me.Email).
+		Metadata(metadata).
 		Auths(auths).
 		Workspace(wid).Build()
 	if err != nil {
@@ -61,9 +68,16 @@ func FragmentToUser(me FragmentUser) (*user.User, error) {
 		auths[i] = user.AuthFrom(me.Auths[i])
 	}
 
+	metadata := user.NewMetadata()
+	metadata.LangFrom(me.Metadata.Lang)
+	metadata.SetDescription(me.Metadata.Description)
+	metadata.SetPhotoURL(me.Metadata.PhotoURL)
+	metadata.SetTheme(user.ThemeFrom(me.Metadata.Theme))
+	metadata.SetWebsite(me.Metadata.Website)
+
 	u, err := user.New().ID(id).Name(me.Name).
-		Email(me.Email).LangFrom(me.Lang).
-		Theme(user.ThemeFrom(me.Theme)).
+		Email(me.Email).
+		Metadata(metadata).
 		Auths(auths).
 		Workspace(wid).Build()
 	if err != nil {
@@ -101,9 +115,17 @@ func UserByIDsNodesUserTo(r *UserByIDsNodesUser) (*user.User, error) {
 	for i := range r.Auths {
 		auths[i] = user.AuthFrom(r.Auths[i])
 	}
+
+	metadata := user.NewMetadata()
+	metadata.LangFrom(r.Metadata.Lang)
+	metadata.SetDescription(r.Metadata.Description)
+	metadata.SetPhotoURL(r.Metadata.PhotoURL)
+	metadata.SetTheme(user.ThemeFrom(r.Metadata.Theme))
+	metadata.SetWebsite(r.Metadata.Website)
+
 	return user.New().ID(id).Name(r.Name).
-		Email(r.Email).LangFrom(r.Lang).
-		Theme(user.ThemeFrom(r.Theme)).
+		Email(r.Email).
+		Metadata(metadata).
 		Auths(auths).
 		Workspace(wid).Build()
 }

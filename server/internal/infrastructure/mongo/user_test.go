@@ -401,7 +401,6 @@ func TestUserRepo_FindByPasswordResetRequest(t *testing.T) {
 			RepoData: user1,
 			Expected: user1,
 		},
-
 		{
 			Name:     "must not find any user",
 			Input:    "x@yxz",
@@ -426,6 +425,8 @@ func TestUserRepo_FindByPasswordResetRequest(t *testing.T) {
 			assert.NoError(tt, err)
 
 			got, err := repo.FindByPasswordResetRequest(ctx, tc.Input)
+			assert.NoError(tt, err)
+			assert.NotNil(tt, got)
 			if tc.WantErr {
 				assert.Equal(tt, err, rerror.ErrNotFound)
 			} else {

@@ -2,6 +2,7 @@ type Workspace implements Node {
     id: ID!
     name: String!
     members: [WorkspaceMember!]!
+    metadata: WorkspaceMetadata!
     personal: Boolean!
 }
 
@@ -20,6 +21,14 @@ type WorkspaceIntegrationMember {
     active: Boolean!
     invitedById: ID!
     invitedBy: User
+}
+
+type WorkspaceMetadata {
+    description: String
+    website: String
+    location: String
+    billingEmail: String
+    photoURL: String
 }
 
 enum Role {

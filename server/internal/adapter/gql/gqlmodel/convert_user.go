@@ -48,12 +48,22 @@ func ToMe(u *user.User) *Me {
 		return nil
 	}
 
+	var metadata UserMetadata
+	if u.Metadata() != nil {
+		metadata = UserMetadata{
+			Description: u.Metadata().Description(),
+			Lang:        u.Metadata().Lang().String(),
+			PhotoURL:    u.Metadata().PhotoURL(),
+			Theme:       Theme(u.Metadata().Theme()),
+			Website:     u.Metadata().Website(),
+		}
+	}
+
 	return &Me{
 		ID:            IDFrom(u.ID()),
 		Name:          u.Name(),
 		Email:         u.Email(),
-		Lang:          u.Lang().String(),
-		Theme:         Theme(u.Theme()),
+		Metadata:      &metadata,
 		MyWorkspaceID: IDFrom(u.Workspace()),
 		Auths: util.Map(u.Auths(), func(a user.Auth) string {
 			return a.Provider

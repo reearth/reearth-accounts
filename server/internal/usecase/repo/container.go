@@ -16,6 +16,7 @@ type Container struct {
 	Permittable Permittable
 	Transaction usecasex.Transaction
 	Users       []User
+	Config      Config
 }
 
 var (
