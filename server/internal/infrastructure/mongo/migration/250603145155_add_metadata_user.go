@@ -47,7 +47,24 @@ func AddMetadataUser(ctx context.Context, c DBClient) error {
 					metadata.Website = doc.Metadata.Website
 					doc.Metadata = metadata
 				} else {
-					doc.Metadata = metadata
+					var lang, theme string
+					if doc.Lang != "" {
+						lang = doc.Lang
+						doc.Lang = ""
+					}
+
+					if doc.Theme != "" {
+						theme = doc.Theme
+						doc.Theme = ""
+					}
+
+					doc.Metadata = &mongodoc.UserMetadataDocument{
+						Description: "",
+						Lang:        lang,
+						PhotoURL:    "",
+						Theme:       theme,
+						Website:     "",
+					}
 				}
 
 				ids = append(ids, doc.ID)
