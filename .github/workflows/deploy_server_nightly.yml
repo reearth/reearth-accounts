@@ -19,7 +19,7 @@ jobs:
     env:
       IMAGE: ${{ secrets.IMAGE }}
       IMAGE_GC: ${{ secrets.IMAGE_GC }}
-      REGION: ${{ secret.GC_REGION }}
+      REGION: ${{ secrets.GC_REGION }}
     steps:
       - name: Authenticate to Google Cloud
         uses: google-github-actions/auth@v2
