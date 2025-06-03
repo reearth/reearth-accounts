@@ -1,4 +1,4 @@
-name: build-deploy-server-dev
+name: build-server-image
 on:
   workflow_call:
     inputs:
