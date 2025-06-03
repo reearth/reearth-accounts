@@ -1,4 +1,4 @@
-name: build-deploy-server
+name: build-deploy-server-dev
 on:
   workflow_call:
     inputs:
@@ -82,43 +82,3 @@ jobs:
           push: true
           build-args: VERSION=${{ steps.options.outputs.version }}
           tags: ${{ steps.options.outputs.tags }}
-
-  deploy-to-cloud-run:
-    name: Deploy to Cloud Run (Nightly)
-    needs:  build-and-push-docker-image
-    runs-on: ubuntu-latest
-    if: ${{ inputs.name == 'nightly' }}
-    permissions:
-      contents: read
-      id-token: write
-    env:
-      IMAGE: reearth/reearth-accounts-api:nightly
-      IMAGE_GCP: us-central1-docker.pkg.dev/reearth-oss/reearth/reearth-accounts-api:nightly
-      GCP_REGION: us-central1
-      CLOUD_RUN_SERVICE: reearth-accounts-api
-    steps:
-      - name: Authenticate to Google Cloud
-        uses: google-github-actions/auth@v2
-        with:
-          service_account: ${{ secrets.GC_SA_EMAIL }}
-          workload_identity_provider: ${{ secrets.GC_WORKLOAD_IDENTITY_PROVIDER }}
-
-      - name: Configure docker for GCP
-        run: gcloud auth configure-docker us-central1-docker.pkg.dev --quiet
-
-      - name: Pull docker image from DockerHub
-        run: docker pull $IMAGE
-
-      - name: Tag docker image for Google Cloud Artifact Registry
-        run: docker tag $IMAGE $IMAGE_GCP
-
-      - name: Push docker image to Google Cloud Artifact Registry
-        run: docker push $IMAGE_GCP
-
-      - name: Deploy to Cloud Run for accounts api (Nightly)
-        run: |
-          gcloud run deploy $CLOUD_RUN_SERVICE \
-            --image $IMAGE_GCP \
-            --region $GCP_REGION \
-            --platform managed \
-            --quiet

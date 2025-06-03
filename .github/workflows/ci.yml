@@ -91,7 +91,7 @@ jobs:
           NAME: ${{ steps.info.outputs.name }}
         run: echo "sha_short=$SHA_SHORT, new_tag=$NEW_TAG, new_tag_short=$NEW_TAG_SHORT, name=$NAME"
 
-  build-deploy-server:
+  build-server:
     needs:
       - prepare
       - ci
@@ -104,11 +104,16 @@ jobs:
         (github.event_name == 'push' && (github.ref_name == 'main' || github.ref_name == 'release' || startsWith(github.ref_name, 'release/'))) ||
         inputs.force_deploy_server
       )
-    uses: ./.github/workflows/build_deploy_server.yml
+    uses: ./.github/workflows/build_server.yml
     with:
       sha_short: ${{ needs.ci-collect-info.outputs.sha_short }}
       new_tag: ${{ needs.ci-collect-info.outputs.new_tag }}
       new_tag_short: ${{ needs.ci-collect-info.outputs.new_tag_short }}
       name: ${{ needs.ci-collect-info.outputs.name }}
       sha: ${{ github.sha }}
+    secrets: inherit
+
+  deploy-server:
+    needs: build-server
+    uses: ./.github/workflows/deploy_server_nightly.yml
     secrets: inherit
