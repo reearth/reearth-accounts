@@ -54,14 +54,14 @@ func (r *mutationResolver) DeleteMe(ctx context.Context, input gqlmodel.DeleteMe
 // Temporary stub implementation to satisfy gqlgen after migrating GraphQL files from reearthx/account.
 // This resolver was added to avoid compile-time errors.
 // Will be implemented if needed, or removed if unused after migration.
-func (r *mutationResolver) SignUp(ctx context.Context, input gqlmodel.SignUpInput) (*gqlmodel.UserPayload, error) {
+func (r *mutationResolver) Signup(ctx context.Context, input gqlmodel.SignupInput) (*gqlmodel.UserPayload, error) {
 	return nil, nil
 }
 
 // Temporary stub implementation to satisfy gqlgen after migrating GraphQL files from reearthx/account.
 // This resolver was added to avoid compile-time errors.
 // Will be implemented if needed, or removed if unused after migration.
-func (r *mutationResolver) SignUpOidc(ctx context.Context, input gqlmodel.SignupOIDCInput) (*gqlmodel.UserPayload, error) {
+func (r *mutationResolver) SignupOidc(ctx context.Context, input gqlmodel.SignupOIDCInput) (*gqlmodel.UserPayload, error) {
 	return nil, nil
 }
 

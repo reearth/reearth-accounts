@@ -104,8 +104,8 @@ type ComplexityRoot struct {
 		RemoveMyAuth                     func(childComplexity int, input gqlmodel.RemoveMyAuthInput) int
 		RemoveRole                       func(childComplexity int, input gqlmodel.RemoveRoleInput) int
 		RemoveUserFromWorkspace          func(childComplexity int, input gqlmodel.RemoveUserFromWorkspaceInput) int
-		SignUp                           func(childComplexity int, input gqlmodel.SignUpInput) int
-		SignUpOidc                       func(childComplexity int, input gqlmodel.SignupOIDCInput) int
+		Signup                           func(childComplexity int, input gqlmodel.SignupInput) int
+		SignupOidc                       func(childComplexity int, input gqlmodel.SignupOIDCInput) int
 		StartPasswordReset               func(childComplexity int, input gqlmodel.StartPasswordResetInput) int
 		UpdateIntegrationOfWorkspace     func(childComplexity int, input gqlmodel.UpdateIntegrationOfWorkspaceInput) int
 		UpdateMe                         func(childComplexity int, input gqlmodel.UpdateMeInput) int
@@ -258,8 +258,8 @@ type MutationResolver interface {
 	UpdateMe(ctx context.Context, input gqlmodel.UpdateMeInput) (*gqlmodel.UpdateMePayload, error)
 	RemoveMyAuth(ctx context.Context, input gqlmodel.RemoveMyAuthInput) (*gqlmodel.UpdateMePayload, error)
 	DeleteMe(ctx context.Context, input gqlmodel.DeleteMeInput) (*gqlmodel.DeleteMePayload, error)
-	SignUp(ctx context.Context, input gqlmodel.SignUpInput) (*gqlmodel.UserPayload, error)
-	SignUpOidc(ctx context.Context, input gqlmodel.SignupOIDCInput) (*gqlmodel.UserPayload, error)
+	Signup(ctx context.Context, input gqlmodel.SignupInput) (*gqlmodel.UserPayload, error)
+	SignupOidc(ctx context.Context, input gqlmodel.SignupOIDCInput) (*gqlmodel.UserPayload, error)
 	VerifyUser(ctx context.Context, input gqlmodel.VerifyUserInput) (*gqlmodel.UserPayload, error)
 	FindOrCreate(ctx context.Context, input gqlmodel.FindOrCreateInput) (*gqlmodel.UserPayload, error)
 	CreateVerification(ctx context.Context, input gqlmodel.CreateVerificationInput) (*bool, error)
@@ -606,29 +606,29 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 
 		return e.complexity.Mutation.RemoveUserFromWorkspace(childComplexity, args["input"].(gqlmodel.RemoveUserFromWorkspaceInput)), true
 
-	case "Mutation.signUp":
-		if e.complexity.Mutation.SignUp == nil {
+	case "Mutation.signup":
+		if e.complexity.Mutation.Signup == nil {
 			break
 		}
 
-		args, err := ec.field_Mutation_signUp_args(context.TODO(), rawArgs)
+		args, err := ec.field_Mutation_signup_args(context.TODO(), rawArgs)
 		if err != nil {
 			return 0, false
 		}
 
-		return e.complexity.Mutation.SignUp(childComplexity, args["input"].(gqlmodel.SignUpInput)), true
+		return e.complexity.Mutation.Signup(childComplexity, args["input"].(gqlmodel.SignupInput)), true
 
-	case "Mutation.signUpOIDC":
-		if e.complexity.Mutation.SignUpOidc == nil {
+	case "Mutation.signupOIDC":
+		if e.complexity.Mutation.SignupOidc == nil {
 			break
 		}
 
-		args, err := ec.field_Mutation_signUpOIDC_args(context.TODO(), rawArgs)
+		args, err := ec.field_Mutation_signupOIDC_args(context.TODO(), rawArgs)
 		if err != nil {
 			return 0, false
 		}
 
-		return e.complexity.Mutation.SignUpOidc(childComplexity, args["input"].(gqlmodel.SignupOIDCInput)), true
+		return e.complexity.Mutation.SignupOidc(childComplexity, args["input"].(gqlmodel.SignupOIDCInput)), true
 
 	case "Mutation.startPasswordReset":
 		if e.complexity.Mutation.StartPasswordReset == nil {
@@ -1238,7 +1238,7 @@ func (e *executableSchema) Exec(ctx context.Context) graphql.ResponseHandler {
 		ec.unmarshalInputRemoveMyAuthInput,
 		ec.unmarshalInputRemoveRoleInput,
 		ec.unmarshalInputRemoveUserFromWorkspaceInput,
-		ec.unmarshalInputSignUpInput,
+		ec.unmarshalInputSignupInput,
 		ec.unmarshalInputSignupOIDCInput,
 		ec.unmarshalInputStartPasswordResetInput,
 		ec.unmarshalInputUpdateIntegrationOfWorkspaceInput,
@@ -1496,7 +1496,7 @@ type UserMetadata {
   website: String!
 }
 
-input SignUpInput {
+input SignupInput {
   id: ID!
   workspaceID: ID!
   name: String!
@@ -1512,7 +1512,7 @@ input SignupOIDCInput {
   name: String!
   email: String!
   sub: String!
-  secret: String
+  secret: String!
 }
 
 input FindOrCreateInput {
@@ -1577,8 +1577,8 @@ extend type Mutation {
   updateMe(input: UpdateMeInput!): UpdateMePayload
   removeMyAuth(input: RemoveMyAuthInput!): UpdateMePayload
   deleteMe(input: DeleteMeInput!): DeleteMePayload
-  signUp(input: SignUpInput!): UserPayload
-  signUpOIDC(input: SignupOIDCInput!): UserPayload
+  signup(input: SignupInput!): UserPayload
+  signupOIDC(input: SignupOIDCInput!): UserPayload
   verifyUser(input: VerifyUserInput!): UserPayload
   findOrCreate(input: FindOrCreateInput!): UserPayload
   createVerification(input: CreateVerificationInput!): Boolean
@@ -2182,17 +2182,17 @@ func (ec *executionContext) field_Mutation_removeUserFromWorkspace_argsInput(
 	return zeroVal, nil
 }
 
-func (ec *executionContext) field_Mutation_signUpOIDC_args(ctx context.Context, rawArgs map[string]any) (map[string]any, error) {
+func (ec *executionContext) field_Mutation_signupOIDC_args(ctx context.Context, rawArgs map[string]any) (map[string]any, error) {
 	var err error
 	args := map[string]any{}
-	arg0, err := ec.field_Mutation_signUpOIDC_argsInput(ctx, rawArgs)
+	arg0, err := ec.field_Mutation_signupOIDC_argsInput(ctx, rawArgs)
 	if err != nil {
 		return nil, err
 	}
 	args["input"] = arg0
 	return args, nil
 }
-func (ec *executionContext) field_Mutation_signUpOIDC_argsInput(
+func (ec *executionContext) field_Mutation_signupOIDC_argsInput(
 	ctx context.Context,
 	rawArgs map[string]any,
 ) (gqlmodel.SignupOIDCInput, error) {
@@ -2210,31 +2210,31 @@ func (ec *executionContext) field_Mutation_signUpOIDC_argsInput(
 	return zeroVal, nil
 }
 
-func (ec *executionContext) field_Mutation_signUp_args(ctx context.Context, rawArgs map[string]any) (map[string]any, error) {
+func (ec *executionContext) field_Mutation_signup_args(ctx context.Context, rawArgs map[string]any) (map[string]any, error) {
 	var err error
 	args := map[string]any{}
-	arg0, err := ec.field_Mutation_signUp_argsInput(ctx, rawArgs)
+	arg0, err := ec.field_Mutation_signup_argsInput(ctx, rawArgs)
 	if err != nil {
 		return nil, err
 	}
 	args["input"] = arg0
 	return args, nil
 }
-func (ec *executionContext) field_Mutation_signUp_argsInput(
+func (ec *executionContext) field_Mutation_signup_argsInput(
 	ctx context.Context,
 	rawArgs map[string]any,
-) (gqlmodel.SignUpInput, error) {
+) (gqlmodel.SignupInput, error) {
 	if _, ok := rawArgs["input"]; !ok {
-		var zeroVal gqlmodel.SignUpInput
+		var zeroVal gqlmodel.SignupInput
 		return zeroVal, nil
 	}
 
 	ctx = graphql.WithPathContext(ctx, graphql.NewPathWithField("input"))
 	if tmp, ok := rawArgs["input"]; ok {
-		return ec.unmarshalNSignUpInput2githubᚗcomᚋreearthᚋreearthᚑaccountsᚋinternalᚋadapterᚋgqlᚋgqlmodelᚐSignUpInput(ctx, tmp)
+		return ec.unmarshalNSignupInput2githubᚗcomᚋreearthᚋreearthᚑaccountsᚋinternalᚋadapterᚋgqlᚋgqlmodelᚐSignupInput(ctx, tmp)
 	}
 
-	var zeroVal gqlmodel.SignUpInput
+	var zeroVal gqlmodel.SignupInput
 	return zeroVal, nil
 }
 
@@ -4096,8 +4096,8 @@ func (ec *executionContext) fieldContext_Mutation_deleteMe(ctx context.Context, 
 	return fc, nil
 }
 
-func (ec *executionContext) _Mutation_signUp(ctx context.Context, field graphql.CollectedField) (ret graphql.Marshaler) {
-	fc, err := ec.fieldContext_Mutation_signUp(ctx, field)
+func (ec *executionContext) _Mutation_signup(ctx context.Context, field graphql.CollectedField) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_Mutation_signup(ctx, field)
 	if err != nil {
 		return graphql.Null
 	}
@@ -4110,7 +4110,7 @@ func (ec *executionContext) _Mutation_signUp(ctx context.Context, field graphql.
 	}()
 	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (any, error) {
 		ctx = rctx // use context from middleware stack in children
-		return ec.resolvers.Mutation().SignUp(rctx, fc.Args["input"].(gqlmodel.SignUpInput))
+		return ec.resolvers.Mutation().Signup(rctx, fc.Args["input"].(gqlmodel.SignupInput))
 	})
 	if err != nil {
 		ec.Error(ctx, err)
@@ -4124,7 +4124,7 @@ func (ec *executionContext) _Mutation_signUp(ctx context.Context, field graphql.
 	return ec.marshalOUserPayload2ᚖgithubᚗcomᚋreearthᚋreearthᚑaccountsᚋinternalᚋadapterᚋgqlᚋgqlmodelᚐUserPayload(ctx, field.Selections, res)
 }
 
-func (ec *executionContext) fieldContext_Mutation_signUp(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+func (ec *executionContext) fieldContext_Mutation_signup(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
 	fc = &graphql.FieldContext{
 		Object:     "Mutation",
 		Field:      field,
@@ -4145,15 +4145,15 @@ func (ec *executionContext) fieldContext_Mutation_signUp(ctx context.Context, fi
 		}
 	}()
 	ctx = graphql.WithFieldContext(ctx, fc)
-	if fc.Args, err = ec.field_Mutation_signUp_args(ctx, field.ArgumentMap(ec.Variables)); err != nil {
+	if fc.Args, err = ec.field_Mutation_signup_args(ctx, field.ArgumentMap(ec.Variables)); err != nil {
 		ec.Error(ctx, err)
 		return fc, err
 	}
 	return fc, nil
 }
 
-func (ec *executionContext) _Mutation_signUpOIDC(ctx context.Context, field graphql.CollectedField) (ret graphql.Marshaler) {
-	fc, err := ec.fieldContext_Mutation_signUpOIDC(ctx, field)
+func (ec *executionContext) _Mutation_signupOIDC(ctx context.Context, field graphql.CollectedField) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_Mutation_signupOIDC(ctx, field)
 	if err != nil {
 		return graphql.Null
 	}
@@ -4166,7 +4166,7 @@ func (ec *executionContext) _Mutation_signUpOIDC(ctx context.Context, field grap
 	}()
 	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (any, error) {
 		ctx = rctx // use context from middleware stack in children
-		return ec.resolvers.Mutation().SignUpOidc(rctx, fc.Args["input"].(gqlmodel.SignupOIDCInput))
+		return ec.resolvers.Mutation().SignupOidc(rctx, fc.Args["input"].(gqlmodel.SignupOIDCInput))
 	})
 	if err != nil {
 		ec.Error(ctx, err)
@@ -4180,7 +4180,7 @@ func (ec *executionContext) _Mutation_signUpOIDC(ctx context.Context, field grap
 	return ec.marshalOUserPayload2ᚖgithubᚗcomᚋreearthᚋreearthᚑaccountsᚋinternalᚋadapterᚋgqlᚋgqlmodelᚐUserPayload(ctx, field.Selections, res)
 }
 
-func (ec *executionContext) fieldContext_Mutation_signUpOIDC(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+func (ec *executionContext) fieldContext_Mutation_signupOIDC(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
 	fc = &graphql.FieldContext{
 		Object:     "Mutation",
 		Field:      field,
@@ -4201,7 +4201,7 @@ func (ec *executionContext) fieldContext_Mutation_signUpOIDC(ctx context.Context
 		}
 	}()
 	ctx = graphql.WithFieldContext(ctx, fc)
-	if fc.Args, err = ec.field_Mutation_signUpOIDC_args(ctx, field.ArgumentMap(ec.Variables)); err != nil {
+	if fc.Args, err = ec.field_Mutation_signupOIDC_args(ctx, field.ArgumentMap(ec.Variables)); err != nil {
 		ec.Error(ctx, err)
 		return fc, err
 	}
@@ -10894,8 +10894,8 @@ func (ec *executionContext) unmarshalInputRemoveUserFromWorkspaceInput(ctx conte
 	return it, nil
 }
 
-func (ec *executionContext) unmarshalInputSignUpInput(ctx context.Context, obj any) (gqlmodel.SignUpInput, error) {
-	var it gqlmodel.SignUpInput
+func (ec *executionContext) unmarshalInputSignupInput(ctx context.Context, obj any) (gqlmodel.SignupInput, error) {
+	var it gqlmodel.SignupInput
 	asMap := map[string]any{}
 	for k, v := range obj.(map[string]any) {
 		asMap[k] = v
@@ -11014,7 +11014,7 @@ func (ec *executionContext) unmarshalInputSignupOIDCInput(ctx context.Context, o
 			it.Sub = data
 		case "secret":
 			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("secret"))
-			data, err := ec.unmarshalOString2ᚖstring(ctx, v)
+			data, err := ec.unmarshalNString2string(ctx, v)
 			if err != nil {
 				return it, err
 			}
@@ -11837,13 +11837,13 @@ func (ec *executionContext) _Mutation(ctx context.Context, sel ast.SelectionSet)
 			out.Values[i] = ec.OperationContext.RootResolverMiddleware(innerCtx, func(ctx context.Context) (res graphql.Marshaler) {
 				return ec._Mutation_deleteMe(ctx, field)
 			})
-		case "signUp":
+		case "signup":
 			out.Values[i] = ec.OperationContext.RootResolverMiddleware(innerCtx, func(ctx context.Context) (res graphql.Marshaler) {
-				return ec._Mutation_signUp(ctx, field)
+				return ec._Mutation_signup(ctx, field)
 			})
-		case "signUpOIDC":
+		case "signupOIDC":
 			out.Values[i] = ec.OperationContext.RootResolverMiddleware(innerCtx, func(ctx context.Context) (res graphql.Marshaler) {
-				return ec._Mutation_signUpOIDC(ctx, field)
+				return ec._Mutation_signupOIDC(ctx, field)
 			})
 		case "verifyUser":
 			out.Values[i] = ec.OperationContext.RootResolverMiddleware(innerCtx, func(ctx context.Context) (res graphql.Marshaler) {
@@ -13835,8 +13835,8 @@ func (ec *executionContext) marshalNRolesPayload2ᚖgithubᚗcomᚋreearthᚋree
 	return ec._RolesPayload(ctx, sel, v)
 }
 
-func (ec *executionContext) unmarshalNSignUpInput2githubᚗcomᚋreearthᚋreearthᚑaccountsᚋinternalᚋadapterᚋgqlᚋgqlmodelᚐSignUpInput(ctx context.Context, v any) (gqlmodel.SignUpInput, error) {
-	res, err := ec.unmarshalInputSignUpInput(ctx, v)
+func (ec *executionContext) unmarshalNSignupInput2githubᚗcomᚋreearthᚋreearthᚑaccountsᚋinternalᚋadapterᚋgqlᚋgqlmodelᚐSignupInput(ctx context.Context, v any) (gqlmodel.SignupInput, error) {
+	res, err := ec.unmarshalInputSignupInput(ctx, v)
 	return res, graphql.ErrorOnPath(ctx, err)
 }
 

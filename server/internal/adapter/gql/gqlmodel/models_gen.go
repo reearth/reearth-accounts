@@ -181,7 +181,7 @@ type RolesPayload struct {
 	Roles []*RoleForAuthorization `json:"roles"`
 }
 
-type SignUpInput struct {
+type SignupInput struct {
 	ID          ID      `json:"id"`
 	WorkspaceID ID      `json:"workspaceID"`
 	Name        string  `json:"name"`
@@ -194,10 +194,10 @@ type SignUpInput struct {
 }
 
 type SignupOIDCInput struct {
-	Name   string  `json:"name"`
-	Email  string  `json:"email"`
-	Sub    string  `json:"sub"`
-	Secret *string `json:"secret,omitempty"`
+	Name   string `json:"name"`
+	Email  string `json:"email"`
+	Sub    string `json:"sub"`
+	Secret string `json:"secret"`
 }
 
 type StartPasswordResetInput struct {
