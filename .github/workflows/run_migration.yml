@@ -18,6 +18,7 @@ concurrency:
 jobs:
   migrate-oss:
     if: ${{ inputs.environment == 'oss' }}
+    environment: oss
     name: Run migration on OSS (Nightly)
     runs-on: ubuntu-latest
     permissions:
@@ -48,6 +49,7 @@ jobs:
             --quiet
   migrate-dev:
     if: ${{ inputs.environment == 'dev' }}
+    environment: dev
     name: Run migration on Dev (Nightly)
     runs-on: ubuntu-latest
     permissions:
