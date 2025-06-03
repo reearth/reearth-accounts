@@ -1,4 +1,4 @@
-name: build-deploy-server-dev
+name: deploy-server-dev
 on:
   workflow_dispatch:
 concurrency:

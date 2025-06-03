@@ -1,4 +1,4 @@
-name: build-deploy-server
+name: deploy-server-oss-nightly
 on:
   workflow_call:
   workflow_dispatch:
