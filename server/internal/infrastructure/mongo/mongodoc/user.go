@@ -8,20 +8,25 @@ import (
 	"github.com/reearth/reearthx/mongox"
 )
 
+type PasswordResetDocument struct {
+	Token     string
+	CreatedAt time.Time
+}
+
 type UserDocument struct {
-	Alias         string `bson:"alias"`
-	Email         string `bson:"email"`
-	ID            string `bson:"id"`
-	Lang          string `bson:"lang"`
-	Metadata      *UserMetadataDocument
-	Name          string                 `bson:"name"`
-	Password      []byte                 `bson:"password"`
-	PasswordReset *PasswordResetDocument `bson:"passwordReset,omitempty"`
-	Subs          []string               `bson:"subs"`
-	Team          string                 `bson:",omitempty"`
-	Theme         string                 `bson:"theme"`
+	ID            string
+	Name          string
+	Alias         string
+	Email         string
+	Subs          []string
+	Workspace     string
+	Team          string `bson:",omitempty"`
+	Lang          string
+	Theme         string
+	Password      []byte
+	PasswordReset *PasswordResetDocument
 	Verification  *UserVerificationDoc
-	Workspace     string `bson:"workspace"`
+	Metadata      *UserMetadataDoc
 }
 
 type UserVerificationDoc struct {
@@ -30,50 +35,31 @@ type UserVerificationDoc struct {
 	Verified   bool
 }
 
-type UserMetadataDocument struct {
+type UserMetadataDoc struct {
 	Description string
-	Lang        string
-	PhotoURL    string
-	Theme       string
 	Website     string
+	PhotoURL    string
+	Lang        string
+	Theme       string
 }
 
-type PasswordResetDocument struct {
-	CreatedAt time.Time
-	Token     string
-}
-
-type UserConsumer = mongox.SliceFuncConsumer[*UserDocument, *user.User]
-
-func NewUserConsumer(host string) *UserConsumer {
-	return mongox.NewSliceFuncConsumer(func(d *UserDocument) (*user.User, error) {
-		m, err := d.Model()
-		if err != nil {
-			return nil, err
-		}
-		return m.WithHost(host), nil
-	})
-}
-
-func NewUser(usr *user.User) (*UserDocument, string) {
-	id := usr.ID().String()
-
-	auths := usr.Auths()
+func NewUser(user *user.User) (*UserDocument, string) {
+	id := user.ID().String()
+	auths := user.Auths()
 	authsdoc := make([]string, 0, len(auths))
 	for _, a := range auths {
 		authsdoc = append(authsdoc, a.Sub)
 	}
-
-	var verificationDoc *UserVerificationDoc
-	if usr.Verification() != nil {
-		verificationDoc = &UserVerificationDoc{
-			Code:       usr.Verification().Code(),
-			Expiration: usr.Verification().Expiration(),
-			Verified:   usr.Verification().IsVerified(),
+	var v *UserVerificationDoc
+	if user.Verification() != nil {
+		v = &UserVerificationDoc{
+			Code:       user.Verification().Code(),
+			Expiration: user.Verification().Expiration(),
+			Verified:   user.Verification().IsVerified(),
 		}
 	}
+	pwdReset := user.PasswordReset()
 
-	pwdReset := usr.PasswordReset()
 	var pwdResetDoc *PasswordResetDocument
 	if pwdReset != nil {
 		pwdResetDoc = &PasswordResetDocument{
@@ -82,27 +68,28 @@ func NewUser(usr *user.User) (*UserDocument, string) {
 		}
 	}
 
-	metadataDoc := &UserMetadataDocument{}
-	if usr.Metadata() != nil {
-		metadataDoc = &UserMetadataDocument{
-			PhotoURL:    usr.Metadata().PhotoURL(),
-			Description: usr.Metadata().Description(),
-			Website:     usr.Metadata().Website(),
-			Lang:        usr.Metadata().Lang().String(),
-			Theme:       string(usr.Metadata().Theme()),
+	var metadataDoc *UserMetadataDoc
+	if user.Metadata() != nil {
+		metadataDoc = &UserMetadataDoc{
+			Description: user.Metadata().Description(),
+			Website:     user.Metadata().Website(),
+			PhotoURL:    user.Metadata().PhotoURL(),
+			Lang:        user.Metadata().Lang().String(),
+			Theme:       string(user.Metadata().Theme()),
 		}
 	}
+
 	return &UserDocument{
-		Alias:         usr.Alias(),
-		Email:         usr.Email(),
 		ID:            id,
-		Metadata:      metadataDoc,
-		Name:          usr.Name(),
-		Password:      usr.Password(),
-		PasswordReset: pwdResetDoc,
+		Name:          user.Name(),
+		Alias:         user.Alias(),
+		Email:         user.Email(),
 		Subs:          authsdoc,
-		Verification:  verificationDoc,
-		Workspace:     usr.Workspace().String(),
+		Workspace:     user.Workspace().String(),
+		Verification:  v,
+		Password:      user.Password(),
+		PasswordReset: pwdResetDoc,
+		Metadata:      metadataDoc,
 	}, id
 }
 
@@ -129,11 +116,7 @@ func (d *UserDocument) Model() (*user.User, error) {
 
 	var v *user.Verification
 	if d.Verification != nil {
-		v = user.VerificationFrom(
-			d.Verification.Code,
-			d.Verification.Expiration,
-			d.Verification.Verified,
-		)
+		v = user.VerificationFrom(d.Verification.Code, d.Verification.Expiration, d.Verification.Verified)
 	}
 
 	var metadata *user.Metadata
@@ -146,7 +129,7 @@ func (d *UserDocument) Model() (*user.User, error) {
 		metadata.SetTheme(user.Theme(d.Metadata.Theme))
 	}
 
-	usr, err := user.New().
+	u, err := user.New().
 		ID(uid).
 		Name(d.Name).
 		Email(d.Email).
@@ -162,8 +145,7 @@ func (d *UserDocument) Model() (*user.User, error) {
 	if err != nil {
 		return nil, err
 	}
-
-	return usr, nil
+	return u, nil
 }
 
 func (d *PasswordResetDocument) Model() *user.PasswordReset {
@@ -174,4 +156,16 @@ func (d *PasswordResetDocument) Model() *user.PasswordReset {
 		Token:     d.Token,
 		CreatedAt: d.CreatedAt,
 	}
+}
+
+type UserConsumer = mongox.SliceFuncConsumer[*UserDocument, *user.User]
+
+func NewUserConsumer(host string) *UserConsumer {
+	return mongox.NewSliceFuncConsumer(func(d *UserDocument) (*user.User, error) {
+		m, err := d.Model()
+		if err != nil {
+			return nil, err
+		}
+		return m.WithHost(host), nil
+	})
 }

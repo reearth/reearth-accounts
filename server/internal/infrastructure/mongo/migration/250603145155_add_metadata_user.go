@@ -20,7 +20,7 @@ func AddMetadataUser(ctx context.Context, c DBClient) error {
 
 			for _, row := range rows {
 				var doc mongodoc.UserDocument
-				metadata := new(mongodoc.UserMetadataDocument)
+				metadata := new(mongodoc.UserMetadataDoc)
 
 				if err := bson.Unmarshal(row, &doc); err != nil {
 					return err
@@ -58,7 +58,7 @@ func AddMetadataUser(ctx context.Context, c DBClient) error {
 						doc.Theme = ""
 					}
 
-					doc.Metadata = &mongodoc.UserMetadataDocument{
+					doc.Metadata = &mongodoc.UserMetadataDoc{
 						Description: "",
 						Lang:        lang,
 						PhotoURL:    "",

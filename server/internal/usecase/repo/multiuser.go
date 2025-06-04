@@ -64,6 +64,12 @@ func (u MultiUser) FindByName(ctx context.Context, name string) (*user.User, err
 	})
 }
 
+func (u MultiUser) FindByAlias(ctx context.Context, alias string) (*user.User, error) {
+	return u.findOne(func(r User) (*user.User, error) {
+		return r.FindByAlias(ctx, alias)
+	})
+}
+
 func (u MultiUser) FindByNameOrEmail(ctx context.Context, nameOrEmail string) (*user.User, error) {
 	return u.findOne(func(r User) (*user.User, error) {
 		return r.FindByNameOrEmail(ctx, nameOrEmail)

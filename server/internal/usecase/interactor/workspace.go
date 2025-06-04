@@ -3,6 +3,8 @@ package interactor
 import (
 	"context"
 	"fmt"
+	"maps"
+	"slices"
 	"strings"
 
 	"github.com/reearth/reearth-accounts/internal/usecase"
@@ -17,7 +19,6 @@ import (
 	"github.com/reearth/reearthx/log"
 	"github.com/reearth/reearthx/rerror"
 	"github.com/samber/lo"
-	"golang.org/x/exp/maps"
 )
 
 type WorkspaceMemberCountEnforcer func(context.Context, *workspace.Workspace, user.List, *usecase.Operator) error
@@ -145,7 +146,8 @@ func (i *Workspace) AddUserMember(ctx context.Context, workspaceID workspace.ID,
 		return nil, interfaces.ErrInvalidOperator
 	}
 
-	ul, err := i.userquery.FetchByID(ctx, maps.Keys(users))
+	keys := slices.Collect(maps.Keys(users))
+	ul, err := i.userquery.FetchByID(ctx, keys)
 	if err != nil {
 		return nil, err
 	}
@@ -463,6 +465,11 @@ func filterWorkspaces(
 // TODO: Delete this once the permission check migration is complete.
 func (i *Workspace) getMaintainerRole(ctx context.Context) (*role.Role, error) {
 	// check and create maintainer role
+	if i.repos.Role == nil {
+		log.Print("Role repository is not set")
+		return nil, nil
+	}
+
 	roles, err := i.repos.Role.FindAll(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get roles: %w", err)
@@ -500,6 +507,11 @@ func (i *Workspace) getMaintainerRole(ctx context.Context) (*role.Role, error) {
 
 // TODO: Delete this once the permission check migration is complete.
 func (i *Workspace) ensureUserHasMaintainerRole(ctx context.Context, userID user.ID, maintainerRoleID id.RoleID) error {
+	if i.repos.Permittable == nil {
+		log.Print("Role repository is not set")
+		return nil
+	}
+
 	var p *permittable.Permittable
 	var err error
 

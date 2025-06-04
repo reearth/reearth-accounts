@@ -1,16 +1,14 @@
 package workspace
 
-import (
-	"github.com/reearth/reearthx/util"
-)
+import "github.com/reearth/reearthx/util"
 
 type Workspace struct {
+	id       ID
+	name     string
 	alias    string
 	email    string
-	id       ID
-	members  *Members
 	metadata *Metadata
-	name     string
+	members  *Members
 	policy   *PolicyID
 }
 

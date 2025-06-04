@@ -13,11 +13,12 @@ func TestUserByIDsResponseTo(t *testing.T) {
 	uid := id.NewUserID()
 	ws := id.NewWorkspaceID()
 	u := &UserByIDsNodesUser{
+		Typename:  "User",
 		Id:        uid.String(),
 		Name:      "name",
 		Email:     "email@example.com",
 		Workspace: ws.String(),
-		Typename:  "User",
+		Auths:     nil,
 		Metadata: UserByIDsNodesUserMetadata{
 			Description: "description",
 			Lang:        "ja",
@@ -211,6 +212,9 @@ func TestMeToUser(t *testing.T) {
 func TestFragmentToUser(t *testing.T) {
 	uid := id.NewUserID()
 	ws := id.NewWorkspaceID()
+	metadata := user.NewMetadata()
+	metadata.LangFrom("ja")
+	metadata.SetTheme(user.ThemeDark)
 
 	u := FragmentUser{
 		Id:        uid.String(),
@@ -228,7 +232,6 @@ func TestFragmentToUser(t *testing.T) {
 	}
 	auth := user.AuthFrom("sub")
 
-	metadata := user.NewMetadata()
 	metadata.LangFrom(u.Metadata.Lang)
 	metadata.SetDescription(u.Metadata.Description)
 	metadata.SetPhotoURL(u.Metadata.PhotoURL)
