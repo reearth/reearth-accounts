@@ -157,10 +157,7 @@ func TestMeToUser(t *testing.T) {
 
 	metadata := user.NewMetadata()
 	metadata.LangFrom("ja")
-	metadata.SetDescription("description")
-	metadata.SetPhotoURL("https://example.com/photo.jpg")
 	metadata.SetTheme("dark")
-	metadata.SetWebsite("https://example.com")
 
 	type args struct {
 		me FragmentMe
