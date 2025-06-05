@@ -18,7 +18,7 @@ func (r *mutationResolver) UpdateMe(ctx context.Context, input gqlmodel.UpdateMe
 		Name:                 input.Name,
 		Email:                input.Email,
 		Lang:                 &lang,
-		Theme:                gqlmodel.ToTheme(input.Theme),
+		Theme:                gqlmodel.ToUserTheme(input.Theme),
 		Password:             input.Password,
 		PasswordConfirmation: input.PasswordConfirmation,
 	}, getOperator(ctx))

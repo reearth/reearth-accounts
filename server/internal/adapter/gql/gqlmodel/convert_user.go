@@ -48,14 +48,22 @@ func ToMe(u *user.User) *Me {
 		return nil
 	}
 
-	metadata := ToMetadata(u.Metadata())
+	var metadata UserMetadata
+	if u.Metadata() != nil {
+		metadata = UserMetadata{
+			Description: optionalString(u.Metadata().Description()),
+			Lang:        u.Metadata().Lang().String(),
+			PhotoURL:    optionalString(u.Metadata().PhotoURL()),
+			Theme:       Theme(u.Metadata().Theme()),
+			Website:     optionalString(u.Metadata().Website()),
+		}
+	}
 
 	return &Me{
 		ID:            IDFrom(u.ID()),
 		Name:          u.Name(),
 		Email:         u.Email(),
-		Lang:          metadata.Lang().String(),
-		Theme:         Theme(metadata.Theme()),
+		Metadata:      &metadata,
 		MyWorkspaceID: IDFrom(u.Workspace()),
 		Auths: util.Map(u.Auths(), func(a user.Auth) string {
 			return a.Provider
@@ -63,14 +71,7 @@ func ToMe(u *user.User) *Me {
 	}
 }
 
-func ToMetadata(m *user.Metadata) *user.Metadata {
-	if m == nil {
-		return user.NewMetadata()
-	}
-	return m
-}
-
-func ToTheme(t *Theme) *user.Theme {
+func ToUserTheme(t *Theme) *user.Theme {
 	if t == nil {
 		return nil
 	}
@@ -146,4 +147,11 @@ func ToRole(r workspace.Role) Role {
 		return RoleOwner
 	}
 	return Role("")
+}
+
+func optionalString(s string) *string {
+	if s == "" {
+		return nil
+	}
+	return &s
 }

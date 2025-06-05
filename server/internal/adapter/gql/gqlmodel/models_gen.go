@@ -90,16 +90,15 @@ type GetUsersWithRolesPayload struct {
 }
 
 type Me struct {
-	ID            ID           `json:"id"`
-	Name          string       `json:"name"`
-	Email         string       `json:"email"`
-	Lang          string       `json:"lang"`
-	Theme         Theme        `json:"theme"`
-	Host          *string      `json:"host,omitempty"`
-	MyWorkspaceID ID           `json:"myWorkspaceId"`
-	Auths         []string     `json:"auths"`
-	Workspaces    []*Workspace `json:"workspaces"`
-	MyWorkspace   *Workspace   `json:"myWorkspace"`
+	ID            ID            `json:"id"`
+	Name          string        `json:"name"`
+	Email         string        `json:"email"`
+	Host          *string       `json:"host,omitempty"`
+	MyWorkspaceID ID            `json:"myWorkspaceId"`
+	Auths         []string      `json:"auths"`
+	Workspaces    []*Workspace  `json:"workspaces"`
+	MyWorkspace   *Workspace    `json:"myWorkspace"`
+	Metadata      *UserMetadata `json:"metadata"`
 }
 
 type MemberInput struct {
@@ -265,8 +264,6 @@ type User struct {
 	ID        ID            `json:"id"`
 	Name      string        `json:"name"`
 	Email     string        `json:"email"`
-	Lang      string        `json:"lang"`
-	Theme     Theme         `json:"theme"`
 	Host      *string       `json:"host,omitempty"`
 	Workspace ID            `json:"workspace"`
 	Auths     []string      `json:"auths"`
