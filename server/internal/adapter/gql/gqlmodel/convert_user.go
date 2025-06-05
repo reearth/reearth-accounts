@@ -71,7 +71,7 @@ func ToMe(u *user.User) *Me {
 	}
 }
 
-func ToUserTheme(t *Theme) *user.Theme {
+func ToTheme(t *Theme) *user.Theme {
 	if t == nil {
 		return nil
 	}
