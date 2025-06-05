@@ -39,20 +39,33 @@ func TestBuilder_Name(t *testing.T) {
 	assert.Equal(t, "xxx", w.w.name)
 }
 
+func TestBuilder_Alias(t *testing.T) {
+	w := New().Alias("xxx")
+	assert.Equal(t, "xxx", w.w.alias)
+}
+
 func TestBuilder_Build(t *testing.T) {
 	m := map[UserID]Member{NewUserID(): {Role: RoleOwner}}
 	i := map[IntegrationID]Member{NewIntegrationID(): {Role: RoleOwner}}
 	id := NewID()
-	w, err := New().ID(id).Name("a").Integrations(i).Members(m).Build()
+	metadata := NewMetadata()
+	metadata.SetDescription("description")
+	metadata.SetWebsite("https://example.com")
+	metadata.SetLocation("location")
+	metadata.SetBillingEmail("billing@mail.com")
+	metadata.SetPhotoURL("https://example.com/photo.jpg")
+
+	w, err := New().ID(id).Name("a").Integrations(i).Metadata(metadata).Members(m).Build()
 	assert.NoError(t, err)
 
 	assert.Equal(t, &Workspace{
-		id:      id,
-		name:    "a",
-		members: NewMembersWith(m, i, false),
+		id:       id,
+		name:     "a",
+		members:  NewMembersWith(m, i, false),
+		metadata: metadata,
 	}, w)
 
-	w, err = New().ID(id).Name("a").Build()
+	w, err = New().ID(id).Name("a").Metadata(metadata).Build()
 	assert.NoError(t, err)
 
 	assert.Equal(t, &Workspace{
@@ -62,6 +75,7 @@ func TestBuilder_Build(t *testing.T) {
 			users:        map[idx.ID[accountsid.User]]Member{},
 			integrations: map[idx.ID[accountsid.Integration]]Member{},
 		},
+		metadata: metadata,
 	}, w)
 
 	w, err = New().Build()
@@ -73,12 +87,21 @@ func TestBuilder_MustBuild(t *testing.T) {
 	m := map[UserID]Member{NewUserID(): {Role: RoleOwner}}
 	i := map[IntegrationID]Member{NewIntegrationID(): {Role: RoleOwner}}
 	id := NewID()
-	w := New().ID(id).Name("a").Integrations(i).Members(m).MustBuild()
+
+	metadata := NewMetadata()
+	metadata.SetDescription("description")
+	metadata.SetWebsite("https://example.com")
+	metadata.SetLocation("location")
+	metadata.SetBillingEmail("billing@mail.com")
+	metadata.SetPhotoURL("https://example.com/photo.jpg")
+
+	w := New().ID(id).Name("a").Integrations(i).Metadata(metadata).Members(m).MustBuild()
 
 	assert.Equal(t, &Workspace{
-		id:      id,
-		name:    "a",
-		members: NewMembersWith(m, i, false),
+		id:       id,
+		name:     "a",
+		members:  NewMembersWith(m, i, false),
+		metadata: metadata,
 	}, w)
 
 	assert.Panics(t, func() { New().MustBuild() })
@@ -106,4 +129,21 @@ func TestBuilder_Policy(t *testing.T) {
 			policy: &pid,
 		},
 	}, New().Policy(&pid))
+}
+
+func TestBuilder_Email(t *testing.T) {
+	assert.Equal(t, &Builder{
+		w: &Workspace{
+			email: "test@mail.com",
+		},
+	}, New().Email("test@mail.com"))
+}
+
+func TestBuilder_Metadata(t *testing.T) {
+	md := MetadataFrom("description", "https://example.com", "location", "billing@mail.com", "https://example.com/photo.jpg")
+	assert.Equal(t, &Builder{
+		w: &Workspace{
+			metadata: md,
+		},
+	}, New().Metadata(md))
 }

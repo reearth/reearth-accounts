@@ -1,10 +1,10 @@
 package user
 
 import (
+	"slices"
 	"strings"
 
 	"github.com/samber/lo"
-	"golang.org/x/exp/slices"
 )
 
 const (

@@ -133,6 +133,20 @@ func (r *User) FindByNameOrEmail(_ context.Context, nameOrEmail string) (*user.U
 	}), rerror.ErrNotFound)
 }
 
+func (r *User) FindByAlias(_ context.Context, alias string) (*user.User, error) {
+	if r.err != nil {
+		return nil, r.err
+	}
+
+	if alias == "" {
+		return nil, rerror.ErrInvalidParams
+	}
+
+	return rerror.ErrIfNil(r.data.Find(func(key user.ID, value *user.User) bool {
+		return value.Alias() == alias
+	}), rerror.ErrNotFound)
+}
+
 func (r *User) SearchByKeyword(_ context.Context, keyword string) (user.List, error) {
 	if r.err != nil {
 		return nil, r.err

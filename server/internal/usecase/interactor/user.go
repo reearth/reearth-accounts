@@ -132,7 +132,7 @@ func (i *User) UpdateMe(ctx context.Context, p interfaces.UpdateMeParam, operato
 
 		if p.Name != nil && *p.Name != u.Name() {
 			oldName := u.Name()
-			u.SetName(*p.Name)
+			u.UpdateName(*p.Name)
 
 			workspace, err = i.repos.Workspace.FindByID(ctx, u.Workspace())
 			if err != nil && !errors.Is(err, rerror.ErrNotFound) {
@@ -147,7 +147,7 @@ func (i *User) UpdateMe(ctx context.Context, p interfaces.UpdateMeParam, operato
 			}
 		}
 		if p.Email != nil {
-			if err := u.SetEmail(*p.Email); err != nil {
+			if err := u.UpdateEmail(*p.Email); err != nil {
 				return nil, err
 			}
 		}

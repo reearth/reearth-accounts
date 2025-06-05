@@ -2,9 +2,8 @@ package workspace
 
 import (
 	"errors"
+	"slices"
 	"strings"
-
-	"golang.org/x/exp/slices"
 )
 
 var (

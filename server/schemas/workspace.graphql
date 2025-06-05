@@ -31,6 +31,11 @@ type WorkspaceMetadata {
     photoURL: String
 }
 
+type WorkspacesWithPagination {
+    workspaces: [Workspace!]!
+    totalCount: Int!
+}
+
 enum Role {
     # a role who can read project
     READER
@@ -40,6 +45,11 @@ enum Role {
     OWNER
     # a eole who can maintain a project
     MAINTAINER
+}
+
+input Pagination {
+    page: Int!
+    size: Int!
 }
 
 input CreateWorkspaceInput {
@@ -138,7 +148,10 @@ type DeleteWorkspacePayload {
 }
 
 extend type Query {
+    findByID(id: ID!): Workspace
+    findByName(name: String!): Workspace
     findByUser(userId: ID!): [Workspace]
+    findByUserWithPagination(userId: ID!, pagination: Pagination!): WorkspacesWithPagination!
 }
 
 extend type Mutation {

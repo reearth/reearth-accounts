@@ -32,6 +32,22 @@ func (w *Workspace) Fetch(ctx context.Context, ids workspace.IDList, op *usecase
 	return WorkspaceByIDsResponseTo(WorkspaceByIDs(ctx, w.gql, ids.Strings()))
 }
 
+func (w *Workspace) FetchByID(ctx context.Context, id workspace.ID) (*workspace.Workspace, error) {
+	res, err := FindByID(ctx, w.gql, id.String())
+	if err != nil {
+		return nil, err
+	}
+	return ToWorkspace(res.FindByID.FragmentWorkspace)
+}
+
+func (w *Workspace) FetchByName(ctx context.Context, name string) (*workspace.Workspace, error) {
+	res, err := FindByName(ctx, w.gql, name)
+	if err != nil {
+		return nil, err
+	}
+	return ToWorkspace(res.FindByName.FragmentWorkspace)
+}
+
 func (w *Workspace) FindByUser(ctx context.Context, userID accountid.UserID, op *usecase.Operator) (workspace.List, error) {
 	res, err := FindByUser(ctx, w.gql, userID.String())
 	if err != nil {
@@ -42,6 +58,25 @@ func (w *Workspace) FindByUser(ctx context.Context, userID accountid.UserID, op 
 		ws[i] = w.FragmentWorkspace
 	}
 	return ToWorkspaces(ws)
+}
+
+func (w *Workspace) FetchByUserWithPagination(ctx context.Context, userID accountid.UserID, param interfaces.FetchByUserWithPaginationParam) (interfaces.FetchByUserWithPaginationResult, error) {
+	res, err := FindByUserWithPagination(ctx, w.gql, userID.String(), int(param.Page), int(param.Size))
+	if err != nil {
+		return interfaces.FetchByUserWithPaginationResult{}, err
+	}
+	workspaces := make([]FragmentWorkspace, len(res.FindByUserWithPagination.Workspaces))
+	for i, w := range res.FindByUserWithPagination.Workspaces {
+		workspaces[i] = w.FragmentWorkspace
+	}
+	ws, err := ToWorkspaces(workspaces)
+	if err != nil {
+		return interfaces.FetchByUserWithPaginationResult{}, err
+	}
+	return interfaces.FetchByUserWithPaginationResult{
+		Workspaces: ws,
+		TotalCount: res.FindByUserWithPagination.TotalCount,
+	}, nil
 }
 
 func (w *Workspace) Create(ctx context.Context, name string, userID accountid.UserID, op *usecase.Operator) (*workspace.Workspace, error) {

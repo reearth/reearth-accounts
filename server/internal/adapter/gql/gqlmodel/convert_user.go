@@ -51,11 +51,11 @@ func ToMe(u *user.User) *Me {
 	var metadata UserMetadata
 	if u.Metadata() != nil {
 		metadata = UserMetadata{
-			Description: u.Metadata().Description(),
+			Description: optionalString(u.Metadata().Description()),
 			Lang:        u.Metadata().Lang().String(),
-			PhotoURL:    u.Metadata().PhotoURL(),
+			PhotoURL:    optionalString(u.Metadata().PhotoURL()),
 			Theme:       Theme(u.Metadata().Theme()),
-			Website:     u.Metadata().Website(),
+			Website:     optionalString(u.Metadata().Website()),
 		}
 	}
 
@@ -109,6 +109,18 @@ func ToWorkspace(t *workspace.Workspace) *Workspace {
 	}
 }
 
+func ToWorkspaces(ws workspace.List) []*Workspace {
+	if ws == nil {
+		return nil
+	}
+
+	workspaces := make([]*Workspace, 0, len(ws))
+	for _, w := range ws {
+		workspaces = append(workspaces, ToWorkspace(w))
+	}
+	return workspaces
+}
+
 func FromRole(r Role) workspace.Role {
 	switch r {
 	case RoleReader:
@@ -135,4 +147,11 @@ func ToRole(r workspace.Role) Role {
 		return RoleOwner
 	}
 	return Role("")
+}
+
+func optionalString(s string) *string {
+	if s == "" {
+		return nil
+	}
+	return &s
 }

@@ -109,6 +109,11 @@ type MemberInput struct {
 type Mutation struct {
 }
 
+type Pagination struct {
+	Page int `json:"page"`
+	Size int `json:"size"`
+}
+
 type PasswordResetInput struct {
 	Password string `json:"password"`
 	Token    string `json:"token"`
@@ -189,10 +194,10 @@ type SignUpInput struct {
 }
 
 type SignupOIDCInput struct {
-	Name   string  `json:"name"`
-	Email  string  `json:"email"`
-	Sub    string  `json:"sub"`
-	Secret *string `json:"secret,omitempty"`
+	Name   string `json:"name"`
+	Email  string `json:"email"`
+	Sub    string `json:"sub"`
+	Secret string `json:"secret"`
 }
 
 type StartPasswordResetInput struct {
@@ -269,11 +274,11 @@ func (User) IsNode()        {}
 func (this User) GetID() ID { return this.ID }
 
 type UserMetadata struct {
-	Description string `json:"description"`
-	Lang        string `json:"lang"`
-	PhotoURL    string `json:"photoURL"`
-	Theme       Theme  `json:"theme"`
-	Website     string `json:"website"`
+	Description *string `json:"description,omitempty"`
+	Website     *string `json:"website,omitempty"`
+	PhotoURL    *string `json:"photoURL,omitempty"`
+	Lang        string  `json:"lang"`
+	Theme       Theme   `json:"theme"`
 }
 
 type UserPayload struct {
@@ -326,6 +331,11 @@ type WorkspaceUserMember struct {
 }
 
 func (WorkspaceUserMember) IsWorkspaceMember() {}
+
+type WorkspacesWithPagination struct {
+	Workspaces []*Workspace `json:"workspaces"`
+	TotalCount int          `json:"totalCount"`
+}
 
 type NodeType string
 

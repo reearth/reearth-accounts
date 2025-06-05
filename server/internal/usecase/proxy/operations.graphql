@@ -146,9 +146,30 @@ fragment FragmentWorkspace on Workspace {
     }
 }
 
+query FindByID($id: ID!) {
+    findByID(id: $id) {
+        ...FragmentWorkspace
+    }
+}
+
+query FindByName($name: String!) {
+    findByName(name: $name) {
+        ...FragmentWorkspace
+    }
+}
+
 query FindByUser($userId: ID!) {
     findByUser(userId: $userId) {
         ...FragmentWorkspace
+    }
+}
+
+query FindByUserWithPagination($userId: ID!, $page: Int!, $size: Int!) {
+    findByUserWithPagination(userId: $userId, pagination: { page: $page, size: $size }) {
+        workspaces {
+            ...FragmentWorkspace
+        }
+        totalCount
     }
 }
 

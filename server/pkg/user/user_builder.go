@@ -1,6 +1,7 @@
 package user
 
 import (
+	"github.com/reearth/reearth-accounts/pkg/id"
 	"github.com/reearth/reearthx/i18n"
 	"github.com/reearth/reearthx/rerror"
 )
@@ -41,7 +42,7 @@ func (b *Builder) Build() (*User, error) {
 			b.u.metadata.theme = ThemeDefault
 		}
 	}
-	if err := b.u.SetEmail(b.email); err != nil {
+	if err := b.u.UpdateEmail(b.email); err != nil {
 		return nil, err
 	}
 	return b.u, nil
@@ -55,7 +56,7 @@ func (b *Builder) MustBuild() *User {
 	return r
 }
 
-func (b *Builder) ID(id ID) *Builder {
+func (b *Builder) ID(id id.UserID) *Builder {
 	b.u.id = id
 	return b
 }

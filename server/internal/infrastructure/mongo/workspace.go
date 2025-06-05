@@ -134,6 +134,21 @@ func (r *Workspace) FindByName(ctx context.Context, name string) (*workspace.Wor
 	return w, nil
 }
 
+func (r *Workspace) FindByAlias(ctx context.Context, alias string) (*workspace.Workspace, error) {
+	if alias == "" {
+		return nil, rerror.ErrNotFound
+	}
+
+	w, err := r.findOne(ctx, bson.M{"alias": alias})
+	if err != nil {
+		return nil, err
+	}
+	if !r.f.CanRead(w.ID()) {
+		return nil, rerror.ErrNotFound
+	}
+	return w, nil
+}
+
 func (r *Workspace) Create(ctx context.Context, workspace *workspace.Workspace) error {
 	doc, id := mongodoc.NewWorkspace(workspace)
 	return r.client.CreateOne(ctx, id, doc)

@@ -21,11 +21,11 @@ type Me {
 }
 
 type UserMetadata {
-  description: String!
+  description: String
+  website: String
+  photoURL: String
   lang: Lang!
-  photoURL: String!
   theme: Theme!
-  website: String!
 }
 
 input SignUpInput {
@@ -44,7 +44,7 @@ input SignupOIDCInput {
   name: String!
   email: String!
   sub: String!
-  secret: String
+  secret: String!
 }
 
 input FindOrCreateInput {

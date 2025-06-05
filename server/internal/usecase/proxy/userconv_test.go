@@ -13,11 +13,12 @@ func TestUserByIDsResponseTo(t *testing.T) {
 	uid := id.NewUserID()
 	ws := id.NewWorkspaceID()
 	u := &UserByIDsNodesUser{
+		Typename:  "User",
 		Id:        uid.String(),
 		Name:      "name",
 		Email:     "email@example.com",
 		Workspace: ws.String(),
-		Typename:  "User",
+		Auths:     nil,
 		Metadata: UserByIDsNodesUserMetadata{
 			Description: "description",
 			Lang:        "ja",
