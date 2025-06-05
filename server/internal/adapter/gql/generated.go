@@ -1480,12 +1480,12 @@ type Me {
   id: ID!
   name: String!
   email: String!
+  metadata: UserMetadata!
   host: String
   myWorkspaceId: ID!
   auths: [String!]!
   workspaces: [Workspace!]!
   myWorkspace: Workspace!
-  metadata: UserMetadata!
 }
 
 type UserMetadata {
@@ -3407,6 +3407,62 @@ func (ec *executionContext) fieldContext_Me_email(_ context.Context, field graph
 	return fc, nil
 }
 
+func (ec *executionContext) _Me_metadata(ctx context.Context, field graphql.CollectedField, obj *gqlmodel.Me) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_Me_metadata(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (any, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.Metadata, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		if !graphql.HasFieldError(ctx, fc) {
+			ec.Errorf(ctx, "must not be null")
+		}
+		return graphql.Null
+	}
+	res := resTmp.(*gqlmodel.UserMetadata)
+	fc.Result = res
+	return ec.marshalNUserMetadata2ᚖgithubᚗcomᚋreearthᚋreearthᚑaccountsᚋinternalᚋadapterᚋgqlᚋgqlmodelᚐUserMetadata(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_Me_metadata(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "Me",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			switch field.Name {
+			case "description":
+				return ec.fieldContext_UserMetadata_description(ctx, field)
+			case "website":
+				return ec.fieldContext_UserMetadata_website(ctx, field)
+			case "photoURL":
+				return ec.fieldContext_UserMetadata_photoURL(ctx, field)
+			case "lang":
+				return ec.fieldContext_UserMetadata_lang(ctx, field)
+			case "theme":
+				return ec.fieldContext_UserMetadata_theme(ctx, field)
+			}
+			return nil, fmt.Errorf("no field named %q was found under type UserMetadata", field.Name)
+		},
+	}
+	return fc, nil
+}
+
 func (ec *executionContext) _Me_host(ctx context.Context, field graphql.CollectedField, obj *gqlmodel.Me) (ret graphql.Marshaler) {
 	fc, err := ec.fieldContext_Me_host(ctx, field)
 	if err != nil {
@@ -3643,62 +3699,6 @@ func (ec *executionContext) fieldContext_Me_myWorkspace(_ context.Context, field
 				return ec.fieldContext_Workspace_personal(ctx, field)
 			}
 			return nil, fmt.Errorf("no field named %q was found under type Workspace", field.Name)
-		},
-	}
-	return fc, nil
-}
-
-func (ec *executionContext) _Me_metadata(ctx context.Context, field graphql.CollectedField, obj *gqlmodel.Me) (ret graphql.Marshaler) {
-	fc, err := ec.fieldContext_Me_metadata(ctx, field)
-	if err != nil {
-		return graphql.Null
-	}
-	ctx = graphql.WithFieldContext(ctx, fc)
-	defer func() {
-		if r := recover(); r != nil {
-			ec.Error(ctx, ec.Recover(ctx, r))
-			ret = graphql.Null
-		}
-	}()
-	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (any, error) {
-		ctx = rctx // use context from middleware stack in children
-		return obj.Metadata, nil
-	})
-	if err != nil {
-		ec.Error(ctx, err)
-		return graphql.Null
-	}
-	if resTmp == nil {
-		if !graphql.HasFieldError(ctx, fc) {
-			ec.Errorf(ctx, "must not be null")
-		}
-		return graphql.Null
-	}
-	res := resTmp.(*gqlmodel.UserMetadata)
-	fc.Result = res
-	return ec.marshalNUserMetadata2ᚖgithubᚗcomᚋreearthᚋreearthᚑaccountsᚋinternalᚋadapterᚋgqlᚋgqlmodelᚐUserMetadata(ctx, field.Selections, res)
-}
-
-func (ec *executionContext) fieldContext_Me_metadata(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
-	fc = &graphql.FieldContext{
-		Object:     "Me",
-		Field:      field,
-		IsMethod:   false,
-		IsResolver: false,
-		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
-			switch field.Name {
-			case "description":
-				return ec.fieldContext_UserMetadata_description(ctx, field)
-			case "website":
-				return ec.fieldContext_UserMetadata_website(ctx, field)
-			case "photoURL":
-				return ec.fieldContext_UserMetadata_photoURL(ctx, field)
-			case "lang":
-				return ec.fieldContext_UserMetadata_lang(ctx, field)
-			case "theme":
-				return ec.fieldContext_UserMetadata_theme(ctx, field)
-			}
-			return nil, fmt.Errorf("no field named %q was found under type UserMetadata", field.Name)
 		},
 	}
 	return fc, nil
@@ -5519,6 +5519,8 @@ func (ec *executionContext) fieldContext_Query_me(_ context.Context, field graph
 				return ec.fieldContext_Me_name(ctx, field)
 			case "email":
 				return ec.fieldContext_Me_email(ctx, field)
+			case "metadata":
+				return ec.fieldContext_Me_metadata(ctx, field)
 			case "host":
 				return ec.fieldContext_Me_host(ctx, field)
 			case "myWorkspaceId":
@@ -5529,8 +5531,6 @@ func (ec *executionContext) fieldContext_Query_me(_ context.Context, field graph
 				return ec.fieldContext_Me_workspaces(ctx, field)
 			case "myWorkspace":
 				return ec.fieldContext_Me_myWorkspace(ctx, field)
-			case "metadata":
-				return ec.fieldContext_Me_metadata(ctx, field)
 			}
 			return nil, fmt.Errorf("no field named %q was found under type Me", field.Name)
 		},
@@ -6456,6 +6456,8 @@ func (ec *executionContext) fieldContext_UpdateMePayload_me(_ context.Context, f
 				return ec.fieldContext_Me_name(ctx, field)
 			case "email":
 				return ec.fieldContext_Me_email(ctx, field)
+			case "metadata":
+				return ec.fieldContext_Me_metadata(ctx, field)
 			case "host":
 				return ec.fieldContext_Me_host(ctx, field)
 			case "myWorkspaceId":
@@ -6466,8 +6468,6 @@ func (ec *executionContext) fieldContext_UpdateMePayload_me(_ context.Context, f
 				return ec.fieldContext_Me_workspaces(ctx, field)
 			case "myWorkspace":
 				return ec.fieldContext_Me_myWorkspace(ctx, field)
-			case "metadata":
-				return ec.fieldContext_Me_metadata(ctx, field)
 			}
 			return nil, fmt.Errorf("no field named %q was found under type Me", field.Name)
 		},
@@ -11669,6 +11669,11 @@ func (ec *executionContext) _Me(ctx context.Context, sel ast.SelectionSet, obj *
 			if out.Values[i] == graphql.Null {
 				atomic.AddUint32(&out.Invalids, 1)
 			}
+		case "metadata":
+			out.Values[i] = ec._Me_metadata(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				atomic.AddUint32(&out.Invalids, 1)
+			}
 		case "host":
 			out.Values[i] = ec._Me_host(ctx, field, obj)
 		case "myWorkspaceId":
@@ -11753,11 +11758,6 @@ func (ec *executionContext) _Me(ctx context.Context, sel ast.SelectionSet, obj *
 			}
 
 			out.Concurrently(i, func(ctx context.Context) graphql.Marshaler { return innerFunc(ctx, out) })
-		case "metadata":
-			out.Values[i] = ec._Me_metadata(ctx, field, obj)
-			if out.Values[i] == graphql.Null {
-				atomic.AddUint32(&out.Invalids, 1)
-			}
 		default:
 			panic("unknown field " + strconv.Quote(field.Name))
 		}

@@ -12,12 +12,12 @@ type Me {
   id: ID!
   name: String!
   email: String!
+  metadata: UserMetadata!
   host: String
   myWorkspaceId: ID!
   auths: [String!]!
   workspaces: [Workspace!]!
   myWorkspace: Workspace!
-  metadata: UserMetadata!
 }
 
 type UserMetadata {

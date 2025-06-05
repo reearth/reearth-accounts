@@ -988,13 +988,12 @@ func (v *FindOrCreateResponse) GetFindOrCreate() FindOrCreateFindOrCreateUserPay
 
 // FragmentMe includes the GraphQL fields of Me requested by the fragment FragmentMe.
 type FragmentMe struct {
-	Id            string   `json:"id"`
-	Name          string   `json:"name"`
-	Email         string   `json:"email"`
-	Lang          string   `json:"lang"`
-	Theme         string   `json:"theme"`
-	MyWorkspaceId string   `json:"myWorkspaceId"`
-	Auths         []string `json:"auths"`
+	Id            string                         `json:"id"`
+	Name          string                         `json:"name"`
+	Email         string                         `json:"email"`
+	Metadata      FragmentMeMetadataUserMetadata `json:"metadata"`
+	MyWorkspaceId string                         `json:"myWorkspaceId"`
+	Auths         []string                       `json:"auths"`
 }
 
 // GetId returns FragmentMe.Id, and is useful for accessing the field via an interface.
@@ -1006,17 +1005,38 @@ func (v *FragmentMe) GetName() string { return v.Name }
 // GetEmail returns FragmentMe.Email, and is useful for accessing the field via an interface.
 func (v *FragmentMe) GetEmail() string { return v.Email }
 
-// GetLang returns FragmentMe.Lang, and is useful for accessing the field via an interface.
-func (v *FragmentMe) GetLang() string { return v.Lang }
-
-// GetTheme returns FragmentMe.Theme, and is useful for accessing the field via an interface.
-func (v *FragmentMe) GetTheme() string { return v.Theme }
+// GetMetadata returns FragmentMe.Metadata, and is useful for accessing the field via an interface.
+func (v *FragmentMe) GetMetadata() FragmentMeMetadataUserMetadata { return v.Metadata }
 
 // GetMyWorkspaceId returns FragmentMe.MyWorkspaceId, and is useful for accessing the field via an interface.
 func (v *FragmentMe) GetMyWorkspaceId() string { return v.MyWorkspaceId }
 
 // GetAuths returns FragmentMe.Auths, and is useful for accessing the field via an interface.
 func (v *FragmentMe) GetAuths() []string { return v.Auths }
+
+// FragmentMeMetadataUserMetadata includes the requested fields of the GraphQL type UserMetadata.
+type FragmentMeMetadataUserMetadata struct {
+	Description string `json:"description"`
+	Lang        string `json:"lang"`
+	PhotoURL    string `json:"photoURL"`
+	Theme       string `json:"theme"`
+	Website     string `json:"website"`
+}
+
+// GetDescription returns FragmentMeMetadataUserMetadata.Description, and is useful for accessing the field via an interface.
+func (v *FragmentMeMetadataUserMetadata) GetDescription() string { return v.Description }
+
+// GetLang returns FragmentMeMetadataUserMetadata.Lang, and is useful for accessing the field via an interface.
+func (v *FragmentMeMetadataUserMetadata) GetLang() string { return v.Lang }
+
+// GetPhotoURL returns FragmentMeMetadataUserMetadata.PhotoURL, and is useful for accessing the field via an interface.
+func (v *FragmentMeMetadataUserMetadata) GetPhotoURL() string { return v.PhotoURL }
+
+// GetTheme returns FragmentMeMetadataUserMetadata.Theme, and is useful for accessing the field via an interface.
+func (v *FragmentMeMetadataUserMetadata) GetTheme() string { return v.Theme }
+
+// GetWebsite returns FragmentMeMetadataUserMetadata.Website, and is useful for accessing the field via an interface.
+func (v *FragmentMeMetadataUserMetadata) GetWebsite() string { return v.Website }
 
 // FragmentUser includes the GraphQL fields of User requested by the fragment FragmentUser.
 type FragmentUser struct {
@@ -1746,11 +1766,10 @@ func (v *RemoveMyAuthRemoveMyAuthUpdateMePayloadMe) GetName() string { return v.
 // GetEmail returns RemoveMyAuthRemoveMyAuthUpdateMePayloadMe.Email, and is useful for accessing the field via an interface.
 func (v *RemoveMyAuthRemoveMyAuthUpdateMePayloadMe) GetEmail() string { return v.FragmentMe.Email }
 
-// GetLang returns RemoveMyAuthRemoveMyAuthUpdateMePayloadMe.Lang, and is useful for accessing the field via an interface.
-func (v *RemoveMyAuthRemoveMyAuthUpdateMePayloadMe) GetLang() string { return v.FragmentMe.Lang }
-
-// GetTheme returns RemoveMyAuthRemoveMyAuthUpdateMePayloadMe.Theme, and is useful for accessing the field via an interface.
-func (v *RemoveMyAuthRemoveMyAuthUpdateMePayloadMe) GetTheme() string { return v.FragmentMe.Theme }
+// GetMetadata returns RemoveMyAuthRemoveMyAuthUpdateMePayloadMe.Metadata, and is useful for accessing the field via an interface.
+func (v *RemoveMyAuthRemoveMyAuthUpdateMePayloadMe) GetMetadata() FragmentMeMetadataUserMetadata {
+	return v.FragmentMe.Metadata
+}
 
 // GetMyWorkspaceId returns RemoveMyAuthRemoveMyAuthUpdateMePayloadMe.MyWorkspaceId, and is useful for accessing the field via an interface.
 func (v *RemoveMyAuthRemoveMyAuthUpdateMePayloadMe) GetMyWorkspaceId() string {
@@ -1792,9 +1811,7 @@ type __premarshalRemoveMyAuthRemoveMyAuthUpdateMePayloadMe struct {
 
 	Email string `json:"email"`
 
-	Lang string `json:"lang"`
-
-	Theme string `json:"theme"`
+	Metadata FragmentMeMetadataUserMetadata `json:"metadata"`
 
 	MyWorkspaceId string `json:"myWorkspaceId"`
 
@@ -1815,8 +1832,7 @@ func (v *RemoveMyAuthRemoveMyAuthUpdateMePayloadMe) __premarshalJSON() (*__prema
 	retval.Id = v.FragmentMe.Id
 	retval.Name = v.FragmentMe.Name
 	retval.Email = v.FragmentMe.Email
-	retval.Lang = v.FragmentMe.Lang
-	retval.Theme = v.FragmentMe.Theme
+	retval.Metadata = v.FragmentMe.Metadata
 	retval.MyWorkspaceId = v.FragmentMe.MyWorkspaceId
 	retval.Auths = v.FragmentMe.Auths
 	return &retval, nil
@@ -2526,11 +2542,10 @@ func (v *UpdateMeUpdateMeUpdateMePayloadMe) GetName() string { return v.Fragment
 // GetEmail returns UpdateMeUpdateMeUpdateMePayloadMe.Email, and is useful for accessing the field via an interface.
 func (v *UpdateMeUpdateMeUpdateMePayloadMe) GetEmail() string { return v.FragmentMe.Email }
 
-// GetLang returns UpdateMeUpdateMeUpdateMePayloadMe.Lang, and is useful for accessing the field via an interface.
-func (v *UpdateMeUpdateMeUpdateMePayloadMe) GetLang() string { return v.FragmentMe.Lang }
-
-// GetTheme returns UpdateMeUpdateMeUpdateMePayloadMe.Theme, and is useful for accessing the field via an interface.
-func (v *UpdateMeUpdateMeUpdateMePayloadMe) GetTheme() string { return v.FragmentMe.Theme }
+// GetMetadata returns UpdateMeUpdateMeUpdateMePayloadMe.Metadata, and is useful for accessing the field via an interface.
+func (v *UpdateMeUpdateMeUpdateMePayloadMe) GetMetadata() FragmentMeMetadataUserMetadata {
+	return v.FragmentMe.Metadata
+}
 
 // GetMyWorkspaceId returns UpdateMeUpdateMeUpdateMePayloadMe.MyWorkspaceId, and is useful for accessing the field via an interface.
 func (v *UpdateMeUpdateMeUpdateMePayloadMe) GetMyWorkspaceId() string {
@@ -2572,9 +2587,7 @@ type __premarshalUpdateMeUpdateMeUpdateMePayloadMe struct {
 
 	Email string `json:"email"`
 
-	Lang string `json:"lang"`
-
-	Theme string `json:"theme"`
+	Metadata FragmentMeMetadataUserMetadata `json:"metadata"`
 
 	MyWorkspaceId string `json:"myWorkspaceId"`
 
@@ -2595,8 +2608,7 @@ func (v *UpdateMeUpdateMeUpdateMePayloadMe) __premarshalJSON() (*__premarshalUpd
 	retval.Id = v.FragmentMe.Id
 	retval.Name = v.FragmentMe.Name
 	retval.Email = v.FragmentMe.Email
-	retval.Lang = v.FragmentMe.Lang
-	retval.Theme = v.FragmentMe.Theme
+	retval.Metadata = v.FragmentMe.Metadata
 	retval.MyWorkspaceId = v.FragmentMe.MyWorkspaceId
 	retval.Auths = v.FragmentMe.Auths
 	return &retval, nil
@@ -4555,8 +4567,13 @@ fragment FragmentMe on Me {
 	id
 	name
 	email
-	lang
-	theme
+	metadata {
+		description
+		lang
+		photoURL
+		theme
+		website
+	}
 	myWorkspaceId
 	auths
 }
@@ -4888,8 +4905,13 @@ fragment FragmentMe on Me {
 	id
 	name
 	email
-	lang
-	theme
+	metadata {
+		description
+		lang
+		photoURL
+		theme
+		website
+	}
 	myWorkspaceId
 	auths
 }

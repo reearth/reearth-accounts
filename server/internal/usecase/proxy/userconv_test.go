@@ -157,7 +157,10 @@ func TestMeToUser(t *testing.T) {
 
 	metadata := user.NewMetadata()
 	metadata.LangFrom("ja")
+	metadata.SetDescription("description")
+	metadata.SetPhotoURL("https://example.com/photo.jpg")
 	metadata.SetTheme("dark")
+	metadata.SetWebsite("https://example.com")
 
 	type args struct {
 		me FragmentMe
@@ -172,11 +175,16 @@ func TestMeToUser(t *testing.T) {
 			name: "ok",
 			args: args{
 				FragmentMe{
-					Id:            uid.String(),
-					Name:          "name",
-					Email:         "test@exmple.com",
-					Lang:          "ja",
-					Theme:         "dark",
+					Id:    uid.String(),
+					Name:  "name",
+					Email: "test@exmple.com",
+					Metadata: FragmentMeMetadataUserMetadata{
+						Description: "description",
+						Lang:        "ja",
+						PhotoURL:    "https://example.com/photo.jpg",
+						Theme:       "dark",
+						Website:     "https://example.com",
+					},
 					MyWorkspaceId: wid.String(),
 					Auths:         []string{"foo|bar"},
 				},
@@ -204,9 +212,6 @@ func TestMeToUser(t *testing.T) {
 func TestFragmentToUser(t *testing.T) {
 	uid := id.NewUserID()
 	ws := id.NewWorkspaceID()
-	metadata := user.NewMetadata()
-	metadata.LangFrom("ja")
-	metadata.SetTheme(user.ThemeDark)
 
 	u := FragmentUser{
 		Id:        uid.String(),
@@ -224,6 +229,7 @@ func TestFragmentToUser(t *testing.T) {
 	}
 	auth := user.AuthFrom("sub")
 
+	metadata := user.NewMetadata()
 	metadata.LangFrom(u.Metadata.Lang)
 	metadata.SetDescription(u.Metadata.Description)
 	metadata.SetPhotoURL(u.Metadata.PhotoURL)

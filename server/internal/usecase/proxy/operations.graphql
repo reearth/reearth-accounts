@@ -98,8 +98,13 @@ fragment FragmentMe on Me {
     id
     name
     email
-    lang
-    theme
+    metadata {
+        description
+        lang
+        photoURL
+        theme
+        website
+    }
     myWorkspaceId
     auths
 }

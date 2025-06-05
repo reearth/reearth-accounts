@@ -93,12 +93,12 @@ type Me struct {
 	ID            ID            `json:"id"`
 	Name          string        `json:"name"`
 	Email         string        `json:"email"`
+	Metadata      *UserMetadata `json:"metadata"`
 	Host          *string       `json:"host,omitempty"`
 	MyWorkspaceID ID            `json:"myWorkspaceId"`
 	Auths         []string      `json:"auths"`
 	Workspaces    []*Workspace  `json:"workspaces"`
 	MyWorkspace   *Workspace    `json:"myWorkspace"`
-	Metadata      *UserMetadata `json:"metadata"`
 }
 
 type MemberInput struct {
