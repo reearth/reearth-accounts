@@ -175,16 +175,11 @@ func TestMeToUser(t *testing.T) {
 			name: "ok",
 			args: args{
 				FragmentMe{
-					Id:    uid.String(),
-					Name:  "name",
-					Email: "test@exmple.com",
-					Metadata: FragmentMeMetadataUserMetadata{
-						Description: "description",
-						Lang:        "ja",
-						PhotoURL:    "https://example.com/photo.jpg",
-						Theme:       "dark",
-						Website:     "https://example.com",
-					},
+					Id:            uid.String(),
+					Name:          "name",
+					Email:         "test@exmple.com",
+					Lang:          "ja",
+					Theme:         "dark",
 					MyWorkspaceId: wid.String(),
 					Auths:         []string{"foo|bar"},
 				},

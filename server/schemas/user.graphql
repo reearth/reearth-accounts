@@ -2,6 +2,8 @@ type User implements Node {
   id: ID!
   name: String!
   email: String!
+  lang: Lang!
+  theme: Theme!
   host: String
   workspace: ID!
   auths: [String!]!
@@ -12,7 +14,8 @@ type Me {
   id: ID!
   name: String!
   email: String!
-  metadata: UserMetadata!
+  lang: Lang!
+  theme: Theme!
   host: String
   myWorkspaceId: ID!
   auths: [String!]!
@@ -21,14 +24,14 @@ type Me {
 }
 
 type UserMetadata {
-  description: String!
+  description: String
+  website: String
+  photoURL: String
   lang: Lang!
-  photoURL: String!
   theme: Theme!
-  website: String!
 }
 
-input SignupInput {
+input SignUpInput {
   id: ID!
   workspaceID: ID!
   name: String!
@@ -109,8 +112,8 @@ extend type Mutation {
   updateMe(input: UpdateMeInput!): UpdateMePayload
   removeMyAuth(input: RemoveMyAuthInput!): UpdateMePayload
   deleteMe(input: DeleteMeInput!): DeleteMePayload
-  signup(input: SignupInput!): UserPayload
-  signupOIDC(input: SignupOIDCInput!): UserPayload
+  signUp(input: SignUpInput!): UserPayload
+  signUpOIDC(input: SignupOIDCInput!): UserPayload
   verifyUser(input: VerifyUserInput!): UserPayload
   findOrCreate(input: FindOrCreateInput!): UserPayload
   createVerification(input: CreateVerificationInput!): Boolean

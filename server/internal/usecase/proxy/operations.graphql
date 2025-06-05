@@ -52,14 +52,14 @@ query SearchUser($keyword: String!) {
   }
 }
 
-mutation Signup($input: SignupInput!) {
-    signup(input: $input) {
+mutation SignUp($input: SignUpInput!) {
+    signUp(input: $input) {
         user {...FragmentUser}
     }
 }
 
 mutation SignupOIDC($input: SignupOIDCInput!) {
-    signupOIDC(input: $input) {
+    signUpOIDC(input: $input) {
         user {...FragmentUser}
     }
 }
@@ -98,13 +98,8 @@ fragment FragmentMe on Me {
     id
     name
     email
-    metadata {
-        description
-        lang
-        photoURL
-        theme
-        website
-    }
+    lang
+    theme
     myWorkspaceId
     auths
 }

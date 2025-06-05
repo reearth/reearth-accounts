@@ -35,10 +35,8 @@ func MeToUser(me FragmentMe) (*user.User, error) {
 	}
 
 	metadata := user.NewMetadata()
-	metadata.LangFrom(me.Metadata.Lang)
-	metadata.SetDescription(me.Metadata.Description)
-	metadata.SetPhotoURL(me.Metadata.PhotoURL)
-	metadata.SetTheme(user.ThemeFrom(me.Metadata.Theme))
+	metadata.LangFrom(me.Lang)
+	metadata.SetTheme(user.ThemeFrom(me.Theme))
 
 	u, err := user.New().ID(id).Name(me.Name).
 		Email(me.Email).

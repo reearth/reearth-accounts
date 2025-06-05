@@ -90,15 +90,16 @@ type GetUsersWithRolesPayload struct {
 }
 
 type Me struct {
-	ID            ID            `json:"id"`
-	Name          string        `json:"name"`
-	Email         string        `json:"email"`
-	Metadata      *UserMetadata `json:"metadata"`
-	Host          *string       `json:"host,omitempty"`
-	MyWorkspaceID ID            `json:"myWorkspaceId"`
-	Auths         []string      `json:"auths"`
-	Workspaces    []*Workspace  `json:"workspaces"`
-	MyWorkspace   *Workspace    `json:"myWorkspace"`
+	ID            ID           `json:"id"`
+	Name          string       `json:"name"`
+	Email         string       `json:"email"`
+	Lang          string       `json:"lang"`
+	Theme         Theme        `json:"theme"`
+	Host          *string      `json:"host,omitempty"`
+	MyWorkspaceID ID           `json:"myWorkspaceId"`
+	Auths         []string     `json:"auths"`
+	Workspaces    []*Workspace `json:"workspaces"`
+	MyWorkspace   *Workspace   `json:"myWorkspace"`
 }
 
 type MemberInput struct {
@@ -181,7 +182,7 @@ type RolesPayload struct {
 	Roles []*RoleForAuthorization `json:"roles"`
 }
 
-type SignupInput struct {
+type SignUpInput struct {
 	ID          ID      `json:"id"`
 	WorkspaceID ID      `json:"workspaceID"`
 	Name        string  `json:"name"`
@@ -264,6 +265,8 @@ type User struct {
 	ID        ID            `json:"id"`
 	Name      string        `json:"name"`
 	Email     string        `json:"email"`
+	Lang      string        `json:"lang"`
+	Theme     Theme         `json:"theme"`
 	Host      *string       `json:"host,omitempty"`
 	Workspace ID            `json:"workspace"`
 	Auths     []string      `json:"auths"`
@@ -274,11 +277,11 @@ func (User) IsNode()        {}
 func (this User) GetID() ID { return this.ID }
 
 type UserMetadata struct {
-	Description string `json:"description"`
-	Lang        string `json:"lang"`
-	PhotoURL    string `json:"photoURL"`
-	Theme       Theme  `json:"theme"`
-	Website     string `json:"website"`
+	Description *string `json:"description,omitempty"`
+	Website     *string `json:"website,omitempty"`
+	PhotoURL    *string `json:"photoURL,omitempty"`
+	Lang        string  `json:"lang"`
+	Theme       Theme   `json:"theme"`
 }
 
 type UserPayload struct {
