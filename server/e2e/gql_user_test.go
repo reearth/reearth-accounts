@@ -128,7 +128,7 @@ func baseSeederUser(ctx context.Context, r *repo.Container) error {
 
 func TestUpdateMe(t *testing.T) {
 	e, _ := StartServer(t, &app.Config{}, true, baseSeederUser)
-	query := `mutation { updateMe(input: {name: "updated",email:"hoge@test.com",lang:"ja",theme:DEFAULT,password: "Ajsownndww1",passwordConfirmation: "Ajsownndww1"}){ me{ id name email metadata { lang theme } } }}`
+	query := `mutation { updateMe(input: {name: "updated",email:"hoge@test.com",lang:"ja",theme:DEFAULT,password: "Ajsownndww1",passwordConfirmation: "Ajsownndww1"}){ me{ id name email lang theme } }}`
 	request := GraphQLRequest{
 		Query: query,
 	}
@@ -143,8 +143,8 @@ func TestUpdateMe(t *testing.T) {
 		WithBytes(jsonData).Expect().Status(http.StatusOK).JSON().Object().Value("data").Object().Value("updateMe").Object().Value("me").Object()
 	o.Value("name").String().IsEqual("updated")
 	o.Value("email").String().IsEqual("hoge@test.com")
-	o.Value("metadata").Object().Value("lang").String().IsEqual("ja")
-	o.Value("metadata").Object().Value("theme").String().IsEqual("default")
+	o.Value("lang").String().IsEqual("ja")
+	o.Value("theme").String().IsEqual("default")
 }
 
 func TestRemoveMyAuth(t *testing.T) {
@@ -154,7 +154,7 @@ func TestRemoveMyAuth(t *testing.T) {
 	assert.Nil(t, err)
 	assert.Equal(t, &user.Auth{Provider: "reearth", Sub: "reearth|" + uId.String()}, u.Auths().GetByProvider("reearth"))
 
-	query := `mutation { removeMyAuth(input: {auth: "reearth"}){ me{ id name email metadata { lang theme } } }}`
+	query := `mutation { removeMyAuth(input: {auth: "reearth"}){ me{ id name email lang theme } }}`
 	request := GraphQLRequest{
 		Query: query,
 	}
@@ -200,7 +200,7 @@ func TestDeleteMe(t *testing.T) {
 
 func TestMe(t *testing.T) {
 	e, _ := StartServer(t, &app.Config{}, true, baseSeederUser)
-	query := ` { me{ id name email metadata { lang theme } myWorkspaceId } }`
+	query := ` { me{ id name email lang theme myWorkspaceId } }`
 	request := GraphQLRequest{
 		Query: query,
 	}
@@ -216,8 +216,8 @@ func TestMe(t *testing.T) {
 	o.Value("id").String().IsEqual(uId.String())
 	o.Value("name").String().IsEqual("e2e")
 	o.Value("email").String().IsEqual("e2e@e2e.com")
-	o.Value("metadata").Object().Value("lang").String().IsEqual("ja")
-	o.Value("metadata").Object().Value("theme").String().IsEqual("dark")
+	o.Value("lang").String().IsEqual("ja")
+	o.Value("theme").String().IsEqual("dark")
 	o.Value("myWorkspaceId").String().IsEqual(wId.String())
 }
 
