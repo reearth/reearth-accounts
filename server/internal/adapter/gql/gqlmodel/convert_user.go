@@ -48,17 +48,26 @@ func ToMe(u *user.User) *Me {
 		return nil
 	}
 
+	metadata := ToMetadata(u.Metadata())
+
 	return &Me{
 		ID:            IDFrom(u.ID()),
 		Name:          u.Name(),
 		Email:         u.Email(),
-		Lang:          u.Metadata().Lang().String(),
-		Theme:         Theme(u.Metadata().Theme()),
+		Lang:          metadata.Lang().String(),
+		Theme:         Theme(metadata.Theme()),
 		MyWorkspaceID: IDFrom(u.Workspace()),
 		Auths: util.Map(u.Auths(), func(a user.Auth) string {
 			return a.Provider
 		}),
 	}
+}
+
+func ToMetadata(m *user.Metadata) *user.Metadata {
+	if m == nil {
+		return user.NewMetadata()
+	}
+	return m
 }
 
 func ToTheme(t *Theme) *user.Theme {
