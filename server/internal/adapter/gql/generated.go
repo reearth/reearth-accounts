@@ -77,6 +77,7 @@ type ComplexityRoot struct {
 	}
 
 	Me struct {
+		Alias         func(childComplexity int) int
 		Auths         func(childComplexity int) int
 		Email         func(childComplexity int) int
 		Host          func(childComplexity int) int
@@ -362,6 +363,13 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 		}
 
 		return e.complexity.GetUsersWithRolesPayload.UsersWithRoles(childComplexity), true
+
+	case "Me.alias":
+		if e.complexity.Me.Alias == nil {
+			break
+		}
+
+		return e.complexity.Me.Alias(childComplexity), true
 
 	case "Me.auths":
 		if e.complexity.Me.Auths == nil {
@@ -1479,6 +1487,7 @@ extend type Mutation {
 type Me {
   id: ID!
   name: String!
+  alias: String!
   email: String!
   metadata: UserMetadata!
   host: String
@@ -3351,6 +3360,50 @@ func (ec *executionContext) _Me_name(ctx context.Context, field graphql.Collecte
 }
 
 func (ec *executionContext) fieldContext_Me_name(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "Me",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type String does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _Me_alias(ctx context.Context, field graphql.CollectedField, obj *gqlmodel.Me) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_Me_alias(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (any, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.Alias, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		if !graphql.HasFieldError(ctx, fc) {
+			ec.Errorf(ctx, "must not be null")
+		}
+		return graphql.Null
+	}
+	res := resTmp.(string)
+	fc.Result = res
+	return ec.marshalNString2string(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_Me_alias(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
 	fc = &graphql.FieldContext{
 		Object:     "Me",
 		Field:      field,
@@ -5517,6 +5570,8 @@ func (ec *executionContext) fieldContext_Query_me(_ context.Context, field graph
 				return ec.fieldContext_Me_id(ctx, field)
 			case "name":
 				return ec.fieldContext_Me_name(ctx, field)
+			case "alias":
+				return ec.fieldContext_Me_alias(ctx, field)
 			case "email":
 				return ec.fieldContext_Me_email(ctx, field)
 			case "metadata":
@@ -6454,6 +6509,8 @@ func (ec *executionContext) fieldContext_UpdateMePayload_me(_ context.Context, f
 				return ec.fieldContext_Me_id(ctx, field)
 			case "name":
 				return ec.fieldContext_Me_name(ctx, field)
+			case "alias":
+				return ec.fieldContext_Me_alias(ctx, field)
 			case "email":
 				return ec.fieldContext_Me_email(ctx, field)
 			case "metadata":
@@ -11661,6 +11718,11 @@ func (ec *executionContext) _Me(ctx context.Context, sel ast.SelectionSet, obj *
 			}
 		case "name":
 			out.Values[i] = ec._Me_name(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				atomic.AddUint32(&out.Invalids, 1)
+			}
+		case "alias":
+			out.Values[i] = ec._Me_alias(ctx, field, obj)
 			if out.Values[i] == graphql.Null {
 				atomic.AddUint32(&out.Invalids, 1)
 			}

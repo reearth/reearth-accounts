@@ -62,6 +62,7 @@ func ToMe(u *user.User) *Me {
 	return &Me{
 		ID:            IDFrom(u.ID()),
 		Name:          u.Name(),
+		Alias:         u.Alias(),
 		Email:         u.Email(),
 		Metadata:      &metadata,
 		MyWorkspaceID: IDFrom(u.Workspace()),
