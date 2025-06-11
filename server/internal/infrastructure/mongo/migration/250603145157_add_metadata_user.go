@@ -76,11 +76,7 @@ func AddMetadataUser(ctx context.Context, c DBClient) error {
 					doc.Alias = alias
 				}
 
-				if doc.Metadata != nil {
-					if doc.Lang != "" {
-						metadata.Lang = doc.Lang
-						doc.Lang = ""
-					}
+				metadata := doc.Metadata
 
 					if doc.Theme != "" {
 						metadata.Theme = doc.Theme
@@ -111,6 +107,12 @@ func AddMetadataUser(ctx context.Context, c DBClient) error {
 						Website:     "",
 					}
 				}
+				if doc.Theme != "" {
+					metadata.Theme = doc.Theme
+					doc.Theme = ""
+				}
+
+				doc.Metadata = metadata
 
 				ids = append(ids, doc.ID)
 				newRows = append(newRows, doc)
