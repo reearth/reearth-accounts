@@ -99,11 +99,20 @@ func ToWorkspace(t *workspace.Workspace) *Workspace {
 		})
 	}
 
+	metadata := WorkspaceMetadata{
+		Description:  t.Metadata().Description(),
+		Website:      t.Metadata().Website(),
+		Location:     t.Metadata().Location(),
+		BillingEmail: t.Metadata().BillingEmail(),
+		PhotoURL:     t.Metadata().PhotoURL(),
+	}
+
 	return &Workspace{
 		ID:       IDFrom(t.ID()),
 		Name:     t.Name(),
 		Personal: t.IsPersonal(),
 		Members:  members,
+		Metadata: &metadata,
 	}
 }
 
