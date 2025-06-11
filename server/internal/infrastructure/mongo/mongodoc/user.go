@@ -26,7 +26,7 @@ type UserDocument struct {
 	Password      []byte
 	PasswordReset *PasswordResetDocument
 	Verification  *UserVerificationDoc
-	Metadata      *UserMetadataDoc
+	Metadata      UserMetadataDoc
 }
 
 type UserVerificationDoc struct {
@@ -68,15 +68,12 @@ func NewUser(user *user.User) (*UserDocument, string) {
 		}
 	}
 
-	var metadataDoc *UserMetadataDoc
-	if user.Metadata() != nil {
-		metadataDoc = &UserMetadataDoc{
-			Description: user.Metadata().Description(),
-			Website:     user.Metadata().Website(),
-			PhotoURL:    user.Metadata().PhotoURL(),
-			Lang:        user.Metadata().Lang().String(),
-			Theme:       string(user.Metadata().Theme()),
-		}
+	metadataDoc := UserMetadataDoc{
+		Description: user.Metadata().Description(),
+		Website:     user.Metadata().Website(),
+		PhotoURL:    user.Metadata().PhotoURL(),
+		Lang:        user.Metadata().Lang().String(),
+		Theme:       string(user.Metadata().Theme()),
 	}
 
 	return &UserDocument{
@@ -119,15 +116,12 @@ func (d *UserDocument) Model() (*user.User, error) {
 		v = user.VerificationFrom(d.Verification.Code, d.Verification.Expiration, d.Verification.Verified)
 	}
 
-	var metadata *user.Metadata
-	if d.Metadata != nil {
-		metadata = user.NewMetadata()
-		metadata.SetDescription(d.Metadata.Description)
-		metadata.SetWebsite(d.Metadata.Website)
-		metadata.SetPhotoURL(d.Metadata.PhotoURL)
-		metadata.LangFrom(d.Metadata.Lang)
-		metadata.SetTheme(user.Theme(d.Metadata.Theme))
-	}
+	metadata := user.NewMetadata()
+	metadata.SetDescription(d.Metadata.Description)
+	metadata.SetWebsite(d.Metadata.Website)
+	metadata.SetPhotoURL(d.Metadata.PhotoURL)
+	metadata.LangFrom(d.Metadata.Lang)
+	metadata.SetTheme(user.Theme(d.Metadata.Theme))
 
 	u, err := user.New().
 		ID(uid).

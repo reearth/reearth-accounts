@@ -48,15 +48,12 @@ func ToMe(u *user.User) *Me {
 		return nil
 	}
 
-	var metadata UserMetadata
-	if u.Metadata() != nil {
-		metadata = UserMetadata{
-			Description: optionalString(u.Metadata().Description()),
-			Lang:        u.Metadata().Lang().String(),
-			PhotoURL:    optionalString(u.Metadata().PhotoURL()),
-			Theme:       Theme(u.Metadata().Theme()),
-			Website:     optionalString(u.Metadata().Website()),
-		}
+	metadata := UserMetadata{
+		Description: u.Metadata().Description(),
+		Lang:        u.Metadata().Lang().String(),
+		PhotoURL:    u.Metadata().PhotoURL(),
+		Theme:       Theme(u.Metadata().Theme()),
+		Website:     u.Metadata().Website(),
 	}
 
 	return &Me{

@@ -7,7 +7,7 @@ type Workspace struct {
 	name     string
 	alias    string
 	email    string
-	metadata *Metadata
+	metadata Metadata
 	members  *Members
 	policy   *PolicyID
 }
@@ -29,7 +29,7 @@ func (w *Workspace) Email() string {
 }
 
 func (w *Workspace) Metadata() *Metadata {
-	return w.metadata
+	return &w.metadata
 }
 
 func (w *Workspace) Members() *Members {
@@ -52,8 +52,8 @@ func (w *Workspace) UpdateEmail(email string) {
 	w.email = email
 }
 
-func (w *Workspace) SetMetadata(metadata *Metadata) {
-	w.metadata = util.CloneRef(metadata)
+func (w *Workspace) SetMetadata(metadata Metadata) {
+	w.metadata = metadata
 }
 
 func (w *Workspace) Policy() *PolicyID {

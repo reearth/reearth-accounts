@@ -10,12 +10,12 @@ type Metadata struct {
 	theme       Theme
 }
 
-func NewMetadata() *Metadata {
-	return &Metadata{}
+func NewMetadata() Metadata {
+	return Metadata{}
 }
 
-func MetadataFrom(photoURL, description, website string, lang language.Tag, theme Theme) *Metadata {
-	return &Metadata{
+func MetadataFrom(photoURL, description, website string, lang language.Tag, theme Theme) Metadata {
+	return Metadata{
 		photoURL:    photoURL,
 		description: description,
 		website:     website,
@@ -24,7 +24,7 @@ func MetadataFrom(photoURL, description, website string, lang language.Tag, them
 	}
 }
 
-func (m *Metadata) LangFrom(lang string) *Metadata {
+func (m Metadata) LangFrom(lang string) Metadata {
 	if lang == "" {
 		m.lang = language.Und
 	} else if l, err := language.Parse(lang); err == nil {
@@ -33,7 +33,7 @@ func (m *Metadata) LangFrom(lang string) *Metadata {
 	return m
 }
 
-func (m *Metadata) PhotoURL() string {
+func (m Metadata) PhotoURL() string {
 	return m.photoURL
 }
 
@@ -41,7 +41,7 @@ func (m *Metadata) SetPhotoURL(url string) {
 	m.photoURL = url
 }
 
-func (m *Metadata) Description() string {
+func (m Metadata) Description() string {
 	return m.description
 }
 
@@ -49,7 +49,7 @@ func (m *Metadata) SetDescription(description string) {
 	m.description = description
 }
 
-func (m *Metadata) Website() string {
+func (m Metadata) Website() string {
 	return m.website
 }
 
@@ -57,7 +57,7 @@ func (m *Metadata) SetWebsite(website string) {
 	m.website = website
 }
 
-func (m *Metadata) Lang() language.Tag {
+func (m Metadata) Lang() language.Tag {
 	return m.lang
 }
 
@@ -65,7 +65,7 @@ func (m *Metadata) SetLang(lang language.Tag) {
 	m.lang = lang
 }
 
-func (m *Metadata) Theme() Theme {
+func (m Metadata) Theme() Theme {
 	if !m.theme.Valid() {
 		return ThemeDefault
 	}

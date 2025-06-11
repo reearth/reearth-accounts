@@ -84,7 +84,7 @@ func TestBuilder_Build(t *testing.T) {
 		Name, Lang, Email string
 		ID                ID
 		Workspace         WorkspaceID
-		Metadata          *Metadata
+		Metadata          Metadata
 		Auths             []Auth
 		PasswordBin       []byte
 	}
@@ -153,7 +153,7 @@ func TestBuilder_Build(t *testing.T) {
 				name:      "xxx",
 				password:  pass,
 				auths:     []Auth{{Provider: "ppp", Sub: "sss"}},
-				metadata: &Metadata{
+				metadata: Metadata{
 					photoURL:    "photo url",
 					description: "description",
 					website:     "website",
@@ -212,7 +212,7 @@ func TestBuilder_MustBuild(t *testing.T) {
 		Workspace         WorkspaceID
 		PasswordBin       []byte
 		Auths             []Auth
-		Metadata          *Metadata
+		Metadata          Metadata
 	}
 
 	tests := []struct {
@@ -245,7 +245,7 @@ func TestBuilder_MustBuild(t *testing.T) {
 				name:      "xxx",
 				password:  pass,
 				auths:     []Auth{{Provider: "ppp", Sub: "sss"}},
-				metadata: &Metadata{
+				metadata: Metadata{
 					photoURL:    "photo url",
 					description: "description",
 					website:     "website",

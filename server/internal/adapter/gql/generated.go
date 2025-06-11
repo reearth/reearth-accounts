@@ -1498,9 +1498,9 @@ type Me {
 }
 
 type UserMetadata {
-  description: String
-  website: String
-  photoURL: String
+  description: String!
+  website: String!
+  photoURL: String!
   lang: Lang!
   theme: Theme!
 }
@@ -1621,11 +1621,11 @@ type WorkspaceIntegrationMember {
 }
 
 type WorkspaceMetadata {
-    description: String
-    website: String
-    location: String
-    billingEmail: String
-    photoURL: String
+    description: String!
+    website: String!
+    location: String!
+    billingEmail: String!
+    photoURL: String!
 }
 
 type WorkspacesWithPagination {
@@ -7084,11 +7084,14 @@ func (ec *executionContext) _UserMetadata_description(ctx context.Context, field
 		return graphql.Null
 	}
 	if resTmp == nil {
+		if !graphql.HasFieldError(ctx, fc) {
+			ec.Errorf(ctx, "must not be null")
+		}
 		return graphql.Null
 	}
-	res := resTmp.(*string)
+	res := resTmp.(string)
 	fc.Result = res
-	return ec.marshalOString2ᚖstring(ctx, field.Selections, res)
+	return ec.marshalNString2string(ctx, field.Selections, res)
 }
 
 func (ec *executionContext) fieldContext_UserMetadata_description(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
@@ -7125,11 +7128,14 @@ func (ec *executionContext) _UserMetadata_website(ctx context.Context, field gra
 		return graphql.Null
 	}
 	if resTmp == nil {
+		if !graphql.HasFieldError(ctx, fc) {
+			ec.Errorf(ctx, "must not be null")
+		}
 		return graphql.Null
 	}
-	res := resTmp.(*string)
+	res := resTmp.(string)
 	fc.Result = res
-	return ec.marshalOString2ᚖstring(ctx, field.Selections, res)
+	return ec.marshalNString2string(ctx, field.Selections, res)
 }
 
 func (ec *executionContext) fieldContext_UserMetadata_website(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
@@ -7166,11 +7172,14 @@ func (ec *executionContext) _UserMetadata_photoURL(ctx context.Context, field gr
 		return graphql.Null
 	}
 	if resTmp == nil {
+		if !graphql.HasFieldError(ctx, fc) {
+			ec.Errorf(ctx, "must not be null")
+		}
 		return graphql.Null
 	}
-	res := resTmp.(*string)
+	res := resTmp.(string)
 	fc.Result = res
-	return ec.marshalOString2ᚖstring(ctx, field.Selections, res)
+	return ec.marshalNString2string(ctx, field.Selections, res)
 }
 
 func (ec *executionContext) fieldContext_UserMetadata_photoURL(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
@@ -7930,11 +7939,14 @@ func (ec *executionContext) _WorkspaceMetadata_description(ctx context.Context, 
 		return graphql.Null
 	}
 	if resTmp == nil {
+		if !graphql.HasFieldError(ctx, fc) {
+			ec.Errorf(ctx, "must not be null")
+		}
 		return graphql.Null
 	}
-	res := resTmp.(*string)
+	res := resTmp.(string)
 	fc.Result = res
-	return ec.marshalOString2ᚖstring(ctx, field.Selections, res)
+	return ec.marshalNString2string(ctx, field.Selections, res)
 }
 
 func (ec *executionContext) fieldContext_WorkspaceMetadata_description(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
@@ -7971,11 +7983,14 @@ func (ec *executionContext) _WorkspaceMetadata_website(ctx context.Context, fiel
 		return graphql.Null
 	}
 	if resTmp == nil {
+		if !graphql.HasFieldError(ctx, fc) {
+			ec.Errorf(ctx, "must not be null")
+		}
 		return graphql.Null
 	}
-	res := resTmp.(*string)
+	res := resTmp.(string)
 	fc.Result = res
-	return ec.marshalOString2ᚖstring(ctx, field.Selections, res)
+	return ec.marshalNString2string(ctx, field.Selections, res)
 }
 
 func (ec *executionContext) fieldContext_WorkspaceMetadata_website(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
@@ -8012,11 +8027,14 @@ func (ec *executionContext) _WorkspaceMetadata_location(ctx context.Context, fie
 		return graphql.Null
 	}
 	if resTmp == nil {
+		if !graphql.HasFieldError(ctx, fc) {
+			ec.Errorf(ctx, "must not be null")
+		}
 		return graphql.Null
 	}
-	res := resTmp.(*string)
+	res := resTmp.(string)
 	fc.Result = res
-	return ec.marshalOString2ᚖstring(ctx, field.Selections, res)
+	return ec.marshalNString2string(ctx, field.Selections, res)
 }
 
 func (ec *executionContext) fieldContext_WorkspaceMetadata_location(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
@@ -8053,11 +8071,14 @@ func (ec *executionContext) _WorkspaceMetadata_billingEmail(ctx context.Context,
 		return graphql.Null
 	}
 	if resTmp == nil {
+		if !graphql.HasFieldError(ctx, fc) {
+			ec.Errorf(ctx, "must not be null")
+		}
 		return graphql.Null
 	}
-	res := resTmp.(*string)
+	res := resTmp.(string)
 	fc.Result = res
-	return ec.marshalOString2ᚖstring(ctx, field.Selections, res)
+	return ec.marshalNString2string(ctx, field.Selections, res)
 }
 
 func (ec *executionContext) fieldContext_WorkspaceMetadata_billingEmail(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
@@ -8094,11 +8115,14 @@ func (ec *executionContext) _WorkspaceMetadata_photoURL(ctx context.Context, fie
 		return graphql.Null
 	}
 	if resTmp == nil {
+		if !graphql.HasFieldError(ctx, fc) {
+			ec.Errorf(ctx, "must not be null")
+		}
 		return graphql.Null
 	}
-	res := resTmp.(*string)
+	res := resTmp.(string)
 	fc.Result = res
-	return ec.marshalOString2ᚖstring(ctx, field.Selections, res)
+	return ec.marshalNString2string(ctx, field.Selections, res)
 }
 
 func (ec *executionContext) fieldContext_WorkspaceMetadata_photoURL(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
@@ -12834,10 +12858,19 @@ func (ec *executionContext) _UserMetadata(ctx context.Context, sel ast.Selection
 			out.Values[i] = graphql.MarshalString("UserMetadata")
 		case "description":
 			out.Values[i] = ec._UserMetadata_description(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
 		case "website":
 			out.Values[i] = ec._UserMetadata_website(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
 		case "photoURL":
 			out.Values[i] = ec._UserMetadata_photoURL(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
 		case "lang":
 			out.Values[i] = ec._UserMetadata_lang(ctx, field, obj)
 			if out.Values[i] == graphql.Null {
@@ -13082,14 +13115,29 @@ func (ec *executionContext) _WorkspaceMetadata(ctx context.Context, sel ast.Sele
 			out.Values[i] = graphql.MarshalString("WorkspaceMetadata")
 		case "description":
 			out.Values[i] = ec._WorkspaceMetadata_description(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
 		case "website":
 			out.Values[i] = ec._WorkspaceMetadata_website(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
 		case "location":
 			out.Values[i] = ec._WorkspaceMetadata_location(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
 		case "billingEmail":
 			out.Values[i] = ec._WorkspaceMetadata_billingEmail(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
 		case "photoURL":
 			out.Values[i] = ec._WorkspaceMetadata_photoURL(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
 		default:
 			panic("unknown field " + strconv.Quote(field.Name))
 		}
