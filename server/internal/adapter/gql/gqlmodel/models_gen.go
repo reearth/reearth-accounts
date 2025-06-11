@@ -298,6 +298,7 @@ type VerifyUserInput struct {
 type Workspace struct {
 	ID       ID                 `json:"id"`
 	Name     string             `json:"name"`
+	Alias    string             `json:"alias"`
 	Members  []WorkspaceMember  `json:"members"`
 	Metadata *WorkspaceMetadata `json:"metadata"`
 	Personal bool               `json:"personal"`

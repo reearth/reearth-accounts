@@ -110,6 +110,7 @@ func ToWorkspace(t *workspace.Workspace) *Workspace {
 	return &Workspace{
 		ID:       IDFrom(t.ID()),
 		Name:     t.Name(),
+		Alias:    t.Alias(),
 		Personal: t.IsPersonal(),
 		Members:  members,
 		Metadata: &metadata,
