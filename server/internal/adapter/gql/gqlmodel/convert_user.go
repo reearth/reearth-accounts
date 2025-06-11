@@ -156,10 +156,3 @@ func ToRole(r workspace.Role) Role {
 	}
 	return Role("")
 }
-
-func optionalString(s string) *string {
-	if s == "" {
-		return nil
-	}
-	return &s
-}
