@@ -59,7 +59,7 @@ func TestUser_Signup(t *testing.T) {
 					Workspace(tid).
 					Name("NAME").
 					Auths(u.Auths()).
-					Metadata(u.Metadata()).
+					Metadata(*u.Metadata()).
 					Email("aaa@bbb.com").
 					PasswordPlainText("PAss00!!").
 					Verification(user.VerificationFrom(mockcode, mocktime.Add(24*time.Hour), false)).
@@ -137,7 +137,7 @@ func TestUser_Signup(t *testing.T) {
 					Workspace(tid).
 					Name("NAME").
 					Auths(u.Auths()).
-					Metadata(u.Metadata()).
+					Metadata(*u.Metadata()).
 					Email("aaa@bbb.com").
 					PasswordPlainText("PAss00!!").
 					Verification(user.VerificationFrom(mockcode, mocktime.Add(24*time.Hour), false)).

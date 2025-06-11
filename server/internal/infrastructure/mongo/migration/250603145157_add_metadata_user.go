@@ -20,7 +20,6 @@ func AddMetadataUser(ctx context.Context, c DBClient) error {
 
 			for _, row := range rows {
 				var doc mongodoc.UserDocument
-				metadata := new(mongodoc.UserMetadataDoc)
 
 				if err := bson.Unmarshal(row, &doc); err != nil {
 					return err
@@ -31,41 +30,18 @@ func AddMetadataUser(ctx context.Context, c DBClient) error {
 					doc.Alias = alias
 				}
 
-				if doc.Metadata != nil {
-					if doc.Lang != "" {
-						metadata.Lang = doc.Lang
-						doc.Lang = ""
-					}
+				metadata := doc.Metadata
 
-					if doc.Theme != "" {
-						metadata.Theme = doc.Theme
-						doc.Theme = ""
-					}
-
-					metadata.Description = doc.Metadata.Description
-					metadata.PhotoURL = doc.Metadata.PhotoURL
-					metadata.Website = doc.Metadata.Website
-					doc.Metadata = metadata
-				} else {
-					var lang, theme string
-					if doc.Lang != "" {
-						lang = doc.Lang
-						doc.Lang = ""
-					}
-
-					if doc.Theme != "" {
-						theme = doc.Theme
-						doc.Theme = ""
-					}
-
-					doc.Metadata = &mongodoc.UserMetadataDoc{
-						Description: "",
-						Lang:        lang,
-						PhotoURL:    "",
-						Theme:       theme,
-						Website:     "",
-					}
+				if doc.Lang != "" {
+					metadata.Lang = doc.Lang
+					doc.Lang = ""
 				}
+				if doc.Theme != "" {
+					metadata.Theme = doc.Theme
+					doc.Theme = ""
+				}
+
+				doc.Metadata = metadata
 
 				ids = append(ids, doc.ID)
 				newRows = append(newRows, doc)

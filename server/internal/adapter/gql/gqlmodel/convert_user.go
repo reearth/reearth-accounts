@@ -48,20 +48,18 @@ func ToMe(u *user.User) *Me {
 		return nil
 	}
 
-	var metadata UserMetadata
-	if u.Metadata() != nil {
-		metadata = UserMetadata{
-			Description: optionalString(u.Metadata().Description()),
-			Lang:        u.Metadata().Lang().String(),
-			PhotoURL:    optionalString(u.Metadata().PhotoURL()),
-			Theme:       Theme(u.Metadata().Theme()),
-			Website:     optionalString(u.Metadata().Website()),
-		}
+	metadata := UserMetadata{
+		Description: u.Metadata().Description(),
+		Lang:        u.Metadata().Lang().String(),
+		PhotoURL:    u.Metadata().PhotoURL(),
+		Theme:       Theme(u.Metadata().Theme()),
+		Website:     u.Metadata().Website(),
 	}
 
 	return &Me{
 		ID:            IDFrom(u.ID()),
 		Name:          u.Name(),
+		Alias:         u.Alias(),
 		Email:         u.Email(),
 		Metadata:      &metadata,
 		MyWorkspaceID: IDFrom(u.Workspace()),
@@ -101,11 +99,21 @@ func ToWorkspace(t *workspace.Workspace) *Workspace {
 		})
 	}
 
+	metadata := WorkspaceMetadata{
+		Description:  t.Metadata().Description(),
+		Website:      t.Metadata().Website(),
+		Location:     t.Metadata().Location(),
+		BillingEmail: t.Metadata().BillingEmail(),
+		PhotoURL:     t.Metadata().PhotoURL(),
+	}
+
 	return &Workspace{
 		ID:       IDFrom(t.ID()),
 		Name:     t.Name(),
+		Alias:    t.Alias(),
 		Personal: t.IsPersonal(),
 		Members:  members,
+		Metadata: &metadata,
 	}
 }
 
@@ -147,11 +155,4 @@ func ToRole(r workspace.Role) Role {
 		return RoleOwner
 	}
 	return Role("")
-}
-
-func optionalString(s string) *string {
-	if s == "" {
-		return nil
-	}
-	return &s
 }

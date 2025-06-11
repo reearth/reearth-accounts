@@ -20,7 +20,6 @@ func AddMetadataWorkspace(ctx context.Context, c DBClient) error {
 
 			for _, row := range rows {
 				var doc mongodoc.WorkspaceDocument
-				metadata := new(mongodoc.WorkspaceMetadataDocument)
 
 				if err := bson.Unmarshal(row, &doc); err != nil {
 					return err
@@ -35,17 +34,15 @@ func AddMetadataWorkspace(ctx context.Context, c DBClient) error {
 					doc.Alias = alias
 				}
 
-				if doc.Metadata != nil {
-					metadata.BillingEmail = doc.Metadata.BillingEmail
-					metadata.Description = doc.Metadata.Description
-					metadata.Location = doc.Metadata.Location
-					metadata.PhotoURL = doc.Metadata.PhotoURL
-					metadata.Website = doc.Metadata.Website
+				metadata := doc.Metadata
 
-					doc.Metadata = metadata
-				} else {
-					doc.Metadata = metadata
-				}
+				metadata.BillingEmail = doc.Metadata.BillingEmail
+				metadata.Description = doc.Metadata.Description
+				metadata.Location = doc.Metadata.Location
+				metadata.PhotoURL = doc.Metadata.PhotoURL
+				metadata.Website = doc.Metadata.Website
+
+				doc.Metadata = metadata
 
 				ids = append(ids, doc.ID)
 				newRows = append(newRows, doc)

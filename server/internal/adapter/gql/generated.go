@@ -77,6 +77,7 @@ type ComplexityRoot struct {
 	}
 
 	Me struct {
+		Alias         func(childComplexity int) int
 		Auths         func(childComplexity int) int
 		Email         func(childComplexity int) int
 		Host          func(childComplexity int) int
@@ -210,6 +211,7 @@ type ComplexityRoot struct {
 	}
 
 	Workspace struct {
+		Alias    func(childComplexity int) int
 		ID       func(childComplexity int) int
 		Members  func(childComplexity int) int
 		Metadata func(childComplexity int) int
@@ -362,6 +364,13 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 		}
 
 		return e.complexity.GetUsersWithRolesPayload.UsersWithRoles(childComplexity), true
+
+	case "Me.alias":
+		if e.complexity.Me.Alias == nil {
+			break
+		}
+
+		return e.complexity.Me.Alias(childComplexity), true
 
 	case "Me.auths":
 		if e.complexity.Me.Auths == nil {
@@ -1065,6 +1074,13 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 
 		return e.complexity.UserWithRoles.User(childComplexity), true
 
+	case "Workspace.alias":
+		if e.complexity.Workspace.Alias == nil {
+			break
+		}
+
+		return e.complexity.Workspace.Alias(childComplexity), true
+
 	case "Workspace.id":
 		if e.complexity.Workspace.ID == nil {
 			break
@@ -1479,6 +1495,7 @@ extend type Mutation {
 type Me {
   id: ID!
   name: String!
+  alias: String!
   email: String!
   metadata: UserMetadata!
   host: String
@@ -1489,9 +1506,9 @@ type Me {
 }
 
 type UserMetadata {
-  description: String
-  website: String
-  photoURL: String
+  description: String!
+  website: String!
+  photoURL: String!
   lang: Lang!
   theme: Theme!
 }
@@ -1589,6 +1606,7 @@ extend type Mutation {
 	{Name: "../../../schemas/workspace.graphql", Input: `type Workspace implements Node {
     id: ID!
     name: String!
+    alias: String!
     members: [WorkspaceMember!]!
     metadata: WorkspaceMetadata!
     personal: Boolean!
@@ -1612,11 +1630,11 @@ type WorkspaceIntegrationMember {
 }
 
 type WorkspaceMetadata {
-    description: String
-    website: String
-    location: String
-    billingEmail: String
-    photoURL: String
+    description: String!
+    website: String!
+    location: String!
+    billingEmail: String!
+    photoURL: String!
 }
 
 type WorkspacesWithPagination {
@@ -3024,6 +3042,8 @@ func (ec *executionContext) fieldContext_AddUsersToWorkspacePayload_workspace(_ 
 				return ec.fieldContext_Workspace_id(ctx, field)
 			case "name":
 				return ec.fieldContext_Workspace_name(ctx, field)
+			case "alias":
+				return ec.fieldContext_Workspace_alias(ctx, field)
 			case "members":
 				return ec.fieldContext_Workspace_members(ctx, field)
 			case "metadata":
@@ -3124,6 +3144,8 @@ func (ec *executionContext) fieldContext_CreateWorkspacePayload_workspace(_ cont
 				return ec.fieldContext_Workspace_id(ctx, field)
 			case "name":
 				return ec.fieldContext_Workspace_name(ctx, field)
+			case "alias":
+				return ec.fieldContext_Workspace_alias(ctx, field)
 			case "members":
 				return ec.fieldContext_Workspace_members(ctx, field)
 			case "metadata":
@@ -3351,6 +3373,50 @@ func (ec *executionContext) _Me_name(ctx context.Context, field graphql.Collecte
 }
 
 func (ec *executionContext) fieldContext_Me_name(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "Me",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type String does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _Me_alias(ctx context.Context, field graphql.CollectedField, obj *gqlmodel.Me) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_Me_alias(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (any, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.Alias, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		if !graphql.HasFieldError(ctx, fc) {
+			ec.Errorf(ctx, "must not be null")
+		}
+		return graphql.Null
+	}
+	res := resTmp.(string)
+	fc.Result = res
+	return ec.marshalNString2string(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_Me_alias(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
 	fc = &graphql.FieldContext{
 		Object:     "Me",
 		Field:      field,
@@ -3635,6 +3701,8 @@ func (ec *executionContext) fieldContext_Me_workspaces(_ context.Context, field 
 				return ec.fieldContext_Workspace_id(ctx, field)
 			case "name":
 				return ec.fieldContext_Workspace_name(ctx, field)
+			case "alias":
+				return ec.fieldContext_Workspace_alias(ctx, field)
 			case "members":
 				return ec.fieldContext_Workspace_members(ctx, field)
 			case "metadata":
@@ -3691,6 +3759,8 @@ func (ec *executionContext) fieldContext_Me_myWorkspace(_ context.Context, field
 				return ec.fieldContext_Workspace_id(ctx, field)
 			case "name":
 				return ec.fieldContext_Workspace_name(ctx, field)
+			case "alias":
+				return ec.fieldContext_Workspace_alias(ctx, field)
 			case "members":
 				return ec.fieldContext_Workspace_members(ctx, field)
 			case "metadata":
@@ -5517,6 +5587,8 @@ func (ec *executionContext) fieldContext_Query_me(_ context.Context, field graph
 				return ec.fieldContext_Me_id(ctx, field)
 			case "name":
 				return ec.fieldContext_Me_name(ctx, field)
+			case "alias":
+				return ec.fieldContext_Me_alias(ctx, field)
 			case "email":
 				return ec.fieldContext_Me_email(ctx, field)
 			case "metadata":
@@ -5717,6 +5789,8 @@ func (ec *executionContext) fieldContext_Query_findByID(ctx context.Context, fie
 				return ec.fieldContext_Workspace_id(ctx, field)
 			case "name":
 				return ec.fieldContext_Workspace_name(ctx, field)
+			case "alias":
+				return ec.fieldContext_Workspace_alias(ctx, field)
 			case "members":
 				return ec.fieldContext_Workspace_members(ctx, field)
 			case "metadata":
@@ -5781,6 +5855,8 @@ func (ec *executionContext) fieldContext_Query_findByName(ctx context.Context, f
 				return ec.fieldContext_Workspace_id(ctx, field)
 			case "name":
 				return ec.fieldContext_Workspace_name(ctx, field)
+			case "alias":
+				return ec.fieldContext_Workspace_alias(ctx, field)
 			case "members":
 				return ec.fieldContext_Workspace_members(ctx, field)
 			case "metadata":
@@ -5845,6 +5921,8 @@ func (ec *executionContext) fieldContext_Query_findByUser(ctx context.Context, f
 				return ec.fieldContext_Workspace_id(ctx, field)
 			case "name":
 				return ec.fieldContext_Workspace_name(ctx, field)
+			case "alias":
+				return ec.fieldContext_Workspace_alias(ctx, field)
 			case "members":
 				return ec.fieldContext_Workspace_members(ctx, field)
 			case "metadata":
@@ -6104,6 +6182,8 @@ func (ec *executionContext) fieldContext_RemoveIntegrationsFromWorkspacePayload_
 				return ec.fieldContext_Workspace_id(ctx, field)
 			case "name":
 				return ec.fieldContext_Workspace_name(ctx, field)
+			case "alias":
+				return ec.fieldContext_Workspace_alias(ctx, field)
 			case "members":
 				return ec.fieldContext_Workspace_members(ctx, field)
 			case "metadata":
@@ -6160,6 +6240,8 @@ func (ec *executionContext) fieldContext_RemoveMemberFromWorkspacePayload_worksp
 				return ec.fieldContext_Workspace_id(ctx, field)
 			case "name":
 				return ec.fieldContext_Workspace_name(ctx, field)
+			case "alias":
+				return ec.fieldContext_Workspace_alias(ctx, field)
 			case "members":
 				return ec.fieldContext_Workspace_members(ctx, field)
 			case "metadata":
@@ -6216,6 +6298,8 @@ func (ec *executionContext) fieldContext_RemoveMultipleMembersFromWorkspacePaylo
 				return ec.fieldContext_Workspace_id(ctx, field)
 			case "name":
 				return ec.fieldContext_Workspace_name(ctx, field)
+			case "alias":
+				return ec.fieldContext_Workspace_alias(ctx, field)
 			case "members":
 				return ec.fieldContext_Workspace_members(ctx, field)
 			case "metadata":
@@ -6454,6 +6538,8 @@ func (ec *executionContext) fieldContext_UpdateMePayload_me(_ context.Context, f
 				return ec.fieldContext_Me_id(ctx, field)
 			case "name":
 				return ec.fieldContext_Me_name(ctx, field)
+			case "alias":
+				return ec.fieldContext_Me_alias(ctx, field)
 			case "email":
 				return ec.fieldContext_Me_email(ctx, field)
 			case "metadata":
@@ -6518,6 +6604,8 @@ func (ec *executionContext) fieldContext_UpdateMemberOfWorkspacePayload_workspac
 				return ec.fieldContext_Workspace_id(ctx, field)
 			case "name":
 				return ec.fieldContext_Workspace_name(ctx, field)
+			case "alias":
+				return ec.fieldContext_Workspace_alias(ctx, field)
 			case "members":
 				return ec.fieldContext_Workspace_members(ctx, field)
 			case "metadata":
@@ -6676,6 +6764,8 @@ func (ec *executionContext) fieldContext_UpdateWorkspacePayload_workspace(_ cont
 				return ec.fieldContext_Workspace_id(ctx, field)
 			case "name":
 				return ec.fieldContext_Workspace_name(ctx, field)
+			case "alias":
+				return ec.fieldContext_Workspace_alias(ctx, field)
 			case "members":
 				return ec.fieldContext_Workspace_members(ctx, field)
 			case "metadata":
@@ -7027,11 +7117,14 @@ func (ec *executionContext) _UserMetadata_description(ctx context.Context, field
 		return graphql.Null
 	}
 	if resTmp == nil {
+		if !graphql.HasFieldError(ctx, fc) {
+			ec.Errorf(ctx, "must not be null")
+		}
 		return graphql.Null
 	}
-	res := resTmp.(*string)
+	res := resTmp.(string)
 	fc.Result = res
-	return ec.marshalOString2ᚖstring(ctx, field.Selections, res)
+	return ec.marshalNString2string(ctx, field.Selections, res)
 }
 
 func (ec *executionContext) fieldContext_UserMetadata_description(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
@@ -7068,11 +7161,14 @@ func (ec *executionContext) _UserMetadata_website(ctx context.Context, field gra
 		return graphql.Null
 	}
 	if resTmp == nil {
+		if !graphql.HasFieldError(ctx, fc) {
+			ec.Errorf(ctx, "must not be null")
+		}
 		return graphql.Null
 	}
-	res := resTmp.(*string)
+	res := resTmp.(string)
 	fc.Result = res
-	return ec.marshalOString2ᚖstring(ctx, field.Selections, res)
+	return ec.marshalNString2string(ctx, field.Selections, res)
 }
 
 func (ec *executionContext) fieldContext_UserMetadata_website(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
@@ -7109,11 +7205,14 @@ func (ec *executionContext) _UserMetadata_photoURL(ctx context.Context, field gr
 		return graphql.Null
 	}
 	if resTmp == nil {
+		if !graphql.HasFieldError(ctx, fc) {
+			ec.Errorf(ctx, "must not be null")
+		}
 		return graphql.Null
 	}
-	res := resTmp.(*string)
+	res := resTmp.(string)
 	fc.Result = res
-	return ec.marshalOString2ᚖstring(ctx, field.Selections, res)
+	return ec.marshalNString2string(ctx, field.Selections, res)
 }
 
 func (ec *executionContext) fieldContext_UserMetadata_photoURL(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
@@ -7463,6 +7562,50 @@ func (ec *executionContext) _Workspace_name(ctx context.Context, field graphql.C
 }
 
 func (ec *executionContext) fieldContext_Workspace_name(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "Workspace",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type String does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _Workspace_alias(ctx context.Context, field graphql.CollectedField, obj *gqlmodel.Workspace) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_Workspace_alias(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (any, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.Alias, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		if !graphql.HasFieldError(ctx, fc) {
+			ec.Errorf(ctx, "must not be null")
+		}
+		return graphql.Null
+	}
+	res := resTmp.(string)
+	fc.Result = res
+	return ec.marshalNString2string(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_Workspace_alias(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
 	fc = &graphql.FieldContext{
 		Object:     "Workspace",
 		Field:      field,
@@ -7873,11 +8016,14 @@ func (ec *executionContext) _WorkspaceMetadata_description(ctx context.Context, 
 		return graphql.Null
 	}
 	if resTmp == nil {
+		if !graphql.HasFieldError(ctx, fc) {
+			ec.Errorf(ctx, "must not be null")
+		}
 		return graphql.Null
 	}
-	res := resTmp.(*string)
+	res := resTmp.(string)
 	fc.Result = res
-	return ec.marshalOString2ᚖstring(ctx, field.Selections, res)
+	return ec.marshalNString2string(ctx, field.Selections, res)
 }
 
 func (ec *executionContext) fieldContext_WorkspaceMetadata_description(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
@@ -7914,11 +8060,14 @@ func (ec *executionContext) _WorkspaceMetadata_website(ctx context.Context, fiel
 		return graphql.Null
 	}
 	if resTmp == nil {
+		if !graphql.HasFieldError(ctx, fc) {
+			ec.Errorf(ctx, "must not be null")
+		}
 		return graphql.Null
 	}
-	res := resTmp.(*string)
+	res := resTmp.(string)
 	fc.Result = res
-	return ec.marshalOString2ᚖstring(ctx, field.Selections, res)
+	return ec.marshalNString2string(ctx, field.Selections, res)
 }
 
 func (ec *executionContext) fieldContext_WorkspaceMetadata_website(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
@@ -7955,11 +8104,14 @@ func (ec *executionContext) _WorkspaceMetadata_location(ctx context.Context, fie
 		return graphql.Null
 	}
 	if resTmp == nil {
+		if !graphql.HasFieldError(ctx, fc) {
+			ec.Errorf(ctx, "must not be null")
+		}
 		return graphql.Null
 	}
-	res := resTmp.(*string)
+	res := resTmp.(string)
 	fc.Result = res
-	return ec.marshalOString2ᚖstring(ctx, field.Selections, res)
+	return ec.marshalNString2string(ctx, field.Selections, res)
 }
 
 func (ec *executionContext) fieldContext_WorkspaceMetadata_location(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
@@ -7996,11 +8148,14 @@ func (ec *executionContext) _WorkspaceMetadata_billingEmail(ctx context.Context,
 		return graphql.Null
 	}
 	if resTmp == nil {
+		if !graphql.HasFieldError(ctx, fc) {
+			ec.Errorf(ctx, "must not be null")
+		}
 		return graphql.Null
 	}
-	res := resTmp.(*string)
+	res := resTmp.(string)
 	fc.Result = res
-	return ec.marshalOString2ᚖstring(ctx, field.Selections, res)
+	return ec.marshalNString2string(ctx, field.Selections, res)
 }
 
 func (ec *executionContext) fieldContext_WorkspaceMetadata_billingEmail(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
@@ -8037,11 +8192,14 @@ func (ec *executionContext) _WorkspaceMetadata_photoURL(ctx context.Context, fie
 		return graphql.Null
 	}
 	if resTmp == nil {
+		if !graphql.HasFieldError(ctx, fc) {
+			ec.Errorf(ctx, "must not be null")
+		}
 		return graphql.Null
 	}
-	res := resTmp.(*string)
+	res := resTmp.(string)
 	fc.Result = res
-	return ec.marshalOString2ᚖstring(ctx, field.Selections, res)
+	return ec.marshalNString2string(ctx, field.Selections, res)
 }
 
 func (ec *executionContext) fieldContext_WorkspaceMetadata_photoURL(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
@@ -8286,6 +8444,8 @@ func (ec *executionContext) fieldContext_WorkspacesWithPagination_workspaces(_ c
 				return ec.fieldContext_Workspace_id(ctx, field)
 			case "name":
 				return ec.fieldContext_Workspace_name(ctx, field)
+			case "alias":
+				return ec.fieldContext_Workspace_alias(ctx, field)
 			case "members":
 				return ec.fieldContext_Workspace_members(ctx, field)
 			case "metadata":
@@ -11664,6 +11824,11 @@ func (ec *executionContext) _Me(ctx context.Context, sel ast.SelectionSet, obj *
 			if out.Values[i] == graphql.Null {
 				atomic.AddUint32(&out.Invalids, 1)
 			}
+		case "alias":
+			out.Values[i] = ec._Me_alias(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				atomic.AddUint32(&out.Invalids, 1)
+			}
 		case "email":
 			out.Values[i] = ec._Me_email(ctx, field, obj)
 			if out.Values[i] == graphql.Null {
@@ -12772,10 +12937,19 @@ func (ec *executionContext) _UserMetadata(ctx context.Context, sel ast.Selection
 			out.Values[i] = graphql.MarshalString("UserMetadata")
 		case "description":
 			out.Values[i] = ec._UserMetadata_description(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
 		case "website":
 			out.Values[i] = ec._UserMetadata_website(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
 		case "photoURL":
 			out.Values[i] = ec._UserMetadata_photoURL(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
 		case "lang":
 			out.Values[i] = ec._UserMetadata_lang(ctx, field, obj)
 			if out.Values[i] == graphql.Null {
@@ -12913,6 +13087,11 @@ func (ec *executionContext) _Workspace(ctx context.Context, sel ast.SelectionSet
 			if out.Values[i] == graphql.Null {
 				out.Invalids++
 			}
+		case "alias":
+			out.Values[i] = ec._Workspace_alias(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
 		case "members":
 			out.Values[i] = ec._Workspace_members(ctx, field, obj)
 			if out.Values[i] == graphql.Null {
@@ -13020,14 +13199,29 @@ func (ec *executionContext) _WorkspaceMetadata(ctx context.Context, sel ast.Sele
 			out.Values[i] = graphql.MarshalString("WorkspaceMetadata")
 		case "description":
 			out.Values[i] = ec._WorkspaceMetadata_description(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
 		case "website":
 			out.Values[i] = ec._WorkspaceMetadata_website(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
 		case "location":
 			out.Values[i] = ec._WorkspaceMetadata_location(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
 		case "billingEmail":
 			out.Values[i] = ec._WorkspaceMetadata_billingEmail(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
 		case "photoURL":
 			out.Values[i] = ec._WorkspaceMetadata_photoURL(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
 		default:
 			panic("unknown field " + strconv.Quote(field.Name))
 		}

@@ -25,7 +25,7 @@ type WorkspaceDocument struct {
 	Name         string
 	Alias        string
 	Email        string
-	Metadata     *WorkspaceMetadataDocument
+	Metadata     WorkspaceMetadataDocument
 	Members      map[string]WorkspaceMemberDocument
 	Integrations map[string]WorkspaceMemberDocument
 	Personal     bool
@@ -51,14 +51,11 @@ func NewWorkspace(ws *workspace.Workspace) (*WorkspaceDocument, string) {
 		}
 	}
 
-	var metadataDoc *WorkspaceMetadataDocument
-	if ws.Metadata() != nil {
-		metadataDoc = &WorkspaceMetadataDocument{
-			Description:  ws.Metadata().Description(),
-			Website:      ws.Metadata().Website(),
-			Location:     ws.Metadata().Location(),
-			BillingEmail: ws.Metadata().BillingEmail(),
-		}
+	metadataDoc := WorkspaceMetadataDocument{
+		Description:  ws.Metadata().Description(),
+		Website:      ws.Metadata().Website(),
+		Location:     ws.Metadata().Location(),
+		BillingEmail: ws.Metadata().BillingEmail(),
 	}
 
 	wId := ws.ID().String()
@@ -120,10 +117,7 @@ func (d *WorkspaceDocument) Model() (*workspace.Workspace, error) {
 		policy = workspace.PolicyID(d.Policy).Ref()
 	}
 
-	var metadata *workspace.Metadata
-	if d.Metadata != nil {
-		metadata = workspace.MetadataFrom(d.Metadata.Description, d.Metadata.Website, d.Metadata.Location, d.Metadata.BillingEmail, d.Metadata.PhotoURL)
-	}
+	metadata := workspace.MetadataFrom(d.Metadata.Description, d.Metadata.Website, d.Metadata.Location, d.Metadata.BillingEmail, d.Metadata.PhotoURL)
 
 	return workspace.New().
 		ID(tid).

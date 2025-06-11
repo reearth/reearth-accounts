@@ -35,13 +35,11 @@ func (b *Builder) Build() (*User, error) {
 			return nil, err
 		}
 	}
-	if b.u.metadata != nil {
-		b.u.SetMetadata(b.u.metadata)
 
-		if !b.u.metadata.theme.Valid() {
-			b.u.metadata.theme = ThemeDefault
-		}
+	if !b.u.metadata.theme.Valid() {
+		b.u.metadata.theme = ThemeDefault
 	}
+
 	if err := b.u.UpdateEmail(b.email); err != nil {
 		return nil, err
 	}
@@ -118,7 +116,7 @@ func (b *Builder) Verification(v *Verification) *Builder {
 	return b
 }
 
-func (b *Builder) Metadata(m *Metadata) *Builder {
+func (b *Builder) Metadata(m Metadata) *Builder {
 	b.u.metadata = m
 	return b
 }
