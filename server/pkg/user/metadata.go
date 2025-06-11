@@ -24,13 +24,12 @@ func MetadataFrom(photoURL, description, website string, lang language.Tag, them
 	}
 }
 
-func (m Metadata) LangFrom(lang string) Metadata {
+func (m *Metadata) LangFrom(lang string) {
 	if lang == "" {
 		m.lang = language.Und
 	} else if l, err := language.Parse(lang); err == nil {
 		m.lang = l
 	}
-	return m
 }
 
 func (m Metadata) PhotoURL() string {
