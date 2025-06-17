@@ -16,7 +16,11 @@ func (r *mutationResolver) UpdateMe(ctx context.Context, input gqlmodel.UpdateMe
 	}
 	res, err := usecases(ctx).User.UpdateMe(ctx, interfaces.UpdateMeParam{
 		Name:                 input.Name,
+		Alias:                input.Alias,
 		Email:                input.Email,
+		PhotoURL:             input.PhotoURL,
+		Website:              input.Website,
+		Description:          input.Description,
 		Lang:                 &lang,
 		Theme:                gqlmodel.ToTheme(input.Theme),
 		Password:             input.Password,

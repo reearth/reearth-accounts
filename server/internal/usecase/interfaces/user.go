@@ -64,7 +64,11 @@ type GetUserByCredentials struct {
 
 type UpdateMeParam struct {
 	Name                 *string
+	Alias                *string
 	Email                *string
+	PhotoURL             *string
+	Website              *string
+	Description          *string
 	Lang                 *language.Tag
 	Theme                *user.Theme
 	Password             *string

@@ -73,7 +73,11 @@ input PasswordResetInput {
 
 input UpdateMeInput {
   name: String
+  alias: String
   email: String
+  photoURL: String
+  website: String
+  description: String
   lang: Lang
   theme: Theme
   password: String

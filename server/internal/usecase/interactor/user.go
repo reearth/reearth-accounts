@@ -123,44 +123,80 @@ func (i *User) UpdateMe(ctx context.Context, p interfaces.UpdateMeParam, operato
 			}
 		}
 
-		var workspace *workspace.Workspace
+		var ws *workspace.Workspace
 
 		u, err = i.repos.User.FindByID(ctx, *operator.User)
 		if err != nil {
 			return nil, err
 		}
 
+		uMetadata := u.Metadata()
+
+		ws, err = i.repos.Workspace.FindByID(ctx, u.Workspace())
+		if err != nil && !errors.Is(err, rerror.ErrNotFound) {
+			return nil, err
+		}
+
+		var wsMetadata *workspace.Metadata
+		if ws != nil {
+			wsMetadata = ws.Metadata()
+		}
+
 		if p.Name != nil && *p.Name != u.Name() {
 			oldName := u.Name()
 			u.UpdateName(*p.Name)
 
-			workspace, err = i.repos.Workspace.FindByID(ctx, u.Workspace())
-			if err != nil && !errors.Is(err, rerror.ErrNotFound) {
-				return nil, err
-			}
-
-			tn := workspace.Name()
-			if tn == "" || tn == oldName {
-				workspace.Rename(*p.Name)
-			} else {
-				workspace = nil
+			if ws != nil {
+				tn := ws.Name()
+				if tn == "" || tn == oldName {
+					ws.Rename(*p.Name)
+				}
 			}
 		}
+
+		if p.Alias != nil {
+			u.UpdateAlias(*p.Alias)
+			if ws != nil {
+				ws.UpdateAlias(*p.Alias)
+			}
+		}
+
 		if p.Email != nil {
 			if err := u.UpdateEmail(*p.Email); err != nil {
 				return nil, err
 			}
 		}
 
-		if u.Metadata() != nil {
-			if p.Lang != nil {
-				u.Metadata().LangFrom(p.Lang.String())
-			}
-
-			if p.Theme != nil {
-				u.Metadata().SetTheme(*p.Theme)
+		if p.PhotoURL != nil {
+			uMetadata.SetPhotoURL(*p.PhotoURL)
+			if wsMetadata != nil {
+				wsMetadata.SetPhotoURL(*p.PhotoURL)
 			}
 		}
+
+		if p.Website != nil {
+			uMetadata.SetWebsite(*p.Website)
+			if wsMetadata != nil {
+				wsMetadata.SetWebsite(*p.Website)
+			}
+		}
+
+		if p.Description != nil {
+			uMetadata.SetDescription(*p.Description)
+			if wsMetadata != nil {
+				wsMetadata.SetDescription(*p.Description)
+			}
+		}
+
+		if p.Lang != nil {
+			uMetadata.LangFrom(p.Lang.String())
+		}
+
+		if p.Theme != nil {
+			uMetadata.SetTheme(*p.Theme)
+		}
+
+		u.SetMetadata(*uMetadata)
 
 		if p.Password != nil && u.HasAuthProvider("reearth") {
 			if err := u.SetPassword(*p.Password); err != nil {
@@ -185,8 +221,8 @@ func (i *User) UpdateMe(ctx context.Context, p interfaces.UpdateMeParam, operato
 			}
 		}
 
-		if workspace != nil {
-			err = i.repos.Workspace.Save(ctx, workspace)
+		if ws != nil {
+			err = i.repos.Workspace.Save(ctx, ws)
 			if err != nil {
 				return nil, err
 			}
