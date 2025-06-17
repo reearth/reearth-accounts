@@ -213,7 +213,11 @@ type UpdateIntegrationOfWorkspaceInput struct {
 
 type UpdateMeInput struct {
 	Name                 *string `json:"name,omitempty"`
+	Alias                *string `json:"alias,omitempty"`
 	Email                *string `json:"email,omitempty"`
+	PhotoURL             *string `json:"photoURL,omitempty"`
+	Website              *string `json:"website,omitempty"`
+	Description          *string `json:"description,omitempty"`
 	Lang                 *string `json:"lang,omitempty"`
 	Theme                *Theme  `json:"theme,omitempty"`
 	Password             *string `json:"password,omitempty"`
