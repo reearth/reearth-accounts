@@ -17,7 +17,7 @@ type User struct {
 	name          string
 	alias         string
 	email         string
-	metadata      *Metadata
+	metadata      Metadata
 	password      EncodedPassword
 	workspace     WorkspaceID
 	auths         []Auth
@@ -79,7 +79,7 @@ func (u *User) Verification() *Verification {
 }
 
 func (u *User) Metadata() *Metadata {
-	return u.metadata
+	return &u.metadata
 }
 
 func (u *User) Auths() Auths {
@@ -194,7 +194,7 @@ func (u *User) SetVerification(v *Verification) {
 	u.verification = v
 }
 
-func (u *User) SetMetadata(m *Metadata) {
+func (u *User) SetMetadata(m Metadata) {
 	u.metadata = m
 }
 
@@ -211,7 +211,7 @@ func (u *User) Clone() *User {
 		password:      u.password,
 		workspace:     u.workspace,
 		auths:         slices.Clone(u.auths),
-		metadata:      util.CloneRef(u.metadata),
+		metadata:      u.metadata,
 		verification:  util.CloneRef(u.verification),
 		passwordReset: util.CloneRef(u.passwordReset),
 	}

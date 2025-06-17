@@ -11,6 +11,7 @@ type User implements Node {
 type Me {
   id: ID!
   name: String!
+  alias: String!
   email: String!
   metadata: UserMetadata!
   host: String
@@ -21,9 +22,9 @@ type Me {
 }
 
 type UserMetadata {
-  description: String
-  website: String
-  photoURL: String
+  description: String!
+  website: String!
+  photoURL: String!
   lang: Lang!
   theme: Theme!
 }

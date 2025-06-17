@@ -50,7 +50,7 @@ func TestUser(t *testing.T) {
 	u.Metadata().SetPhotoURL("photo url")
 	u.Metadata().SetDescription("description")
 	u.Metadata().SetWebsite("website")
-	assert.Equal(t, u.metadata, u.Metadata())
+	assert.Equal(t, &u.metadata, u.Metadata())
 
 	wid := NewWorkspaceID()
 	u.UpdateWorkspace(wid)

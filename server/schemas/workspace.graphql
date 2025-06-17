@@ -1,6 +1,7 @@
 type Workspace implements Node {
     id: ID!
     name: String!
+    alias: String!
     members: [WorkspaceMember!]!
     metadata: WorkspaceMetadata!
     personal: Boolean!
@@ -24,11 +25,11 @@ type WorkspaceIntegrationMember {
 }
 
 type WorkspaceMetadata {
-    description: String
-    website: String
-    location: String
-    billingEmail: String
-    photoURL: String
+    description: String!
+    website: String!
+    location: String!
+    billingEmail: String!
+    photoURL: String!
 }
 
 type WorkspacesWithPagination {

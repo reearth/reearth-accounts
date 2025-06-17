@@ -3,12 +3,58 @@ package migration
 import (
 	"context"
 	"strings"
+	"time"
 
-	"github.com/reearth/reearth-accounts/internal/infrastructure/mongo/mongodoc"
 	"github.com/reearth/reearthx/mongox"
 	"go.mongodb.org/mongo-driver/bson"
 )
 
+// NOTE:
+// The original `UserDocument` structs from `mongodoc` were updated to remove the pointer from the `Metadata` field.
+// As a result, keeping the original migration logic caused compilation errors.
+// To maintain compatibility and avoid coupling this migration to future struct changes, we define local legacy versions of the structs below, matching the schema at the time this migration was first written.
+
+// userDocumentLegacy represents the old version of UserDocument
+type userDocumentLegacy struct {
+	ID            string
+	Name          string
+	Alias         string
+	Email         string
+	Subs          []string
+	Workspace     string
+	Team          string `bson:",omitempty"`
+	Lang          string
+	Theme         string
+	Password      []byte
+	PasswordReset *passwordResetDocumentLegacy
+	Verification  *userVerificationDocLegacy
+	Metadata      *userMetadataDocLegacy
+}
+
+// userVerificationDoc represents the old version of UserVerificationDoc
+type passwordResetDocumentLegacy struct {
+	Token     string
+	CreatedAt time.Time
+}
+
+// userVerificationDocLegacy represents the old version of UserVerificationDoc
+type userVerificationDocLegacy struct {
+	Code       string
+	Expiration time.Time
+	Verified   bool
+}
+
+// userMetadataDocLegacy represents the old version of UserMetadataDoc
+type userMetadataDocLegacy struct {
+	Description string
+	Website     string
+	PhotoURL    string
+	Lang        string
+	Theme       string
+}
+
+// AddMetadataUser is a legacy migration to initialize metadata fields in user documents.
+// This version avoids using updated mongodoc structs to prevent compile issues.
 func AddMetadataUser(ctx context.Context, c DBClient) error {
 	col := c.Collection("user")
 
@@ -19,13 +65,12 @@ func AddMetadataUser(ctx context.Context, c DBClient) error {
 			newRows := make([]interface{}, 0, len(rows))
 
 			for _, row := range rows {
-				var doc mongodoc.UserDocument
-				metadata := new(mongodoc.UserMetadataDoc)
+				var doc userDocumentLegacy
+				metadata := new(userMetadataDocLegacy)
 
 				if err := bson.Unmarshal(row, &doc); err != nil {
 					return err
 				}
-
 				if doc.Alias == "" {
 					alias := strings.ToLower(strings.ReplaceAll(doc.Name, " ", "-"))
 					doc.Alias = alias
@@ -58,7 +103,7 @@ func AddMetadataUser(ctx context.Context, c DBClient) error {
 						doc.Theme = ""
 					}
 
-					doc.Metadata = &mongodoc.UserMetadataDoc{
+					doc.Metadata = &userMetadataDocLegacy{
 						Description: "",
 						Lang:        lang,
 						PhotoURL:    "",

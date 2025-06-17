@@ -9,7 +9,7 @@ import (
 
 func TestNewMetadata(t *testing.T) {
 	metadata := NewMetadata()
-	assert.Equal(t, &Metadata{}, metadata)
+	assert.Equal(t, Metadata{}, metadata)
 }
 
 func TestMetadata_MetadataFrom(t *testing.T) {

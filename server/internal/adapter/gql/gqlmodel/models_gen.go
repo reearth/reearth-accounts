@@ -92,6 +92,7 @@ type GetUsersWithRolesPayload struct {
 type Me struct {
 	ID            ID            `json:"id"`
 	Name          string        `json:"name"`
+	Alias         string        `json:"alias"`
 	Email         string        `json:"email"`
 	Metadata      *UserMetadata `json:"metadata"`
 	Host          *string       `json:"host,omitempty"`
@@ -274,11 +275,11 @@ func (User) IsNode()        {}
 func (this User) GetID() ID { return this.ID }
 
 type UserMetadata struct {
-	Description *string `json:"description,omitempty"`
-	Website     *string `json:"website,omitempty"`
-	PhotoURL    *string `json:"photoURL,omitempty"`
-	Lang        string  `json:"lang"`
-	Theme       Theme   `json:"theme"`
+	Description string `json:"description"`
+	Website     string `json:"website"`
+	PhotoURL    string `json:"photoURL"`
+	Lang        string `json:"lang"`
+	Theme       Theme  `json:"theme"`
 }
 
 type UserPayload struct {
@@ -297,6 +298,7 @@ type VerifyUserInput struct {
 type Workspace struct {
 	ID       ID                 `json:"id"`
 	Name     string             `json:"name"`
+	Alias    string             `json:"alias"`
 	Members  []WorkspaceMember  `json:"members"`
 	Metadata *WorkspaceMetadata `json:"metadata"`
 	Personal bool               `json:"personal"`
@@ -316,11 +318,11 @@ type WorkspaceIntegrationMember struct {
 func (WorkspaceIntegrationMember) IsWorkspaceMember() {}
 
 type WorkspaceMetadata struct {
-	Description  *string `json:"description,omitempty"`
-	Website      *string `json:"website,omitempty"`
-	Location     *string `json:"location,omitempty"`
-	BillingEmail *string `json:"billingEmail,omitempty"`
-	PhotoURL     *string `json:"photoURL,omitempty"`
+	Description  string `json:"description"`
+	Website      string `json:"website"`
+	Location     string `json:"location"`
+	BillingEmail string `json:"billingEmail"`
+	PhotoURL     string `json:"photoURL"`
 }
 
 type WorkspaceUserMember struct {

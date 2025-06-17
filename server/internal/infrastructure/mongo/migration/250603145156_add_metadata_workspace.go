@@ -4,10 +4,43 @@ import (
 	"context"
 	"strings"
 
-	"github.com/reearth/reearth-accounts/internal/infrastructure/mongo/mongodoc"
 	"github.com/reearth/reearthx/mongox"
 	"go.mongodb.org/mongo-driver/bson"
 )
+
+// NOTE:
+// The original `WorkspaceDocument` structs from `mongodoc` were updated to remove the pointer from the `Metadata` field.
+// As a result, keeping the original migration logic caused compilation errors.
+// To maintain compatibility and avoid coupling this migration to future struct changes, we define local legacy versions of the structs below, matching the schema at the time this migration was first written.
+
+// workspaceDocumentLegacy represents the old version of WorkspaceDocument
+type workspaceDocumentLegacy struct {
+	ID           string
+	Name         string
+	Alias        string
+	Email        string
+	Metadata     *workspaceMetadataDocumentLegacy
+	Members      map[string]workspaceMemberDocumentLegacy
+	Integrations map[string]workspaceMemberDocumentLegacy
+	Personal     bool
+	Policy       string `bson:",omitempty"`
+}
+
+// workspaceMetadataDocumentLegacy represents the old version of WorkspaceMetadataDocument
+type workspaceMetadataDocumentLegacy struct {
+	Description  string
+	Website      string
+	Location     string
+	BillingEmail string
+	PhotoURL     string
+}
+
+// workspaceMemberDocumentLegacy represents the old version of WorkspaceMemberDocument
+type workspaceMemberDocumentLegacy struct {
+	Role      string
+	InvitedBy string
+	Disabled  bool
+}
 
 func AddMetadataWorkspace(ctx context.Context, c DBClient) error {
 	col := c.WithCollection("workspace")
@@ -19,17 +52,15 @@ func AddMetadataWorkspace(ctx context.Context, c DBClient) error {
 			newRows := make([]interface{}, 0, len(rows))
 
 			for _, row := range rows {
-				var doc mongodoc.WorkspaceDocument
-				metadata := new(mongodoc.WorkspaceMetadataDocument)
+				var doc workspaceDocumentLegacy
+				metadata := new(workspaceMetadataDocumentLegacy)
 
 				if err := bson.Unmarshal(row, &doc); err != nil {
 					return err
 				}
-
 				if doc.Email == "" {
 					doc.Email = ""
 				}
-
 				if doc.Alias == "" {
 					alias := strings.ToLower(strings.ReplaceAll(doc.Name, " ", "-"))
 					doc.Alias = alias
