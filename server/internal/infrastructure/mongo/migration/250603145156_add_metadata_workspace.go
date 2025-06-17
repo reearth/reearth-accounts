@@ -66,15 +66,17 @@ func AddMetadataWorkspace(ctx context.Context, c DBClient) error {
 					doc.Alias = alias
 				}
 
-				metadata := doc.Metadata
+				if doc.Metadata != nil {
+					metadata.BillingEmail = doc.Metadata.BillingEmail
+					metadata.Description = doc.Metadata.Description
+					metadata.Location = doc.Metadata.Location
+					metadata.PhotoURL = doc.Metadata.PhotoURL
+					metadata.Website = doc.Metadata.Website
 
-				metadata.BillingEmail = doc.Metadata.BillingEmail
-				metadata.Description = doc.Metadata.Description
-				metadata.Location = doc.Metadata.Location
-				metadata.PhotoURL = doc.Metadata.PhotoURL
-				metadata.Website = doc.Metadata.Website
-
-				doc.Metadata = metadata
+					doc.Metadata = metadata
+				} else {
+					doc.Metadata = metadata
+				}
 
 				ids = append(ids, doc.ID)
 				newRows = append(newRows, doc)
