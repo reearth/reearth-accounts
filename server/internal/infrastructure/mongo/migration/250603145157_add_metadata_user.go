@@ -111,35 +111,6 @@ func AddMetadataUser(ctx context.Context, c DBClient) error {
 						Website:     "",
 					}
 				}
-				if doc.Theme != "" {
-					metadata.Theme = doc.Theme
-					doc.Theme = ""
-				}
-
-					metadata.Description = doc.Metadata.Description
-					metadata.PhotoURL = doc.Metadata.PhotoURL
-					metadata.Website = doc.Metadata.Website
-					doc.Metadata = metadata
-				} else {
-					var lang, theme string
-					if doc.Lang != "" {
-						lang = doc.Lang
-						doc.Lang = ""
-					}
-
-					if doc.Theme != "" {
-						theme = doc.Theme
-						doc.Theme = ""
-					}
-
-					doc.Metadata = &userMetadataDocLegacy{
-						Description: "",
-						Lang:        lang,
-						PhotoURL:    "",
-						Theme:       theme,
-						Website:     "",
-					}
-				}
 
 				ids = append(ids, doc.ID)
 				newRows = append(newRows, doc)
