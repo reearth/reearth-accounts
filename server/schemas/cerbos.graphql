@@ -1,5 +1,4 @@
 input CheckPermissionInput {
-  userId: String!
   service: String!
   resource: String!
   action: String!

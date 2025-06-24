@@ -1392,7 +1392,6 @@ schema {
   mutation: Mutation
 }`, BuiltIn: false},
 	{Name: "../../../schemas/cerbos.graphql", Input: `input CheckPermissionInput {
-  userId: String!
   service: String!
   resource: String!
   action: String!
@@ -10563,20 +10562,13 @@ func (ec *executionContext) unmarshalInputCheckPermissionInput(ctx context.Conte
 		asMap[k] = v
 	}
 
-	fieldsInOrder := [...]string{"userId", "service", "resource", "action"}
+	fieldsInOrder := [...]string{"service", "resource", "action"}
 	for _, k := range fieldsInOrder {
 		v, ok := asMap[k]
 		if !ok {
 			continue
 		}
 		switch k {
-		case "userId":
-			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("userId"))
-			data, err := ec.unmarshalNString2string(ctx, v)
-			if err != nil {
-				return it, err
-			}
-			it.UserID = data
 		case "service":
 			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("service"))
 			data, err := ec.unmarshalNString2string(ctx, v)
