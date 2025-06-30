@@ -41,7 +41,6 @@ type AddUsersToWorkspacePayload struct {
 }
 
 type CheckPermissionInput struct {
-	UserID   string `json:"userId"`
 	Service  string `json:"service"`
 	Resource string `json:"resource"`
 	Action   string `json:"action"`
