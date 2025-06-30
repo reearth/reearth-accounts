@@ -35,10 +35,6 @@ func (u *User) Name() string {
 }
 
 func (u *User) Alias() string {
-	if u.alias == "" {
-		return u.name
-	}
-
 	return u.alias
 }
 
