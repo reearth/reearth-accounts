@@ -8,8 +8,8 @@ concurrency:
 
 jobs:
   deploy-to-cloud-run:
-    name: Deploy to Dev
-    environment: dev
+    name: Deploy to Prod
+    environment: prod
     runs-on: ubuntu-latest
     if: github.event.repository.full_name == 'reearth/reearth-accounts'
     permissions:
