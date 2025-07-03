@@ -80,7 +80,7 @@ jobs:
             --quiet
   migrate-prod:
     if: ${{ inputs.environment == 'prod' }}
-    environment: dev
+    environment: prod
     name: Run migration on Prod (Latest)
     runs-on: ubuntu-latest
     permissions:
