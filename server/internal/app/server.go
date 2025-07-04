@@ -49,7 +49,7 @@ func Start(debug bool) {
 	// Check if migration mode
 	// Once the permission check migration is complete, it will be deleted.
 	if os.Getenv("RUN_MIGRATION") == "true" {
-		clientx := mongox.NewClient("reearth-accounts", client)
+		clientx := mongox.NewClient("reearth-account", client)
 		db := clientx.Database()
 
 		lock, lockErr := mongorepo.NewLock(db.Collection("locks"))
