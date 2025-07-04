@@ -13,7 +13,7 @@ import (
 	"go.mongodb.org/mongo-driver/mongo"
 )
 
-const databaseName = "reearth-accounts"
+const databaseName = "reearth-account"
 
 func initReposAndGateways(ctx context.Context, client *mongo.Client, conf *Config) (*repo.Container, *gateway.Container) {
 	txAvailable := mongox.IsTransactionAvailable(conf.DB)
