@@ -84,7 +84,11 @@ func (u *User) FindOrCreate(ctx context.Context, param interfaces.UserFindOrCrea
 func (u *User) UpdateMe(ctx context.Context, param interfaces.UpdateMeParam, op *usecase.Operator) (*user.User, error) {
 	input := UpdateMeInput{
 		Name:                 *param.Name,
+		Alias:                *param.Alias,
 		Email:                *param.Email,
+		PhotoURL:             *param.PhotoURL,
+		Website:              *param.Website,
+		Description:          *param.Description,
 		Lang:                 param.Lang.String(),
 		Theme:                string(*param.Theme),
 		Password:             *param.Password,
