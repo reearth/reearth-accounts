@@ -13,12 +13,10 @@ import (
 	"go.mongodb.org/mongo-driver/mongo"
 )
 
-const databaseName = "reearth-accounts"
-
 func initReposAndGateways(ctx context.Context, client *mongo.Client, conf *Config) (*repo.Container, *gateway.Container) {
 	txAvailable := mongox.IsTransactionAvailable(conf.DB)
 
-	repos, err := mongorepo.New(ctx, client.Database(databaseName), txAvailable, false, []repo.User{})
+	repos, err := mongorepo.New(ctx, client.Database(conf.DBName), txAvailable, false, []repo.User{})
 	if err != nil {
 		log.Fatalf("Failed to init mongo: %+v\n", err)
 	}
