@@ -3,21 +3,23 @@ package migration
 import (
 	"context"
 	"errors"
+	"regexp"
 	"strings"
 
-	validator "github.com/go-playground/validator/v10"
+	"github.com/go-playground/validator/v10"
 	"github.com/labstack/gommon/random"
 	"github.com/reearth/reearth-accounts/internal/infrastructure/mongo/mongodoc"
 	"github.com/reearth/reearthx/mongox"
 	"go.mongodb.org/mongo-driver/bson"
 )
 
-type TempASCIIWorkspaceAlias struct {
+type TempWorkspaceAlias struct {
 	Alias string `validate:"required,printascii"`
 }
 
-func ConvertNonASCIIWorkspaceAlias(ctx context.Context, c DBClient) error {
+func ConvertNonValidWorkspaceAlias(ctx context.Context, c DBClient) error {
 	col := c.Collection("workspace")
+	nameRegex := regexp.MustCompile(`^[a-z0-9](?:[a-z0-9-_@.]{0,61}[a-z0-9])?$`)
 
 	return col.Find(ctx, bson.D{}, &mongox.BatchConsumer{
 		Size: 1000,
@@ -33,11 +35,29 @@ func ConvertNonASCIIWorkspaceAlias(ctx context.Context, c DBClient) error {
 				}
 
 				doc.Alias = strings.ReplaceAll(doc.Alias, " ", "")
+				doc.Alias = strings.ToLower(doc.Alias)
 
-				var tempAlias TempASCIIWorkspaceAlias
+				// multiple consecutive characters check
+				chars := []string{"-", "_", ".", "@"}
+				for _, char := range chars {
+					if strings.Contains(doc.Alias, char+char) {
+						doc.Alias = strings.ReplaceAll(doc.Alias, char+char, char)
+					}
+				}
+
+				// email address check
+				if strings.Contains(doc.Alias, "@") && strings.Contains(doc.Alias, ".") {
+					doc.Alias = random.String(10, random.Lowercase)
+				}
+
+				// validate alias against regex
+				if !nameRegex.MatchString(doc.Alias) {
+					doc.Alias = random.String(10, random.Lowercase)
+				}
+
+				var tempAlias TempWorkspaceAlias
 				tempAlias.Alias = doc.Alias
 
-				// Validate the alias to ensure it is ASCII
 				validate := validator.New()
 				if err := validate.Struct(&tempAlias); err != nil {
 					var invalidValidationError *validator.InvalidValidationError
@@ -45,8 +65,7 @@ func ConvertNonASCIIWorkspaceAlias(ctx context.Context, c DBClient) error {
 						return err
 					}
 
-					// If the alias is not valid ASCII, generate a new random alias
-					doc.Alias = strings.ToLower(random.String(10))
+					doc.Alias = random.String(10, random.Lowercase)
 				}
 
 				ids = append(ids, doc.ID)
