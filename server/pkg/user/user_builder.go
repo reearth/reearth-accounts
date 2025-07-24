@@ -27,9 +27,6 @@ func (b *Builder) Build() (*User, error) {
 	if b.u.id.IsEmpty() {
 		return nil, ErrInvalidID
 	}
-	if b.u.name == "" {
-		return nil, ErrInvalidName
-	}
 	if b.passwordText != "" {
 		if err := b.u.SetPassword(b.passwordText); err != nil {
 			return nil, err
