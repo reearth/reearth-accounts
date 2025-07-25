@@ -10,9 +10,11 @@ import "github.com/reearth/reearthx/usecasex/migration"
 // If the migration takes too long, the deployment may fail in a serverless environment.
 // Set the batch size to as large a value as possible without using up the RAM of the deployment destination.
 var migrations = migration.Migrations[DBClient]{
-	250603145156: AddMetadataWorkspace,
-	250603145157: AddMetadataUser,
-	250617171040: AddMetadataWorkspaceV2,
-	250617171054: AddMetadataUserV2,
+	250617171055: AddMetadataWorkspace,
+	250617171056: AddMetadataUser,
+	250617171057: AddMetadataWorkspaceV2,
+	250617171058: AddMetadataUserV2,
 	250724212700: AddMetadataUserV3,
+	250725020842: ConvertNonValidUserAlias,
+	250725020843: ConvertNonValidWorkspaceAlias,
 }
