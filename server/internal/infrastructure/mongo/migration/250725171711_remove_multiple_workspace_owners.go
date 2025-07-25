@@ -25,28 +25,39 @@ func RemoveMultipleWorkspaceOwners(ctx context.Context, c DBClient) error {
 					return err
 				}
 
-				var ownerCount int
-				// count member with role "owner"
-				for _, member := range doc.Members {
+				// Create map of user_id -> role for owners only
+				owners := make(map[string]string)
+				for userID, member := range doc.Members {
 					if member.Role == string(workspace.RoleOwner) {
-						ownerCount++
+						owners[userID] = member.Role
 					}
 				}
 
-				if ownerCount > 1 {
+				// Only process if there are multiple owners
+				if len(owners) > 1 {
+					needsUpdate := false
 					for userID, member := range doc.Members {
-						if userID != member.InvitedBy {
+						// Only change owners who were not self-invited to maintainer
+						if member.Role == string(workspace.RoleOwner) && userID != member.InvitedBy {
 							member.Role = string(workspace.RoleMaintainer)
 							doc.Members[userID] = member
+							needsUpdate = true
 						}
 					}
-				}
 
-				ids = append(ids, doc.ID)
-				newRows = append(newRows, doc)
+					// Only add to update list if changes were made
+					if needsUpdate {
+						ids = append(ids, doc.ID)
+						newRows = append(newRows, doc)
+					}
+				}
 			}
 
-			return col.SaveAll(ctx, ids, newRows)
+			// Only save if there are changes
+			if len(ids) > 0 {
+				return col.SaveAll(ctx, ids, newRows)
+			}
+			return nil
 		},
 	})
 }
