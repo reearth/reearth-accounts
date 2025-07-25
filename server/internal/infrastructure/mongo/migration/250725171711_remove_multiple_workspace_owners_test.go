@@ -69,7 +69,7 @@ func TestRemoveMultipleWorkspaceOwners(t *testing.T) {
 		assert.Equal(t, string(workspace.RoleMaintainer), user2["role"])
 	})
 
-	t.Run("workspace with multiple owners - demote non-self-invited", func(t *testing.T) {
+	t.Run("workspace with multiple owners - convert excess to maintainers", func(t *testing.T) {
 		// Clear collection
 		_, err := workspaceCollection.DeleteMany(ctx, bson.M{})
 		require.NoError(t, err)
@@ -82,15 +82,15 @@ func TestRemoveMultipleWorkspaceOwners(t *testing.T) {
 				"members": bson.M{
 					"user1": bson.M{
 						"role":      string(workspace.RoleOwner),
-						"invitedby": "user1", // self-invited, should remain owner
+						"invitedby": "user1",
 					},
 					"user2": bson.M{
 						"role":      string(workspace.RoleOwner),
-						"invitedby": "user1", // invited by user1, should become maintainer
+						"invitedby": "user1",
 					},
 					"user3": bson.M{
 						"role":      string(workspace.RoleOwner),
-						"invitedby": "user3", // self-invited, should remain owner
+						"invitedby": "user3",
 					},
 				},
 			},
@@ -103,27 +103,29 @@ func TestRemoveMultipleWorkspaceOwners(t *testing.T) {
 		err = RemoveMultipleWorkspaceOwners(ctx, client)
 		require.NoError(t, err)
 
-		// Verify changes
+		// Verify changes - only one owner should remain
 		var ws2 bson.M
 		err = workspaceCollection.FindOne(ctx, bson.M{"id": "ws2"}).Decode(&ws2)
 		require.NoError(t, err)
 
 		members := ws2["members"].(bson.M)
-		user1 := members["user1"].(bson.M)
-		user2 := members["user2"].(bson.M)
-		user3 := members["user3"].(bson.M)
+		ownerCount := 0
+		for _, member := range members {
+			memberData := member.(bson.M)
+			if memberData["role"] == string(workspace.RoleOwner) {
+				ownerCount++
+			}
+		}
 
-		assert.Equal(t, string(workspace.RoleOwner), user1["role"], "user1 should remain owner (self-invited)")
-		assert.Equal(t, string(workspace.RoleMaintainer), user2["role"], "user2 should become maintainer (not self-invited)")
-		assert.Equal(t, string(workspace.RoleOwner), user3["role"], "user3 should remain owner (self-invited)")
+		assert.Equal(t, 1, ownerCount, "Should have exactly one owner after migration")
 	})
 
-	t.Run("workspace with multiple owners - all non-self-invited become maintainers", func(t *testing.T) {
+	t.Run("workspace with multiple owners - reduce to single owner", func(t *testing.T) {
 		// Clear collection
 		_, err := workspaceCollection.DeleteMany(ctx, bson.M{})
 		require.NoError(t, err)
 
-		// Setup: Insert workspace with multiple owners, only one self-invited
+		// Setup: Insert workspace with multiple owners
 		workspaceData := []interface{}{
 			bson.M{
 				"_id": primitive.NewObjectID(),
@@ -131,19 +133,19 @@ func TestRemoveMultipleWorkspaceOwners(t *testing.T) {
 				"members": bson.M{
 					"user1": bson.M{
 						"role":      string(workspace.RoleOwner),
-						"invitedby": "user1", // self-invited, should remain owner
+						"invitedby": "user1",
 					},
 					"user2": bson.M{
 						"role":      string(workspace.RoleOwner),
-						"invitedby": "user1", // invited by user1, should become maintainer
+						"invitedby": "user1",
 					},
 					"user3": bson.M{
 						"role":      string(workspace.RoleOwner),
-						"invitedby": "user1", // invited by user1, should become maintainer
+						"invitedby": "user1",
 					},
 					"user4": bson.M{
 						"role":      string(workspace.RoleMaintainer),
-						"invitedby": "user1", // already maintainer, no change
+						"invitedby": "user1",
 					},
 				},
 			},
@@ -156,20 +158,24 @@ func TestRemoveMultipleWorkspaceOwners(t *testing.T) {
 		err = RemoveMultipleWorkspaceOwners(ctx, client)
 		require.NoError(t, err)
 
-		// Verify changes
+		// Verify only one owner remains
 		var ws3 bson.M
 		err = workspaceCollection.FindOne(ctx, bson.M{"id": "ws3"}).Decode(&ws3)
 		require.NoError(t, err)
 
 		members := ws3["members"].(bson.M)
-		user1 := members["user1"].(bson.M)
-		user2 := members["user2"].(bson.M)
-		user3 := members["user3"].(bson.M)
-		user4 := members["user4"].(bson.M)
+		ownerCount := 0
+		for _, member := range members {
+			memberData := member.(bson.M)
+			if memberData["role"] == string(workspace.RoleOwner) {
+				ownerCount++
+			}
+		}
 
-		assert.Equal(t, string(workspace.RoleOwner), user1["role"], "user1 should remain owner (self-invited)")
-		assert.Equal(t, string(workspace.RoleMaintainer), user2["role"], "user2 should become maintainer (not self-invited)")
-		assert.Equal(t, string(workspace.RoleMaintainer), user3["role"], "user3 should become maintainer (not self-invited)")
+		assert.Equal(t, 1, ownerCount, "Should have exactly one owner after migration")
+
+		// Verify user4 remains maintainer
+		user4 := members["user4"].(bson.M)
 		assert.Equal(t, string(workspace.RoleMaintainer), user4["role"], "user4 should remain maintainer")
 	})
 
@@ -267,17 +273,21 @@ func TestRemoveMultipleWorkspaceOwners(t *testing.T) {
 		user1_ws5 := members5["user1"].(bson.M)
 		assert.Equal(t, string(workspace.RoleOwner), user1_ws5["role"])
 
-		// Verify ws6 (multiple owners) has changes
+		// Verify ws6 (multiple owners) has only one owner
 		var ws6 bson.M
 		err = workspaceCollection.FindOne(ctx, bson.M{"id": "ws6"}).Decode(&ws6)
 		require.NoError(t, err)
 
 		members6 := ws6["members"].(bson.M)
-		user1_ws6 := members6["user1"].(bson.M)
-		user2_ws6 := members6["user2"].(bson.M)
+		ownerCount := 0
+		for _, member := range members6 {
+			memberData := member.(bson.M)
+			if memberData["role"] == string(workspace.RoleOwner) {
+				ownerCount++
+			}
+		}
 
-		assert.Equal(t, string(workspace.RoleOwner), user1_ws6["role"], "user1 should remain owner")
-		assert.Equal(t, string(workspace.RoleMaintainer), user2_ws6["role"], "user2 should become maintainer")
+		assert.Equal(t, 1, ownerCount, "Should have exactly one owner after migration")
 	})
 
 	t.Run("handles empty collection gracefully", func(t *testing.T) {
@@ -295,28 +305,28 @@ func TestRemoveMultipleWorkspaceOwners(t *testing.T) {
 		assert.Equal(t, int64(0), count)
 	})
 
-	t.Run("workspace with all owners self-invited should not change", func(t *testing.T) {
+	t.Run("workspace with multiple owners - converts excess to maintainers", func(t *testing.T) {
 		// Clear collection
 		_, err := workspaceCollection.DeleteMany(ctx, bson.M{})
 		require.NoError(t, err)
 
-		// Setup: Insert workspace where all owners are self-invited
+		// Setup: Insert workspace with multiple owners
 		workspaceData := []interface{}{
 			bson.M{
 				"_id": primitive.NewObjectID(),
-				"id":  "ws_all_self",
+				"id":  "ws_multiple",
 				"members": bson.M{
 					"user1": bson.M{
 						"role":      string(workspace.RoleOwner),
-						"invitedby": "user1", // self-invited
+						"invitedby": "user1",
 					},
 					"user2": bson.M{
 						"role":      string(workspace.RoleOwner),
-						"invitedby": "user2", // self-invited
+						"invitedby": "user2",
 					},
 					"user3": bson.M{
 						"role":      string(workspace.RoleOwner),
-						"invitedby": "user3", // self-invited
+						"invitedby": "user3",
 					},
 				},
 			},
@@ -329,16 +339,21 @@ func TestRemoveMultipleWorkspaceOwners(t *testing.T) {
 		err = RemoveMultipleWorkspaceOwners(ctx, client)
 		require.NoError(t, err)
 
-		// Verify all owners remain owners since they are self-invited
+		// Verify only one owner remains
 		var ws bson.M
-		err = workspaceCollection.FindOne(ctx, bson.M{"id": "ws_all_self"}).Decode(&ws)
+		err = workspaceCollection.FindOne(ctx, bson.M{"id": "ws_multiple"}).Decode(&ws)
 		require.NoError(t, err)
 
 		members := ws["members"].(bson.M)
-		for userID := range members {
-			member := members[userID].(bson.M)
-			assert.Equal(t, string(workspace.RoleOwner), member["role"], "User %s should remain owner", userID)
+		ownerCount := 0
+		for _, member := range members {
+			memberData := member.(bson.M)
+			if memberData["role"] == string(workspace.RoleOwner) {
+				ownerCount++
+			}
 		}
+
+		assert.Equal(t, 1, ownerCount, "Should have exactly one owner after migration")
 	})
 
 	t.Run("idempotent - running migration twice has no additional effect", func(t *testing.T) {
@@ -371,17 +386,20 @@ func TestRemoveMultipleWorkspaceOwners(t *testing.T) {
 		err = RemoveMultipleWorkspaceOwners(ctx, client)
 		require.NoError(t, err)
 
-		// Verify changes after first run
+		// Verify only one owner after first run
 		var ws1 bson.M
 		err = workspaceCollection.FindOne(ctx, bson.M{"id": "ws_idempotent"}).Decode(&ws1)
 		require.NoError(t, err)
 
 		members1 := ws1["members"].(bson.M)
-		user1_first := members1["user1"].(bson.M)
-		user2_first := members1["user2"].(bson.M)
-
-		assert.Equal(t, string(workspace.RoleOwner), user1_first["role"])
-		assert.Equal(t, string(workspace.RoleMaintainer), user2_first["role"])
+		ownerCount1 := 0
+		for _, member := range members1 {
+			memberData := member.(bson.M)
+			if memberData["role"] == string(workspace.RoleOwner) {
+				ownerCount1++
+			}
+		}
+		assert.Equal(t, 1, ownerCount1, "Should have exactly one owner after first run")
 
 		// Run migration second time
 		err = RemoveMultipleWorkspaceOwners(ctx, client)
@@ -393,11 +411,14 @@ func TestRemoveMultipleWorkspaceOwners(t *testing.T) {
 		require.NoError(t, err)
 
 		members2 := ws2["members"].(bson.M)
-		user1_second := members2["user1"].(bson.M)
-		user2_second := members2["user2"].(bson.M)
-
-		assert.Equal(t, string(workspace.RoleOwner), user1_second["role"])
-		assert.Equal(t, string(workspace.RoleMaintainer), user2_second["role"])
+		ownerCount2 := 0
+		for _, member := range members2 {
+			memberData := member.(bson.M)
+			if memberData["role"] == string(workspace.RoleOwner) {
+				ownerCount2++
+			}
+		}
+		assert.Equal(t, 1, ownerCount2, "Should still have exactly one owner after second run")
 
 		// Verify only one document exists
 		count, err := workspaceCollection.CountDocuments(ctx, bson.M{})
