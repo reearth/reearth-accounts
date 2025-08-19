@@ -126,6 +126,7 @@ type ComplexityRoot struct {
 	Query struct {
 		CheckPermission          func(childComplexity int, input gqlmodel.CheckPermissionInput) int
 		FindByID                 func(childComplexity int, id gqlmodel.ID) int
+		FindByIDs                func(childComplexity int, ids []gqlmodel.ID) int
 		FindByName               func(childComplexity int, name string) int
 		FindByUser               func(childComplexity int, userID gqlmodel.ID) int
 		FindByUserWithPagination func(childComplexity int, userID gqlmodel.ID, pagination gqlmodel.Pagination) int
@@ -289,6 +290,7 @@ type QueryResolver interface {
 	UserByNameOrEmail(ctx context.Context, nameOrEmail string) (*gqlmodel.User, error)
 	SearchUser(ctx context.Context, keyword string) ([]*gqlmodel.User, error)
 	FindByID(ctx context.Context, id gqlmodel.ID) (*gqlmodel.Workspace, error)
+	FindByIDs(ctx context.Context, ids []gqlmodel.ID) ([]*gqlmodel.Workspace, error)
 	FindByName(ctx context.Context, name string) (*gqlmodel.Workspace, error)
 	FindByUser(ctx context.Context, userID gqlmodel.ID) ([]*gqlmodel.Workspace, error)
 	FindByUserWithPagination(ctx context.Context, userID gqlmodel.ID, pagination gqlmodel.Pagination) (*gqlmodel.WorkspacesWithPagination, error)
@@ -779,6 +781,18 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 		}
 
 		return e.complexity.Query.FindByID(childComplexity, args["id"].(gqlmodel.ID)), true
+
+	case "Query.findByIDs":
+		if e.complexity.Query.FindByIDs == nil {
+			break
+		}
+
+		args, err := ec.field_Query_findByIDs_args(context.TODO(), rawArgs)
+		if err != nil {
+			return 0, false
+		}
+
+		return e.complexity.Query.FindByIDs(childComplexity, args["ids"].([]gqlmodel.ID)), true
 
 	case "Query.findByName":
 		if e.complexity.Query.FindByName == nil {
@@ -1754,6 +1768,7 @@ type DeleteWorkspacePayload {
 
 extend type Query {
     findByID(id: ID!): Workspace
+    findByIDs(ids: [ID!]!): [Workspace!]!
     findByName(name: String!): Workspace
     findByUser(userId: ID!): [Workspace]
     findByUserWithPagination(userId: ID!, pagination: Pagination!): WorkspacesWithPagination!
@@ -2560,6 +2575,34 @@ func (ec *executionContext) field_Query_findByID_argsID(
 	}
 
 	var zeroVal gqlmodel.ID
+	return zeroVal, nil
+}
+
+func (ec *executionContext) field_Query_findByIDs_args(ctx context.Context, rawArgs map[string]any) (map[string]any, error) {
+	var err error
+	args := map[string]any{}
+	arg0, err := ec.field_Query_findByIDs_argsIds(ctx, rawArgs)
+	if err != nil {
+		return nil, err
+	}
+	args["ids"] = arg0
+	return args, nil
+}
+func (ec *executionContext) field_Query_findByIDs_argsIds(
+	ctx context.Context,
+	rawArgs map[string]any,
+) ([]gqlmodel.ID, error) {
+	if _, ok := rawArgs["ids"]; !ok {
+		var zeroVal []gqlmodel.ID
+		return zeroVal, nil
+	}
+
+	ctx = graphql.WithPathContext(ctx, graphql.NewPathWithField("ids"))
+	if tmp, ok := rawArgs["ids"]; ok {
+		return ec.unmarshalNID2ᚕgithubᚗcomᚋreearthᚋreearthᚑaccountsᚋinternalᚋadapterᚋgqlᚋgqlmodelᚐIDᚄ(ctx, tmp)
+	}
+
+	var zeroVal []gqlmodel.ID
 	return zeroVal, nil
 }
 
@@ -5808,6 +5851,75 @@ func (ec *executionContext) fieldContext_Query_findByID(ctx context.Context, fie
 	}()
 	ctx = graphql.WithFieldContext(ctx, fc)
 	if fc.Args, err = ec.field_Query_findByID_args(ctx, field.ArgumentMap(ec.Variables)); err != nil {
+		ec.Error(ctx, err)
+		return fc, err
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _Query_findByIDs(ctx context.Context, field graphql.CollectedField) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_Query_findByIDs(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (any, error) {
+		ctx = rctx // use context from middleware stack in children
+		return ec.resolvers.Query().FindByIDs(rctx, fc.Args["ids"].([]gqlmodel.ID))
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		if !graphql.HasFieldError(ctx, fc) {
+			ec.Errorf(ctx, "must not be null")
+		}
+		return graphql.Null
+	}
+	res := resTmp.([]*gqlmodel.Workspace)
+	fc.Result = res
+	return ec.marshalNWorkspace2ᚕᚖgithubᚗcomᚋreearthᚋreearthᚑaccountsᚋinternalᚋadapterᚋgqlᚋgqlmodelᚐWorkspaceᚄ(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_Query_findByIDs(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "Query",
+		Field:      field,
+		IsMethod:   true,
+		IsResolver: true,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			switch field.Name {
+			case "id":
+				return ec.fieldContext_Workspace_id(ctx, field)
+			case "name":
+				return ec.fieldContext_Workspace_name(ctx, field)
+			case "alias":
+				return ec.fieldContext_Workspace_alias(ctx, field)
+			case "members":
+				return ec.fieldContext_Workspace_members(ctx, field)
+			case "metadata":
+				return ec.fieldContext_Workspace_metadata(ctx, field)
+			case "personal":
+				return ec.fieldContext_Workspace_personal(ctx, field)
+			}
+			return nil, fmt.Errorf("no field named %q was found under type Workspace", field.Name)
+		},
+	}
+	defer func() {
+		if r := recover(); r != nil {
+			err = ec.Recover(ctx, r)
+			ec.Error(ctx, err)
+		}
+	}()
+	ctx = graphql.WithFieldContext(ctx, fc)
+	if fc.Args, err = ec.field_Query_findByIDs_args(ctx, field.ArgumentMap(ec.Variables)); err != nil {
 		ec.Error(ctx, err)
 		return fc, err
 	}
@@ -12316,6 +12428,28 @@ func (ec *executionContext) _Query(ctx context.Context, sel ast.SelectionSet) gr
 					}
 				}()
 				res = ec._Query_findByID(ctx, field)
+				return res
+			}
+
+			rrm := func(ctx context.Context) graphql.Marshaler {
+				return ec.OperationContext.RootResolverMiddleware(ctx,
+					func(ctx context.Context) graphql.Marshaler { return innerFunc(ctx, out) })
+			}
+
+			out.Concurrently(i, func(ctx context.Context) graphql.Marshaler { return rrm(innerCtx) })
+		case "findByIDs":
+			field := field
+
+			innerFunc := func(ctx context.Context, fs *graphql.FieldSet) (res graphql.Marshaler) {
+				defer func() {
+					if r := recover(); r != nil {
+						ec.Error(ctx, ec.Recover(ctx, r))
+					}
+				}()
+				res = ec._Query_findByIDs(ctx, field)
+				if res == graphql.Null {
+					atomic.AddUint32(&fs.Invalids, 1)
+				}
 				return res
 			}
 
