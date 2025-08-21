@@ -4,6 +4,7 @@ import (
 	"context"
 
 	"github.com/reearth/reearth-accounts/internal/adapter/gql/gqlmodel"
+	"github.com/reearth/reearth-accounts/pkg/id"
 )
 
 func (r *Resolver) Me() MeResolver {
@@ -18,4 +19,18 @@ func (r *meResolver) MyWorkspace(ctx context.Context, obj *gqlmodel.Me) (*gqlmod
 
 func (r *meResolver) Workspaces(ctx context.Context, obj *gqlmodel.Me) ([]*gqlmodel.Workspace, error) {
 	return loaders(ctx).Workspace.FindByUser(ctx, obj.ID)
+}
+
+func (r *queryResolver) FindUsersByIDs(ctx context.Context, userIds []gqlmodel.ID) ([]*gqlmodel.User, error) {
+	uids, err := gqlmodel.ToIDs[id.User](userIds)
+	if err != nil {
+		return nil, err
+	}
+
+	res, err := usecases(ctx).User.FetchByID(ctx, uids)
+	if err != nil {
+		return nil, err
+	}
+
+	return gqlmodel.ToUsers(res), nil
 }

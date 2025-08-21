@@ -92,6 +92,7 @@ extend type Query {
   me: Me
   userByNameOrEmail(nameOrEmail: String!): User
   searchUser(keyword: String!): [User!]!
+  findUsersByIDs(ids: [ID!]!): [User!]!
 }
 
 type UserPayload {
