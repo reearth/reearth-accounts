@@ -32,6 +32,20 @@ func (r *queryResolver) FindByID(ctx context.Context, workpaceId gqlmodel.ID) (*
 	return gqlmodel.ToWorkspace(res), nil
 }
 
+func (r *queryResolver) FindByIDs(ctx context.Context, workpaceIds []gqlmodel.ID) ([]*gqlmodel.Workspace, error) {
+	wids, err := gqlmodel.ToIDs[id.Workspace](workpaceIds)
+	if err != nil {
+		return nil, err
+	}
+
+	res, err := usecases(ctx).Workspace.Fetch(ctx, wids, getOperator(ctx))
+	if err != nil {
+		return nil, err
+	}
+
+	return gqlmodel.ToWorkspaces(res), nil
+}
+
 func (r *queryResolver) FindByName(ctx context.Context, name string) (*gqlmodel.Workspace, error) {
 	res, err := usecases(ctx).Workspace.FetchByName(ctx, name)
 	if err != nil {

@@ -150,6 +150,7 @@ type DeleteWorkspacePayload {
 
 extend type Query {
     findByID(id: ID!): Workspace
+    findByIDs(ids: [ID!]!): [Workspace!]!
     findByName(name: String!): Workspace
     findByUser(userId: ID!): [Workspace]
     findByUserWithPagination(userId: ID!, pagination: Pagination!): WorkspacesWithPagination!
