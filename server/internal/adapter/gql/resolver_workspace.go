@@ -55,11 +55,18 @@ func (r *queryResolver) FindByName(ctx context.Context, name string) (*gqlmodel.
 	return gqlmodel.ToWorkspace(res), nil
 }
 
-// Temporary stub implementation to satisfy gqlgen after migrating GraphQL files from reearthx/account.
-// This resolver was added to avoid compile-time errors.
-// Will be implemented if needed, or removed if unused after migration.
 func (r *queryResolver) FindByUser(ctx context.Context, userID gqlmodel.ID) ([]*gqlmodel.Workspace, error) {
-	return nil, nil
+	uid, err := gqlmodel.ToID[id.User](userID)
+	if err != nil {
+		return nil, err
+	}
+
+	res, err := usecases(ctx).Workspace.FindByUser(ctx, uid, getOperator(ctx))
+	if err != nil {
+		return nil, err
+	}
+
+	return gqlmodel.ToWorkspaces(res), nil
 }
 
 func (r *queryResolver) FindByUserWithPagination(ctx context.Context, userID gqlmodel.ID, pagination gqlmodel.Pagination) (*gqlmodel.WorkspacesWithPagination, error) {

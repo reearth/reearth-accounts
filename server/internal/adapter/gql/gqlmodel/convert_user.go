@@ -3,6 +3,7 @@ package gqlmodel
 import (
 	"github.com/reearth/reearth-accounts/pkg/user"
 	"github.com/reearth/reearth-accounts/pkg/workspace"
+	"github.com/samber/lo"
 
 	"github.com/reearth/reearthx/util"
 )
@@ -12,11 +13,37 @@ func ToUser(u *user.User) *User {
 		return nil
 	}
 
-	return &User{
-		ID:    IDFrom(u.ID()),
-		Name:  u.Name(),
-		Email: u.Email(),
+	metadata := UserMetadata{
+		Description: u.Metadata().Description(),
+		Lang:        u.Metadata().Lang().String(),
+		PhotoURL:    u.Metadata().PhotoURL(),
+		Theme:       Theme(u.Metadata().Theme()),
+		Website:     u.Metadata().Website(),
 	}
+
+	return &User{
+		ID:        IDFrom(u.ID()),
+		Name:      u.Name(),
+		Email:     u.Email(),
+		Host:      lo.EmptyableToPtr(u.Host()),
+		Workspace: IDFrom(u.Workspace()),
+		Auths: util.Map(u.Auths(), func(a user.Auth) string {
+			return a.Provider
+		}),
+		Metadata: &metadata,
+	}
+}
+
+func ToUsers(ul user.List) []*User {
+	if ul == nil {
+		return nil
+	}
+
+	users := make([]*User, 0, len(ul))
+	for _, u := range ul {
+		users = append(users, ToUser(u))
+	}
+	return users
 }
 
 func ToUserFromSimple(u *user.Simple) *User {
