@@ -88,6 +88,7 @@ func (i *Workspace) Create(ctx context.Context, name string, firstUser workspace
 		ws, err := workspace.New().
 			NewID().
 			Name(name).
+			Metadata(workspace.NewMetadata()).
 			Build()
 		if err != nil {
 			return nil, err
