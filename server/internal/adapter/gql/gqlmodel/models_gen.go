@@ -194,10 +194,10 @@ type SignUpInput struct {
 }
 
 type SignupOIDCInput struct {
-	Name   string `json:"name"`
-	Email  string `json:"email"`
-	Sub    string `json:"sub"`
-	Secret string `json:"secret"`
+	ID          *ID     `json:"id,omitempty"`
+	Lang        *string `json:"lang,omitempty"`
+	WorkspaceID *ID     `json:"workspaceId,omitempty"`
+	Secret      *string `json:"secret,omitempty"`
 }
 
 type StartPasswordResetInput struct {

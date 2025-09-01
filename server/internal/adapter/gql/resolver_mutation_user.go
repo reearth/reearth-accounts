@@ -3,6 +3,7 @@ package gql
 import (
 	"context"
 
+	"github.com/reearth/reearth-accounts/internal/adapter"
 	"github.com/reearth/reearth-accounts/internal/adapter/gql/gqlmodel"
 	"github.com/reearth/reearth-accounts/internal/usecase/interfaces"
 	"github.com/reearth/reearth-accounts/pkg/id"
@@ -58,11 +59,34 @@ func (r *mutationResolver) SignUp(ctx context.Context, input gqlmodel.SignUpInpu
 	return nil, nil
 }
 
-// Temporary stub implementation to satisfy gqlgen after migrating GraphQL files from reearthx/account.
-// This resolver was added to avoid compile-time errors.
-// Will be implemented if needed, or removed if unused after migration.
-func (r *mutationResolver) SignUpOidc(ctx context.Context, input gqlmodel.SignupOIDCInput) (*gqlmodel.UserPayload, error) {
-	return nil, nil
+func (r *mutationResolver) SignupOidc(ctx context.Context, input gqlmodel.SignupOIDCInput) (*gqlmodel.UserPayload, error) {
+	au := adapter.GetAuthInfo(ctx)
+	if au == nil {
+		return nil, interfaces.ErrOperationDenied
+	}
+
+	var lang language.Tag
+	if input.Lang != nil {
+		lang = language.Make(*input.Lang)
+	}
+	u, err := usecases(ctx).User.SignupOIDC(ctx, interfaces.SignupOIDCParam{
+		Sub:         au.Sub,
+		AccessToken: au.Token,
+		Issuer:      au.Iss,
+		Email:       au.Email,
+		Name:        au.Name,
+		Secret:      input.Secret,
+		User: interfaces.SignupUserParam{
+			Lang:        &lang,
+			UserID:      gqlmodel.ToIDRef[id.User](input.ID),
+			WorkspaceID: gqlmodel.ToIDRef[id.Workspace](input.WorkspaceID),
+		},
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	return &gqlmodel.UserPayload{User: gqlmodel.ToUser(u)}, nil
 }
 
 // Temporary stub implementation to satisfy gqlgen after migrating GraphQL files from reearthx/account.

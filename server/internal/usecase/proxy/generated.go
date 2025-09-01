@@ -2220,78 +2220,78 @@ func (v *SignUpSignUpUserPayloadUser) __premarshalJSON() (*__premarshalSignUpSig
 }
 
 type SignupOIDCInput struct {
-	Name   string `json:"name"`
-	Email  string `json:"email"`
-	Sub    string `json:"sub"`
-	Secret string `json:"secret"`
+	Id          string `json:"id"`
+	Lang        string `json:"lang"`
+	WorkspaceId string `json:"workspaceId"`
+	Secret      string `json:"secret"`
 }
 
-// GetName returns SignupOIDCInput.Name, and is useful for accessing the field via an interface.
-func (v *SignupOIDCInput) GetName() string { return v.Name }
+// GetId returns SignupOIDCInput.Id, and is useful for accessing the field via an interface.
+func (v *SignupOIDCInput) GetId() string { return v.Id }
 
-// GetEmail returns SignupOIDCInput.Email, and is useful for accessing the field via an interface.
-func (v *SignupOIDCInput) GetEmail() string { return v.Email }
+// GetLang returns SignupOIDCInput.Lang, and is useful for accessing the field via an interface.
+func (v *SignupOIDCInput) GetLang() string { return v.Lang }
 
-// GetSub returns SignupOIDCInput.Sub, and is useful for accessing the field via an interface.
-func (v *SignupOIDCInput) GetSub() string { return v.Sub }
+// GetWorkspaceId returns SignupOIDCInput.WorkspaceId, and is useful for accessing the field via an interface.
+func (v *SignupOIDCInput) GetWorkspaceId() string { return v.WorkspaceId }
 
 // GetSecret returns SignupOIDCInput.Secret, and is useful for accessing the field via an interface.
 func (v *SignupOIDCInput) GetSecret() string { return v.Secret }
 
 // SignupOIDCResponse is returned by SignupOIDC on success.
 type SignupOIDCResponse struct {
-	SignUpOIDC SignupOIDCSignUpOIDCUserPayload `json:"signUpOIDC"`
+	SignupOIDC SignupOIDCSignupOIDCUserPayload `json:"signupOIDC"`
 }
 
-// GetSignUpOIDC returns SignupOIDCResponse.SignUpOIDC, and is useful for accessing the field via an interface.
-func (v *SignupOIDCResponse) GetSignUpOIDC() SignupOIDCSignUpOIDCUserPayload { return v.SignUpOIDC }
+// GetSignupOIDC returns SignupOIDCResponse.SignupOIDC, and is useful for accessing the field via an interface.
+func (v *SignupOIDCResponse) GetSignupOIDC() SignupOIDCSignupOIDCUserPayload { return v.SignupOIDC }
 
-// SignupOIDCSignUpOIDCUserPayload includes the requested fields of the GraphQL type UserPayload.
-type SignupOIDCSignUpOIDCUserPayload struct {
-	User SignupOIDCSignUpOIDCUserPayloadUser `json:"user"`
+// SignupOIDCSignupOIDCUserPayload includes the requested fields of the GraphQL type UserPayload.
+type SignupOIDCSignupOIDCUserPayload struct {
+	User SignupOIDCSignupOIDCUserPayloadUser `json:"user"`
 }
 
-// GetUser returns SignupOIDCSignUpOIDCUserPayload.User, and is useful for accessing the field via an interface.
-func (v *SignupOIDCSignUpOIDCUserPayload) GetUser() SignupOIDCSignUpOIDCUserPayloadUser {
+// GetUser returns SignupOIDCSignupOIDCUserPayload.User, and is useful for accessing the field via an interface.
+func (v *SignupOIDCSignupOIDCUserPayload) GetUser() SignupOIDCSignupOIDCUserPayloadUser {
 	return v.User
 }
 
-// SignupOIDCSignUpOIDCUserPayloadUser includes the requested fields of the GraphQL type User.
-type SignupOIDCSignUpOIDCUserPayloadUser struct {
+// SignupOIDCSignupOIDCUserPayloadUser includes the requested fields of the GraphQL type User.
+type SignupOIDCSignupOIDCUserPayloadUser struct {
 	FragmentUser `json:"-"`
 }
 
-// GetId returns SignupOIDCSignUpOIDCUserPayloadUser.Id, and is useful for accessing the field via an interface.
-func (v *SignupOIDCSignUpOIDCUserPayloadUser) GetId() string { return v.FragmentUser.Id }
+// GetId returns SignupOIDCSignupOIDCUserPayloadUser.Id, and is useful for accessing the field via an interface.
+func (v *SignupOIDCSignupOIDCUserPayloadUser) GetId() string { return v.FragmentUser.Id }
 
-// GetName returns SignupOIDCSignUpOIDCUserPayloadUser.Name, and is useful for accessing the field via an interface.
-func (v *SignupOIDCSignUpOIDCUserPayloadUser) GetName() string { return v.FragmentUser.Name }
+// GetName returns SignupOIDCSignupOIDCUserPayloadUser.Name, and is useful for accessing the field via an interface.
+func (v *SignupOIDCSignupOIDCUserPayloadUser) GetName() string { return v.FragmentUser.Name }
 
-// GetEmail returns SignupOIDCSignUpOIDCUserPayloadUser.Email, and is useful for accessing the field via an interface.
-func (v *SignupOIDCSignUpOIDCUserPayloadUser) GetEmail() string { return v.FragmentUser.Email }
+// GetEmail returns SignupOIDCSignupOIDCUserPayloadUser.Email, and is useful for accessing the field via an interface.
+func (v *SignupOIDCSignupOIDCUserPayloadUser) GetEmail() string { return v.FragmentUser.Email }
 
-// GetMetadata returns SignupOIDCSignUpOIDCUserPayloadUser.Metadata, and is useful for accessing the field via an interface.
-func (v *SignupOIDCSignUpOIDCUserPayloadUser) GetMetadata() FragmentUserMetadata {
+// GetMetadata returns SignupOIDCSignupOIDCUserPayloadUser.Metadata, and is useful for accessing the field via an interface.
+func (v *SignupOIDCSignupOIDCUserPayloadUser) GetMetadata() FragmentUserMetadata {
 	return v.FragmentUser.Metadata
 }
 
-// GetWorkspace returns SignupOIDCSignUpOIDCUserPayloadUser.Workspace, and is useful for accessing the field via an interface.
-func (v *SignupOIDCSignUpOIDCUserPayloadUser) GetWorkspace() string { return v.FragmentUser.Workspace }
+// GetWorkspace returns SignupOIDCSignupOIDCUserPayloadUser.Workspace, and is useful for accessing the field via an interface.
+func (v *SignupOIDCSignupOIDCUserPayloadUser) GetWorkspace() string { return v.FragmentUser.Workspace }
 
-// GetAuths returns SignupOIDCSignUpOIDCUserPayloadUser.Auths, and is useful for accessing the field via an interface.
-func (v *SignupOIDCSignUpOIDCUserPayloadUser) GetAuths() []string { return v.FragmentUser.Auths }
+// GetAuths returns SignupOIDCSignupOIDCUserPayloadUser.Auths, and is useful for accessing the field via an interface.
+func (v *SignupOIDCSignupOIDCUserPayloadUser) GetAuths() []string { return v.FragmentUser.Auths }
 
-func (v *SignupOIDCSignUpOIDCUserPayloadUser) UnmarshalJSON(b []byte) error {
+func (v *SignupOIDCSignupOIDCUserPayloadUser) UnmarshalJSON(b []byte) error {
 
 	if string(b) == "null" {
 		return nil
 	}
 
 	var firstPass struct {
-		*SignupOIDCSignUpOIDCUserPayloadUser
+		*SignupOIDCSignupOIDCUserPayloadUser
 		graphql.NoUnmarshalJSON
 	}
-	firstPass.SignupOIDCSignUpOIDCUserPayloadUser = v
+	firstPass.SignupOIDCSignupOIDCUserPayloadUser = v
 
 	err := json.Unmarshal(b, &firstPass)
 	if err != nil {
@@ -2306,7 +2306,7 @@ func (v *SignupOIDCSignUpOIDCUserPayloadUser) UnmarshalJSON(b []byte) error {
 	return nil
 }
 
-type __premarshalSignupOIDCSignUpOIDCUserPayloadUser struct {
+type __premarshalSignupOIDCSignupOIDCUserPayloadUser struct {
 	Id string `json:"id"`
 
 	Name string `json:"name"`
@@ -2320,7 +2320,7 @@ type __premarshalSignupOIDCSignUpOIDCUserPayloadUser struct {
 	Auths []string `json:"auths"`
 }
 
-func (v *SignupOIDCSignUpOIDCUserPayloadUser) MarshalJSON() ([]byte, error) {
+func (v *SignupOIDCSignupOIDCUserPayloadUser) MarshalJSON() ([]byte, error) {
 	premarshaled, err := v.__premarshalJSON()
 	if err != nil {
 		return nil, err
@@ -2328,8 +2328,8 @@ func (v *SignupOIDCSignUpOIDCUserPayloadUser) MarshalJSON() ([]byte, error) {
 	return json.Marshal(premarshaled)
 }
 
-func (v *SignupOIDCSignUpOIDCUserPayloadUser) __premarshalJSON() (*__premarshalSignupOIDCSignUpOIDCUserPayloadUser, error) {
-	var retval __premarshalSignupOIDCSignUpOIDCUserPayloadUser
+func (v *SignupOIDCSignupOIDCUserPayloadUser) __premarshalJSON() (*__premarshalSignupOIDCSignupOIDCUserPayloadUser, error) {
+	var retval __premarshalSignupOIDCSignupOIDCUserPayloadUser
 
 	retval.Id = v.FragmentUser.Id
 	retval.Name = v.FragmentUser.Name
@@ -4759,7 +4759,7 @@ func SignUp(
 // The mutation executed by SignupOIDC.
 const SignupOIDC_Operation = `
 mutation SignupOIDC ($input: SignupOIDCInput!) {
-	signUpOIDC(input: $input) {
+	signupOIDC(input: $input) {
 		user {
 			... FragmentUser
 		}
