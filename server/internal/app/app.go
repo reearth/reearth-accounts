@@ -10,6 +10,7 @@ import (
 
 	"github.com/labstack/echo/v4"
 	"github.com/labstack/echo/v4/middleware"
+	"github.com/reearth/reearth-accounts/internal/adapter"
 	"github.com/reearth/reearth-accounts/internal/usecase/interactor"
 	"github.com/reearth/reearthx/appx"
 	"github.com/reearth/reearthx/log"
@@ -84,7 +85,7 @@ func initEcho(ctx context.Context, cfg *ServerConfig) *echo.Echo {
 
 	// API
 	api := e.Group("/api")
-	jwt, err := appx.AuthMiddleware(cfg.Config.Auths(), authInfoKey{}, false)
+	jwt, err := appx.AuthMiddleware(cfg.Config.Auths(), adapter.AuthInfoKey, false)
 	if err != nil {
 		log.Panicc(ctx, err)
 	}
