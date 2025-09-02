@@ -6,6 +6,7 @@ import (
 	"context"
 
 	"github.com/reearth/reearth-accounts/pkg/user"
+	"github.com/reearth/reearth-accounts/pkg/workspace"
 	"github.com/reearth/reearthx/util"
 
 	_ "github.com/Khan/genqlient/generate"
@@ -54,7 +55,7 @@ func (u *User) Signup(ctx context.Context, param interfaces.SignupParam) (*user.
 	return FragmentToUser(res.SignUp.User.FragmentUser)
 }
 
-func (u *User) SignupOIDC(ctx context.Context, param interfaces.SignupOIDCParam) (*user.User, error) {
+func (u *User) SignupOIDC(ctx context.Context, param interfaces.SignupOIDCParam) (*user.User, *workspace.Workspace, error) {
 	input := SignupOIDCInput{
 		Id:          param.User.UserID.String(),
 		Lang:        param.User.Lang.String(),
@@ -63,9 +64,17 @@ func (u *User) SignupOIDC(ctx context.Context, param interfaces.SignupOIDCParam)
 	}
 	res, err := SignupOIDC(ctx, u.gql, input)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
-	return FragmentToUser(res.SignupOIDC.User.FragmentUser)
+	user, err := FragmentToUser(res.SignupOIDC.User.FragmentUser)
+	if err != nil {
+		return nil, nil, err
+	}
+	workspace, err := ToWorkspace(res.SignupOIDC.Workspace.FragmentWorkspace)
+	if err != nil {
+		return nil, nil, err
+	}
+	return user, workspace, nil
 }
 
 func (u *User) FindOrCreate(ctx context.Context, param interfaces.UserFindOrCreateParam) (*user.User, error) {

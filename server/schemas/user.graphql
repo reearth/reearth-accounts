@@ -99,6 +99,11 @@ type UserPayload {
   user: User!
 }
 
+type SignupPayload {
+  user: User!
+  workspace: Workspace!
+}
+
 type UpdateMePayload {
   me: Me!
 }
@@ -112,7 +117,7 @@ extend type Mutation {
   removeMyAuth(input: RemoveMyAuthInput!): UpdateMePayload
   deleteMe(input: DeleteMeInput!): DeleteMePayload
   signUp(input: SignUpInput!): UserPayload
-  signupOIDC(input: SignupOIDCInput!): UserPayload
+  signupOIDC(input: SignupOIDCInput!): SignupPayload
   verifyUser(input: VerifyUserInput!): UserPayload
   findOrCreate(input: FindOrCreateInput!): UserPayload
   createVerification(input: CreateVerificationInput!): Boolean

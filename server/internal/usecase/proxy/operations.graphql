@@ -61,6 +61,7 @@ mutation SignUp($input: SignUpInput!) {
 mutation SignupOIDC($input: SignupOIDCInput!) {
     signupOIDC(input: $input) {
         user {...FragmentUser}
+        workspace {...FragmentWorkspace}
     }
 }
 
