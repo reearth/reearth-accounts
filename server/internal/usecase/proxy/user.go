@@ -6,7 +6,6 @@ import (
 	"context"
 
 	"github.com/reearth/reearth-accounts/pkg/user"
-	"github.com/reearth/reearth-accounts/pkg/workspace"
 	"github.com/reearth/reearthx/util"
 
 	_ "github.com/Khan/genqlient/generate"
