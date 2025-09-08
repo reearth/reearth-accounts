@@ -83,7 +83,7 @@ type User interface {
 
 	// sign up
 	Signup(context.Context, SignupParam) (*user.User, error)
-	SignupOIDC(context.Context, SignupOIDCParam) (*user.User, *workspace.Workspace, error)
+	SignupOIDC(context.Context, SignupOIDCParam) (*user.User, error)
 
 	// editing me
 	UpdateMe(context.Context, UpdateMeParam, *usecase.Operator) (*user.User, error)

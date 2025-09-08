@@ -107,9 +107,9 @@ func (i *User) Signup(ctx context.Context, param interfaces.SignupParam) (u *use
 	return u, nil
 }
 
-func (i *User) SignupOIDC(ctx context.Context, param interfaces.SignupOIDCParam) (*user.User, *workspace.Workspace, error) {
+func (i *User) SignupOIDC(ctx context.Context, param interfaces.SignupOIDCParam) (*user.User, error) {
 	if err := i.verifySignupSecret(param.Secret); err != nil {
-		return nil, nil, err
+		return nil, err
 	}
 
 	sub := param.Sub
@@ -118,7 +118,7 @@ func (i *User) SignupOIDC(ctx context.Context, param interfaces.SignupOIDCParam)
 	if sub == "" || email == "" {
 		ui, err := getUserInfoFromISS(ctx, param.Issuer, param.AccessToken)
 		if err != nil {
-			return nil, nil, err
+			return nil, err
 		}
 		sub = ui.Sub
 		email = ui.Email
@@ -135,18 +135,18 @@ func (i *User) SignupOIDC(ctx context.Context, param interfaces.SignupOIDCParam)
 
 	eu, err := i.repos.User.FindByEmail(ctx, param.Email)
 	if err != nil && !errors.Is(err, rerror.ErrNotFound) {
-		return nil, nil, err
+		return nil, err
 	}
 	if eu != nil {
-		return nil, nil, repo.ErrDuplicatedUser
+		return nil, repo.ErrDuplicatedUser
 	}
 
 	eu, err = i.repos.User.FindBySub(ctx, param.Sub)
 	if err != nil && !errors.Is(err, rerror.ErrNotFound) {
-		return nil, nil, err
+		return nil, err
 	}
 	if eu != nil {
-		return nil, nil, repo.ErrDuplicatedUser
+		return nil, repo.ErrDuplicatedUser
 	}
 
 	// Initialize user and ws
@@ -160,18 +160,18 @@ func (i *User) SignupOIDC(ctx context.Context, param interfaces.SignupOIDCParam)
 		WorkspaceID: param.User.WorkspaceID,
 	})
 	if err != nil {
-		return nil, nil, err
+		return nil, err
 	}
 
 	if err := i.repos.User.Create(ctx, u); err != nil {
-		return nil, nil, err
+		return nil, err
 	}
 
 	if err := i.repos.Workspace.Save(ctx, ws); err != nil {
-		return nil, nil, err
+		return nil, err
 	}
 
-	return u, ws, nil
+	return u, nil
 }
 
 func (i *User) FindOrCreate(ctx context.Context, param interfaces.UserFindOrCreateParam) (u *user.User, err error) {

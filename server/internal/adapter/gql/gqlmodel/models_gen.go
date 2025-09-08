@@ -201,11 +201,6 @@ type SignupOIDCInput struct {
 	Secret      *string `json:"secret,omitempty"`
 }
 
-type SignupPayload struct {
-	User      *User      `json:"user"`
-	Workspace *Workspace `json:"workspace"`
-}
-
 type StartPasswordResetInput struct {
 	Email string `json:"email"`
 }

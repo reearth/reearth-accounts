@@ -59,7 +59,7 @@ func (r *mutationResolver) SignUp(ctx context.Context, input gqlmodel.SignUpInpu
 	return nil, nil
 }
 
-func (r *mutationResolver) SignupOidc(ctx context.Context, input gqlmodel.SignupOIDCInput) (*gqlmodel.SignupPayload, error) {
+func (r *mutationResolver) SignupOidc(ctx context.Context, input gqlmodel.SignupOIDCInput) (*gqlmodel.UserPayload, error) {
 	au := adapter.GetAuthInfo(ctx)
 	if au == nil {
 		return nil, interfaces.ErrOperationDenied
@@ -69,7 +69,7 @@ func (r *mutationResolver) SignupOidc(ctx context.Context, input gqlmodel.Signup
 	if input.Lang != nil {
 		lang = language.Make(*input.Lang)
 	}
-	u, ws, err := usecases(ctx).User.SignupOIDC(ctx, interfaces.SignupOIDCParam{
+	u, err := usecases(ctx).User.SignupOIDC(ctx, interfaces.SignupOIDCParam{
 		Sub:         au.Sub,
 		AccessToken: au.Token,
 		Issuer:      au.Iss,
@@ -86,10 +86,7 @@ func (r *mutationResolver) SignupOidc(ctx context.Context, input gqlmodel.Signup
 		return nil, err
 	}
 
-	return &gqlmodel.SignupPayload{
-		User:      gqlmodel.ToUser(u),
-		Workspace: gqlmodel.ToWorkspace(ws),
-	}, nil
+	return &gqlmodel.UserPayload{User: gqlmodel.ToUser(u)}, nil
 }
 
 // Temporary stub implementation to satisfy gqlgen after migrating GraphQL files from reearthx/account.

@@ -165,11 +165,6 @@ type ComplexityRoot struct {
 		Roles func(childComplexity int) int
 	}
 
-	SignupPayload struct {
-		User      func(childComplexity int) int
-		Workspace func(childComplexity int) int
-	}
-
 	UpdateMePayload struct {
 		Me func(childComplexity int) int
 	}
@@ -268,7 +263,7 @@ type MutationResolver interface {
 	RemoveMyAuth(ctx context.Context, input gqlmodel.RemoveMyAuthInput) (*gqlmodel.UpdateMePayload, error)
 	DeleteMe(ctx context.Context, input gqlmodel.DeleteMeInput) (*gqlmodel.DeleteMePayload, error)
 	SignUp(ctx context.Context, input gqlmodel.SignUpInput) (*gqlmodel.UserPayload, error)
-	SignupOidc(ctx context.Context, input gqlmodel.SignupOIDCInput) (*gqlmodel.SignupPayload, error)
+	SignupOidc(ctx context.Context, input gqlmodel.SignupOIDCInput) (*gqlmodel.UserPayload, error)
 	VerifyUser(ctx context.Context, input gqlmodel.VerifyUserInput) (*gqlmodel.UserPayload, error)
 	FindOrCreate(ctx context.Context, input gqlmodel.FindOrCreateInput) (*gqlmodel.UserPayload, error)
 	CreateVerification(ctx context.Context, input gqlmodel.CreateVerificationInput) (*bool, error)
@@ -967,20 +962,6 @@ func (e *executableSchema) Complexity(ctx context.Context, typeName, field strin
 
 		return e.complexity.RolesPayload.Roles(childComplexity), true
 
-	case "SignupPayload.user":
-		if e.complexity.SignupPayload.User == nil {
-			break
-		}
-
-		return e.complexity.SignupPayload.User(childComplexity), true
-
-	case "SignupPayload.workspace":
-		if e.complexity.SignupPayload.Workspace == nil {
-			break
-		}
-
-		return e.complexity.SignupPayload.Workspace(childComplexity), true
-
 	case "UpdateMePayload.me":
 		if e.complexity.UpdateMePayload.Me == nil {
 			break
@@ -1629,11 +1610,6 @@ type UserPayload {
   user: User!
 }
 
-type SignupPayload {
-  user: User!
-  workspace: Workspace!
-}
-
 type UpdateMePayload {
   me: Me!
 }
@@ -1647,7 +1623,7 @@ extend type Mutation {
   removeMyAuth(input: RemoveMyAuthInput!): UpdateMePayload
   deleteMe(input: DeleteMeInput!): DeleteMePayload
   signUp(input: SignUpInput!): UserPayload
-  signupOIDC(input: SignupOIDCInput!): SignupPayload
+  signupOIDC(input: SignupOIDCInput!): UserPayload
   verifyUser(input: VerifyUserInput!): UserPayload
   findOrCreate(input: FindOrCreateInput!): UserPayload
   createVerification(input: CreateVerificationInput!): Boolean
@@ -4354,9 +4330,9 @@ func (ec *executionContext) _Mutation_signupOIDC(ctx context.Context, field grap
 	if resTmp == nil {
 		return graphql.Null
 	}
-	res := resTmp.(*gqlmodel.SignupPayload)
+	res := resTmp.(*gqlmodel.UserPayload)
 	fc.Result = res
-	return ec.marshalOSignupPayload2ᚖgithubᚗcomᚋreearthᚋreearthᚑaccountsᚋinternalᚋadapterᚋgqlᚋgqlmodelᚐSignupPayload(ctx, field.Selections, res)
+	return ec.marshalOUserPayload2ᚖgithubᚗcomᚋreearthᚋreearthᚑaccountsᚋinternalᚋadapterᚋgqlᚋgqlmodelᚐUserPayload(ctx, field.Selections, res)
 }
 
 func (ec *executionContext) fieldContext_Mutation_signupOIDC(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
@@ -4368,11 +4344,9 @@ func (ec *executionContext) fieldContext_Mutation_signupOIDC(ctx context.Context
 		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
 			switch field.Name {
 			case "user":
-				return ec.fieldContext_SignupPayload_user(ctx, field)
-			case "workspace":
-				return ec.fieldContext_SignupPayload_workspace(ctx, field)
+				return ec.fieldContext_UserPayload_user(ctx, field)
 			}
-			return nil, fmt.Errorf("no field named %q was found under type SignupPayload", field.Name)
+			return nil, fmt.Errorf("no field named %q was found under type UserPayload", field.Name)
 		},
 	}
 	defer func() {
@@ -6741,124 +6715,6 @@ func (ec *executionContext) fieldContext_RolesPayload_roles(_ context.Context, f
 				return ec.fieldContext_RoleForAuthorization_name(ctx, field)
 			}
 			return nil, fmt.Errorf("no field named %q was found under type RoleForAuthorization", field.Name)
-		},
-	}
-	return fc, nil
-}
-
-func (ec *executionContext) _SignupPayload_user(ctx context.Context, field graphql.CollectedField, obj *gqlmodel.SignupPayload) (ret graphql.Marshaler) {
-	fc, err := ec.fieldContext_SignupPayload_user(ctx, field)
-	if err != nil {
-		return graphql.Null
-	}
-	ctx = graphql.WithFieldContext(ctx, fc)
-	defer func() {
-		if r := recover(); r != nil {
-			ec.Error(ctx, ec.Recover(ctx, r))
-			ret = graphql.Null
-		}
-	}()
-	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (any, error) {
-		ctx = rctx // use context from middleware stack in children
-		return obj.User, nil
-	})
-	if err != nil {
-		ec.Error(ctx, err)
-		return graphql.Null
-	}
-	if resTmp == nil {
-		if !graphql.HasFieldError(ctx, fc) {
-			ec.Errorf(ctx, "must not be null")
-		}
-		return graphql.Null
-	}
-	res := resTmp.(*gqlmodel.User)
-	fc.Result = res
-	return ec.marshalNUser2ᚖgithubᚗcomᚋreearthᚋreearthᚑaccountsᚋinternalᚋadapterᚋgqlᚋgqlmodelᚐUser(ctx, field.Selections, res)
-}
-
-func (ec *executionContext) fieldContext_SignupPayload_user(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
-	fc = &graphql.FieldContext{
-		Object:     "SignupPayload",
-		Field:      field,
-		IsMethod:   false,
-		IsResolver: false,
-		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
-			switch field.Name {
-			case "id":
-				return ec.fieldContext_User_id(ctx, field)
-			case "name":
-				return ec.fieldContext_User_name(ctx, field)
-			case "email":
-				return ec.fieldContext_User_email(ctx, field)
-			case "host":
-				return ec.fieldContext_User_host(ctx, field)
-			case "workspace":
-				return ec.fieldContext_User_workspace(ctx, field)
-			case "auths":
-				return ec.fieldContext_User_auths(ctx, field)
-			case "metadata":
-				return ec.fieldContext_User_metadata(ctx, field)
-			}
-			return nil, fmt.Errorf("no field named %q was found under type User", field.Name)
-		},
-	}
-	return fc, nil
-}
-
-func (ec *executionContext) _SignupPayload_workspace(ctx context.Context, field graphql.CollectedField, obj *gqlmodel.SignupPayload) (ret graphql.Marshaler) {
-	fc, err := ec.fieldContext_SignupPayload_workspace(ctx, field)
-	if err != nil {
-		return graphql.Null
-	}
-	ctx = graphql.WithFieldContext(ctx, fc)
-	defer func() {
-		if r := recover(); r != nil {
-			ec.Error(ctx, ec.Recover(ctx, r))
-			ret = graphql.Null
-		}
-	}()
-	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (any, error) {
-		ctx = rctx // use context from middleware stack in children
-		return obj.Workspace, nil
-	})
-	if err != nil {
-		ec.Error(ctx, err)
-		return graphql.Null
-	}
-	if resTmp == nil {
-		if !graphql.HasFieldError(ctx, fc) {
-			ec.Errorf(ctx, "must not be null")
-		}
-		return graphql.Null
-	}
-	res := resTmp.(*gqlmodel.Workspace)
-	fc.Result = res
-	return ec.marshalNWorkspace2ᚖgithubᚗcomᚋreearthᚋreearthᚑaccountsᚋinternalᚋadapterᚋgqlᚋgqlmodelᚐWorkspace(ctx, field.Selections, res)
-}
-
-func (ec *executionContext) fieldContext_SignupPayload_workspace(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
-	fc = &graphql.FieldContext{
-		Object:     "SignupPayload",
-		Field:      field,
-		IsMethod:   false,
-		IsResolver: false,
-		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
-			switch field.Name {
-			case "id":
-				return ec.fieldContext_Workspace_id(ctx, field)
-			case "name":
-				return ec.fieldContext_Workspace_name(ctx, field)
-			case "alias":
-				return ec.fieldContext_Workspace_alias(ctx, field)
-			case "members":
-				return ec.fieldContext_Workspace_members(ctx, field)
-			case "metadata":
-				return ec.fieldContext_Workspace_metadata(ctx, field)
-			case "personal":
-				return ec.fieldContext_Workspace_personal(ctx, field)
-			}
-			return nil, fmt.Errorf("no field named %q was found under type Workspace", field.Name)
 		},
 	}
 	return fc, nil
@@ -13069,50 +12925,6 @@ func (ec *executionContext) _RolesPayload(ctx context.Context, sel ast.Selection
 	return out
 }
 
-var signupPayloadImplementors = []string{"SignupPayload"}
-
-func (ec *executionContext) _SignupPayload(ctx context.Context, sel ast.SelectionSet, obj *gqlmodel.SignupPayload) graphql.Marshaler {
-	fields := graphql.CollectFields(ec.OperationContext, sel, signupPayloadImplementors)
-
-	out := graphql.NewFieldSet(fields)
-	deferred := make(map[string]*graphql.FieldSet)
-	for i, field := range fields {
-		switch field.Name {
-		case "__typename":
-			out.Values[i] = graphql.MarshalString("SignupPayload")
-		case "user":
-			out.Values[i] = ec._SignupPayload_user(ctx, field, obj)
-			if out.Values[i] == graphql.Null {
-				out.Invalids++
-			}
-		case "workspace":
-			out.Values[i] = ec._SignupPayload_workspace(ctx, field, obj)
-			if out.Values[i] == graphql.Null {
-				out.Invalids++
-			}
-		default:
-			panic("unknown field " + strconv.Quote(field.Name))
-		}
-	}
-	out.Dispatch(ctx)
-	if out.Invalids > 0 {
-		return graphql.Null
-	}
-
-	atomic.AddInt32(&ec.deferred, int32(len(deferred)))
-
-	for label, dfs := range deferred {
-		ec.processDeferredGroup(graphql.DeferredGroup{
-			Label:    label,
-			Path:     graphql.GetPath(ctx),
-			FieldSet: dfs,
-			Context:  ctx,
-		})
-	}
-
-	return out
-}
-
 var updateMePayloadImplementors = []string{"UpdateMePayload"}
 
 func (ec *executionContext) _UpdateMePayload(ctx context.Context, sel ast.SelectionSet, obj *gqlmodel.UpdateMePayload) graphql.Marshaler {
@@ -15271,13 +15083,6 @@ func (ec *executionContext) marshalORemoveRolePayload2ᚖgithubᚗcomᚋreearth�
 		return graphql.Null
 	}
 	return ec._RemoveRolePayload(ctx, sel, v)
-}
-
-func (ec *executionContext) marshalOSignupPayload2ᚖgithubᚗcomᚋreearthᚋreearthᚑaccountsᚋinternalᚋadapterᚋgqlᚋgqlmodelᚐSignupPayload(ctx context.Context, sel ast.SelectionSet, v *gqlmodel.SignupPayload) graphql.Marshaler {
-	if v == nil {
-		return graphql.Null
-	}
-	return ec._SignupPayload(ctx, sel, v)
 }
 
 func (ec *executionContext) unmarshalOString2ᚖstring(ctx context.Context, v any) (*string, error) {
