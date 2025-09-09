@@ -4,11 +4,11 @@ import (
 	"context"
 	"testing"
 
-	"github.com/labstack/gommon/log"
+	"github.com/reearth/reearth-accounts/internal/infrastructure/mongo"
 	"github.com/reearth/reearth-accounts/internal/infrastructure/mongo/mongodoc"
 	"github.com/reearth/reearthx/mongox"
 	"github.com/stretchr/testify/assert"
-	"go.mongodb.org/mongo-driver/mongo"
+	mongodriver "go.mongodb.org/mongo-driver/mongo"
 )
 
 func TestAddCaseInsensitiveWorkspaceIndexes_CaseInsensitiveUniqueness(t *testing.T) {
@@ -18,29 +18,15 @@ func TestAddCaseInsensitiveWorkspaceIndexes_CaseInsensitiveUniqueness(t *testing
 
 	ctx := context.Background()
 	
-	// Connect to test database
-	client, err := mongo.Connect(ctx, nil) 
-	if err != nil {
-		t.Skipf("Could not connect to MongoDB: %v", err)
-	}
-	err = client.Disconnect(ctx)
-	if err != nil {
-		  log.Errorf("failed to disconnect: %v", err)
-	}
-
-	testDB := client.Database("test_migration")
-    err = testDB.Drop(ctx)
-	if err != nil {
-          t.Errorf("failed to drop test database: %v", err)
-      }
-
-	mongoxClient := mongox.NewClientWithDatabase(testDB)
+	// Use proper test database connection
+	db := mongo.Connect(t)(t)
+	mongoxClient := mongox.NewClientWithDatabase(db)
 
 	// Run the migration to create the index
-	err = AddCaseInsensitiveWorkspaceIndexes(ctx, mongoxClient)
+	err := AddCaseInsensitiveWorkspaceIndexes(ctx, mongoxClient)
 	assert.NoError(t, err)
 
-	col := testDB.Collection("workspace")
+	col := db.Collection("workspace")
 
 	// Insert first workspace with lowercase alias
 	workspace1 := mongodoc.WorkspaceDocument{
@@ -65,7 +51,7 @@ func TestAddCaseInsensitiveWorkspaceIndexes_CaseInsensitiveUniqueness(t *testing
 	assert.Error(t, err, "Second workspace with case-different alias should fail")
 	
 	// Verify it's a duplicate key error
-	if mongo.IsDuplicateKeyError(err) {
+	if mongodriver.IsDuplicateKeyError(err) {
 		t.Logf("Correctly got duplicate key error: %v", err)
 	} else {
 		t.Errorf("Expected duplicate key error, got: %v", err)
@@ -81,5 +67,5 @@ func TestAddCaseInsensitiveWorkspaceIndexes_CaseInsensitiveUniqueness(t *testing
 
 	_, err = col.InsertOne(ctx, workspace3)
 	assert.Error(t, err, "Third workspace with mixed case alias should also fail")
-	assert.True(t, mongo.IsDuplicateKeyError(err), "Should be duplicate key error")
+	assert.True(t, mongodriver.IsDuplicateKeyError(err), "Should be duplicate key error")
 }

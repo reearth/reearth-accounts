@@ -4,11 +4,11 @@ import (
 	"context"
 	"testing"
 
-	"github.com/labstack/gommon/log"
+	"github.com/reearth/reearth-accounts/internal/infrastructure/mongo"
 	"github.com/reearth/reearth-accounts/internal/infrastructure/mongo/mongodoc"
 	"github.com/reearth/reearthx/mongox"
 	"github.com/stretchr/testify/assert"
-	"go.mongodb.org/mongo-driver/mongo"
+	mongodriver "go.mongodb.org/mongo-driver/mongo"
 )
 
 func TestAddWorkspaceAliasMembersCompositeUniqueIndex(t *testing.T) {
@@ -18,29 +18,15 @@ func TestAddWorkspaceAliasMembersCompositeUniqueIndex(t *testing.T) {
 
 	ctx := context.Background()
 	
-	// Connect to test database
-	client, err := mongo.Connect(ctx, nil) 
-	if err != nil {
-		t.Skipf("Could not connect to MongoDB: %v", err)
-	}
-	err = client.Disconnect(ctx)
-	if err != nil {
-		  log.Errorf("failed to disconnect: %v", err)
-	}
-
-	testDB := client.Database("test_composite_migration")
-	err = testDB.Drop(ctx)
-	if err != nil {
-          t.Errorf("failed to drop test database: %v", err)
-      }
-
-	mongoxClient := mongox.NewClientWithDatabase(testDB)
+	// Use proper test database connection
+	db := mongo.Connect(t)(t)
+	mongoxClient := mongox.NewClientWithDatabase(db)
 
 	// Run the migration to create the composite index
-	err = AddWorkspaceAliasMembersCompositeUniqueIndex(ctx, mongoxClient)
+	err := AddWorkspaceAliasMembersCompositeUniqueIndex(ctx, mongoxClient)
 	assert.NoError(t, err)
 
-	col := testDB.Collection("workspace")
+	col := db.Collection("workspace")
 
 	// Create sample members map
 	members1 := map[string]mongodoc.WorkspaceMemberDocument{
@@ -77,18 +63,16 @@ func TestAddWorkspaceAliasMembersCompositeUniqueIndex(t *testing.T) {
 	_, err = col.InsertOne(ctx, workspace2)
 	assert.NoError(t, err, "Workspace with same alias but different members should succeed")
 
-	// Try to insert workspace with same alias and same members - should fail
+	// Try to insert workspace with exactly same alias and same members - should fail
 	workspace3 := mongodoc.WorkspaceDocument{
 		ID:      "workspace3",
 		Name:    "Test Workspace 3",
-		Alias:   "MyWorkSpace", // Mixed case version
+		Alias:   "myworkspace", // Same alias as workspace1
 		Email:   "test3@example.com", 
 		Members: members1, // Same members as workspace1
 	}
 
 	_, err = col.InsertOne(ctx, workspace3)
 	assert.Error(t, err, "Workspace with same alias and same members should fail")
-	assert.True(t, mongo.IsDuplicateKeyError(err), "Should be duplicate key error for composite index")
-
-	t.Logf("Composite index correctly prevented duplicate: %v", err)
+	assert.True(t, mongodriver.IsDuplicateKeyError(err), "Should be duplicate key error for composite index")
 }

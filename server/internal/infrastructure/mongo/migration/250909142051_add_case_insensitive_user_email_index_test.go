@@ -4,11 +4,11 @@ import (
 	"context"
 	"testing"
 
-	"github.com/labstack/gommon/log"
+	"github.com/reearth/reearth-accounts/internal/infrastructure/mongo"
 	"github.com/reearth/reearth-accounts/internal/infrastructure/mongo/mongodoc"
 	"github.com/reearth/reearthx/mongox"
 	"github.com/stretchr/testify/assert"
-	"go.mongodb.org/mongo-driver/mongo"
+	mongodriver "go.mongodb.org/mongo-driver/mongo"
 )
 
 func TestAddCaseInsensitiveUserEmailIndex_CaseInsensitiveUniqueness(t *testing.T) {
@@ -19,28 +19,13 @@ func TestAddCaseInsensitiveUserEmailIndex_CaseInsensitiveUniqueness(t *testing.T
 	ctx := context.Background()
 	
 	// Connect to test database
-	client, err := mongo.Connect(ctx, nil) 
-	if err != nil {
-		t.Skipf("Could not connect to MongoDB: %v", err)
-	}
-	err = client.Disconnect(ctx)
-	if err != nil {
-		  log.Errorf("failed to disconnect: %v", err)
-	}
+	db := mongo.Connect(t)(t)
+	mongoxClient := mongox.NewClientWithDatabase(db)
 
-	testDB := client.Database("test_user_email_migration")
-	err = testDB.Drop(ctx)
-	if err != nil {
-          t.Errorf("failed to drop test database: %v", err)
-      }
-
-	mongoxClient := mongox.NewClientWithDatabase(testDB)
-
-	// Run the migration to create the index
-	err = AddCaseInsensitiveUserEmailIndex(ctx, mongoxClient)
+	err := AddCaseInsensitiveUserEmailIndex(ctx, mongoxClient)
 	assert.NoError(t, err)
 
-	col := testDB.Collection("user")
+	col := db.Collection("user")
 
 	// Insert first user with lowercase email
 	user1 := mongodoc.UserDocument{
@@ -63,5 +48,5 @@ func TestAddCaseInsensitiveUserEmailIndex_CaseInsensitiveUniqueness(t *testing.T
 
 	_, err = col.InsertOne(ctx, user2)
 	assert.Error(t, err, "Second user with case-different email should fail")
-	assert.True(t, mongo.IsDuplicateKeyError(err), "Should be duplicate key error")
+	assert.True(t, mongodriver.IsDuplicateKeyError(err), "Should be duplicate key error")
 }
