@@ -12,7 +12,6 @@ import (
 func AddWorkspaceAliasMembersCompositeUniqueIndex(ctx context.Context, c DBClient) error {
 	col := c.Database().Collection("workspace")
 
-	// Create composite unique index for alias and members
 	compositeIndexModel := mongo.IndexModel{
 		Keys: bson.D{
 			{Key: "alias", Value: 1},
