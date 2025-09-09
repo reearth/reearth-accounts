@@ -18,4 +18,5 @@ var migrations = migration.Migrations[DBClient]{
 	250725020842: ConvertNonValidUserAlias,
 	250725020843: ConvertNonValidWorkspaceAlias,
 	250909092221: AddCaseInsensitiveWorkspaceIndexes,
+	250909103955: AddWorkspaceAliasMembersCompositeUniqueIndex,
 }
