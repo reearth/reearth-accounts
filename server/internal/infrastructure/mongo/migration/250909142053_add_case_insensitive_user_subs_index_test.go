@@ -22,11 +22,8 @@ func TestAddCaseInsensitiveUserSubsIndex_CaseInsensitiveUniqueness(t *testing.T)
 	db := mongo.Connect(t)(t)
 	mongoxClient := mongox.NewClientWithDatabase(db)
 
-	err := AddCaseInsensitiveUserSubsIndex(ctx, mongoxClient)
-	assert.NoError(t, err)
-
 	// Run the migration to create the index
-	err = AddCaseInsensitiveUserSubsIndex(ctx, mongoxClient)
+	err := AddCaseInsensitiveUserSubsIndex(ctx, mongoxClient)
 	assert.NoError(t, err)
 
 	col := db.Collection("user")
