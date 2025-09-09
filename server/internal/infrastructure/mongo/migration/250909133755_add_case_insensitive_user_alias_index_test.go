@@ -4,6 +4,7 @@ import (
 	"context"
 	"testing"
 
+	"github.com/labstack/gommon/log"
 	"github.com/reearth/reearth-accounts/internal/infrastructure/mongo/mongodoc"
 	"github.com/reearth/reearthx/mongox"
 	"github.com/stretchr/testify/assert"
@@ -22,10 +23,15 @@ func TestAddCaseInsensitiveUserAliasIndex_CaseInsensitiveUniqueness(t *testing.T
 	if err != nil {
 		t.Skipf("Could not connect to MongoDB: %v", err)
 	}
-	defer client.Disconnect(ctx)
+	err = client.Disconnect(ctx)
+	if err != nil {
+		  log.Errorf("failed to disconnect: %v", err)
+	}
 
 	testDB := client.Database("test_user_migration")
-	defer testDB.Drop(ctx)
+	if err != nil {
+          t.Errorf("failed to drop test database: %v", err)
+      }
 
 	mongoxClient := mongox.NewClientWithDatabase(testDB)
 
