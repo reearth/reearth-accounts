@@ -17,7 +17,7 @@ func AddCaseInsensitiveUserAliasIndex(ctx context.Context, c DBClient) error {
 		},
 		Options: options.Index().SetCollation(&options.Collation{
 			Locale: "en",
-			Strength: 2,
+			Strength: 2, // Case-insensitive comparison
 		}).SetUnique(true).SetName("alias_case_insensitive_unique"),
 	}
 	_, err := col.Indexes().CreateOne(ctx, aliasIndexModel)

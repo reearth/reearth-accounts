@@ -22,7 +22,7 @@ func AddCaseInsensitiveWorkspaceIndexes(ctx context.Context, c DBClient) error {
 	}
 
 	_, err := col.Indexes().CreateOne(ctx, aliasIndexModel)
-		if err != nil {
+	if err != nil {
 		return fmt.Errorf("failed to create unique index on workspace.alias: %w", err)
 	}
 	fmt.Println("Created unique case-insensitive index on workspace.alias")
