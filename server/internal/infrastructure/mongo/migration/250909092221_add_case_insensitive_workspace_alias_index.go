@@ -8,7 +8,7 @@ import (
 	"go.mongodb.org/mongo-driver/mongo/options"
 )
 
-func AddCaseInsensitiveWorkspaceIndexes(ctx context.Context, c DBClient) error {
+func AddCaseInsensitiveWorkspaceAliasIndex(ctx context.Context, c DBClient) error {
 	col := c.Database().Collection("workspace")
 
 	aliasIndexModel := mongo.IndexModel{

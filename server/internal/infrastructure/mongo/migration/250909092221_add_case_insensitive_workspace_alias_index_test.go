@@ -23,7 +23,7 @@ func TestAddCaseInsensitiveWorkspaceIndexes_CaseInsensitiveUniqueness(t *testing
 	mongoxClient := mongox.NewClientWithDatabase(db)
 
 	// Run the migration to create the index
-	err := AddCaseInsensitiveWorkspaceIndexes(ctx, mongoxClient)
+	err := AddCaseInsensitiveWorkspaceAliasIndex(ctx, mongoxClient)
 	assert.NoError(t, err)
 
 	col := db.Collection("workspace")
