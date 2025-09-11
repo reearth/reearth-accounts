@@ -67,9 +67,15 @@ func TestGenerateMissingWorkspaceAliases(t *testing.T) {
 	err = GenerateMissingWorkspaceAliases(ctx, mongoxClient)
 	assert.NoError(t, err)
 
-	// Check that workspaces 1-4 got new aliases
-	updatedWorkspaces := []string{"workspace1", "workspace2", "workspace3", "workspace4"}
-	for _, id := range updatedWorkspaces {
+	// Check that problematic workspaces got new random aliases
+	problematicWorkspaces := map[string]string{
+		"workspace1": "", // originally empty
+		"workspace2": "test", // originally "test"
+		"workspace3": "aaaaa", // originally "aaaaa"
+		"workspace4": "e2e-workspace-name", // originally "e2e-workspace-name"
+	}
+	
+	for id, originalAlias := range problematicWorkspaces {
 		var result bson.M
 		err := workspaceCollection.FindOne(ctx, bson.M{"id": id}).Decode(&result)
 		assert.NoError(t, err)
@@ -79,12 +85,7 @@ func TestGenerateMissingWorkspaceAliases(t *testing.T) {
 		aliasStr := alias.(string)
 		assert.NotEmpty(t, aliasStr, "Alias should not be empty for workspace %s", id)
 		assert.Len(t, aliasStr, 10, "Generated alias should be 10 characters for workspace %s", id)
-		
-		// Verify it's not one of the test aliases
-		testAliases := []string{"", "test", "aaaaa", "e2e-workspace-name"}
-		for _, testAlias := range testAliases {
-			assert.NotEqual(t, testAlias, aliasStr, "Alias should not be a test alias for workspace %s", id)
-		}
+		assert.NotEqual(t, originalAlias, aliasStr, "Original problematic alias should be replaced for workspace %s", id)
 	}
 
 	// Check that workspace5 kept its original alias

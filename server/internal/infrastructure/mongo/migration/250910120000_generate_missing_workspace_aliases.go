@@ -12,14 +12,21 @@ import (
 func GenerateMissingWorkspaceAliases(ctx context.Context, c DBClient) error {
 	col := c.Collection("workspace")
 	
-	// Test aliases that should be replaced
-	testAliases := map[string]bool{
-		"test":               true,
-		"aaaaa":              true,
-		"e2e-workspace-name": true,
+	// Query to find workspaces with problematic aliases or the specific eukarya workspace
+	filter := bson.M{
+		"$or": []bson.M{
+			{"alias": ""},
+			{"alias": "test"},
+			{"alias": "aaaaa"},
+			{"alias": "e2e-workspace-name"},
+			{"$and": []bson.M{
+				{"id": "01jhmkh59s3q06xzm1215w7y2v"},
+				{"alias": "eukarya"},
+			}},
+		},
 	}
 
-	return col.Find(ctx, bson.D{}, &mongox.BatchConsumer{
+	return col.Find(ctx, filter, &mongox.BatchConsumer{
 		Size: 1000,
 		Callback: func(rows []bson.Raw) error {
 			ids := make([]string, 0, len(rows))
@@ -32,42 +39,21 @@ func GenerateMissingWorkspaceAliases(ctx context.Context, c DBClient) error {
 					return err
 				}
 
-				needsNewAlias := false
-				var newAlias string
-
-				// Check if alias is missing (empty)
-				if doc.Alias == "" {
-					needsNewAlias = true
-				}
-
-				// Check if alias is one of the test aliases
-				if testAliases[doc.Alias] {
-					needsNewAlias = true
-				}
-
-				// Check for specific workspace that needs alias update
+				// All returned documents need new aliases (due to our query filter)
+				// Check for specific workspace that needs a custom alias
 				if doc.ID == "01jhmkh59s3q06xzm1215w7y2v" && doc.Alias == "eukarya" {
-					needsNewAlias = true
-					newAlias = "eukarya-roboco"
+					doc.Alias = "eukarya-roboco"
+				} else {
+					// Generate a random 10-character lowercase alias
+					doc.Alias = random.String(10, random.Lowercase)
 				}
-
-				if needsNewAlias {
-					if newAlias != "" {
-						doc.Alias = newAlias
-					} else {
-						doc.Alias = random.String(10, random.Lowercase)
-					}
-					
-					ids = append(ids, doc.ID)
-					newRows = append(newRows, doc)
-				}
+				
+				ids = append(ids, doc.ID)
+				newRows = append(newRows, doc)
 			}
 
-			if len(newRows) > 0 {
-				return col.SaveAll(ctx, ids, newRows)
-			}
-			
-			return nil
+			// Update all documents (they all need new aliases based on our query)
+			return col.SaveAll(ctx, ids, newRows)
 		},
 	})
 }

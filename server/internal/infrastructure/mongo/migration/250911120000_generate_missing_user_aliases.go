@@ -12,7 +12,15 @@ import (
 func GenerateMissingUserAliases(ctx context.Context, c DBClient) error {
 	col := c.Collection("user")
 
-	return col.Find(ctx, bson.D{}, &mongox.BatchConsumer{
+	// Query to find users with empty alias or alias equal to "waqas"
+	filter := bson.M{
+		"$or": []bson.M{
+			{"alias": ""},
+			{"alias": "waqas"},
+		},
+	}
+
+	return col.Find(ctx, filter, &mongox.BatchConsumer{
 		Size: 1000,
 		Callback: func(rows []bson.Raw) error {
 			ids := make([]string, 0, len(rows))
@@ -25,32 +33,15 @@ func GenerateMissingUserAliases(ctx context.Context, c DBClient) error {
 					return err
 				}
 
-				needsNewAlias := false
-
-				// Check if alias is missing (empty)
-				if doc.Alias == "" {
-					needsNewAlias = true
-				}
-
-				// Check if alias is "waqas"
-				if doc.Alias == "waqas" {
-					needsNewAlias = true
-				}
-
-				if needsNewAlias {
-					// Generate a random 10-character lowercase alias
-					doc.Alias = random.String(10, random.Lowercase)
-					
-					ids = append(ids, doc.ID)
-					newRows = append(newRows, doc)
-				}
+				// All returned documents need new aliases (due to our query filter)
+				doc.Alias = random.String(10, random.Lowercase)
+				
+				ids = append(ids, doc.ID)
+				newRows = append(newRows, doc)
 			}
 
-			if len(newRows) > 0 {
-				return col.SaveAll(ctx, ids, newRows)
-			}
-			
-			return nil
+			// Update all documents (they all need new aliases based on our query)
+			return col.SaveAll(ctx, ids, newRows)
 		},
 	})
 }
