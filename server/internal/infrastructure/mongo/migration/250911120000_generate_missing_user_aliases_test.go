@@ -59,8 +59,8 @@ func TestGenerateMissingUserAliases(t *testing.T) {
 	err = GenerateMissingUserAliases(ctx, mongoxClient)
 	assert.NoError(t, err)
 
-	// Check that user1 and user2 got new aliases
-	updatedUsers := []string{"user1", "user2"}
+	// Check that user1, user2, and user3 got new aliases
+	updatedUsers := []string{"user1", "user2", "user3"}
 	for _, id := range updatedUsers {
 		var result bson.M
 		err := userCollection.FindOne(ctx, bson.M{"id": id}).Decode(&result)
@@ -71,11 +71,16 @@ func TestGenerateMissingUserAliases(t *testing.T) {
 		aliasStr := alias.(string)
 		assert.NotEmpty(t, aliasStr, "Alias should not be empty for user %s", id)
 		assert.Len(t, aliasStr, 10, "Generated alias should be 10 characters for user %s", id)
+		
+		// Verify it's not the original problematic alias
+		if id == "user3" {
+			assert.NotEqual(t, "waqas", aliasStr, "Waqas alias should be replaced for user3")
+		}
 	}
 
-	// Check that user3 kept its original alias
+	// Check that user4 kept its original alias
 	var result bson.M
-	err = userCollection.FindOne(ctx, bson.M{"id": "user3"}).Decode(&result)
+	err = userCollection.FindOne(ctx, bson.M{"id": "user4"}).Decode(&result)
 	assert.NoError(t, err)
 	assert.Equal(t, "validalias", result["alias"], "Valid alias should not be changed")
 }
