@@ -41,6 +41,13 @@ func TestGenerateMissingUserAliases(t *testing.T) {
 			"id":    "user3", 
 			"name":  "User Three",
 			"email": "user3@example.com",
+			"alias": "waqas", 
+		},
+		bson.M{
+			"_id":   "user4",
+			"id":    "user4", 
+			"name":  "User Four",
+			"email": "user4@example.com",
 			"alias": "validalias", 
 		},
 	}
