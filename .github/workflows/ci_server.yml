@@ -2,7 +2,7 @@ name: ci-server
 on:
   workflow_call:
 env:
-  GO_VERSION: "1.23.5"
+  GO_VERSION: "1.24.2"
 jobs:
   ci-server-lint:
     runs-on: ubuntu-latest
@@ -19,7 +19,8 @@ jobs:
       - name: golangci-lint
         uses: golangci/golangci-lint-action@v6
         with:
-          version: v1.63.4
+          version: v1.64
+          install-mode: goinstall
           working-directory: server
           args: --timeout=5m
 

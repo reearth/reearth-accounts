@@ -56,16 +56,16 @@ func (u *User) Signup(ctx context.Context, param interfaces.SignupParam) (*user.
 
 func (u *User) SignupOIDC(ctx context.Context, param interfaces.SignupOIDCParam) (*user.User, error) {
 	input := SignupOIDCInput{
-		Name:   param.Name,
-		Email:  param.Email,
-		Secret: *param.Secret,
-		Sub:    param.Sub,
+		Id:          param.User.UserID.String(),
+		Lang:        param.User.Lang.String(),
+		WorkspaceId: param.User.WorkspaceID.String(),
+		Secret:      *param.Secret,
 	}
 	res, err := SignupOIDC(ctx, u.gql, input)
 	if err != nil {
 		return nil, err
 	}
-	return FragmentToUser(res.SignUpOIDC.User.FragmentUser)
+	return FragmentToUser(res.SignupOIDC.User.FragmentUser)
 }
 
 func (u *User) FindOrCreate(ctx context.Context, param interfaces.UserFindOrCreateParam) (*user.User, error) {

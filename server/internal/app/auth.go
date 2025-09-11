@@ -14,8 +14,6 @@ import (
 
 const debugUserHeader = "X-Reearth-Debug-User"
 
-type authInfoKey struct{}
-
 func authMiddleware(cfg *ServerConfig) func(http.Handler) http.Handler {
 	return appx.ContextMiddlewareBy(func(w http.ResponseWriter, req *http.Request) context.Context {
 		ctx := req.Context()
@@ -25,7 +23,7 @@ func authMiddleware(cfg *ServerConfig) func(http.Handler) http.Handler {
 		var ai appx.AuthInfo
 
 		// get sub from context
-		if a, ok := ctx.Value(authInfoKey{}).(appx.AuthInfo); ok {
+		if a, ok := ctx.Value(adapter.AuthInfoKey).(appx.AuthInfo); ok {
 			ai = a
 		}
 

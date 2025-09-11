@@ -58,6 +58,7 @@ func Init(p InitParams) (*user.User, *Workspace, error) {
 		Name(p.Name).
 		Members(map[user.ID]Member{u.ID(): {Role: RoleOwner, Disabled: false, InvitedBy: u.ID()}}).
 		Personal(true).
+		Metadata(NewMetadata()).
 		Build()
 	if err != nil {
 		return nil, nil, err

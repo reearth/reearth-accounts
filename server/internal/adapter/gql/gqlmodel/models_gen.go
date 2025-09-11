@@ -3,6 +3,7 @@
 package gqlmodel
 
 import (
+	"bytes"
 	"fmt"
 	"io"
 	"strconv"
@@ -194,10 +195,10 @@ type SignUpInput struct {
 }
 
 type SignupOIDCInput struct {
-	Name   string `json:"name"`
-	Email  string `json:"email"`
-	Sub    string `json:"sub"`
-	Secret string `json:"secret"`
+	ID          *ID     `json:"id,omitempty"`
+	Lang        *string `json:"lang,omitempty"`
+	WorkspaceID *ID     `json:"workspaceId,omitempty"`
+	Secret      *string `json:"secret,omitempty"`
 }
 
 type StartPasswordResetInput struct {
@@ -379,6 +380,20 @@ func (e NodeType) MarshalGQL(w io.Writer) {
 	fmt.Fprint(w, strconv.Quote(e.String()))
 }
 
+func (e *NodeType) UnmarshalJSON(b []byte) error {
+	s, err := strconv.Unquote(string(b))
+	if err != nil {
+		return err
+	}
+	return e.UnmarshalGQL(s)
+}
+
+func (e NodeType) MarshalJSON() ([]byte, error) {
+	var buf bytes.Buffer
+	e.MarshalGQL(&buf)
+	return buf.Bytes(), nil
+}
+
 type Role string
 
 const (
@@ -424,6 +439,20 @@ func (e Role) MarshalGQL(w io.Writer) {
 	fmt.Fprint(w, strconv.Quote(e.String()))
 }
 
+func (e *Role) UnmarshalJSON(b []byte) error {
+	s, err := strconv.Unquote(string(b))
+	if err != nil {
+		return err
+	}
+	return e.UnmarshalGQL(s)
+}
+
+func (e Role) MarshalJSON() ([]byte, error) {
+	var buf bytes.Buffer
+	e.MarshalGQL(&buf)
+	return buf.Bytes(), nil
+}
+
 type Theme string
 
 const (
@@ -465,4 +494,18 @@ func (e *Theme) UnmarshalGQL(v any) error {
 
 func (e Theme) MarshalGQL(w io.Writer) {
 	fmt.Fprint(w, strconv.Quote(e.String()))
+}
+
+func (e *Theme) UnmarshalJSON(b []byte) error {
+	s, err := strconv.Unquote(string(b))
+	if err != nil {
+		return err
+	}
+	return e.UnmarshalGQL(s)
+}
+
+func (e Theme) MarshalJSON() ([]byte, error) {
+	var buf bytes.Buffer
+	e.MarshalGQL(&buf)
+	return buf.Bytes(), nil
 }

@@ -42,10 +42,10 @@ input SignUpInput {
 }
 
 input SignupOIDCInput {
-  name: String!
-  email: String!
-  sub: String!
-  secret: String!
+  id: ID
+  lang: Lang
+  workspaceId: ID
+  secret: String
 }
 
 input FindOrCreateInput {
@@ -112,7 +112,7 @@ extend type Mutation {
   removeMyAuth(input: RemoveMyAuthInput!): UpdateMePayload
   deleteMe(input: DeleteMeInput!): DeleteMePayload
   signUp(input: SignUpInput!): UserPayload
-  signUpOIDC(input: SignupOIDCInput!): UserPayload
+  signupOIDC(input: SignupOIDCInput!): UserPayload
   verifyUser(input: VerifyUserInput!): UserPayload
   findOrCreate(input: FindOrCreateInput!): UserPayload
   createVerification(input: CreateVerificationInput!): Boolean
