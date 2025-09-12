@@ -61,7 +61,7 @@ func Start(debug bool) {
 			log.Fatal(migrationErr)
 		}
 
-		if migrationErr := migration.Do(ctx, clientx, mongorepo.NewConfig(db.Collection("config"), lock)); err != nil {
+		if migrationErr := migration.Do(ctx, clientx, mongorepo.NewConfig(db.Collection("config"), lock)); migrationErr != nil {
 			log.Fatalf("failed to run migration: %v", migrationErr)
 		}
 		return
