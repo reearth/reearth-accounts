@@ -9,6 +9,7 @@ help:
 	@echo "  dev               Run the application with hot reloading"
 	@echo "  run-app           Run the application"
 	@echo "  run-cerbos        Run the Cerbos server"
+	@echo "  run-migration     Run database migrations"
 	@echo "  gql               Generate GraphQL code include dataloader"
 	@echo "  generate          Run go generate"
 
@@ -48,4 +49,7 @@ generate: dev-install
 gql:
 	go generate ./internal/adapter/gql
 
-.PHONY: dev-install dev run-app run-cerbos gql
+.PHONY: dev-install dev run-app run-cerbos run-migration gql
+
+run-migration:
+	RUN_MIGRATION=true go run ./cmd/reearth-accounts

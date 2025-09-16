@@ -24,5 +24,5 @@ var migrations = migration.Migrations[DBClient]{
 	250911120003: AddCaseInsensitiveUserAliasIndex,
 	250911120004: AddCaseInsensitiveUserEmailIndex,
 	250911120005: AddCaseInsensitiveUserWorkspaceIndex,
-	250911120006: AddCaseInsensitiveUserSubsIndex, 
+	// 250911120006: AddCaseInsensitiveUserSubsIndex,
 }
