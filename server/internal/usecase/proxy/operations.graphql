@@ -52,8 +52,8 @@ query SearchUser($keyword: String!) {
   }
 }
 
-mutation SignUp($input: SignUpInput!) {
-    signUp(input: $input) {
+mutation Signup($input: SignupInput!) {
+    signup(input: $input) {
         user {...FragmentUser}
     }
 }

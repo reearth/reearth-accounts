@@ -37,7 +37,7 @@ func (u *User) FetchByID(ctx context.Context, ids user.IDList) (user.List, error
 }
 
 func (u *User) Signup(ctx context.Context, param interfaces.SignupParam) (*user.User, error) {
-	input := SignUpInput{
+	input := SignupInput{
 		Id:          param.UserID.String(),
 		WorkspaceID: param.WorkspaceID.String(),
 		Name:        param.Name,
@@ -47,11 +47,11 @@ func (u *User) Signup(ctx context.Context, param interfaces.SignupParam) (*user.
 		Lang:        param.Lang.String(),
 		Theme:       string(*param.Theme),
 	}
-	res, err := SignUp(ctx, u.gql, input)
+	res, err := Signup(ctx, u.gql, input)
 	if err != nil {
 		return nil, err
 	}
-	return FragmentToUser(res.SignUp.User.FragmentUser)
+	return FragmentToUser(res.Signup.User.FragmentUser)
 }
 
 func (u *User) SignupOIDC(ctx context.Context, param interfaces.SignupOIDCParam) (*user.User, error) {

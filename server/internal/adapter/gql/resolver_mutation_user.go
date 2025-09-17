@@ -7,6 +7,7 @@ import (
 	"github.com/reearth/reearth-accounts/internal/adapter/gql/gqlmodel"
 	"github.com/reearth/reearth-accounts/internal/usecase/interfaces"
 	"github.com/reearth/reearth-accounts/pkg/id"
+	"github.com/samber/lo"
 	"golang.org/x/text/language"
 )
 
@@ -52,11 +53,27 @@ func (r *mutationResolver) DeleteMe(ctx context.Context, input gqlmodel.DeleteMe
 	return &gqlmodel.DeleteMePayload{UserID: input.UserID}, nil
 }
 
-// Temporary stub implementation to satisfy gqlgen after migrating GraphQL files from reearthx/account.
-// This resolver was added to avoid compile-time errors.
-// Will be implemented if needed, or removed if unused after migration.
-func (r *mutationResolver) SignUp(ctx context.Context, input gqlmodel.SignUpInput) (*gqlmodel.UserPayload, error) {
-	return nil, nil
+func (r *mutationResolver) Signup(ctx context.Context, input gqlmodel.SignupInput) (*gqlmodel.UserPayload, error) {
+	var lang language.Tag
+	if input.Lang != nil {
+		lang = language.Make(*input.Lang)
+	}
+	u, err := usecases(ctx).User.Signup(ctx, interfaces.SignupParam{
+		Email:       input.Email,
+		Name:        input.Name,
+		Password:    input.Password,
+		Secret:      input.Secret,
+		Lang:        &lang,
+		Theme:       gqlmodel.ToTheme(input.Theme),
+		UserID:      gqlmodel.ToIDRef[id.User](input.ID),
+		WorkspaceID: gqlmodel.ToIDRef[id.Workspace](input.WorkspaceID),
+		MockAuth:    lo.FromPtr(input.MockAuth),
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	return &gqlmodel.UserPayload{User: gqlmodel.ToUser(u)}, nil
 }
 
 func (r *mutationResolver) SignupOidc(ctx context.Context, input gqlmodel.SignupOIDCInput) (*gqlmodel.UserPayload, error) {
