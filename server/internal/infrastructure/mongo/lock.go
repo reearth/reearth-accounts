@@ -24,9 +24,6 @@ func NewLock(c *mongo.Collection) (*Lock, error) {
 	hostid := uuid.NewString()
 
 	l := lock.NewClient(c)
-	if err := l.CreateIndexes(context.Background()); err != nil {
-		return nil, err
-	}
 
 	return &Lock{
 		l:      l,
