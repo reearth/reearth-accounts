@@ -48,7 +48,8 @@ func Start(debug bool) {
 					evt.CommandName == "createIndexes" || 
 					evt.CommandName == "dropIndexes" ||
 					evt.CommandName == "drop" {
-					log.Debugf("MongoDB Command: %s - Duration: %v", evt.CommandName, evt.Duration)
+					log.Debugf("MongoDB Command: %s - Duration: %v - Reply: %v", 
+						evt.CommandName, evt.Duration, evt.Reply)
 				}
 			},
 		}
