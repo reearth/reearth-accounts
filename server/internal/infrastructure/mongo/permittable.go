@@ -12,11 +12,6 @@ import (
 	"go.mongodb.org/mongo-driver/bson"
 )
 
-var (
-	newPermittableIndexes       = []string{}
-	newPermittableUniqueIndexes = []string{"id", "userid"}
-)
-
 type Permittable struct {
 	client *mongox.ClientCollection
 }

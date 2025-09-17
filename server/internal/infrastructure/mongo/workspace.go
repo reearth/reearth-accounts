@@ -15,10 +15,6 @@ import (
 	"go.mongodb.org/mongo-driver/bson"
 )
 
-var (
-	workspaceUniqueIndexes = []string{"id"}
-)
-
 type Workspace struct {
 	client *mongox.Collection
 	f      repo.WorkspaceFilter

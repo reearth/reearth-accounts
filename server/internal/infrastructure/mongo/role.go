@@ -10,11 +10,6 @@ import (
 	"go.mongodb.org/mongo-driver/bson"
 )
 
-var (
-	roleIndexes       = []string{}
-	roleUniqueIndexes = []string{"id", "name"}
-)
-
 type Role struct {
 	client *mongox.ClientCollection
 }
