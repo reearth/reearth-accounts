@@ -2121,6 +2121,9 @@ func (v *SignupInput) GetMockAuth() bool { return v.MockAuth }
 
 type SignupOIDCInput struct {
 	Id          string `json:"id"`
+	Name        string `json:"name"`
+	Email       string `json:"email"`
+	Sub         string `json:"sub"`
 	Lang        string `json:"lang"`
 	WorkspaceId string `json:"workspaceId"`
 	Secret      string `json:"secret"`
@@ -2128,6 +2131,15 @@ type SignupOIDCInput struct {
 
 // GetId returns SignupOIDCInput.Id, and is useful for accessing the field via an interface.
 func (v *SignupOIDCInput) GetId() string { return v.Id }
+
+// GetName returns SignupOIDCInput.Name, and is useful for accessing the field via an interface.
+func (v *SignupOIDCInput) GetName() string { return v.Name }
+
+// GetEmail returns SignupOIDCInput.Email, and is useful for accessing the field via an interface.
+func (v *SignupOIDCInput) GetEmail() string { return v.Email }
+
+// GetSub returns SignupOIDCInput.Sub, and is useful for accessing the field via an interface.
+func (v *SignupOIDCInput) GetSub() string { return v.Sub }
 
 // GetLang returns SignupOIDCInput.Lang, and is useful for accessing the field via an interface.
 func (v *SignupOIDCInput) GetLang() string { return v.Lang }

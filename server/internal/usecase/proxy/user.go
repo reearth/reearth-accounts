@@ -57,6 +57,9 @@ func (u *User) Signup(ctx context.Context, param interfaces.SignupParam) (*user.
 func (u *User) SignupOIDC(ctx context.Context, param interfaces.SignupOIDCParam) (*user.User, error) {
 	input := SignupOIDCInput{
 		Id:          param.User.UserID.String(),
+		Name:        param.Name,
+		Email:       param.Email,
+		Sub:         param.Sub,
 		Lang:        param.User.Lang.String(),
 		WorkspaceId: param.User.WorkspaceID.String(),
 		Secret:      *param.Secret,
