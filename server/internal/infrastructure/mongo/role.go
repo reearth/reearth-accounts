@@ -25,10 +25,6 @@ func NewRole(client *mongox.Client) *Role {
 	}
 }
 
-func (r *Role) Init(ctx context.Context) error {
-	return createIndexes(ctx, r.client, roleIndexes, roleUniqueIndexes)
-}
-
 func (r *Role) FindAll(ctx context.Context) (role.List, error) {
 	filter := bson.M{}
 	return r.find(ctx, filter)

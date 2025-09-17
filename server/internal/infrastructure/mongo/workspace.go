@@ -32,10 +32,6 @@ func NewWorkspaceCompat(client *mongox.Client) repo.Workspace {
 	return &Workspace{client: client.WithCollection("team")}
 }
 
-func (r *Workspace) Init() error {
-	return createIndexes(context.Background(), r.client, nil, workspaceUniqueIndexes)
-}
-
 func (r *Workspace) Filtered(f repo.WorkspaceFilter) repo.Workspace {
 	return &Workspace{
 		client: r.client,

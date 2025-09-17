@@ -27,10 +27,6 @@ func NewPermittable(client *mongox.Client) *Permittable {
 	}
 }
 
-func (r *Permittable) Init(ctx context.Context) error {
-	return createIndexes(ctx, r.client, newPermittableIndexes, newPermittableUniqueIndexes)
-}
-
 func (r *Permittable) FindByUserID(ctx context.Context, id user.ID) (*permittable.Permittable, error) {
 	return r.findOne(ctx, bson.M{
 		"userid": id.String(),
