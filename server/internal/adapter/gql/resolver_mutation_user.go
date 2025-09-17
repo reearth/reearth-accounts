@@ -90,17 +90,12 @@ func (r *mutationResolver) SignupOidc(ctx context.Context, input gqlmodel.Signup
 	if input.Email != nil {
 		email = *input.Email
 	}
-	sub := ""
-	if input.Sub != nil {
-		sub = *input.Sub
-	}
-
 	var lang language.Tag
 	if input.Lang != nil {
 		lang = language.Make(*input.Lang)
 	}
 	u, err := usecases(ctx).User.SignupOIDC(ctx, interfaces.SignupOIDCParam{
-		Sub:         sub,
+		Sub:         au.Sub,
 		AccessToken: au.Token,
 		Issuer:      au.Iss,
 		Email:       email,
