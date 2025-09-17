@@ -1554,6 +1554,9 @@ input SignupInput {
 
 input SignupOIDCInput {
   id: ID
+  name: String
+  email: String
+  sub: String
   lang: Lang
   workspaceId: ID
   secret: String
@@ -11353,7 +11356,7 @@ func (ec *executionContext) unmarshalInputSignupOIDCInput(ctx context.Context, o
 		asMap[k] = v
 	}
 
-	fieldsInOrder := [...]string{"id", "lang", "workspaceId", "secret"}
+	fieldsInOrder := [...]string{"id", "name", "email", "sub", "lang", "workspaceId", "secret"}
 	for _, k := range fieldsInOrder {
 		v, ok := asMap[k]
 		if !ok {
@@ -11367,6 +11370,27 @@ func (ec *executionContext) unmarshalInputSignupOIDCInput(ctx context.Context, o
 				return it, err
 			}
 			it.ID = data
+		case "name":
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("name"))
+			data, err := ec.unmarshalOString2ᚖstring(ctx, v)
+			if err != nil {
+				return it, err
+			}
+			it.Name = data
+		case "email":
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("email"))
+			data, err := ec.unmarshalOString2ᚖstring(ctx, v)
+			if err != nil {
+				return it, err
+			}
+			it.Email = data
+		case "sub":
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("sub"))
+			data, err := ec.unmarshalOString2ᚖstring(ctx, v)
+			if err != nil {
+				return it, err
+			}
+			it.Sub = data
 		case "lang":
 			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("lang"))
 			data, err := ec.unmarshalOLang2ᚖstring(ctx, v)

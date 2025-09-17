@@ -196,6 +196,9 @@ type SignupInput struct {
 
 type SignupOIDCInput struct {
 	ID          *ID     `json:"id,omitempty"`
+	Name        *string `json:"name,omitempty"`
+	Email       *string `json:"email,omitempty"`
+	Sub         *string `json:"sub,omitempty"`
 	Lang        *string `json:"lang,omitempty"`
 	WorkspaceID *ID     `json:"workspaceId,omitempty"`
 	Secret      *string `json:"secret,omitempty"`

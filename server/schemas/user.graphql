@@ -43,6 +43,9 @@ input SignupInput {
 
 input SignupOIDCInput {
   id: ID
+  name: String
+  email: String
+  sub: String
   lang: Lang
   workspaceId: ID
   secret: String
