@@ -16,11 +16,6 @@ import (
 	"go.mongodb.org/mongo-driver/mongo/options"
 )
 
-var (
-	userIndexes       = []string{"subs", "name"}
-	userUniqueIndexes = []string{"id", "email"}
-)
-
 type User struct {
 	client *mongox.Collection
 	host   string
@@ -32,10 +27,6 @@ func NewUser(client *mongox.Client) repo.User {
 
 func NewUserWithHost(client *mongox.Client, host string) repo.User {
 	return &User{client: client.WithCollection("user"), host: host}
-}
-
-func (r *User) Init() error {
-	return createIndexes(context.Background(), r.client, userIndexes, userUniqueIndexes)
 }
 
 func (r *User) FindAll(ctx context.Context) (user.List, error) {

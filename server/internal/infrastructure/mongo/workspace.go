@@ -15,10 +15,6 @@ import (
 	"go.mongodb.org/mongo-driver/bson"
 )
 
-var (
-	workspaceUniqueIndexes = []string{"id"}
-)
-
 type Workspace struct {
 	client *mongox.Collection
 	f      repo.WorkspaceFilter
@@ -30,10 +26,6 @@ func NewWorkspace(client *mongox.Client) repo.Workspace {
 
 func NewWorkspaceCompat(client *mongox.Client) repo.Workspace {
 	return &Workspace{client: client.WithCollection("team")}
-}
-
-func (r *Workspace) Init() error {
-	return createIndexes(context.Background(), r.client, nil, workspaceUniqueIndexes)
 }
 
 func (r *Workspace) Filtered(f repo.WorkspaceFilter) repo.Workspace {

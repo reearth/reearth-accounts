@@ -10,11 +10,6 @@ import (
 	"go.mongodb.org/mongo-driver/bson"
 )
 
-var (
-	roleIndexes       = []string{}
-	roleUniqueIndexes = []string{"id", "name"}
-)
-
 type Role struct {
 	client *mongox.ClientCollection
 }
@@ -23,10 +18,6 @@ func NewRole(client *mongox.Client) *Role {
 	return &Role{
 		client: client.WithCollection("role"),
 	}
-}
-
-func (r *Role) Init(ctx context.Context) error {
-	return createIndexes(ctx, r.client, roleIndexes, roleUniqueIndexes)
 }
 
 func (r *Role) FindAll(ctx context.Context) (role.List, error) {
