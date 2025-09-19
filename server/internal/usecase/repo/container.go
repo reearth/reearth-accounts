@@ -83,7 +83,7 @@ func (f WorkspaceFilter) CanRead(id id.WorkspaceID) bool {
 }
 
 func (f WorkspaceFilter) CanWrite(id id.WorkspaceID) bool {
-	return f.Writable == nil || f.Writable.Has(id)
+	return len(f.Writable) == 0 || f.Writable.Has(id)
 }
 
 func (f WorkspaceFilter) Filter(q any) any {
