@@ -20,7 +20,7 @@ var migrations = migration.Migrations[DBClient]{
 	250910120000: GenerateMissingWorkspaceAliases,
 	250911120000: GenerateMissingUserAliases,
 	250911120001: AddCaseInsensitiveWorkspaceAliasIndex,
-	// 250911120002: AddWorkspaceAliasMembersCompositeIndex,
+	// 250911120002: AddWorkspaceAliasMembersCompositeUniqueIndex,
 	250911120003: AddCaseInsensitiveUserAliasIndex,
 	250911120004: AddCaseInsensitiveUserEmailIndex,
 	// 250911120005: AddCaseInsensitiveUserWorkspaceIndex,
