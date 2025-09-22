@@ -415,3 +415,75 @@ func TestVerifyUser(t *testing.T) {
 	assert.NoError(t, err)
 	assert.True(t, u2.Verification().IsVerified())
 }
+
+func TestPasswordReset(t *testing.T) {
+	e, r := StartServer(t, &app.Config{}, true, baseSeederUser)
+
+	startQuery := `mutation($input: StartPasswordResetInput!) {
+		startPasswordReset(input: $input)
+	}`
+	startVars := map[string]any{
+		"input": map[string]any{
+			"email": "e2e@e2e.com",
+		},
+	}
+	startReq := GraphQLRequest{
+		Query:     startQuery,
+		Variables: startVars,
+	}
+	startBody, err := json.Marshal(startReq)
+	assert.NoError(t, err)
+	e.POST("/api/graphql").
+		WithHeader("authorization", "Bearer test").
+		WithHeader("Content-Type", "application/json").
+		WithHeader("X-Reearth-Debug-User", uId.String()).
+		WithBytes(startBody).
+		Expect().Status(http.StatusOK).
+		JSON().Object().
+		Value("data").Object().
+		Value("startPasswordReset").Boolean().IsTrue()
+
+	u, err := r.User.FindByID(context.Background(), uId)
+	assert.NoError(t, err)
+	pr := u.PasswordReset()
+	if !assert.NotNil(t, pr) {
+		t.Fatal("password reset request not set")
+	}
+	token := pr.Token
+	assert.NotEmpty(t, token)
+
+	newPass := "N3wStr0ngPass!"
+	resetQuery := `mutation($input: PasswordResetInput!) {
+		passwordReset(input: $input)
+	}`
+	resetVars := map[string]any{
+		"input": map[string]any{
+			"password": newPass,
+			"token":    token,
+		},
+	}
+	resetReq := GraphQLRequest{
+		Query:     resetQuery,
+		Variables: resetVars,
+	}
+	resetBody, err := json.Marshal(resetReq)
+	assert.NoError(t, err)
+
+	e.POST("/api/graphql").
+		WithHeader("authorization", "Bearer test").
+		WithHeader("Content-Type", "application/json").
+		WithHeader("X-Reearth-Debug-User", uId.String()).
+		WithBytes(resetBody).
+		Expect().Status(http.StatusOK).
+		JSON().Object().
+		Value("data").Object().
+		Value("passwordReset").Boolean().IsTrue()
+
+	u2, err := r.User.FindByID(context.Background(), uId)
+	assert.NoError(t, err)
+	assert.Nil(t, u2.PasswordReset())
+
+	ok, err := u2.MatchPassword(newPass)
+	assert.NoError(t, err)
+	assert.True(t, ok, "password should be updated")
+}
