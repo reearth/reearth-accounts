@@ -276,3 +276,142 @@ func TestNodes(t *testing.T) {
 		WithBytes(jsonData).Expect().Status(http.StatusOK).JSON().Object().Value("data").Object().Value("nodes")
 	o.Array().ConsistsOf(map[string]string{"id": uId.String()})
 }
+
+func TestSignup(t *testing.T) {
+	e, _ := StartServer(t, &app.Config{}, true, nil)
+	email := "newuser@example.com"
+	query := `mutation($input: SignupInput!) {
+		signup(input: $input) {
+			user { id name email }
+		}
+	}`
+	vars := map[string]interface{}{
+		"input": map[string]interface{}{
+			"email":    email,
+			"name":     "new user",
+			"password": "StrongPassw0rd!",
+		},
+	}
+	request := GraphQLRequest{
+		Query:     query,
+		Variables: vars,
+	}
+	jsonData, err := json.Marshal(request)
+	if err != nil {
+		assert.NoError(t, err)
+	}
+	o := e.POST("/api/graphql").
+		WithHeader("authorization", "Bearer test").
+		WithHeader("Content-Type", "application/json").
+		WithBytes(jsonData).Expect().Status(http.StatusOK).JSON().Object().Value("data").Object().Value("signup").Object().Value("user").Object()
+	o.Value("id").String().NotEmpty()
+	o.Value("name").String().IsEqual("new user")
+	o.Value("email").String().IsEqual(email)
+}
+
+func TestSignupOIDC(t *testing.T) {
+	e, _ := StartServer(t, &app.Config{}, true, nil)
+	email := "testSignupOIDC@example.com"
+	auth := user.ReearthSub(uId.String())
+	query := `mutation($input: SignupOIDCInput!) {
+		signupOIDC(input: $input) {
+			user { id name email }
+		}
+	}`
+	vars := map[string]interface{}{
+		"input": map[string]interface{}{
+			"email": email,
+			"name":  "new user",
+			"sub":   auth.Sub,
+		},
+	}
+	request := GraphQLRequest{
+		Query:     query,
+		Variables: vars,
+	}
+	jsonData, err := json.Marshal(request)
+	if err != nil {
+		assert.NoError(t, err)
+	}
+	o := e.POST("/api/graphql").
+		WithHeader("authorization", "Bearer test").
+		WithHeader("Content-Type", "application/json").
+		WithHeader("X-Reearth-Debug-User", uId.String()).
+		WithHeader("X-Reearth-Debug-Auth-Sub", "oidc|1234567890").
+		WithHeader("X-Reearth-Debug-Auth-Iss", "https://issuer.example.com").
+		WithHeader("X-Reearth-Debug-Auth-Token", "dummy").
+		WithHeader("X-Reearth-Debug-Auth-Name", "new user").
+		WithHeader("X-Reearth-Debug-Auth-Email", email).
+		WithBytes(jsonData).Expect().Status(http.StatusOK).JSON().Object().Value("data").Object().Value("signupOIDC").Object().Value("user").Object()
+	o.Value("id").String().NotEmpty()
+	o.Value("name").String().IsEqual("new user")
+	o.Value("email").String().IsEqual(email)
+}
+
+func TestVerifyUser(t *testing.T) {
+	e, r := StartServer(t, &app.Config{}, true, baseSeederUser)
+
+	email := "e2e@e2e.com"
+	query1 := `mutation($input: CreateVerificationInput!) {
+		createVerification(input: $input)
+	}`
+	vars1 := map[string]interface{}{
+		"input": map[string]interface{}{
+			"email": email,
+		},
+	}
+	request1 := GraphQLRequest{
+		Query:     query1,
+		Variables: vars1,
+	}
+	jsonData1, err := json.Marshal(request1)
+	if err != nil {
+		assert.NoError(t, err)
+	}
+	e.POST("/api/graphql").
+		WithHeader("authorization", "Bearer test").
+		WithHeader("Content-Type", "application/json").
+		WithHeader("X-Reearth-Debug-User", uId.String()).
+		WithBytes(jsonData1).
+		Expect().Status(http.StatusOK).
+		JSON().Object().Value("data").Object().Value("createVerification").Boolean().IsTrue()
+
+	u, err := r.User.FindByID(context.Background(), uId)
+	assert.NoError(t, err)
+	assert.NotNil(t, u.Verification())
+	code := u.Verification().Code()
+
+	query2 := `mutation($input: VerifyUserInput!) {
+		verifyUser(input: $input) {
+			user { id name email }
+		}
+	}`
+	vars2 := map[string]interface{}{
+		"input": map[string]interface{}{
+			"code": code,
+		},
+	}
+	request2 := GraphQLRequest{
+		Query:     query2,
+		Variables: vars2,
+	}
+	jsonData2, err := json.Marshal(request2)
+	if err != nil {
+		assert.NoError(t, err)
+	}
+
+	o2 := e.POST("/api/graphql").
+		WithHeader("authorization", "Bearer test").
+		WithHeader("Content-Type", "application/json").
+		WithHeader("X-Reearth-Debug-User", uId.String()).
+		WithBytes(jsonData2).
+		Expect().Status(http.StatusOK).
+		JSON().Object().Value("data").Object().Value("verifyUser").Object().Value("user").Object()
+	o2.Value("id").String().IsEqual(uId.String())
+	o2.Value("name").String().IsEqual("e2e")
+	o2.Value("email").String().IsEqual(email)
+
+	u2, err := r.User.FindByID(context.Background(), uId)
+	assert.NoError(t, err)
+	assert.True(t, u2.Verification().IsVerified())
+}
