@@ -12,7 +12,14 @@ import (
 	"github.com/reearth/reearthx/appx"
 )
 
-const debugUserHeader = "X-Reearth-Debug-User"
+const (
+	debugUserHeader      = "X-Reearth-Debug-User"
+	debugAuthSubHeader   = "X-Reearth-Debug-Auth-Sub"
+	debugAuthIssHeader   = "X-Reearth-Debug-Auth-Iss"
+	debugAuthTokenHeader = "X-Reearth-Debug-Auth-Token"
+	debugAuthNameHeader  = "X-Reearth-Debug-Auth-Name"
+	debugAuthEmailHeader = "X-Reearth-Debug-Auth-Email"
+)
 
 func authMiddleware(cfg *ServerConfig) func(http.Handler) http.Handler {
 	return appx.ContextMiddlewareBy(func(w http.ResponseWriter, req *http.Request) context.Context {
@@ -27,8 +34,12 @@ func authMiddleware(cfg *ServerConfig) func(http.Handler) http.Handler {
 			ai = a
 		}
 
-		// debug mode: fetch user by user id
+		// debug mode: fetch user by user id add AuthInfo to context
 		if cfg.Debug {
+			if newCtx, dai := injectDebugAuthInfo(ctx, req); dai != nil {
+				ctx = newCtx
+				ai = *dai
+			}
 			usr = isDebugUserExists(req, cfg, ctx)
 		}
 
@@ -94,4 +105,19 @@ func generateUserOperator(ctx context.Context, cfg *ServerConfig, u *user.User) 
 		MaintainableWorkspaces: mw,
 		OwningWorkspaces:       ow,
 	}, nil
+}
+
+func injectDebugAuthInfo(ctx context.Context, req *http.Request) (context.Context, *appx.AuthInfo) {
+	sub := req.Header.Get(debugAuthSubHeader)
+	if sub == "" {
+		return ctx, nil
+	}
+	ai := &appx.AuthInfo{
+		Token: req.Header.Get(debugAuthTokenHeader),
+		Sub:   sub,
+		Iss:   req.Header.Get(debugAuthIssHeader),
+		Name:  req.Header.Get(debugAuthNameHeader),
+		Email: req.Header.Get(debugAuthEmailHeader),
+	}
+	return context.WithValue(ctx, adapter.AuthInfoKey, *ai), ai
 }
