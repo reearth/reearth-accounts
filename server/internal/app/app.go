@@ -96,7 +96,7 @@ func initEcho(ctx context.Context, cfg *ServerConfig) *echo.Echo {
 	)
 
 	api.POST(
-		"/graphql", GraphqlAPI(cfg.Config.GraphQL, cfg.Config.Dev),
+		"/graphql", GraphqlAPI(cfg.Config, cfg.Config.Dev),
 		usecaseMiddleware,
 	)
 

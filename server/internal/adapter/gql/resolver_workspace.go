@@ -29,6 +29,14 @@ func (r *queryResolver) FindByID(ctx context.Context, workpaceId gqlmodel.ID) (*
 		return nil, err
 	}
 
+	if res != nil && res.Metadata() != nil && res.Metadata().PhotoURL() != "" {
+		signedURL, sErr := r.Storage.GetSignedURL(ctx, res.Metadata().PhotoURL())
+		if sErr != nil {
+			return nil, sErr
+		}
+		res.Metadata().SetPhotoURL(signedURL)
+	}
+
 	return gqlmodel.ToWorkspace(res), nil
 }
 
@@ -50,6 +58,14 @@ func (r *queryResolver) FindByName(ctx context.Context, name string) (*gqlmodel.
 	res, err := usecases(ctx).Workspace.FetchByName(ctx, name)
 	if err != nil {
 		return nil, err
+	}
+
+	if res != nil && res.Metadata() != nil && res.Metadata().PhotoURL() != "" {
+		signedURL, sErr := r.Storage.GetSignedURL(ctx, res.Metadata().PhotoURL())
+		if sErr != nil {
+			return nil, sErr
+		}
+		res.Metadata().SetPhotoURL(signedURL)
 	}
 
 	return gqlmodel.ToWorkspace(res), nil
