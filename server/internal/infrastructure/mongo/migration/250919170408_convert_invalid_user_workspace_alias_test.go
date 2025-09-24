@@ -83,7 +83,7 @@ func TestConvertInvalidWorkspaceAlias(t *testing.T) {
 	assert.NoError(t, err)
 
 	// Run the migration
-	err = ConvertInvalidWorkspaceAlias(ctx, mongoxClient)
+	err = ConvertInvalidUserWorkspaceAlias(ctx, mongoxClient)
 	assert.NoError(t, err)
 
 	// Check that invalid aliases were sanitized

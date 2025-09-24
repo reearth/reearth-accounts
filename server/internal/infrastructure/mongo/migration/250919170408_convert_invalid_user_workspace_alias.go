@@ -12,11 +12,11 @@ import (
 	"go.mongodb.org/mongo-driver/bson"
 )
 
-type TempWorkspaceAliasNew struct {
+type TempUserWorkspaceAliasNew struct {
 	Alias string `validate:"required,min=5,max=30,printascii"`
 }
 
-func ConvertInvalidWorkspaceAlias(ctx context.Context, c DBClient) error {
+func ConvertInvalidUserWorkspaceAlias(ctx context.Context, c DBClient) error {
 	col := c.Collection("workspace")
 	nameRegex := regexp.MustCompile(`^[a-zA-Z0-9][a-zA-Z0-9-]{3,30}[a-zA-Z0-9]$`)
 
@@ -41,7 +41,7 @@ func ConvertInvalidWorkspaceAlias(ctx context.Context, c DBClient) error {
 					doc.Alias = sanitizedAlias
 				}
 
-				var tempAlias TempWorkspaceAliasNew
+				var tempAlias TempUserWorkspaceAliasNew
 				tempAlias.Alias = doc.Alias
 
 				validate := validator.New()
