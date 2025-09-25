@@ -68,11 +68,11 @@ func init() {
 }
 
 func (i *User) Signup(ctx context.Context, param interfaces.SignupParam) (u *user.User, err error) {
-	if err := i.verifySignupSecret(param.Secret); err != nil {
+	if err = i.verifySignupSecret(param.Secret); err != nil {
 		return nil, err
 	}
 
-	u, workspace, err := workspace.Init(workspace.InitParams{
+	u, ws, err := workspace.Init(workspace.InitParams{
 		Email:       param.Email,
 		Name:        param.Name,
 		Password:    lo.ToPtr(param.Password),
@@ -88,18 +88,18 @@ func (i *User) Signup(ctx context.Context, param interfaces.SignupParam) (u *use
 	vr := user.NewVerification()
 	u.SetVerification(vr)
 
-	if err := i.repos.User.Create(ctx, u); err != nil {
+	if err = i.repos.User.Create(ctx, u); err != nil {
 		if errors.Is(err, repo.ErrDuplicatedUser) {
 			return nil, interfaces.ErrUserAlreadyExists
 		}
 		return nil, err
 	}
-	if err := i.repos.Workspace.Save(ctx, workspace); err != nil {
+	if err = i.repos.Workspace.Save(ctx, ws); err != nil {
 		return nil, err
 	}
 
 	if !param.MockAuth {
-		if err := i.sendVerificationMail(ctx, u, vr); err != nil {
+		if err = i.sendVerificationMail(ctx, u, vr); err != nil {
 			return nil, err
 		}
 	}
@@ -122,15 +122,6 @@ func (i *User) SignupOIDC(ctx context.Context, param interfaces.SignupOIDCParam)
 		}
 		sub = ui.Sub
 		email = ui.Email
-		if name == "" {
-			name = ui.Nickname
-		}
-		if name == "" {
-			name = ui.Name
-		}
-		if name == "" {
-			name = ui.Email
-		}
 	}
 
 	eu, err := i.repos.User.FindByEmail(ctx, param.Email)
@@ -163,11 +154,11 @@ func (i *User) SignupOIDC(ctx context.Context, param interfaces.SignupOIDCParam)
 		return nil, err
 	}
 
-	if err := i.repos.User.Create(ctx, u); err != nil {
+	if err = i.repos.User.Create(ctx, u); err != nil {
 		return nil, err
 	}
 
-	if err := i.repos.Workspace.Save(ctx, ws); err != nil {
+	if err = i.repos.Workspace.Save(ctx, ws); err != nil {
 		return nil, err
 	}
 
