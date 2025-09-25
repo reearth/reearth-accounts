@@ -17,6 +17,15 @@ func (r *queryResolver) Me(ctx context.Context) (*gqlmodel.Me, error) {
 	if u == nil {
 		return nil, nil
 	}
+
+	if u.Metadata().PhotoURL() != "" {
+		signedURL, err := r.Storage.GetSignedURL(ctx, u.Metadata().PhotoURL())
+		if err != nil {
+			return nil, err
+		}
+		u.Metadata().SetPhotoURL(signedURL)
+	}
+
 	return gqlmodel.ToMe(u), nil
 }
 

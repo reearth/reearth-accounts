@@ -47,6 +47,12 @@ type Config struct {
 
 	// cerbos
 	CerbosHost string `envconfig:"CERBOS_HOST"`
+
+	// Storage
+	StorageIsLocal          bool   `envconfig:"REEARTH_ACCOUNTS_STORAGE_IS_LOCAL"`
+	StorageBucketName       string `envconfig:"REEARTH_ACCOUNTS_STORAGE_BUCKET_NAME" default:"reearth"`
+	StorageEmulatorEnabled  bool   `envconfig:"REEARTH_ACCOUNTS_STORAGE_EMULATOR_ENABLED"`
+	StorageEmulatorEndpoint string `envconfig:"REEARTH_ACCOUNTS_STORAGE_EMULATOR_ENDPOINT"`
 }
 
 type AuthConfig struct {

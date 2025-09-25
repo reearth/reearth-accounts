@@ -11,6 +11,8 @@ import (
 	"github.com/99designs/gqlgen/graphql/handler/transport"
 	"github.com/reearth/reearth-accounts/internal/adapter"
 	"github.com/reearth/reearth-accounts/internal/adapter/gql"
+	"github.com/reearth/reearth-accounts/internal/infrastructure/storage"
+	"github.com/reearth/reearthx/log"
 
 	"github.com/labstack/echo/v4"
 	"github.com/ravilushqa/otelgqlgen"
@@ -24,9 +26,19 @@ const (
 	maxMemorySize     = 100 * 1024 * 1024       // 100MB
 )
 
-func GraphqlAPI(conf GraphQLConfig, dev bool) echo.HandlerFunc {
+func GraphqlAPI(conf *Config, dev bool) echo.HandlerFunc {
+	str, err := storage.NewGCPStorage(&storage.Config{
+		IsLocal:          conf.StorageIsLocal,
+		BucketName:       conf.StorageBucketName,
+		EmulatorEnabled:  conf.StorageEmulatorEnabled,
+		EmulatorEndpoint: conf.StorageEmulatorEndpoint,
+	})
+	if err != nil {
+		log.Fatal("failed to initialize storage: " + err.Error())
+	}
+
 	schema := gql.NewExecutableSchema(gql.Config{
-		Resolvers: gql.NewResolver(),
+		Resolvers: gql.NewResolver(str),
 	})
 
 	srv := handler.New(schema)
@@ -43,8 +55,8 @@ func GraphqlAPI(conf GraphQLConfig, dev bool) echo.HandlerFunc {
 	srv.SetQueryCache(lru.New[*ast.QueryDocument](1000))
 	srv.Use(otelgqlgen.Middleware())
 
-	if conf.ComplexityLimit > 0 {
-		srv.Use(extension.FixedComplexityLimit(conf.ComplexityLimit))
+	if conf.GraphQL.ComplexityLimit > 0 {
+		srv.Use(extension.FixedComplexityLimit(conf.GraphQL.ComplexityLimit))
 	}
 
 	srv.Use(extension.AutomaticPersistedQuery{
