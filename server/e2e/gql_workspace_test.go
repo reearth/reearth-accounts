@@ -99,6 +99,27 @@ type GraphQLRequest struct {
 	Variables     map[string]any `json:"variables"`
 }
 
+func TestFindByID(t *testing.T) {
+	e, _ := StartServer(t, &app.Config{}, true, baseSeederWorkspace)
+
+	query := fmt.Sprintf(`query { findByID(id: "%s"){ id name }}`, wId)
+	request := GraphQLRequest{
+		Query: query,
+	}
+	jsonData, err := json.Marshal(request)
+	if err != nil {
+		assert.NoError(t, err)
+	}
+	o := e.POST("/api/graphql").
+		WithHeader("authorization", "Bearer test").
+		WithHeader("Content-Type", "application/json").
+		WithHeader("X-Reearth-Debug-User", uId.String()).
+		WithBytes(jsonData).Expect().Status(http.StatusOK).JSON().Object().
+		Value("data").Object().Value("findByID").Object()
+	o.Value("id").String().IsEqual(wId.String())
+	o.Value("name").String().IsEqual("e2e")
+}
+
 func TestCreateWorkspace(t *testing.T) {
 	e, _ := StartServer(t, &app.Config{}, true, baseSeederWorkspace)
 
