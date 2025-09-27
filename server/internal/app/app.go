@@ -1,10 +1,14 @@
 package app
 
 import (
+	"bytes"
 	"context"
 	"errors"
+	"fmt"
+	"io"
 	"net/http"
 	"net/http/pprof"
+	"time"
 
 	"github.com/99designs/gqlgen/graphql/playground"
 	"github.com/labstack/echo/v4"
@@ -15,6 +19,16 @@ import (
 	"github.com/reearth/reearthx/log"
 	"github.com/reearth/reearthx/rerror"
 )
+
+type responseBodyWriter struct {
+	http.ResponseWriter
+	body *bytes.Buffer
+}
+
+func (w *responseBodyWriter) Write(b []byte) (int, error) {
+	w.body.Write(b)
+	return w.ResponseWriter.Write(b)
+}
 
 func initEcho(ctx context.Context, cfg *ServerConfig) *echo.Echo {
 	if cfg.Config == nil {
@@ -28,7 +42,7 @@ func initEcho(ctx context.Context, cfg *ServerConfig) *echo.Echo {
 
 	logger := log.NewEcho()
 	e.Logger = logger
-	e.Use(logger.AccessLogger())
+	e.Use(accessLogger())
 
 	origins := allowedOrigins(cfg)
 	if len(origins) > 0 {
@@ -145,5 +159,96 @@ func cacheControl(next echo.HandlerFunc) echo.HandlerFunc {
 	return func(c echo.Context) error {
 		c.Response().Header().Set("Cache-Control", "private")
 		return next(c)
+	}
+}
+
+func accessLogger() echo.MiddlewareFunc {
+	return func(next echo.HandlerFunc) echo.HandlerFunc {
+		return func(c echo.Context) error {
+			req := c.Request()
+			res := c.Response()
+			start := time.Now()
+
+			reqid := log.GetReqestID(res, req)
+
+			// Capture request body
+			var requestBody string
+			if req.Body != nil {
+				bodyBytes, err := io.ReadAll(req.Body)
+				if err == nil {
+					requestBody = string(bodyBytes)
+					// Restore the body for downstream handlers
+					req.Body = io.NopCloser(bytes.NewBuffer(bodyBytes))
+				}
+			}
+
+			// Capture response body using a custom response writer
+			resBody := &bytes.Buffer{}
+			writer := &responseBodyWriter{
+				ResponseWriter: c.Response().Writer,
+				body:           resBody,
+			}
+			c.Response().Writer = writer
+
+			args := []any{
+				"time_unix", start.Unix(),
+				"remote_ip", c.RealIP(),
+				"host", req.Host,
+				"uri", req.RequestURI,
+				"method", req.Method,
+				"path", req.URL.Path,
+				"protocol", req.Proto,
+				"referer", req.Referer(),
+				"user_agent", req.UserAgent(),
+				"bytes_in", req.ContentLength,
+				"request_id", reqid,
+				"route", c.Path(),
+				"request_body", requestBody,
+				"response_body", "",
+			}
+
+			logger := log.GetLoggerFromContextOrDefault(c.Request().Context())
+			logger = logger.WithCaller(false)
+
+			// incoming log
+			logger.Infow(
+				fmt.Sprintf("<-- %s %s", req.Method, req.URL.Path),
+				args...,
+			)
+
+			if err := next(c); err != nil {
+				c.Error(err)
+			}
+
+			res = c.Response()
+			stop := time.Now()
+			latency := stop.Sub(start)
+			latencyHuman := latency.String()
+
+			// Get response body from the custom writer
+			responseBody := resBody.String()
+
+			// Update args with captured response body
+			for i, arg := range args {
+				if str, ok := arg.(string); ok && str == "response_body" && i+1 < len(args) {
+					args[i+1] = responseBody
+					break
+				}
+			}
+
+			args = append(args,
+				"status", res.Status,
+				"bytes_out", res.Size,
+				"letency", latency.Microseconds(),
+				"latency_human", latencyHuman,
+			)
+
+			// outcoming log
+			logger.Infow(
+				fmt.Sprintf("--> %s %d %s %s", req.Method, res.Status, req.URL.Path, latencyHuman),
+				args...,
+			)
+			return nil
+		}
 	}
 }
