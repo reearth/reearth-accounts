@@ -24,14 +24,19 @@ func (c *WorkspaceLoader) Fetch(ctx context.Context, ids []gqlmodel.ID) ([]*gqlm
 		return nil, []error{err}
 	}
 
-	res, err := c.usecase.Fetch(ctx, uids, getOperator(ctx))
+	ws, err := c.usecase.Fetch(ctx, uids, getOperator(ctx))
 	if err != nil {
 		return nil, []error{err}
 	}
 
-	workspaces := make([]*gqlmodel.Workspace, 0, len(res))
-	for _, t := range res {
-		workspaces = append(workspaces, gqlmodel.ToWorkspace(t))
+	exists, err := buildExistingUserSetFromWorkspaces(ctx, ws)
+	if err != nil {
+		return nil, []error{err}
+	}
+
+	workspaces := make([]*gqlmodel.Workspace, 0, len(ws))
+	for _, w := range ws {
+		workspaces = append(workspaces, gqlmodel.ToWorkspace(w, exists))
 	}
 	return workspaces, nil
 }
@@ -42,13 +47,19 @@ func (c *WorkspaceLoader) FindByUser(ctx context.Context, uid gqlmodel.ID) ([]*g
 		return nil, err
 	}
 
-	res, err := c.usecase.FindByUser(ctx, userid, getOperator(ctx))
+	ws, err := c.usecase.FindByUser(ctx, userid, getOperator(ctx))
 	if err != nil {
 		return nil, err
 	}
-	workspaces := make([]*gqlmodel.Workspace, 0, len(res))
-	for _, t := range res {
-		workspaces = append(workspaces, gqlmodel.ToWorkspace(t))
+
+	exists, err := buildExistingUserSetFromWorkspaces(ctx, ws)
+	if err != nil {
+		return nil, err
+	}
+
+	workspaces := make([]*gqlmodel.Workspace, 0, len(ws))
+	for _, w := range ws {
+		workspaces = append(workspaces, gqlmodel.ToWorkspace(w, exists))
 	}
 	return workspaces, nil
 }
