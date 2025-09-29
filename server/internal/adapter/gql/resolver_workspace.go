@@ -24,12 +24,17 @@ func (r *queryResolver) FindByID(ctx context.Context, workpaceId gqlmodel.ID) (*
 		return nil, err
 	}
 
-	res, err := usecases(ctx).Workspace.FetchByID(ctx, wid)
+	w, err := usecases(ctx).Workspace.FetchByID(ctx, wid)
 	if err != nil {
 		return nil, err
 	}
 
-	return gqlmodel.ToWorkspace(res), nil
+	exists, err := buildExistingUserSetFromWorkspace(ctx, w)
+	if err != nil {
+		return nil, err
+	}
+
+	return gqlmodel.ToWorkspace(w, exists), nil
 }
 
 func (r *queryResolver) FindByIDs(ctx context.Context, workpaceIds []gqlmodel.ID) ([]*gqlmodel.Workspace, error) {
@@ -38,21 +43,31 @@ func (r *queryResolver) FindByIDs(ctx context.Context, workpaceIds []gqlmodel.ID
 		return nil, err
 	}
 
-	res, err := usecases(ctx).Workspace.Fetch(ctx, wids, getOperator(ctx))
+	ws, err := usecases(ctx).Workspace.Fetch(ctx, wids, getOperator(ctx))
 	if err != nil {
 		return nil, err
 	}
 
-	return gqlmodel.ToWorkspaces(res), nil
+	exists, err := buildExistingUserSetFromWorkspaces(ctx, ws)
+	if err != nil {
+		return nil, err
+	}
+
+	return gqlmodel.ToWorkspaces(ws, exists), nil
 }
 
 func (r *queryResolver) FindByName(ctx context.Context, name string) (*gqlmodel.Workspace, error) {
-	res, err := usecases(ctx).Workspace.FetchByName(ctx, name)
+	w, err := usecases(ctx).Workspace.FetchByName(ctx, name)
 	if err != nil {
 		return nil, err
 	}
 
-	return gqlmodel.ToWorkspace(res), nil
+	exists, err := buildExistingUserSetFromWorkspace(ctx, w)
+	if err != nil {
+		return nil, err
+	}
+
+	return gqlmodel.ToWorkspace(w, exists), nil
 }
 
 func (r *queryResolver) FindByUser(ctx context.Context, userID gqlmodel.ID) ([]*gqlmodel.Workspace, error) {
@@ -61,12 +76,17 @@ func (r *queryResolver) FindByUser(ctx context.Context, userID gqlmodel.ID) ([]*
 		return nil, err
 	}
 
-	res, err := usecases(ctx).Workspace.FindByUser(ctx, uid, getOperator(ctx))
+	ws, err := usecases(ctx).Workspace.FindByUser(ctx, uid, getOperator(ctx))
 	if err != nil {
 		return nil, err
 	}
 
-	return gqlmodel.ToWorkspaces(res), nil
+	exists, err := buildExistingUserSetFromWorkspaces(ctx, ws)
+	if err != nil {
+		return nil, err
+	}
+
+	return gqlmodel.ToWorkspaces(ws, exists), nil
 }
 
 func (r *queryResolver) FindByUserWithPagination(ctx context.Context, userID gqlmodel.ID, pagination gqlmodel.Pagination) (*gqlmodel.WorkspacesWithPagination, error) {
@@ -83,8 +103,13 @@ func (r *queryResolver) FindByUserWithPagination(ctx context.Context, userID gql
 		return nil, err
 	}
 
+	exists, err := buildExistingUserSetFromWorkspaces(ctx, res.Workspaces)
+	if err != nil {
+		return nil, err
+	}
+
 	return &gqlmodel.WorkspacesWithPagination{
-		Workspaces: gqlmodel.ToWorkspaces(res.Workspaces),
+		Workspaces: gqlmodel.ToWorkspaces(res.Workspaces, exists),
 		TotalCount: res.TotalCount,
 	}, nil
 }
