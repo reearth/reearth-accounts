@@ -75,12 +75,12 @@ func (r *queryResolver) FindByName(ctx context.Context, name string) (*gqlmodel.
 		return nil, err
 	}
 
-	if res != nil && res.Metadata() != nil && res.Metadata().PhotoURL() != "" {
-		signedURL, sErr := r.Storage.GetSignedURL(ctx, res.Metadata().PhotoURL())
+	if w != nil && w.Metadata() != nil && w.Metadata().PhotoURL() != "" {
+		signedURL, sErr := r.Storage.GetSignedURL(ctx, w.Metadata().PhotoURL())
 		if sErr != nil {
 			return nil, sErr
 		}
-		res.Metadata().SetPhotoURL(signedURL)
+		w.Metadata().SetPhotoURL(signedURL)
 	}
 
 	return gqlmodel.ToWorkspace(w, exists), nil
