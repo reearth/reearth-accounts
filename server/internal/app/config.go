@@ -38,7 +38,7 @@ type Config struct {
 
 	GraphQL GraphQLConfig
 
-	SignupSecret   string
+	SignupSecret   string `envconfig:"REEARTH_ACCOUNTS_SIGNUP_SECRET"`
 	HostWeb        string
 	Reearth_API    string
 	Reearth_Web    string
