@@ -78,9 +78,6 @@ func (r *mutationResolver) Signup(ctx context.Context, input gqlmodel.SignupInpu
 
 func (r *mutationResolver) SignupOidc(ctx context.Context, input gqlmodel.SignupOIDCInput) (*gqlmodel.UserPayload, error) {
 	au := adapter.GetAuthInfo(ctx)
-	if au == nil {
-		return nil, interfaces.ErrOperationDenied
-	}
 
 	name := ""
 	if input.Name != nil {
@@ -90,14 +87,27 @@ func (r *mutationResolver) SignupOidc(ctx context.Context, input gqlmodel.Signup
 	if input.Email != nil {
 		email = *input.Email
 	}
+	sub := ""
+	if input.Sub != nil {
+		sub = *input.Sub
+	}
+	accessToken := ""
+	if au != nil && au.Token != "" {
+		accessToken = au.Token
+	}
+	iss := ""
+	if au != nil && au.Iss != "" {
+		iss = au.Iss
+	}
+
 	var lang language.Tag
 	if input.Lang != nil {
 		lang = language.Make(*input.Lang)
 	}
 	u, err := usecases(ctx).User.SignupOIDC(ctx, interfaces.SignupOIDCParam{
-		Sub:         au.Sub,
-		AccessToken: au.Token,
-		Issuer:      au.Iss,
+		Sub:         sub,
+		AccessToken: accessToken,
+		Issuer:      iss,
 		Email:       email,
 		Name:        name,
 		Secret:      input.Secret,
