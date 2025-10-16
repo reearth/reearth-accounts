@@ -5,7 +5,7 @@ package gql
 import (
 	"errors"
 
-	"github.com/reearth/reearth-accounts/internal/usecase/gateway"
+	"github.com/reearth/reearth-accounts/server/internal/usecase/gateway"
 )
 
 // THIS CODE IS A STARTING POINT ONLY. IT WILL NOT BE UPDATED WITH SCHEMA CHANGES.

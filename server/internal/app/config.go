@@ -9,7 +9,7 @@ import (
 
 	"github.com/joho/godotenv"
 	"github.com/kelseyhightower/envconfig"
-	"github.com/reearth/reearth-accounts/pkg/workspace"
+	"github.com/reearth/reearth-accounts/server/pkg/workspace"
 	"github.com/reearth/reearthx/appx"
 	"github.com/reearth/reearthx/log"
 )
@@ -20,7 +20,7 @@ type Config struct {
 	Port    string `default:"8090" envconfig:"PORT"`
 	Dev     bool
 	DB      string   `default:"mongodb://localhost" envconfig:"REEARTH_ACCOUNTS_DB"`
-	DBName  string   `default:"reearth-account" envconfig:"REEARTH_ACCOUNTS_DB_NAME"`
+	DBName  string   `default:"reearth" envconfig:"REEARTH_ACCOUNTS_DB_NAME"`
 	Origins []string `envconfig:"REEARTH_ACCOUNTS_ORIGINS"`
 	Host    string
 

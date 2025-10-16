@@ -4,8 +4,8 @@ import (
 	"io"
 	"testing"
 
-	"github.com/reearth/reearth-accounts/pkg/id"
-	"github.com/reearth/reearth-accounts/pkg/role"
+	"github.com/reearth/reearth-accounts/server/pkg/id"
+	"github.com/reearth/reearth-accounts/server/pkg/role"
 	"github.com/samber/lo"
 	"github.com/stretchr/testify/assert"
 	"go.mongodb.org/mongo-driver/bson"

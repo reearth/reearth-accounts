@@ -48,6 +48,8 @@ generate: dev-install
 
 gql:
 	go generate ./internal/adapter/gql
+	find ./pkg/gqlmodel -type f -name '*.go' \
+	-exec sed -i '' 's/json:"\([^"]*\)"/json:"\1" graphql:"\1"/g' {} +
 
 .PHONY: dev-install dev run-app run-cerbos run-migration gql
 

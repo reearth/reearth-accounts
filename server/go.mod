@@ -1,4 +1,4 @@
-module github.com/reearth/reearth-accounts
+module github.com/reearth/reearth-accounts/server
 
 go 1.24.2
 
@@ -76,6 +76,7 @@ require (
 	github.com/cenkalti/backoff/v4 v4.3.0 // indirect
 	github.com/cespare/xxhash/v2 v2.3.0 // indirect
 	github.com/cncf/xds/go v0.0.0-20250501225837-2ac532fd4443 // indirect
+	github.com/coder/websocket v1.8.13 // indirect
 	github.com/containerd/continuity v0.4.4 // indirect
 	github.com/containerd/log v0.1.0 // indirect
 	github.com/containerd/platforms v0.2.1 // indirect
@@ -117,6 +118,7 @@ require (
 	github.com/grpc-ecosystem/go-grpc-middleware/v2 v2.2.0 // indirect
 	github.com/grpc-ecosystem/grpc-gateway/v2 v2.26.0 // indirect
 	github.com/hashicorp/golang-lru/v2 v2.0.7 // indirect
+	github.com/hasura/go-graphql-client v0.14.5 // indirect
 	github.com/hpcloud/tail v1.0.0 // indirect
 	github.com/imkira/go-interpol v1.1.0 // indirect
 	github.com/jdxcode/netrc v1.0.0 // indirect

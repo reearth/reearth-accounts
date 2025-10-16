@@ -3,8 +3,8 @@ package gql
 import (
 	"context"
 
-	"github.com/reearth/reearth-accounts/pkg/user"
-	"github.com/reearth/reearth-accounts/pkg/workspace"
+	"github.com/reearth/reearth-accounts/server/pkg/user"
+	"github.com/reearth/reearth-accounts/server/pkg/workspace"
 )
 
 func buildExistingUserSetFromWorkspace(

@@ -5,7 +5,7 @@ import (
 	"regexp"
 	"testing"
 
-	"github.com/reearth/reearth-accounts/internal/infrastructure/mongo"
+	"github.com/reearth/reearth-accounts/server/internal/infrastructure/mongo"
 	"github.com/reearth/reearthx/mongox"
 	"github.com/stretchr/testify/assert"
 	"go.mongodb.org/mongo-driver/bson"

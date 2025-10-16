@@ -10,7 +10,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/reearth/reearth-accounts/internal/usecase/gateway"
+	"github.com/reearth/reearth-accounts/server/internal/usecase/gateway"
 
 	"github.com/stretchr/testify/assert"
 )

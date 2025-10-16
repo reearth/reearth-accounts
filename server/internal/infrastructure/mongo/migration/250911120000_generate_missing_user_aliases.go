@@ -4,7 +4,7 @@ import (
 	"context"
 
 	"github.com/labstack/gommon/random"
-	"github.com/reearth/reearth-accounts/internal/infrastructure/mongo/mongodoc"
+	"github.com/reearth/reearth-accounts/server/internal/infrastructure/mongo/mongodoc"
 	"github.com/reearth/reearthx/mongox"
 	"go.mongodb.org/mongo-driver/bson"
 )
@@ -35,7 +35,7 @@ func GenerateMissingUserAliases(ctx context.Context, c DBClient) error {
 
 				// All returned documents need new aliases (due to our query filter)
 				doc.Alias = random.String(10, random.Lowercase)
-				
+
 				ids = append(ids, doc.ID)
 				newRows = append(newRows, doc)
 			}

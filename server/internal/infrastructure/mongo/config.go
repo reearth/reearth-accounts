@@ -4,9 +4,9 @@ import (
 	"context"
 	"errors"
 
-	"github.com/reearth/reearth-accounts/internal/infrastructure/mongo/mongodoc"
-	"github.com/reearth/reearth-accounts/internal/usecase/repo"
-	"github.com/reearth/reearth-accounts/pkg/config"
+	"github.com/reearth/reearth-accounts/server/internal/infrastructure/mongo/mongodoc"
+	"github.com/reearth/reearth-accounts/server/internal/usecase/repo"
+	"github.com/reearth/reearth-accounts/server/pkg/config"
 	"github.com/reearth/reearthx/rerror"
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/mongo"
