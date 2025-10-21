@@ -10,11 +10,11 @@ import (
 
 	"github.com/cerbos/cerbos-sdk-go/cerbos"
 	"github.com/labstack/echo/v4"
-	infraCerbos "github.com/reearth/reearth-accounts/internal/infrastructure/cerbos"
-	mongorepo "github.com/reearth/reearth-accounts/internal/infrastructure/mongo"
-	"github.com/reearth/reearth-accounts/internal/infrastructure/mongo/migration"
-	"github.com/reearth/reearth-accounts/internal/usecase/gateway"
-	"github.com/reearth/reearth-accounts/internal/usecase/repo"
+	infraCerbos "github.com/reearth/reearth-accounts/server/internal/infrastructure/cerbos"
+	mongorepo "github.com/reearth/reearth-accounts/server/internal/infrastructure/mongo"
+	"github.com/reearth/reearth-accounts/server/internal/infrastructure/mongo/migration"
+	"github.com/reearth/reearth-accounts/server/internal/usecase/gateway"
+	"github.com/reearth/reearth-accounts/server/internal/usecase/repo"
 	"github.com/reearth/reearthx/log"
 	"github.com/reearth/reearthx/mongox"
 	"go.mongodb.org/mongo-driver/event"
@@ -39,16 +39,16 @@ func Start(debug bool) {
 	if debug || os.Getenv("REEARTH_ACCOUNTS_DEV") == "true" {
 		monitor = &event.CommandMonitor{
 			Failed: func(ctx context.Context, evt *event.CommandFailedEvent) {
-				log.Errorf("MongoDB Command Failed: %s - Duration: %v - Error: %s", 
+				log.Errorf("MongoDB Command Failed: %s - Duration: %v - Error: %s",
 					evt.CommandName, evt.Duration, evt.Failure)
 			},
 			Succeeded: func(ctx context.Context, evt *event.CommandSucceededEvent) {
 				// Only log slow queries or critical operations
-				if evt.Duration > time.Millisecond*100 || 
-					evt.CommandName == "createIndexes" || 
+				if evt.Duration > time.Millisecond*100 ||
+					evt.CommandName == "createIndexes" ||
 					evt.CommandName == "dropIndexes" ||
 					evt.CommandName == "drop" {
-					log.Debugf("MongoDB Command: %s - Duration: %v - Reply: %v", 
+					log.Debugf("MongoDB Command: %s - Duration: %v - Reply: %v",
 						evt.CommandName, evt.Duration, evt.Reply)
 				}
 			},

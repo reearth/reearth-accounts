@@ -11,7 +11,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/reearth/reearth-accounts/internal/usecase/gateway"
+	"github.com/reearth/reearth-accounts/server/internal/usecase/gateway"
 	"github.com/reearth/reearthx/i18n"
 	"github.com/reearth/reearthx/log"
 	"github.com/reearth/reearthx/rerror"

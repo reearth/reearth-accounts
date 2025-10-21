@@ -4,8 +4,8 @@ import (
 	"context"
 	"testing"
 
-	"github.com/reearth/reearth-accounts/internal/infrastructure/mongo"
-	"github.com/reearth/reearth-accounts/internal/infrastructure/mongo/mongodoc"
+	"github.com/reearth/reearth-accounts/server/internal/infrastructure/mongo"
+	"github.com/reearth/reearth-accounts/server/internal/infrastructure/mongo/mongodoc"
 	"github.com/reearth/reearthx/mongox"
 	"github.com/stretchr/testify/assert"
 	mongodriver "go.mongodb.org/mongo-driver/mongo"
@@ -17,7 +17,7 @@ func TestAddCaseInsensitiveUserWorkspaceIndex_CaseInsensitiveUniqueness(t *testi
 	}
 
 	ctx := context.Background()
-	
+
 	// Connect to test database
 	db := mongo.Connect(t)(t)
 	mongoxClient := mongox.NewClientWithDatabase(db)
@@ -35,13 +35,13 @@ func TestAddCaseInsensitiveUserWorkspaceIndex_CaseInsensitiveUniqueness(t *testi
 		Email:     "test1@example.com",
 		Workspace: "workspace123",
 	}
-	
+
 	_, err = col.InsertOne(ctx, user1)
 	assert.NoError(t, err, "First user should insert successfully")
 
 	// Try to insert second user with uppercase workspace - should fail
 	user2 := mongodoc.UserDocument{
-		ID:        "user2", 
+		ID:        "user2",
 		Name:      "Test User 2",
 		Alias:     "testuser2",
 		Email:     "test2@example.com",

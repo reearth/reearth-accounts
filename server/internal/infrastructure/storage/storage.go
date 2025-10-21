@@ -12,7 +12,7 @@ import (
 	"time"
 
 	"cloud.google.com/go/storage"
-	"github.com/reearth/reearth-accounts/internal/usecase/gateway"
+	"github.com/reearth/reearth-accounts/server/internal/usecase/gateway"
 	"github.com/reearth/reearthx/asset/domain/file"
 	"github.com/reearth/reearthx/log"
 	"google.golang.org/api/option"
