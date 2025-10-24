@@ -7,10 +7,10 @@ import (
 
 	_ "github.com/Khan/genqlient/generate"
 	"github.com/Khan/genqlient/graphql"
-	"github.com/reearth/reearth-accounts/internal/usecase"
-	"github.com/reearth/reearth-accounts/internal/usecase/interfaces"
-	accountid "github.com/reearth/reearth-accounts/pkg/id"
-	"github.com/reearth/reearth-accounts/pkg/workspace"
+	"github.com/reearth/reearth-accounts/server/internal/usecase"
+	"github.com/reearth/reearth-accounts/server/internal/usecase/interfaces"
+	accountid "github.com/reearth/reearth-accounts/server/pkg/id"
+	"github.com/reearth/reearth-accounts/server/pkg/workspace"
 	"github.com/samber/lo"
 )
 

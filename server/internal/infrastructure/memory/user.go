@@ -4,8 +4,8 @@ import (
 	"context"
 	"strings"
 
-	"github.com/reearth/reearth-accounts/internal/usecase/repo"
-	"github.com/reearth/reearth-accounts/pkg/user"
+	"github.com/reearth/reearth-accounts/server/internal/usecase/repo"
+	"github.com/reearth/reearth-accounts/server/pkg/user"
 	"github.com/reearth/reearthx/rerror"
 	"github.com/reearth/reearthx/util"
 )

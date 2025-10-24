@@ -1,8 +1,8 @@
 package mongodoc
 
 import (
-	"github.com/reearth/reearth-accounts/pkg/config"
-	"github.com/reearth/reearth-accounts/pkg/policy"
+	"github.com/reearth/reearth-accounts/server/pkg/config"
+	"github.com/reearth/reearth-accounts/server/pkg/policy"
 )
 
 type ConfigDocument struct {

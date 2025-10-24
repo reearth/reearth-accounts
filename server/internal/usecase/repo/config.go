@@ -3,7 +3,7 @@ package repo
 import (
 	"context"
 
-	"github.com/reearth/reearth-accounts/pkg/config"
+	"github.com/reearth/reearth-accounts/server/pkg/config"
 )
 
 type Config interface {

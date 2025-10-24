@@ -8,10 +8,10 @@ import (
 
 	"github.com/cerbos/cerbos-sdk-go/cerbos"
 	effectv1 "github.com/cerbos/cerbos/api/genpb/cerbos/effect/v1"
-	"github.com/reearth/reearth-accounts/internal/usecase/gateway"
-	"github.com/reearth/reearth-accounts/internal/usecase/interfaces"
-	"github.com/reearth/reearth-accounts/internal/usecase/repo"
-	"github.com/reearth/reearth-accounts/pkg/user"
+	"github.com/reearth/reearth-accounts/server/internal/usecase/gateway"
+	"github.com/reearth/reearth-accounts/server/internal/usecase/interfaces"
+	"github.com/reearth/reearth-accounts/server/internal/usecase/repo"
+	"github.com/reearth/reearth-accounts/server/pkg/user"
 	"github.com/reearth/reearthx/rerror"
 )
 

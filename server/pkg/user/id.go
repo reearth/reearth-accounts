@@ -1,7 +1,7 @@
 package user
 
 import (
-	"github.com/reearth/reearth-accounts/pkg/id"
+	"github.com/reearth/reearth-accounts/server/pkg/id"
 )
 
 type ID = id.UserID

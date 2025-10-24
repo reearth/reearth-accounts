@@ -4,11 +4,11 @@ import (
 	"context"
 	"errors"
 
-	"github.com/reearth/reearth-accounts/internal/usecase/interfaces"
-	"github.com/reearth/reearth-accounts/internal/usecase/repo"
-	"github.com/reearth/reearth-accounts/pkg/permittable"
-	"github.com/reearth/reearth-accounts/pkg/role"
-	"github.com/reearth/reearth-accounts/pkg/user"
+	"github.com/reearth/reearth-accounts/server/internal/usecase/interfaces"
+	"github.com/reearth/reearth-accounts/server/internal/usecase/repo"
+	"github.com/reearth/reearth-accounts/server/pkg/permittable"
+	"github.com/reearth/reearth-accounts/server/pkg/role"
+	"github.com/reearth/reearth-accounts/server/pkg/user"
 	"github.com/reearth/reearthx/rerror"
 	"github.com/reearth/reearthx/usecasex"
 )

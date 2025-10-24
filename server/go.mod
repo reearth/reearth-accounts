@@ -1,4 +1,4 @@
-module github.com/reearth/reearth-accounts
+module github.com/reearth/reearth-accounts/server
 
 go 1.24.2
 

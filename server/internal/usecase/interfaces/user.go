@@ -3,9 +3,9 @@ package interfaces
 import (
 	"context"
 
-	"github.com/reearth/reearth-accounts/internal/usecase"
-	"github.com/reearth/reearth-accounts/pkg/user"
-	"github.com/reearth/reearth-accounts/pkg/workspace"
+	"github.com/reearth/reearth-accounts/server/internal/usecase"
+	"github.com/reearth/reearth-accounts/server/pkg/user"
+	"github.com/reearth/reearth-accounts/server/pkg/workspace"
 	"github.com/reearth/reearthx/i18n"
 	"github.com/reearth/reearthx/rerror"
 	"golang.org/x/text/language"

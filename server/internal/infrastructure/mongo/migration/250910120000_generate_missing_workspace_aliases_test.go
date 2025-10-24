@@ -4,7 +4,7 @@ import (
 	"context"
 	"testing"
 
-	"github.com/reearth/reearth-accounts/internal/infrastructure/mongo"
+	"github.com/reearth/reearth-accounts/server/internal/infrastructure/mongo"
 	"github.com/reearth/reearthx/mongox"
 	"github.com/stretchr/testify/assert"
 	"go.mongodb.org/mongo-driver/bson"
@@ -20,43 +20,43 @@ func TestGenerateMissingWorkspaceAliases(t *testing.T) {
 	db := mongo.Connect(t)(t)
 	mongoxClient := mongox.NewClientWithDatabase(db)
 	workspaceCollection := db.Collection("workspace")
-	
+
 	testWorkspaces := []interface{}{
 		bson.M{
 			"_id":   "workspace1",
 			"id":    "workspace1",
 			"name":  "Workspace One",
-			"alias": "", 
+			"alias": "",
 		},
 		bson.M{
-			"_id":   "workspace2", 
+			"_id":   "workspace2",
 			"id":    "workspace2",
 			"name":  "Test Workspace",
-			"alias": "test", 
+			"alias": "test",
 		},
 		bson.M{
 			"_id":   "workspace3",
-			"id":    "workspace3", 
+			"id":    "workspace3",
 			"name":  "Another Workspace",
-			"alias": "aaaaa", 
+			"alias": "aaaaa",
 		},
 		bson.M{
 			"_id":   "workspace4",
 			"id":    "workspace4",
-			"name":  "E2E Workspace", 
-			"alias": "e2e-workspace-name", 
+			"name":  "E2E Workspace",
+			"alias": "e2e-workspace-name",
 		},
 		bson.M{
 			"_id":   "workspace5",
 			"id":    "workspace5",
 			"name":  "Valid Workspace",
-			"alias": "validalias", 
+			"alias": "validalias",
 		},
 		bson.M{
 			"_id":   "01jhmkh59s3q06xzm1215w7y2v",
 			"id":    "01jhmkh59s3q06xzm1215w7y2v",
 			"name":  "Eukarya Workspace",
-			"alias": "eukarya", 
+			"alias": "eukarya",
 		},
 	}
 
@@ -69,17 +69,17 @@ func TestGenerateMissingWorkspaceAliases(t *testing.T) {
 
 	// Check that problematic workspaces got new random aliases
 	problematicWorkspaces := map[string]string{
-		"workspace1": "", // originally empty
-		"workspace2": "test", // originally "test"
-		"workspace3": "aaaaa", // originally "aaaaa"
+		"workspace1": "",                   // originally empty
+		"workspace2": "test",               // originally "test"
+		"workspace3": "aaaaa",              // originally "aaaaa"
 		"workspace4": "e2e-workspace-name", // originally "e2e-workspace-name"
 	}
-	
+
 	for id, originalAlias := range problematicWorkspaces {
 		var result bson.M
 		err := workspaceCollection.FindOne(ctx, bson.M{"id": id}).Decode(&result)
 		assert.NoError(t, err)
-		
+
 		alias, exists := result["alias"]
 		assert.True(t, exists, "Alias should exist for workspace %s", id)
 		aliasStr := alias.(string)

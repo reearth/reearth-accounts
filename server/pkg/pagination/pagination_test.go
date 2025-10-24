@@ -3,7 +3,7 @@ package pagination_test
 import (
 	"testing"
 
-	"github.com/reearth/reearth-accounts/pkg/pagination"
+	"github.com/reearth/reearth-accounts/server/pkg/pagination"
 	"github.com/stretchr/testify/assert"
 )
 

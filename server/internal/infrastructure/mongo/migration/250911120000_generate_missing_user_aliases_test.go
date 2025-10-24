@@ -4,7 +4,7 @@ import (
 	"context"
 	"testing"
 
-	"github.com/reearth/reearth-accounts/internal/infrastructure/mongo"
+	"github.com/reearth/reearth-accounts/server/internal/infrastructure/mongo"
 	"github.com/reearth/reearthx/mongox"
 	"github.com/stretchr/testify/assert"
 	"go.mongodb.org/mongo-driver/bson"
@@ -20,35 +20,35 @@ func TestGenerateMissingUserAliases(t *testing.T) {
 	db := mongo.Connect(t)(t)
 	mongoxClient := mongox.NewClientWithDatabase(db)
 	userCollection := db.Collection("user")
-	
+
 	testUsers := []interface{}{
 		bson.M{
 			"_id":   "user1",
 			"id":    "user1",
 			"name":  "User One",
 			"email": "user1@example.com",
-			"alias": "", 
+			"alias": "",
 		},
 		bson.M{
-			"_id":   "user2", 
+			"_id":   "user2",
 			"id":    "user2",
 			"name":  "User Two",
 			"email": "user2@example.com",
-			"alias": "", 
+			"alias": "",
 		},
 		bson.M{
 			"_id":   "user3",
-			"id":    "user3", 
+			"id":    "user3",
 			"name":  "User Three",
 			"email": "user3@example.com",
-			"alias": "waqas", 
+			"alias": "waqas",
 		},
 		bson.M{
 			"_id":   "user4",
-			"id":    "user4", 
+			"id":    "user4",
 			"name":  "User Four",
 			"email": "user4@example.com",
-			"alias": "validalias", 
+			"alias": "validalias",
 		},
 	}
 
@@ -61,16 +61,16 @@ func TestGenerateMissingUserAliases(t *testing.T) {
 
 	// Check that user1, user2, and user3 got new aliases
 	updatedUsers := map[string]string{
-		"user1": "", // originally empty
-		"user2": "", // originally empty  
+		"user1": "",      // originally empty
+		"user2": "",      // originally empty
 		"user3": "waqas", // originally "waqas"
 	}
-	
+
 	for id, originalAlias := range updatedUsers {
 		var result bson.M
 		err := userCollection.FindOne(ctx, bson.M{"id": id}).Decode(&result)
 		assert.NoError(t, err)
-		
+
 		alias, exists := result["alias"]
 		assert.True(t, exists, "Alias should exist for user %s", id)
 		aliasStr := alias.(string)
