@@ -13,9 +13,9 @@ import (
 	context "context"
 	reflect "reflect"
 
-	id "github.com/reearth/reearth-accounts/pkg/id"
-	permittable "github.com/reearth/reearth-accounts/pkg/permittable"
-	user "github.com/reearth/reearth-accounts/pkg/user"
+	id "github.com/reearth/reearth-accounts/server/pkg/id"
+	permittable "github.com/reearth/reearth-accounts/server/pkg/permittable"
+	user "github.com/reearth/reearth-accounts/server/pkg/user"
 	gomock "go.uber.org/mock/gomock"
 )
 

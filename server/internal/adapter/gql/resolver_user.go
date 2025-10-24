@@ -3,8 +3,10 @@ package gql
 import (
 	"context"
 
-	"github.com/reearth/reearth-accounts/internal/adapter/gql/gqlmodel"
-	"github.com/reearth/reearth-accounts/pkg/id"
+	"github.com/reearth/reearth-accounts/server/internal/adapter/gql/gqlmodel"
+	"github.com/reearth/reearth-accounts/server/pkg/id"
+
+	"github.com/reearth/reearthx/log"
 )
 
 func (r *Resolver) Me() MeResolver {
@@ -18,7 +20,23 @@ func (r *meResolver) MyWorkspace(ctx context.Context, obj *gqlmodel.Me) (*gqlmod
 }
 
 func (r *meResolver) Workspaces(ctx context.Context, obj *gqlmodel.Me) ([]*gqlmodel.Workspace, error) {
-	return loaders(ctx).Workspace.FindByUser(ctx, obj.ID)
+	uid, err := gqlmodel.ToID[id.User](obj.ID)
+	if err != nil {
+		return nil, err
+	}
+
+	ws, err := usecases(ctx).Workspace.FindByUser(ctx, uid, getOperator(ctx))
+	if err != nil {
+		log.Error(ctx, "failed to find workspaces: %v", err)
+		return nil, err
+	}
+
+	exists, err := buildExistingUserSetFromWorkspaces(ctx, ws)
+	if err != nil {
+		return nil, err
+	}
+
+	return gqlmodel.ToWorkspaces(ws, exists), nil
 }
 
 func (r *queryResolver) FindUsersByIDs(ctx context.Context, userIds []gqlmodel.ID) ([]*gqlmodel.User, error) {

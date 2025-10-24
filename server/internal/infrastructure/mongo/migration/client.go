@@ -5,8 +5,8 @@ import (
 	"errors"
 	"sync"
 
-	"github.com/reearth/reearth-accounts/internal/usecase/repo"
-	"github.com/reearth/reearth-accounts/pkg/config"
+	"github.com/reearth/reearth-accounts/server/internal/usecase/repo"
+	"github.com/reearth/reearth-accounts/server/pkg/config"
 	"github.com/reearth/reearthx/mongox"
 	"github.com/reearth/reearthx/usecasex/migration"
 )

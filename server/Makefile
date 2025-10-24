@@ -59,6 +59,8 @@ generate: dev-install
 
 gql:
 	go generate ./internal/adapter/gql
+	find ./pkg/gqlmodel -type f -name '*.go' \
+	-exec sed -i '' 's/json:"\([^"]*\)"/json:"\1" graphql:"\1"/g' {} +
 
 run-migration:
 	RUN_MIGRATION=true go run ./cmd/reearth-accounts

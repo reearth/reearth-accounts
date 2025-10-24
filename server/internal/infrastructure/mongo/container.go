@@ -3,7 +3,7 @@ package mongo
 import (
 	"context"
 
-	"github.com/reearth/reearth-accounts/internal/usecase/repo"
+	"github.com/reearth/reearth-accounts/server/internal/usecase/repo"
 	"github.com/reearth/reearthx/mongox"
 	"go.mongodb.org/mongo-driver/mongo"
 )

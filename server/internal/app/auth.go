@@ -2,13 +2,14 @@ package app
 
 import (
 	"context"
+	"fmt"
 	"net/http"
 
-	"github.com/reearth/reearth-accounts/internal/adapter"
-	"github.com/reearth/reearth-accounts/internal/usecase"
-	"github.com/reearth/reearth-accounts/pkg/id"
-	"github.com/reearth/reearth-accounts/pkg/user"
-	"github.com/reearth/reearth-accounts/pkg/workspace"
+	"github.com/reearth/reearth-accounts/server/internal/adapter"
+	"github.com/reearth/reearth-accounts/server/internal/usecase"
+	"github.com/reearth/reearth-accounts/server/pkg/id"
+	"github.com/reearth/reearth-accounts/server/pkg/user"
+	"github.com/reearth/reearth-accounts/server/pkg/workspace"
 	"github.com/reearth/reearthx/appx"
 )
 
@@ -29,6 +30,7 @@ func authMiddleware(cfg *ServerConfig) func(http.Handler) http.Handler {
 
 		var ai appx.AuthInfo
 
+		fmt.Println("ctx::::", ctx.Value(adapter.AuthInfoKey))
 		// get sub from context
 		if a, ok := ctx.Value(adapter.AuthInfoKey).(appx.AuthInfo); ok {
 			ai = a

@@ -3,10 +3,10 @@ package mongo
 import (
 	"context"
 
-	"github.com/reearth/reearth-accounts/internal/infrastructure/mongo/mongodoc"
-	"github.com/reearth/reearth-accounts/pkg/id"
-	"github.com/reearth/reearth-accounts/pkg/permittable"
-	"github.com/reearth/reearth-accounts/pkg/user"
+	"github.com/reearth/reearth-accounts/server/internal/infrastructure/mongo/mongodoc"
+	"github.com/reearth/reearth-accounts/server/pkg/id"
+	"github.com/reearth/reearth-accounts/server/pkg/permittable"
+	"github.com/reearth/reearth-accounts/server/pkg/user"
 	"github.com/reearth/reearthx/mongox"
 	"github.com/reearth/reearthx/rerror"
 	"go.mongodb.org/mongo-driver/bson"

@@ -4,10 +4,10 @@ import (
 	"context"
 
 	"github.com/labstack/echo/v4"
-	"github.com/reearth/reearth-accounts/internal/adapter"
-	"github.com/reearth/reearth-accounts/internal/usecase/gateway"
-	"github.com/reearth/reearth-accounts/internal/usecase/interactor"
-	"github.com/reearth/reearth-accounts/internal/usecase/repo"
+	"github.com/reearth/reearth-accounts/server/internal/adapter"
+	"github.com/reearth/reearth-accounts/server/internal/usecase/gateway"
+	"github.com/reearth/reearth-accounts/server/internal/usecase/interactor"
+	"github.com/reearth/reearth-accounts/server/internal/usecase/repo"
 )
 
 func UsecaseMiddleware(
