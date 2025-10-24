@@ -128,7 +128,34 @@ func baseSeederUser(ctx context.Context, r *repo.Container) error {
 
 func TestUpdateMe(t *testing.T) {
 	e, _ := StartServer(t, &app.Config{}, true, baseSeederUser)
-	query := `mutation { updateMe(input: {name: "updated",email:"hoge@test.com",lang:"ja",theme:DEFAULT,password: "Ajsownndww1",passwordConfirmation: "Ajsownndww1"}){ me{ id name email metadata { lang theme } } }}`
+	query := `mutation {
+		updateMe(input: {
+			name: "updated",
+			alias: "updated_alias",
+			email: "hoge@test.com",
+			photoURL: "https://example.com/photo.jpg",
+			website: "https://example.com",
+			description: "Updated description",
+			lang: "ja",
+			theme: DEFAULT,
+			password: "Ajsownndww1",
+			passwordConfirmation: "Ajsownndww1"
+		}) {
+			me {
+				id
+				name
+				alias
+				email
+				metadata {
+					photoURL
+					website
+					description
+					lang
+					theme
+				}
+			}
+		}
+	}`
 	request := GraphQLRequest{
 		Query: query,
 	}
@@ -142,7 +169,11 @@ func TestUpdateMe(t *testing.T) {
 		WithHeader("X-Reearth-Debug-User", uId.String()).
 		WithBytes(jsonData).Expect().Status(http.StatusOK).JSON().Object().Value("data").Object().Value("updateMe").Object().Value("me").Object()
 	o.Value("name").String().IsEqual("updated")
+	o.Value("alias").String().IsEqual("updated_alias")
 	o.Value("email").String().IsEqual("hoge@test.com")
+	o.Value("metadata").Object().Value("photoURL").String().IsEqual("https://example.com/photo.jpg")
+	o.Value("metadata").Object().Value("website").String().IsEqual("https://example.com")
+	o.Value("metadata").Object().Value("description").String().IsEqual("Updated description")
 	o.Value("metadata").Object().Value("lang").String().IsEqual("ja")
 	o.Value("metadata").Object().Value("theme").String().IsEqual("default")
 }
