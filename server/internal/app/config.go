@@ -22,7 +22,7 @@ type Config struct {
 	DB      string   `default:"mongodb://localhost" envconfig:"REEARTH_ACCOUNTS_DB"`
 	DBName  string   `default:"reearth-account" envconfig:"REEARTH_ACCOUNTS_DB_NAME"`
 	Origins []string `envconfig:"REEARTH_ACCOUNTS_ORIGINS"`
-	Host    string
+	Host    string   `default:"0.0.0.0" envconfig:"HOST"`
 
 	GCPProject string `envconfig:"GOOGLE_CLOUD_PROJECT"`
 	Cert       CertConfig

@@ -39,16 +39,16 @@ func Start(debug bool) {
 	if debug || os.Getenv("REEARTH_ACCOUNTS_DEV") == "true" {
 		monitor = &event.CommandMonitor{
 			Failed: func(ctx context.Context, evt *event.CommandFailedEvent) {
-				log.Errorf("MongoDB Command Failed: %s - Duration: %v - Error: %s", 
+				log.Errorf("MongoDB Command Failed: %s - Duration: %v - Error: %s",
 					evt.CommandName, evt.Duration, evt.Failure)
 			},
 			Succeeded: func(ctx context.Context, evt *event.CommandSucceededEvent) {
 				// Only log slow queries or critical operations
-				if evt.Duration > time.Millisecond*100 || 
-					evt.CommandName == "createIndexes" || 
+				if evt.Duration > time.Millisecond*100 ||
+					evt.CommandName == "createIndexes" ||
 					evt.CommandName == "dropIndexes" ||
 					evt.CommandName == "drop" {
-					log.Debugf("MongoDB Command: %s - Duration: %v - Reply: %v", 
+					log.Debugf("MongoDB Command: %s - Duration: %v - Reply: %v",
 						evt.CommandName, evt.Duration, evt.Reply)
 				}
 			},
@@ -126,14 +126,21 @@ type ServerConfig struct {
 
 func NewServer(ctx context.Context, cfg *ServerConfig) *WebServer {
 	port := cfg.Config.Port
+	host := cfg.Config.Host
+
 	if port == "" {
 		port = "8080"
 	}
 
-	address := "0.0.0.0:" + port
-	if cfg.Debug {
-		address = "localhost:" + port
+	if host == "" {
+		if cfg.Debug {
+			host = "localhost"
+		} else {
+			host = "0.0.0.0"
+		}
 	}
+
+	address := host + ":" + port
 
 	w := &WebServer{
 		address: address,
