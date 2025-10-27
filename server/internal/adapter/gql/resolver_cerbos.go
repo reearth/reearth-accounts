@@ -3,8 +3,8 @@ package gql
 import (
 	"context"
 
-	"github.com/reearth/reearth-accounts/internal/adapter/gql/gqlmodel"
-	"github.com/reearth/reearth-accounts/internal/usecase/interfaces"
+	"github.com/reearth/reearth-accounts/server/internal/adapter/gql/gqlmodel"
+	"github.com/reearth/reearth-accounts/server/internal/usecase/interfaces"
 	"github.com/reearth/reearthx/rerror"
 )
 

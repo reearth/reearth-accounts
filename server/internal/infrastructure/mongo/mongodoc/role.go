@@ -1,8 +1,8 @@
 package mongodoc
 
 import (
-	"github.com/reearth/reearth-accounts/pkg/id"
-	"github.com/reearth/reearth-accounts/pkg/role"
+	"github.com/reearth/reearth-accounts/server/pkg/id"
+	"github.com/reearth/reearth-accounts/server/pkg/role"
 )
 
 type RoleDocument struct {

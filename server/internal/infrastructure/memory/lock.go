@@ -3,7 +3,7 @@ package memory
 import (
 	"context"
 
-	"github.com/reearth/reearth-accounts/internal/usecase/repo"
+	"github.com/reearth/reearth-accounts/server/internal/usecase/repo"
 )
 
 type Lock struct{}
