@@ -7,10 +7,12 @@ import (
 
 	"github.com/hasura/go-graphql-client"
 	"github.com/reearth/reearth-accounts/server/pkg/gqlclient/user"
+	"github.com/reearth/reearth-accounts/server/pkg/gqlclient/workspace"
 )
 
 type Client struct {
-	UserRepo user.UserRepo
+	UserRepo      user.UserRepo
+	WorkspaceRepo workspace.WorkspaceRepo
 }
 
 func NewClient(host string, timeout int, transport http.RoundTripper) *Client {
@@ -24,6 +26,7 @@ func NewClient(host string, timeout int, transport http.RoundTripper) *Client {
 	gqlClient := graphql.NewClient(fullEndpoint, httpClient)
 
 	return &Client{
-		UserRepo: user.NewRepo(gqlClient),
+		UserRepo:      user.NewRepo(gqlClient),
+		WorkspaceRepo: workspace.NewRepo(gqlClient),
 	}
 }
