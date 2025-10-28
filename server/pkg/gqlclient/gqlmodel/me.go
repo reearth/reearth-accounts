@@ -13,5 +13,4 @@ type Me struct {
 	Host          graphql.String   `json:"host" graphql:"host"`
 	MyWorkspaceID graphql.ID       `json:"myWorkspaceId" graphql:"myWorkspaceId"`
 	Auths         []graphql.String `json:"auths" graphql:"auths"`
-	Workspaces    []Workspace      `json:"workspaces" graphql:"workspaces"`
 }
