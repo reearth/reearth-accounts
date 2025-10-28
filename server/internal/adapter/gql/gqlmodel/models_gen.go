@@ -98,7 +98,6 @@ type Me struct {
 	Host          *string       `json:"host,omitempty"`
 	MyWorkspaceID ID            `json:"myWorkspaceId"`
 	Auths         []string      `json:"auths"`
-	Workspaces    []*Workspace  `json:"workspaces"`
 	MyWorkspace   *Workspace    `json:"myWorkspace"`
 }
 

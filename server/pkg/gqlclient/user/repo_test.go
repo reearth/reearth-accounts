@@ -35,6 +35,7 @@ func TestUserRepo_FindMe(t *testing.T) {
 							"alias": "testuser",
 							"email": "test@example.com",
 							"myWorkspaceId": "01j9x0yy00000000000000001a",
+							"host": "",
 							"auths": ["auth0|123456"],
 							"metadata": {
 								"photoURL": "https://example.com/photo.jpg",
@@ -42,48 +43,7 @@ func TestUserRepo_FindMe(t *testing.T) {
 								"website": "https://example.com",
 								"lang": "en",
 								"theme": "light"
-							},
-							"workspaces": [
-								{
-									"id": "01j9x0yy00000000000000001a",
-									"name": "Personal Workspace",
-									"alias": "personal",
-									"members": [],
-									"metadata": {
-										"description": "Personal workspace",
-										"website": "",
-										"location": "",
-										"billingEmail": "",
-										"photoURL": ""
-									},
-									"personal": true
-								},
-								{
-									"id": "01j9x0yy00000000000000002a",
-									"name": "Team Workspace",
-									"alias": "team",
-									"members": [
-										{
-											"__typename": "WorkspaceUserMember",
-											"userId": "01j9x0yy00000000000000000a",
-											"role": "OWNER",
-											"user": {
-												"id": "01j9x0yy00000000000000000a",
-												"name": "Test User",
-												"email": "test@example.com"
-											}
-										}
-									],
-									"metadata": {
-										"description": "Team workspace",
-										"website": "https://team.example.com",
-										"location": "Tokyo",
-										"billingEmail": "billing@example.com",
-										"photoURL": "https://example.com/team.jpg"
-									},
-									"personal": false
-								}
-							]
+							}
 						}
 					}
 				}`), nil
@@ -129,8 +89,7 @@ func TestUserRepo_FindMe(t *testing.T) {
 							"website": "",
 							"lang": "",
 							"theme": ""
-						},
-						"workspaces": []
+						}
 					}
 				}
 			}`),
@@ -168,8 +127,7 @@ func TestUserRepo_FindMe(t *testing.T) {
 							"website": "",
 							"lang": "",
 							"theme": ""
-						},
-						"workspaces": []
+						}
 					}
 				}
 			}`),

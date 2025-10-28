@@ -130,41 +130,6 @@ func TestGetMeAllFields(t *testing.T) {
     host
     myWorkspaceId
     auths
-    workspaces {
-      id
-      name
-      alias
-      members {
-        __typename
-        ... on WorkspaceUserMember {
-          userId
-          role
-          user {
-            id
-            name
-            email
-          }
-        }
-        ... on WorkspaceIntegrationMember {
-          integrationId
-          role
-          active
-          invitedById
-          invitedBy {
-            id
-            name
-          }
-        }
-      }
-      metadata {
-        description
-        website
-        location
-        billingEmail
-        photoURL
-      }
-      personal
-    }
   }
 }`
 	request := GraphQLRequest{
@@ -198,30 +163,6 @@ func TestGetMeAllFields(t *testing.T) {
 	metadata.Value("lang").String().IsEqual("en")
 	metadata.Value("theme").String().IsEqual("light")
 	metadata.Value("website").String().IsEqual("https://example.com")
-
-	workspaces := o.Value("workspaces").Array()
-	workspaces.Length().IsEqual(3)
-
-	// Workspace 1: Personal workspace
-	ws1 := workspaces.Value(0).Object()
-	ws1.Value("id").String().IsEqual(wId.String())
-	ws1.Value("name").String().IsEqual("Personal Workspace")
-	ws1.Value("alias").String().IsEqual("personal")
-	ws1.Value("personal").Boolean().IsTrue()
-
-	// Workspace 2: Team workspace
-	ws2 := workspaces.Value(1).Object()
-	ws2.Value("id").String().IsEqual(wId2.String())
-	ws2.Value("name").String().IsEqual("Team Workspace")
-	ws2.Value("alias").String().IsEqual("team")
-	ws2.Value("personal").Boolean().IsFalse()
-
-	// Workspace 3: Project workspace
-	ws3 := workspaces.Value(2).Object()
-	ws3.Value("id").String().IsEqual(wId3.String())
-	ws3.Value("name").String().IsEqual("Project Workspace")
-	ws3.Value("alias").String().IsEqual("project")
-	ws3.Value("personal").Boolean().IsFalse()
 }
 
 func TestGetMeMinimalFields(t *testing.T) {
