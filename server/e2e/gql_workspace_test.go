@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"log"
 	"net/http"
 	"testing"
 
@@ -142,6 +143,8 @@ func TestFindByID(t *testing.T) {
 		WithBytes(jsonData).
 		Expect().Status(http.StatusOK).
 		JSON().Object()
+
+	log.Println("resp", resp.Raw())
 
 	o := resp.Value("data").Object().Value("findByID").Object()
 	o.Value("id").String().IsEqual(wId.String())

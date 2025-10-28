@@ -41,7 +41,7 @@ jobs:
           cache-dependency-path: server/go.sum
       - name: test
         working-directory: server
-        run: go test ./... -v -race
+        run: go clean -testcache && go test ./... -v -race
         env:
           REEARTH_DB: mongodb://localhost
       - name: Run go generate
