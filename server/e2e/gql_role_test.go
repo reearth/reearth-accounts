@@ -131,7 +131,7 @@ func removeRole(e *httpexpect.Expect, roleID string) (GraphQLRequest, *httpexpec
 }
 
 func TestRoleCRUD(t *testing.T) {
-	e, _ := StartServer(t, &app.Config{}, true, baseSeederUser, nil)
+	e, _ := StartServer(t, &app.Config{}, true, baseSeederUser)
 
 	// Get roles and check if there are no roles
 	_, res1 := getRoles(e)

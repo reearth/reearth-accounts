@@ -33,12 +33,12 @@ func init() {
 	mongotest.Env = "REEARTH_DB"
 }
 
-func StartServer(t *testing.T, cfg *app.Config, useMongo bool, seeder Seeder, mocks *Mocks) (*httpexpect.Expect, *repo.Container) {
-	e, r := StartServerAndRepos(t, cfg, useMongo, seeder, mocks)
+func StartServer(t *testing.T, cfg *app.Config, useMongo bool, seeder Seeder) (*httpexpect.Expect, *repo.Container) {
+	e, r := StartServerAndRepos(t, cfg, useMongo, seeder)
 	return e, r
 }
 
-func StartServerAndRepos(t *testing.T, cfg *app.Config, useMongo bool, seeder Seeder, mocks *Mocks) (*httpexpect.Expect, *repo.Container) {
+func StartServerAndRepos(t *testing.T, cfg *app.Config, useMongo bool, seeder Seeder) (*httpexpect.Expect, *repo.Container) {
 	ctx := context.Background()
 	var repos *repo.Container
 
@@ -64,7 +64,6 @@ func StartServerAndRepos(t *testing.T, cfg *app.Config, useMongo bool, seeder Se
 		t,
 		cfg,
 		repos,
-		mocks,
 	), repos
 }
 
@@ -82,7 +81,6 @@ func StartServerWithRepos(
 	t *testing.T,
 	cfg *app.Config,
 	repos *repo.Container,
-	mocks *Mocks,
 ) *httpexpect.Expect {
 	t.Helper()
 
@@ -106,18 +104,12 @@ func StartServerWithRepos(
 		cerbosAdapter = infraCerbos.NewCerbosAdapter(cerbosClient)
 	}
 
-	gateways := &gateway.Container{
-		Mailer: mailer.New(ctx, &mailer.Config{}),
-	}
-
-	if mocks != nil {
-		gateways.Storage = mocks.Storage
-	}
-
 	srv := app.NewServer(ctx, &app.ServerConfig{
-		Config:        cfg,
-		Repos:         repos,
-		Gateways:      gateways,
+		Config: cfg,
+		Repos:  repos,
+		Gateways: &gateway.Container{
+			Mailer: mailer.New(ctx, &mailer.Config{}),
+		},
 		Debug:         true,
 		CerbosAdapter: cerbosAdapter,
 	})

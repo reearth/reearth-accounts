@@ -77,7 +77,7 @@ func updatePermittable(e *httpexpect.Expect, userID string, roleIDs []string) (G
 }
 
 func TestPermittableCRUD(t *testing.T) {
-	e, _ := StartServer(t, &app.Config{}, true, nil, nil)
+	e, _ := StartServer(t, &app.Config{}, true, nil)
 
 	// Get users and roles check if users are empty
 	_, res1 := getUsersWithRoles(e)
@@ -86,7 +86,7 @@ func TestPermittableCRUD(t *testing.T) {
 		Value("getUsersWithRoles").Object().
 		Value("usersWithRoles").Array().IsEmpty()
 
-	e, _ = StartServer(t, &app.Config{}, true, baseSeederOneUser, nil)
+	e, _ = StartServer(t, &app.Config{}, true, baseSeederOneUser)
 
 	// Get users and roles check if users are not empty and roles are empty
 	_, res2 := getUsersWithRoles(e)

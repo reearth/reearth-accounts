@@ -16,7 +16,6 @@ import (
 	"github.com/reearth/reearthx/idx"
 	"github.com/reearth/reearthx/rerror"
 	"github.com/stretchr/testify/assert"
-	"go.uber.org/mock/gomock"
 )
 
 var (
@@ -121,13 +120,7 @@ type GraphQLRequest struct {
 }
 
 func TestFindByID(t *testing.T) {
-	ctrl := gomock.NewController(t)
-	defer ctrl.Finish()
-
-	mocks := NewMocks(ctrl)
-	mocks.Storage.EXPECT().GetSignedURL(gomock.Any(), gomock.Any()).Return("https://example.com/signed/test", nil).AnyTimes()
-
-	e, _ := StartServer(t, &app.Config{}, true, baseSeederWorkspace, mocks)
+	e, _ := StartServer(t, &app.Config{StorageIsLocal: true}, true, baseSeederWorkspace)
 
 	query := fmt.Sprintf(`query { findByID(id: "%s"){ id name }}`, wId)
 	request := GraphQLRequest{
@@ -152,7 +145,7 @@ func TestFindByID(t *testing.T) {
 }
 
 func TestCreateWorkspace(t *testing.T) {
-	e, _ := StartServer(t, &app.Config{}, true, baseSeederWorkspace, nil)
+	e, _ := StartServer(t, &app.Config{}, true, baseSeederWorkspace)
 
 	query := `mutation { createWorkspace(input: {name: "test"}){ workspace{ id name } }}`
 	request := GraphQLRequest{
@@ -171,7 +164,7 @@ func TestCreateWorkspace(t *testing.T) {
 }
 
 func TestDeleteWorkspace(t *testing.T) {
-	e, r := StartServer(t, &app.Config{}, true, baseSeederWorkspace, nil)
+	e, r := StartServer(t, &app.Config{}, true, baseSeederWorkspace)
 	_, err := r.Workspace.FindByID(context.Background(), wId)
 	assert.Nil(t, err)
 	query := fmt.Sprintf(`mutation { deleteWorkspace(input: {workspaceId: "%s"}){ workspaceId }}`, wId)
@@ -193,7 +186,7 @@ func TestDeleteWorkspace(t *testing.T) {
 }
 
 func TestUpdateWorkspace(t *testing.T) {
-	e, r := StartServer(t, &app.Config{}, true, baseSeederWorkspace, nil)
+	e, r := StartServer(t, &app.Config{}, true, baseSeederWorkspace)
 
 	w, err := r.Workspace.FindByID(context.Background(), wId)
 	assert.Nil(t, err)
@@ -220,7 +213,7 @@ func TestUpdateWorkspace(t *testing.T) {
 }
 
 func TestAddUsersToWorkspace(t *testing.T) {
-	e, r := StartServer(t, &app.Config{}, true, baseSeederWorkspace, nil)
+	e, r := StartServer(t, &app.Config{}, true, baseSeederWorkspace)
 
 	w, err := r.Workspace.FindByID(context.Background(), wId)
 	assert.Nil(t, err)
@@ -247,7 +240,7 @@ func TestAddUsersToWorkspace(t *testing.T) {
 }
 
 func TestRemoveUserFromWorkspace(t *testing.T) {
-	e, r := StartServer(t, &app.Config{}, true, baseSeederWorkspace, nil)
+	e, r := StartServer(t, &app.Config{}, true, baseSeederWorkspace)
 
 	w, err := r.Workspace.FindByID(context.Background(), wId2)
 	assert.Nil(t, err)
@@ -273,7 +266,7 @@ func TestRemoveUserFromWorkspace(t *testing.T) {
 }
 
 func TestUpdateMemberOfWorkspace(t *testing.T) {
-	e, r := StartServer(t, &app.Config{}, true, baseSeederWorkspace, nil)
+	e, r := StartServer(t, &app.Config{}, true, baseSeederWorkspace)
 
 	w, err := r.Workspace.FindByID(context.Background(), wId2)
 	assert.Nil(t, err)
@@ -298,7 +291,7 @@ func TestUpdateMemberOfWorkspace(t *testing.T) {
 }
 
 func TestAddIntegrationToWorkspace(t *testing.T) {
-	e, r := StartServer(t, &app.Config{}, true, baseSeederWorkspace, nil)
+	e, r := StartServer(t, &app.Config{}, true, baseSeederWorkspace)
 
 	w, err := r.Workspace.FindByID(context.Background(), wId)
 	assert.Nil(t, err)
@@ -325,7 +318,7 @@ func TestAddIntegrationToWorkspace(t *testing.T) {
 }
 
 func TestRemoveIntegrationFromWorkspace(t *testing.T) {
-	e, r := StartServer(t, &app.Config{}, true, baseSeederWorkspace, nil)
+	e, r := StartServer(t, &app.Config{}, true, baseSeederWorkspace)
 
 	w, err := r.Workspace.FindByID(context.Background(), wId)
 	assert.Nil(t, err)
@@ -351,7 +344,7 @@ func TestRemoveIntegrationFromWorkspace(t *testing.T) {
 }
 
 func TestUpdateIntegrationOfWorkspace(t *testing.T) {
-	e, r := StartServer(t, &app.Config{}, true, baseSeederWorkspace, nil)
+	e, r := StartServer(t, &app.Config{}, true, baseSeederWorkspace)
 
 	w, err := r.Workspace.FindByID(context.Background(), wId)
 	assert.Nil(t, err)
@@ -376,13 +369,7 @@ func TestUpdateIntegrationOfWorkspace(t *testing.T) {
 }
 
 func TestFindByUser(t *testing.T) {
-	ctrl := gomock.NewController(t)
-	defer ctrl.Finish()
-
-	mocks := NewMocks(ctrl)
-	mocks.Storage.EXPECT().GetSignedURL(gomock.Any(), gomock.Any()).Return("https://example.com/signed/test", nil).AnyTimes()
-
-	e, _ := StartServer(t, &app.Config{}, true, baseSeederWorkspace, mocks)
+	e, _ := StartServer(t, &app.Config{StorageIsLocal: true}, true, baseSeederWorkspace)
 
 	t.Run("successfully find workspaces by user with metadata", func(t *testing.T) {
 		query := fmt.Sprintf(`query { findByUser(userId: "%s"){ id name alias personal metadata { description website location billingEmail photoURL } members { ... on WorkspaceUserMember { userId role } ... on WorkspaceIntegrationMember { integrationId role } } }}`, uId)

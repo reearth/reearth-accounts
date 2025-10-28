@@ -112,7 +112,7 @@ func baseSeederGetMe(ctx context.Context, r *repo.Container) error {
 }
 
 func TestGetMeAllFields(t *testing.T) {
-	e, _ := StartServer(t, &app.Config{}, true, baseSeederGetMe, nil)
+	e, _ := StartServer(t, &app.Config{}, true, baseSeederGetMe)
 
 	query := `{
   me {
@@ -166,7 +166,7 @@ func TestGetMeAllFields(t *testing.T) {
 }
 
 func TestGetMeMinimalFields(t *testing.T) {
-	e, _ := StartServer(t, &app.Config{StorageIsLocal: true}, true, baseSeederGetMe, nil)
+	e, _ := StartServer(t, &app.Config{}, true, baseSeederGetMe)
 
 	query := `{
 		me {
