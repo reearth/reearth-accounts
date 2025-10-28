@@ -19,6 +19,18 @@ func ToWorkspace(w Workspace) *workspace.Workspace {
 	if err != nil {
 		return nil
 	}
+
+	members := make(map[workspace.UserID]workspace.Member)
+	for _, m := range w.Members {
+		userID, err := workspace.UserIDFrom(string(m.UserMember.UserID))
+		if err != nil {
+			return nil
+		}
+		members[userID] = workspace.Member{
+			Role: workspace.Role(m.UserMember.Role),
+		}
+	}
+
 	return workspace.New().
 		ID(id).
 		Name(string(w.Name)).
@@ -30,6 +42,7 @@ func ToWorkspace(w Workspace) *workspace.Workspace {
 			string(w.Metadata.BillingEmail),
 			string(w.Metadata.PhotoURL),
 		)).
+		Members(members).
 		Personal(w.Personal).
 		MustBuild()
 }
