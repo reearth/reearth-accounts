@@ -23,6 +23,7 @@ var (
 	uId3 = id.NewUserID()
 	wId  = id.NewWorkspaceID()
 	wId2 = id.NewWorkspaceID()
+	wId3 = id.NewWorkspaceID()
 	iId  = id.NewIntegrationID()
 	iId2 = id.NewIntegrationID()
 	iId3 = id.NewIntegrationID()
