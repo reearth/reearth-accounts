@@ -127,7 +127,7 @@ func baseSeederUser(ctx context.Context, r *repo.Container) error {
 }
 
 func TestUpdateMe(t *testing.T) {
-	e, _ := StartServer(t, &app.Config{}, true, baseSeederUser)
+	e, _ := StartServer(t, &app.Config{}, true, baseSeederUser, nil)
 	query := `mutation { updateMe(input: {name: "updated",email:"hoge@test.com",lang:"ja",theme:DEFAULT,password: "Ajsownndww1",passwordConfirmation: "Ajsownndww1"}){ me{ id name email metadata { lang theme } } }}`
 	request := GraphQLRequest{
 		Query: query,
@@ -148,7 +148,7 @@ func TestUpdateMe(t *testing.T) {
 }
 
 func TestRemoveMyAuth(t *testing.T) {
-	e, r := StartServer(t, &app.Config{}, true, baseSeederUser)
+	e, r := StartServer(t, &app.Config{}, true, baseSeederUser, nil)
 
 	u, err := r.User.FindByID(context.Background(), uId)
 	assert.Nil(t, err)
@@ -174,7 +174,7 @@ func TestRemoveMyAuth(t *testing.T) {
 }
 
 func TestDeleteMe(t *testing.T) {
-	e, r := StartServer(t, &app.Config{}, true, baseSeederUser)
+	e, r := StartServer(t, &app.Config{}, true, baseSeederUser, nil)
 
 	u, err := r.User.FindByID(context.Background(), uId)
 	assert.Nil(t, err)
@@ -199,7 +199,7 @@ func TestDeleteMe(t *testing.T) {
 }
 
 func TestMe(t *testing.T) {
-	e, _ := StartServer(t, &app.Config{}, true, baseSeederUser)
+	e, _ := StartServer(t, &app.Config{}, true, baseSeederUser, nil)
 	query := ` { me{ id name email metadata { lang theme } myWorkspaceId } }`
 	request := GraphQLRequest{
 		Query: query,
@@ -222,7 +222,7 @@ func TestMe(t *testing.T) {
 }
 
 func TestUserByNameOrEmail(t *testing.T) {
-	e, _ := StartServer(t, &app.Config{}, true, baseSeederUser)
+	e, _ := StartServer(t, &app.Config{}, true, baseSeederUser, nil)
 	query := fmt.Sprintf(` { userByNameOrEmail(nameOrEmail: "%s"){ id name email } }`, "e2e")
 	request := GraphQLRequest{
 		Query: query,
@@ -242,7 +242,7 @@ func TestUserByNameOrEmail(t *testing.T) {
 }
 
 func TestNode(t *testing.T) {
-	e, _ := StartServer(t, &app.Config{}, true, baseSeederUser)
+	e, _ := StartServer(t, &app.Config{}, true, baseSeederUser, nil)
 	query := fmt.Sprintf(` { node(id: "%s", type: USER){ id } }`, uId.String())
 	request := GraphQLRequest{
 		Query: query,
@@ -260,7 +260,7 @@ func TestNode(t *testing.T) {
 }
 
 func TestNodes(t *testing.T) {
-	e, _ := StartServer(t, &app.Config{}, true, baseSeederUser)
+	e, _ := StartServer(t, &app.Config{}, true, baseSeederUser, nil)
 	query := fmt.Sprintf(` { nodes(id: "%s", type: USER){ id } }`, uId.String())
 	request := GraphQLRequest{
 		Query: query,
@@ -278,7 +278,7 @@ func TestNodes(t *testing.T) {
 }
 
 func TestSignup(t *testing.T) {
-	e, _ := StartServer(t, &app.Config{}, true, nil)
+	e, _ := StartServer(t, &app.Config{}, true, nil, nil)
 	email := "newuser@example.com"
 	query := `mutation($input: SignupInput!) {
 		signup(input: $input) {
@@ -310,7 +310,7 @@ func TestSignup(t *testing.T) {
 }
 
 func TestSignupOIDC(t *testing.T) {
-	e, _ := StartServer(t, &app.Config{}, true, nil)
+	e, _ := StartServer(t, &app.Config{}, true, nil, nil)
 	email := "testSignupOIDC@example.com"
 	auth := user.ReearthSub(uId.String())
 	query := `mutation($input: SignupOIDCInput!) {
@@ -349,7 +349,7 @@ func TestSignupOIDC(t *testing.T) {
 }
 
 func TestVerifyUser(t *testing.T) {
-	e, r := StartServer(t, &app.Config{}, true, baseSeederUser)
+	e, r := StartServer(t, &app.Config{}, true, baseSeederUser, nil)
 
 	email := "e2e@e2e.com"
 	query1 := `mutation($input: CreateVerificationInput!) {
@@ -417,7 +417,7 @@ func TestVerifyUser(t *testing.T) {
 }
 
 func TestPasswordReset(t *testing.T) {
-	e, r := StartServer(t, &app.Config{}, true, baseSeederUser)
+	e, r := StartServer(t, &app.Config{}, true, baseSeederUser, nil)
 
 	startQuery := `mutation($input: StartPasswordResetInput!) {
 		startPasswordReset(input: $input)

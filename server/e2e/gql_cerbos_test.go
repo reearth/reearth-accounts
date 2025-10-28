@@ -53,7 +53,7 @@ func TestCheckPermission(t *testing.T) {
 	// Start server
 	e, _ := StartServer(t, &app.Config{
 		CerbosHost: cerbosContainer.getAddress(),
-	}, true, baseSeederOneUser)
+	}, true, baseSeederOneUser, nil)
 
 	// check permission with no permittable
 	_, res1 := checkPermission(e, "service", "resource", "read")

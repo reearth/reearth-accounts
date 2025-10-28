@@ -15,10 +15,12 @@ import (
 	"github.com/reearth/reearth-accounts/server/internal/infrastructure/memory"
 	mongorepo "github.com/reearth/reearth-accounts/server/internal/infrastructure/mongo"
 	"github.com/reearth/reearth-accounts/server/internal/usecase/gateway"
+	gatewaymock "github.com/reearth/reearth-accounts/server/internal/usecase/gateway/mock"
 	"github.com/reearth/reearth-accounts/server/internal/usecase/repo"
 	"github.com/reearth/reearth-accounts/server/pkg/user"
 	"github.com/reearth/reearthx/mailer"
 	"github.com/reearth/reearthx/mongox/mongotest"
+	"go.uber.org/mock/gomock"
 )
 
 var (
@@ -31,12 +33,12 @@ func init() {
 	mongotest.Env = "REEARTH_DB"
 }
 
-func StartServer(t *testing.T, cfg *app.Config, useMongo bool, seeder Seeder) (*httpexpect.Expect, *repo.Container) {
-	e, r := StartServerAndRepos(t, cfg, useMongo, seeder)
+func StartServer(t *testing.T, cfg *app.Config, useMongo bool, seeder Seeder, mocks *Mocks) (*httpexpect.Expect, *repo.Container) {
+	e, r := StartServerAndRepos(t, cfg, useMongo, seeder, mocks)
 	return e, r
 }
 
-func StartServerAndRepos(t *testing.T, cfg *app.Config, useMongo bool, seeder Seeder) (*httpexpect.Expect, *repo.Container) {
+func StartServerAndRepos(t *testing.T, cfg *app.Config, useMongo bool, seeder Seeder, mocks *Mocks) (*httpexpect.Expect, *repo.Container) {
 	ctx := context.Background()
 	var repos *repo.Container
 
@@ -62,13 +64,25 @@ func StartServerAndRepos(t *testing.T, cfg *app.Config, useMongo bool, seeder Se
 		t,
 		cfg,
 		repos,
+		nil,
 	), repos
+}
+
+type Mocks struct {
+	Storage *gatewaymock.MockStorage
+}
+
+func NewMocks(ctrl *gomock.Controller) *Mocks {
+	return &Mocks{
+		Storage: gatewaymock.NewMockStorage(ctrl),
+	}
 }
 
 func StartServerWithRepos(
 	t *testing.T,
 	cfg *app.Config,
 	repos *repo.Container,
+	mocks *Mocks,
 ) *httpexpect.Expect {
 	t.Helper()
 
@@ -92,12 +106,18 @@ func StartServerWithRepos(
 		cerbosAdapter = infraCerbos.NewCerbosAdapter(cerbosClient)
 	}
 
+	gateways := &gateway.Container{
+		Mailer: mailer.New(ctx, &mailer.Config{}),
+	}
+
+	if mocks != nil {
+		gateways.Storage = mocks.Storage
+	}
+
 	srv := app.NewServer(ctx, &app.ServerConfig{
-		Config: cfg,
-		Repos:  repos,
-		Gateways: &gateway.Container{
-			Mailer: mailer.New(ctx, &mailer.Config{}),
-		},
+		Config:        cfg,
+		Repos:         repos,
+		Gateways:      gateways,
 		Debug:         true,
 		CerbosAdapter: cerbosAdapter,
 	})
