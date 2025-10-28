@@ -127,7 +127,7 @@ func TestFindByID(t *testing.T) {
 	mocks := NewMocks(ctrl)
 	mocks.Storage.EXPECT().GetSignedURL(gomock.Any(), gomock.Any()).Return("https://example.com/signed/test", nil).AnyTimes()
 
-	e, _ := StartServer(t, &app.Config{StorageIsLocal: true}, true, baseSeederWorkspace, mocks)
+	e, _ := StartServer(t, &app.Config{}, true, baseSeederWorkspace, mocks)
 
 	query := fmt.Sprintf(`query { findByID(id: "%s"){ id name }}`, wId)
 	request := GraphQLRequest{

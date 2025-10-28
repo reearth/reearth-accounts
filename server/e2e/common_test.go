@@ -64,7 +64,7 @@ func StartServerAndRepos(t *testing.T, cfg *app.Config, useMongo bool, seeder Se
 		t,
 		cfg,
 		repos,
-		nil,
+		mocks,
 	), repos
 }
 
