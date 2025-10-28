@@ -56,6 +56,7 @@ func NewWorkspace(ws *workspace.Workspace) (*WorkspaceDocument, string) {
 		Website:      ws.Metadata().Website(),
 		Location:     ws.Metadata().Location(),
 		BillingEmail: ws.Metadata().BillingEmail(),
+		PhotoURL:     ws.Metadata().PhotoURL(),
 	}
 
 	wId := ws.ID().String()
