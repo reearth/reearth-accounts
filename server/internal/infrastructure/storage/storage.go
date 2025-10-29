@@ -91,6 +91,10 @@ func (s *Storage) client(ctx context.Context) (*storage.BucketHandle, error) {
 		_ = os.Setenv("STORAGE_EMULATOR_HOST", s.cfg.EmulatorEndpoint)
 	}
 
+	if s.cfg.IsLocal {
+		opts = append(opts, option.WithoutAuthentication())
+	}
+
 	client, err = storage.NewClient(ctx, opts...)
 	if err != nil {
 		return nil, err

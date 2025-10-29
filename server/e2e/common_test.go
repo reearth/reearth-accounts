@@ -15,10 +15,12 @@ import (
 	"github.com/reearth/reearth-accounts/server/internal/infrastructure/memory"
 	mongorepo "github.com/reearth/reearth-accounts/server/internal/infrastructure/mongo"
 	"github.com/reearth/reearth-accounts/server/internal/usecase/gateway"
+	gatewaymock "github.com/reearth/reearth-accounts/server/internal/usecase/gateway/mock"
 	"github.com/reearth/reearth-accounts/server/internal/usecase/repo"
 	"github.com/reearth/reearth-accounts/server/pkg/user"
 	"github.com/reearth/reearthx/mailer"
 	"github.com/reearth/reearthx/mongox/mongotest"
+	"go.uber.org/mock/gomock"
 )
 
 var (
@@ -63,6 +65,16 @@ func StartServerAndRepos(t *testing.T, cfg *app.Config, useMongo bool, seeder Se
 		cfg,
 		repos,
 	), repos
+}
+
+type Mocks struct {
+	Storage *gatewaymock.MockStorage
+}
+
+func NewMocks(ctrl *gomock.Controller) *Mocks {
+	return &Mocks{
+		Storage: gatewaymock.NewMockStorage(ctrl),
+	}
 }
 
 func StartServerWithRepos(

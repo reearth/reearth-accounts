@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"log"
 	"net/http"
 	"testing"
 
@@ -23,6 +24,7 @@ var (
 	uId3 = id.NewUserID()
 	wId  = id.NewWorkspaceID()
 	wId2 = id.NewWorkspaceID()
+	wId3 = id.NewWorkspaceID()
 	iId  = id.NewIntegrationID()
 	iId2 = id.NewIntegrationID()
 	iId3 = id.NewIntegrationID()
@@ -62,6 +64,14 @@ func baseSeederWorkspace(ctx context.Context, r *repo.Container) error {
 		InvitedBy: uId,
 	}
 
+	metadata1 := workspace.MetadataFrom(
+		"Test workspace 1 description",
+		"https://example1.com",
+		"Tokyo",
+		"billing1@example.com",
+		"https://example1.com/photo.jpg",
+	)
+
 	w := workspace.New().ID(wId).
 		Name("e2e").
 		Members(map[idx.ID[id.User]]workspace.Member{
@@ -71,10 +81,19 @@ func baseSeederWorkspace(ctx context.Context, r *repo.Container) error {
 			iId:  roleOwner,
 			iId3: roleReader,
 		}).
+		Metadata(metadata1).
 		MustBuild()
 	if err := r.Workspace.Save(ctx, w); err != nil {
 		return err
 	}
+
+	metadata2 := workspace.MetadataFrom(
+		"Test workspace 2 description",
+		"https://example2.com",
+		"Osaka",
+		"billing2@example.com",
+		"https://example2.com/photo.jpg",
+	)
 
 	w2 := workspace.New().ID(wId2).
 		Name("e2e2").
@@ -85,6 +104,7 @@ func baseSeederWorkspace(ctx context.Context, r *repo.Container) error {
 		Integrations(map[idx.ID[id.Integration]]workspace.Member{
 			iId: roleOwner,
 		}).
+		Metadata(metadata2).
 		MustBuild()
 	if err := r.Workspace.Save(ctx, w2); err != nil {
 		return err
@@ -100,22 +120,26 @@ type GraphQLRequest struct {
 }
 
 func TestFindByID(t *testing.T) {
-	e, _ := StartServer(t, &app.Config{}, true, baseSeederWorkspace)
+	e, _ := StartServer(t, &app.Config{StorageIsLocal: true}, true, baseSeederWorkspace)
 
 	query := fmt.Sprintf(`query { findByID(id: "%s"){ id name }}`, wId)
 	request := GraphQLRequest{
 		Query: query,
 	}
 	jsonData, err := json.Marshal(request)
-	if err != nil {
-		assert.NoError(t, err)
-	}
-	o := e.POST("/api/graphql").
+	assert.NoError(t, err)
+
+	resp := e.POST("/api/graphql").
 		WithHeader("authorization", "Bearer test").
 		WithHeader("Content-Type", "application/json").
 		WithHeader("X-Reearth-Debug-User", uId.String()).
-		WithBytes(jsonData).Expect().Status(http.StatusOK).JSON().Object().
-		Value("data").Object().Value("findByID").Object()
+		WithBytes(jsonData).
+		Expect().Status(http.StatusOK).
+		JSON().Object()
+
+	log.Println("resp", resp.Raw())
+
+	o := resp.Value("data").Object().Value("findByID").Object()
 	o.Value("id").String().IsEqual(wId.String())
 	o.Value("name").String().IsEqual("e2e")
 }
@@ -342,4 +366,78 @@ func TestUpdateIntegrationOfWorkspace(t *testing.T) {
 	w, err = r.Workspace.FindByID(context.Background(), wId)
 	assert.Nil(t, err)
 	assert.Equal(t, w.Members().Integration(iId3).Role, workspace.RoleMaintainer)
+}
+
+func TestFindByUser(t *testing.T) {
+	e, _ := StartServer(t, &app.Config{StorageIsLocal: true}, true, baseSeederWorkspace)
+
+	t.Run("successfully find workspaces by user with metadata", func(t *testing.T) {
+		query := fmt.Sprintf(`query { findByUser(userId: "%s"){ id name alias personal metadata { description website location billingEmail photoURL } members { ... on WorkspaceUserMember { userId role } ... on WorkspaceIntegrationMember { integrationId role } } }}`, uId)
+		request := GraphQLRequest{
+			Query: query,
+		}
+		jsonData, err := json.Marshal(request)
+		assert.NoError(t, err)
+
+		o := e.POST("/api/graphql").
+			WithHeader("authorization", "Bearer test").
+			WithHeader("Content-Type", "application/json").
+			WithHeader("X-Reearth-Debug-User", uId.String()).
+			WithBytes(jsonData).
+			Expect().Status(http.StatusOK).
+			JSON().Object().
+			Value("data").Object().
+			Value("findByUser").Array()
+
+		o.Length().IsEqual(2)
+
+		// Check first workspace
+		ws1 := o.Value(0).Object()
+		ws1.Value("id").String().IsEqual(wId.String())
+		ws1.Value("name").String().IsEqual("e2e")
+		ws1.Value("alias").String().IsEqual("")
+		ws1.Value("personal").Boolean().IsFalse()
+
+		metadata1 := ws1.Value("metadata").Object()
+		metadata1.Value("description").String().IsEqual("Test workspace 1 description")
+		metadata1.Value("website").String().IsEqual("https://example1.com")
+		metadata1.Value("location").String().IsEqual("Tokyo")
+		metadata1.Value("billingEmail").String().IsEqual("billing1@example.com")
+		metadata1.Value("photoURL").String().IsEqual("https://example1.com/photo.jpg")
+
+		// Check second workspace
+		ws2 := o.Value(1).Object()
+		ws2.Value("id").String().IsEqual(wId2.String())
+		ws2.Value("name").String().IsEqual("e2e2")
+		ws2.Value("alias").String().IsEqual("")
+		ws2.Value("personal").Boolean().IsFalse()
+
+		metadata2 := ws2.Value("metadata").Object()
+		metadata2.Value("description").String().IsEqual("Test workspace 2 description")
+		metadata2.Value("website").String().IsEqual("https://example2.com")
+		metadata2.Value("location").String().IsEqual("Osaka")
+		metadata2.Value("billingEmail").String().IsEqual("billing2@example.com")
+		metadata2.Value("photoURL").String().IsEqual("https://example2.com/photo.jpg")
+	})
+
+	t.Run("user with no workspaces", func(t *testing.T) {
+		query := fmt.Sprintf(`query { findByUser(userId: "%s"){ id name }}`, uId2)
+		request := GraphQLRequest{
+			Query: query,
+		}
+		jsonData, err := json.Marshal(request)
+		assert.NoError(t, err)
+
+		o := e.POST("/api/graphql").
+			WithHeader("authorization", "Bearer test").
+			WithHeader("Content-Type", "application/json").
+			WithHeader("X-Reearth-Debug-User", uId.String()).
+			WithBytes(jsonData).
+			Expect().Status(http.StatusOK).
+			JSON().Object().
+			Value("data").Object().
+			Value("findByUser").Array()
+
+		o.Length().IsEqual(0)
+	})
 }

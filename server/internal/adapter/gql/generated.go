@@ -86,7 +86,6 @@ type ComplexityRoot struct {
 		MyWorkspace   func(childComplexity int) int
 		MyWorkspaceID func(childComplexity int) int
 		Name          func(childComplexity int) int
-		Workspaces    func(childComplexity int) int
 	}
 
 	Mutation struct {
@@ -251,7 +250,6 @@ type ComplexityRoot struct {
 }
 
 type MeResolver interface {
-	Workspaces(ctx context.Context, obj *gqlmodel.Me) ([]*gqlmodel.Workspace, error)
 	MyWorkspace(ctx context.Context, obj *gqlmodel.Me) (*gqlmodel.Workspace, error)
 }
 type MutationResolver interface {
@@ -431,13 +429,6 @@ func (e *executableSchema) Complexity(ctx context.Context, typeName, field strin
 		}
 
 		return e.complexity.Me.Name(childComplexity), true
-
-	case "Me.workspaces":
-		if e.complexity.Me.Workspaces == nil {
-			break
-		}
-
-		return e.complexity.Me.Workspaces(childComplexity), true
 
 	case "Mutation.addIntegrationToWorkspace":
 		if e.complexity.Mutation.AddIntegrationToWorkspace == nil {
@@ -1528,7 +1519,6 @@ type Me {
   host: String
   myWorkspaceId: ID!
   auths: [String!]!
-  workspaces: [Workspace!]!
   myWorkspace: Workspace!
 }
 
@@ -3746,64 +3736,6 @@ func (ec *executionContext) fieldContext_Me_auths(_ context.Context, field graph
 	return fc, nil
 }
 
-func (ec *executionContext) _Me_workspaces(ctx context.Context, field graphql.CollectedField, obj *gqlmodel.Me) (ret graphql.Marshaler) {
-	fc, err := ec.fieldContext_Me_workspaces(ctx, field)
-	if err != nil {
-		return graphql.Null
-	}
-	ctx = graphql.WithFieldContext(ctx, fc)
-	defer func() {
-		if r := recover(); r != nil {
-			ec.Error(ctx, ec.Recover(ctx, r))
-			ret = graphql.Null
-		}
-	}()
-	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (any, error) {
-		ctx = rctx // use context from middleware stack in children
-		return ec.resolvers.Me().Workspaces(rctx, obj)
-	})
-	if err != nil {
-		ec.Error(ctx, err)
-		return graphql.Null
-	}
-	if resTmp == nil {
-		if !graphql.HasFieldError(ctx, fc) {
-			ec.Errorf(ctx, "must not be null")
-		}
-		return graphql.Null
-	}
-	res := resTmp.([]*gqlmodel.Workspace)
-	fc.Result = res
-	return ec.marshalNWorkspace2ᚕᚖgithubᚗcomᚋreearthᚋreearthᚑaccountsᚋserverᚋinternalᚋadapterᚋgqlᚋgqlmodelᚐWorkspaceᚄ(ctx, field.Selections, res)
-}
-
-func (ec *executionContext) fieldContext_Me_workspaces(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
-	fc = &graphql.FieldContext{
-		Object:     "Me",
-		Field:      field,
-		IsMethod:   true,
-		IsResolver: true,
-		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
-			switch field.Name {
-			case "id":
-				return ec.fieldContext_Workspace_id(ctx, field)
-			case "name":
-				return ec.fieldContext_Workspace_name(ctx, field)
-			case "alias":
-				return ec.fieldContext_Workspace_alias(ctx, field)
-			case "members":
-				return ec.fieldContext_Workspace_members(ctx, field)
-			case "metadata":
-				return ec.fieldContext_Workspace_metadata(ctx, field)
-			case "personal":
-				return ec.fieldContext_Workspace_personal(ctx, field)
-			}
-			return nil, fmt.Errorf("no field named %q was found under type Workspace", field.Name)
-		},
-	}
-	return fc, nil
-}
-
 func (ec *executionContext) _Me_myWorkspace(ctx context.Context, field graphql.CollectedField, obj *gqlmodel.Me) (ret graphql.Marshaler) {
 	fc, err := ec.fieldContext_Me_myWorkspace(ctx, field)
 	if err != nil {
@@ -5687,8 +5619,6 @@ func (ec *executionContext) fieldContext_Query_me(_ context.Context, field graph
 				return ec.fieldContext_Me_myWorkspaceId(ctx, field)
 			case "auths":
 				return ec.fieldContext_Me_auths(ctx, field)
-			case "workspaces":
-				return ec.fieldContext_Me_workspaces(ctx, field)
 			case "myWorkspace":
 				return ec.fieldContext_Me_myWorkspace(ctx, field)
 			}
@@ -6781,8 +6711,6 @@ func (ec *executionContext) fieldContext_UpdateMePayload_me(_ context.Context, f
 				return ec.fieldContext_Me_myWorkspaceId(ctx, field)
 			case "auths":
 				return ec.fieldContext_Me_auths(ctx, field)
-			case "workspaces":
-				return ec.fieldContext_Me_workspaces(ctx, field)
 			case "myWorkspace":
 				return ec.fieldContext_Me_myWorkspace(ctx, field)
 			}
@@ -12096,42 +12024,6 @@ func (ec *executionContext) _Me(ctx context.Context, sel ast.SelectionSet, obj *
 			if out.Values[i] == graphql.Null {
 				atomic.AddUint32(&out.Invalids, 1)
 			}
-		case "workspaces":
-			field := field
-
-			innerFunc := func(ctx context.Context, fs *graphql.FieldSet) (res graphql.Marshaler) {
-				defer func() {
-					if r := recover(); r != nil {
-						ec.Error(ctx, ec.Recover(ctx, r))
-					}
-				}()
-				res = ec._Me_workspaces(ctx, field, obj)
-				if res == graphql.Null {
-					atomic.AddUint32(&fs.Invalids, 1)
-				}
-				return res
-			}
-
-			if field.Deferrable != nil {
-				dfs, ok := deferred[field.Deferrable.Label]
-				di := 0
-				if ok {
-					dfs.AddField(field)
-					di = len(dfs.Values) - 1
-				} else {
-					dfs = graphql.NewFieldSet([]graphql.CollectedField{field})
-					deferred[field.Deferrable.Label] = dfs
-				}
-				dfs.Concurrently(di, func(ctx context.Context) graphql.Marshaler {
-					return innerFunc(ctx, dfs)
-				})
-
-				// don't run the out.Concurrently() call below
-				out.Values[i] = graphql.Null
-				continue
-			}
-
-			out.Concurrently(i, func(ctx context.Context) graphql.Marshaler { return innerFunc(ctx, out) })
 		case "myWorkspace":
 			field := field
 
