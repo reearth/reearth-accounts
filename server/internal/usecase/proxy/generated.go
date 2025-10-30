@@ -387,11 +387,19 @@ func (v *CreateWorkspaceCreateWorkspaceCreateWorkspacePayloadWorkspace) __premar
 }
 
 type CreateWorkspaceInput struct {
-	Name string `json:"name"`
+	Alias       string `json:"alias"`
+	Name        string `json:"name"`
+	Description string `json:"description"`
 }
+
+// GetAlias returns CreateWorkspaceInput.Alias, and is useful for accessing the field via an interface.
+func (v *CreateWorkspaceInput) GetAlias() string { return v.Alias }
 
 // GetName returns CreateWorkspaceInput.Name, and is useful for accessing the field via an interface.
 func (v *CreateWorkspaceInput) GetName() string { return v.Name }
+
+// GetDescription returns CreateWorkspaceInput.Description, and is useful for accessing the field via an interface.
+func (v *CreateWorkspaceInput) GetDescription() string { return v.Description }
 
 // CreateWorkspaceResponse is returned by CreateWorkspace on success.
 type CreateWorkspaceResponse struct {
@@ -452,6 +460,103 @@ type DeleteWorkspaceResponse struct {
 func (v *DeleteWorkspaceResponse) GetDeleteWorkspace() DeleteWorkspaceDeleteWorkspaceDeleteWorkspacePayload {
 	return v.DeleteWorkspace
 }
+
+// FindByAliasFindByAliasWorkspace includes the requested fields of the GraphQL type Workspace.
+type FindByAliasFindByAliasWorkspace struct {
+	FragmentWorkspace `json:"-"`
+}
+
+// GetId returns FindByAliasFindByAliasWorkspace.Id, and is useful for accessing the field via an interface.
+func (v *FindByAliasFindByAliasWorkspace) GetId() string { return v.FragmentWorkspace.Id }
+
+// GetName returns FindByAliasFindByAliasWorkspace.Name, and is useful for accessing the field via an interface.
+func (v *FindByAliasFindByAliasWorkspace) GetName() string { return v.FragmentWorkspace.Name }
+
+// GetPersonal returns FindByAliasFindByAliasWorkspace.Personal, and is useful for accessing the field via an interface.
+func (v *FindByAliasFindByAliasWorkspace) GetPersonal() bool { return v.FragmentWorkspace.Personal }
+
+// GetMembers returns FindByAliasFindByAliasWorkspace.Members, and is useful for accessing the field via an interface.
+func (v *FindByAliasFindByAliasWorkspace) GetMembers() []FragmentWorkspaceMembersWorkspaceMember {
+	return v.FragmentWorkspace.Members
+}
+
+func (v *FindByAliasFindByAliasWorkspace) UnmarshalJSON(b []byte) error {
+
+	if string(b) == "null" {
+		return nil
+	}
+
+	var firstPass struct {
+		*FindByAliasFindByAliasWorkspace
+		graphql.NoUnmarshalJSON
+	}
+	firstPass.FindByAliasFindByAliasWorkspace = v
+
+	err := json.Unmarshal(b, &firstPass)
+	if err != nil {
+		return err
+	}
+
+	err = json.Unmarshal(
+		b, &v.FragmentWorkspace)
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
+type __premarshalFindByAliasFindByAliasWorkspace struct {
+	Id string `json:"id"`
+
+	Name string `json:"name"`
+
+	Personal bool `json:"personal"`
+
+	Members []json.RawMessage `json:"members"`
+}
+
+func (v *FindByAliasFindByAliasWorkspace) MarshalJSON() ([]byte, error) {
+	premarshaled, err := v.__premarshalJSON()
+	if err != nil {
+		return nil, err
+	}
+	return json.Marshal(premarshaled)
+}
+
+func (v *FindByAliasFindByAliasWorkspace) __premarshalJSON() (*__premarshalFindByAliasFindByAliasWorkspace, error) {
+	var retval __premarshalFindByAliasFindByAliasWorkspace
+
+	retval.Id = v.FragmentWorkspace.Id
+	retval.Name = v.FragmentWorkspace.Name
+	retval.Personal = v.FragmentWorkspace.Personal
+	{
+
+		dst := &retval.Members
+		src := v.FragmentWorkspace.Members
+		*dst = make(
+			[]json.RawMessage,
+			len(src))
+		for i, src := range src {
+			dst := &(*dst)[i]
+			var err error
+			*dst, err = __marshalFragmentWorkspaceMembersWorkspaceMember(
+				&src)
+			if err != nil {
+				return nil, fmt.Errorf(
+					"unable to marshal FindByAliasFindByAliasWorkspace.FragmentWorkspace.Members: %w", err)
+			}
+		}
+	}
+	return &retval, nil
+}
+
+// FindByAliasResponse is returned by FindByAlias on success.
+type FindByAliasResponse struct {
+	FindByAlias FindByAliasFindByAliasWorkspace `json:"findByAlias"`
+}
+
+// GetFindByAlias returns FindByAliasResponse.FindByAlias, and is useful for accessing the field via an interface.
+func (v *FindByAliasResponse) GetFindByAlias() FindByAliasFindByAliasWorkspace { return v.FindByAlias }
 
 // FindByIDFindByIDWorkspace includes the requested fields of the GraphQL type Workspace.
 type FindByIDFindByIDWorkspace struct {
@@ -3615,6 +3720,14 @@ type __DeleteWorkspaceInput struct {
 // GetInput returns __DeleteWorkspaceInput.Input, and is useful for accessing the field via an interface.
 func (v *__DeleteWorkspaceInput) GetInput() DeleteWorkspaceInput { return v.Input }
 
+// __FindByAliasInput is used internally by genqlient
+type __FindByAliasInput struct {
+	Alias string `json:"alias"`
+}
+
+// GetAlias returns __FindByAliasInput.Alias, and is useful for accessing the field via an interface.
+func (v *__FindByAliasInput) GetAlias() string { return v.Alias }
+
 // __FindByIDInput is used internally by genqlient
 type __FindByIDInput struct {
 	Id string `json:"id"`
@@ -4066,6 +4179,58 @@ func DeleteWorkspace(
 	}
 
 	data_ = &DeleteWorkspaceResponse{}
+	resp_ := &graphql.Response{Data: data_}
+
+	err_ = client_.MakeRequest(
+		ctx_,
+		req_,
+		resp_,
+	)
+
+	return data_, err_
+}
+
+// The query executed by FindByAlias.
+const FindByAlias_Operation = `
+query FindByAlias ($alias: String!) {
+	findByAlias(alias: $alias) {
+		... FragmentWorkspace
+	}
+}
+fragment FragmentWorkspace on Workspace {
+	id
+	name
+	personal
+	members {
+		__typename
+		... on WorkspaceUserMember {
+			userId
+			role
+		}
+		... on WorkspaceIntegrationMember {
+			integrationId
+			role
+			active
+			invitedById
+		}
+	}
+}
+`
+
+func FindByAlias(
+	ctx_ context.Context,
+	client_ graphql.Client,
+	alias string,
+) (data_ *FindByAliasResponse, err_ error) {
+	req_ := &graphql.Request{
+		OpName: "FindByAlias",
+		Query:  FindByAlias_Operation,
+		Variables: &__FindByAliasInput{
+			Alias: alias,
+		},
+	}
+
+	data_ = &FindByAliasResponse{}
 	resp_ := &graphql.Response{Data: data_}
 
 	err_ = client_.MakeRequest(
