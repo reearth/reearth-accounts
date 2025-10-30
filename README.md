@@ -4,7 +4,7 @@
 [![GitHub issues](https://img.shields.io/github/issues/reearth/reearth-accounts)](https://github.com/reearth/reearth-accounts/issues)
 [![License](https://img.shields.io/badge/license-Apache%202.0-blue.svg)](https://github.com/reearth/reearth-accounts/blob/main/LICENSE)
 
-Centralized account management and authorization service for Re:Earth's microservice architecture.
+Centralized account management and authorization service for Re:Earth's microservice architecture. This service complements the authentication functionality across Re:Earth microservices by providing unified user, workspace, role management and permission evaluation.
 
 ## Features
 
@@ -36,7 +36,16 @@ Centralized account management and authorization service for Re:Earth's microser
 
 ### Running with Docker Compose
 
-The easiest way to get started is using Docker Compose, which starts both the server and Cerbos authorization service:
+This service is designed to run alongside other Re:Earth microservices within a shared Docker network.
+
+**Prerequisites:**
+- Create the external `reearth` Docker network if it doesn't exist:
+
+```bash
+docker network create reearth
+```
+
+**Start the service:**
 
 ```bash
 cd server
@@ -46,9 +55,11 @@ make run
 This will:
 - Start Cerbos authorization server on port 3593
 - Start Re:Earth Accounts server on port 8090
-- Connect to the external `reearth` Docker network
+- Attach to the external `reearth` Docker network, making the service accessible to other Re:Earth microservices
 
 The GraphQL endpoint will be available at `http://localhost:8090/graphql`
+
+**Note:** The service uses `docker-compose.dev.yml` which requires the external `reearth` network. This allows seamless integration with other Re:Earth services running on the same network.
 
 To stop the services:
 
