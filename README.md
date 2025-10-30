@@ -16,6 +16,15 @@ Centralized account management and authorization service for Re:Earth's microser
 - **Multi-language Support** - Internationalization support (English, Japanese)
 - **DDD Architecture** - Clean domain-driven design with clear layer separation
 
+## Architecture
+
+Re:Earth Accounts follows Domain-Driven Design (DDD) principles with clear layer separation:
+
+- **Domain Layer** (`pkg/`) - Core business logic and entities
+- **Application Layer** (`internal/usecase/`) - Use cases and orchestration
+- **Infrastructure Layer** (`internal/infrastructure/`) - Database and external services
+- **Adapter Layer** (`internal/adapter/`) - GraphQL API and request handling
+
 ## Built with
 
 - [Go](https://golang.org/) - Backend language (1.24.2+)
@@ -25,6 +34,17 @@ Centralized account management and authorization service for Re:Earth's microser
 - [Cerbos](https://cerbos.dev/) - Authorization engine
 - [Auth0](https://auth0.com/) - Authentication provider
 - [Docker](https://www.docker.com/) - Containerization
+
+## GraphQL API
+
+The service exposes GraphQL APIs for:
+
+- User operations (create, update, delete, query)
+- Workspace management
+- Role definitions and assignments
+- Permission evaluation
+
+Schema files are located in the `schemas/` directory.
 
 ## Getting Started
 
@@ -36,16 +56,28 @@ Centralized account management and authorization service for Re:Earth's microser
 
 ### Running with Docker Compose
 
-This service is designed to run alongside other Re:Earth microservices within a shared Docker network.
+This service is designed to run alongside other Re:Earth microservices within a shared Docker network. It provides centralized authentication and authorization for all Re:Earth services including reearth-visualizer, reearth-cms, reearth-flow, and others.
 
 **Prerequisites:**
-- Create the external `reearth` Docker network if it doesn't exist:
+
+Before starting this service, ensure the following are running:
+- The `reearth` Docker network
+- MongoDB instance named `reearth-mongo` on that network
+
+These are typically provided by any Re:Earth service (e.g., [reearth-visualizer](https://github.com/reearth/reearth-visualizer), [reearth-cms](https://github.com/reearth/reearth-cms), [reearth-flow](https://github.com/reearth/reearth-flow)).
+
+Example setup with reearth-visualizer:
 
 ```bash
-docker network create reearth
+# Clone and start reearth-visualizer (or any other Re:Earth service)
+git clone https://github.com/reearth/reearth-visualizer.git
+cd reearth-visualizer/server
+make run
 ```
 
 **Start the service:**
+
+Once the `reearth` network and `reearth-mongo` are available, start this service:
 
 ```bash
 cd server
@@ -55,11 +87,14 @@ make run
 This will:
 - Start Cerbos authorization server on port 3593
 - Start Re:Earth Accounts server on port 8090
-- Attach to the external `reearth` Docker network, making the service accessible to other Re:Earth microservices
+- Attach to the external `reearth` Docker network, making the service accessible to all Re:Earth microservices
+- Connect to the `reearth-mongo` database
 
-The GraphQL endpoint will be available at `http://localhost:8090/graphql`
+The GraphQL endpoint will be available at:
+- From host machine: `http://localhost:8090/graphql`
+- From within Docker network: `http://reearth-accounts-dev:8090/graphql`
 
-**Note:** The service uses `docker-compose.dev.yml` which requires the external `reearth` network. This allows seamless integration with other Re:Earth services running on the same network.
+**Note:** The service uses `docker-compose.dev.yml` which declares `networks.reearth.external: true`, meaning it attaches to the existing `reearth` network rather than creating its own.
 
 To stop the services:
 
@@ -162,35 +197,7 @@ make run-migration
 | Docker Compose | Latest |
 | MongoDB | 4.4+ |
 
-## Architecture
-
-Re:Earth Accounts follows Domain-Driven Design (DDD) principles with clear layer separation:
-
-- **Domain Layer** (`pkg/`) - Core business logic and entities
-- **Application Layer** (`internal/usecase/`) - Use cases and orchestration
-- **Infrastructure Layer** (`internal/infrastructure/`) - Database and external services
-- **Adapter Layer** (`internal/adapter/`) - GraphQL API and request handling
-
 For detailed architecture documentation, see [server/CLAUDE.md](server/CLAUDE.md).
-
-## GraphQL API
-
-The service exposes GraphQL APIs for:
-
-- User operations (create, update, delete, query)
-- Workspace management
-- Role definitions and assignments
-- Permission evaluation
-
-Schema files are located in the `schemas/` directory.
-
-## Contributing
-
-We welcome contributions! Please see our [Contributing Guide](CONTRIBUTING.md) for details.
-
-## License
-
-Licensed under the Apache License, Version 2.0. See [LICENSE](LICENSE) for the full license text.
 
 ## Contact
 
