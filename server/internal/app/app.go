@@ -3,14 +3,10 @@ package app
 import (
 	"context"
 	"errors"
-	"fmt"
 	"net/http"
 	"net/http/pprof"
-	"strings"
-	"time"
 
 	"github.com/99designs/gqlgen/graphql/playground"
-	"github.com/golang-jwt/jwt"
 	"github.com/labstack/echo/v4"
 	"github.com/labstack/echo/v4/middleware"
 	"github.com/reearth/reearth-accounts/server/internal/adapter"
@@ -93,11 +89,6 @@ func initEcho(ctx context.Context, cfg *ServerConfig) *echo.Echo {
 		log.Panicc(ctx, err)
 	}
 
-	// TODO: Remove after debugging JWT issues
-	e.GET("/debug/jwt", jwtDebugHandler)
-	log.Printf("debug: JWT debug endpoint is available at /debug/jwt")
-	api.Use(jwtDebugMiddleware)
-
 	api.POST(
 		"/graphql", GraphqlAPI(cfg.Config, cfg.Config.Dev),
 		middleware.CORSWithConfig(middleware.CORSConfig{AllowOrigins: origins}),
@@ -108,107 +99,6 @@ func initEcho(ctx context.Context, cfg *ServerConfig) *echo.Echo {
 	)
 
 	return e
-}
-
-func jwtDebugHandler(c echo.Context) error {
-	token := c.Request().Header.Get("Authorization")
-
-	result := map[string]interface{}{
-		"server_time": map[string]interface{}{
-			"utc":      time.Now().UTC().Format(time.RFC3339),
-			"unix":     time.Now().Unix(),
-			"jst":      time.Now().In(time.FixedZone("JST", 9*60*60)).Format(time.RFC3339),
-			"location": time.Now().Location().String(),
-		},
-	}
-
-	if token != "" {
-		token = strings.TrimPrefix(token, "Bearer ")
-		parser := jwt.Parser{}
-		t, _, err := parser.ParseUnverified(token, jwt.MapClaims{})
-
-		if err == nil {
-			result["token_raw"] = t.Claims
-
-			if claims, ok := t.Claims.(jwt.MapClaims); ok {
-				decoded := map[string]interface{}{
-					"iss": claims["iss"],
-					"sub": claims["sub"],
-					"aud": claims["aud"],
-				}
-
-				if iat, ok := claims["iat"].(float64); ok {
-					iatTime := time.Unix(int64(iat), 0)
-					decoded["iat"] = map[string]interface{}{
-						"unix": int64(iat),
-						"utc":  iatTime.UTC().Format(time.RFC3339),
-						"jst":  iatTime.In(time.FixedZone("JST", 9*60*60)).Format(time.RFC3339),
-					}
-				}
-
-				if exp, ok := claims["exp"].(float64); ok {
-					expTime := time.Unix(int64(exp), 0)
-					decoded["exp"] = map[string]interface{}{
-						"unix": int64(exp),
-						"utc":  expTime.UTC().Format(time.RFC3339),
-						"jst":  expTime.In(time.FixedZone("JST", 9*60*60)).Format(time.RFC3339),
-					}
-
-					if time.Now().Unix() > int64(exp) {
-						decoded["status"] = "EXPIRED"
-					} else {
-						decoded["status"] = "VALID"
-						decoded["expires_in_seconds"] = int64(exp) - time.Now().Unix()
-					}
-				}
-
-				result["token_decoded"] = decoded
-			}
-		} else {
-			result["parse_error"] = err.Error()
-		}
-	} else {
-		result["message"] = "No Authorization header found"
-	}
-
-	return c.JSON(200, result)
-}
-
-func jwtDebugMiddleware(next echo.HandlerFunc) echo.HandlerFunc {
-	return func(c echo.Context) error {
-		authHeader := c.Request().Header.Get("Authorization")
-
-		if authHeader != "" {
-			log.Infof("=== JWT Debug Start ===")
-			log.Infof("Request time (UTC): %v", time.Now().UTC())
-			log.Infof("Request time (Unix): %v", time.Now().Unix())
-			log.Infof("Request path: %v", c.Request().URL.Path)
-
-			token := strings.TrimPrefix(authHeader, "Bearer ")
-			parser := jwt.Parser{}
-			t, _, err := parser.ParseUnverified(token, jwt.MapClaims{})
-
-			if err == nil && t != nil {
-				if claims, ok := t.Claims.(jwt.MapClaims); ok {
-					if iat, ok := claims["iat"].(float64); ok {
-						log.Infof("Token iat: %v (issued at: %v)", int64(iat), time.Unix(int64(iat), 0))
-					}
-					if exp, ok := claims["exp"].(float64); ok {
-						log.Infof("Token exp: %v (expires at: %v)", int64(exp), time.Unix(int64(exp), 0))
-						log.Infof("Token expires in: %v seconds", int64(exp)-time.Now().Unix())
-					}
-				}
-			}
-			log.Infof("=== JWT Debug End ===")
-		}
-
-		err := next(c)
-		if err != nil && strings.Contains(fmt.Sprintf("%v", err), "expired") {
-			log.Errorf("JWT validation failed: %v", err)
-		}
-
-		return err
-	}
 }
 
 func allowedOrigins(cfg *ServerConfig) []string {
