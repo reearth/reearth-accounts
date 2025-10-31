@@ -6112,7 +6112,7 @@ func (ec *executionContext) _Query_findByAlias(ctx context.Context, field graphq
 	}
 	res := resTmp.(*gqlmodel.Workspace)
 	fc.Result = res
-	return ec.marshalOWorkspace2ᚖgithubᚗcomᚋreearthᚋreearthᚑaccountsᚋinternalᚋadapterᚋgqlᚋgqlmodelᚐWorkspace(ctx, field.Selections, res)
+	return ec.marshalOWorkspace2ᚖgithubᚗcomᚋreearthᚋreearthᚑaccountsᚋserverᚋinternalᚋadapterᚋgqlᚋgqlmodelᚐWorkspace(ctx, field.Selections, res)
 }
 
 func (ec *executionContext) fieldContext_Query_findByAlias(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
@@ -10922,6 +10922,13 @@ func (ec *executionContext) unmarshalInputCreateWorkspaceInput(ctx context.Conte
 				return it, err
 			}
 			it.Name = data
+		case "description":
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("description"))
+			data, err := ec.unmarshalOString2ᚖstring(ctx, v)
+			if err != nil {
+				return it, err
+			}
+			it.Description = data
 		}
 	}
 
@@ -11659,13 +11666,6 @@ func (ec *executionContext) unmarshalInputUpdateRoleInput(ctx context.Context, o
 				return it, err
 			}
 			it.Name = data
-		case "description":
-			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("description"))
-			data, err := ec.unmarshalOString2ᚖstring(ctx, v)
-			if err != nil {
-				return it, err
-			}
-			it.Description = data
 		}
 	}
 
