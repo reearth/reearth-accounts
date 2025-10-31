@@ -86,6 +86,28 @@ func (r *queryResolver) FindByName(ctx context.Context, name string) (*gqlmodel.
 	return gqlmodel.ToWorkspace(w, exists), nil
 }
 
+func (r *queryResolver) FindByAlias(ctx context.Context, alias string) (*gqlmodel.Workspace, error) {
+	w, err := usecases(ctx).Workspace.FetchByAlias(ctx, alias)
+	if err != nil {
+		return nil, err
+	}
+
+	exists, err := buildExistingUserSetFromWorkspace(ctx, w)
+	if err != nil {
+		return nil, err
+	}
+
+	if w != nil && w.Metadata() != nil && w.Metadata().PhotoURL() != "" {
+		signedURL, sErr := r.Storage.GetSignedURL(ctx, w.Metadata().PhotoURL())
+		if sErr != nil {
+			return nil, sErr
+		}
+		w.Metadata().SetPhotoURL(signedURL)
+	}
+
+	return gqlmodel.ToWorkspace(w, exists), nil
+}
+
 func (r *queryResolver) FindByUser(ctx context.Context, userID gqlmodel.ID) ([]*gqlmodel.Workspace, error) {
 	uid, err := gqlmodel.ToID[id.User](userID)
 	if err != nil {

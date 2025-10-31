@@ -147,7 +147,7 @@ func TestFindByID(t *testing.T) {
 func TestCreateWorkspace(t *testing.T) {
 	e, _ := StartServer(t, &app.Config{}, true, baseSeederWorkspace)
 
-	query := `mutation { createWorkspace(input: {name: "test"}){ workspace{ id name } }}`
+	query := `mutation { createWorkspace(input: {alias: "alias", name: "test", description: "description"}){ workspace{ id name } }}`
 	request := GraphQLRequest{
 		Query: query,
 	}

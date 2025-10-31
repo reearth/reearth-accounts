@@ -34,6 +34,8 @@ func (b *Builder) Build() (*Workspace, error) {
 		b.w.members = NewMembersWith(b.members, b.integrations, false)
 	}
 
+	b.w.SetMetadata(b.w.metadata)
+
 	b.w.members.fixed = b.personal
 	return b.w, nil
 }
