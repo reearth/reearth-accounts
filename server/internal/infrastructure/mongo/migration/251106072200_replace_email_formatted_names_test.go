@@ -53,6 +53,13 @@ func TestReplaceEmailFormattedNames(t *testing.T) {
 			Alias:     "testalias4",
 			Workspace: "workspace4",
 		},
+		{
+			ID:        "user5",
+			Name:      "user.name@gmail.com",
+			Email:     "user.name@gmail.com",
+			Alias:     "testalias5",
+			Workspace: "workspace5",
+		},
 	}
 
 	for _, user := range testUsers {

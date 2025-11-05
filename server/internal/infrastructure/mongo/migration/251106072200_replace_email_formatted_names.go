@@ -16,7 +16,14 @@ func ReplaceEmailFormattedNames(ctx context.Context, c DBClient) error {
 	col := c.Collection("user")
 	seenNames := make(map[string]bool)
 
-	return col.Find(ctx, bson.D{}, &mongox.BatchConsumer{
+	// Query to find users with email-formatted names (contains @ symbol)
+	filter := bson.M{
+		"name": bson.M{
+			"$regex": "@",
+		},
+	}
+
+	return col.Find(ctx, filter, &mongox.BatchConsumer{
 		Size: 1000,
 		Callback: func(rows []bson.Raw) error {
 			ids := make([]string, 0, len(rows))
@@ -29,21 +36,22 @@ func ReplaceEmailFormattedNames(ctx context.Context, c DBClient) error {
 					return err
 				}
 
-				// Check if name is in email format
+				// Double-check with strict email regex
 				if emailRegex.MatchString(doc.Name) {
 					newName := generateUniqueName(seenNames)
 					doc.Name = newName
 					seenNames[newName] = true
-				} else {
-					// Track non-email names to avoid collisions
-					seenNames[doc.Name] = true
-				}
 
-				ids = append(ids, doc.ID)
-				newRows = append(newRows, doc)
+					ids = append(ids, doc.ID)
+					newRows = append(newRows, doc)
+				}
 			}
 
-			return col.SaveAll(ctx, ids, newRows)
+			// Only save if there are records to update
+			if len(ids) > 0 {
+				return col.SaveAll(ctx, ids, newRows)
+			}
+			return nil
 		},
 	})
 }
