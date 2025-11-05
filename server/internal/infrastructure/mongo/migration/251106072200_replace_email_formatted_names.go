@@ -2,6 +2,7 @@ package migration
 
 import (
 	"context"
+	"log"
 	"regexp"
 
 	"github.com/reearth/reearth-accounts/server/internal/infrastructure/mongo/mongodoc"
@@ -46,6 +47,8 @@ func ReplaceEmailFormattedNames(ctx context.Context, c DBClient) error {
 					newRows = append(newRows, doc)
 				}
 			}
+
+			log.Println("count of ids: ", len(ids))
 
 			// Only save if there are records to update
 			if len(ids) > 0 {
