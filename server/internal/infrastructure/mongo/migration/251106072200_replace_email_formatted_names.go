@@ -2,12 +2,10 @@ package migration
 
 import (
 	"context"
-	"crypto/rand"
-	"encoding/hex"
 	"regexp"
-	"strings"
 
 	"github.com/reearth/reearth-accounts/server/internal/infrastructure/mongo/mongodoc"
+	"github.com/reearth/reearth-accounts/server/pkg/id"
 	"github.com/reearth/reearthx/mongox"
 	"go.mongodb.org/mongo-driver/bson"
 )
@@ -51,20 +49,5 @@ func ReplaceEmailFormattedNames(ctx context.Context, c DBClient) error {
 }
 
 func generateUniqueName(seenNames map[string]bool) string {
-	for {
-		randomStr := generateRandomString(8)
-		name := "user-" + randomStr
-		if !seenNames[name] {
-			return name
-		}
-	}
-}
-
-func generateRandomString(length int) string {
-	bytes := make([]byte, length/2+1)
-	if _, err := rand.Read(bytes); err != nil {
-		// Fallback to timestamp-based approach if random fails
-		return strings.ToLower(hex.EncodeToString([]byte("fallback"))[:length])
-	}
-	return hex.EncodeToString(bytes)[:length]
+	return "user-" + id.NewUserID().String()
 }

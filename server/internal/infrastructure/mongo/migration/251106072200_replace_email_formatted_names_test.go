@@ -12,6 +12,10 @@ import (
 	"go.mongodb.org/mongo-driver/bson"
 )
 
+func init() {
+	mongotest.Env = "REEARTH_DB"
+}
+
 func TestReplaceEmailFormattedNames(t *testing.T) {
 	ctx := context.Background()
 	db := mongotest.Connect(t)(t)
@@ -67,7 +71,8 @@ func TestReplaceEmailFormattedNames(t *testing.T) {
 	err = cursor.All(ctx, &results)
 	assert.NoError(t, err)
 
-	userPattern := regexp.MustCompile(`^user-[a-f0-9]{8}$`)
+	// Pattern for user-{26-char-ulid} format (e.g., user-01k9b3s58jgpf0gzzrjs3w6bcc)
+	userPattern := regexp.MustCompile(`^user-[0-9a-z]{26}$`)
 	seenNames := make(map[string]bool)
 
 	for _, result := range results {
@@ -76,8 +81,8 @@ func TestReplaceEmailFormattedNames(t *testing.T) {
 
 		switch result.ID {
 		case "user1", "user2", "user4":
-			// These had email-formatted names, should now be user-{string}
-			assert.Regexp(t, userPattern, result.Name, "Name should match user-{string} pattern")
+			// These had email-formatted names, should now be user-{ulid}
+			assert.Regexp(t, userPattern, result.Name, "Name should match user-{ulid} pattern")
 			// Verify uniqueness
 			assert.False(t, seenNames[result.Name], "Each generated name should be unique")
 			seenNames[result.Name] = true
@@ -99,19 +104,12 @@ func TestGenerateUniqueName(t *testing.T) {
 	for i := 0; i < 100; i++ {
 		name := generateUniqueName(seenNames)
 		assert.NotContains(t, names, name, "Generated name should be unique")
-		assert.Regexp(t, `^user-[a-f0-9]{8}$`, name, "Name should match expected pattern")
+		assert.Regexp(t, `^user-[0-9a-z]{26}$`, name, "Name should match user-{ulid} pattern")
 		names[name] = true
 		seenNames[name] = true
 	}
 
 	assert.Equal(t, 100, len(names), "Should have generated 100 unique names")
-}
-
-func TestGenerateRandomString(t *testing.T) {
-	length := 8
-	str := generateRandomString(length)
-	assert.Equal(t, length, len(str), "Generated string should have correct length")
-	assert.Regexp(t, `^[a-f0-9]+$`, str, "Generated string should be hex")
 }
 
 func TestEmailRegex(t *testing.T) {
