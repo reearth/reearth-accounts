@@ -30,4 +30,5 @@ var migrations = migration.Migrations[DBClient]{
 	//250911120005: AddCaseInsensitiveUserWorkspaceIndex,
 	250919170404: ConvertInvalidUserAlias,
 	250919170408: ConvertInvalidUserWorkspaceAlias,
+	251106072200: ReplaceEmailFormattedNames,
 }
