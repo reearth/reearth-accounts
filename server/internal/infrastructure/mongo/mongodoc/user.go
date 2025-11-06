@@ -106,6 +106,9 @@ func (d *UserDocument) Model() (*user.User, error) {
 
 	tid, err := id.WorkspaceIDFrom(wid)
 	if err != nil {
+		log.Warn("error converting workspace id: ", err)
+		log.Warn("user id: ", d.ID)
+		log.Error("workspace id: ", wid)
 		return nil, err
 	}
 
