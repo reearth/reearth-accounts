@@ -3,6 +3,7 @@ package mongodoc
 import (
 	"time"
 
+	"github.com/labstack/gommon/log"
 	"github.com/reearth/reearth-accounts/server/pkg/id"
 	"github.com/reearth/reearth-accounts/server/pkg/user"
 	"github.com/reearth/reearthx/mongox"
@@ -93,6 +94,8 @@ func NewUser(user *user.User) (*UserDocument, string) {
 func (d *UserDocument) Model() (*user.User, error) {
 	uid, err := id.UserIDFrom(d.ID)
 	if err != nil {
+		log.Warn("error converting user id: ", err)
+		log.Error("user id: ", d.ID)
 		return nil, err
 	}
 
