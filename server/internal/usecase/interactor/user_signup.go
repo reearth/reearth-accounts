@@ -383,12 +383,15 @@ func (i *User) CreateVerification(ctx context.Context, email string) error {
 		vr := user.NewVerification()
 		u.SetVerification(vr)
 
-		if err := i.repos.User.Save(ctx, u); err != nil {
+		if err = i.repos.User.Save(ctx, u); err != nil {
 			return err
 		}
 
-		if err := i.sendVerificationMail(ctx, u, vr); err != nil {
-			return err
+		auth0Auth := u.Auths().GetByProvider("auth0")
+		if auth0Auth != nil {
+			if err = i.gateways.Authenticator.ResendVerificationEmail(ctx, auth0Auth.Sub); err != nil {
+				return err
+			}
 		}
 
 		return nil

@@ -21,6 +21,15 @@ func ToUser(u *user.User) *User {
 		Website:     u.Metadata().Website(),
 	}
 
+	var v *Verification
+	if u.Verification() != nil {
+		v = &Verification{
+			Code:       u.Verification().Code(),
+			Expiration: u.Verification().Expiration().Format("2006-01-02T15:04:05.000Z"),
+			Verified:   u.Verification().IsVerified(),
+		}
+	}
+
 	return &User{
 		ID:        IDFrom(u.ID()),
 		Name:      u.Name(),
@@ -30,7 +39,8 @@ func ToUser(u *user.User) *User {
 		Auths: util.Map(u.Auths(), func(a user.Auth) string {
 			return a.Provider
 		}),
-		Metadata: &metadata,
+		Metadata:     &metadata,
+		Verification: v,
 	}
 }
 
@@ -44,6 +54,20 @@ func ToUsers(ul user.List) []*User {
 		users = append(users, ToUser(u))
 	}
 	return users
+}
+
+func ToSearchUserOutput(ul user.List) *SearchUserOutput {
+	if ul == nil {
+		return nil
+	}
+
+	users := make([]*User, 0, len(ul))
+	for _, u := range ul {
+		users = append(users, ToUser(u))
+	}
+	return &SearchUserOutput{
+		Users: users,
+	}
 }
 
 func ToUserFromSimple(u *user.Simple) *User {
