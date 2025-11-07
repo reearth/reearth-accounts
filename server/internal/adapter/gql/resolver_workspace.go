@@ -3,8 +3,10 @@ package gql
 import (
 	"context"
 
+	"github.com/labstack/gommon/log"
 	"github.com/reearth/reearth-accounts/server/internal/adapter/gql/gqlmodel"
 	"github.com/reearth/reearth-accounts/server/internal/usecase/interfaces"
+	"github.com/reearth/reearth-accounts/server/pkg/gqlclient/gqlerror"
 	"github.com/reearth/reearth-accounts/server/pkg/id"
 )
 
@@ -21,22 +23,26 @@ func (w workspaceUserMemberResolver) User(ctx context.Context, obj *gqlmodel.Wor
 func (r *queryResolver) FindByID(ctx context.Context, workpaceId gqlmodel.ID) (*gqlmodel.Workspace, error) {
 	wid, err := gqlmodel.ToID[id.Workspace](workpaceId)
 	if err != nil {
-		return nil, err
+		log.Errorf("[FindByID] failed to convert workspace id: %s, workspace id: %v", err.Error(), workpaceId)
+		return nil, gqlerror.ReturnAccountsError(ctx, err)
 	}
 
 	w, err := usecases(ctx).Workspace.FetchByID(ctx, wid)
 	if err != nil {
-		return nil, err
+		log.Errorf("[FindByID] failed to fetch workspace by id: %s, workspace id: %v", err.Error(), wid)
+		return nil, gqlerror.ReturnAccountsError(ctx, err)
 	}
 
 	exists, err := buildExistingUserSetFromWorkspace(ctx, w)
 	if err != nil {
-		return nil, err
+		log.Errorf("[FindByID] failed to build existing user set from workspace: %s, workspace id: %v", err.Error(), wid)
+		return nil, gqlerror.ReturnAccountsError(ctx, err)
 	}
 
 	converted, err := gqlmodel.ToWorkspace(w, exists, r.Storage)
 	if err != nil {
-		return nil, err
+		log.Errorf("[FindByID] failed to convert workspace: %s, workspace id: %v", err.Error(), wid)
+		return nil, gqlerror.ReturnAccountsError(ctx, err)
 	}
 
 	return converted, nil
@@ -45,17 +51,20 @@ func (r *queryResolver) FindByID(ctx context.Context, workpaceId gqlmodel.ID) (*
 func (r *queryResolver) FindByIDs(ctx context.Context, workpaceIds []gqlmodel.ID) ([]*gqlmodel.Workspace, error) {
 	wids, err := gqlmodel.ToIDs[id.Workspace](workpaceIds)
 	if err != nil {
-		return nil, err
+		log.Errorf("[FindByIDs] failed to convert workspace ids: %s, workspace ids: %v", err.Error(), workpaceIds)
+		return nil, gqlerror.ReturnAccountsError(ctx, err)
 	}
 
 	ws, err := usecases(ctx).Workspace.Fetch(ctx, wids, getOperator(ctx))
 	if err != nil {
-		return nil, err
+		log.Errorf("[FindByIDs] failed to fetch workspaces: %s, workspace ids: %v", err.Error(), wids)
+		return nil, gqlerror.ReturnAccountsError(ctx, err)
 	}
 
 	exists, err := buildExistingUserSetFromWorkspaces(ctx, ws)
 	if err != nil {
-		return nil, err
+		log.Errorf("[FindByIDs] failed to build existing user set from workspaces: %s, workspace ids: %v", err.Error(), wids)
+		return nil, gqlerror.ReturnAccountsError(ctx, err)
 	}
 
 	return gqlmodel.ToWorkspaces(ws, exists, r.Storage), nil
@@ -69,12 +78,14 @@ func (r *queryResolver) FindByName(ctx context.Context, name string) (*gqlmodel.
 
 	exists, err := buildExistingUserSetFromWorkspace(ctx, w)
 	if err != nil {
-		return nil, err
+		log.Errorf("[FindByName] failed to build existing user set from workspace: %s, name: %s", err.Error(), name)
+		return nil, gqlerror.ReturnAccountsError(ctx, err)
 	}
 
 	converted, err := gqlmodel.ToWorkspace(w, exists, r.Storage)
 	if err != nil {
-		return nil, err
+		log.Errorf("[FindByName] failed to convert workspace: %s, name: %s", err.Error(), name)
+		return nil, gqlerror.ReturnAccountsError(ctx, err)
 	}
 
 	return converted, nil
@@ -83,17 +94,20 @@ func (r *queryResolver) FindByName(ctx context.Context, name string) (*gqlmodel.
 func (r *queryResolver) FindByUser(ctx context.Context, userID gqlmodel.ID) ([]*gqlmodel.Workspace, error) {
 	uid, err := gqlmodel.ToID[id.User](userID)
 	if err != nil {
-		return nil, err
+		log.Errorf("[FindByUser] failed to convert user id: %s, user id: %v", err.Error(), userID)
+		return nil, gqlerror.ReturnAccountsError(ctx, err)
 	}
 
 	ws, err := usecases(ctx).Workspace.FindByUser(ctx, uid, getOperator(ctx))
 	if err != nil {
-		return nil, err
+		log.Errorf("[FindByUser] failed to find workspaces by user: %s, user id: %v", err.Error(), userID)
+		return nil, gqlerror.ReturnAccountsError(ctx, err)
 	}
 
 	exists, err := buildExistingUserSetFromWorkspaces(ctx, ws)
 	if err != nil {
-		return nil, err
+		log.Errorf("[FindByUser] failed to build existing user set from workspaces: %s, user id: %v", err.Error(), userID)
+		return nil, gqlerror.ReturnAccountsError(ctx, err)
 	}
 
 	return gqlmodel.ToWorkspaces(ws, exists, r.Storage), nil
@@ -102,7 +116,8 @@ func (r *queryResolver) FindByUser(ctx context.Context, userID gqlmodel.ID) ([]*
 func (r *queryResolver) FindByUserWithPagination(ctx context.Context, userID gqlmodel.ID, pagination gqlmodel.Pagination) (*gqlmodel.WorkspacesWithPagination, error) {
 	uid, err := gqlmodel.ToID[id.User](userID)
 	if err != nil {
-		return nil, err
+		log.Errorf("[FindByUserWithPagination] failed to convert user id: %s, user id: %v", err.Error(), userID)
+		return nil, gqlerror.ReturnAccountsError(ctx, err)
 	}
 
 	res, err := usecases(ctx).Workspace.FetchByUserWithPagination(ctx, uid, interfaces.FetchByUserWithPaginationParam{
@@ -110,12 +125,14 @@ func (r *queryResolver) FindByUserWithPagination(ctx context.Context, userID gql
 		Size: int64(pagination.Size),
 	})
 	if err != nil {
-		return nil, err
+		log.Errorf("[FindByUserWithPagination] failed to find workspaces by user with pagination: %s, user id: %v", err.Error(), userID)
+		return nil, gqlerror.ReturnAccountsError(ctx, err)
 	}
 
 	exists, err := buildExistingUserSetFromWorkspaces(ctx, res.Workspaces)
 	if err != nil {
-		return nil, err
+		log.Errorf("[FindByUserWithPagination] failed to build existing user set from workspaces: %s, user id: %v", err.Error(), userID)
+		return nil, gqlerror.ReturnAccountsError(ctx, err)
 	}
 
 	return &gqlmodel.WorkspacesWithPagination{
