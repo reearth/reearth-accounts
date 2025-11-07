@@ -12,153 +12,163 @@ import (
 )
 
 func TestSyncPersonalWorkspaceAlias(t *testing.T) {
-	ctx := context.Background()
-	db := mongotest.Connect(t)(t)
+	t.Run("PersonalWorkspaceWithDifferentAlias", func(t *testing.T) {
+		ctx := context.Background()
+		db := mongotest.Connect(t)(t)
 
-	client := mongox.NewClientWithDatabase(db)
-	userCol := client.WithCollection("user")
-	workspaceCol := client.WithCollection("workspace")
+		client := mongox.NewClientWithDatabase(db)
+		userCol := client.WithCollection("user")
+		workspaceCol := client.WithCollection("workspace")
 
-	// Setup test data
-	testUsers := []mongodoc.UserDocument{
-		{
+		// Setup: User with alias "userone" and personal workspace with different alias
+		testUser := mongodoc.UserDocument{
 			ID:        "user1",
 			Name:      "User One",
 			Email:     "user1@example.com",
 			Alias:     "userone",
 			Workspace: "workspace1",
-		},
-		{
+		}
+
+		testWorkspace := mongodoc.WorkspaceDocument{
+			ID:       "workspace1",
+			Name:     "Workspace One",
+			Alias:    "oldaliasone",
+			Personal: true,
+		}
+
+		_, err := userCol.Client().InsertOne(ctx, testUser)
+		assert.NoError(t, err)
+		_, err = workspaceCol.Client().InsertOne(ctx, testWorkspace)
+		assert.NoError(t, err)
+
+		// Run migration
+		err = SyncPersonalWorkspaceAlias(ctx, client)
+		assert.NoError(t, err)
+
+		// Verify workspace alias was updated to match user alias
+		var result mongodoc.WorkspaceDocument
+		err = workspaceCol.Client().FindOne(ctx, bson.M{"id": "workspace1"}).Decode(&result)
+		assert.NoError(t, err)
+		assert.Equal(t, "userone", result.Alias)
+	})
+
+	t.Run("PersonalWorkspaceWithMatchingAlias", func(t *testing.T) {
+		ctx := context.Background()
+		db := mongotest.Connect(t)(t)
+
+		client := mongox.NewClientWithDatabase(db)
+		userCol := client.WithCollection("user")
+		workspaceCol := client.WithCollection("workspace")
+
+		// Setup: User and personal workspace with matching alias
+		testUser := mongodoc.UserDocument{
 			ID:        "user2",
 			Name:      "User Two",
 			Email:     "user2@example.com",
 			Alias:     "usertwo",
 			Workspace: "workspace2",
-		},
-		{
+		}
+
+		testWorkspace := mongodoc.WorkspaceDocument{
+			ID:       "workspace2",
+			Name:     "Workspace Two",
+			Alias:    "usertwo",
+			Personal: true,
+		}
+
+		_, err := userCol.Client().InsertOne(ctx, testUser)
+		assert.NoError(t, err)
+		_, err = workspaceCol.Client().InsertOne(ctx, testWorkspace)
+		assert.NoError(t, err)
+
+		// Run migration
+		err = SyncPersonalWorkspaceAlias(ctx, client)
+		assert.NoError(t, err)
+
+		// Verify workspace alias remains unchanged
+		var result mongodoc.WorkspaceDocument
+		err = workspaceCol.Client().FindOne(ctx, bson.M{"id": "workspace2"}).Decode(&result)
+		assert.NoError(t, err)
+		assert.Equal(t, "usertwo", result.Alias)
+	})
+
+	t.Run("NonPersonalWorkspace", func(t *testing.T) {
+		ctx := context.Background()
+		db := mongotest.Connect(t)(t)
+
+		client := mongox.NewClientWithDatabase(db)
+		userCol := client.WithCollection("user")
+		workspaceCol := client.WithCollection("workspace")
+
+		// Setup: User and non-personal workspace
+		testUser := mongodoc.UserDocument{
 			ID:        "user3",
 			Name:      "User Three",
 			Email:     "user3@example.com",
 			Alias:     "userthree",
 			Workspace: "workspace3",
-		},
-	}
+		}
 
-	testWorkspaces := []mongodoc.WorkspaceDocument{
-		{
-			ID:       "workspace1",
-			Name:     "Workspace One",
-			Alias:    "oldaliasone", // Different from user alias
-			Personal: true,
-		},
-		{
-			ID:       "workspace2",
-			Name:     "Workspace Two",
-			Alias:    "usertwo", // Same as user alias - should not change
-			Personal: true,
-		},
-		{
+		testWorkspace := mongodoc.WorkspaceDocument{
 			ID:       "workspace3",
 			Name:     "Workspace Three",
-			Alias:    "teamworkspace", // Different but not personal
+			Alias:    "teamworkspace",
 			Personal: false,
-		},
-		{
+		}
+
+		_, err := userCol.Client().InsertOne(ctx, testUser)
+		assert.NoError(t, err)
+		_, err = workspaceCol.Client().InsertOne(ctx, testWorkspace)
+		assert.NoError(t, err)
+
+		// Run migration
+		err = SyncPersonalWorkspaceAlias(ctx, client)
+		assert.NoError(t, err)
+
+		// Verify workspace alias remains unchanged (not personal)
+		var result mongodoc.WorkspaceDocument
+		err = workspaceCol.Client().FindOne(ctx, bson.M{"id": "workspace3"}).Decode(&result)
+		assert.NoError(t, err)
+		assert.Equal(t, "teamworkspace", result.Alias)
+	})
+
+	t.Run("PersonalWorkspaceWithoutUser", func(t *testing.T) {
+		ctx := context.Background()
+		db := mongotest.Connect(t)(t)
+
+		client := mongox.NewClientWithDatabase(db)
+		workspaceCol := client.WithCollection("workspace")
+
+		// Setup: Personal workspace without matching user
+		testWorkspace := mongodoc.WorkspaceDocument{
 			ID:       "workspace4",
 			Name:     "Workspace Four",
 			Alias:    "orphanworkspace",
-			Personal: true, // Personal but no matching user
-		},
-	}
-
-	// Insert test users
-	for _, user := range testUsers {
-		_, err := userCol.Client().InsertOne(ctx, user)
-		assert.NoError(t, err)
-	}
-
-	// Insert test workspaces
-	for _, workspace := range testWorkspaces {
-		_, err := workspaceCol.Client().InsertOne(ctx, workspace)
-		assert.NoError(t, err)
-	}
-
-	// Run migration
-	err := SyncPersonalWorkspaceAlias(ctx, client)
-	assert.NoError(t, err)
-
-	// Verify results
-	var results []mongodoc.WorkspaceDocument
-	cursor, err := workspaceCol.Client().Find(ctx, bson.M{})
-	assert.NoError(t, err)
-	err = cursor.All(ctx, &results)
-	assert.NoError(t, err)
-
-	for _, result := range results {
-		switch result.ID {
-		case "workspace1":
-			// Should be updated to match user alias
-			assert.Equal(t, "userone", result.Alias, "Personal workspace alias should match user alias")
-		case "workspace2":
-			// Should remain the same (already matched)
-			assert.Equal(t, "usertwo", result.Alias, "Already matching alias should not change")
-		case "workspace3":
-			// Should not be updated (not personal)
-			assert.Equal(t, "teamworkspace", result.Alias, "Non-personal workspace should not change")
-		case "workspace4":
-			// Should remain the same (no matching user)
-			assert.Equal(t, "orphanworkspace", result.Alias, "Workspace without user should not change")
+			Personal: true,
 		}
-	}
-}
 
-func TestSyncPersonalWorkspaceAlias_EmptyDatabase(t *testing.T) {
-	ctx := context.Background()
-	db := mongotest.Connect(t)(t)
+		_, err := workspaceCol.Client().InsertOne(ctx, testWorkspace)
+		assert.NoError(t, err)
 
-	client := mongox.NewClientWithDatabase(db)
+		// Run migration
+		err = SyncPersonalWorkspaceAlias(ctx, client)
+		assert.NoError(t, err)
 
-	// Run migration on empty database - should not error
-	err := SyncPersonalWorkspaceAlias(ctx, client)
-	assert.NoError(t, err)
-}
+		// Verify workspace alias remains unchanged (no matching user)
+		var result mongodoc.WorkspaceDocument
+		err = workspaceCol.Client().FindOne(ctx, bson.M{"id": "workspace4"}).Decode(&result)
+		assert.NoError(t, err)
+		assert.Equal(t, "orphanworkspace", result.Alias)
+	})
 
-func TestSyncPersonalWorkspaceAlias_NoPersonalWorkspaces(t *testing.T) {
-	ctx := context.Background()
-	db := mongotest.Connect(t)(t)
+	t.Run("EmptyDatabase", func(t *testing.T) {
+		ctx := context.Background()
+		db := mongotest.Connect(t)(t)
 
-	client := mongox.NewClientWithDatabase(db)
-	userCol := client.WithCollection("user")
-	workspaceCol := client.WithCollection("workspace")
+		client := mongox.NewClientWithDatabase(db)
 
-	// Setup test data with no personal workspaces
-	testUser := mongodoc.UserDocument{
-		ID:        "user1",
-		Name:      "User One",
-		Email:     "user1@example.com",
-		Alias:     "userone",
-		Workspace: "workspace1",
-	}
-
-	testWorkspace := mongodoc.WorkspaceDocument{
-		ID:       "workspace1",
-		Name:     "Workspace One",
-		Alias:    "teamworkspace",
-		Personal: false, // Not personal
-	}
-
-	_, err := userCol.Client().InsertOne(ctx, testUser)
-	assert.NoError(t, err)
-	_, err = workspaceCol.Client().InsertOne(ctx, testWorkspace)
-	assert.NoError(t, err)
-
-	// Run migration
-	err = SyncPersonalWorkspaceAlias(ctx, client)
-	assert.NoError(t, err)
-
-	// Verify workspace alias unchanged
-	var result mongodoc.WorkspaceDocument
-	err = workspaceCol.Client().FindOne(ctx, bson.M{"id": "workspace1"}).Decode(&result)
-	assert.NoError(t, err)
-	assert.Equal(t, "teamworkspace", result.Alias, "Non-personal workspace should not change")
+		// Run migration on empty database - should not error
+		err := SyncPersonalWorkspaceAlias(ctx, client)
+		assert.NoError(t, err)
+	})
 }
