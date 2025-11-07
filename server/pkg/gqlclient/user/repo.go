@@ -4,6 +4,7 @@ import (
 	"context"
 
 	"github.com/hasura/go-graphql-client"
+	"github.com/labstack/gommon/log"
 	"github.com/reearth/reearth-accounts/server/pkg/gqlclient/gqlerror"
 	"github.com/reearth/reearth-accounts/server/pkg/gqlclient/gqlmodel"
 	"github.com/reearth/reearth-accounts/server/pkg/gqlclient/gqlutil"
@@ -36,12 +37,14 @@ func (r *userRepo) FindMe(ctx context.Context) (*user.User, error) {
 
 	id, err := user.IDFrom(string(q.Me.ID))
 	if err != nil {
-		return nil, err
+		log.Errorf("[FindMe] failed to convert user id: %s", q.Me.ID)
+		return nil, gqlerror.ReturnAccountsError(ctx, err)
 	}
 
 	wid, err := user.WorkspaceIDFrom(string(q.Me.MyWorkspaceID))
 	if err != nil {
-		return nil, err
+		log.Errorf("[FindMe] failed to convert workspace id: %s", q.Me.MyWorkspaceID)
+		return nil, gqlerror.ReturnAccountsError(ctx, err)
 	}
 
 	auths := gqlutil.ToStringSlice(q.Me.Auths)
@@ -72,12 +75,14 @@ func (r *userRepo) FindByID(ctx context.Context, id string) (*user.User, error) 
 
 	uid, err := user.IDFrom(string(q.User.ID))
 	if err != nil {
-		return nil, err
+		log.Errorf("[FindByID] failed to convert user id: %s", q.User.ID)
+		return nil, gqlerror.ReturnAccountsError(ctx, err)
 	}
 
 	wid, err := user.WorkspaceIDFrom(string(q.User.Workspace))
 	if err != nil {
-		return nil, err
+		log.Errorf("[FindByID] failed to convert workspace id: %s", q.User.Workspace)
+		return nil, gqlerror.ReturnAccountsError(ctx, err)
 	}
 
 	return user.New().
@@ -100,7 +105,8 @@ func (r *userRepo) FindByAlias(ctx context.Context, name string) (*user.User, er
 
 	uid, err := user.IDFrom(string(q.User.ID))
 	if err != nil {
-		return nil, err
+		log.Errorf("[FindByAlias] failed to convert user id: %s", q.User.ID)
+		return nil, gqlerror.ReturnAccountsError(ctx, err)
 	}
 
 	return user.New().
@@ -134,7 +140,8 @@ func (r *userRepo) SignupOIDC(ctx context.Context, name string, email string, su
 
 	uid, err := user.IDFrom(string(m.SignupOIDC.User.ID))
 	if err != nil {
-		return nil, err
+		log.Errorf("[SignupOIDC] failed to convert user id: %s", m.SignupOIDC.User.ID)
+		return nil, gqlerror.ReturnAccountsError(ctx, err)
 	}
 
 	return user.New().
@@ -167,7 +174,8 @@ func (r *userRepo) Signup(ctx context.Context, userID, name, email, password, se
 
 	uid, err := user.IDFrom(string(m.Signup.User.ID))
 	if err != nil {
-		return nil, err
+		log.Errorf("[Signup] failed to convert user id: %s", m.Signup.User.ID)
+		return nil, gqlerror.ReturnAccountsError(ctx, err)
 	}
 
 	return user.New().
