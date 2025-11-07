@@ -3,8 +3,10 @@ package gql
 import (
 	"context"
 
+	"github.com/labstack/gommon/log"
 	"github.com/reearth/reearth-accounts/server/internal/adapter/gql/gqldataloader"
 	"github.com/reearth/reearth-accounts/server/internal/adapter/gql/gqlmodel"
+	"github.com/reearth/reearth-accounts/server/internal/usecase/gateway"
 	"github.com/reearth/reearth-accounts/server/internal/usecase/interfaces"
 	"github.com/reearth/reearth-accounts/server/pkg/id"
 	"github.com/reearth/reearthx/util"
@@ -12,10 +14,11 @@ import (
 
 type WorkspaceLoader struct {
 	usecase interfaces.Workspace
+	storage gateway.Storage
 }
 
-func NewWorkspaceLoader(usecase interfaces.Workspace) *WorkspaceLoader {
-	return &WorkspaceLoader{usecase: usecase}
+func NewWorkspaceLoader(usecase interfaces.Workspace, storage gateway.Storage) *WorkspaceLoader {
+	return &WorkspaceLoader{usecase: usecase, storage: storage}
 }
 
 func (c *WorkspaceLoader) Fetch(ctx context.Context, ids []gqlmodel.ID) ([]*gqlmodel.Workspace, []error) {
@@ -36,7 +39,12 @@ func (c *WorkspaceLoader) Fetch(ctx context.Context, ids []gqlmodel.ID) ([]*gqlm
 
 	workspaces := make([]*gqlmodel.Workspace, 0, len(ws))
 	for _, w := range ws {
-		workspaces = append(workspaces, gqlmodel.ToWorkspace(w, exists))
+		converted, err := gqlmodel.ToWorkspace(w, exists, c.storage)
+		if err != nil {
+			log.Errorf("failed to convert workspace: %s", err.Error())
+			continue
+		}
+		workspaces = append(workspaces, converted)
 	}
 	return workspaces, nil
 }
@@ -59,7 +67,12 @@ func (c *WorkspaceLoader) FindByUser(ctx context.Context, uid gqlmodel.ID) ([]*g
 
 	workspaces := make([]*gqlmodel.Workspace, 0, len(ws))
 	for _, w := range ws {
-		workspaces = append(workspaces, gqlmodel.ToWorkspace(w, exists))
+		converted, err := gqlmodel.ToWorkspace(w, exists, c.storage)
+		if err != nil {
+			log.Errorf("failed to convert workspace: %s", err.Error())
+			continue
+		}
+		workspaces = append(workspaces, converted)
 	}
 	return workspaces, nil
 }

@@ -30,5 +30,5 @@ func (r *workspaceRepo) FindByUser(ctx context.Context, userID string) (workspac
 		return nil, gqlerror.ReturnAccountsError(ctx, err)
 	}
 
-	return gqlmodel.ToWorkspaces(q.FindByUser), nil
+	return gqlmodel.ToWorkspaces(ctx, q.FindByUser), nil
 }
