@@ -11,6 +11,10 @@ import (
 	"go.mongodb.org/mongo-driver/bson"
 )
 
+func init() {
+	mongotest.Env = "REEARTH_DB"
+}
+
 func TestSyncPersonalWorkspaceAlias(t *testing.T) {
 	t.Run("PersonalWorkspaceWithDifferentAlias", func(t *testing.T) {
 		ctx := context.Background()
