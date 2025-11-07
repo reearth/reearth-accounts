@@ -54,6 +54,7 @@ func SyncPersonalWorkspaceAlias(ctx context.Context, c DBClient) error {
 				if userAlias, ok := userAliasMap[wsDoc.ID]; ok {
 					// Only update if aliases differ
 					if wsDoc.Alias != userAlias {
+						log.Println("updating workspace alias: ", wsDoc.ID, "from", wsDoc.Alias, "to", userAlias)
 						wsDoc.Alias = userAlias
 						ids = append(ids, wsDoc.ID)
 						newRows = append(newRows, wsDoc)
