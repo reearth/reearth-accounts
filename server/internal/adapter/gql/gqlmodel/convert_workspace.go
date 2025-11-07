@@ -45,9 +45,9 @@ func ToWorkspace(
 	if t.Metadata() != nil && t.Metadata().PhotoURL() != "" {
 		signedURL, sErr := storage.GetSignedURL(context.Background(), t.Metadata().PhotoURL())
 		if sErr != nil {
-			return nil, sErr
+			log.Errorf("[ToWorkspace] failed to get signed url: %s, workspace id: %s", sErr.Error(), t.ID())
 		}
-		t.Metadata().SetPhotoURL(signedURL)
+		metadata.PhotoURL = signedURL
 	}
 
 	return &Workspace{
