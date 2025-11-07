@@ -34,15 +34,12 @@ func (r *queryResolver) FindByID(ctx context.Context, workpaceId gqlmodel.ID) (*
 		return nil, err
 	}
 
-	if w != nil && w.Metadata() != nil && w.Metadata().PhotoURL() != "" {
-		signedURL, sErr := r.Storage.GetSignedURL(ctx, w.Metadata().PhotoURL())
-		if sErr != nil {
-			return nil, sErr
-		}
-		w.Metadata().SetPhotoURL(signedURL)
+	converted, err := gqlmodel.ToWorkspace(w, exists, r.Storage)
+	if err != nil {
+		return nil, err
 	}
 
-	return gqlmodel.ToWorkspace(w, exists), nil
+	return converted, nil
 }
 
 func (r *queryResolver) FindByIDs(ctx context.Context, workpaceIds []gqlmodel.ID) ([]*gqlmodel.Workspace, error) {
@@ -61,7 +58,7 @@ func (r *queryResolver) FindByIDs(ctx context.Context, workpaceIds []gqlmodel.ID
 		return nil, err
 	}
 
-	return gqlmodel.ToWorkspaces(ws, exists), nil
+	return gqlmodel.ToWorkspaces(ws, exists, r.Storage), nil
 }
 
 func (r *queryResolver) FindByName(ctx context.Context, name string) (*gqlmodel.Workspace, error) {
@@ -75,15 +72,12 @@ func (r *queryResolver) FindByName(ctx context.Context, name string) (*gqlmodel.
 		return nil, err
 	}
 
-	if w != nil && w.Metadata() != nil && w.Metadata().PhotoURL() != "" {
-		signedURL, sErr := r.Storage.GetSignedURL(ctx, w.Metadata().PhotoURL())
-		if sErr != nil {
-			return nil, sErr
-		}
-		w.Metadata().SetPhotoURL(signedURL)
+	converted, err := gqlmodel.ToWorkspace(w, exists, r.Storage)
+	if err != nil {
+		return nil, err
 	}
 
-	return gqlmodel.ToWorkspace(w, exists), nil
+	return converted, nil
 }
 
 func (r *queryResolver) FindByUser(ctx context.Context, userID gqlmodel.ID) ([]*gqlmodel.Workspace, error) {
@@ -102,7 +96,7 @@ func (r *queryResolver) FindByUser(ctx context.Context, userID gqlmodel.ID) ([]*
 		return nil, err
 	}
 
-	return gqlmodel.ToWorkspaces(ws, exists), nil
+	return gqlmodel.ToWorkspaces(ws, exists, r.Storage), nil
 }
 
 func (r *queryResolver) FindByUserWithPagination(ctx context.Context, userID gqlmodel.ID, pagination gqlmodel.Pagination) (*gqlmodel.WorkspacesWithPagination, error) {
@@ -125,7 +119,7 @@ func (r *queryResolver) FindByUserWithPagination(ctx context.Context, userID gql
 	}
 
 	return &gqlmodel.WorkspacesWithPagination{
-		Workspaces: gqlmodel.ToWorkspaces(res.Workspaces, exists),
+		Workspaces: gqlmodel.ToWorkspaces(res.Workspaces, exists, r.Storage),
 		TotalCount: res.TotalCount,
 	}, nil
 }
