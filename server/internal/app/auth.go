@@ -55,16 +55,22 @@ func authMiddleware(cfg *ServerConfig) func(http.Handler) http.Handler {
 					existingUsr, err := cfg.Repos.User.FindBySub(ctx, ai.Sub)
 					if err != nil {
 						if errors.Is(err, rerror.ErrNotFound) {
-							log.Warnfc(ctx, "[authMiddleware] failed to find user by sub: %s, error: %s", ai.Sub, err.Error())
-							http.Error(w, http.StatusText(http.StatusUnauthorized), http.StatusUnauthorized)
+							// In debug mode, allow requests without an existing user (e.g., for signup)
+							if cfg.Debug {
+								log.Debugfc(ctx, "[authMiddleware] user not found by sub in debug mode, allowing request: %s", ai.Sub)
+							} else {
+								log.Warnfc(ctx, "[authMiddleware] failed to find user by sub: %s, error: %s", ai.Sub, err.Error())
+								http.Error(w, http.StatusText(http.StatusUnauthorized), http.StatusUnauthorized)
+								return
+							}
+						} else {
+							log.Errorfc(ctx, "[authMiddleware] failed to find user by sub: %s, error: %s", ai.Sub, err.Error())
+							http.Error(w, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
 							return
 						}
-
-						log.Errorfc(ctx, "[authMiddleware] failed to find user by sub: %s, error: %s", ai.Sub, err.Error())
-						http.Error(w, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
-						return
+					} else {
+						usr = existingUsr
 					}
-					usr = existingUsr
 				}
 			}
 
