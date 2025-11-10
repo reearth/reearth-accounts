@@ -42,8 +42,10 @@ func ToWorkspace(
 		BillingEmail: t.Metadata().BillingEmail(),
 	}
 
+	log.Infof("[ToWorkspace] convert workspace photo url: %s", t.Metadata().PhotoURL())
 	if t.Metadata() != nil && t.Metadata().PhotoURL() != "" {
 		signedURL, sErr := storage.GetSignedURL(context.Background(), t.Metadata().PhotoURL())
+		log.Infof("[ToWorkspace] get signed url: %s", signedURL)
 		if sErr != nil {
 			log.Errorf("[ToWorkspace] failed to get signed url: %s, workspace id: %s", sErr.Error(), t.ID())
 		}
