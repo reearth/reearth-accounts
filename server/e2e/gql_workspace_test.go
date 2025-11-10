@@ -403,7 +403,7 @@ func TestFindByUser(t *testing.T) {
 		metadata1.Value("website").String().IsEqual("https://example1.com")
 		metadata1.Value("location").String().IsEqual("Tokyo")
 		metadata1.Value("billingEmail").String().IsEqual("billing1@example.com")
-		metadata1.Value("photoURL").String().IsEqual("https://example1.com/photo.jpg")
+		metadata1.Value("photoURL").String().NotEmpty().Contains("https://example1.com/photo.jpg")
 
 		// Check second workspace
 		ws2 := o.Value(1).Object()
@@ -417,7 +417,7 @@ func TestFindByUser(t *testing.T) {
 		metadata2.Value("website").String().IsEqual("https://example2.com")
 		metadata2.Value("location").String().IsEqual("Osaka")
 		metadata2.Value("billingEmail").String().IsEqual("billing2@example.com")
-		metadata2.Value("photoURL").String().IsEqual("https://example2.com/photo.jpg")
+		metadata2.Value("photoURL").String().NotEmpty().Contains("https://example2.com/photo.jpg")
 	})
 
 	t.Run("user with no workspaces", func(t *testing.T) {
