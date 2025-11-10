@@ -1,9 +1,13 @@
 package app
 
 import (
+	"bytes"
 	"context"
+	"encoding/json"
 	"errors"
+	"io"
 	"net/http"
+	"strings"
 
 	"github.com/reearth/reearth-accounts/server/internal/adapter"
 	"github.com/reearth/reearth-accounts/server/internal/usecase"
@@ -24,10 +28,55 @@ const (
 	debugAuthEmailHeader = "X-Reearth-Debug-Auth-Email"
 )
 
+type graphqlRequest struct {
+	Query         string                 `json:"query"`
+	OperationName string                 `json:"operationName"`
+	Variables     map[string]interface{} `json:"variables"`
+}
+
+func isSignupMutation(req *http.Request) bool {
+	if req.Method != http.MethodPost {
+		return false
+	}
+
+	body, err := io.ReadAll(req.Body)
+	if err != nil {
+		return false
+	}
+	req.Body = io.NopCloser(bytes.NewReader(body))
+
+	var gqlReq graphqlRequest
+	if err := json.Unmarshal(body, &gqlReq); err != nil {
+		return false
+	}
+
+	query := strings.ToLower(gqlReq.Query)
+	query = strings.ReplaceAll(query, " ", "")
+	query = strings.ReplaceAll(query, "\n", "")
+	query = strings.ReplaceAll(query, "\t", "")
+	query = strings.ReplaceAll(query, "\r", "")
+
+	// Check if it's a mutation
+	if !strings.Contains(query, "mutation") {
+		return false
+	}
+
+	// Check for signup or signupOIDC after mutation keyword
+	// This handles both named and anonymous mutations
+	return strings.Contains(query, "signup(") || strings.Contains(query, "signupoidc(")
+}
+
 func authMiddleware(cfg *ServerConfig) func(http.Handler) http.Handler {
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
 			ctx := req.Context()
+
+			// Skip auth for signup mutations
+			if isSignupMutation(req) {
+				log.Debugfc(ctx, "[authMiddleware] Skipping auth for signup mutation")
+				next.ServeHTTP(w, req.WithContext(ctx))
+				return
+			}
 
 			var usr *user.User
 			var ai appx.AuthInfo
