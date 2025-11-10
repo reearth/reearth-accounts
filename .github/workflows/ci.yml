@@ -119,7 +119,3 @@ jobs:
     needs: build-server
     uses: ./.github/workflows/deploy_server_nightly.yml
     secrets: inherit
-  deploy-server-dev:
-    needs: build-server
-    uses: ./.github/workflows/deploy_server_dev.yml
-    secrets: inherit
