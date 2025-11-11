@@ -21,6 +21,7 @@ type UserRepo interface {
 	Update(ctx context.Context, name string) error
 	SignupOIDC(ctx context.Context, name string, email string, sub string, secret string) (*user.User, error)
 	Signup(ctx context.Context, userID, name, email, password, secret, workspaceID string) (*user.User, error)
+	CreateVerification(ctx context.Context, email string) (bool, error)
 }
 
 func NewRepo(gql *graphql.Client) UserRepo {
@@ -175,4 +176,16 @@ func (r *userRepo) Signup(ctx context.Context, userID, name, email, password, se
 		Name(string(m.Signup.User.Name)).
 		Email(string(m.Signup.User.Email)).
 		Build()
+}
+
+func (r *userRepo) CreateVerification(ctx context.Context, email string) (bool, error) {
+	var m createVerificationMutation
+	vars := map[string]interface{}{
+		"email": graphql.String(email),
+	}
+	if err := r.client.Mutate(ctx, &m, vars); err != nil {
+		return false, err
+	}
+
+	return m.CreateVerification, nil
 }
