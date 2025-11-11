@@ -22,6 +22,7 @@ const (
 	InternalServiceFlowAPI       InternalService = "flow-api"
 	InternalServiceDashboardAPI  InternalService = "dashboard-api"
 	InternalServiceVisualizerAPI InternalService = "visualizer-api"
+	InternalServiceUnknown       InternalService = "unknown"
 )
 
 type AccountsTransport struct {
