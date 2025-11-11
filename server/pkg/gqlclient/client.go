@@ -15,7 +15,36 @@ type Client struct {
 	WorkspaceRepo workspace.WorkspaceRepo
 }
 
-func NewClient(host string, timeout int, transport http.RoundTripper) *Client {
+type InternalService string
+
+const (
+	InternalServiceCMSAPI        InternalService = "cms-api"
+	InternalServiceFlowAPI       InternalService = "flow-api"
+	InternalServiceDashboardAPI  InternalService = "dashboard-api"
+	InternalServiceVisualizerAPI InternalService = "visualizer-api"
+	InternalServiceUnknown       InternalService = "unknown"
+)
+
+type AccountsTransport struct {
+	serviceRoundTripper http.RoundTripper
+	internalService     InternalService
+}
+
+func NewAccountsTransport(serviceRoundTripper http.RoundTripper, internalService InternalService) *AccountsTransport {
+	return &AccountsTransport{serviceRoundTripper: serviceRoundTripper, internalService: internalService}
+}
+
+func (t *AccountsTransport) RoundTrip(req *http.Request) (*http.Response, error) {
+	req2 := req.Clone(req.Context())
+	req2.Header.Set("X-Internal-Service", string(t.internalService))
+	return t.serviceRoundTripper.RoundTrip(req2)
+}
+
+func NewClient(
+	host string,
+	timeout int,
+	transport http.RoundTripper,
+) *Client {
 	httpClient := &http.Client{
 		Transport: transport,
 		Timeout:   time.Duration(timeout) * time.Second,
