@@ -99,7 +99,7 @@ func GraphqlAPI(conf *Config, dev bool) echo.HandlerFunc {
 		srv.SetErrorPresenter(gqlErrorPresenter(dev))
 
 		usecases := adapter.Usecases(ctx)
-		ctx = gql.AttachUsecases(ctx, usecases, enableDataLoaders)
+		ctx = gql.AttachUsecases(ctx, usecases, str, enableDataLoaders)
 		c.SetRequest(req.WithContext(ctx))
 
 		srv.ServeHTTP(c.Response(), c.Request())

@@ -28,7 +28,7 @@ func initEcho(ctx context.Context, cfg *ServerConfig) *echo.Echo {
 
 	logger := log.NewEcho()
 	e.Logger = logger
-	e.Use(logger.AccessLogger())
+	e.Use(AccessLogger(logger))
 
 	origins := allowedOrigins(cfg)
 	if len(origins) > 0 {

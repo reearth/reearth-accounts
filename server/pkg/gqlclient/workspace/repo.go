@@ -4,6 +4,7 @@ import (
 	"context"
 
 	"github.com/hasura/go-graphql-client"
+	"github.com/reearth/reearth-accounts/server/pkg/gqlclient/gqlerror"
 	"github.com/reearth/reearth-accounts/server/pkg/gqlclient/gqlmodel"
 	"github.com/reearth/reearth-accounts/server/pkg/workspace"
 )
@@ -26,8 +27,8 @@ func (r *workspaceRepo) FindByUser(ctx context.Context, userID string) (workspac
 		"userId": graphql.ID(userID),
 	}
 	if err := r.client.Query(ctx, &q, vars); err != nil {
-		return nil, err
+		return nil, gqlerror.ReturnAccountsError(ctx, err)
 	}
 
-	return gqlmodel.ToWorkspaces(q.FindByUser), nil
+	return gqlmodel.ToWorkspaces(ctx, q.FindByUser), nil
 }
