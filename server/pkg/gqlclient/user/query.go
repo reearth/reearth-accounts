@@ -30,6 +30,12 @@ type updateMeMutation struct {
 	} `graphql:"updateMe(input: {name: $name})"`
 }
 
+type updateMeFullMutation struct {
+	UpdateMe struct {
+		Me gqlmodel.Me
+	} `graphql:"updateMe(input: {name: $name, email: $email, lang: $lang, theme: $theme, password: $password, passwordConfirmation: $passwordConfirmation})"`
+}
+
 type signupOIDCMutation struct {
 	SignupOIDC struct {
 		User gqlmodel.User

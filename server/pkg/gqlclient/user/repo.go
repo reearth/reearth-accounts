@@ -15,11 +15,21 @@ type userRepo struct {
 	client *graphql.Client
 }
 
+type UpdateMeInput struct {
+	Name                 *string
+	Email                *string
+	Lang                 *string
+	Theme                *string
+	Password             *string
+	PasswordConfirmation *string
+}
+
 type UserRepo interface {
 	FindMe(ctx context.Context) (*user.User, error)
 	FindByID(ctx context.Context, id string) (*user.User, error)
 	FindByAlias(ctx context.Context, name string) (*user.User, error)
 	Update(ctx context.Context, name string) error
+	UpdateMe(ctx context.Context, input UpdateMeInput) (*user.User, error)
 	SignupOIDC(ctx context.Context, name string, email string, sub string, secret string) (*user.User, error)
 	Signup(ctx context.Context, userID, name, email, password, secret, workspaceID string) (*user.User, error)
 }
@@ -124,6 +134,62 @@ func (r *userRepo) Update(ctx context.Context, name string) error {
 		"name": graphql.String(name),
 	}
 	return r.client.Mutate(ctx, &m, vars)
+}
+
+func (r *userRepo) UpdateMe(ctx context.Context, input UpdateMeInput) (*user.User, error) {
+	var m updateMeFullMutation
+	vars := map[string]interface{}{}
+
+	if input.Name != nil {
+		vars["name"] = graphql.String(*input.Name)
+	}
+	if input.Email != nil {
+		vars["email"] = graphql.String(*input.Email)
+	}
+	if input.Lang != nil {
+		vars["lang"] = graphql.String(*input.Lang)
+	}
+	if input.Theme != nil {
+		vars["theme"] = graphql.String(*input.Theme)
+	}
+	if input.Password != nil {
+		vars["password"] = graphql.String(*input.Password)
+	}
+	if input.PasswordConfirmation != nil {
+		vars["passwordConfirmation"] = graphql.String(*input.PasswordConfirmation)
+	}
+
+	if err := r.client.Mutate(ctx, &m, vars); err != nil {
+		return nil, gqlerror.ReturnAccountsError(ctx, err)
+	}
+
+	id, err := user.IDFrom(string(m.UpdateMe.Me.ID))
+	if err != nil {
+		log.Errorf("[UpdateMe] failed to convert user id: %s", m.UpdateMe.Me.ID)
+		return nil, gqlerror.ReturnAccountsError(ctx, err)
+	}
+
+	wid, err := user.WorkspaceIDFrom(string(m.UpdateMe.Me.MyWorkspaceID))
+	if err != nil {
+		log.Errorf("[UpdateMe] failed to convert workspace id: %s", m.UpdateMe.Me.MyWorkspaceID)
+		return nil, gqlerror.ReturnAccountsError(ctx, err)
+	}
+
+	auths := gqlutil.ToStringSlice(m.UpdateMe.Me.Auths)
+	auths2 := make([]user.Auth, len(auths))
+	for i, auth := range auths {
+		auths2[i] = user.AuthFrom(auth)
+	}
+
+	return user.New().
+		ID(id).
+		Name(string(m.UpdateMe.Me.Name)).
+		Alias(string(m.UpdateMe.Me.Alias)).
+		Email(string(m.UpdateMe.Me.Email)).
+		Metadata(gqlmodel.ToUserMetadata(m.UpdateMe.Me.Metadata)).
+		Workspace(wid).
+		Auths(auths2).
+		Build()
 }
 
 func (r *userRepo) SignupOIDC(ctx context.Context, name string, email string, sub string, secret string) (*user.User, error) {
