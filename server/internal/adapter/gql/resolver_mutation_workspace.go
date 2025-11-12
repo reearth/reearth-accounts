@@ -10,7 +10,7 @@ import (
 )
 
 func (r *mutationResolver) CreateWorkspace(ctx context.Context, input gqlmodel.CreateWorkspaceInput) (*gqlmodel.CreateWorkspacePayload, error) {
-	w, err := usecases(ctx).Workspace.Create(ctx, input.Name, getUser(ctx).ID(), getOperator(ctx))
+	w, err := usecases(ctx).Workspace.Create(ctx, input.Alias, input.Name, *input.Description, getUser(ctx).ID(), getOperator(ctx))
 	if err != nil {
 		return nil, err
 	}

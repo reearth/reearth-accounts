@@ -158,6 +158,12 @@ query FindByName($name: String!) {
     }
 }
 
+query FindByAlias($alias: String!) {
+    findByAlias(alias: $alias) {
+        ...FragmentWorkspace
+    }
+}
+
 query FindByUser($userId: ID!) {
     findByUser(userId: $userId) {
         ...FragmentWorkspace

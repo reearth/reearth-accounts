@@ -91,6 +91,28 @@ func (r *queryResolver) FindByName(ctx context.Context, name string) (*gqlmodel.
 	return converted, nil
 }
 
+func (r *queryResolver) FindByAlias(ctx context.Context, alias string) (*gqlmodel.Workspace, error) {
+	w, err := usecases(ctx).Workspace.FetchByAlias(ctx, alias)
+	if err != nil {
+		log.Errorf("[FindByAlias] failed to fetch workspace: %s, alias: %s", err.Error(), alias)
+		return nil, err
+	}
+
+	exists, err := buildExistingUserSetFromWorkspace(ctx, w)
+	if err != nil {
+		log.Errorf("[FindByAlias] failed to build existing user set from workspace: %s, alias: %s", err.Error(), alias)
+		return nil, err
+	}
+
+	converted, err := gqlmodel.ToWorkspace(w, exists, r.Storage)
+	if err != nil {
+		log.Errorf("[FindByID] failed to convert workspace: %s, workspace id: %v", err.Error(), w.ID().String())
+		return nil, gqlerror.ReturnAccountsError(ctx, err)
+	}
+
+	return converted, nil
+}
+
 func (r *queryResolver) FindByUser(ctx context.Context, userID gqlmodel.ID) ([]*gqlmodel.Workspace, error) {
 	uid, err := gqlmodel.ToID[id.User](userID)
 	if err != nil {
