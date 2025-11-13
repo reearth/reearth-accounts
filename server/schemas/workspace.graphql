@@ -1,6 +1,7 @@
 type Workspace implements Node {
     id: ID!
     name: String!
+    alias: String!
     members: [WorkspaceMember!]!
     metadata: WorkspaceMetadata!
     personal: Boolean!
@@ -24,11 +25,16 @@ type WorkspaceIntegrationMember {
 }
 
 type WorkspaceMetadata {
-    description: String
-    website: String
-    location: String
-    billingEmail: String
-    photoURL: String
+    description: String!
+    website: String!
+    location: String!
+    billingEmail: String!
+    photoURL: String!
+}
+
+type WorkspacesWithPagination {
+    workspaces: [Workspace!]!
+    totalCount: Int!
 }
 
 enum Role {
@@ -42,8 +48,15 @@ enum Role {
     MAINTAINER
 }
 
+input Pagination {
+    page: Int!
+    size: Int!
+}
+
 input CreateWorkspaceInput {
+    alias: String!
     name: String!
+    description: String
 }
 
 input UpdateWorkspaceInput {
@@ -138,7 +151,12 @@ type DeleteWorkspacePayload {
 }
 
 extend type Query {
+    findByID(id: ID!): Workspace!
+    findByIDs(ids: [ID!]!): [Workspace!]!
+    findByName(name: String!): Workspace
+    findByAlias(alias: String!): Workspace
     findByUser(userId: ID!): [Workspace]
+    findByUserWithPagination(userId: ID!, pagination: Pagination!): WorkspacesWithPagination!
 }
 
 extend type Mutation {

@@ -9,12 +9,12 @@ import (
 	"github.com/samber/lo"
 	"golang.org/x/text/language"
 
-	accountmemory "github.com/reearth/reearth-accounts/internal/infrastructure/memory"
-	"github.com/reearth/reearth-accounts/internal/usecase/gateway"
-	"github.com/reearth/reearth-accounts/internal/usecase/interfaces"
-	"github.com/reearth/reearth-accounts/pkg/id"
-	"github.com/reearth/reearth-accounts/pkg/user"
-	"github.com/reearth/reearth-accounts/pkg/workspace"
+	accountmemory "github.com/reearth/reearth-accounts/server/internal/infrastructure/memory"
+	"github.com/reearth/reearth-accounts/server/internal/usecase/gateway"
+	"github.com/reearth/reearth-accounts/server/internal/usecase/interfaces"
+	"github.com/reearth/reearth-accounts/server/pkg/id"
+	"github.com/reearth/reearth-accounts/server/pkg/user"
+	"github.com/reearth/reearth-accounts/server/pkg/workspace"
 	"github.com/reearth/reearthx/mailer"
 	"github.com/reearth/reearthx/rerror"
 	"github.com/reearth/reearthx/util"
@@ -59,7 +59,7 @@ func TestUser_Signup(t *testing.T) {
 					Workspace(tid).
 					Name("NAME").
 					Auths(u.Auths()).
-					Metadata(u.Metadata()).
+					Metadata(*u.Metadata()).
 					Email("aaa@bbb.com").
 					PasswordPlainText("PAss00!!").
 					Verification(user.VerificationFrom(mockcode, mocktime.Add(24*time.Hour), false)).
@@ -137,7 +137,7 @@ func TestUser_Signup(t *testing.T) {
 					Workspace(tid).
 					Name("NAME").
 					Auths(u.Auths()).
-					Metadata(u.Metadata()).
+					Metadata(*u.Metadata()).
 					Email("aaa@bbb.com").
 					PasswordPlainText("PAss00!!").
 					Verification(user.VerificationFrom(mockcode, mocktime.Add(24*time.Hour), false)).
@@ -235,15 +235,6 @@ func TestUser_Signup(t *testing.T) {
 				Password: "PAss00",
 			},
 			wantError: user.ErrPasswordLength,
-		},
-		{
-			name: "invalid name",
-			args: interfaces.SignupParam{
-				Email:    "aaa@bbb.com",
-				Name:     "",
-				Password: "Ass00!!",
-			},
-			wantError: user.ErrInvalidName,
 		},
 	}
 

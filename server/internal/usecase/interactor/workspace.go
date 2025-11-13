@@ -3,20 +3,22 @@ package interactor
 import (
 	"context"
 	"fmt"
+	"maps"
+	"slices"
 	"strings"
 
-	"github.com/reearth/reearth-accounts/internal/usecase"
-	"github.com/reearth/reearth-accounts/internal/usecase/interfaces"
-	"github.com/reearth/reearth-accounts/internal/usecase/repo"
-	"github.com/reearth/reearth-accounts/pkg/id"
-	"github.com/reearth/reearth-accounts/pkg/permittable"
-	"github.com/reearth/reearth-accounts/pkg/role"
-	"github.com/reearth/reearth-accounts/pkg/user"
-	"github.com/reearth/reearth-accounts/pkg/workspace"
+	"github.com/reearth/reearth-accounts/server/internal/usecase"
+	"github.com/reearth/reearth-accounts/server/internal/usecase/interfaces"
+	"github.com/reearth/reearth-accounts/server/internal/usecase/repo"
+	"github.com/reearth/reearth-accounts/server/pkg/id"
+	"github.com/reearth/reearth-accounts/server/pkg/pagination"
+	"github.com/reearth/reearth-accounts/server/pkg/permittable"
+	"github.com/reearth/reearth-accounts/server/pkg/role"
+	"github.com/reearth/reearth-accounts/server/pkg/user"
+	"github.com/reearth/reearth-accounts/server/pkg/workspace"
 	"github.com/reearth/reearthx/log"
 	"github.com/reearth/reearthx/rerror"
 	"github.com/samber/lo"
-	"golang.org/x/exp/maps"
 )
 
 type WorkspaceMemberCountEnforcer func(context.Context, *workspace.Workspace, user.List, *usecase.Operator) error
@@ -40,12 +42,36 @@ func (i *Workspace) Fetch(ctx context.Context, ids workspace.IDList, operator *u
 	return filterWorkspaces(res, operator, err, false, true)
 }
 
+func (i *Workspace) FetchByID(ctx context.Context, id workspace.ID) (*workspace.Workspace, error) {
+	return i.repos.Workspace.FindByID(ctx, id)
+}
+
+func (i *Workspace) FetchByName(ctx context.Context, name string) (*workspace.Workspace, error) {
+	return i.repos.Workspace.FindByName(ctx, name)
+}
+
+func (i *Workspace) FetchByAlias(ctx context.Context, alias string) (*workspace.Workspace, error) {
+	return i.repos.Workspace.FindByAlias(ctx, alias)
+}
+
 func (i *Workspace) FindByUser(ctx context.Context, id workspace.UserID, operator *usecase.Operator) (workspace.List, error) {
 	res, err := i.repos.Workspace.FindByUser(ctx, id)
 	return filterWorkspaces(res, operator, err, true, true)
 }
 
-func (i *Workspace) Create(ctx context.Context, name string, firstUser workspace.UserID, operator *usecase.Operator) (_ *workspace.Workspace, err error) {
+func (i *Workspace) FetchByUserWithPagination(ctx context.Context, userID workspace.UserID, input interfaces.FetchByUserWithPaginationParam) (interfaces.FetchByUserWithPaginationResult, error) {
+	workspaces, pageInfo, err := i.repos.Workspace.FindByUserWithPagination(ctx, userID, pagination.ToPagination(input.Page, input.Size))
+	if err != nil {
+		return interfaces.FetchByUserWithPaginationResult{}, err
+	}
+
+	return interfaces.FetchByUserWithPaginationResult{
+		Workspaces: workspace.List(workspaces),
+		TotalCount: int(pageInfo.TotalCount),
+	}, nil
+}
+
+func (i *Workspace) Create(ctx context.Context, alias, name, description string, firstUser workspace.UserID, operator *usecase.Operator) (_ *workspace.Workspace, err error) {
 	if operator.User == nil {
 		return nil, interfaces.ErrInvalidOperator
 	}
@@ -63,19 +89,24 @@ func (i *Workspace) Create(ctx context.Context, name string, firstUser workspace
 	}
 
 	return Run1(ctx, operator, i.repos, Usecase().Transaction(), func(ctx context.Context) (*workspace.Workspace, error) {
-		ws, err := workspace.New().
+		metadata := workspace.NewMetadata()
+		metadata.SetDescription(description)
+
+		ws, wErr := workspace.New().
 			NewID().
+			Alias(alias).
 			Name(name).
+			Metadata(metadata).
 			Build()
-		if err != nil {
+		if wErr != nil {
+			return nil, wErr
+		}
+
+		if err = ws.Members().Join(firstUsers[0], workspace.RoleOwner, *operator.User); err != nil {
 			return nil, err
 		}
 
-		if err := ws.Members().Join(firstUsers[0], workspace.RoleOwner, *operator.User); err != nil {
-			return nil, err
-		}
-
-		if err := i.repos.Workspace.Create(ctx, ws); err != nil {
+		if err = i.repos.Workspace.Create(ctx, ws); err != nil {
 			return nil, err
 		}
 
@@ -124,7 +155,8 @@ func (i *Workspace) AddUserMember(ctx context.Context, workspaceID workspace.ID,
 		return nil, interfaces.ErrInvalidOperator
 	}
 
-	ul, err := i.userquery.FetchByID(ctx, maps.Keys(users))
+	keys := slices.Collect(maps.Keys(users))
+	ul, err := i.userquery.FetchByID(ctx, keys)
 	if err != nil {
 		return nil, err
 	}
@@ -442,6 +474,11 @@ func filterWorkspaces(
 // TODO: Delete this once the permission check migration is complete.
 func (i *Workspace) getMaintainerRole(ctx context.Context) (*role.Role, error) {
 	// check and create maintainer role
+	if i.repos.Role == nil {
+		log.Print("Role repository is not set")
+		return nil, nil
+	}
+
 	roles, err := i.repos.Role.FindAll(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get roles: %w", err)
@@ -479,6 +516,11 @@ func (i *Workspace) getMaintainerRole(ctx context.Context) (*role.Role, error) {
 
 // TODO: Delete this once the permission check migration is complete.
 func (i *Workspace) ensureUserHasMaintainerRole(ctx context.Context, userID user.ID, maintainerRoleID id.RoleID) error {
+	if i.repos.Permittable == nil {
+		log.Print("Role repository is not set")
+		return nil
+	}
+
 	var p *permittable.Permittable
 	var err error
 

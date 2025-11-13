@@ -7,10 +7,10 @@ import (
 	"net/http/pprof"
 
 	"github.com/99designs/gqlgen/graphql/playground"
-
 	"github.com/labstack/echo/v4"
 	"github.com/labstack/echo/v4/middleware"
-	"github.com/reearth/reearth-accounts/internal/usecase/interactor"
+	"github.com/reearth/reearth-accounts/server/internal/adapter"
+	"github.com/reearth/reearth-accounts/server/internal/usecase/interactor"
 	"github.com/reearth/reearthx/appx"
 	"github.com/reearth/reearthx/log"
 	"github.com/reearth/reearthx/rerror"
@@ -28,7 +28,7 @@ func initEcho(ctx context.Context, cfg *ServerConfig) *echo.Echo {
 
 	logger := log.NewEcho()
 	e.Logger = logger
-	e.Use(logger.AccessLogger())
+	e.Use(AccessLogger(logger))
 
 	origins := allowedOrigins(cfg)
 	if len(origins) > 0 {
@@ -84,18 +84,17 @@ func initEcho(ctx context.Context, cfg *ServerConfig) *echo.Echo {
 
 	// API
 	api := e.Group("/api")
-	jwt, err := appx.AuthMiddleware(cfg.Config.Auths(), authInfoKey{}, false)
+	jwt, err := appx.AuthMiddleware(cfg.Config.Auths(), adapter.AuthInfoKey, true)
 	if err != nil {
 		log.Panicc(ctx, err)
 	}
-	api.Use(
+
+	api.POST(
+		"/graphql", GraphqlAPI(cfg.Config, cfg.Config.Dev),
+		middleware.CORSWithConfig(middleware.CORSConfig{AllowOrigins: origins}),
 		echo.WrapMiddleware(jwt),
 		echo.WrapMiddleware(authMiddleware(cfg)),
 		cacheControl,
-	)
-
-	api.POST(
-		"/graphql", GraphqlAPI(cfg.Config.GraphQL, cfg.Config.Dev),
 		usecaseMiddleware,
 	)
 

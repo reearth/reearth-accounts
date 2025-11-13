@@ -4,13 +4,13 @@ import (
 	"context"
 	"strings"
 
-	"github.com/reearth/reearth-accounts/internal/infrastructure/mongo/mongodoc"
+	"github.com/reearth/reearth-accounts/server/internal/infrastructure/mongo/mongodoc"
 	"github.com/reearth/reearthx/mongox"
 	"go.mongodb.org/mongo-driver/bson"
 )
 
-func AddMetadataWorkspace(ctx context.Context, c DBClient) error {
-	col := c.WithCollection("workspace")
+func AddMetadataUserV3(ctx context.Context, c DBClient) error {
+	col := c.Collection("user")
 
 	return col.Find(ctx, bson.D{}, &mongox.BatchConsumer{
 		Size: 1000,
@@ -19,15 +19,10 @@ func AddMetadataWorkspace(ctx context.Context, c DBClient) error {
 			newRows := make([]interface{}, 0, len(rows))
 
 			for _, row := range rows {
-				var doc mongodoc.WorkspaceDocument
-				metadata := new(mongodoc.WorkspaceMetadataDocument)
+				var doc mongodoc.UserDocument
 
 				if err := bson.Unmarshal(row, &doc); err != nil {
 					return err
-				}
-
-				if doc.Email == "" {
-					doc.Email = ""
 				}
 
 				if doc.Alias == "" {
@@ -35,17 +30,18 @@ func AddMetadataWorkspace(ctx context.Context, c DBClient) error {
 					doc.Alias = alias
 				}
 
-				if doc.Metadata != nil {
-					metadata.BillingEmail = doc.Metadata.BillingEmail
-					metadata.Description = doc.Metadata.Description
-					metadata.Location = doc.Metadata.Location
-					metadata.PhotoURL = doc.Metadata.PhotoURL
-					metadata.Website = doc.Metadata.Website
+				metadata := doc.Metadata
 
-					doc.Metadata = metadata
-				} else {
-					doc.Metadata = metadata
+				if doc.Lang != "" {
+					metadata.Lang = doc.Lang
+					doc.Lang = ""
 				}
+				if doc.Theme != "" {
+					metadata.Theme = doc.Theme
+					doc.Theme = ""
+				}
+
+				doc.Metadata = metadata
 
 				ids = append(ids, doc.ID)
 				newRows = append(newRows, doc)
@@ -54,4 +50,5 @@ func AddMetadataWorkspace(ctx context.Context, c DBClient) error {
 			return col.SaveAll(ctx, ids, newRows)
 		},
 	})
+
 }

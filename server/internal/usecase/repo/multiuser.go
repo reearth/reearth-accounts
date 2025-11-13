@@ -4,7 +4,7 @@ import (
 	"context"
 	"errors"
 
-	"github.com/reearth/reearth-accounts/pkg/user"
+	"github.com/reearth/reearth-accounts/server/pkg/user"
 	"github.com/reearth/reearthx/rerror"
 )
 
@@ -61,6 +61,12 @@ func (u MultiUser) FindByEmail(ctx context.Context, email string) (*user.User, e
 func (u MultiUser) FindByName(ctx context.Context, name string) (*user.User, error) {
 	return u.findOne(func(r User) (*user.User, error) {
 		return r.FindByName(ctx, name)
+	})
+}
+
+func (u MultiUser) FindByAlias(ctx context.Context, alias string) (*user.User, error) {
+	return u.findOne(func(r User) (*user.User, error) {
+		return r.FindByAlias(ctx, alias)
 	})
 }
 

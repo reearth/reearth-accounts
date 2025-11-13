@@ -1,9 +1,9 @@
 package mongodoc
 
 import (
-	"github.com/reearth/reearth-accounts/pkg/id"
-	permittable "github.com/reearth/reearth-accounts/pkg/permittable"
-	"github.com/reearth/reearth-accounts/pkg/user"
+	"github.com/reearth/reearth-accounts/server/pkg/id"
+	permittable "github.com/reearth/reearth-accounts/server/pkg/permittable"
+	"github.com/reearth/reearth-accounts/server/pkg/user"
 )
 
 type PermittableDocument struct {

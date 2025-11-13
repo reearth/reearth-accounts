@@ -10,6 +10,26 @@ import "github.com/reearth/reearthx/usecasex/migration"
 // If the migration takes too long, the deployment may fail in a serverless environment.
 // Set the batch size to as large a value as possible without using up the RAM of the deployment destination.
 var migrations = migration.Migrations[DBClient]{
-	250530152219: AddMetadataWorkspace,
-	250603145155: AddMetadataUser,
+	250617171055: AddMetadataWorkspace,
+	250617171056: AddMetadataUser,
+	250617171057: AddMetadataWorkspaceV2,
+	250617171058: AddMetadataUserV2,
+	250724212700: AddMetadataUserV3,
+	250725020842: ConvertNonValidUserAlias,
+	250725020843: ConvertNonValidWorkspaceAlias,
+	/**
+	Commented out migrations for production deployment due to having some bug on mongodb.
+	After resolving the issues, these migrations can be uncommented and applied.
+	*/
+	//250910120000: GenerateMissingWorkspaceAliases,
+	//250911120000: GenerateMissingUserAliases,
+	//250911120001: AddCaseInsensitiveWorkspaceAliasIndex,
+	//250911120002: AddWorkspaceAliasMembersCompositeUniqueIndex,
+	//250911120003: AddCaseInsensitiveUserAliasIndex,
+	//250911120004: AddCaseInsensitiveUserEmailIndex,
+	//250911120005: AddCaseInsensitiveUserWorkspaceIndex,
+	250919170404: ConvertInvalidUserAlias,
+	250919170408: ConvertInvalidUserWorkspaceAlias,
+	251106072200: ReplaceEmailFormattedNames,
+	251107102200: SyncPersonalWorkspaceAlias,
 }

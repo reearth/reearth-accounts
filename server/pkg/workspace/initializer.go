@@ -1,7 +1,7 @@
 package workspace
 
 import (
-	"github.com/reearth/reearth-accounts/pkg/user"
+	"github.com/reearth/reearth-accounts/server/pkg/user"
 	"golang.org/x/text/language"
 )
 
@@ -58,6 +58,7 @@ func Init(p InitParams) (*user.User, *Workspace, error) {
 		Name(p.Name).
 		Members(map[user.ID]Member{u.ID(): {Role: RoleOwner, Disabled: false, InvitedBy: u.ID()}}).
 		Personal(true).
+		Metadata(NewMetadata()).
 		Build()
 	if err != nil {
 		return nil, nil, err

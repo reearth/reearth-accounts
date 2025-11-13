@@ -3,9 +3,9 @@ package user
 import (
 	"errors"
 	"net/mail"
+	"slices"
 
 	"github.com/reearth/reearthx/util"
-	"golang.org/x/exp/slices"
 )
 
 var (
@@ -17,7 +17,7 @@ type User struct {
 	name          string
 	alias         string
 	email         string
-	metadata      *Metadata
+	metadata      Metadata
 	password      EncodedPassword
 	workspace     WorkspaceID
 	auths         []Auth
@@ -27,48 +27,38 @@ type User struct {
 }
 
 func (u *User) ID() ID {
-	if u == nil {
-		return ID{}
-	}
 	return u.id
 }
 
 func (u *User) Name() string {
-	if u == nil {
-		return ""
-	}
 	return u.name
 }
 
-func (u *User) SetName(name string) {
-	if u == nil {
-		return
-	}
-	u.name = name
-}
-
 func (u *User) Alias() string {
-	if u == nil {
-		return ""
-	}
 	return u.alias
 }
 
-func (u *User) SetAlias(alias string) {
-	if u == nil {
-		return
-	}
-	u.alias = alias
-}
-
 func (u *User) Email() string {
-	if u == nil {
-		return ""
-	}
 	return u.email
 }
 
-func (u *User) SetEmail(email string) error {
+func (u *User) Workspace() WorkspaceID {
+	return u.workspace
+}
+
+func (u *User) Password() []byte {
+	return u.password
+}
+
+func (u *User) UpdateName(name string) {
+	u.name = name
+}
+
+func (u *User) UpdateAlias(alias string) {
+	u.alias = alias
+}
+
+func (u *User) UpdateEmail(email string) error {
 	if _, err := mail.ParseAddress(email); err != nil {
 		return ErrInvalidEmail
 	}
@@ -76,65 +66,16 @@ func (u *User) SetEmail(email string) error {
 	return nil
 }
 
-func (u *User) Metadata() *Metadata {
-	if u == nil {
-		return nil
-	}
-	return u.metadata
-}
-
-func (u *User) SetMetadata(metadata *Metadata) {
-	if u == nil {
-		return
-	}
-	u.metadata = metadata
-}
-
-func (u *User) Workspace() WorkspaceID {
-	return u.workspace
-}
-
 func (u *User) UpdateWorkspace(workspace WorkspaceID) {
 	u.workspace = workspace
 }
 
 func (u *User) Verification() *Verification {
-	if u == nil {
-		return nil
-	}
 	return u.verification
 }
 
-func (u *User) SetVerification(v *Verification) {
-	u.verification = v
-}
-
-func (u *User) Password() []byte {
-	if u == nil {
-		return nil
-	}
-	return u.password
-}
-
-func (u *User) SetPassword(pass string) error {
-	p, err := NewEncodedPassword(pass)
-	if err != nil {
-		return err
-	}
-
-	u.password = p
-	return nil
-}
-
-func (u *User) PasswordReset() *PasswordReset {
-	if u == nil {
-		return nil
-	}
-	return u.passwordReset
-}
-
-func (u *User) SetPasswordReset(pr *PasswordReset) {
-	u.passwordReset = pr.Clone()
+func (u *User) Metadata() *Metadata {
+	return &u.metadata
 }
 
 func (u *User) Auths() Auths {
@@ -221,11 +162,36 @@ func (u *User) ClearAuths() {
 	u.auths = nil
 }
 
+func (u *User) SetPassword(pass string) error {
+	p, err := NewEncodedPassword(pass)
+	if err != nil {
+		return err
+	}
+	u.password = p
+	return nil
+}
+
 func (u *User) MatchPassword(pass string) (bool, error) {
 	if u == nil {
 		return false, nil
 	}
 	return u.password.Verify(pass)
+}
+
+func (u *User) PasswordReset() *PasswordReset {
+	return u.passwordReset
+}
+
+func (u *User) SetPasswordReset(pr *PasswordReset) {
+	u.passwordReset = pr.Clone()
+}
+
+func (u *User) SetVerification(v *Verification) {
+	u.verification = v
+}
+
+func (u *User) SetMetadata(m Metadata) {
+	u.metadata = m
 }
 
 func (u *User) Host() string {
@@ -241,7 +207,7 @@ func (u *User) Clone() *User {
 		password:      u.password,
 		workspace:     u.workspace,
 		auths:         slices.Clone(u.auths),
-		metadata:      util.CloneRef(u.metadata),
+		metadata:      u.metadata,
 		verification:  util.CloneRef(u.verification),
 		passwordReset: util.CloneRef(u.passwordReset),
 	}

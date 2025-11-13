@@ -5,8 +5,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/reearth/reearth-accounts/pkg/id"
-	"github.com/reearth/reearth-accounts/pkg/user"
+	"github.com/reearth/reearth-accounts/server/pkg/id"
+	"github.com/reearth/reearth-accounts/server/pkg/user"
 	"github.com/reearth/reearthx/mongox"
 	"github.com/reearth/reearthx/mongox/mongotest"
 	"github.com/reearth/reearthx/rerror"
@@ -259,6 +259,62 @@ func TestUserRepo_FindByName(t *testing.T) {
 	}
 }
 
+func TestUserRepo_FindByAlias(t *testing.T) {
+	wsid := user.NewWorkspaceID()
+	user1 := user.New().
+		NewID().
+		Name("foo").
+		Alias("alias").
+		Email("foo@bar.com").
+		Workspace(wsid).
+		MustBuild()
+	tests := []struct {
+		Name               string
+		Input              string
+		RepoData, Expected *user.User
+		WantErr            bool
+	}{
+		{
+			Name:     "must find a user",
+			Input:    user1.Alias(),
+			RepoData: user1,
+			Expected: user1,
+		},
+		{
+			Name:     "must not find any user",
+			Input:    "xxx",
+			RepoData: user1,
+			WantErr:  true,
+		},
+	}
+
+	init := mongotest.Connect(t)
+	for _, tc := range tests {
+		tc := tc
+
+		t.Run(tc.Name, func(tt *testing.T) {
+			tt.Parallel()
+
+			client := mongox.NewClientWithDatabase(init(t))
+
+			repo := NewUser(client)
+			ctx := context.Background()
+			err := repo.Save(ctx, tc.RepoData)
+			assert.NoError(tt, err)
+
+			got, err := repo.FindByAlias(ctx, tc.Input)
+			if tc.WantErr {
+				assert.Equal(tt, err, rerror.ErrNotFound)
+			} else {
+				assert.Equal(tt, tc.Expected.ID(), got.ID())
+				assert.Equal(tt, tc.Expected.Email(), got.Email())
+				assert.Equal(tt, tc.Expected.Name(), got.Name())
+				assert.Equal(tt, tc.Expected.Workspace(), got.Workspace())
+			}
+		})
+	}
+}
+
 func TestUserRepo_FindByEmail(t *testing.T) {
 	wsid := user.NewWorkspaceID()
 	user1 := user.New().
@@ -401,6 +457,7 @@ func TestUserRepo_FindByPasswordResetRequest(t *testing.T) {
 			RepoData: user1,
 			Expected: user1,
 		},
+
 		{
 			Name:     "must not find any user",
 			Input:    "x@yxz",
@@ -425,8 +482,6 @@ func TestUserRepo_FindByPasswordResetRequest(t *testing.T) {
 			assert.NoError(tt, err)
 
 			got, err := repo.FindByPasswordResetRequest(ctx, tc.Input)
-			assert.NoError(tt, err)
-			assert.NotNil(tt, got)
 			if tc.WantErr {
 				assert.Equal(tt, err, rerror.ErrNotFound)
 			} else {

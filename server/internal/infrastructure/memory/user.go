@@ -4,8 +4,8 @@ import (
 	"context"
 	"strings"
 
-	"github.com/reearth/reearth-accounts/internal/usecase/repo"
-	"github.com/reearth/reearth-accounts/pkg/user"
+	"github.com/reearth/reearth-accounts/server/internal/usecase/repo"
+	"github.com/reearth/reearth-accounts/server/pkg/user"
 	"github.com/reearth/reearthx/rerror"
 	"github.com/reearth/reearthx/util"
 )
@@ -130,6 +130,20 @@ func (r *User) FindByNameOrEmail(_ context.Context, nameOrEmail string) (*user.U
 
 	return rerror.ErrIfNil(r.data.Find(func(key user.ID, value *user.User) bool {
 		return value.Email() == nameOrEmail || value.Name() == nameOrEmail
+	}), rerror.ErrNotFound)
+}
+
+func (r *User) FindByAlias(_ context.Context, alias string) (*user.User, error) {
+	if r.err != nil {
+		return nil, r.err
+	}
+
+	if alias == "" {
+		return nil, rerror.ErrInvalidParams
+	}
+
+	return rerror.ErrIfNil(r.data.Find(func(key user.ID, value *user.User) bool {
+		return value.Alias() == alias
 	}), rerror.ErrNotFound)
 }
 

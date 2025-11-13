@@ -7,12 +7,12 @@ import (
 	"errors"
 	htmlTmpl "html/template"
 
-	"github.com/reearth/reearth-accounts/internal/usecase"
-	"github.com/reearth/reearth-accounts/internal/usecase/gateway"
-	"github.com/reearth/reearth-accounts/internal/usecase/interfaces"
-	"github.com/reearth/reearth-accounts/internal/usecase/repo"
-	"github.com/reearth/reearth-accounts/pkg/user"
-	"github.com/reearth/reearth-accounts/pkg/workspace"
+	"github.com/reearth/reearth-accounts/server/internal/usecase"
+	"github.com/reearth/reearth-accounts/server/internal/usecase/gateway"
+	"github.com/reearth/reearth-accounts/server/internal/usecase/interfaces"
+	"github.com/reearth/reearth-accounts/server/internal/usecase/repo"
+	"github.com/reearth/reearth-accounts/server/pkg/user"
+	"github.com/reearth/reearth-accounts/server/pkg/workspace"
 	"github.com/reearth/reearthx/i18n"
 	"github.com/reearth/reearthx/mailer"
 	"github.com/reearth/reearthx/rerror"
@@ -132,7 +132,7 @@ func (i *User) UpdateMe(ctx context.Context, p interfaces.UpdateMeParam, operato
 
 		if p.Name != nil && *p.Name != u.Name() {
 			oldName := u.Name()
-			u.SetName(*p.Name)
+			u.UpdateName(*p.Name)
 
 			workspace, err = i.repos.Workspace.FindByID(ctx, u.Workspace())
 			if err != nil && !errors.Is(err, rerror.ErrNotFound) {
@@ -147,7 +147,7 @@ func (i *User) UpdateMe(ctx context.Context, p interfaces.UpdateMeParam, operato
 			}
 		}
 		if p.Email != nil {
-			if err := u.SetEmail(*p.Email); err != nil {
+			if err := u.UpdateEmail(*p.Email); err != nil {
 				return nil, err
 			}
 		}

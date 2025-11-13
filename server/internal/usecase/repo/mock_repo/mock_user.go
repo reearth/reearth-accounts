@@ -13,7 +13,7 @@ import (
 	context "context"
 	reflect "reflect"
 
-	user "github.com/reearth/reearth-accounts/pkg/user"
+	user "github.com/reearth/reearth-accounts/server/pkg/user"
 	gomock "go.uber.org/mock/gomock"
 )
 
@@ -68,6 +68,21 @@ func (m *MockUser) FindAll(arg0 context.Context) (user.List, error) {
 func (mr *MockUserMockRecorder) FindAll(arg0 any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "FindAll", reflect.TypeOf((*MockUser)(nil).FindAll), arg0)
+}
+
+// FindByAlias mocks base method.
+func (m *MockUser) FindByAlias(arg0 context.Context, arg1 string) (*user.User, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "FindByAlias", arg0, arg1)
+	ret0, _ := ret[0].(*user.User)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// FindByAlias indicates an expected call of FindByAlias.
+func (mr *MockUserMockRecorder) FindByAlias(arg0, arg1 any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "FindByAlias", reflect.TypeOf((*MockUser)(nil).FindByAlias), arg0, arg1)
 }
 
 // FindByEmail mocks base method.
@@ -285,6 +300,21 @@ func (m *MockUserQuery) FindAll(arg0 context.Context) (user.List, error) {
 func (mr *MockUserQueryMockRecorder) FindAll(arg0 any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "FindAll", reflect.TypeOf((*MockUserQuery)(nil).FindAll), arg0)
+}
+
+// FindByAlias mocks base method.
+func (m *MockUserQuery) FindByAlias(arg0 context.Context, arg1 string) (*user.User, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "FindByAlias", arg0, arg1)
+	ret0, _ := ret[0].(*user.User)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// FindByAlias indicates an expected call of FindByAlias.
+func (mr *MockUserQueryMockRecorder) FindByAlias(arg0, arg1 any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "FindByAlias", reflect.TypeOf((*MockUserQuery)(nil).FindByAlias), arg0, arg1)
 }
 
 // FindByEmail mocks base method.

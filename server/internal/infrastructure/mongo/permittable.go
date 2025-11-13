@@ -3,18 +3,13 @@ package mongo
 import (
 	"context"
 
-	"github.com/reearth/reearth-accounts/internal/infrastructure/mongo/mongodoc"
-	"github.com/reearth/reearth-accounts/pkg/id"
-	"github.com/reearth/reearth-accounts/pkg/permittable"
-	"github.com/reearth/reearth-accounts/pkg/user"
+	"github.com/reearth/reearth-accounts/server/internal/infrastructure/mongo/mongodoc"
+	"github.com/reearth/reearth-accounts/server/pkg/id"
+	"github.com/reearth/reearth-accounts/server/pkg/permittable"
+	"github.com/reearth/reearth-accounts/server/pkg/user"
 	"github.com/reearth/reearthx/mongox"
 	"github.com/reearth/reearthx/rerror"
 	"go.mongodb.org/mongo-driver/bson"
-)
-
-var (
-	newPermittableIndexes       = []string{}
-	newPermittableUniqueIndexes = []string{"id", "userid"}
 )
 
 type Permittable struct {
@@ -25,10 +20,6 @@ func NewPermittable(client *mongox.Client) *Permittable {
 	return &Permittable{
 		client: client.WithCollection("permittable"),
 	}
-}
-
-func (r *Permittable) Init(ctx context.Context) error {
-	return createIndexes(ctx, r.client, newPermittableIndexes, newPermittableUniqueIndexes)
 }
 
 func (r *Permittable) FindByUserID(ctx context.Context, id user.ID) (*permittable.Permittable, error) {

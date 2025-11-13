@@ -8,12 +8,12 @@ type Metadata struct {
 	photoURL     string
 }
 
-func NewMetadata() *Metadata {
-	return &Metadata{}
+func NewMetadata() Metadata {
+	return Metadata{}
 }
 
-func MetadataFrom(description, website, location, billingEmail, photoURL string) *Metadata {
-	return &Metadata{
+func MetadataFrom(description, website, location, billingEmail, photoURL string) Metadata {
+	return Metadata{
 		description:  description,
 		website:      website,
 		location:     location,
@@ -22,7 +22,7 @@ func MetadataFrom(description, website, location, billingEmail, photoURL string)
 	}
 }
 
-func (m *Metadata) Description() string {
+func (m Metadata) Description() string {
 	return m.description
 }
 
@@ -30,7 +30,7 @@ func (m *Metadata) SetDescription(description string) {
 	m.description = description
 }
 
-func (m *Metadata) Website() string {
+func (m Metadata) Website() string {
 	return m.website
 }
 
@@ -38,7 +38,7 @@ func (m *Metadata) SetWebsite(website string) {
 	m.website = website
 }
 
-func (m *Metadata) Location() string {
+func (m Metadata) Location() string {
 	return m.location
 }
 
@@ -46,7 +46,7 @@ func (m *Metadata) SetLocation(location string) {
 	m.location = location
 }
 
-func (m *Metadata) BillingEmail() string {
+func (m Metadata) BillingEmail() string {
 	return m.billingEmail
 }
 
@@ -54,7 +54,7 @@ func (m *Metadata) SetBillingEmail(billingEmail string) {
 	m.billingEmail = billingEmail
 }
 
-func (m *Metadata) PhotoURL() string {
+func (m Metadata) PhotoURL() string {
 	return m.photoURL
 }
 

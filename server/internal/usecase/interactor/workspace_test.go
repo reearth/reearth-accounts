@@ -6,15 +6,15 @@ import (
 	"fmt"
 	"testing"
 
-	"github.com/reearth/reearth-accounts/internal/infrastructure/memory"
-	"github.com/reearth/reearth-accounts/internal/usecase"
-	"github.com/reearth/reearth-accounts/internal/usecase/interfaces"
-	"github.com/reearth/reearth-accounts/internal/usecase/repo"
-	"github.com/reearth/reearth-accounts/pkg/id"
-	"github.com/reearth/reearth-accounts/pkg/permittable"
-	"github.com/reearth/reearth-accounts/pkg/role"
-	"github.com/reearth/reearth-accounts/pkg/user"
-	"github.com/reearth/reearth-accounts/pkg/workspace"
+	"github.com/reearth/reearth-accounts/server/internal/infrastructure/memory"
+	"github.com/reearth/reearth-accounts/server/internal/usecase"
+	"github.com/reearth/reearth-accounts/server/internal/usecase/interfaces"
+	"github.com/reearth/reearth-accounts/server/internal/usecase/repo"
+	"github.com/reearth/reearth-accounts/server/pkg/id"
+	"github.com/reearth/reearth-accounts/server/pkg/permittable"
+	"github.com/reearth/reearth-accounts/server/pkg/role"
+	"github.com/reearth/reearth-accounts/server/pkg/user"
+	"github.com/reearth/reearth-accounts/server/pkg/workspace"
 	"github.com/reearth/reearthx/idx"
 	"github.com/reearth/reearthx/rerror"
 	"github.com/samber/lo"
@@ -30,7 +30,7 @@ func TestWorkspace_Create(t *testing.T) {
 	_ = db.User.Save(ctx, u)
 	workspaceUC := NewWorkspace(db, nil)
 	op := &usecase.Operator{User: lo.ToPtr(u.ID())}
-	ws, err := workspaceUC.Create(ctx, "workspace name", u.ID(), op)
+	ws, err := workspaceUC.Create(ctx, "alias", "name", "description", u.ID(), op)
 
 	assert.NoError(t, err)
 	assert.NotNil(t, ws)
@@ -42,13 +42,15 @@ func TestWorkspace_Create(t *testing.T) {
 	assert.NotNil(t, resultWorkspaces)
 	assert.NotEmpty(t, resultWorkspaces)
 	assert.Equal(t, resultWorkspaces[0].ID(), ws.ID())
-	assert.Equal(t, resultWorkspaces[0].Name(), "workspace name")
+	assert.Equal(t, resultWorkspaces[0].Alias(), "alias")
+	assert.Equal(t, resultWorkspaces[0].Name(), "name")
+	assert.Equal(t, resultWorkspaces[0].Metadata().Description(), "description")
 	assert.Equal(t, workspace.IDList{resultWorkspaces[0].ID()}, op.OwningWorkspaces)
 
 	// mock workspace error
 	wantErr := errors.New("test")
 	memory.SetWorkspaceError(db.Workspace, wantErr)
-	workspace2, err := workspaceUC.Create(ctx, "workspace name 2", u.ID(), op)
+	workspace2, err := workspaceUC.Create(ctx, "alias2", "name2", "description2", u.ID(), op)
 	assert.Nil(t, workspace2)
 	assert.Equal(t, wantErr, err)
 }

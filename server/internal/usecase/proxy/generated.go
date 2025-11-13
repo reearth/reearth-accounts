@@ -387,11 +387,19 @@ func (v *CreateWorkspaceCreateWorkspaceCreateWorkspacePayloadWorkspace) __premar
 }
 
 type CreateWorkspaceInput struct {
-	Name string `json:"name"`
+	Alias       string `json:"alias"`
+	Name        string `json:"name"`
+	Description string `json:"description"`
 }
+
+// GetAlias returns CreateWorkspaceInput.Alias, and is useful for accessing the field via an interface.
+func (v *CreateWorkspaceInput) GetAlias() string { return v.Alias }
 
 // GetName returns CreateWorkspaceInput.Name, and is useful for accessing the field via an interface.
 func (v *CreateWorkspaceInput) GetName() string { return v.Name }
+
+// GetDescription returns CreateWorkspaceInput.Description, and is useful for accessing the field via an interface.
+func (v *CreateWorkspaceInput) GetDescription() string { return v.Description }
 
 // CreateWorkspaceResponse is returned by CreateWorkspace on success.
 type CreateWorkspaceResponse struct {
@@ -452,6 +460,297 @@ type DeleteWorkspaceResponse struct {
 func (v *DeleteWorkspaceResponse) GetDeleteWorkspace() DeleteWorkspaceDeleteWorkspaceDeleteWorkspacePayload {
 	return v.DeleteWorkspace
 }
+
+// FindByAliasFindByAliasWorkspace includes the requested fields of the GraphQL type Workspace.
+type FindByAliasFindByAliasWorkspace struct {
+	FragmentWorkspace `json:"-"`
+}
+
+// GetId returns FindByAliasFindByAliasWorkspace.Id, and is useful for accessing the field via an interface.
+func (v *FindByAliasFindByAliasWorkspace) GetId() string { return v.FragmentWorkspace.Id }
+
+// GetName returns FindByAliasFindByAliasWorkspace.Name, and is useful for accessing the field via an interface.
+func (v *FindByAliasFindByAliasWorkspace) GetName() string { return v.FragmentWorkspace.Name }
+
+// GetPersonal returns FindByAliasFindByAliasWorkspace.Personal, and is useful for accessing the field via an interface.
+func (v *FindByAliasFindByAliasWorkspace) GetPersonal() bool { return v.FragmentWorkspace.Personal }
+
+// GetMembers returns FindByAliasFindByAliasWorkspace.Members, and is useful for accessing the field via an interface.
+func (v *FindByAliasFindByAliasWorkspace) GetMembers() []FragmentWorkspaceMembersWorkspaceMember {
+	return v.FragmentWorkspace.Members
+}
+
+func (v *FindByAliasFindByAliasWorkspace) UnmarshalJSON(b []byte) error {
+
+	if string(b) == "null" {
+		return nil
+	}
+
+	var firstPass struct {
+		*FindByAliasFindByAliasWorkspace
+		graphql.NoUnmarshalJSON
+	}
+	firstPass.FindByAliasFindByAliasWorkspace = v
+
+	err := json.Unmarshal(b, &firstPass)
+	if err != nil {
+		return err
+	}
+
+	err = json.Unmarshal(
+		b, &v.FragmentWorkspace)
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
+type __premarshalFindByAliasFindByAliasWorkspace struct {
+	Id string `json:"id"`
+
+	Name string `json:"name"`
+
+	Personal bool `json:"personal"`
+
+	Members []json.RawMessage `json:"members"`
+}
+
+func (v *FindByAliasFindByAliasWorkspace) MarshalJSON() ([]byte, error) {
+	premarshaled, err := v.__premarshalJSON()
+	if err != nil {
+		return nil, err
+	}
+	return json.Marshal(premarshaled)
+}
+
+func (v *FindByAliasFindByAliasWorkspace) __premarshalJSON() (*__premarshalFindByAliasFindByAliasWorkspace, error) {
+	var retval __premarshalFindByAliasFindByAliasWorkspace
+
+	retval.Id = v.FragmentWorkspace.Id
+	retval.Name = v.FragmentWorkspace.Name
+	retval.Personal = v.FragmentWorkspace.Personal
+	{
+
+		dst := &retval.Members
+		src := v.FragmentWorkspace.Members
+		*dst = make(
+			[]json.RawMessage,
+			len(src))
+		for i, src := range src {
+			dst := &(*dst)[i]
+			var err error
+			*dst, err = __marshalFragmentWorkspaceMembersWorkspaceMember(
+				&src)
+			if err != nil {
+				return nil, fmt.Errorf(
+					"unable to marshal FindByAliasFindByAliasWorkspace.FragmentWorkspace.Members: %w", err)
+			}
+		}
+	}
+	return &retval, nil
+}
+
+// FindByAliasResponse is returned by FindByAlias on success.
+type FindByAliasResponse struct {
+	FindByAlias FindByAliasFindByAliasWorkspace `json:"findByAlias"`
+}
+
+// GetFindByAlias returns FindByAliasResponse.FindByAlias, and is useful for accessing the field via an interface.
+func (v *FindByAliasResponse) GetFindByAlias() FindByAliasFindByAliasWorkspace { return v.FindByAlias }
+
+// FindByIDFindByIDWorkspace includes the requested fields of the GraphQL type Workspace.
+type FindByIDFindByIDWorkspace struct {
+	FragmentWorkspace `json:"-"`
+}
+
+// GetId returns FindByIDFindByIDWorkspace.Id, and is useful for accessing the field via an interface.
+func (v *FindByIDFindByIDWorkspace) GetId() string { return v.FragmentWorkspace.Id }
+
+// GetName returns FindByIDFindByIDWorkspace.Name, and is useful for accessing the field via an interface.
+func (v *FindByIDFindByIDWorkspace) GetName() string { return v.FragmentWorkspace.Name }
+
+// GetPersonal returns FindByIDFindByIDWorkspace.Personal, and is useful for accessing the field via an interface.
+func (v *FindByIDFindByIDWorkspace) GetPersonal() bool { return v.FragmentWorkspace.Personal }
+
+// GetMembers returns FindByIDFindByIDWorkspace.Members, and is useful for accessing the field via an interface.
+func (v *FindByIDFindByIDWorkspace) GetMembers() []FragmentWorkspaceMembersWorkspaceMember {
+	return v.FragmentWorkspace.Members
+}
+
+func (v *FindByIDFindByIDWorkspace) UnmarshalJSON(b []byte) error {
+
+	if string(b) == "null" {
+		return nil
+	}
+
+	var firstPass struct {
+		*FindByIDFindByIDWorkspace
+		graphql.NoUnmarshalJSON
+	}
+	firstPass.FindByIDFindByIDWorkspace = v
+
+	err := json.Unmarshal(b, &firstPass)
+	if err != nil {
+		return err
+	}
+
+	err = json.Unmarshal(
+		b, &v.FragmentWorkspace)
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
+type __premarshalFindByIDFindByIDWorkspace struct {
+	Id string `json:"id"`
+
+	Name string `json:"name"`
+
+	Personal bool `json:"personal"`
+
+	Members []json.RawMessage `json:"members"`
+}
+
+func (v *FindByIDFindByIDWorkspace) MarshalJSON() ([]byte, error) {
+	premarshaled, err := v.__premarshalJSON()
+	if err != nil {
+		return nil, err
+	}
+	return json.Marshal(premarshaled)
+}
+
+func (v *FindByIDFindByIDWorkspace) __premarshalJSON() (*__premarshalFindByIDFindByIDWorkspace, error) {
+	var retval __premarshalFindByIDFindByIDWorkspace
+
+	retval.Id = v.FragmentWorkspace.Id
+	retval.Name = v.FragmentWorkspace.Name
+	retval.Personal = v.FragmentWorkspace.Personal
+	{
+
+		dst := &retval.Members
+		src := v.FragmentWorkspace.Members
+		*dst = make(
+			[]json.RawMessage,
+			len(src))
+		for i, src := range src {
+			dst := &(*dst)[i]
+			var err error
+			*dst, err = __marshalFragmentWorkspaceMembersWorkspaceMember(
+				&src)
+			if err != nil {
+				return nil, fmt.Errorf(
+					"unable to marshal FindByIDFindByIDWorkspace.FragmentWorkspace.Members: %w", err)
+			}
+		}
+	}
+	return &retval, nil
+}
+
+// FindByIDResponse is returned by FindByID on success.
+type FindByIDResponse struct {
+	FindByID FindByIDFindByIDWorkspace `json:"findByID"`
+}
+
+// GetFindByID returns FindByIDResponse.FindByID, and is useful for accessing the field via an interface.
+func (v *FindByIDResponse) GetFindByID() FindByIDFindByIDWorkspace { return v.FindByID }
+
+// FindByNameFindByNameWorkspace includes the requested fields of the GraphQL type Workspace.
+type FindByNameFindByNameWorkspace struct {
+	FragmentWorkspace `json:"-"`
+}
+
+// GetId returns FindByNameFindByNameWorkspace.Id, and is useful for accessing the field via an interface.
+func (v *FindByNameFindByNameWorkspace) GetId() string { return v.FragmentWorkspace.Id }
+
+// GetName returns FindByNameFindByNameWorkspace.Name, and is useful for accessing the field via an interface.
+func (v *FindByNameFindByNameWorkspace) GetName() string { return v.FragmentWorkspace.Name }
+
+// GetPersonal returns FindByNameFindByNameWorkspace.Personal, and is useful for accessing the field via an interface.
+func (v *FindByNameFindByNameWorkspace) GetPersonal() bool { return v.FragmentWorkspace.Personal }
+
+// GetMembers returns FindByNameFindByNameWorkspace.Members, and is useful for accessing the field via an interface.
+func (v *FindByNameFindByNameWorkspace) GetMembers() []FragmentWorkspaceMembersWorkspaceMember {
+	return v.FragmentWorkspace.Members
+}
+
+func (v *FindByNameFindByNameWorkspace) UnmarshalJSON(b []byte) error {
+
+	if string(b) == "null" {
+		return nil
+	}
+
+	var firstPass struct {
+		*FindByNameFindByNameWorkspace
+		graphql.NoUnmarshalJSON
+	}
+	firstPass.FindByNameFindByNameWorkspace = v
+
+	err := json.Unmarshal(b, &firstPass)
+	if err != nil {
+		return err
+	}
+
+	err = json.Unmarshal(
+		b, &v.FragmentWorkspace)
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
+type __premarshalFindByNameFindByNameWorkspace struct {
+	Id string `json:"id"`
+
+	Name string `json:"name"`
+
+	Personal bool `json:"personal"`
+
+	Members []json.RawMessage `json:"members"`
+}
+
+func (v *FindByNameFindByNameWorkspace) MarshalJSON() ([]byte, error) {
+	premarshaled, err := v.__premarshalJSON()
+	if err != nil {
+		return nil, err
+	}
+	return json.Marshal(premarshaled)
+}
+
+func (v *FindByNameFindByNameWorkspace) __premarshalJSON() (*__premarshalFindByNameFindByNameWorkspace, error) {
+	var retval __premarshalFindByNameFindByNameWorkspace
+
+	retval.Id = v.FragmentWorkspace.Id
+	retval.Name = v.FragmentWorkspace.Name
+	retval.Personal = v.FragmentWorkspace.Personal
+	{
+
+		dst := &retval.Members
+		src := v.FragmentWorkspace.Members
+		*dst = make(
+			[]json.RawMessage,
+			len(src))
+		for i, src := range src {
+			dst := &(*dst)[i]
+			var err error
+			*dst, err = __marshalFragmentWorkspaceMembersWorkspaceMember(
+				&src)
+			if err != nil {
+				return nil, fmt.Errorf(
+					"unable to marshal FindByNameFindByNameWorkspace.FragmentWorkspace.Members: %w", err)
+			}
+		}
+	}
+	return &retval, nil
+}
+
+// FindByNameResponse is returned by FindByName on success.
+type FindByNameResponse struct {
+	FindByName FindByNameFindByNameWorkspace `json:"findByName"`
+}
+
+// GetFindByName returns FindByNameResponse.FindByName, and is useful for accessing the field via an interface.
+func (v *FindByNameResponse) GetFindByName() FindByNameFindByNameWorkspace { return v.FindByName }
 
 // FindByUserFindByUserWorkspace includes the requested fields of the GraphQL type Workspace.
 type FindByUserFindByUserWorkspace struct {
@@ -549,6 +848,127 @@ type FindByUserResponse struct {
 
 // GetFindByUser returns FindByUserResponse.FindByUser, and is useful for accessing the field via an interface.
 func (v *FindByUserResponse) GetFindByUser() []FindByUserFindByUserWorkspace { return v.FindByUser }
+
+// FindByUserWithPaginationFindByUserWithPaginationWorkspacesWithPagination includes the requested fields of the GraphQL type WorkspacesWithPagination.
+type FindByUserWithPaginationFindByUserWithPaginationWorkspacesWithPagination struct {
+	Workspaces []FindByUserWithPaginationFindByUserWithPaginationWorkspacesWithPaginationWorkspacesWorkspace `json:"workspaces"`
+	TotalCount int                                                                                           `json:"totalCount"`
+}
+
+// GetWorkspaces returns FindByUserWithPaginationFindByUserWithPaginationWorkspacesWithPagination.Workspaces, and is useful for accessing the field via an interface.
+func (v *FindByUserWithPaginationFindByUserWithPaginationWorkspacesWithPagination) GetWorkspaces() []FindByUserWithPaginationFindByUserWithPaginationWorkspacesWithPaginationWorkspacesWorkspace {
+	return v.Workspaces
+}
+
+// GetTotalCount returns FindByUserWithPaginationFindByUserWithPaginationWorkspacesWithPagination.TotalCount, and is useful for accessing the field via an interface.
+func (v *FindByUserWithPaginationFindByUserWithPaginationWorkspacesWithPagination) GetTotalCount() int {
+	return v.TotalCount
+}
+
+// FindByUserWithPaginationFindByUserWithPaginationWorkspacesWithPaginationWorkspacesWorkspace includes the requested fields of the GraphQL type Workspace.
+type FindByUserWithPaginationFindByUserWithPaginationWorkspacesWithPaginationWorkspacesWorkspace struct {
+	FragmentWorkspace `json:"-"`
+}
+
+// GetId returns FindByUserWithPaginationFindByUserWithPaginationWorkspacesWithPaginationWorkspacesWorkspace.Id, and is useful for accessing the field via an interface.
+func (v *FindByUserWithPaginationFindByUserWithPaginationWorkspacesWithPaginationWorkspacesWorkspace) GetId() string {
+	return v.FragmentWorkspace.Id
+}
+
+// GetName returns FindByUserWithPaginationFindByUserWithPaginationWorkspacesWithPaginationWorkspacesWorkspace.Name, and is useful for accessing the field via an interface.
+func (v *FindByUserWithPaginationFindByUserWithPaginationWorkspacesWithPaginationWorkspacesWorkspace) GetName() string {
+	return v.FragmentWorkspace.Name
+}
+
+// GetPersonal returns FindByUserWithPaginationFindByUserWithPaginationWorkspacesWithPaginationWorkspacesWorkspace.Personal, and is useful for accessing the field via an interface.
+func (v *FindByUserWithPaginationFindByUserWithPaginationWorkspacesWithPaginationWorkspacesWorkspace) GetPersonal() bool {
+	return v.FragmentWorkspace.Personal
+}
+
+// GetMembers returns FindByUserWithPaginationFindByUserWithPaginationWorkspacesWithPaginationWorkspacesWorkspace.Members, and is useful for accessing the field via an interface.
+func (v *FindByUserWithPaginationFindByUserWithPaginationWorkspacesWithPaginationWorkspacesWorkspace) GetMembers() []FragmentWorkspaceMembersWorkspaceMember {
+	return v.FragmentWorkspace.Members
+}
+
+func (v *FindByUserWithPaginationFindByUserWithPaginationWorkspacesWithPaginationWorkspacesWorkspace) UnmarshalJSON(b []byte) error {
+
+	if string(b) == "null" {
+		return nil
+	}
+
+	var firstPass struct {
+		*FindByUserWithPaginationFindByUserWithPaginationWorkspacesWithPaginationWorkspacesWorkspace
+		graphql.NoUnmarshalJSON
+	}
+	firstPass.FindByUserWithPaginationFindByUserWithPaginationWorkspacesWithPaginationWorkspacesWorkspace = v
+
+	err := json.Unmarshal(b, &firstPass)
+	if err != nil {
+		return err
+	}
+
+	err = json.Unmarshal(
+		b, &v.FragmentWorkspace)
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
+type __premarshalFindByUserWithPaginationFindByUserWithPaginationWorkspacesWithPaginationWorkspacesWorkspace struct {
+	Id string `json:"id"`
+
+	Name string `json:"name"`
+
+	Personal bool `json:"personal"`
+
+	Members []json.RawMessage `json:"members"`
+}
+
+func (v *FindByUserWithPaginationFindByUserWithPaginationWorkspacesWithPaginationWorkspacesWorkspace) MarshalJSON() ([]byte, error) {
+	premarshaled, err := v.__premarshalJSON()
+	if err != nil {
+		return nil, err
+	}
+	return json.Marshal(premarshaled)
+}
+
+func (v *FindByUserWithPaginationFindByUserWithPaginationWorkspacesWithPaginationWorkspacesWorkspace) __premarshalJSON() (*__premarshalFindByUserWithPaginationFindByUserWithPaginationWorkspacesWithPaginationWorkspacesWorkspace, error) {
+	var retval __premarshalFindByUserWithPaginationFindByUserWithPaginationWorkspacesWithPaginationWorkspacesWorkspace
+
+	retval.Id = v.FragmentWorkspace.Id
+	retval.Name = v.FragmentWorkspace.Name
+	retval.Personal = v.FragmentWorkspace.Personal
+	{
+
+		dst := &retval.Members
+		src := v.FragmentWorkspace.Members
+		*dst = make(
+			[]json.RawMessage,
+			len(src))
+		for i, src := range src {
+			dst := &(*dst)[i]
+			var err error
+			*dst, err = __marshalFragmentWorkspaceMembersWorkspaceMember(
+				&src)
+			if err != nil {
+				return nil, fmt.Errorf(
+					"unable to marshal FindByUserWithPaginationFindByUserWithPaginationWorkspacesWithPaginationWorkspacesWorkspace.FragmentWorkspace.Members: %w", err)
+			}
+		}
+	}
+	return &retval, nil
+}
+
+// FindByUserWithPaginationResponse is returned by FindByUserWithPagination on success.
+type FindByUserWithPaginationResponse struct {
+	FindByUserWithPagination FindByUserWithPaginationFindByUserWithPaginationWorkspacesWithPagination `json:"findByUserWithPagination"`
+}
+
+// GetFindByUserWithPagination returns FindByUserWithPaginationResponse.FindByUserWithPagination, and is useful for accessing the field via an interface.
+func (v *FindByUserWithPaginationResponse) GetFindByUserWithPagination() FindByUserWithPaginationFindByUserWithPaginationWorkspacesWithPagination {
+	return v.FindByUserWithPagination
+}
 
 // FindOrCreateFindOrCreateUserPayload includes the requested fields of the GraphQL type UserPayload.
 type FindOrCreateFindOrCreateUserPayload struct {
@@ -1765,7 +2185,7 @@ func (v *SearchUserSearchUser) __premarshalJSON() (*__premarshalSearchUserSearch
 	return &retval, nil
 }
 
-type SignUpInput struct {
+type SignupInput struct {
 	Id          string `json:"id"`
 	WorkspaceID string `json:"workspaceID"`
 	Name        string `json:"name"`
@@ -1777,139 +2197,45 @@ type SignUpInput struct {
 	MockAuth    bool   `json:"mockAuth"`
 }
 
-// GetId returns SignUpInput.Id, and is useful for accessing the field via an interface.
-func (v *SignUpInput) GetId() string { return v.Id }
+// GetId returns SignupInput.Id, and is useful for accessing the field via an interface.
+func (v *SignupInput) GetId() string { return v.Id }
 
-// GetWorkspaceID returns SignUpInput.WorkspaceID, and is useful for accessing the field via an interface.
-func (v *SignUpInput) GetWorkspaceID() string { return v.WorkspaceID }
+// GetWorkspaceID returns SignupInput.WorkspaceID, and is useful for accessing the field via an interface.
+func (v *SignupInput) GetWorkspaceID() string { return v.WorkspaceID }
 
-// GetName returns SignUpInput.Name, and is useful for accessing the field via an interface.
-func (v *SignUpInput) GetName() string { return v.Name }
+// GetName returns SignupInput.Name, and is useful for accessing the field via an interface.
+func (v *SignupInput) GetName() string { return v.Name }
 
-// GetEmail returns SignUpInput.Email, and is useful for accessing the field via an interface.
-func (v *SignUpInput) GetEmail() string { return v.Email }
+// GetEmail returns SignupInput.Email, and is useful for accessing the field via an interface.
+func (v *SignupInput) GetEmail() string { return v.Email }
 
-// GetPassword returns SignUpInput.Password, and is useful for accessing the field via an interface.
-func (v *SignUpInput) GetPassword() string { return v.Password }
+// GetPassword returns SignupInput.Password, and is useful for accessing the field via an interface.
+func (v *SignupInput) GetPassword() string { return v.Password }
 
-// GetSecret returns SignUpInput.Secret, and is useful for accessing the field via an interface.
-func (v *SignUpInput) GetSecret() string { return v.Secret }
+// GetSecret returns SignupInput.Secret, and is useful for accessing the field via an interface.
+func (v *SignupInput) GetSecret() string { return v.Secret }
 
-// GetLang returns SignUpInput.Lang, and is useful for accessing the field via an interface.
-func (v *SignUpInput) GetLang() string { return v.Lang }
+// GetLang returns SignupInput.Lang, and is useful for accessing the field via an interface.
+func (v *SignupInput) GetLang() string { return v.Lang }
 
-// GetTheme returns SignUpInput.Theme, and is useful for accessing the field via an interface.
-func (v *SignUpInput) GetTheme() string { return v.Theme }
+// GetTheme returns SignupInput.Theme, and is useful for accessing the field via an interface.
+func (v *SignupInput) GetTheme() string { return v.Theme }
 
-// GetMockAuth returns SignUpInput.MockAuth, and is useful for accessing the field via an interface.
-func (v *SignUpInput) GetMockAuth() bool { return v.MockAuth }
-
-// SignUpResponse is returned by SignUp on success.
-type SignUpResponse struct {
-	SignUp SignUpSignUpUserPayload `json:"signUp"`
-}
-
-// GetSignUp returns SignUpResponse.SignUp, and is useful for accessing the field via an interface.
-func (v *SignUpResponse) GetSignUp() SignUpSignUpUserPayload { return v.SignUp }
-
-// SignUpSignUpUserPayload includes the requested fields of the GraphQL type UserPayload.
-type SignUpSignUpUserPayload struct {
-	User SignUpSignUpUserPayloadUser `json:"user"`
-}
-
-// GetUser returns SignUpSignUpUserPayload.User, and is useful for accessing the field via an interface.
-func (v *SignUpSignUpUserPayload) GetUser() SignUpSignUpUserPayloadUser { return v.User }
-
-// SignUpSignUpUserPayloadUser includes the requested fields of the GraphQL type User.
-type SignUpSignUpUserPayloadUser struct {
-	FragmentUser `json:"-"`
-}
-
-// GetId returns SignUpSignUpUserPayloadUser.Id, and is useful for accessing the field via an interface.
-func (v *SignUpSignUpUserPayloadUser) GetId() string { return v.FragmentUser.Id }
-
-// GetName returns SignUpSignUpUserPayloadUser.Name, and is useful for accessing the field via an interface.
-func (v *SignUpSignUpUserPayloadUser) GetName() string { return v.FragmentUser.Name }
-
-// GetEmail returns SignUpSignUpUserPayloadUser.Email, and is useful for accessing the field via an interface.
-func (v *SignUpSignUpUserPayloadUser) GetEmail() string { return v.FragmentUser.Email }
-
-// GetMetadata returns SignUpSignUpUserPayloadUser.Metadata, and is useful for accessing the field via an interface.
-func (v *SignUpSignUpUserPayloadUser) GetMetadata() FragmentUserMetadata {
-	return v.FragmentUser.Metadata
-}
-
-// GetWorkspace returns SignUpSignUpUserPayloadUser.Workspace, and is useful for accessing the field via an interface.
-func (v *SignUpSignUpUserPayloadUser) GetWorkspace() string { return v.FragmentUser.Workspace }
-
-// GetAuths returns SignUpSignUpUserPayloadUser.Auths, and is useful for accessing the field via an interface.
-func (v *SignUpSignUpUserPayloadUser) GetAuths() []string { return v.FragmentUser.Auths }
-
-func (v *SignUpSignUpUserPayloadUser) UnmarshalJSON(b []byte) error {
-
-	if string(b) == "null" {
-		return nil
-	}
-
-	var firstPass struct {
-		*SignUpSignUpUserPayloadUser
-		graphql.NoUnmarshalJSON
-	}
-	firstPass.SignUpSignUpUserPayloadUser = v
-
-	err := json.Unmarshal(b, &firstPass)
-	if err != nil {
-		return err
-	}
-
-	err = json.Unmarshal(
-		b, &v.FragmentUser)
-	if err != nil {
-		return err
-	}
-	return nil
-}
-
-type __premarshalSignUpSignUpUserPayloadUser struct {
-	Id string `json:"id"`
-
-	Name string `json:"name"`
-
-	Email string `json:"email"`
-
-	Metadata FragmentUserMetadata `json:"metadata"`
-
-	Workspace string `json:"workspace"`
-
-	Auths []string `json:"auths"`
-}
-
-func (v *SignUpSignUpUserPayloadUser) MarshalJSON() ([]byte, error) {
-	premarshaled, err := v.__premarshalJSON()
-	if err != nil {
-		return nil, err
-	}
-	return json.Marshal(premarshaled)
-}
-
-func (v *SignUpSignUpUserPayloadUser) __premarshalJSON() (*__premarshalSignUpSignUpUserPayloadUser, error) {
-	var retval __premarshalSignUpSignUpUserPayloadUser
-
-	retval.Id = v.FragmentUser.Id
-	retval.Name = v.FragmentUser.Name
-	retval.Email = v.FragmentUser.Email
-	retval.Metadata = v.FragmentUser.Metadata
-	retval.Workspace = v.FragmentUser.Workspace
-	retval.Auths = v.FragmentUser.Auths
-	return &retval, nil
-}
+// GetMockAuth returns SignupInput.MockAuth, and is useful for accessing the field via an interface.
+func (v *SignupInput) GetMockAuth() bool { return v.MockAuth }
 
 type SignupOIDCInput struct {
-	Name   string `json:"name"`
-	Email  string `json:"email"`
-	Sub    string `json:"sub"`
-	Secret string `json:"secret"`
+	Id          string `json:"id"`
+	Name        string `json:"name"`
+	Email       string `json:"email"`
+	Sub         string `json:"sub"`
+	Lang        string `json:"lang"`
+	WorkspaceId string `json:"workspaceId"`
+	Secret      string `json:"secret"`
 }
+
+// GetId returns SignupOIDCInput.Id, and is useful for accessing the field via an interface.
+func (v *SignupOIDCInput) GetId() string { return v.Id }
 
 // GetName returns SignupOIDCInput.Name, and is useful for accessing the field via an interface.
 func (v *SignupOIDCInput) GetName() string { return v.Name }
@@ -1920,63 +2246,69 @@ func (v *SignupOIDCInput) GetEmail() string { return v.Email }
 // GetSub returns SignupOIDCInput.Sub, and is useful for accessing the field via an interface.
 func (v *SignupOIDCInput) GetSub() string { return v.Sub }
 
+// GetLang returns SignupOIDCInput.Lang, and is useful for accessing the field via an interface.
+func (v *SignupOIDCInput) GetLang() string { return v.Lang }
+
+// GetWorkspaceId returns SignupOIDCInput.WorkspaceId, and is useful for accessing the field via an interface.
+func (v *SignupOIDCInput) GetWorkspaceId() string { return v.WorkspaceId }
+
 // GetSecret returns SignupOIDCInput.Secret, and is useful for accessing the field via an interface.
 func (v *SignupOIDCInput) GetSecret() string { return v.Secret }
 
 // SignupOIDCResponse is returned by SignupOIDC on success.
 type SignupOIDCResponse struct {
-	SignUpOIDC SignupOIDCSignUpOIDCUserPayload `json:"signUpOIDC"`
+	SignupOIDC SignupOIDCSignupOIDCUserPayload `json:"signupOIDC"`
 }
 
-// GetSignUpOIDC returns SignupOIDCResponse.SignUpOIDC, and is useful for accessing the field via an interface.
-func (v *SignupOIDCResponse) GetSignUpOIDC() SignupOIDCSignUpOIDCUserPayload { return v.SignUpOIDC }
+// GetSignupOIDC returns SignupOIDCResponse.SignupOIDC, and is useful for accessing the field via an interface.
+func (v *SignupOIDCResponse) GetSignupOIDC() SignupOIDCSignupOIDCUserPayload { return v.SignupOIDC }
 
-// SignupOIDCSignUpOIDCUserPayload includes the requested fields of the GraphQL type UserPayload.
-type SignupOIDCSignUpOIDCUserPayload struct {
-	User SignupOIDCSignUpOIDCUserPayloadUser `json:"user"`
+// SignupOIDCSignupOIDCUserPayload includes the requested fields of the GraphQL type UserPayload.
+type SignupOIDCSignupOIDCUserPayload struct {
+	User SignupOIDCSignupOIDCUserPayloadUser `json:"user"`
 }
 
-// GetUser returns SignupOIDCSignUpOIDCUserPayload.User, and is useful for accessing the field via an interface.
-func (v *SignupOIDCSignUpOIDCUserPayload) GetUser() SignupOIDCSignUpOIDCUserPayloadUser {
+// GetUser returns SignupOIDCSignupOIDCUserPayload.User, and is useful for accessing the field via an interface.
+func (v *SignupOIDCSignupOIDCUserPayload) GetUser() SignupOIDCSignupOIDCUserPayloadUser {
 	return v.User
 }
 
-// SignupOIDCSignUpOIDCUserPayloadUser includes the requested fields of the GraphQL type User.
-type SignupOIDCSignUpOIDCUserPayloadUser struct {
+// SignupOIDCSignupOIDCUserPayloadUser includes the requested fields of the GraphQL type User.
+type SignupOIDCSignupOIDCUserPayloadUser struct {
 	FragmentUser `json:"-"`
 }
 
-// GetId returns SignupOIDCSignUpOIDCUserPayloadUser.Id, and is useful for accessing the field via an interface.
-func (v *SignupOIDCSignUpOIDCUserPayloadUser) GetId() string { return v.FragmentUser.Id }
+// GetId returns SignupOIDCSignupOIDCUserPayloadUser.Id, and is useful for accessing the field via an interface.
+func (v *SignupOIDCSignupOIDCUserPayloadUser) GetId() string { return v.FragmentUser.Id }
 
-// GetName returns SignupOIDCSignUpOIDCUserPayloadUser.Name, and is useful for accessing the field via an interface.
-func (v *SignupOIDCSignUpOIDCUserPayloadUser) GetName() string { return v.FragmentUser.Name }
+// GetName returns SignupOIDCSignupOIDCUserPayloadUser.Name, and is useful for accessing the field via an interface.
+func (v *SignupOIDCSignupOIDCUserPayloadUser) GetName() string { return v.FragmentUser.Name }
 
-// GetEmail returns SignupOIDCSignUpOIDCUserPayloadUser.Email, and is useful for accessing the field via an interface.
-func (v *SignupOIDCSignUpOIDCUserPayloadUser) GetEmail() string { return v.FragmentUser.Email }
+// GetEmail returns SignupOIDCSignupOIDCUserPayloadUser.Email, and is useful for accessing the field via an interface.
+func (v *SignupOIDCSignupOIDCUserPayloadUser) GetEmail() string { return v.FragmentUser.Email }
 
-// GetMetadata returns SignupOIDCSignUpOIDCUserPayloadUser.Metadata, and is useful for accessing the field via an interface.
-func (v *SignupOIDCSignUpOIDCUserPayloadUser) GetMetadata() FragmentUserMetadata {
+// GetMetadata returns SignupOIDCSignupOIDCUserPayloadUser.Metadata, and is useful for accessing the field via an interface.
+func (v *SignupOIDCSignupOIDCUserPayloadUser) GetMetadata() FragmentUserMetadata {
 	return v.FragmentUser.Metadata
 }
 
-// GetWorkspace returns SignupOIDCSignUpOIDCUserPayloadUser.Workspace, and is useful for accessing the field via an interface.
-func (v *SignupOIDCSignUpOIDCUserPayloadUser) GetWorkspace() string { return v.FragmentUser.Workspace }
+// GetWorkspace returns SignupOIDCSignupOIDCUserPayloadUser.Workspace, and is useful for accessing the field via an interface.
+func (v *SignupOIDCSignupOIDCUserPayloadUser) GetWorkspace() string { return v.FragmentUser.Workspace }
 
-// GetAuths returns SignupOIDCSignUpOIDCUserPayloadUser.Auths, and is useful for accessing the field via an interface.
-func (v *SignupOIDCSignUpOIDCUserPayloadUser) GetAuths() []string { return v.FragmentUser.Auths }
+// GetAuths returns SignupOIDCSignupOIDCUserPayloadUser.Auths, and is useful for accessing the field via an interface.
+func (v *SignupOIDCSignupOIDCUserPayloadUser) GetAuths() []string { return v.FragmentUser.Auths }
 
-func (v *SignupOIDCSignUpOIDCUserPayloadUser) UnmarshalJSON(b []byte) error {
+func (v *SignupOIDCSignupOIDCUserPayloadUser) UnmarshalJSON(b []byte) error {
 
 	if string(b) == "null" {
 		return nil
 	}
 
 	var firstPass struct {
-		*SignupOIDCSignUpOIDCUserPayloadUser
+		*SignupOIDCSignupOIDCUserPayloadUser
 		graphql.NoUnmarshalJSON
 	}
-	firstPass.SignupOIDCSignUpOIDCUserPayloadUser = v
+	firstPass.SignupOIDCSignupOIDCUserPayloadUser = v
 
 	err := json.Unmarshal(b, &firstPass)
 	if err != nil {
@@ -1991,7 +2323,7 @@ func (v *SignupOIDCSignUpOIDCUserPayloadUser) UnmarshalJSON(b []byte) error {
 	return nil
 }
 
-type __premarshalSignupOIDCSignUpOIDCUserPayloadUser struct {
+type __premarshalSignupOIDCSignupOIDCUserPayloadUser struct {
 	Id string `json:"id"`
 
 	Name string `json:"name"`
@@ -2005,7 +2337,7 @@ type __premarshalSignupOIDCSignUpOIDCUserPayloadUser struct {
 	Auths []string `json:"auths"`
 }
 
-func (v *SignupOIDCSignUpOIDCUserPayloadUser) MarshalJSON() ([]byte, error) {
+func (v *SignupOIDCSignupOIDCUserPayloadUser) MarshalJSON() ([]byte, error) {
 	premarshaled, err := v.__premarshalJSON()
 	if err != nil {
 		return nil, err
@@ -2013,8 +2345,108 @@ func (v *SignupOIDCSignUpOIDCUserPayloadUser) MarshalJSON() ([]byte, error) {
 	return json.Marshal(premarshaled)
 }
 
-func (v *SignupOIDCSignUpOIDCUserPayloadUser) __premarshalJSON() (*__premarshalSignupOIDCSignUpOIDCUserPayloadUser, error) {
-	var retval __premarshalSignupOIDCSignUpOIDCUserPayloadUser
+func (v *SignupOIDCSignupOIDCUserPayloadUser) __premarshalJSON() (*__premarshalSignupOIDCSignupOIDCUserPayloadUser, error) {
+	var retval __premarshalSignupOIDCSignupOIDCUserPayloadUser
+
+	retval.Id = v.FragmentUser.Id
+	retval.Name = v.FragmentUser.Name
+	retval.Email = v.FragmentUser.Email
+	retval.Metadata = v.FragmentUser.Metadata
+	retval.Workspace = v.FragmentUser.Workspace
+	retval.Auths = v.FragmentUser.Auths
+	return &retval, nil
+}
+
+// SignupResponse is returned by Signup on success.
+type SignupResponse struct {
+	Signup SignupSignupUserPayload `json:"signup"`
+}
+
+// GetSignup returns SignupResponse.Signup, and is useful for accessing the field via an interface.
+func (v *SignupResponse) GetSignup() SignupSignupUserPayload { return v.Signup }
+
+// SignupSignupUserPayload includes the requested fields of the GraphQL type UserPayload.
+type SignupSignupUserPayload struct {
+	User SignupSignupUserPayloadUser `json:"user"`
+}
+
+// GetUser returns SignupSignupUserPayload.User, and is useful for accessing the field via an interface.
+func (v *SignupSignupUserPayload) GetUser() SignupSignupUserPayloadUser { return v.User }
+
+// SignupSignupUserPayloadUser includes the requested fields of the GraphQL type User.
+type SignupSignupUserPayloadUser struct {
+	FragmentUser `json:"-"`
+}
+
+// GetId returns SignupSignupUserPayloadUser.Id, and is useful for accessing the field via an interface.
+func (v *SignupSignupUserPayloadUser) GetId() string { return v.FragmentUser.Id }
+
+// GetName returns SignupSignupUserPayloadUser.Name, and is useful for accessing the field via an interface.
+func (v *SignupSignupUserPayloadUser) GetName() string { return v.FragmentUser.Name }
+
+// GetEmail returns SignupSignupUserPayloadUser.Email, and is useful for accessing the field via an interface.
+func (v *SignupSignupUserPayloadUser) GetEmail() string { return v.FragmentUser.Email }
+
+// GetMetadata returns SignupSignupUserPayloadUser.Metadata, and is useful for accessing the field via an interface.
+func (v *SignupSignupUserPayloadUser) GetMetadata() FragmentUserMetadata {
+	return v.FragmentUser.Metadata
+}
+
+// GetWorkspace returns SignupSignupUserPayloadUser.Workspace, and is useful for accessing the field via an interface.
+func (v *SignupSignupUserPayloadUser) GetWorkspace() string { return v.FragmentUser.Workspace }
+
+// GetAuths returns SignupSignupUserPayloadUser.Auths, and is useful for accessing the field via an interface.
+func (v *SignupSignupUserPayloadUser) GetAuths() []string { return v.FragmentUser.Auths }
+
+func (v *SignupSignupUserPayloadUser) UnmarshalJSON(b []byte) error {
+
+	if string(b) == "null" {
+		return nil
+	}
+
+	var firstPass struct {
+		*SignupSignupUserPayloadUser
+		graphql.NoUnmarshalJSON
+	}
+	firstPass.SignupSignupUserPayloadUser = v
+
+	err := json.Unmarshal(b, &firstPass)
+	if err != nil {
+		return err
+	}
+
+	err = json.Unmarshal(
+		b, &v.FragmentUser)
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
+type __premarshalSignupSignupUserPayloadUser struct {
+	Id string `json:"id"`
+
+	Name string `json:"name"`
+
+	Email string `json:"email"`
+
+	Metadata FragmentUserMetadata `json:"metadata"`
+
+	Workspace string `json:"workspace"`
+
+	Auths []string `json:"auths"`
+}
+
+func (v *SignupSignupUserPayloadUser) MarshalJSON() ([]byte, error) {
+	premarshaled, err := v.__premarshalJSON()
+	if err != nil {
+		return nil, err
+	}
+	return json.Marshal(premarshaled)
+}
+
+func (v *SignupSignupUserPayloadUser) __premarshalJSON() (*__premarshalSignupSignupUserPayloadUser, error) {
+	var retval __premarshalSignupSignupUserPayloadUser
 
 	retval.Id = v.FragmentUser.Id
 	retval.Name = v.FragmentUser.Name
@@ -3288,6 +3720,30 @@ type __DeleteWorkspaceInput struct {
 // GetInput returns __DeleteWorkspaceInput.Input, and is useful for accessing the field via an interface.
 func (v *__DeleteWorkspaceInput) GetInput() DeleteWorkspaceInput { return v.Input }
 
+// __FindByAliasInput is used internally by genqlient
+type __FindByAliasInput struct {
+	Alias string `json:"alias"`
+}
+
+// GetAlias returns __FindByAliasInput.Alias, and is useful for accessing the field via an interface.
+func (v *__FindByAliasInput) GetAlias() string { return v.Alias }
+
+// __FindByIDInput is used internally by genqlient
+type __FindByIDInput struct {
+	Id string `json:"id"`
+}
+
+// GetId returns __FindByIDInput.Id, and is useful for accessing the field via an interface.
+func (v *__FindByIDInput) GetId() string { return v.Id }
+
+// __FindByNameInput is used internally by genqlient
+type __FindByNameInput struct {
+	Name string `json:"name"`
+}
+
+// GetName returns __FindByNameInput.Name, and is useful for accessing the field via an interface.
+func (v *__FindByNameInput) GetName() string { return v.Name }
+
 // __FindByUserInput is used internally by genqlient
 type __FindByUserInput struct {
 	UserId string `json:"userId"`
@@ -3295,6 +3751,22 @@ type __FindByUserInput struct {
 
 // GetUserId returns __FindByUserInput.UserId, and is useful for accessing the field via an interface.
 func (v *__FindByUserInput) GetUserId() string { return v.UserId }
+
+// __FindByUserWithPaginationInput is used internally by genqlient
+type __FindByUserWithPaginationInput struct {
+	UserId string `json:"userId"`
+	Page   int    `json:"page"`
+	Size   int    `json:"size"`
+}
+
+// GetUserId returns __FindByUserWithPaginationInput.UserId, and is useful for accessing the field via an interface.
+func (v *__FindByUserWithPaginationInput) GetUserId() string { return v.UserId }
+
+// GetPage returns __FindByUserWithPaginationInput.Page, and is useful for accessing the field via an interface.
+func (v *__FindByUserWithPaginationInput) GetPage() int { return v.Page }
+
+// GetSize returns __FindByUserWithPaginationInput.Size, and is useful for accessing the field via an interface.
+func (v *__FindByUserWithPaginationInput) GetSize() int { return v.Size }
 
 // __FindOrCreateInput is used internally by genqlient
 type __FindOrCreateInput struct {
@@ -3366,13 +3838,13 @@ type __SearchUserInput struct {
 // GetKeyword returns __SearchUserInput.Keyword, and is useful for accessing the field via an interface.
 func (v *__SearchUserInput) GetKeyword() string { return v.Keyword }
 
-// __SignUpInput is used internally by genqlient
-type __SignUpInput struct {
-	Input SignUpInput `json:"input"`
+// __SignupInput is used internally by genqlient
+type __SignupInput struct {
+	Input SignupInput `json:"input"`
 }
 
-// GetInput returns __SignUpInput.Input, and is useful for accessing the field via an interface.
-func (v *__SignUpInput) GetInput() SignUpInput { return v.Input }
+// GetInput returns __SignupInput.Input, and is useful for accessing the field via an interface.
+func (v *__SignupInput) GetInput() SignupInput { return v.Input }
 
 // __SignupOIDCInput is used internally by genqlient
 type __SignupOIDCInput struct {
@@ -3718,6 +4190,162 @@ func DeleteWorkspace(
 	return data_, err_
 }
 
+// The query executed by FindByAlias.
+const FindByAlias_Operation = `
+query FindByAlias ($alias: String!) {
+	findByAlias(alias: $alias) {
+		... FragmentWorkspace
+	}
+}
+fragment FragmentWorkspace on Workspace {
+	id
+	name
+	personal
+	members {
+		__typename
+		... on WorkspaceUserMember {
+			userId
+			role
+		}
+		... on WorkspaceIntegrationMember {
+			integrationId
+			role
+			active
+			invitedById
+		}
+	}
+}
+`
+
+func FindByAlias(
+	ctx_ context.Context,
+	client_ graphql.Client,
+	alias string,
+) (data_ *FindByAliasResponse, err_ error) {
+	req_ := &graphql.Request{
+		OpName: "FindByAlias",
+		Query:  FindByAlias_Operation,
+		Variables: &__FindByAliasInput{
+			Alias: alias,
+		},
+	}
+
+	data_ = &FindByAliasResponse{}
+	resp_ := &graphql.Response{Data: data_}
+
+	err_ = client_.MakeRequest(
+		ctx_,
+		req_,
+		resp_,
+	)
+
+	return data_, err_
+}
+
+// The query executed by FindByID.
+const FindByID_Operation = `
+query FindByID ($id: ID!) {
+	findByID(id: $id) {
+		... FragmentWorkspace
+	}
+}
+fragment FragmentWorkspace on Workspace {
+	id
+	name
+	personal
+	members {
+		__typename
+		... on WorkspaceUserMember {
+			userId
+			role
+		}
+		... on WorkspaceIntegrationMember {
+			integrationId
+			role
+			active
+			invitedById
+		}
+	}
+}
+`
+
+func FindByID(
+	ctx_ context.Context,
+	client_ graphql.Client,
+	id string,
+) (data_ *FindByIDResponse, err_ error) {
+	req_ := &graphql.Request{
+		OpName: "FindByID",
+		Query:  FindByID_Operation,
+		Variables: &__FindByIDInput{
+			Id: id,
+		},
+	}
+
+	data_ = &FindByIDResponse{}
+	resp_ := &graphql.Response{Data: data_}
+
+	err_ = client_.MakeRequest(
+		ctx_,
+		req_,
+		resp_,
+	)
+
+	return data_, err_
+}
+
+// The query executed by FindByName.
+const FindByName_Operation = `
+query FindByName ($name: String!) {
+	findByName(name: $name) {
+		... FragmentWorkspace
+	}
+}
+fragment FragmentWorkspace on Workspace {
+	id
+	name
+	personal
+	members {
+		__typename
+		... on WorkspaceUserMember {
+			userId
+			role
+		}
+		... on WorkspaceIntegrationMember {
+			integrationId
+			role
+			active
+			invitedById
+		}
+	}
+}
+`
+
+func FindByName(
+	ctx_ context.Context,
+	client_ graphql.Client,
+	name string,
+) (data_ *FindByNameResponse, err_ error) {
+	req_ := &graphql.Request{
+		OpName: "FindByName",
+		Query:  FindByName_Operation,
+		Variables: &__FindByNameInput{
+			Name: name,
+		},
+	}
+
+	data_ = &FindByNameResponse{}
+	resp_ := &graphql.Response{Data: data_}
+
+	err_ = client_.MakeRequest(
+		ctx_,
+		req_,
+		resp_,
+	)
+
+	return data_, err_
+}
+
 // The query executed by FindByUser.
 const FindByUser_Operation = `
 query FindByUser ($userId: ID!) {
@@ -3759,6 +4387,65 @@ func FindByUser(
 	}
 
 	data_ = &FindByUserResponse{}
+	resp_ := &graphql.Response{Data: data_}
+
+	err_ = client_.MakeRequest(
+		ctx_,
+		req_,
+		resp_,
+	)
+
+	return data_, err_
+}
+
+// The query executed by FindByUserWithPagination.
+const FindByUserWithPagination_Operation = `
+query FindByUserWithPagination ($userId: ID!, $page: Int!, $size: Int!) {
+	findByUserWithPagination(userId: $userId, pagination: {page:$page,size:$size}) {
+		workspaces {
+			... FragmentWorkspace
+		}
+		totalCount
+	}
+}
+fragment FragmentWorkspace on Workspace {
+	id
+	name
+	personal
+	members {
+		__typename
+		... on WorkspaceUserMember {
+			userId
+			role
+		}
+		... on WorkspaceIntegrationMember {
+			integrationId
+			role
+			active
+			invitedById
+		}
+	}
+}
+`
+
+func FindByUserWithPagination(
+	ctx_ context.Context,
+	client_ graphql.Client,
+	userId string,
+	page int,
+	size int,
+) (data_ *FindByUserWithPaginationResponse, err_ error) {
+	req_ := &graphql.Request{
+		OpName: "FindByUserWithPagination",
+		Query:  FindByUserWithPagination_Operation,
+		Variables: &__FindByUserWithPaginationInput{
+			UserId: userId,
+			Page:   page,
+			Size:   size,
+		},
+	}
+
+	data_ = &FindByUserWithPaginationResponse{}
 	resp_ := &graphql.Response{Data: data_}
 
 	err_ = client_.MakeRequest(
@@ -4196,10 +4883,10 @@ func SearchUser(
 	return data_, err_
 }
 
-// The mutation executed by SignUp.
-const SignUp_Operation = `
-mutation SignUp ($input: SignUpInput!) {
-	signUp(input: $input) {
+// The mutation executed by Signup.
+const Signup_Operation = `
+mutation Signup ($input: SignupInput!) {
+	signup(input: $input) {
 		user {
 			... FragmentUser
 		}
@@ -4221,20 +4908,20 @@ fragment FragmentUser on User {
 }
 `
 
-func SignUp(
+func Signup(
 	ctx_ context.Context,
 	client_ graphql.Client,
-	input SignUpInput,
-) (data_ *SignUpResponse, err_ error) {
+	input SignupInput,
+) (data_ *SignupResponse, err_ error) {
 	req_ := &graphql.Request{
-		OpName: "SignUp",
-		Query:  SignUp_Operation,
-		Variables: &__SignUpInput{
+		OpName: "Signup",
+		Query:  Signup_Operation,
+		Variables: &__SignupInput{
 			Input: input,
 		},
 	}
 
-	data_ = &SignUpResponse{}
+	data_ = &SignupResponse{}
 	resp_ := &graphql.Response{Data: data_}
 
 	err_ = client_.MakeRequest(
@@ -4249,7 +4936,7 @@ func SignUp(
 // The mutation executed by SignupOIDC.
 const SignupOIDC_Operation = `
 mutation SignupOIDC ($input: SignupOIDCInput!) {
-	signUpOIDC(input: $input) {
+	signupOIDC(input: $input) {
 		user {
 			... FragmentUser
 		}

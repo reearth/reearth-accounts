@@ -3,6 +3,7 @@
 package gqlmodel
 
 import (
+	"bytes"
 	"fmt"
 	"io"
 	"strconv"
@@ -41,7 +42,6 @@ type AddUsersToWorkspacePayload struct {
 }
 
 type CheckPermissionInput struct {
-	UserID   string `json:"userId"`
 	Service  string `json:"service"`
 	Resource string `json:"resource"`
 	Action   string `json:"action"`
@@ -56,7 +56,9 @@ type CreateVerificationInput struct {
 }
 
 type CreateWorkspaceInput struct {
-	Name string `json:"name"`
+	Alias       string  `json:"alias"`
+	Name        string  `json:"name"`
+	Description *string `json:"description,omitempty"`
 }
 
 type CreateWorkspacePayload struct {
@@ -92,12 +94,12 @@ type GetUsersWithRolesPayload struct {
 type Me struct {
 	ID            ID            `json:"id"`
 	Name          string        `json:"name"`
+	Alias         string        `json:"alias"`
 	Email         string        `json:"email"`
 	Metadata      *UserMetadata `json:"metadata"`
 	Host          *string       `json:"host,omitempty"`
 	MyWorkspaceID ID            `json:"myWorkspaceId"`
 	Auths         []string      `json:"auths"`
-	Workspaces    []*Workspace  `json:"workspaces"`
 	MyWorkspace   *Workspace    `json:"myWorkspace"`
 }
 
@@ -107,6 +109,11 @@ type MemberInput struct {
 }
 
 type Mutation struct {
+}
+
+type Pagination struct {
+	Page int `json:"page"`
+	Size int `json:"size"`
 }
 
 type PasswordResetInput struct {
@@ -176,9 +183,9 @@ type RolesPayload struct {
 	Roles []*RoleForAuthorization `json:"roles"`
 }
 
-type SignUpInput struct {
-	ID          ID      `json:"id"`
-	WorkspaceID ID      `json:"workspaceID"`
+type SignupInput struct {
+	ID          *ID     `json:"id,omitempty"`
+	WorkspaceID *ID     `json:"workspaceID,omitempty"`
 	Name        string  `json:"name"`
 	Email       string  `json:"email"`
 	Password    string  `json:"password"`
@@ -189,10 +196,13 @@ type SignUpInput struct {
 }
 
 type SignupOIDCInput struct {
-	Name   string  `json:"name"`
-	Email  string  `json:"email"`
-	Sub    string  `json:"sub"`
-	Secret *string `json:"secret,omitempty"`
+	ID          *ID     `json:"id,omitempty"`
+	Name        *string `json:"name,omitempty"`
+	Email       *string `json:"email,omitempty"`
+	Sub         *string `json:"sub,omitempty"`
+	Lang        *string `json:"lang,omitempty"`
+	WorkspaceID *ID     `json:"workspaceId,omitempty"`
+	Secret      *string `json:"secret,omitempty"`
 }
 
 type StartPasswordResetInput struct {
@@ -270,10 +280,10 @@ func (this User) GetID() ID { return this.ID }
 
 type UserMetadata struct {
 	Description string `json:"description"`
-	Lang        string `json:"lang"`
-	PhotoURL    string `json:"photoURL"`
-	Theme       Theme  `json:"theme"`
 	Website     string `json:"website"`
+	PhotoURL    string `json:"photoURL"`
+	Lang        string `json:"lang"`
+	Theme       Theme  `json:"theme"`
 }
 
 type UserPayload struct {
@@ -292,6 +302,7 @@ type VerifyUserInput struct {
 type Workspace struct {
 	ID       ID                 `json:"id"`
 	Name     string             `json:"name"`
+	Alias    string             `json:"alias"`
 	Members  []WorkspaceMember  `json:"members"`
 	Metadata *WorkspaceMetadata `json:"metadata"`
 	Personal bool               `json:"personal"`
@@ -311,11 +322,11 @@ type WorkspaceIntegrationMember struct {
 func (WorkspaceIntegrationMember) IsWorkspaceMember() {}
 
 type WorkspaceMetadata struct {
-	Description  *string `json:"description,omitempty"`
-	Website      *string `json:"website,omitempty"`
-	Location     *string `json:"location,omitempty"`
-	BillingEmail *string `json:"billingEmail,omitempty"`
-	PhotoURL     *string `json:"photoURL,omitempty"`
+	Description  string `json:"description"`
+	Website      string `json:"website"`
+	Location     string `json:"location"`
+	BillingEmail string `json:"billingEmail"`
+	PhotoURL     string `json:"photoURL"`
 }
 
 type WorkspaceUserMember struct {
@@ -326,6 +337,11 @@ type WorkspaceUserMember struct {
 }
 
 func (WorkspaceUserMember) IsWorkspaceMember() {}
+
+type WorkspacesWithPagination struct {
+	Workspaces []*Workspace `json:"workspaces"`
+	TotalCount int          `json:"totalCount"`
+}
 
 type NodeType string
 
@@ -366,6 +382,20 @@ func (e *NodeType) UnmarshalGQL(v any) error {
 
 func (e NodeType) MarshalGQL(w io.Writer) {
 	fmt.Fprint(w, strconv.Quote(e.String()))
+}
+
+func (e *NodeType) UnmarshalJSON(b []byte) error {
+	s, err := strconv.Unquote(string(b))
+	if err != nil {
+		return err
+	}
+	return e.UnmarshalGQL(s)
+}
+
+func (e NodeType) MarshalJSON() ([]byte, error) {
+	var buf bytes.Buffer
+	e.MarshalGQL(&buf)
+	return buf.Bytes(), nil
 }
 
 type Role string
@@ -413,6 +443,20 @@ func (e Role) MarshalGQL(w io.Writer) {
 	fmt.Fprint(w, strconv.Quote(e.String()))
 }
 
+func (e *Role) UnmarshalJSON(b []byte) error {
+	s, err := strconv.Unquote(string(b))
+	if err != nil {
+		return err
+	}
+	return e.UnmarshalGQL(s)
+}
+
+func (e Role) MarshalJSON() ([]byte, error) {
+	var buf bytes.Buffer
+	e.MarshalGQL(&buf)
+	return buf.Bytes(), nil
+}
+
 type Theme string
 
 const (
@@ -454,4 +498,18 @@ func (e *Theme) UnmarshalGQL(v any) error {
 
 func (e Theme) MarshalGQL(w io.Writer) {
 	fmt.Fprint(w, strconv.Quote(e.String()))
+}
+
+func (e *Theme) UnmarshalJSON(b []byte) error {
+	s, err := strconv.Unquote(string(b))
+	if err != nil {
+		return err
+	}
+	return e.UnmarshalGQL(s)
+}
+
+func (e Theme) MarshalJSON() ([]byte, error) {
+	var buf bytes.Buffer
+	e.MarshalGQL(&buf)
+	return buf.Bytes(), nil
 }

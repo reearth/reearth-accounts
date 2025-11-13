@@ -3,8 +3,8 @@ package repo
 import (
 	"context"
 
-	"github.com/reearth/reearth-accounts/pkg/user"
-	"github.com/reearth/reearth-accounts/pkg/workspace"
+	"github.com/reearth/reearth-accounts/server/pkg/user"
+	"github.com/reearth/reearth-accounts/server/pkg/workspace"
 	"github.com/reearth/reearthx/usecasex"
 )
 
@@ -12,6 +12,7 @@ type Workspace interface {
 	Filtered(WorkspaceFilter) Workspace
 	FindByID(context.Context, workspace.ID) (*workspace.Workspace, error)
 	FindByName(context.Context, string) (*workspace.Workspace, error)
+	FindByAlias(ctx context.Context, alias string) (*workspace.Workspace, error)
 	FindByIDs(context.Context, workspace.IDList) (workspace.List, error)
 	FindByUser(context.Context, user.ID) (workspace.List, error)
 	FindByUserWithPagination(ctx context.Context, id user.ID, pagination *usecasex.Pagination) (workspace.List, *usecasex.PageInfo, error)

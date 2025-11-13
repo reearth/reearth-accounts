@@ -11,26 +11,26 @@ type User implements Node {
 type Me {
   id: ID!
   name: String!
+  alias: String!
   email: String!
   metadata: UserMetadata!
   host: String
   myWorkspaceId: ID!
   auths: [String!]!
-  workspaces: [Workspace!]!
   myWorkspace: Workspace!
 }
 
 type UserMetadata {
   description: String!
-  lang: Lang!
-  photoURL: String!
-  theme: Theme!
   website: String!
+  photoURL: String!
+  lang: Lang!
+  theme: Theme!
 }
 
-input SignUpInput {
-  id: ID!
-  workspaceID: ID!
+input SignupInput {
+  id: ID
+  workspaceID: ID
   name: String!
   email: String!
   password: String!
@@ -41,9 +41,12 @@ input SignUpInput {
 }
 
 input SignupOIDCInput {
-  name: String!
-  email: String!
-  sub: String!
+  id: ID
+  name: String
+  email: String
+  sub: String
+  lang: Lang
+  workspaceId: ID
   secret: String
 }
 
@@ -91,6 +94,7 @@ extend type Query {
   me: Me
   userByNameOrEmail(nameOrEmail: String!): User
   searchUser(keyword: String!): [User!]!
+  findUsersByIDs(ids: [ID!]!): [User!]!
 }
 
 type UserPayload {
@@ -109,8 +113,8 @@ extend type Mutation {
   updateMe(input: UpdateMeInput!): UpdateMePayload
   removeMyAuth(input: RemoveMyAuthInput!): UpdateMePayload
   deleteMe(input: DeleteMeInput!): DeleteMePayload
-  signUp(input: SignUpInput!): UserPayload
-  signUpOIDC(input: SignupOIDCInput!): UserPayload
+  signup(input: SignupInput!): UserPayload
+  signupOIDC(input: SignupOIDCInput!): UserPayload
   verifyUser(input: VerifyUserInput!): UserPayload
   findOrCreate(input: FindOrCreateInput!): UserPayload
   createVerification(input: CreateVerificationInput!): Boolean

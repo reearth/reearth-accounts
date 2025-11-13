@@ -1,6 +1,7 @@
 package user
 
 import (
+	"github.com/reearth/reearth-accounts/server/pkg/id"
 	"github.com/reearth/reearthx/i18n"
 	"github.com/reearth/reearthx/rerror"
 )
@@ -26,22 +27,17 @@ func (b *Builder) Build() (*User, error) {
 	if b.u.id.IsEmpty() {
 		return nil, ErrInvalidID
 	}
-	if b.u.name == "" {
-		return nil, ErrInvalidName
-	}
 	if b.passwordText != "" {
 		if err := b.u.SetPassword(b.passwordText); err != nil {
 			return nil, err
 		}
 	}
-	if b.u.metadata != nil {
-		b.u.SetMetadata(b.u.metadata)
 
-		if !b.u.metadata.theme.Valid() {
-			b.u.metadata.theme = ThemeDefault
-		}
+	if !b.u.metadata.theme.Valid() {
+		b.u.metadata.theme = ThemeDefault
 	}
-	if err := b.u.SetEmail(b.email); err != nil {
+
+	if err := b.u.UpdateEmail(b.email); err != nil {
 		return nil, err
 	}
 	return b.u, nil
@@ -55,7 +51,7 @@ func (b *Builder) MustBuild() *User {
 	return r
 }
 
-func (b *Builder) ID(id ID) *Builder {
+func (b *Builder) ID(id id.UserID) *Builder {
 	b.u.id = id
 	return b
 }
@@ -117,7 +113,7 @@ func (b *Builder) Verification(v *Verification) *Builder {
 	return b
 }
 
-func (b *Builder) Metadata(m *Metadata) *Builder {
+func (b *Builder) Metadata(m Metadata) *Builder {
 	b.u.metadata = m
 	return b
 }

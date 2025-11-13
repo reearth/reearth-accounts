@@ -52,14 +52,14 @@ query SearchUser($keyword: String!) {
   }
 }
 
-mutation SignUp($input: SignUpInput!) {
-    signUp(input: $input) {
+mutation Signup($input: SignupInput!) {
+    signup(input: $input) {
         user {...FragmentUser}
     }
 }
 
 mutation SignupOIDC($input: SignupOIDCInput!) {
-    signUpOIDC(input: $input) {
+    signupOIDC(input: $input) {
         user {...FragmentUser}
     }
 }
@@ -146,9 +146,36 @@ fragment FragmentWorkspace on Workspace {
     }
 }
 
+query FindByID($id: ID!) {
+    findByID(id: $id) {
+        ...FragmentWorkspace
+    }
+}
+
+query FindByName($name: String!) {
+    findByName(name: $name) {
+        ...FragmentWorkspace
+    }
+}
+
+query FindByAlias($alias: String!) {
+    findByAlias(alias: $alias) {
+        ...FragmentWorkspace
+    }
+}
+
 query FindByUser($userId: ID!) {
     findByUser(userId: $userId) {
         ...FragmentWorkspace
+    }
+}
+
+query FindByUserWithPagination($userId: ID!, $page: Int!, $size: Int!) {
+    findByUserWithPagination(userId: $userId, pagination: { page: $page, size: $size }) {
+        workspaces {
+            ...FragmentWorkspace
+        }
+        totalCount
     }
 }
 

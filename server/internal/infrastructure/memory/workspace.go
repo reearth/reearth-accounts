@@ -2,16 +2,15 @@ package memory
 
 import (
 	"context"
-	slices0 "slices"
+	"slices"
 
-	"github.com/reearth/reearth-accounts/internal/usecase/repo"
-	"github.com/reearth/reearth-accounts/pkg/id"
-	"github.com/reearth/reearth-accounts/pkg/user"
-	"github.com/reearth/reearth-accounts/pkg/workspace"
+	"github.com/reearth/reearth-accounts/server/internal/usecase/repo"
+	"github.com/reearth/reearth-accounts/server/pkg/id"
+	"github.com/reearth/reearth-accounts/server/pkg/user"
+	"github.com/reearth/reearth-accounts/server/pkg/workspace"
 	"github.com/reearth/reearthx/rerror"
 	"github.com/reearth/reearthx/usecasex"
 	"github.com/reearth/reearthx/util"
-	"golang.org/x/exp/slices"
 )
 
 type Workspace struct {
@@ -95,7 +94,7 @@ func (r *Workspace) FindByIntegrations(_ context.Context, ids workspace.Integrat
 	}
 
 	res := r.data.FindAll(func(key workspace.ID, value *workspace.Workspace) bool {
-		return slices0.ContainsFunc(ids, value.Members().HasIntegration)
+		return slices.ContainsFunc(ids, value.Members().HasIntegration)
 	})
 
 	slices.SortFunc(res, func(a, b *workspace.Workspace) int { return a.ID().Compare(b.ID()) })
@@ -134,6 +133,18 @@ func (r *Workspace) FindByName(_ context.Context, name string) (*workspace.Works
 	}
 	return rerror.ErrIfNil(r.data.Find(func(key workspace.ID, value *workspace.Workspace) bool {
 		return value.Name() == name
+	}), rerror.ErrNotFound)
+}
+
+func (r *Workspace) FindByAlias(_ context.Context, alias string) (*workspace.Workspace, error) {
+	if r.err != nil {
+		return nil, r.err
+	}
+	if alias == "" {
+		return nil, rerror.ErrNotFound
+	}
+	return rerror.ErrIfNil(r.data.Find(func(key workspace.ID, value *workspace.Workspace) bool {
+		return value.Alias() == alias
 	}), rerror.ErrNotFound)
 }
 

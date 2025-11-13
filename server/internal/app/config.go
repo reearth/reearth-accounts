@@ -9,7 +9,7 @@ import (
 
 	"github.com/joho/godotenv"
 	"github.com/kelseyhightower/envconfig"
-	"github.com/reearth/reearth-accounts/pkg/workspace"
+	"github.com/reearth/reearth-accounts/server/pkg/workspace"
 	"github.com/reearth/reearthx/appx"
 	"github.com/reearth/reearthx/log"
 )
@@ -20,8 +20,9 @@ type Config struct {
 	Port    string `default:"8090" envconfig:"PORT"`
 	Dev     bool
 	DB      string   `default:"mongodb://localhost" envconfig:"REEARTH_ACCOUNTS_DB"`
+	DBName  string   `default:"reearth-account" envconfig:"REEARTH_ACCOUNTS_DB_NAME"`
 	Origins []string `envconfig:"REEARTH_ACCOUNTS_ORIGINS"`
-	Host    string
+	Host    string   `default:"0.0.0.0" envconfig:"HOST"`
 
 	GCPProject string `envconfig:"GOOGLE_CLOUD_PROJECT"`
 	Cert       CertConfig
@@ -37,7 +38,7 @@ type Config struct {
 
 	GraphQL GraphQLConfig
 
-	SignupSecret   string
+	SignupSecret   string `envconfig:"REEARTH_ACCOUNTS_SIGNUP_SECRET"`
 	HostWeb        string
 	Reearth_API    string
 	Reearth_Web    string
@@ -46,6 +47,12 @@ type Config struct {
 
 	// cerbos
 	CerbosHost string `envconfig:"CERBOS_HOST"`
+
+	// Storage
+	StorageIsLocal          bool   `envconfig:"REEARTH_ACCOUNTS_STORAGE_IS_LOCAL"`
+	StorageBucketName       string `envconfig:"REEARTH_ACCOUNTS_STORAGE_BUCKET_NAME" default:"reearth"`
+	StorageEmulatorEnabled  bool   `envconfig:"REEARTH_ACCOUNTS_STORAGE_EMULATOR_ENABLED"`
+	StorageEmulatorEndpoint string `envconfig:"REEARTH_ACCOUNTS_STORAGE_EMULATOR_ENDPOINT"`
 }
 
 type AuthConfig struct {

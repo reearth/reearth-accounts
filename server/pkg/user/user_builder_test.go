@@ -6,6 +6,7 @@ import (
 
 	"github.com/reearth/reearthx/idx"
 	"github.com/stretchr/testify/assert"
+	"golang.org/x/text/language"
 )
 
 func TestBuilder_ID(t *testing.T) {
@@ -32,6 +33,11 @@ func TestBuilder_ParseID(t *testing.T) {
 func TestBuilder_Name(t *testing.T) {
 	b := New().NewID().Name("xxx").Email("aaa@bbb.com").MustBuild()
 	assert.Equal(t, "xxx", b.Name())
+}
+
+func TestBuilder_Alias(t *testing.T) {
+	b := New().NewID().Name("aaa").Alias("xxx").Email("aaa@bbb.com").MustBuild()
+	assert.Equal(t, "xxx", b.Alias())
 }
 
 func TestBuilder_Workspace(t *testing.T) {
@@ -74,21 +80,21 @@ func TestBuilder_Build(t *testing.T) {
 	wid := NewWorkspaceID()
 	pass := MustEncodedPassword("abcDEF0!")
 
+	type args struct {
+		Name, Lang, Email string
+		ID                ID
+		Workspace         WorkspaceID
+		Metadata          Metadata
+		Auths             []Auth
+		PasswordBin       []byte
+	}
+
 	metadata := NewMetadata()
 	metadata.SetDescription("description")
 	metadata.SetWebsite("website")
 	metadata.SetPhotoURL("photo url")
 	metadata.LangFrom("en")
 	metadata.SetTheme(ThemeDefault)
-
-	type args struct {
-		Name, Lang, Email string
-		ID                ID
-		Workspace         WorkspaceID
-		Auths             []Auth
-		PasswordBin       []byte
-		Metadata          *Metadata
-	}
 
 	tests := []struct {
 		Name     string
@@ -122,7 +128,41 @@ func TestBuilder_Build(t *testing.T) {
 				auths:     []Auth{{Provider: "ppp", Sub: "sss"}},
 				metadata:  metadata,
 			},
-		}, {
+		},
+		{
+			Name: "Success build user with metadata",
+			Args: args{
+				Name:        "xxx",
+				Email:       "xx@yy.zz",
+				Lang:        "en",
+				ID:          uid,
+				Workspace:   wid,
+				Metadata:    metadata,
+				PasswordBin: pass,
+				Auths: []Auth{
+					{
+						Provider: "ppp",
+						Sub:      "sss",
+					},
+				},
+			},
+			Expected: &User{
+				id:        uid,
+				workspace: wid,
+				email:     "xx@yy.zz",
+				name:      "xxx",
+				password:  pass,
+				auths:     []Auth{{Provider: "ppp", Sub: "sss"}},
+				metadata: Metadata{
+					photoURL:    "photo url",
+					description: "description",
+					website:     "website",
+					lang:        language.English,
+					theme:       ThemeDefault,
+				},
+			},
+		},
+		{
 			Name:     "failed invalid id",
 			Expected: nil,
 			Err:      ErrInvalidID,
@@ -137,8 +177,8 @@ func TestBuilder_Build(t *testing.T) {
 				ID(tt.Args.ID).
 				EncodedPassword(pass).
 				Name(tt.Args.Name).
-				Auths(tt.Args.Auths).
 				Metadata(tt.Args.Metadata).
+				Auths(tt.Args.Auths).
 				Email(tt.Args.Email).
 				Workspace(tt.Args.Workspace).
 				Build()
@@ -172,7 +212,7 @@ func TestBuilder_MustBuild(t *testing.T) {
 		Workspace         WorkspaceID
 		PasswordBin       []byte
 		Auths             []Auth
-		Metadata          *Metadata
+		Metadata          Metadata
 	}
 
 	tests := []struct {
@@ -205,7 +245,13 @@ func TestBuilder_MustBuild(t *testing.T) {
 				name:      "xxx",
 				password:  pass,
 				auths:     []Auth{{Provider: "ppp", Sub: "sss"}},
-				metadata:  metadata,
+				metadata: Metadata{
+					photoURL:    "photo url",
+					description: "description",
+					website:     "website",
+					lang:        language.English,
+					theme:       ThemeDefault,
+				},
 			},
 		}, {
 			Name: "failed invalid id",

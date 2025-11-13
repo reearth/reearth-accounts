@@ -3,18 +3,35 @@ package gql
 import (
 	"context"
 
-	"github.com/reearth/reearth-accounts/internal/adapter/gql/gqlmodel"
-	"github.com/reearth/reearth-accounts/pkg/id"
-	"github.com/reearth/reearth-accounts/pkg/workspace"
+	"github.com/labstack/gommon/log"
+	"github.com/reearth/reearth-accounts/server/internal/adapter/gql/gqlmodel"
+	"github.com/reearth/reearth-accounts/server/pkg/id"
+	"github.com/reearth/reearth-accounts/server/pkg/workspace"
 )
 
 func (r *mutationResolver) CreateWorkspace(ctx context.Context, input gqlmodel.CreateWorkspaceInput) (*gqlmodel.CreateWorkspacePayload, error) {
-	res, err := usecases(ctx).Workspace.Create(ctx, input.Name, getUser(ctx).ID(), getOperator(ctx))
+	description := ""
+	if input.Description != nil {
+		description = *input.Description
+	}
+
+	w, err := usecases(ctx).Workspace.Create(ctx, input.Alias, input.Name, description, getUser(ctx).ID(), getOperator(ctx))
 	if err != nil {
 		return nil, err
 	}
 
-	return &gqlmodel.CreateWorkspacePayload{Workspace: gqlmodel.ToWorkspace(res)}, nil
+	exists, err := buildExistingUserSetFromWorkspace(ctx, w)
+	if err != nil {
+		return nil, err
+	}
+
+	converted, err := gqlmodel.ToWorkspace(w, exists, r.Storage)
+	if err != nil {
+		log.Errorf("failed to convert workspace: %s", err.Error())
+		return nil, err
+	}
+
+	return &gqlmodel.CreateWorkspacePayload{Workspace: converted}, nil
 }
 
 func (r *mutationResolver) DeleteWorkspace(ctx context.Context, input gqlmodel.DeleteWorkspaceInput) (*gqlmodel.DeleteWorkspacePayload, error) {
@@ -36,12 +53,23 @@ func (r *mutationResolver) UpdateWorkspace(ctx context.Context, input gqlmodel.U
 		return nil, err
 	}
 
-	res, err := usecases(ctx).Workspace.Update(ctx, tid, input.Name, getOperator(ctx))
+	w, err := usecases(ctx).Workspace.Update(ctx, tid, input.Name, getOperator(ctx))
 	if err != nil {
 		return nil, err
 	}
 
-	return &gqlmodel.UpdateWorkspacePayload{Workspace: gqlmodel.ToWorkspace(res)}, nil
+	exists, err := buildExistingUserSetFromWorkspace(ctx, w)
+	if err != nil {
+		return nil, err
+	}
+
+	converted, err := gqlmodel.ToWorkspace(w, exists, r.Storage)
+	if err != nil {
+		log.Errorf("failed to convert workspace: %s", err.Error())
+		return nil, err
+	}
+
+	return &gqlmodel.UpdateWorkspacePayload{Workspace: converted}, nil
 }
 
 func (r *mutationResolver) AddUsersToWorkspace(ctx context.Context, input gqlmodel.AddUsersToWorkspaceInput) (*gqlmodel.AddUsersToWorkspacePayload, error) {
@@ -57,12 +85,23 @@ func (r *mutationResolver) AddUsersToWorkspace(ctx context.Context, input gqlmod
 		}
 		usersMap[uid] = gqlmodel.FromRole(u.Role)
 	}
-	res, err := usecases(ctx).Workspace.AddUserMember(ctx, wid, usersMap, getOperator(ctx))
+	w, err := usecases(ctx).Workspace.AddUserMember(ctx, wid, usersMap, getOperator(ctx))
 	if err != nil {
 		return nil, err
 	}
 
-	return &gqlmodel.AddUsersToWorkspacePayload{Workspace: gqlmodel.ToWorkspace(res)}, nil
+	exists, err := buildExistingUserSetFromWorkspace(ctx, w)
+	if err != nil {
+		return nil, err
+	}
+
+	converted, err := gqlmodel.ToWorkspace(w, exists, r.Storage)
+	if err != nil {
+		log.Errorf("failed to convert workspace: %s", err.Error())
+		return nil, err
+	}
+
+	return &gqlmodel.AddUsersToWorkspacePayload{Workspace: converted}, nil
 }
 
 func (r *mutationResolver) AddIntegrationToWorkspace(ctx context.Context, input gqlmodel.AddIntegrationToWorkspaceInput) (*gqlmodel.AddUsersToWorkspacePayload, error) {
@@ -71,12 +110,23 @@ func (r *mutationResolver) AddIntegrationToWorkspace(ctx context.Context, input 
 		return nil, err
 	}
 
-	res, err := usecases(ctx).Workspace.AddIntegrationMember(ctx, wId, iId, gqlmodel.FromRole(input.Role), getOperator(ctx))
+	w, err := usecases(ctx).Workspace.AddIntegrationMember(ctx, wId, iId, gqlmodel.FromRole(input.Role), getOperator(ctx))
 	if err != nil {
 		return nil, err
 	}
 
-	return &gqlmodel.AddUsersToWorkspacePayload{Workspace: gqlmodel.ToWorkspace(res)}, nil
+	exists, err := buildExistingUserSetFromWorkspace(ctx, w)
+	if err != nil {
+		return nil, err
+	}
+
+	converted, err := gqlmodel.ToWorkspace(w, exists, r.Storage)
+	if err != nil {
+		log.Errorf("failed to convert workspace: %s", err.Error())
+		return nil, err
+	}
+
+	return &gqlmodel.AddUsersToWorkspacePayload{Workspace: converted}, nil
 }
 
 func (r *mutationResolver) RemoveUserFromWorkspace(ctx context.Context, input gqlmodel.RemoveUserFromWorkspaceInput) (*gqlmodel.RemoveMemberFromWorkspacePayload, error) {
@@ -85,12 +135,23 @@ func (r *mutationResolver) RemoveUserFromWorkspace(ctx context.Context, input gq
 		return nil, err
 	}
 
-	res, err := usecases(ctx).Workspace.RemoveUserMember(ctx, tid, uid, getOperator(ctx))
+	w, err := usecases(ctx).Workspace.RemoveUserMember(ctx, tid, uid, getOperator(ctx))
 	if err != nil {
 		return nil, err
 	}
 
-	return &gqlmodel.RemoveMemberFromWorkspacePayload{Workspace: gqlmodel.ToWorkspace(res)}, nil
+	exists, err := buildExistingUserSetFromWorkspace(ctx, w)
+	if err != nil {
+		return nil, err
+	}
+
+	converted, err := gqlmodel.ToWorkspace(w, exists, r.Storage)
+	if err != nil {
+		log.Errorf("failed to convert workspace: %s", err.Error())
+		return nil, err
+	}
+
+	return &gqlmodel.RemoveMemberFromWorkspacePayload{Workspace: converted}, nil
 }
 
 // Temporary stub implementation to satisfy gqlgen after migrating GraphQL files from reearthx/account.
@@ -106,12 +167,23 @@ func (r *mutationResolver) RemoveIntegrationFromWorkspace(ctx context.Context, i
 		return nil, err
 	}
 
-	res, err := usecases(ctx).Workspace.RemoveIntegration(ctx, wId, iId, getOperator(ctx))
+	w, err := usecases(ctx).Workspace.RemoveIntegration(ctx, wId, iId, getOperator(ctx))
 	if err != nil {
 		return nil, err
 	}
 
-	return &gqlmodel.RemoveMemberFromWorkspacePayload{Workspace: gqlmodel.ToWorkspace(res)}, nil
+	exists, err := buildExistingUserSetFromWorkspace(ctx, w)
+	if err != nil {
+		return nil, err
+	}
+
+	converted, err := gqlmodel.ToWorkspace(w, exists, r.Storage)
+	if err != nil {
+		log.Errorf("failed to convert workspace: %s", err.Error())
+		return nil, err
+	}
+
+	return &gqlmodel.RemoveMemberFromWorkspacePayload{Workspace: converted}, nil
 }
 
 // Temporary stub implementation to satisfy gqlgen after migrating GraphQL files from reearthx/account.
@@ -127,12 +199,23 @@ func (r *mutationResolver) UpdateUserOfWorkspace(ctx context.Context, input gqlm
 		return nil, err
 	}
 
-	res, err := usecases(ctx).Workspace.UpdateUserMember(ctx, tid, uid, gqlmodel.FromRole(input.Role), getOperator(ctx))
+	w, err := usecases(ctx).Workspace.UpdateUserMember(ctx, tid, uid, gqlmodel.FromRole(input.Role), getOperator(ctx))
 	if err != nil {
 		return nil, err
 	}
 
-	return &gqlmodel.UpdateMemberOfWorkspacePayload{Workspace: gqlmodel.ToWorkspace(res)}, nil
+	exists, err := buildExistingUserSetFromWorkspace(ctx, w)
+	if err != nil {
+		return nil, err
+	}
+
+	converted, err := gqlmodel.ToWorkspace(w, exists, r.Storage)
+	if err != nil {
+		log.Errorf("failed to convert workspace: %s", err.Error())
+		return nil, err
+	}
+
+	return &gqlmodel.UpdateMemberOfWorkspacePayload{Workspace: converted}, nil
 }
 
 func (r *mutationResolver) UpdateIntegrationOfWorkspace(ctx context.Context, input gqlmodel.UpdateIntegrationOfWorkspaceInput) (*gqlmodel.UpdateMemberOfWorkspacePayload, error) {
@@ -141,10 +224,21 @@ func (r *mutationResolver) UpdateIntegrationOfWorkspace(ctx context.Context, inp
 		return nil, err
 	}
 
-	res, err := usecases(ctx).Workspace.UpdateIntegration(ctx, wId, iId, gqlmodel.FromRole(input.Role), getOperator(ctx))
+	w, err := usecases(ctx).Workspace.UpdateIntegration(ctx, wId, iId, gqlmodel.FromRole(input.Role), getOperator(ctx))
 	if err != nil {
 		return nil, err
 	}
 
-	return &gqlmodel.UpdateMemberOfWorkspacePayload{Workspace: gqlmodel.ToWorkspace(res)}, nil
+	exists, err := buildExistingUserSetFromWorkspace(ctx, w)
+	if err != nil {
+		return nil, err
+	}
+
+	converted, err := gqlmodel.ToWorkspace(w, exists, r.Storage)
+	if err != nil {
+		log.Errorf("failed to convert workspace: %s", err.Error())
+		return nil, err
+	}
+
+	return &gqlmodel.UpdateMemberOfWorkspacePayload{Workspace: converted}, nil
 }

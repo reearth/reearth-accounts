@@ -7,8 +7,11 @@ help:
 	@echo "Targets:"
 	@echo "  dev-install       Install tools for make dev - behavior not confirmed in windows."
 	@echo "  dev               Run the application with hot reloading"
+	@echo "  run               Run reearth-cerbos and reearth-accounts via docker-compose with hot reload"
+	@echo "  down              Stop and remove containers started by make run"
 	@echo "  run-app           Run the application"
 	@echo "  run-cerbos        Run the Cerbos server"
+	@echo "  run-migration     Run database migrations"
 	@echo "  gql               Generate GraphQL code include dataloader"
 	@echo "  generate          Run go generate"
 
@@ -16,6 +19,9 @@ TARGET_TEST :=./...
 REEARTH_DB := mongodb://localhost
 test:
 	REEARTH_DB=${REEARTH_DB} go test ./... -run ${TARGET_TEST}
+
+DOCKER_COMPOSE := docker compose -f ../docker-compose.yml
+DOCKER_COMPOSE_DEV := docker compose -f ../docker-compose.dev.yml
 
 AIR_BIN := $(shell which air)
 MOCKGEN_BIN := $(shell which mockgen)
@@ -39,8 +45,14 @@ dev: dev-install
 run-app:
 	go run ./cmd/reearth-accounts
 
+run:
+	${DOCKER_COMPOSE_DEV} up reearth-accounts-dev
+
+down:
+	${DOCKER_COMPOSE_DEV} down
+
 run-cerbos:
-	docker compose -f ../docker-compose.yml up -d reearth-cerbos
+	${DOCKER_COMPOSE} up -d reearth-cerbos
 
 generate: dev-install
 	go generate ./...
@@ -48,4 +60,7 @@ generate: dev-install
 gql:
 	go generate ./internal/adapter/gql
 
-.PHONY: dev-install dev run-app run-cerbos gql
+run-migration:
+	RUN_MIGRATION=true go run ./cmd/reearth-accounts
+
+.PHONY: dev-install dev run down run-app run-cerbos run-migration gql
