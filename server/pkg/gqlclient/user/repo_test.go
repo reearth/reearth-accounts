@@ -10,6 +10,7 @@ import (
 
 	"github.com/jarcoal/httpmock"
 	"github.com/reearth/reearth-accounts/server/pkg/gqlclient"
+	"github.com/reearth/reearth-accounts/server/pkg/gqlclient/user"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -134,6 +135,169 @@ func TestUserRepo_FindMe(t *testing.T) {
 		)
 
 		got, err := client.UserRepo.FindMe(ctx)
+
+		assert.Error(t, err)
+		assert.Nil(t, got)
+	})
+}
+
+func TestUserRepo_UpdateMe(t *testing.T) {
+	ctx := context.Background()
+
+	t.Run("successfully update with all fields", func(t *testing.T) {
+		httpmock.Activate()
+		defer httpmock.DeactivateAndReset()
+
+		transport := httpmock.DefaultTransport
+		client := gqlclient.NewClient("https://accounts.example.com", 30, transport)
+
+		name := "Updated Name"
+		email := "updated@example.com"
+		lang := "ja"
+		theme := "DARK"
+		password := "newpassword123"
+		passwordConfirmation := "newpassword123"
+
+		httpmock.RegisterResponder("POST", "https://accounts.example.com/api/graphql",
+			func(req *http.Request) (*http.Response, error) {
+				bodyBytes, _ := io.ReadAll(req.Body)
+				fmt.Printf("\n--- UpdateMe GraphQL Request ---\n%s\n", string(bodyBytes))
+				req.Body = io.NopCloser(bytes.NewBuffer(bodyBytes))
+				return httpmock.NewStringResponse(http.StatusOK, `{
+					"data": {
+						"updateMe": {
+							"me": {
+								"id": "01j9x0yy00000000000000000a",
+								"name": "Updated Name",
+								"alias": "testuser",
+								"email": "updated@example.com",
+								"myWorkspaceId": "01j9x0yy00000000000000001a",
+								"host": "",
+								"auths": ["auth0|123456"],
+								"metadata": {
+									"photoURL": "https://example.com/photo.jpg",
+									"description": "Test description",
+									"website": "https://example.com",
+									"lang": "ja",
+									"theme": "DARK"
+								}
+							}
+						}
+					}
+				}`), nil
+			},
+		)
+
+		input := user.UpdateMeInput{
+			Name:                 &name,
+			Email:                &email,
+			Lang:                 &lang,
+			Theme:                &theme,
+			Password:             &password,
+			PasswordConfirmation: &passwordConfirmation,
+		}
+
+		got, err := client.UserRepo.UpdateMe(ctx, input)
+
+		assert.NoError(t, err)
+		assert.NotNil(t, got)
+		assert.Equal(t, "Updated Name", got.Name())
+		assert.Equal(t, "updated@example.com", got.Email())
+		assert.Equal(t, "ja", got.Metadata().Lang().String())
+		assert.Equal(t, "dark", string(got.Metadata().Theme()))
+	})
+
+	t.Run("successfully update with partial fields", func(t *testing.T) {
+		httpmock.Activate()
+		defer httpmock.DeactivateAndReset()
+
+		transport := httpmock.DefaultTransport
+		client := gqlclient.NewClient("https://accounts.example.com", 30, transport)
+
+		name := "Partial Update"
+
+		httpmock.RegisterResponder("POST", "https://accounts.example.com/api/graphql",
+			func(req *http.Request) (*http.Response, error) {
+				bodyBytes, _ := io.ReadAll(req.Body)
+				fmt.Printf("\n--- UpdateMe Partial GraphQL Request ---\n%s\n", string(bodyBytes))
+				req.Body = io.NopCloser(bytes.NewBuffer(bodyBytes))
+				return httpmock.NewStringResponse(http.StatusOK, `{
+					"data": {
+						"updateMe": {
+							"me": {
+								"id": "01j9x0yy00000000000000000a",
+								"name": "Partial Update",
+								"alias": "testuser",
+								"email": "test@example.com",
+								"myWorkspaceId": "01j9x0yy00000000000000001a",
+								"host": "",
+								"auths": ["auth0|123456"],
+								"metadata": {
+									"photoURL": "",
+									"description": "",
+									"website": "",
+									"lang": "en",
+									"theme": "light"
+								}
+							}
+						}
+					}
+				}`), nil
+			},
+		)
+
+		input := user.UpdateMeInput{
+			Name: &name,
+		}
+
+		got, err := client.UserRepo.UpdateMe(ctx, input)
+
+		assert.NoError(t, err)
+		assert.NotNil(t, got)
+		assert.Equal(t, "Partial Update", got.Name())
+	})
+
+	t.Run("error on invalid user ID", func(t *testing.T) {
+		httpmock.Activate()
+		defer httpmock.DeactivateAndReset()
+
+		transport := httpmock.DefaultTransport
+		client := gqlclient.NewClient("https://accounts.example.com", 30, transport)
+
+		name := "Test"
+
+		httpmock.RegisterResponder(
+			"POST",
+			"https://accounts.example.com/api/graphql",
+			httpmock.NewStringResponder(http.StatusOK, `{
+				"data": {
+					"updateMe": {
+						"me": {
+							"id": "invalid-id",
+							"name": "Test",
+							"alias": "testuser",
+							"email": "test@example.com",
+							"myWorkspaceId": "01j9x0yy00000000000000001a",
+							"host": "",
+							"auths": [],
+							"metadata": {
+								"photoURL": "",
+								"description": "",
+								"website": "",
+								"lang": "",
+								"theme": ""
+							}
+						}
+					}
+				}
+			}`),
+		)
+
+		input := user.UpdateMeInput{
+			Name: &name,
+		}
+
+		got, err := client.UserRepo.UpdateMe(ctx, input)
 
 		assert.Error(t, err)
 		assert.Nil(t, got)
