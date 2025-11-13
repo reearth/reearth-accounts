@@ -1,11 +1,13 @@
 type User implements Node {
   id: ID!
   name: String!
+  alias: String!
   email: String!
   host: String
   workspace: ID!
   auths: [String!]!
   metadata: UserMetadata!
+  verification: Verification
 }
 
 type Me {
@@ -26,6 +28,12 @@ type UserMetadata {
   photoURL: String!
   lang: Lang!
   theme: Theme!
+}
+
+type Verification {
+  code: String!
+  expiration: String!
+  verified: Boolean!
 }
 
 input SignupInput {
@@ -90,10 +98,14 @@ input DeleteMeInput {
   userId: ID!
 }
 
+type SearchUserOutput {
+  users: [User!]!
+}
+
 extend type Query {
   me: Me
   userByNameOrEmail(nameOrEmail: String!): User
-  searchUser(keyword: String!): [User!]!
+  searchUser(keyword: String!): SearchUserOutput!
   findUsersByIDs(ids: [ID!]!): [User!]!
 }
 

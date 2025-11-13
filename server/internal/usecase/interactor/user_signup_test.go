@@ -15,6 +15,7 @@ import (
 	"github.com/reearth/reearth-accounts/server/pkg/id"
 	"github.com/reearth/reearth-accounts/server/pkg/user"
 	"github.com/reearth/reearth-accounts/server/pkg/workspace"
+	"github.com/reearth/reearthx/i18n"
 	"github.com/reearth/reearthx/mailer"
 	"github.com/reearth/reearthx/rerror"
 	"github.com/reearth/reearthx/util"
@@ -294,26 +295,43 @@ func TestIssToURL(t *testing.T) {
 	assert.Equal(t, &url.URL{Scheme: "https", Host: "iss.com", Path: "/hoge/foobar"}, issToURL("https://iss.com/hoge", "foobar"))
 }
 
+// mockAuthenticator is a test helper that implements the Authenticator interface
+type mockAuthenticator struct {
+	resendVerificationEmailCalled bool
+	resendVerificationEmailUserID string
+	resendVerificationEmailError  error
+}
+
+func (m *mockAuthenticator) UpdateUser(ctx context.Context, p gateway.AuthenticatorUpdateUserParam) (gateway.AuthenticatorUser, error) {
+	return gateway.AuthenticatorUser{}, nil
+}
+
+func (m *mockAuthenticator) ResendVerificationEmail(ctx context.Context, userID string) error {
+	m.resendVerificationEmailCalled = true
+	m.resendVerificationEmailUserID = userID
+	return m.resendVerificationEmailError
+}
+
 func TestUser_CreateVerification(t *testing.T) {
 	user.DefaultPasswordEncoder = &user.NoopPasswordEncoder{}
 	uid := id.NewUserID()
+	uid2 := id.NewUserID()
+	uid3 := id.NewUserID()
 	tid := id.NewWorkspaceID()
-	r := accountmemory.New()
-
-	m := mailer.NewMock()
-	g := &gateway.Container{Mailer: m}
-	uc := NewUser(r, g, "", "")
 	mocktime := time.Time{}
 	mockcode := "CODECODE"
 
 	tests := []struct {
-		name             string
-		createUserBefore *user.User
-		email            string
-		wantError        error
+		name                              string
+		createUserBefore                  *user.User
+		email                             string
+		authenticatorError                error
+		wantError                         error
+		wantAuthenticatorCalled           bool
+		wantAuthenticatorCalledWithUserID string
 	}{
 		{
-			name: "ok",
+			name: "user without auth0",
 			createUserBefore: user.New().
 				ID(uid).
 				Workspace(tid).
@@ -321,25 +339,78 @@ func TestUser_CreateVerification(t *testing.T) {
 				Name("NAME").
 				Verification(user.VerificationFrom(mockcode, mocktime, false)).
 				MustBuild(),
-			email:     "aaa@bbb.com",
-			wantError: nil,
+			email:                   "aaa@bbb.com",
+			wantError:               nil,
+			wantAuthenticatorCalled: false,
 		},
 		{
-			name: "verified user",
+			name: "user with auth0",
 			createUserBefore: user.New().
-				ID(uid).
+				ID(uid2).
 				Workspace(tid).
-				Email("aaa@bbb.com").
-				Name("NAME").
+				Email("auth0user@bbb.com").
+				Name("AUTH0USER").
+				Auths([]user.Auth{{Provider: "auth0", Sub: "auth0|123456"}}).
+				Verification(user.VerificationFrom(mockcode, mocktime, false)).
+				MustBuild(),
+			email:                             "auth0user@bbb.com",
+			wantError:                         nil,
+			wantAuthenticatorCalled:           true,
+			wantAuthenticatorCalledWithUserID: "auth0|123456",
+		},
+		{
+			name: "user with auth0 and reearth",
+			createUserBefore: user.New().
+				ID(uid3).
+				Workspace(tid).
+				Email("mixeduser@bbb.com").
+				Name("MIXEDUSER").
+				Auths([]user.Auth{
+					{Provider: "reearth", Sub: "reearth|abc"},
+					{Provider: "auth0", Sub: "auth0|789"},
+				}).
+				Verification(user.VerificationFrom(mockcode, mocktime, false)).
+				MustBuild(),
+			email:                             "mixeduser@bbb.com",
+			wantError:                         nil,
+			wantAuthenticatorCalled:           true,
+			wantAuthenticatorCalledWithUserID: "auth0|789",
+		},
+		{
+			name: "verified user with auth0 - should skip",
+			createUserBefore: user.New().
+				ID(uid2).
+				Workspace(tid).
+				Email("verified@bbb.com").
+				Name("VERIFIED").
+				Auths([]user.Auth{{Provider: "auth0", Sub: "auth0|verified"}}).
 				Verification(user.VerificationFrom(mockcode, mocktime, true)).
 				MustBuild(),
-			email:     "aaa@bbb.com",
-			wantError: nil,
+			email:                   "verified@bbb.com",
+			wantError:               nil,
+			wantAuthenticatorCalled: false,
 		},
 		{
-			name:      "not found",
-			email:     "ccc@bbb.com",
-			wantError: rerror.ErrNotFound,
+			name: "authenticator returns error",
+			createUserBefore: user.New().
+				ID(uid2).
+				Workspace(tid).
+				Email("erroruser@bbb.com").
+				Name("ERRORUSER").
+				Auths([]user.Auth{{Provider: "auth0", Sub: "auth0|error"}}).
+				Verification(user.VerificationFrom(mockcode, mocktime, false)).
+				MustBuild(),
+			email:                             "erroruser@bbb.com",
+			authenticatorError:                rerror.NewE(i18n.T("failed to resend verification email")),
+			wantError:                         rerror.NewE(i18n.T("failed to resend verification email")),
+			wantAuthenticatorCalled:           true,
+			wantAuthenticatorCalledWithUserID: "auth0|error",
+		},
+		{
+			name:                    "not found",
+			email:                   "ccc@bbb.com",
+			wantError:               rerror.ErrNotFound,
+			wantAuthenticatorCalled: false,
 		},
 	}
 
@@ -348,17 +419,36 @@ func TestUser_CreateVerification(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 			ctx := context.Background()
+			r := accountmemory.New()
+
 			if tt.createUserBefore != nil {
 				assert.NoError(t, r.User.Save(ctx, tt.createUserBefore))
 			}
+
+			m := mailer.NewMock()
+			auth := &mockAuthenticator{
+				resendVerificationEmailError: tt.authenticatorError,
+			}
+			g := &gateway.Container{
+				Mailer:        m,
+				Authenticator: auth,
+			}
+			uc := NewUser(r, g, "", "")
+
 			err := uc.CreateVerification(ctx, tt.email)
 
-			if err != nil {
-				assert.Equal(t, tt.wantError, err)
+			if tt.wantError != nil {
+				assert.Error(t, err)
 			} else {
+				assert.NoError(t, err)
 				user, err := r.User.FindByEmail(ctx, tt.email)
 				assert.NoError(t, err)
 				assert.NotNil(t, user.Verification())
+			}
+
+			assert.Equal(t, tt.wantAuthenticatorCalled, auth.resendVerificationEmailCalled, "authenticator call mismatch")
+			if tt.wantAuthenticatorCalled {
+				assert.Equal(t, tt.wantAuthenticatorCalledWithUserID, auth.resendVerificationEmailUserID, "authenticator userID mismatch")
 			}
 		})
 	}
