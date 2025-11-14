@@ -290,6 +290,164 @@ func TestSyncUserNameToWorkspace(t *testing.T) {
 		assert.Equal(t, "Charlie Brown", result2.Name)
 	})
 
+	t.Run("EukaryaEmailDomain", func(t *testing.T) {
+		ctx := context.Background()
+		db := mongotest.Connect(t)(t)
+
+		client := mongox.NewClientWithDatabase(db)
+		userCol := client.WithCollection("user")
+		workspaceCol := client.WithCollection("workspace")
+
+		// Setup: User with eukarya.io email domain
+		testUser := mongodoc.UserDocument{
+			ID:        "user9",
+			Name:      "Eukarya User",
+			Email:     "user@eukarya.io",
+			Workspace: "workspace9",
+		}
+
+		testWorkspace := mongodoc.WorkspaceDocument{
+			ID:       "workspace9",
+			Name:     "user@eukarya.io",
+			Personal: true,
+		}
+
+		_, err := userCol.Client().InsertOne(ctx, testUser)
+		assert.NoError(t, err)
+		_, err = workspaceCol.Client().InsertOne(ctx, testWorkspace)
+		assert.NoError(t, err)
+
+		// Run migration
+		err = SyncUserNameToWorkspace(ctx, client)
+		assert.NoError(t, err)
+
+		// Verify workspace name was updated
+		var result mongodoc.WorkspaceDocument
+		err = workspaceCol.Client().FindOne(ctx, bson.M{"id": "workspace9"}).Decode(&result)
+		assert.NoError(t, err)
+		assert.Equal(t, "Eukarya User", result.Name)
+	})
+
+	t.Run("GmailDomain", func(t *testing.T) {
+		ctx := context.Background()
+		db := mongotest.Connect(t)(t)
+
+		client := mongox.NewClientWithDatabase(db)
+		userCol := client.WithCollection("user")
+		workspaceCol := client.WithCollection("workspace")
+
+		// Setup: User with gmail.com email domain
+		testUser := mongodoc.UserDocument{
+			ID:        "user10",
+			Name:      "Gmail User",
+			Email:     "someone@gmail.com",
+			Workspace: "workspace10",
+		}
+
+		testWorkspace := mongodoc.WorkspaceDocument{
+			ID:       "workspace10",
+			Name:     "someone@gmail.com",
+			Personal: true,
+		}
+
+		_, err := userCol.Client().InsertOne(ctx, testUser)
+		assert.NoError(t, err)
+		_, err = workspaceCol.Client().InsertOne(ctx, testWorkspace)
+		assert.NoError(t, err)
+
+		// Run migration
+		err = SyncUserNameToWorkspace(ctx, client)
+		assert.NoError(t, err)
+
+		// Verify workspace name was updated
+		var result mongodoc.WorkspaceDocument
+		err = workspaceCol.Client().FindOne(ctx, bson.M{"id": "workspace10"}).Decode(&result)
+		assert.NoError(t, err)
+		assert.Equal(t, "Gmail User", result.Name)
+	})
+
+	t.Run("MixedEmailDomains", func(t *testing.T) {
+		ctx := context.Background()
+		db := mongotest.Connect(t)(t)
+
+		client := mongox.NewClientWithDatabase(db)
+		userCol := client.WithCollection("user")
+		workspaceCol := client.WithCollection("workspace")
+
+		// Setup: Multiple users with different email domains
+		testUser1 := mongodoc.UserDocument{
+			ID:        "user11",
+			Name:      "Eukarya Admin",
+			Email:     "admin@eukarya.io",
+			Workspace: "workspace11",
+		}
+
+		testWorkspace1 := mongodoc.WorkspaceDocument{
+			ID:       "workspace11",
+			Name:     "admin@eukarya.io",
+			Personal: true,
+		}
+
+		testUser2 := mongodoc.UserDocument{
+			ID:        "user12",
+			Name:      "Gmail Developer",
+			Email:     "dev@gmail.com",
+			Workspace: "workspace12",
+		}
+
+		testWorkspace2 := mongodoc.WorkspaceDocument{
+			ID:       "workspace12",
+			Name:     "dev@gmail.com",
+			Personal: true,
+		}
+
+		testUser3 := mongodoc.UserDocument{
+			ID:        "user13",
+			Name:      "Example User",
+			Email:     "test@example.com",
+			Workspace: "workspace13",
+		}
+
+		testWorkspace3 := mongodoc.WorkspaceDocument{
+			ID:       "workspace13",
+			Name:     "test@example.com",
+			Personal: true,
+		}
+
+		_, err := userCol.Client().InsertOne(ctx, testUser1)
+		assert.NoError(t, err)
+		_, err = workspaceCol.Client().InsertOne(ctx, testWorkspace1)
+		assert.NoError(t, err)
+		_, err = userCol.Client().InsertOne(ctx, testUser2)
+		assert.NoError(t, err)
+		_, err = workspaceCol.Client().InsertOne(ctx, testWorkspace2)
+		assert.NoError(t, err)
+		_, err = userCol.Client().InsertOne(ctx, testUser3)
+		assert.NoError(t, err)
+		_, err = workspaceCol.Client().InsertOne(ctx, testWorkspace3)
+		assert.NoError(t, err)
+
+		// Run migration
+		err = SyncUserNameToWorkspace(ctx, client)
+		assert.NoError(t, err)
+
+		// Verify all workspaces were updated correctly
+		var result1 mongodoc.WorkspaceDocument
+		err = workspaceCol.Client().FindOne(ctx, bson.M{"id": "workspace11"}).Decode(&result1)
+		assert.NoError(t, err)
+		assert.Equal(t, "Eukarya Admin", result1.Name)
+
+		var result2 mongodoc.WorkspaceDocument
+		err = workspaceCol.Client().FindOne(ctx, bson.M{"id": "workspace12"}).Decode(&result2)
+		assert.NoError(t, err)
+		assert.Equal(t, "Gmail Developer", result2.Name)
+
+		var result3 mongodoc.WorkspaceDocument
+		err = workspaceCol.Client().FindOne(ctx, bson.M{"id": "workspace13"}).Decode(&result3)
+		assert.NoError(t, err)
+		assert.Equal(t, "Example User", result3.Name)
+	})
+
 	t.Run("EmptyDatabase", func(t *testing.T) {
 		ctx := context.Background()
 		db := mongotest.Connect(t)(t)
