@@ -296,43 +296,40 @@ func TestIssToURL(t *testing.T) {
 
 func TestUser_CreateVerification(t *testing.T) {
 	user.DefaultPasswordEncoder = &user.NoopPasswordEncoder{}
-	uid := id.NewUserID()
-	tid := id.NewWorkspaceID()
-	r := accountmemory.New()
-
-	m := mailer.NewMock()
-	g := &gateway.Container{Mailer: m}
-	uc := NewUser(r, g, "", "")
 	mocktime := time.Time{}
 	mockcode := "CODECODE"
 
 	tests := []struct {
 		name             string
-		createUserBefore *user.User
+		createUserBefore func() *user.User
 		email            string
 		wantError        error
 	}{
 		{
 			name: "ok",
-			createUserBefore: user.New().
-				ID(uid).
-				Workspace(tid).
-				Email("aaa@bbb.com").
-				Name("NAME").
-				Verification(user.VerificationFrom(mockcode, mocktime, false)).
-				MustBuild(),
+			createUserBefore: func() *user.User {
+				return user.New().
+					ID(id.NewUserID()).
+					Workspace(id.NewWorkspaceID()).
+					Email("aaa@bbb.com").
+					Name("NAME").
+					Verification(user.VerificationFrom(mockcode, mocktime, false)).
+					MustBuild()
+			},
 			email:     "aaa@bbb.com",
 			wantError: nil,
 		},
 		{
 			name: "verified user",
-			createUserBefore: user.New().
-				ID(uid).
-				Workspace(tid).
-				Email("aaa@bbb.com").
-				Name("NAME").
-				Verification(user.VerificationFrom(mockcode, mocktime, true)).
-				MustBuild(),
+			createUserBefore: func() *user.User {
+				return user.New().
+					ID(id.NewUserID()).
+					Workspace(id.NewWorkspaceID()).
+					Email("aaa@bbb.com").
+					Name("NAME").
+					Verification(user.VerificationFrom(mockcode, mocktime, true)).
+					MustBuild()
+			},
 			email:     "aaa@bbb.com",
 			wantError: nil,
 		},
@@ -348,8 +345,15 @@ func TestUser_CreateVerification(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 			ctx := context.Background()
+
+			// Create independent repository for each test case to avoid data races
+			r := accountmemory.New()
+			m := mailer.NewMock()
+			g := &gateway.Container{Mailer: m}
+			uc := NewUser(r, g, "", "")
+
 			if tt.createUserBefore != nil {
-				assert.NoError(t, r.User.Save(ctx, tt.createUserBefore))
+				assert.NoError(t, r.User.Save(ctx, tt.createUserBefore()))
 			}
 			err := uc.CreateVerification(ctx, tt.email)
 

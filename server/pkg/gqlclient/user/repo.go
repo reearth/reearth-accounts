@@ -138,25 +138,39 @@ func (r *userRepo) Update(ctx context.Context, name string) error {
 
 func (r *userRepo) UpdateMe(ctx context.Context, input UpdateMeInput) (*user.User, error) {
 	var m updateMeFullMutation
-	vars := map[string]interface{}{}
+
+	vars := map[string]interface{}{
+		"name":                 (*graphql.String)(nil),
+		"email":                (*graphql.String)(nil),
+		"lang":                 (*gqlmodel.Lang)(nil),
+		"theme":                (*gqlmodel.Theme)(nil),
+		"password":             (*graphql.String)(nil),
+		"passwordConfirmation": (*graphql.String)(nil),
+	}
 
 	if input.Name != nil {
-		vars["name"] = graphql.String(*input.Name)
+		name := graphql.String(*input.Name)
+		vars["name"] = &name
 	}
 	if input.Email != nil {
-		vars["email"] = graphql.String(*input.Email)
+		email := graphql.String(*input.Email)
+		vars["email"] = &email
 	}
 	if input.Lang != nil {
-		vars["lang"] = graphql.String(*input.Lang)
+		lang := gqlmodel.Lang(*input.Lang)
+		vars["lang"] = &lang
 	}
 	if input.Theme != nil {
-		vars["theme"] = graphql.String(*input.Theme)
+		theme := gqlmodel.Theme(*input.Theme)
+		vars["theme"] = &theme
 	}
 	if input.Password != nil {
-		vars["password"] = graphql.String(*input.Password)
+		password := graphql.String(*input.Password)
+		vars["password"] = &password
 	}
 	if input.PasswordConfirmation != nil {
-		vars["passwordConfirmation"] = graphql.String(*input.PasswordConfirmation)
+		passwordConfirmation := graphql.String(*input.PasswordConfirmation)
+		vars["passwordConfirmation"] = &passwordConfirmation
 	}
 
 	if err := r.client.Mutate(ctx, &m, vars); err != nil {
