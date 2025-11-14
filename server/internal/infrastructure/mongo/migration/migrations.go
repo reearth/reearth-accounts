@@ -32,4 +32,5 @@ var migrations = migration.Migrations[DBClient]{
 	250919170408: ConvertInvalidUserWorkspaceAlias,
 	251106072200: ReplaceEmailFormattedNames,
 	251107102200: SyncPersonalWorkspaceAlias,
+	251114101525: SyncUserNameToWorkspace,
 }
