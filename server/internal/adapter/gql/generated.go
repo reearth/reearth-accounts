@@ -1591,7 +1591,11 @@ input PasswordResetInput {
 
 input UpdateMeInput {
   name: String
+  alias: String
   email: String
+  photoURL: String
+  website: String
+  description: String
   lang: Lang
   theme: Theme
   password: String
@@ -11549,7 +11553,7 @@ func (ec *executionContext) unmarshalInputUpdateMeInput(ctx context.Context, obj
 		asMap[k] = v
 	}
 
-	fieldsInOrder := [...]string{"name", "email", "lang", "theme", "password", "passwordConfirmation"}
+	fieldsInOrder := [...]string{"name", "alias", "email", "photoURL", "website", "description", "lang", "theme", "password", "passwordConfirmation"}
 	for _, k := range fieldsInOrder {
 		v, ok := asMap[k]
 		if !ok {
@@ -11563,6 +11567,13 @@ func (ec *executionContext) unmarshalInputUpdateMeInput(ctx context.Context, obj
 				return it, err
 			}
 			it.Name = data
+		case "alias":
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("alias"))
+			data, err := ec.unmarshalOString2ᚖstring(ctx, v)
+			if err != nil {
+				return it, err
+			}
+			it.Alias = data
 		case "email":
 			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("email"))
 			data, err := ec.unmarshalOString2ᚖstring(ctx, v)
@@ -11570,6 +11581,27 @@ func (ec *executionContext) unmarshalInputUpdateMeInput(ctx context.Context, obj
 				return it, err
 			}
 			it.Email = data
+		case "photoURL":
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("photoURL"))
+			data, err := ec.unmarshalOString2ᚖstring(ctx, v)
+			if err != nil {
+				return it, err
+			}
+			it.PhotoURL = data
+		case "website":
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("website"))
+			data, err := ec.unmarshalOString2ᚖstring(ctx, v)
+			if err != nil {
+				return it, err
+			}
+			it.Website = data
+		case "description":
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("description"))
+			data, err := ec.unmarshalOString2ᚖstring(ctx, v)
+			if err != nil {
+				return it, err
+			}
+			it.Description = data
 		case "lang":
 			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("lang"))
 			data, err := ec.unmarshalOLang2ᚖstring(ctx, v)
