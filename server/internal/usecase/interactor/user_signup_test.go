@@ -314,7 +314,6 @@ func (m *mockAuthenticator) ResendVerificationEmail(ctx context.Context, userID 
 
 func TestUser_CreateVerification(t *testing.T) {
 	user.DefaultPasswordEncoder = &user.NoopPasswordEncoder{}
-	uid := id.NewUserID()
 	uid2 := id.NewUserID()
 	uid3 := id.NewUserID()
 	tid := id.NewWorkspaceID()
@@ -323,7 +322,7 @@ func TestUser_CreateVerification(t *testing.T) {
 
 	tests := []struct {
 		name                              string
-		createUserBefore                  func()*user.User
+		createUserBefore                  func() *user.User
 		email                             string
 		authenticatorError                error
 		wantError                         error
@@ -347,14 +346,16 @@ func TestUser_CreateVerification(t *testing.T) {
 		},
 		{
 			name: "user with auth0",
-			createUserBefore: user.New().
-				ID(uid2).
-				Workspace(tid).
-				Email("auth0user@bbb.com").
-				Name("AUTH0USER").
-				Auths([]user.Auth{{Provider: "auth0", Sub: "auth0|123456"}}).
-				Verification(user.VerificationFrom(mockcode, mocktime, false)).
-				MustBuild(),
+			createUserBefore: func() *user.User {
+				return user.New().
+					ID(uid2).
+					Workspace(tid).
+					Email("auth0user@bbb.com").
+					Name("AUTH0USER").
+					Auths([]user.Auth{{Provider: "auth0", Sub: "auth0|123456"}}).
+					Verification(user.VerificationFrom(mockcode, mocktime, false)).
+					MustBuild()
+			},
 			email:                             "auth0user@bbb.com",
 			wantError:                         nil,
 			wantAuthenticatorCalled:           true,
@@ -362,17 +363,19 @@ func TestUser_CreateVerification(t *testing.T) {
 		},
 		{
 			name: "user with auth0 and reearth",
-			createUserBefore: user.New().
-				ID(uid3).
-				Workspace(tid).
-				Email("mixeduser@bbb.com").
-				Name("MIXEDUSER").
-				Auths([]user.Auth{
-					{Provider: "reearth", Sub: "reearth|abc"},
-					{Provider: "auth0", Sub: "auth0|789"},
-				}).
-				Verification(user.VerificationFrom(mockcode, mocktime, false)).
-				MustBuild(),
+			createUserBefore: func() *user.User {
+				return user.New().
+					ID(uid3).
+					Workspace(tid).
+					Email("mixeduser@bbb.com").
+					Name("MIXEDUSER").
+					Auths([]user.Auth{
+						{Provider: "reearth", Sub: "reearth|abc"},
+						{Provider: "auth0", Sub: "auth0|789"},
+					}).
+					Verification(user.VerificationFrom(mockcode, mocktime, false)).
+					MustBuild()
+			},
 			email:                             "mixeduser@bbb.com",
 			wantError:                         nil,
 			wantAuthenticatorCalled:           true,
@@ -380,33 +383,39 @@ func TestUser_CreateVerification(t *testing.T) {
 		},
 		{
 			name: "verified user with auth0 - should skip",
-			createUserBefore: user.New().
-				ID(uid2).
-				Workspace(tid).
-				Email("verified@bbb.com").
-				Name("VERIFIED").
-				Auths([]user.Auth{{Provider: "auth0", Sub: "auth0|verified"}}).
-				Verification(user.VerificationFrom(mockcode, mocktime, true)).
-				MustBuild(),
+			createUserBefore: func() *user.User {
+				return user.New().
+					ID(uid2).
+					Workspace(tid).
+					Email("verified@bbb.com").
+					Name("VERIFIED").
+					Auths([]user.Auth{{Provider: "auth0", Sub: "auth0|verified"}}).
+					Verification(user.VerificationFrom(mockcode, mocktime, true)).
+					MustBuild()
+			},
 			email:                   "verified@bbb.com",
 			wantError:               nil,
 			wantAuthenticatorCalled: false,
 		},
 		{
 			name: "authenticator returns error",
-			createUserBefore: user.New().
-				ID(uid2).
-				Workspace(tid).
-				Email("erroruser@bbb.com").
-				Name("ERRORUSER").
-				Auths([]user.Auth{{Provider: "auth0", Sub: "auth0|error"}}).
-				Verification(user.VerificationFrom(mockcode, mocktime, false)).
-				MustBuild(),
+			createUserBefore: func() *user.User {
+				return user.New().
+					ID(uid2).
+					Workspace(tid).
+					Email("erroruser@bbb.com").
+					Name("ERRORUSER").
+					Auths([]user.Auth{{Provider: "auth0", Sub: "auth0|error"}}).
+					Verification(user.VerificationFrom(mockcode, mocktime, false)).
+					MustBuild()
+			},
 			email:                             "erroruser@bbb.com",
 			authenticatorError:                rerror.NewE(i18n.T("failed to resend verification email")),
 			wantError:                         rerror.NewE(i18n.T("failed to resend verification email")),
 			wantAuthenticatorCalled:           true,
 			wantAuthenticatorCalledWithUserID: "auth0|error",
+		},
+		{
 			name: "verified user",
 			createUserBefore: func() *user.User {
 				return user.New().
@@ -417,8 +426,9 @@ func TestUser_CreateVerification(t *testing.T) {
 					Verification(user.VerificationFrom(mockcode, mocktime, true)).
 					MustBuild()
 			},
-			email:     "aaa@bbb.com",
-			wantError: nil,
+			email:                   "aaa@bbb.com",
+			wantError:               nil,
+			wantAuthenticatorCalled: false,
 		},
 		{
 			name:                    "not found",
@@ -434,12 +444,6 @@ func TestUser_CreateVerification(t *testing.T) {
 			t.Parallel()
 			ctx := context.Background()
 			r := accountmemory.New()
-
-
-			// Create independent repository for each test case to avoid data races
-			m := mailer.NewMock()
-			g := &gateway.Container{Mailer: m}
-			uc := NewUser(r, g, "", "")
 
 			if tt.createUserBefore != nil {
 				assert.NoError(t, r.User.Save(ctx, tt.createUserBefore()))
