@@ -50,6 +50,10 @@ func (i *Workspace) FetchByName(ctx context.Context, name string) (*workspace.Wo
 	return i.repos.Workspace.FindByName(ctx, name)
 }
 
+func (i *Workspace) FetchByAlias(ctx context.Context, alias string) (*workspace.Workspace, error) {
+	return i.repos.Workspace.FindByAlias(ctx, alias)
+}
+
 func (i *Workspace) FindByUser(ctx context.Context, id workspace.UserID, operator *usecase.Operator) (workspace.List, error) {
 	res, err := i.repos.Workspace.FindByUser(ctx, id)
 	return filterWorkspaces(res, operator, err, true, true)
@@ -67,7 +71,7 @@ func (i *Workspace) FetchByUserWithPagination(ctx context.Context, userID worksp
 	}, nil
 }
 
-func (i *Workspace) Create(ctx context.Context, name string, firstUser workspace.UserID, operator *usecase.Operator) (_ *workspace.Workspace, err error) {
+func (i *Workspace) Create(ctx context.Context, alias, name, description string, firstUser workspace.UserID, operator *usecase.Operator) (_ *workspace.Workspace, err error) {
 	if operator.User == nil {
 		return nil, interfaces.ErrInvalidOperator
 	}
@@ -85,20 +89,24 @@ func (i *Workspace) Create(ctx context.Context, name string, firstUser workspace
 	}
 
 	return Run1(ctx, operator, i.repos, Usecase().Transaction(), func(ctx context.Context) (*workspace.Workspace, error) {
-		ws, err := workspace.New().
+		metadata := workspace.NewMetadata()
+		metadata.SetDescription(description)
+
+		ws, wErr := workspace.New().
 			NewID().
+			Alias(alias).
 			Name(name).
-			Metadata(workspace.NewMetadata()).
+			Metadata(metadata).
 			Build()
-		if err != nil {
+		if wErr != nil {
+			return nil, wErr
+		}
+
+		if err = ws.Members().Join(firstUsers[0], workspace.RoleOwner, *operator.User); err != nil {
 			return nil, err
 		}
 
-		if err := ws.Members().Join(firstUsers[0], workspace.RoleOwner, *operator.User); err != nil {
-			return nil, err
-		}
-
-		if err := i.repos.Workspace.Create(ctx, ws); err != nil {
+		if err = i.repos.Workspace.Create(ctx, ws); err != nil {
 			return nil, err
 		}
 

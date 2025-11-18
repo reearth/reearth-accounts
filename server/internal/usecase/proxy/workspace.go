@@ -48,6 +48,14 @@ func (w *Workspace) FetchByName(ctx context.Context, name string) (*workspace.Wo
 	return ToWorkspace(res.FindByName.FragmentWorkspace)
 }
 
+func (w *Workspace) FetchByAlias(ctx context.Context, alias string) (*workspace.Workspace, error) {
+	res, err := FindByAlias(ctx, w.gql, alias)
+	if err != nil {
+		return nil, err
+	}
+	return ToWorkspace(res.FindByAlias.FragmentWorkspace)
+}
+
 func (w *Workspace) FindByUser(ctx context.Context, userID accountid.UserID, op *usecase.Operator) (workspace.List, error) {
 	res, err := FindByUser(ctx, w.gql, userID.String())
 	if err != nil {
@@ -79,8 +87,12 @@ func (w *Workspace) FetchByUserWithPagination(ctx context.Context, userID accoun
 	}, nil
 }
 
-func (w *Workspace) Create(ctx context.Context, name string, userID accountid.UserID, op *usecase.Operator) (*workspace.Workspace, error) {
-	res, err := CreateWorkspace(ctx, w.gql, CreateWorkspaceInput{Name: name})
+func (w *Workspace) Create(ctx context.Context, alias, name, description string, userID accountid.UserID, op *usecase.Operator) (*workspace.Workspace, error) {
+	res, err := CreateWorkspace(ctx, w.gql, CreateWorkspaceInput{
+		Alias:       alias,
+		Name:        name,
+		Description: description,
+	})
 	if err != nil {
 		return nil, err
 	}

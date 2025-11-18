@@ -56,7 +56,9 @@ type CreateVerificationInput struct {
 }
 
 type CreateWorkspaceInput struct {
-	Name string `json:"name"`
+	Alias       string  `json:"alias"`
+	Name        string  `json:"name"`
+	Description *string `json:"description,omitempty"`
 }
 
 type CreateWorkspacePayload struct {

@@ -323,7 +323,7 @@ func TestUser_CreateVerification(t *testing.T) {
 
 	tests := []struct {
 		name                              string
-		createUserBefore                  *user.User
+		createUserBefore                  func()*user.User
 		email                             string
 		authenticatorError                error
 		wantError                         error
@@ -332,13 +332,15 @@ func TestUser_CreateVerification(t *testing.T) {
 	}{
 		{
 			name: "user without auth0",
-			createUserBefore: user.New().
-				ID(uid).
-				Workspace(tid).
-				Email("aaa@bbb.com").
-				Name("NAME").
-				Verification(user.VerificationFrom(mockcode, mocktime, false)).
-				MustBuild(),
+			createUserBefore: func() *user.User {
+				return user.New().
+					ID(id.NewUserID()).
+					Workspace(id.NewWorkspaceID()).
+					Email("aaa@bbb.com").
+					Name("NAME").
+					Verification(user.VerificationFrom(mockcode, mocktime, false)).
+					MustBuild()
+			},
 			email:                   "aaa@bbb.com",
 			wantError:               nil,
 			wantAuthenticatorCalled: false,
@@ -405,6 +407,18 @@ func TestUser_CreateVerification(t *testing.T) {
 			wantError:                         rerror.NewE(i18n.T("failed to resend verification email")),
 			wantAuthenticatorCalled:           true,
 			wantAuthenticatorCalledWithUserID: "auth0|error",
+			name: "verified user",
+			createUserBefore: func() *user.User {
+				return user.New().
+					ID(id.NewUserID()).
+					Workspace(id.NewWorkspaceID()).
+					Email("aaa@bbb.com").
+					Name("NAME").
+					Verification(user.VerificationFrom(mockcode, mocktime, true)).
+					MustBuild()
+			},
+			email:     "aaa@bbb.com",
+			wantError: nil,
 		},
 		{
 			name:                    "not found",
@@ -421,8 +435,14 @@ func TestUser_CreateVerification(t *testing.T) {
 			ctx := context.Background()
 			r := accountmemory.New()
 
+
+			// Create independent repository for each test case to avoid data races
+			m := mailer.NewMock()
+			g := &gateway.Container{Mailer: m}
+			uc := NewUser(r, g, "", "")
+
 			if tt.createUserBefore != nil {
-				assert.NoError(t, r.User.Save(ctx, tt.createUserBefore))
+				assert.NoError(t, r.User.Save(ctx, tt.createUserBefore()))
 			}
 
 			m := mailer.NewMock()
