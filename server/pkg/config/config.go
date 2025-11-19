@@ -3,7 +3,7 @@ package config
 import (
 	"sort"
 
-	"github.com/reearth/reearth-accounts/pkg/policy"
+	"github.com/reearth/reearth-accounts/server/pkg/policy"
 )
 
 type Config struct {

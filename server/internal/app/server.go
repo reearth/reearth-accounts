@@ -10,13 +10,14 @@ import (
 
 	"github.com/cerbos/cerbos-sdk-go/cerbos"
 	"github.com/labstack/echo/v4"
-	infraCerbos "github.com/reearth/reearth-accounts/internal/infrastructure/cerbos"
-	mongorepo "github.com/reearth/reearth-accounts/internal/infrastructure/mongo"
-	"github.com/reearth/reearth-accounts/internal/infrastructure/mongo/migration"
-	"github.com/reearth/reearth-accounts/internal/usecase/gateway"
-	"github.com/reearth/reearth-accounts/internal/usecase/repo"
+	infraCerbos "github.com/reearth/reearth-accounts/server/internal/infrastructure/cerbos"
+	mongorepo "github.com/reearth/reearth-accounts/server/internal/infrastructure/mongo"
+	"github.com/reearth/reearth-accounts/server/internal/infrastructure/mongo/migration"
+	"github.com/reearth/reearth-accounts/server/internal/usecase/gateway"
+	"github.com/reearth/reearth-accounts/server/internal/usecase/repo"
 	"github.com/reearth/reearthx/log"
 	"github.com/reearth/reearthx/mongox"
+	"go.mongodb.org/mongo-driver/event"
 	"go.mongodb.org/mongo-driver/mongo"
 	"go.mongodb.org/mongo-driver/mongo/options"
 	"golang.org/x/net/http2"
@@ -33,12 +34,33 @@ func Start(debug bool) {
 	}
 	log.Infof("config: %s", conf.Print())
 
-	// Init MongoDB client
+	// Init MongoDB client with optional command monitoring
+	var monitor *event.CommandMonitor
+	if debug || os.Getenv("REEARTH_ACCOUNTS_DEV") == "true" {
+		monitor = &event.CommandMonitor{
+			Failed: func(ctx context.Context, evt *event.CommandFailedEvent) {
+				log.Errorf("MongoDB Command Failed: %s - Duration: %v - Error: %s",
+					evt.CommandName, evt.Duration, evt.Failure)
+			},
+			Succeeded: func(ctx context.Context, evt *event.CommandSucceededEvent) {
+				// Only log slow queries or critical operations
+				if evt.Duration > time.Millisecond*100 ||
+					evt.CommandName == "createIndexes" ||
+					evt.CommandName == "dropIndexes" ||
+					evt.CommandName == "drop" {
+					log.Debugf("MongoDB Command: %s - Duration: %v - Reply: %v",
+						evt.CommandName, evt.Duration, evt.Reply)
+				}
+			},
+		}
+	}
+
 	client, err := mongo.Connect(
 		ctx,
 		options.Client().
 			ApplyURI(conf.DB).
-			SetConnectTimeout(time.Second*10))
+			SetConnectTimeout(time.Second*10).
+			SetMonitor(monitor))
 	if err != nil {
 		log.Fatalc(ctx, fmt.Sprintf("repo initialization error: %+v", err))
 	}
@@ -61,7 +83,7 @@ func Start(debug bool) {
 			log.Fatal(migrationErr)
 		}
 
-		if migrationErr := migration.Do(ctx, clientx, mongorepo.NewConfig(db.Collection("config"), lock)); err != nil {
+		if migrationErr := migration.Do(ctx, clientx, mongorepo.NewConfig(db.Collection("config"), lock)); migrationErr != nil {
 			log.Fatalf("failed to run migration: %v", migrationErr)
 		}
 		return
@@ -70,7 +92,7 @@ func Start(debug bool) {
 	// Cerbos
 	var opts []cerbos.Opt
 	if os.Getenv("REEARTH_ACCOUNTS_DEV") == "true" {
-		opts = append(opts, cerbos.WithPlaintext())
+		opts = append(opts, cerbos.WithPlaintext(), cerbos.WithTLSInsecure())
 	}
 
 	cerbosClient, err := cerbos.New(conf.CerbosHost, opts...)
@@ -104,14 +126,21 @@ type ServerConfig struct {
 
 func NewServer(ctx context.Context, cfg *ServerConfig) *WebServer {
 	port := cfg.Config.Port
+	host := cfg.Config.Host
+
 	if port == "" {
 		port = "8080"
 	}
 
-	address := "0.0.0.0:" + port
-	if cfg.Debug {
-		address = "localhost:" + port
+	if host == "" {
+		if cfg.Debug {
+			host = "localhost"
+		} else {
+			host = "0.0.0.0"
+		}
 	}
+
+	address := host + ":" + port
 
 	w := &WebServer{
 		address: address,

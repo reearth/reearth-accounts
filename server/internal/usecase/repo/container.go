@@ -1,8 +1,8 @@
 package repo
 
 import (
-	"github.com/reearth/reearth-accounts/internal/usecase"
-	"github.com/reearth/reearth-accounts/pkg/id"
+	"github.com/reearth/reearth-accounts/server/internal/usecase"
+	"github.com/reearth/reearth-accounts/server/pkg/id"
 	"github.com/reearth/reearthx/i18n"
 	"github.com/reearth/reearthx/rerror"
 	"github.com/reearth/reearthx/usecasex"
@@ -83,7 +83,7 @@ func (f WorkspaceFilter) CanRead(id id.WorkspaceID) bool {
 }
 
 func (f WorkspaceFilter) CanWrite(id id.WorkspaceID) bool {
-	return f.Writable == nil || f.Writable.Has(id)
+	return len(f.Writable) == 0 || f.Writable.Has(id)
 }
 
 func (f WorkspaceFilter) Filter(q any) any {

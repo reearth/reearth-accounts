@@ -52,8 +52,8 @@ query SearchUser($keyword: String!) {
   }
 }
 
-mutation SignUp($input: SignUpInput!) {
-    signUp(input: $input) {
+mutation Signup($input: SignupInput!) {
+    signup(input: $input) {
         user {...FragmentUser}
     }
 }
@@ -154,6 +154,12 @@ query FindByID($id: ID!) {
 
 query FindByName($name: String!) {
     findByName(name: $name) {
+        ...FragmentWorkspace
+    }
+}
+
+query FindByAlias($alias: String!) {
+    findByAlias(alias: $alias) {
         ...FragmentWorkspace
     }
 }

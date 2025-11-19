@@ -56,7 +56,9 @@ type CreateVerificationInput struct {
 }
 
 type CreateWorkspaceInput struct {
-	Name string `json:"name"`
+	Alias       string  `json:"alias"`
+	Name        string  `json:"name"`
+	Description *string `json:"description,omitempty"`
 }
 
 type CreateWorkspacePayload struct {
@@ -98,7 +100,6 @@ type Me struct {
 	Host          *string       `json:"host,omitempty"`
 	MyWorkspaceID ID            `json:"myWorkspaceId"`
 	Auths         []string      `json:"auths"`
-	Workspaces    []*Workspace  `json:"workspaces"`
 	MyWorkspace   *Workspace    `json:"myWorkspace"`
 }
 
@@ -182,9 +183,9 @@ type RolesPayload struct {
 	Roles []*RoleForAuthorization `json:"roles"`
 }
 
-type SignUpInput struct {
-	ID          ID      `json:"id"`
-	WorkspaceID ID      `json:"workspaceID"`
+type SignupInput struct {
+	ID          *ID     `json:"id,omitempty"`
+	WorkspaceID *ID     `json:"workspaceID,omitempty"`
 	Name        string  `json:"name"`
 	Email       string  `json:"email"`
 	Password    string  `json:"password"`
@@ -196,6 +197,9 @@ type SignUpInput struct {
 
 type SignupOIDCInput struct {
 	ID          *ID     `json:"id,omitempty"`
+	Name        *string `json:"name,omitempty"`
+	Email       *string `json:"email,omitempty"`
+	Sub         *string `json:"sub,omitempty"`
 	Lang        *string `json:"lang,omitempty"`
 	WorkspaceID *ID     `json:"workspaceId,omitempty"`
 	Secret      *string `json:"secret,omitempty"`

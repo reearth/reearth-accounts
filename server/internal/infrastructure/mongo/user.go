@@ -5,20 +5,15 @@ import (
 	"fmt"
 	"regexp"
 
-	"github.com/reearth/reearth-accounts/internal/infrastructure/mongo/mongodoc"
-	"github.com/reearth/reearth-accounts/internal/usecase/repo"
-	"github.com/reearth/reearth-accounts/pkg/user"
+	"github.com/reearth/reearth-accounts/server/internal/infrastructure/mongo/mongodoc"
+	"github.com/reearth/reearth-accounts/server/internal/usecase/repo"
+	"github.com/reearth/reearth-accounts/server/pkg/user"
 	"github.com/reearth/reearthx/mongox"
 	"github.com/reearth/reearthx/rerror"
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/bson/primitive"
 	"go.mongodb.org/mongo-driver/mongo"
 	"go.mongodb.org/mongo-driver/mongo/options"
-)
-
-var (
-	userIndexes       = []string{"subs", "name"}
-	userUniqueIndexes = []string{"id", "email"}
 )
 
 type User struct {
@@ -32,10 +27,6 @@ func NewUser(client *mongox.Client) repo.User {
 
 func NewUserWithHost(client *mongox.Client, host string) repo.User {
 	return &User{client: client.WithCollection("user"), host: host}
-}
-
-func (r *User) Init() error {
-	return createIndexes(context.Background(), r.client, userIndexes, userUniqueIndexes)
 }
 
 func (r *User) FindAll(ctx context.Context) (user.List, error) {

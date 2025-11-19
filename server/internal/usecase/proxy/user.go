@@ -5,13 +5,13 @@ package proxy
 import (
 	"context"
 
-	"github.com/reearth/reearth-accounts/pkg/user"
+	"github.com/reearth/reearth-accounts/server/pkg/user"
 	"github.com/reearth/reearthx/util"
 
 	_ "github.com/Khan/genqlient/generate"
 	"github.com/Khan/genqlient/graphql"
-	"github.com/reearth/reearth-accounts/internal/usecase"
-	"github.com/reearth/reearth-accounts/internal/usecase/interfaces"
+	"github.com/reearth/reearth-accounts/server/internal/usecase"
+	"github.com/reearth/reearth-accounts/server/internal/usecase/interfaces"
 )
 
 type User struct {
@@ -37,7 +37,7 @@ func (u *User) FetchByID(ctx context.Context, ids user.IDList) (user.List, error
 }
 
 func (u *User) Signup(ctx context.Context, param interfaces.SignupParam) (*user.User, error) {
-	input := SignUpInput{
+	input := SignupInput{
 		Id:          param.UserID.String(),
 		WorkspaceID: param.WorkspaceID.String(),
 		Name:        param.Name,
@@ -47,16 +47,19 @@ func (u *User) Signup(ctx context.Context, param interfaces.SignupParam) (*user.
 		Lang:        param.Lang.String(),
 		Theme:       string(*param.Theme),
 	}
-	res, err := SignUp(ctx, u.gql, input)
+	res, err := Signup(ctx, u.gql, input)
 	if err != nil {
 		return nil, err
 	}
-	return FragmentToUser(res.SignUp.User.FragmentUser)
+	return FragmentToUser(res.Signup.User.FragmentUser)
 }
 
 func (u *User) SignupOIDC(ctx context.Context, param interfaces.SignupOIDCParam) (*user.User, error) {
 	input := SignupOIDCInput{
 		Id:          param.User.UserID.String(),
+		Name:        param.Name,
+		Email:       param.Email,
+		Sub:         param.Sub,
 		Lang:        param.User.Lang.String(),
 		WorkspaceId: param.User.WorkspaceID.String(),
 		Secret:      *param.Secret,

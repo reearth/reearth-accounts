@@ -1,8 +1,8 @@
 package mongodoc
 
 import (
-	"github.com/reearth/reearth-accounts/pkg/id"
-	"github.com/reearth/reearth-accounts/pkg/workspace"
+	"github.com/reearth/reearth-accounts/server/pkg/id"
+	"github.com/reearth/reearth-accounts/server/pkg/workspace"
 	"github.com/samber/lo"
 )
 
@@ -56,6 +56,7 @@ func NewWorkspace(ws *workspace.Workspace) (*WorkspaceDocument, string) {
 		Website:      ws.Metadata().Website(),
 		Location:     ws.Metadata().Location(),
 		BillingEmail: ws.Metadata().BillingEmail(),
+		PhotoURL:     ws.Metadata().PhotoURL(),
 	}
 
 	wId := ws.ID().String()

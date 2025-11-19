@@ -17,7 +17,6 @@ type Me {
   host: String
   myWorkspaceId: ID!
   auths: [String!]!
-  workspaces: [Workspace!]!
   myWorkspace: Workspace!
 }
 
@@ -29,9 +28,9 @@ type UserMetadata {
   theme: Theme!
 }
 
-input SignUpInput {
-  id: ID!
-  workspaceID: ID!
+input SignupInput {
+  id: ID
+  workspaceID: ID
   name: String!
   email: String!
   password: String!
@@ -43,6 +42,9 @@ input SignUpInput {
 
 input SignupOIDCInput {
   id: ID
+  name: String
+  email: String
+  sub: String
   lang: Lang
   workspaceId: ID
   secret: String
@@ -111,7 +113,7 @@ extend type Mutation {
   updateMe(input: UpdateMeInput!): UpdateMePayload
   removeMyAuth(input: RemoveMyAuthInput!): UpdateMePayload
   deleteMe(input: DeleteMeInput!): DeleteMePayload
-  signUp(input: SignUpInput!): UserPayload
+  signup(input: SignupInput!): UserPayload
   signupOIDC(input: SignupOIDCInput!): UserPayload
   verifyUser(input: VerifyUserInput!): UserPayload
   findOrCreate(input: FindOrCreateInput!): UserPayload

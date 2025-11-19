@@ -1,0 +1,30 @@
+services:
+  reearth-cerbos:
+    image: cerbos/cerbos:0.40.0
+    command: server --config=/policies/.cerbos.yaml
+    ports:
+      - 3593:3593
+    volumes:
+      - ./server/e2e/testdata/policies:/policies
+    networks:
+      - reearth
+
+  reearth-accounts-dev:
+    build:
+      context: ./server
+      dockerfile: Dockerfile.dev
+    env_file:
+      - ./server/.env.docker
+    ports:
+      - 8090:8090
+    depends_on:
+      - reearth-cerbos
+    volumes:
+      - ./server:/reearth-accounts  # Mount source code for hot reload
+      - /reearth-accounts/tmp       # Exclude tmp directory
+    networks:
+      - reearth
+
+networks:
+  reearth:
+    external: true

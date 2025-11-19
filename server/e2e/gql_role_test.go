@@ -5,7 +5,7 @@ import (
 	"testing"
 
 	httpexpect "github.com/gavv/httpexpect/v2"
-	"github.com/reearth/reearth-accounts/internal/app"
+	"github.com/reearth/reearth-accounts/server/internal/app"
 )
 
 func getRoles(e *httpexpect.Expect) (GraphQLRequest, *httpexpect.Value) {

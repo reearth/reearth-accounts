@@ -4,7 +4,8 @@ import (
 	"context"
 	"time"
 
-	"github.com/reearth/reearth-accounts/internal/usecase/interfaces"
+	"github.com/reearth/reearth-accounts/server/internal/usecase/gateway"
+	"github.com/reearth/reearth-accounts/server/internal/usecase/interfaces"
 )
 
 const (
@@ -23,13 +24,13 @@ type DataLoaders struct {
 	User      UserDataLoader
 }
 
-func NewLoaders(usecases *interfaces.Container) *Loaders {
+func NewLoaders(usecases *interfaces.Container, storage gateway.Storage) *Loaders {
 	if usecases == nil {
 		return nil
 	}
 	return &Loaders{
 		usecases:  *usecases,
-		Workspace: NewWorkspaceLoader(usecases.Workspace),
+		Workspace: NewWorkspaceLoader(usecases.Workspace, storage),
 		User:      NewUserLoader(usecases.User),
 	}
 }

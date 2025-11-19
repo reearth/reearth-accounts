@@ -3,9 +3,9 @@ package interfaces
 import (
 	"context"
 
-	"github.com/reearth/reearth-accounts/internal/usecase"
-	"github.com/reearth/reearth-accounts/pkg/user"
-	"github.com/reearth/reearth-accounts/pkg/workspace"
+	"github.com/reearth/reearth-accounts/server/internal/usecase"
+	"github.com/reearth/reearth-accounts/server/pkg/user"
+	"github.com/reearth/reearth-accounts/server/pkg/workspace"
 	"github.com/reearth/reearthx/i18n"
 	"github.com/reearth/reearthx/rerror"
 )
@@ -31,9 +31,10 @@ type Workspace interface {
 	Fetch(context.Context, workspace.IDList, *usecase.Operator) (workspace.List, error)
 	FetchByID(context.Context, workspace.ID) (*workspace.Workspace, error)
 	FetchByName(context.Context, string) (*workspace.Workspace, error)
+	FetchByAlias(context.Context, string) (*workspace.Workspace, error)
 	FetchByUserWithPagination(context.Context, user.ID, FetchByUserWithPaginationParam) (FetchByUserWithPaginationResult, error)
 	FindByUser(context.Context, user.ID, *usecase.Operator) (workspace.List, error)
-	Create(context.Context, string, user.ID, *usecase.Operator) (*workspace.Workspace, error)
+	Create(ctx context.Context, alias, name, description string, firstUser workspace.UserID, operator *usecase.Operator) (_ *workspace.Workspace, err error)
 	Update(context.Context, workspace.ID, string, *usecase.Operator) (*workspace.Workspace, error)
 	AddUserMember(context.Context, workspace.ID, map[user.ID]workspace.Role, *usecase.Operator) (*workspace.Workspace, error)
 	AddIntegrationMember(context.Context, workspace.ID, workspace.IntegrationID, workspace.Role, *usecase.Operator) (*workspace.Workspace, error)

@@ -7,7 +7,7 @@ import (
 
 	"github.com/avast/retry-go/v4"
 	"github.com/google/uuid"
-	"github.com/reearth/reearth-accounts/internal/usecase/repo"
+	"github.com/reearth/reearth-accounts/server/internal/usecase/repo"
 	"github.com/reearth/reearthx/log"
 	"github.com/reearth/reearthx/rerror"
 	lock "github.com/square/mongo-lock"
@@ -24,9 +24,6 @@ func NewLock(c *mongo.Collection) (*Lock, error) {
 	hostid := uuid.NewString()
 
 	l := lock.NewClient(c)
-	if err := l.CreateIndexes(context.Background()); err != nil {
-		return nil, err
-	}
 
 	return &Lock{
 		l:      l,

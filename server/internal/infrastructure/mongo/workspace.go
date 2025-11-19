@@ -4,19 +4,15 @@ import (
 	"context"
 	"strings"
 
-	"github.com/reearth/reearth-accounts/internal/infrastructure/mongo/mongodoc"
-	"github.com/reearth/reearth-accounts/internal/usecase/repo"
-	"github.com/reearth/reearth-accounts/pkg/id"
-	"github.com/reearth/reearth-accounts/pkg/user"
-	"github.com/reearth/reearth-accounts/pkg/workspace"
+	"github.com/reearth/reearth-accounts/server/internal/infrastructure/mongo/mongodoc"
+	"github.com/reearth/reearth-accounts/server/internal/usecase/repo"
+	"github.com/reearth/reearth-accounts/server/pkg/id"
+	"github.com/reearth/reearth-accounts/server/pkg/user"
+	"github.com/reearth/reearth-accounts/server/pkg/workspace"
 	"github.com/reearth/reearthx/mongox"
 	"github.com/reearth/reearthx/rerror"
 	"github.com/reearth/reearthx/usecasex"
 	"go.mongodb.org/mongo-driver/bson"
-)
-
-var (
-	workspaceUniqueIndexes = []string{"id"}
 )
 
 type Workspace struct {
@@ -30,10 +26,6 @@ func NewWorkspace(client *mongox.Client) repo.Workspace {
 
 func NewWorkspaceCompat(client *mongox.Client) repo.Workspace {
 	return &Workspace{client: client.WithCollection("team")}
-}
-
-func (r *Workspace) Init() error {
-	return createIndexes(context.Background(), r.client, nil, workspaceUniqueIndexes)
 }
 
 func (r *Workspace) Filtered(f repo.WorkspaceFilter) repo.Workspace {

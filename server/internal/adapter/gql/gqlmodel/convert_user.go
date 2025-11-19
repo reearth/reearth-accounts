@@ -1,8 +1,8 @@
 package gqlmodel
 
 import (
-	"github.com/reearth/reearth-accounts/pkg/user"
-	"github.com/reearth/reearth-accounts/pkg/workspace"
+	"github.com/reearth/reearth-accounts/server/pkg/user"
+	"github.com/reearth/reearth-accounts/server/pkg/workspace"
 	"github.com/samber/lo"
 
 	"github.com/reearth/reearthx/util"
@@ -109,51 +109,6 @@ func ToTheme(t *Theme) *user.Theme {
 		th = user.ThemeLight
 	}
 	return &th
-}
-
-func ToWorkspace(t *workspace.Workspace) *Workspace {
-	if t == nil {
-		return nil
-	}
-
-	usersMap := t.Members().Users()
-	integrationsMap := t.Members().Integrations()
-	members := make([]WorkspaceMember, 0, len(usersMap)+len(integrationsMap))
-	for u, m := range usersMap {
-		members = append(members, &WorkspaceUserMember{
-			UserID: IDFrom(u),
-			Role:   ToRole(m.Role),
-		})
-	}
-
-	metadata := WorkspaceMetadata{
-		Description:  t.Metadata().Description(),
-		Website:      t.Metadata().Website(),
-		Location:     t.Metadata().Location(),
-		BillingEmail: t.Metadata().BillingEmail(),
-		PhotoURL:     t.Metadata().PhotoURL(),
-	}
-
-	return &Workspace{
-		ID:       IDFrom(t.ID()),
-		Name:     t.Name(),
-		Alias:    t.Alias(),
-		Personal: t.IsPersonal(),
-		Members:  members,
-		Metadata: &metadata,
-	}
-}
-
-func ToWorkspaces(ws workspace.List) []*Workspace {
-	if ws == nil {
-		return nil
-	}
-
-	workspaces := make([]*Workspace, 0, len(ws))
-	for _, w := range ws {
-		workspaces = append(workspaces, ToWorkspace(w))
-	}
-	return workspaces
 }
 
 func FromRole(r Role) workspace.Role {

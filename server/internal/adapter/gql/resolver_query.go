@@ -3,7 +3,7 @@ package gql
 import (
 	"context"
 
-	"github.com/reearth/reearth-accounts/internal/adapter/gql/gqlmodel"
+	"github.com/reearth/reearth-accounts/server/internal/adapter/gql/gqlmodel"
 )
 
 func (r *Resolver) Query() QueryResolver {
@@ -17,6 +17,15 @@ func (r *queryResolver) Me(ctx context.Context) (*gqlmodel.Me, error) {
 	if u == nil {
 		return nil, nil
 	}
+
+	if u.Metadata().PhotoURL() != "" {
+		signedURL, err := r.Storage.GetSignedURL(ctx, u.Metadata().PhotoURL())
+		if err != nil {
+			return nil, err
+		}
+		u.Metadata().SetPhotoURL(signedURL)
+	}
+
 	return gqlmodel.ToMe(u), nil
 }
 
