@@ -29,7 +29,7 @@ type workspaceMemberDoc struct {
 }
 
 // computeMembersHashFromBSON creates a deterministic hash of members and integrations
-func computeMembersHashFromBSON(members, integrations map[string]workspaceMemberDoc) string {
+func computeMembersHashFromBSON(members, integrations map[string]workspaceMemberDoc) (string, error) {
 	var allMembers []workspaceMemberData
 
 	// Add users
@@ -60,9 +60,12 @@ func computeMembersHashFromBSON(members, integrations map[string]workspaceMember
 	})
 
 	// Convert to JSON and hash
-	jsonData, _ := json.Marshal(allMembers)
+	jsonData, err := json.Marshal(allMembers)
+	if err != nil {
+		return "", fmt.Errorf("failed to marshal members for hash: %w", err)
+	}
 	hash := sha256.Sum256(jsonData)
-	return hex.EncodeToString(hash[:])
+	return hex.EncodeToString(hash[:]), nil
 }
 
 func AddWorkspaceMembersHash(ctx context.Context, c DBClient) error {
@@ -105,11 +108,12 @@ func AddWorkspaceMembersHash(ctx context.Context, c DBClient) error {
 			continue
 		}
 
-		fmt.Printf("Processing workspace ID: %s, Members: %+v, Integrations: %+v\n", doc.ID.Hex(), doc.Members, doc.Integrations)
-
 		// Compute hash for this workspace
-		membersHash := computeMembersHashFromBSON(doc.Members, doc.Integrations)
-		fmt.Printf("Computed hash for workspace %s: %s\n", doc.ID.Hex(), membersHash)
+		membersHash, err := computeMembersHashFromBSON(doc.Members, doc.Integrations)
+		if err != nil {
+			fmt.Printf("Warning: failed to compute members_hash for workspace %s: %v\n", doc.ID.Hex(), err)
+			continue
+		}
 
 		// Prepare bulk update
 		filter := bson.M{"_id": doc.ID}

@@ -119,8 +119,10 @@ func TestComputeMembersHashFromBSON(t *testing.T) {
 		"integration1": {Role: "writer", InvitedBy: "user1", Disabled: false},
 	}
 
-	hash1 := computeMembersHashFromBSON(members, integrations)
-	hash2 := computeMembersHashFromBSON(members, integrations)
+	hash1, err := computeMembersHashFromBSON(members, integrations)
+	assert.NoError(t, err)
+	hash2, err := computeMembersHashFromBSON(members, integrations)
+	assert.NoError(t, err)
 
 	// Hash should be deterministic
 	assert.Equal(t, hash1, hash2)
@@ -132,6 +134,7 @@ func TestComputeMembersHashFromBSON(t *testing.T) {
 		"user3": {Role: "owner", InvitedBy: "user3", Disabled: false},
 	}
 
-	hash3 := computeMembersHashFromBSON(differentMembers, integrations)
+	hash3, err := computeMembersHashFromBSON(differentMembers, integrations)
+	assert.NoError(t, err)
 	assert.NotEqual(t, hash1, hash3)
 }

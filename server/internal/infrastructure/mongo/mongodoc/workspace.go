@@ -4,6 +4,7 @@ import (
 	"crypto/sha256"
 	"encoding/hex"
 	"encoding/json"
+	"fmt"
 	"sort"
 
 	"github.com/reearth/reearth-accounts/server/pkg/id"
@@ -40,7 +41,7 @@ type WorkspaceDocument struct {
 
 // computeMembersHash creates a deterministic hash of members and integrations
 // for use in compound unique indexes with alias
-func computeMembersHash(members map[string]WorkspaceMemberDocument, integrations map[string]WorkspaceMemberDocument) string {
+func computeMembersHash(members map[string]WorkspaceMemberDocument, integrations map[string]WorkspaceMemberDocument) (string, error) {
 	// Create a combined structure for consistent hashing
 	type memberData struct {
 		ID        string `json:"id"`
@@ -77,9 +78,12 @@ func computeMembersHash(members map[string]WorkspaceMemberDocument, integrations
 		return allMembers[i].ID < allMembers[j].ID
 	})
 
-	jsonData, _ := json.Marshal(allMembers)
+	jsonData, err := json.Marshal(allMembers)
+	if err != nil {
+		return "", fmt.Errorf("failed to marshal members for hash: %w", err)
+	}
 	hash := sha256.Sum256(jsonData)
-	return hex.EncodeToString(hash[:])
+	return hex.EncodeToString(hash[:]), nil
 }
 
 func NewWorkspace(ws *workspace.Workspace) (*WorkspaceDocument, string) {
@@ -110,7 +114,12 @@ func NewWorkspace(ws *workspace.Workspace) (*WorkspaceDocument, string) {
 	}
 
 	// Compute members hash for unique indexing
-	membersHash := computeMembersHash(membersDoc, integrationsDoc)
+	membersHash, err := computeMembersHash(membersDoc, integrationsDoc)
+	if err != nil {
+		// In case of marshalling error, fallback to empty hash
+		// This should never happen with our data structures, but better to be safe
+		membersHash = ""
+	}
 
 	wId := ws.ID().String()
 	return &WorkspaceDocument{
