@@ -23,7 +23,6 @@ var migrations = migration.Migrations[DBClient]{
 	*/
 	//250910120000: GenerateMissingWorkspaceAliases,
 	//250911120000: GenerateMissingUserAliases,
-	250911120001: AddCaseInsensitiveWorkspaceAliasIndex,
 	//250911120002: AddWorkspaceAliasMembersCompositeUniqueIndex, // Replaced by 251119144501 with members_hash
 	//250911120003: AddCaseInsensitiveUserAliasIndex,
 	//250911120004: AddCaseInsensitiveUserEmailIndex,
@@ -35,4 +34,5 @@ var migrations = migration.Migrations[DBClient]{
 	251114101525: SyncUserNameToWorkspace,
 	251119144500: AddWorkspaceMembersHash,
 	251119144501: ReplaceWorkspaceAliasMembersIndex,
+	202511191900: AddCaseInsensitiveWorkspaceAliasIndex,
 }
