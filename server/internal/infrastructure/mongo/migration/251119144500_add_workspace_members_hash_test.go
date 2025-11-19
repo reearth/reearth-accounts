@@ -4,6 +4,7 @@ import (
 	"context"
 	"testing"
 
+	"github.com/reearth/reearth-accounts/server/internal/infrastructure/mongo/mongodoc"
 	"github.com/reearth/reearthx/mongox"
 	"github.com/reearth/reearthx/mongox/mongotest"
 	"github.com/stretchr/testify/assert"
@@ -109,19 +110,19 @@ func TestReplaceWorkspaceAliasMembersIndex(t *testing.T) {
 	assert.True(t, found, "New compound index alias_members_hash_case_insensitive_unique should exist")
 }
 
-func TestComputeMembersHashFromBSON(t *testing.T) {
-	members := map[string]workspaceMemberDoc{
+func TestComputeWorkspaceMembersHash(t *testing.T) {
+	members := map[string]mongodoc.WorkspaceMemberDocument{
 		"user1": {Role: "owner", InvitedBy: "user1", Disabled: false},
 		"user2": {Role: "reader", InvitedBy: "user1", Disabled: true},
 	}
 
-	integrations := map[string]workspaceMemberDoc{
+	integrations := map[string]mongodoc.WorkspaceMemberDocument{
 		"integration1": {Role: "writer", InvitedBy: "user1", Disabled: false},
 	}
 
-	hash1, err := computeMembersHashFromBSON(members, integrations)
+	hash1, err := mongodoc.ComputeWorkspaceMembersHash(members, integrations)
 	assert.NoError(t, err)
-	hash2, err := computeMembersHashFromBSON(members, integrations)
+	hash2, err := mongodoc.ComputeWorkspaceMembersHash(members, integrations)
 	assert.NoError(t, err)
 
 	// Hash should be deterministic
@@ -130,11 +131,11 @@ func TestComputeMembersHashFromBSON(t *testing.T) {
 	assert.Len(t, hash1, 64) // SHA256 hex string length
 
 	// Different members should produce different hash
-	differentMembers := map[string]workspaceMemberDoc{
+	differentMembers := map[string]mongodoc.WorkspaceMemberDocument{
 		"user3": {Role: "owner", InvitedBy: "user3", Disabled: false},
 	}
 
-	hash3, err := computeMembersHashFromBSON(differentMembers, integrations)
+	hash3, err := mongodoc.ComputeWorkspaceMembersHash(differentMembers, integrations)
 	assert.NoError(t, err)
 	assert.NotEqual(t, hash1, hash3)
 }

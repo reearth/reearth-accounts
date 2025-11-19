@@ -1,12 +1,6 @@
 package mongodoc
 
 import (
-	"crypto/sha256"
-	"encoding/hex"
-	"encoding/json"
-	"fmt"
-	"sort"
-
 	"github.com/reearth/reearth-accounts/server/pkg/id"
 	"github.com/reearth/reearth-accounts/server/pkg/workspace"
 	"github.com/samber/lo"
@@ -39,52 +33,6 @@ type WorkspaceDocument struct {
 	Policy       string `bson:",omitempty"`
 }
 
-// computeMembersHash creates a deterministic hash of members and integrations
-// for use in compound unique indexes with alias
-func computeMembersHash(members map[string]WorkspaceMemberDocument, integrations map[string]WorkspaceMemberDocument) (string, error) {
-	// Create a combined structure for consistent hashing
-	type memberData struct {
-		ID        string `json:"id"`
-		Role      string `json:"role"`
-		InvitedBy string `json:"invited_by"`
-		Disabled  bool   `json:"disabled"`
-		Type      string `json:"type"` // "user" or "integration"
-	}
-
-	var allMembers []memberData
-
-	for id, member := range members {
-		allMembers = append(allMembers, memberData{
-			ID:        id,
-			Role:      member.Role,
-			InvitedBy: member.InvitedBy,
-			Disabled:  member.Disabled,
-			Type:      "user",
-		})
-	}
-
-	for id, member := range integrations {
-		allMembers = append(allMembers, memberData{
-			ID:        id,
-			Role:      member.Role,
-			InvitedBy: member.InvitedBy,
-			Disabled:  member.Disabled,
-			Type:      "integration",
-		})
-	}
-
-	// Sort by ID for deterministic ordering
-	sort.Slice(allMembers, func(i, j int) bool {
-		return allMembers[i].ID < allMembers[j].ID
-	})
-
-	jsonData, err := json.Marshal(allMembers)
-	if err != nil {
-		return "", fmt.Errorf("failed to marshal members for hash: %w", err)
-	}
-	hash := sha256.Sum256(jsonData)
-	return hex.EncodeToString(hash[:]), nil
-}
 
 func NewWorkspace(ws *workspace.Workspace) (*WorkspaceDocument, string) {
 	membersDoc := map[string]WorkspaceMemberDocument{}
@@ -114,7 +62,7 @@ func NewWorkspace(ws *workspace.Workspace) (*WorkspaceDocument, string) {
 	}
 
 	// Compute members hash for unique indexing
-	membersHash, err := computeMembersHash(membersDoc, integrationsDoc)
+	membersHash, err := ComputeWorkspaceMembersHash(membersDoc, integrationsDoc)
 	if err != nil {
 		// In case of marshalling error, fallback to empty hash
 		// This should never happen with our data structures, but better to be safe

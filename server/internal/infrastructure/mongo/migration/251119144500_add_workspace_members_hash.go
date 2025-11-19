@@ -2,25 +2,14 @@ package migration
 
 import (
 	"context"
-	"crypto/sha256"
-	"encoding/hex"
-	"encoding/json"
 	"fmt"
-	"sort"
 
+	"github.com/reearth/reearth-accounts/server/internal/infrastructure/mongo/mongodoc"
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/bson/primitive"
 	"go.mongodb.org/mongo-driver/mongo"
 	"go.mongodb.org/mongo-driver/mongo/options"
 )
-
-type workspaceMemberData struct {
-	ID        string `json:"id"`
-	Role      string `json:"role"`
-	InvitedBy string `json:"invited_by"`
-	Disabled  bool   `json:"disabled"`
-	Type      string `json:"type"` // "user" or "integration"
-}
 
 type workspaceMemberDoc struct {
 	Role      string `bson:"role,omitempty"`
@@ -28,55 +17,21 @@ type workspaceMemberDoc struct {
 	Disabled  bool   `bson:"disabled,omitempty"`
 }
 
-// computeMembersHashFromBSON creates a deterministic hash of members and integrations
-func computeMembersHashFromBSON(members, integrations map[string]workspaceMemberDoc) (string, error) {
-	var allMembers []workspaceMemberData
-
-	// Add users
+// convertToWorkspaceMemberDocument converts migration BSON types to the shared type
+func convertToWorkspaceMemberDocument(members map[string]workspaceMemberDoc) map[string]mongodoc.WorkspaceMemberDocument {
+	result := make(map[string]mongodoc.WorkspaceMemberDocument)
 	for id, member := range members {
-		allMembers = append(allMembers, workspaceMemberData{
-			ID:        id,
+		result[id] = mongodoc.WorkspaceMemberDocument{
 			Role:      member.Role,
 			InvitedBy: member.InvitedBy,
 			Disabled:  member.Disabled,
-			Type:      "user",
-		})
+		}
 	}
-
-	// Add integrations
-	for id, member := range integrations {
-		allMembers = append(allMembers, workspaceMemberData{
-			ID:        id,
-			Role:      member.Role,
-			InvitedBy: member.InvitedBy,
-			Disabled:  member.Disabled,
-			Type:      "integration",
-		})
-	}
-
-	// Sort by ID for deterministic ordering
-	sort.Slice(allMembers, func(i, j int) bool {
-		return allMembers[i].ID < allMembers[j].ID
-	})
-
-	// Convert to JSON and hash
-	jsonData, err := json.Marshal(allMembers)
-	if err != nil {
-		return "", fmt.Errorf("failed to marshal members for hash: %w", err)
-	}
-	hash := sha256.Sum256(jsonData)
-	return hex.EncodeToString(hash[:]), nil
+	return result
 }
 
 func AddWorkspaceMembersHash(ctx context.Context, c DBClient) error {
 	col := c.Database().Collection("workspace")
-
-	// First, let's see what workspaces exist
-	totalCount, err := col.CountDocuments(ctx, bson.M{})
-	if err != nil {
-		return fmt.Errorf("failed to count workspaces: %w", err)
-	}
-	fmt.Printf("Total workspaces in collection: %d\n", totalCount)
 
 	// Count workspaces without members_hash field
 	missingHashCount, err := col.CountDocuments(ctx, bson.M{"members_hash": bson.M{"$exists": false}})
@@ -108,8 +63,10 @@ func AddWorkspaceMembersHash(ctx context.Context, c DBClient) error {
 			continue
 		}
 
-		// Compute hash for this workspace
-		membersHash, err := computeMembersHashFromBSON(doc.Members, doc.Integrations)
+		// Compute hash for this workspace using shared function
+		members := convertToWorkspaceMemberDocument(doc.Members)
+		integrations := convertToWorkspaceMemberDocument(doc.Integrations)
+		membersHash, err := mongodoc.ComputeWorkspaceMembersHash(members, integrations)
 		if err != nil {
 			fmt.Printf("Warning: failed to compute members_hash for workspace %s: %v\n", doc.ID.Hex(), err)
 			continue
