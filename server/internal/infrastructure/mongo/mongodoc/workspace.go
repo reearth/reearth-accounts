@@ -1,6 +1,11 @@
 package mongodoc
 
 import (
+	"crypto/sha256"
+	"encoding/hex"
+	"encoding/json"
+	"sort"
+
 	"github.com/reearth/reearth-accounts/server/pkg/id"
 	"github.com/reearth/reearth-accounts/server/pkg/workspace"
 	"github.com/samber/lo"
@@ -28,8 +33,53 @@ type WorkspaceDocument struct {
 	Metadata     WorkspaceMetadataDocument
 	Members      map[string]WorkspaceMemberDocument
 	Integrations map[string]WorkspaceMemberDocument
+	MembersHash  string `bson:"members_hash,omitempty"`
 	Personal     bool
 	Policy       string `bson:",omitempty"`
+}
+
+// computeMembersHash creates a deterministic hash of members and integrations
+// for use in compound unique indexes with alias
+func computeMembersHash(members map[string]WorkspaceMemberDocument, integrations map[string]WorkspaceMemberDocument) string {
+	// Create a combined structure for consistent hashing
+	type memberData struct {
+		ID        string `json:"id"`
+		Role      string `json:"role"`
+		InvitedBy string `json:"invited_by"`
+		Disabled  bool   `json:"disabled"`
+		Type      string `json:"type"` // "user" or "integration"
+	}
+
+	var allMembers []memberData
+
+	for id, member := range members {
+		allMembers = append(allMembers, memberData{
+			ID:        id,
+			Role:      member.Role,
+			InvitedBy: member.InvitedBy,
+			Disabled:  member.Disabled,
+			Type:      "user",
+		})
+	}
+
+	for id, member := range integrations {
+		allMembers = append(allMembers, memberData{
+			ID:        id,
+			Role:      member.Role,
+			InvitedBy: member.InvitedBy,
+			Disabled:  member.Disabled,
+			Type:      "integration",
+		})
+	}
+
+	// Sort by ID for deterministic ordering
+	sort.Slice(allMembers, func(i, j int) bool {
+		return allMembers[i].ID < allMembers[j].ID
+	})
+
+	jsonData, _ := json.Marshal(allMembers)
+	hash := sha256.Sum256(jsonData)
+	return hex.EncodeToString(hash[:])
 }
 
 func NewWorkspace(ws *workspace.Workspace) (*WorkspaceDocument, string) {
@@ -59,6 +109,9 @@ func NewWorkspace(ws *workspace.Workspace) (*WorkspaceDocument, string) {
 		PhotoURL:     ws.Metadata().PhotoURL(),
 	}
 
+	// Compute members hash for unique indexing
+	membersHash := computeMembersHash(membersDoc, integrationsDoc)
+
 	wId := ws.ID().String()
 	return &WorkspaceDocument{
 		ID:           wId,
@@ -68,6 +121,7 @@ func NewWorkspace(ws *workspace.Workspace) (*WorkspaceDocument, string) {
 		Metadata:     metadataDoc,
 		Members:      membersDoc,
 		Integrations: integrationsDoc,
+		MembersHash:  membersHash,
 		Personal:     ws.IsPersonal(),
 		Policy:       lo.FromPtr(ws.Policy()).String(),
 	}, wId
