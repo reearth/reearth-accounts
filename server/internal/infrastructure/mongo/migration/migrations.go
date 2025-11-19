@@ -34,5 +34,5 @@ var migrations = migration.Migrations[DBClient]{
 	251114101525: SyncUserNameToWorkspace,
 	251119144500: AddWorkspaceMembersHash,
 	251119144501: ReplaceWorkspaceAliasMembersIndex,
-	202511191900: AddCaseInsensitiveWorkspaceAliasIndex,
+	251119160000: AddCaseInsensitiveWorkspaceAliasIndex,
 }
