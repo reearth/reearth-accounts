@@ -8,6 +8,7 @@ import (
 	"github.com/reearth/reearthx/mongox/mongotest"
 	"github.com/stretchr/testify/assert"
 	"go.mongodb.org/mongo-driver/bson"
+	"go.mongodb.org/mongo-driver/bson/primitive"
 )
 
 func TestAddWorkspaceMembersHash(t *testing.T) {
@@ -21,7 +22,7 @@ func TestAddWorkspaceMembersHash(t *testing.T) {
 
 	// Insert test workspace without members_hash
 	testWorkspace := bson.M{
-		"_id":   "workspace1",
+		"_id":   primitive.NewObjectID(),
 		"alias": "test-workspace",
 		"name":  "Test Workspace",
 		"email": "test@example.com",
@@ -59,7 +60,7 @@ func TestAddWorkspaceMembersHash(t *testing.T) {
 
 	// Verify members_hash was added
 	var result bson.M
-	err = col.FindOne(ctx, bson.M{"_id": "workspace1"}).Decode(&result)
+	err = col.FindOne(ctx, bson.M{"_id": testWorkspace["_id"]}).Decode(&result)
 	assert.NoError(t, err)
 	assert.Contains(t, result, "members_hash")
 	assert.NotEmpty(t, result["members_hash"])
@@ -69,7 +70,7 @@ func TestAddWorkspaceMembersHash(t *testing.T) {
 	err = AddWorkspaceMembersHash(ctx, c)
 	assert.NoError(t, err)
 
-	err = col.FindOne(ctx, bson.M{"_id": "workspace1"}).Decode(&result)
+	err = col.FindOne(ctx, bson.M{"_id": testWorkspace["_id"]}).Decode(&result)
 	assert.NoError(t, err)
 	assert.Equal(t, originalHash, result["members_hash"])
 }
