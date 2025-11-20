@@ -377,18 +377,27 @@ func (i *User) CreateVerification(ctx context.Context, email string) error {
 		if err != nil {
 			return err
 		}
+
 		if u.Verification().IsVerified() {
 			return nil
 		}
+
+		if !u.Verification().IsExpired() {
+			return nil
+		}
+
 		vr := user.NewVerification()
 		u.SetVerification(vr)
 
-		if err := i.repos.User.Save(ctx, u); err != nil {
+		if err = i.repos.User.Save(ctx, u); err != nil {
 			return err
 		}
 
-		if err := i.sendVerificationMail(ctx, u, vr); err != nil {
-			return err
+		auth0Auth := u.Auths().GetByProvider("auth0")
+		if auth0Auth != nil {
+			if err = i.gateways.Authenticator.ResendVerificationEmail(ctx, auth0Auth.Sub); err != nil {
+				return err
+			}
 		}
 
 		return nil

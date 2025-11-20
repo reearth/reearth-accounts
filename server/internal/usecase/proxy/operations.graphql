@@ -7,6 +7,7 @@ query Me {
 fragment FragmentUser on User {
     id
     name
+    alias
     email
     metadata {
         description
@@ -17,6 +18,11 @@ fragment FragmentUser on User {
     }
     workspace
     auths
+    verification {
+        code
+        expiration
+        verified
+    }
 }
 
 
@@ -48,7 +54,9 @@ query UserByNameOrEmail($nameOrEmail: String!) {
 
 query SearchUser($keyword: String!) {
   searchUser(keyword: $keyword) {
-     ...FragmentUser
+     users {
+        ...FragmentUser
+     }
   }
 }
 

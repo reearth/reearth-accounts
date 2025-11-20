@@ -110,6 +110,32 @@ func (a *Auth0) UpdateUser(ctx context.Context, p gateway.AuthenticatorUpdateUse
 	return
 }
 
+func (a *Auth0) ResendVerificationEmail(ctx context.Context, userID string) error {
+	err := a.updateToken()
+	if err != nil {
+		return err
+	}
+
+	payload := map[string]any{
+		"user_id":   userID,
+		"client_id": a.clientID,
+		"identity": map[string]string{
+			"user_id":  strings.Split(userID, "|")[1],
+			"provider": "auth0",
+		},
+	}
+
+	_, err = a.exec(http.MethodPost, "api/v2/jobs/verification-email", a.token, payload)
+	if err != nil {
+		if !a.disableLogging {
+			log.Errorf("auth0: resend verification email: %+v", err)
+		}
+		return rerror.NewE(i18n.T("failed to resend verification email"))
+	}
+
+	return nil
+}
+
 func (a *Auth0) needsFetchToken() bool {
 	if a == nil {
 		return false

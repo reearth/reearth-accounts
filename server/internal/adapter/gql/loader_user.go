@@ -37,8 +37,21 @@ func (c *UserLoader) Fetch(ctx context.Context, ids []gqlmodel.ID) ([]*gqlmodel.
 	return users, nil
 }
 
-func (c *UserLoader) SearchUser(ctx context.Context, nameOrEmail string) (*gqlmodel.User, error) {
-	res, err := c.usecase.SearchUser(ctx, nameOrEmail)
+func (c *UserLoader) UserByNameOrEmail(ctx context.Context, nameOrEmail string) (*gqlmodel.User, error) {
+	res, err := c.usecase.FetchByNameOrEmail(ctx, nameOrEmail)
+	if err != nil {
+		return nil, err
+	}
+
+	if res == nil {
+		return nil, nil
+	}
+
+	return gqlmodel.ToUserFromSimple(res), nil
+}
+
+func (c *UserLoader) SearchUser(ctx context.Context, keyword string) (*gqlmodel.SearchUserOutput, error) {
+	res, err := c.usecase.SearchUser(ctx, keyword)
 	if err != nil {
 		return nil, err
 	}
@@ -47,7 +60,7 @@ func (c *UserLoader) SearchUser(ctx context.Context, nameOrEmail string) (*gqlmo
 		return nil, nil
 	}
 
-	return gqlmodel.ToUserFromSimple(res[0]), nil
+	return gqlmodel.ToSearchUserOutput(res), nil
 }
 
 // data loader
