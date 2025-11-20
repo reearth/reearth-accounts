@@ -28,9 +28,11 @@ type WorkspaceDocument struct {
 	Metadata     WorkspaceMetadataDocument
 	Members      map[string]WorkspaceMemberDocument
 	Integrations map[string]WorkspaceMemberDocument
+	MembersHash  string `bson:"members_hash,omitempty"`
 	Personal     bool
 	Policy       string `bson:",omitempty"`
 }
+
 
 func NewWorkspace(ws *workspace.Workspace) (*WorkspaceDocument, string) {
 	membersDoc := map[string]WorkspaceMemberDocument{}
@@ -59,6 +61,14 @@ func NewWorkspace(ws *workspace.Workspace) (*WorkspaceDocument, string) {
 		PhotoURL:     ws.Metadata().PhotoURL(),
 	}
 
+	// Compute members hash for unique indexing
+	membersHash, err := ComputeWorkspaceMembersHash(membersDoc, integrationsDoc)
+	if err != nil {
+		// In case of marshalling error, fallback to empty hash
+		// This should never happen with our data structures, but better to be safe
+		membersHash = ""
+	}
+
 	wId := ws.ID().String()
 	return &WorkspaceDocument{
 		ID:           wId,
@@ -68,6 +78,7 @@ func NewWorkspace(ws *workspace.Workspace) (*WorkspaceDocument, string) {
 		Metadata:     metadataDoc,
 		Members:      membersDoc,
 		Integrations: integrationsDoc,
+		MembersHash:  membersHash,
 		Personal:     ws.IsPersonal(),
 		Policy:       lo.FromPtr(ws.Policy()).String(),
 	}, wId
