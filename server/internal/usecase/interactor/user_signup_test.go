@@ -431,6 +431,21 @@ func TestUser_CreateVerification(t *testing.T) {
 			wantAuthenticatorCalled: false,
 		},
 		{
+			name: "verification not expired - should return nil without creating new verification",
+			createUserBefore: func() *user.User {
+				return user.New().
+					ID(id.NewUserID()).
+					Workspace(id.NewWorkspaceID()).
+					Email("notexpired@bbb.com").
+					Name("NOTEXPIRED").
+					Verification(user.VerificationFrom(mockcode, time.Now().Add(1*time.Hour), false)).
+					MustBuild()
+			},
+			email:                   "notexpired@bbb.com",
+			wantError:               nil,
+			wantAuthenticatorCalled: false,
+		},
+		{
 			name:                    "not found",
 			email:                   "ccc@bbb.com",
 			wantError:               rerror.ErrNotFound,

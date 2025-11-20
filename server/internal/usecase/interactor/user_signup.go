@@ -377,9 +377,15 @@ func (i *User) CreateVerification(ctx context.Context, email string) error {
 		if err != nil {
 			return err
 		}
+
 		if u.Verification().IsVerified() {
 			return nil
 		}
+
+		if !u.Verification().IsExpired() {
+			return nil
+		}
+
 		vr := user.NewVerification()
 		u.SetVerification(vr)
 
