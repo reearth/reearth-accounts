@@ -9,14 +9,14 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-func TestIsSignupMutation(t *testing.T) {
+func TestIsBypassed(t *testing.T) {
 	t.Run("should detect signup mutations", func(t *testing.T) {
 		t.Run("signup mutation with operation name", func(t *testing.T) {
 			body := `{"query":"mutation SignupUser($input: SignupInput!) { signup(input: $input) { user { id } } }"}`
 			req, err := http.NewRequest(http.MethodPost, "/api/graphql", io.NopCloser(bytes.NewBufferString(body)))
 			assert.NoError(t, err)
-			
-			result := isSignupMutation(req)
+
+			result := isBypassed(req)
 			assert.True(t, result)
 		})
 
@@ -24,8 +24,8 @@ func TestIsSignupMutation(t *testing.T) {
 			body := `{"query":"mutation { signup(input: $input) { user { id } } }"}`
 			req, err := http.NewRequest(http.MethodPost, "/api/graphql", io.NopCloser(bytes.NewBufferString(body)))
 			assert.NoError(t, err)
-			
-			result := isSignupMutation(req)
+
+			result := isBypassed(req)
 			assert.True(t, result)
 		})
 
@@ -33,8 +33,8 @@ func TestIsSignupMutation(t *testing.T) {
 			body := `{"query":"mutation { signupOIDC(input: $input) { user { id } } }"}`
 			req, err := http.NewRequest(http.MethodPost, "/api/graphql", io.NopCloser(bytes.NewBufferString(body)))
 			assert.NoError(t, err)
-			
-			result := isSignupMutation(req)
+
+			result := isBypassed(req)
 			assert.True(t, result)
 		})
 
@@ -42,8 +42,8 @@ func TestIsSignupMutation(t *testing.T) {
 			body := `{"query":"mutation {\n  signup(input: $input) {\n    user { id }\n  }\n}"}`
 			req, err := http.NewRequest(http.MethodPost, "/api/graphql", io.NopCloser(bytes.NewBufferString(body)))
 			assert.NoError(t, err)
-			
-			result := isSignupMutation(req)
+
+			result := isBypassed(req)
 			assert.True(t, result)
 		})
 	})
@@ -53,8 +53,8 @@ func TestIsSignupMutation(t *testing.T) {
 			body := `{"query":"mutation { updateMe(input: $input) { me { id } } }"}`
 			req, err := http.NewRequest(http.MethodPost, "/api/graphql", io.NopCloser(bytes.NewBufferString(body)))
 			assert.NoError(t, err)
-			
-			result := isSignupMutation(req)
+
+			result := isBypassed(req)
 			assert.False(t, result)
 		})
 
@@ -62,8 +62,8 @@ func TestIsSignupMutation(t *testing.T) {
 			body := `{"query":"query { me { id } }"}`
 			req, err := http.NewRequest(http.MethodPost, "/api/graphql", io.NopCloser(bytes.NewBufferString(body)))
 			assert.NoError(t, err)
-			
-			result := isSignupMutation(req)
+
+			result := isBypassed(req)
 			assert.False(t, result)
 		})
 
@@ -71,8 +71,8 @@ func TestIsSignupMutation(t *testing.T) {
 			body := `{"query":"mutation { signup(input: $input) { user { id } } }"}`
 			req, err := http.NewRequest(http.MethodGet, "/api/graphql", io.NopCloser(bytes.NewBufferString(body)))
 			assert.NoError(t, err)
-			
-			result := isSignupMutation(req)
+
+			result := isBypassed(req)
 			assert.False(t, result)
 		})
 
@@ -80,16 +80,16 @@ func TestIsSignupMutation(t *testing.T) {
 			body := `invalid json`
 			req, err := http.NewRequest(http.MethodPost, "/api/graphql", io.NopCloser(bytes.NewBufferString(body)))
 			assert.NoError(t, err)
-			
-			result := isSignupMutation(req)
+
+			result := isBypassed(req)
 			assert.False(t, result)
 		})
 
 		t.Run("empty body", func(t *testing.T) {
 			req, err := http.NewRequest(http.MethodPost, "/api/graphql", io.NopCloser(bytes.NewBufferString("")))
 			assert.NoError(t, err)
-			
-			result := isSignupMutation(req)
+
+			result := isBypassed(req)
 			assert.False(t, result)
 		})
 	})
