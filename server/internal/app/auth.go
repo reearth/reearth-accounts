@@ -34,7 +34,7 @@ type graphqlRequest struct {
 	Variables     map[string]interface{} `json:"variables"`
 }
 
-func isSignupMutation(req *http.Request) bool {
+func isBypassed(req *http.Request) bool {
 	if req.Method != http.MethodPost {
 		return false
 	}
@@ -56,14 +56,19 @@ func isSignupMutation(req *http.Request) bool {
 	query = strings.ReplaceAll(query, "\t", "")
 	query = strings.ReplaceAll(query, "\r", "")
 
-	// Check if it's a mutation
-	if !strings.Contains(query, "mutation") {
-		return false
+	list := []string{
+		"signup(",
+		"signupoidc(",
+		"findbyalias(",
 	}
 
-	// Check for signup or signupOIDC after mutation keyword
-	// This handles both named and anonymous mutations
-	return strings.Contains(query, "signup(") || strings.Contains(query, "signupoidc(")
+	for _, q := range list {
+		if strings.Contains(query, q) {
+			return true
+		}
+	}
+
+	return false
 }
 
 func authMiddleware(cfg *ServerConfig) func(http.Handler) http.Handler {
@@ -71,8 +76,8 @@ func authMiddleware(cfg *ServerConfig) func(http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
 			ctx := req.Context()
 
-			// Skip auth for signup mutations
-			if isSignupMutation(req) {
+			// bypass some queries & mutations
+			if isBypassed(req) {
 				log.Debugfc(ctx, "[authMiddleware] Skipping auth for signup mutation")
 				next.ServeHTTP(w, req.WithContext(ctx))
 				return
