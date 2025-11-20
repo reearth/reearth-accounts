@@ -21,7 +21,6 @@ var migrations = migration.Migrations[DBClient]{
 	Commented out migrations for production deployment due to having some bug on mongodb.
 	After resolving the issues, these migrations can be uncommented and applied.
 	*/
-	//250910120000: GenerateMissingWorkspaceAliases,
 	//250911120000: GenerateMissingUserAliases,
 	//250911120002: AddWorkspaceAliasMembersCompositeUniqueIndex, // Replaced by 251119144501 with members_hash
 	//250911120003: AddCaseInsensitiveUserAliasIndex,
@@ -33,6 +32,7 @@ var migrations = migration.Migrations[DBClient]{
 	251107102200: SyncPersonalWorkspaceAlias,
 	251114101525: SyncUserNameToWorkspace,
 	251119144500: AddWorkspaceMembersHash,
-	251120160000: AddCaseInsensitiveWorkspaceAliasIndex,
-	251120160001: ReplaceWorkspaceAliasMembersIndex,
+	251120200000: GenerateMissingWorkspaceAliases,
+	251120210000: AddCaseInsensitiveWorkspaceAliasIndex,
+	251120220000: ReplaceWorkspaceAliasMembersIndex,
 }

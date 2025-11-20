@@ -52,12 +52,6 @@ func TestGenerateMissingWorkspaceAliases(t *testing.T) {
 			"name":  "Valid Workspace",
 			"alias": "validalias",
 		},
-		bson.M{
-			"_id":   "01jhmkh59s3q06xzm1215w7y2v",
-			"id":    "01jhmkh59s3q06xzm1215w7y2v",
-			"name":  "Eukarya Workspace",
-			"alias": "eukarya",
-		},
 	}
 
 	_, err := workspaceCollection.InsertMany(ctx, testWorkspaces)
@@ -94,9 +88,4 @@ func TestGenerateMissingWorkspaceAliases(t *testing.T) {
 	assert.NoError(t, err)
 	assert.Equal(t, "validalias", result["alias"], "Valid alias should not be changed")
 
-	// Check that the specific eukarya workspace got updated to eukarya-roboco
-	var eukaryaResult bson.M
-	err = workspaceCollection.FindOne(ctx, bson.M{"id": "01jhmkh59s3q06xzm1215w7y2v"}).Decode(&eukaryaResult)
-	assert.NoError(t, err)
-	assert.Equal(t, "eukarya-roboco", eukaryaResult["alias"], "Eukarya workspace should be updated to eukarya-roboco")
 }
