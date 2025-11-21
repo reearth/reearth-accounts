@@ -69,8 +69,10 @@ func (i *User) UpdateProfile(ctx context.Context, userID id.UserID, name, email 
 		return nil, err
 	}
 
-	u.SetName(name)
-	u.SetEmail(email)
+	u.UpdateName(name)
+	if err := u.UpdateEmail(email); err != nil {
+		return nil, err
+	}
 
 	if err := i.repos.User.Save(ctx, u); err != nil {
 		return nil, err

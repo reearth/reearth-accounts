@@ -39,11 +39,13 @@ func (i *Workspace) FindByUser(ctx context.Context, userID id.UserID, operator *
 
 func (i *Workspace) Create(ctx context.Context, name string, userID id.UserID, operator *usecase.Operator) (*workspace.Workspace, error) {
 	ws := workspace.New().
+		NewID().
 		Name(name).
-		Members([]*workspace.Member{
-			{
-				UserID: userID,
-				Role:   workspace.RoleOwner,
+		Members(map[workspace.UserID]workspace.Member{
+			userID: {
+				Role:      workspace.RoleOwner,
+				Disabled:  false,
+				InvitedBy: userID,
 			},
 		}).
 		MustBuild()
@@ -60,7 +62,7 @@ func (i *Workspace) Update(ctx context.Context, wsID id.WorkspaceID, name string
 		return nil, err
 	}
 
-	ws.SetName(name)
+	ws.Rename(name)
 
 	if err := i.repos.Workspace.Save(ctx, ws); err != nil {
 		return nil, err
@@ -78,7 +80,19 @@ func (i *Workspace) AddMember(ctx context.Context, wsID id.WorkspaceID, userID i
 		return nil, err
 	}
 
-	ws.AddMember(userID, role)
+	u, err := i.repos.User.FindByID(ctx, userID)
+	if err != nil {
+		return nil, err
+	}
+
+	inviterID := userID
+	if operator != nil && operator.User != nil {
+		inviterID = *operator.User
+	}
+
+	if err := ws.Members().Join(u, role, inviterID); err != nil {
+		return nil, err
+	}
 
 	if err := i.repos.Workspace.Save(ctx, ws); err != nil {
 		return nil, err
@@ -92,7 +106,9 @@ func (i *Workspace) RemoveMember(ctx context.Context, wsID id.WorkspaceID, userI
 		return nil, err
 	}
 
-	ws.RemoveMember(userID)
+	if err := ws.Members().Leave(userID); err != nil {
+		return nil, err
+	}
 
 	if err := i.repos.Workspace.Save(ctx, ws); err != nil {
 		return nil, err
@@ -106,7 +122,9 @@ func (i *Workspace) UpdateMember(ctx context.Context, wsID id.WorkspaceID, userI
 		return nil, err
 	}
 
-	ws.UpdateMember(userID, role)
+	if err := ws.Members().UpdateUserRole(userID, role); err != nil {
+		return nil, err
+	}
 
 	if err := i.repos.Workspace.Save(ctx, ws); err != nil {
 		return nil, err
