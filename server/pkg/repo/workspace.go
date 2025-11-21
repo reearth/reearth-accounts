@@ -52,3 +52,18 @@ func (f WorkspaceFilter) CanRead(ws id.WorkspaceID) bool {
 func (f WorkspaceFilter) CanWrite(ws id.WorkspaceID) bool {
 	return f.Writable == nil || f.Writable.Has(ws)
 }
+
+func WorkspaceFilterFromOperator(op WorkspaceFilterOperator) WorkspaceFilter {
+	if op == nil {
+		return WorkspaceFilter{}
+	}
+	return WorkspaceFilter{
+		Readable: op.AllReadableWorkspaces(),
+		Writable: op.AllWritableWorkspaces(),
+	}
+}
+
+type WorkspaceFilterOperator interface {
+	AllReadableWorkspaces() id.WorkspaceIDList
+	AllWritableWorkspaces() id.WorkspaceIDList
+}
