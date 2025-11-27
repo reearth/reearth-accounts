@@ -2,12 +2,14 @@ package migration
 
 import (
 	"context"
+	"strings"
 	"testing"
 
 	"github.com/reearth/reearth-accounts/server/internal/infrastructure/mongo"
 	"github.com/reearth/reearth-accounts/server/internal/infrastructure/mongo/mongodoc"
 	"github.com/reearth/reearthx/mongox"
 	"github.com/stretchr/testify/assert"
+	"go.mongodb.org/mongo-driver/bson"
 	mongodriver "go.mongodb.org/mongo-driver/mongo"
 )
 
@@ -68,4 +70,91 @@ func TestAddCaseInsensitiveWorkspaceIndexes_CaseInsensitiveUniqueness(t *testing
 	_, err = col.InsertOne(ctx, workspace3)
 	assert.Error(t, err, "Third workspace with mixed case alias should also fail")
 	assert.True(t, mongodriver.IsDuplicateKeyError(err), "Should be duplicate key error")
+}
+
+func TestAddCaseInsensitiveWorkspaceIndexes_DuplicateHandling(t *testing.T) {
+	if testing.Short() {
+		t.Skip("skipping integration test")
+	}
+
+	ctx := context.Background()
+	db := mongo.Connect(t)(t)
+	mongoxClient := mongox.NewClientWithDatabase(db)
+	col := db.Collection("workspace")
+
+	// Insert workspaces with case-insensitive duplicate aliases before migration
+	workspaces := []mongodoc.WorkspaceDocument{
+		{
+			ID:    "workspace1",
+			Name:  "First Workspace",
+			Alias: "testworkspace",
+			Email: "test1@example.com",
+		},
+		{
+			ID:    "workspace2",
+			Name:  "Second Workspace",
+			Alias: "TESTWORKSPACE",
+			Email: "test2@example.com",
+		},
+		{
+			ID:    "workspace3",
+			Name:  "Third Workspace",
+			Alias: "TestWorkspace",
+			Email: "test3@example.com",
+		},
+	}
+
+	for _, ws := range workspaces {
+		_, err := col.InsertOne(ctx, ws)
+		assert.NoError(t, err)
+	}
+
+	// Run migration - should handle duplicates and create index
+	err := AddCaseInsensitiveWorkspaceAliasIndex(ctx, mongoxClient)
+	assert.NoError(t, err)
+
+	// Verify results
+	var results []mongodoc.WorkspaceDocument
+	cursor, err := col.Find(ctx, bson.M{})
+	assert.NoError(t, err)
+	err = cursor.All(ctx, &results)
+	assert.NoError(t, err)
+	assert.Len(t, results, 3)
+
+	// Check aliases are unique case-insensitively
+	aliasMap := make(map[string]string)
+	for _, ws := range results {
+		lowerAlias := strings.ToLower(ws.Alias)
+		if existingID, exists := aliasMap[lowerAlias]; exists {
+			t.Errorf("Duplicate case-insensitive alias '%s' for workspaces %s and %s",
+				lowerAlias, existingID, ws.ID)
+		}
+		aliasMap[lowerAlias] = ws.ID
+	}
+
+	// First workspace should keep original alias
+	var firstWorkspace mongodoc.WorkspaceDocument
+	err = col.FindOne(ctx, bson.M{"_id": "workspace1"}).Decode(&firstWorkspace)
+	assert.NoError(t, err)
+	assert.Equal(t, "testworkspace", firstWorkspace.Alias)
+
+	// Other workspaces should have new aliases with suffix pattern
+	for _, wsID := range []string{"workspace2", "workspace3"} {
+		var ws mongodoc.WorkspaceDocument
+		err = col.FindOne(ctx, bson.M{"_id": wsID}).Decode(&ws)
+		assert.NoError(t, err)
+		assert.True(t, strings.HasPrefix(ws.Alias, "testworkspace-"))
+	}
+
+	// Index should prevent new duplicates
+	newWorkspace := mongodoc.WorkspaceDocument{
+		ID:    "workspace4",
+		Name:  "Fourth Workspace",
+		Alias: "TESTWORKSPACE",
+		Email: "test4@example.com",
+	}
+
+	_, err = col.InsertOne(ctx, newWorkspace)
+	assert.Error(t, err)
+	assert.True(t, mongodriver.IsDuplicateKeyError(err))
 }
