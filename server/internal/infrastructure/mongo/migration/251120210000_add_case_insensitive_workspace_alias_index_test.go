@@ -134,15 +134,19 @@ func TestAddCaseInsensitiveWorkspaceIndexes_DuplicateHandling(t *testing.T) {
 
 	// First workspace should keep original alias
 	var firstWorkspace mongodoc.WorkspaceDocument
-	err = col.FindOne(ctx, bson.M{"_id": "workspace1"}).Decode(&firstWorkspace)
+	// Find by alias instead of _id, since _id may be ObjectID
+	err = col.FindOne(ctx, bson.M{"alias": "testworkspace"}).Decode(&firstWorkspace)
 	assert.NoError(t, err)
 	assert.Equal(t, "testworkspace", firstWorkspace.Alias)
 
 	// Other workspaces should have new aliases with suffix pattern
-	for _, wsID := range []string{"workspace2", "workspace3"} {
-		var ws mongodoc.WorkspaceDocument
-		err = col.FindOne(ctx, bson.M{"_id": wsID}).Decode(&ws)
-		assert.NoError(t, err)
+	cursor, err = col.Find(ctx, bson.M{"alias": bson.M{"$regex": "^testworkspace-"}})
+	assert.NoError(t, err)
+	var updatedWorkspaces []mongodoc.WorkspaceDocument
+	err = cursor.All(ctx, &updatedWorkspaces)
+	assert.NoError(t, err)
+	assert.Len(t, updatedWorkspaces, 2)
+	for _, ws := range updatedWorkspaces {
 		assert.True(t, strings.HasPrefix(ws.Alias, "testworkspace-"))
 	}
 
