@@ -16,7 +16,6 @@ func AddCaseInsensitiveWorkspaceAliasIndex(ctx context.Context, c DBClient) erro
 	col := c.Database().Collection("workspace")
 	colWorkspace := c.Collection("workspace")
 
-	// Scan for duplicate aliases (case-insensitive)
 	duplicates, err := FindDuplicateWorkspaceAliases(ctx, col)
 	if err != nil {
 		return fmt.Errorf("failed to scan for duplicate workspace aliases: %w", err)
@@ -26,7 +25,6 @@ func AddCaseInsensitiveWorkspaceAliasIndex(ctx context.Context, c DBClient) erro
 		for alias, ids := range duplicates {
 			fmt.Printf("Alias: %s, Workspace IDs: %v\n", alias, ids)
 		}
-		// Generate new random aliases for duplicates
 		if err := GenerateNewAliasesForDuplicates(ctx, colWorkspace, duplicates); err != nil {
 			return fmt.Errorf("failed to generate new aliases for duplicates: %w", err)
 		}
@@ -102,13 +100,11 @@ func GenerateNewAliasesForDuplicates(ctx context.Context, col *mongox.Collection
 	for lowerAlias, wsIDs := range duplicates {
 		// Keep the first workspace with the original alias, change the rest
 		for i, id := range wsIDs {
-			// Skip the first workspace - it keeps the original alias
 			if i == 0 {
 				fmt.Printf("Keeping workspace %v with original alias for: %s\n", id, lowerAlias)
 				continue
 			}
 
-			// Fetch the workspace document to get proper structure
 			var doc mongodoc.WorkspaceDocument
 			filter := bson.M{"_id": id}
 			err := col.Client().FindOne(ctx, filter).Decode(&doc)
@@ -116,7 +112,6 @@ func GenerateNewAliasesForDuplicates(ctx context.Context, col *mongox.Collection
 				return fmt.Errorf("failed to find workspace with id %v: %w", id, err)
 			}
 
-			// Generate a new alias for duplicates
 			newAlias := fmt.Sprintf("%s-%s", lowerAlias, random.String(6, random.Lowercase))
 			doc.Alias = newAlias
 
