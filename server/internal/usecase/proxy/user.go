@@ -125,7 +125,7 @@ func (u *User) SearchUser(ctx context.Context, keyword string) (user.List, error
 	if err != nil {
 		return nil, err
 	}
-	r, err := util.TryMap(res.SearchUser.Users, func(u SearchUserSearchUserSearchUserOutputUsersUser) (*user.User, error) {
+	r, err := util.TryMap(res.SearchUser, func(u SearchUserSearchUser) (*user.User, error) {
 		return FragmentToUser(u.FragmentUser)
 	})
 	if err != nil {
