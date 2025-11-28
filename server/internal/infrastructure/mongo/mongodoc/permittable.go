@@ -6,10 +6,16 @@ import (
 	"github.com/reearth/reearth-accounts/server/pkg/user"
 )
 
+type WorkspaceRoleDocument struct {
+	WorkspaceID string `bson:"workspace_id"`
+	RoleID      string `bson:"role_id"`
+}
+
 type PermittableDocument struct {
-	ID      string
-	UserID  string
-	RoleIDs []string
+	ID             string
+	UserID         string
+	UserRoles      []string                `bson:"user_roles"`
+	WorkspaceRoles []WorkspaceRoleDocument `bson:"workspace_roles,omitempty"`
 }
 
 type PermittableConsumer = Consumer[*PermittableDocument, *permittable.Permittable]
@@ -29,9 +35,9 @@ func NewPermittable(p permittable.Permittable) (*PermittableDocument, string) {
 	}
 
 	return &PermittableDocument{
-		ID:      id,
-		UserID:  p.UserID().String(),
-		RoleIDs: roleIds,
+		ID:        id,
+		UserID:    p.UserID().String(),
+		UserRoles: roleIds,
 	}, id
 }
 
@@ -50,7 +56,7 @@ func (d *PermittableDocument) Model() (*permittable.Permittable, error) {
 		return nil, err
 	}
 
-	roleIds, err := id.RoleIDListFrom(d.RoleIDs)
+	roleIds, err := id.RoleIDListFrom(d.UserRoles)
 	if err != nil {
 		return nil, err
 	}
