@@ -98,14 +98,10 @@ input DeleteMeInput {
   userId: ID!
 }
 
-type SearchUserOutput {
-  users: [User!]!
-}
-
 extend type Query {
   me: Me
   userByNameOrEmail(nameOrEmail: String!): User
-  searchUser(keyword: String!): SearchUserOutput!
+  searchUser(keyword: String!): [User!]!
   findUsersByIDs(ids: [ID!]!): [User!]!
 }
 

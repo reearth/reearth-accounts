@@ -165,10 +165,6 @@ type ComplexityRoot struct {
 		Roles func(childComplexity int) int
 	}
 
-	SearchUserOutput struct {
-		Users func(childComplexity int) int
-	}
-
 	UpdateMePayload struct {
 		Me func(childComplexity int) int
 	}
@@ -300,7 +296,7 @@ type QueryResolver interface {
 	GetUsersWithRoles(ctx context.Context) (*gqlmodel.GetUsersWithRolesPayload, error)
 	Me(ctx context.Context) (*gqlmodel.Me, error)
 	UserByNameOrEmail(ctx context.Context, nameOrEmail string) (*gqlmodel.User, error)
-	SearchUser(ctx context.Context, keyword string) (*gqlmodel.SearchUserOutput, error)
+	SearchUser(ctx context.Context, keyword string) ([]*gqlmodel.User, error)
 	FindUsersByIDs(ctx context.Context, ids []gqlmodel.ID) ([]*gqlmodel.User, error)
 	FindByID(ctx context.Context, id gqlmodel.ID) (*gqlmodel.Workspace, error)
 	FindByIDs(ctx context.Context, ids []gqlmodel.ID) ([]*gqlmodel.Workspace, error)
@@ -978,13 +974,6 @@ func (e *executableSchema) Complexity(ctx context.Context, typeName, field strin
 		}
 
 		return e.complexity.RolesPayload.Roles(childComplexity), true
-
-	case "SearchUserOutput.users":
-		if e.complexity.SearchUserOutput.Users == nil {
-			break
-		}
-
-		return e.complexity.SearchUserOutput.Users(childComplexity), true
 
 	case "UpdateMePayload.me":
 		if e.complexity.UpdateMePayload.Me == nil {
@@ -1668,14 +1657,10 @@ input DeleteMeInput {
   userId: ID!
 }
 
-type SearchUserOutput {
-  users: [User!]!
-}
-
 extend type Query {
   me: Me
   userByNameOrEmail(nameOrEmail: String!): User
-  searchUser(keyword: String!): SearchUserOutput!
+  searchUser(keyword: String!): [User!]!
   findUsersByIDs(ids: [ID!]!): [User!]!
 }
 
@@ -5837,9 +5822,9 @@ func (ec *executionContext) _Query_searchUser(ctx context.Context, field graphql
 		}
 		return graphql.Null
 	}
-	res := resTmp.(*gqlmodel.SearchUserOutput)
+	res := resTmp.([]*gqlmodel.User)
 	fc.Result = res
-	return ec.marshalNSearchUserOutput2ᚖgithubᚗcomᚋreearthᚋreearthᚑaccountsᚋserverᚋinternalᚋadapterᚋgqlᚋgqlmodelᚐSearchUserOutput(ctx, field.Selections, res)
+	return ec.marshalNUser2ᚕᚖgithubᚗcomᚋreearthᚋreearthᚑaccountsᚋserverᚋinternalᚋadapterᚋgqlᚋgqlmodelᚐUserᚄ(ctx, field.Selections, res)
 }
 
 func (ec *executionContext) fieldContext_Query_searchUser(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
@@ -5850,10 +5835,26 @@ func (ec *executionContext) fieldContext_Query_searchUser(ctx context.Context, f
 		IsResolver: true,
 		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
 			switch field.Name {
-			case "users":
-				return ec.fieldContext_SearchUserOutput_users(ctx, field)
+			case "id":
+				return ec.fieldContext_User_id(ctx, field)
+			case "name":
+				return ec.fieldContext_User_name(ctx, field)
+			case "alias":
+				return ec.fieldContext_User_alias(ctx, field)
+			case "email":
+				return ec.fieldContext_User_email(ctx, field)
+			case "host":
+				return ec.fieldContext_User_host(ctx, field)
+			case "workspace":
+				return ec.fieldContext_User_workspace(ctx, field)
+			case "auths":
+				return ec.fieldContext_User_auths(ctx, field)
+			case "metadata":
+				return ec.fieldContext_User_metadata(ctx, field)
+			case "verification":
+				return ec.fieldContext_User_verification(ctx, field)
 			}
-			return nil, fmt.Errorf("no field named %q was found under type SearchUserOutput", field.Name)
+			return nil, fmt.Errorf("no field named %q was found under type User", field.Name)
 		},
 	}
 	defer func() {
@@ -6824,70 +6825,6 @@ func (ec *executionContext) fieldContext_RolesPayload_roles(_ context.Context, f
 				return ec.fieldContext_RoleForAuthorization_name(ctx, field)
 			}
 			return nil, fmt.Errorf("no field named %q was found under type RoleForAuthorization", field.Name)
-		},
-	}
-	return fc, nil
-}
-
-func (ec *executionContext) _SearchUserOutput_users(ctx context.Context, field graphql.CollectedField, obj *gqlmodel.SearchUserOutput) (ret graphql.Marshaler) {
-	fc, err := ec.fieldContext_SearchUserOutput_users(ctx, field)
-	if err != nil {
-		return graphql.Null
-	}
-	ctx = graphql.WithFieldContext(ctx, fc)
-	defer func() {
-		if r := recover(); r != nil {
-			ec.Error(ctx, ec.Recover(ctx, r))
-			ret = graphql.Null
-		}
-	}()
-	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (any, error) {
-		ctx = rctx // use context from middleware stack in children
-		return obj.Users, nil
-	})
-	if err != nil {
-		ec.Error(ctx, err)
-		return graphql.Null
-	}
-	if resTmp == nil {
-		if !graphql.HasFieldError(ctx, fc) {
-			ec.Errorf(ctx, "must not be null")
-		}
-		return graphql.Null
-	}
-	res := resTmp.([]*gqlmodel.User)
-	fc.Result = res
-	return ec.marshalNUser2ᚕᚖgithubᚗcomᚋreearthᚋreearthᚑaccountsᚋserverᚋinternalᚋadapterᚋgqlᚋgqlmodelᚐUserᚄ(ctx, field.Selections, res)
-}
-
-func (ec *executionContext) fieldContext_SearchUserOutput_users(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
-	fc = &graphql.FieldContext{
-		Object:     "SearchUserOutput",
-		Field:      field,
-		IsMethod:   false,
-		IsResolver: false,
-		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
-			switch field.Name {
-			case "id":
-				return ec.fieldContext_User_id(ctx, field)
-			case "name":
-				return ec.fieldContext_User_name(ctx, field)
-			case "alias":
-				return ec.fieldContext_User_alias(ctx, field)
-			case "email":
-				return ec.fieldContext_User_email(ctx, field)
-			case "host":
-				return ec.fieldContext_User_host(ctx, field)
-			case "workspace":
-				return ec.fieldContext_User_workspace(ctx, field)
-			case "auths":
-				return ec.fieldContext_User_auths(ctx, field)
-			case "metadata":
-				return ec.fieldContext_User_metadata(ctx, field)
-			case "verification":
-				return ec.fieldContext_User_verification(ctx, field)
-			}
-			return nil, fmt.Errorf("no field named %q was found under type User", field.Name)
 		},
 	}
 	return fc, nil
@@ -13358,45 +13295,6 @@ func (ec *executionContext) _RolesPayload(ctx context.Context, sel ast.Selection
 	return out
 }
 
-var searchUserOutputImplementors = []string{"SearchUserOutput"}
-
-func (ec *executionContext) _SearchUserOutput(ctx context.Context, sel ast.SelectionSet, obj *gqlmodel.SearchUserOutput) graphql.Marshaler {
-	fields := graphql.CollectFields(ec.OperationContext, sel, searchUserOutputImplementors)
-
-	out := graphql.NewFieldSet(fields)
-	deferred := make(map[string]*graphql.FieldSet)
-	for i, field := range fields {
-		switch field.Name {
-		case "__typename":
-			out.Values[i] = graphql.MarshalString("SearchUserOutput")
-		case "users":
-			out.Values[i] = ec._SearchUserOutput_users(ctx, field, obj)
-			if out.Values[i] == graphql.Null {
-				out.Invalids++
-			}
-		default:
-			panic("unknown field " + strconv.Quote(field.Name))
-		}
-	}
-	out.Dispatch(ctx)
-	if out.Invalids > 0 {
-		return graphql.Null
-	}
-
-	atomic.AddInt32(&ec.deferred, int32(len(deferred)))
-
-	for label, dfs := range deferred {
-		ec.processDeferredGroup(graphql.DeferredGroup{
-			Label:    label,
-			Path:     graphql.GetPath(ctx),
-			FieldSet: dfs,
-			Context:  ctx,
-		})
-	}
-
-	return out
-}
-
 var updateMePayloadImplementors = []string{"UpdateMePayload"}
 
 func (ec *executionContext) _UpdateMePayload(ctx context.Context, sel ast.SelectionSet, obj *gqlmodel.UpdateMePayload) graphql.Marshaler {
@@ -14799,20 +14697,6 @@ func (ec *executionContext) marshalNRolesPayload2ᚖgithubᚗcomᚋreearthᚋree
 		return graphql.Null
 	}
 	return ec._RolesPayload(ctx, sel, v)
-}
-
-func (ec *executionContext) marshalNSearchUserOutput2githubᚗcomᚋreearthᚋreearthᚑaccountsᚋserverᚋinternalᚋadapterᚋgqlᚋgqlmodelᚐSearchUserOutput(ctx context.Context, sel ast.SelectionSet, v gqlmodel.SearchUserOutput) graphql.Marshaler {
-	return ec._SearchUserOutput(ctx, sel, &v)
-}
-
-func (ec *executionContext) marshalNSearchUserOutput2ᚖgithubᚗcomᚋreearthᚋreearthᚑaccountsᚋserverᚋinternalᚋadapterᚋgqlᚋgqlmodelᚐSearchUserOutput(ctx context.Context, sel ast.SelectionSet, v *gqlmodel.SearchUserOutput) graphql.Marshaler {
-	if v == nil {
-		if !graphql.HasFieldError(ctx, graphql.GetFieldContext(ctx)) {
-			ec.Errorf(ctx, "the requested element is null which the schema does not allow")
-		}
-		return graphql.Null
-	}
-	return ec._SearchUserOutput(ctx, sel, v)
 }
 
 func (ec *executionContext) unmarshalNSignupInput2githubᚗcomᚋreearthᚋreearthᚑaccountsᚋserverᚋinternalᚋadapterᚋgqlᚋgqlmodelᚐSignupInput(ctx context.Context, v any) (gqlmodel.SignupInput, error) {

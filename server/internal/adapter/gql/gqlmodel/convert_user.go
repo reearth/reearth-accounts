@@ -56,20 +56,6 @@ func ToUsers(ul user.List) []*User {
 	return users
 }
 
-func ToSearchUserOutput(ul user.List) *SearchUserOutput {
-	if ul == nil {
-		return nil
-	}
-
-	users := make([]*User, 0, len(ul))
-	for _, u := range ul {
-		users = append(users, ToUser(u))
-	}
-	return &SearchUserOutput{
-		Users: users,
-	}
-}
-
 func ToUserFromSimple(u *user.Simple) *User {
 	if u == nil {
 		return nil

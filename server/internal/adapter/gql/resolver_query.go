@@ -86,6 +86,6 @@ func (r *queryResolver) UserByNameOrEmail(ctx context.Context, nameOrEmail strin
 // Temporary stub implementation to satisfy gqlgen after migrating GraphQL files from reearthx/account.
 // This resolver was added to avoid compile-time errors.
 // Will be implemented if needed, or removed if unused after migration.
-func (r *queryResolver) SearchUser(ctx context.Context, keyword string) (*gqlmodel.SearchUserOutput, error) {
+func (r *queryResolver) SearchUser(ctx context.Context, keyword string) ([]*gqlmodel.User, error) {
 	return loaders(ctx).User.SearchUser(ctx, keyword)
 }

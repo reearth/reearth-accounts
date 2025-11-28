@@ -183,10 +183,6 @@ type RolesPayload struct {
 	Roles []*RoleForAuthorization `json:"roles"`
 }
 
-type SearchUserOutput struct {
-	Users []*User `json:"users"`
-}
-
 type SignupInput struct {
 	ID          *ID     `json:"id,omitempty"`
 	WorkspaceID *ID     `json:"workspaceID,omitempty"`

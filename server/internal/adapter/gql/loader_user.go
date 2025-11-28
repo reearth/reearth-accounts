@@ -2,7 +2,6 @@ package gql
 
 import (
 	"context"
-
 	"github.com/reearth/reearth-accounts/server/internal/adapter/gql/gqldataloader"
 	"github.com/reearth/reearth-accounts/server/internal/adapter/gql/gqlmodel"
 	"github.com/reearth/reearth-accounts/server/internal/usecase/interfaces"
@@ -50,7 +49,7 @@ func (c *UserLoader) UserByNameOrEmail(ctx context.Context, nameOrEmail string) 
 	return gqlmodel.ToUserFromSimple(res), nil
 }
 
-func (c *UserLoader) SearchUser(ctx context.Context, keyword string) (*gqlmodel.SearchUserOutput, error) {
+func (c *UserLoader) SearchUser(ctx context.Context, keyword string) ([]*gqlmodel.User, error) {
 	res, err := c.usecase.SearchUser(ctx, keyword)
 	if err != nil {
 		return nil, err
@@ -60,7 +59,7 @@ func (c *UserLoader) SearchUser(ctx context.Context, keyword string) (*gqlmodel.
 		return nil, nil
 	}
 
-	return gqlmodel.ToSearchUserOutput(res), nil
+	return gqlmodel.ToUsers(res), nil
 }
 
 // data loader

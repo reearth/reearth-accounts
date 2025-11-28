@@ -2135,76 +2135,54 @@ var AllRole = []Role{
 
 // SearchUserResponse is returned by SearchUser on success.
 type SearchUserResponse struct {
-	SearchUser SearchUserSearchUserSearchUserOutput `json:"searchUser"`
+	SearchUser []SearchUserSearchUser `json:"searchUser"`
 }
 
 // GetSearchUser returns SearchUserResponse.SearchUser, and is useful for accessing the field via an interface.
-func (v *SearchUserResponse) GetSearchUser() SearchUserSearchUserSearchUserOutput {
-	return v.SearchUser
-}
+func (v *SearchUserResponse) GetSearchUser() []SearchUserSearchUser { return v.SearchUser }
 
-// SearchUserSearchUserSearchUserOutput includes the requested fields of the GraphQL type SearchUserOutput.
-type SearchUserSearchUserSearchUserOutput struct {
-	Users []SearchUserSearchUserSearchUserOutputUsersUser `json:"users"`
-}
-
-// GetUsers returns SearchUserSearchUserSearchUserOutput.Users, and is useful for accessing the field via an interface.
-func (v *SearchUserSearchUserSearchUserOutput) GetUsers() []SearchUserSearchUserSearchUserOutputUsersUser {
-	return v.Users
-}
-
-// SearchUserSearchUserSearchUserOutputUsersUser includes the requested fields of the GraphQL type User.
-type SearchUserSearchUserSearchUserOutputUsersUser struct {
+// SearchUserSearchUser includes the requested fields of the GraphQL type User.
+type SearchUserSearchUser struct {
 	FragmentUser `json:"-"`
 }
 
-// GetId returns SearchUserSearchUserSearchUserOutputUsersUser.Id, and is useful for accessing the field via an interface.
-func (v *SearchUserSearchUserSearchUserOutputUsersUser) GetId() string { return v.FragmentUser.Id }
+// GetId returns SearchUserSearchUser.Id, and is useful for accessing the field via an interface.
+func (v *SearchUserSearchUser) GetId() string { return v.FragmentUser.Id }
 
-// GetName returns SearchUserSearchUserSearchUserOutputUsersUser.Name, and is useful for accessing the field via an interface.
-func (v *SearchUserSearchUserSearchUserOutputUsersUser) GetName() string { return v.FragmentUser.Name }
+// GetName returns SearchUserSearchUser.Name, and is useful for accessing the field via an interface.
+func (v *SearchUserSearchUser) GetName() string { return v.FragmentUser.Name }
 
-// GetAlias returns SearchUserSearchUserSearchUserOutputUsersUser.Alias, and is useful for accessing the field via an interface.
-func (v *SearchUserSearchUserSearchUserOutputUsersUser) GetAlias() string {
-	return v.FragmentUser.Alias
-}
+// GetAlias returns SearchUserSearchUser.Alias, and is useful for accessing the field via an interface.
+func (v *SearchUserSearchUser) GetAlias() string { return v.FragmentUser.Alias }
 
-// GetEmail returns SearchUserSearchUserSearchUserOutputUsersUser.Email, and is useful for accessing the field via an interface.
-func (v *SearchUserSearchUserSearchUserOutputUsersUser) GetEmail() string {
-	return v.FragmentUser.Email
-}
+// GetEmail returns SearchUserSearchUser.Email, and is useful for accessing the field via an interface.
+func (v *SearchUserSearchUser) GetEmail() string { return v.FragmentUser.Email }
 
-// GetMetadata returns SearchUserSearchUserSearchUserOutputUsersUser.Metadata, and is useful for accessing the field via an interface.
-func (v *SearchUserSearchUserSearchUserOutputUsersUser) GetMetadata() FragmentUserMetadata {
-	return v.FragmentUser.Metadata
-}
+// GetMetadata returns SearchUserSearchUser.Metadata, and is useful for accessing the field via an interface.
+func (v *SearchUserSearchUser) GetMetadata() FragmentUserMetadata { return v.FragmentUser.Metadata }
 
-// GetWorkspace returns SearchUserSearchUserSearchUserOutputUsersUser.Workspace, and is useful for accessing the field via an interface.
-func (v *SearchUserSearchUserSearchUserOutputUsersUser) GetWorkspace() string {
-	return v.FragmentUser.Workspace
-}
+// GetWorkspace returns SearchUserSearchUser.Workspace, and is useful for accessing the field via an interface.
+func (v *SearchUserSearchUser) GetWorkspace() string { return v.FragmentUser.Workspace }
 
-// GetAuths returns SearchUserSearchUserSearchUserOutputUsersUser.Auths, and is useful for accessing the field via an interface.
-func (v *SearchUserSearchUserSearchUserOutputUsersUser) GetAuths() []string {
-	return v.FragmentUser.Auths
-}
+// GetAuths returns SearchUserSearchUser.Auths, and is useful for accessing the field via an interface.
+func (v *SearchUserSearchUser) GetAuths() []string { return v.FragmentUser.Auths }
 
-// GetVerification returns SearchUserSearchUserSearchUserOutputUsersUser.Verification, and is useful for accessing the field via an interface.
-func (v *SearchUserSearchUserSearchUserOutputUsersUser) GetVerification() FragmentUserVerification {
+// GetVerification returns SearchUserSearchUser.Verification, and is useful for accessing the field via an interface.
+func (v *SearchUserSearchUser) GetVerification() FragmentUserVerification {
 	return v.FragmentUser.Verification
 }
 
-func (v *SearchUserSearchUserSearchUserOutputUsersUser) UnmarshalJSON(b []byte) error {
+func (v *SearchUserSearchUser) UnmarshalJSON(b []byte) error {
 
 	if string(b) == "null" {
 		return nil
 	}
 
 	var firstPass struct {
-		*SearchUserSearchUserSearchUserOutputUsersUser
+		*SearchUserSearchUser
 		graphql.NoUnmarshalJSON
 	}
-	firstPass.SearchUserSearchUserSearchUserOutputUsersUser = v
+	firstPass.SearchUserSearchUser = v
 
 	err := json.Unmarshal(b, &firstPass)
 	if err != nil {
@@ -2219,7 +2197,7 @@ func (v *SearchUserSearchUserSearchUserOutputUsersUser) UnmarshalJSON(b []byte) 
 	return nil
 }
 
-type __premarshalSearchUserSearchUserSearchUserOutputUsersUser struct {
+type __premarshalSearchUserSearchUser struct {
 	Id string `json:"id"`
 
 	Name string `json:"name"`
@@ -2237,7 +2215,7 @@ type __premarshalSearchUserSearchUserSearchUserOutputUsersUser struct {
 	Verification FragmentUserVerification `json:"verification"`
 }
 
-func (v *SearchUserSearchUserSearchUserOutputUsersUser) MarshalJSON() ([]byte, error) {
+func (v *SearchUserSearchUser) MarshalJSON() ([]byte, error) {
 	premarshaled, err := v.__premarshalJSON()
 	if err != nil {
 		return nil, err
@@ -2245,8 +2223,8 @@ func (v *SearchUserSearchUserSearchUserOutputUsersUser) MarshalJSON() ([]byte, e
 	return json.Marshal(premarshaled)
 }
 
-func (v *SearchUserSearchUserSearchUserOutputUsersUser) __premarshalJSON() (*__premarshalSearchUserSearchUserSearchUserOutputUsersUser, error) {
-	var retval __premarshalSearchUserSearchUserSearchUserOutputUsersUser
+func (v *SearchUserSearchUser) __premarshalJSON() (*__premarshalSearchUserSearchUser, error) {
+	var retval __premarshalSearchUserSearchUser
 
 	retval.Id = v.FragmentUser.Id
 	retval.Name = v.FragmentUser.Name
@@ -4975,9 +4953,7 @@ func RemoveUserFromWorkspace(
 const SearchUser_Operation = `
 query SearchUser ($keyword: String!) {
 	searchUser(keyword: $keyword) {
-		users {
-			... FragmentUser
-		}
+		... FragmentUser
 	}
 }
 fragment FragmentUser on User {
