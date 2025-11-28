@@ -355,8 +355,6 @@ github.com/power-devops/perfstat v0.0.0-20240221224432-82ca36839d55 h1:o4JXh1EVt
 github.com/power-devops/perfstat v0.0.0-20240221224432-82ca36839d55/go.mod h1:OmDBASR4679mdNQnz2pUhc2G8CO2JrUAVFDRBDP/hJE=
 github.com/ravilushqa/otelgqlgen v0.17.0 h1:bLwQfKqtj9P24QpjM2sc1ipBm5Fqv2u7DKN5LIpj3g8=
 github.com/ravilushqa/otelgqlgen v0.17.0/go.mod h1:orOIikuYsay1y3CmLgd5gsHcT9EsnXwNKmkAplzzYXQ=
-github.com/reearth/reearthx v0.0.0-20250711044138-418475ad1421 h1:PpguVY3+KaSkRl1lMvNLCfUVdvTa3xKdX5SZfEM8Sqw=
-github.com/reearth/reearthx v0.0.0-20250711044138-418475ad1421/go.mod h1:LB99y3wpdleJ2LcZ/5226iaHf8HO+R3pp6omwUFDw8I=
 github.com/reearth/reearthx v0.0.0-20251128044232-3067c04f34da h1:eolcPfhTG4aTAi6yoBpDlE1yyrnHUGDf8D7lIxg7dZQ=
 github.com/reearth/reearthx v0.0.0-20251128044232-3067c04f34da/go.mod h1:z4JjOCy4MZZglLSrJx+btJ1ZLltESDZfSWJCnONwRS4=
 github.com/rogpeppe/go-internal v1.13.1 h1:KvO1DLK/DRN07sQ1LQKScxyZJuNnedQ5/wKSR38lUII=
