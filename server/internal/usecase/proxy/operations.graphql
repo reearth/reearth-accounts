@@ -54,7 +54,7 @@ query UserByNameOrEmail($nameOrEmail: String!) {
 
 query SearchUser($keyword: String!) {
   searchUser(keyword: $keyword) {
-      ...FragmentUser
+     ...FragmentUser
   }
 }
 
