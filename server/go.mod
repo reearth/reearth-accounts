@@ -19,7 +19,7 @@ require (
 	github.com/labstack/echo/v4 v4.13.3
 	github.com/labstack/gommon v0.4.2
 	github.com/ravilushqa/otelgqlgen v0.17.0
-	github.com/reearth/reearthx v0.0.0-20250711044138-418475ad1421
+	github.com/reearth/reearthx v0.0.0-20251128044232-3067c04f34da
 	github.com/samber/lo v1.50.0
 	github.com/square/mongo-lock v0.0.0-20230808145049-cfcf499f6bf0
 	github.com/stretchr/testify v1.10.0
