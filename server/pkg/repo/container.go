@@ -9,3 +9,11 @@ type Container struct {
 	User        User
 	Transaction usecasex.Transaction
 }
+
+func (c *Container) Filtered(wsFilter WorkspaceFilter) *Container {
+	return &Container{
+		Workspace:   c.Workspace.Filtered(wsFilter),
+		User:        c.User,
+		Transaction: c.Transaction,
+	}
+}
