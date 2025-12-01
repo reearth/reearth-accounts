@@ -266,13 +266,15 @@ type UpdateWorkspacePayload struct {
 }
 
 type User struct {
-	ID        ID            `json:"id"`
-	Name      string        `json:"name"`
-	Email     string        `json:"email"`
-	Host      *string       `json:"host,omitempty"`
-	Workspace ID            `json:"workspace"`
-	Auths     []string      `json:"auths"`
-	Metadata  *UserMetadata `json:"metadata"`
+	ID           ID            `json:"id"`
+	Name         string        `json:"name"`
+	Alias        string        `json:"alias"`
+	Email        string        `json:"email"`
+	Host         *string       `json:"host,omitempty"`
+	Workspace    ID            `json:"workspace"`
+	Auths        []string      `json:"auths"`
+	Metadata     *UserMetadata `json:"metadata"`
+	Verification *Verification `json:"verification,omitempty"`
 }
 
 func (User) IsNode()        {}
@@ -293,6 +295,12 @@ type UserPayload struct {
 type UserWithRoles struct {
 	User  *User                   `json:"user"`
 	Roles []*RoleForAuthorization `json:"roles"`
+}
+
+type Verification struct {
+	Code       string `json:"code"`
+	Expiration string `json:"expiration"`
+	Verified   bool   `json:"verified"`
 }
 
 type VerifyUserInput struct {
