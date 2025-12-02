@@ -16,6 +16,8 @@ import (
 
 	"github.com/reearth/reearth-accounts/server/internal/usecase/interfaces"
 	"github.com/reearth/reearth-accounts/server/internal/usecase/repo"
+	"github.com/reearth/reearth-accounts/server/pkg/id"
+	"github.com/reearth/reearth-accounts/server/pkg/permittable"
 	"github.com/reearth/reearth-accounts/server/pkg/user"
 	"github.com/reearth/reearth-accounts/server/pkg/workspace"
 	"github.com/reearth/reearthx/i18n"
@@ -98,6 +100,22 @@ func (i *User) Signup(ctx context.Context, param interfaces.SignupParam) (u *use
 		return nil, err
 	}
 
+	roleSelf, err := i.repos.Role.FindByName(ctx, interfaces.RoleSelf)
+	if err != nil {
+		return nil, err
+	}
+
+	roleOwner, err := i.repos.Role.FindByName(ctx, workspace.RoleOwner.String())
+	if err != nil {
+		return nil, err
+	}
+
+	wsRole := permittable.NewWorkspaceRole(ws.ID(), roleOwner.ID())
+	perm := permittable.New().NewID().RoleIDs([]id.RoleID{roleSelf.ID()}).UserID(u.ID()).WorkspaceRoles([]permittable.WorkspaceRole{wsRole}).MustBuild()
+	if err = i.repos.Permittable.Save(ctx, lo.FromPtr(perm)); err != nil {
+		return nil, err
+	}
+
 	if !param.MockAuth {
 		if err = i.sendVerificationMail(ctx, u, vr); err != nil {
 			return nil, err
@@ -159,6 +177,22 @@ func (i *User) SignupOIDC(ctx context.Context, param interfaces.SignupOIDCParam)
 	}
 
 	if err = i.repos.Workspace.Save(ctx, ws); err != nil {
+		return nil, err
+	}
+
+	roleSelf, err := i.repos.Role.FindByName(ctx, interfaces.RoleSelf)
+	if err != nil {
+		return nil, err
+	}
+
+	roleOwner, err := i.repos.Role.FindByName(ctx, workspace.RoleOwner.String())
+	if err != nil {
+		return nil, err
+	}
+
+	wsRole := permittable.NewWorkspaceRole(ws.ID(), roleOwner.ID())
+	perm := permittable.New().NewID().RoleIDs([]id.RoleID{roleSelf.ID()}).UserID(u.ID()).WorkspaceRoles([]permittable.WorkspaceRole{wsRole}).MustBuild()
+	if err = i.repos.Permittable.Save(ctx, lo.FromPtr(perm)); err != nil {
 		return nil, err
 	}
 

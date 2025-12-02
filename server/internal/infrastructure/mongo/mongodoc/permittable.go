@@ -14,7 +14,7 @@ type WorkspaceRoleDocument struct {
 type PermittableDocument struct {
 	ID             string
 	UserID         string
-	UserRoles      []string                `bson:"user_roles"`
+	RoleIDs        []string                `bson:"roleids"`
 	WorkspaceRoles []WorkspaceRoleDocument `bson:"workspace_roles,omitempty"`
 }
 
@@ -34,10 +34,22 @@ func NewPermittable(p permittable.Permittable) (*PermittableDocument, string) {
 		roleIds = append(roleIds, r.String())
 	}
 
+	var workspaceRoles []WorkspaceRoleDocument
+	if len(p.WorkspaceRoles()) > 0 {
+		workspaceRoles = make([]WorkspaceRoleDocument, 0, len(p.WorkspaceRoles()))
+		for _, r := range p.WorkspaceRoles() {
+			workspaceRoles = append(workspaceRoles, WorkspaceRoleDocument{
+				WorkspaceID: r.ID().String(),
+				RoleID:      r.RoleID().String(),
+			})
+		}
+	}
+
 	return &PermittableDocument{
-		ID:        id,
-		UserID:    p.UserID().String(),
-		UserRoles: roleIds,
+		ID:             id,
+		UserID:         p.UserID().String(),
+		RoleIDs:        roleIds,
+		WorkspaceRoles: workspaceRoles,
 	}, id
 }
 
@@ -56,14 +68,34 @@ func (d *PermittableDocument) Model() (*permittable.Permittable, error) {
 		return nil, err
 	}
 
-	roleIds, err := id.RoleIDListFrom(d.UserRoles)
+	roleIds, err := id.RoleIDListFrom(d.RoleIDs)
 	if err != nil {
 		return nil, err
+	}
+
+	var workspaceRoles []permittable.WorkspaceRole
+	if len(d.WorkspaceRoles) > 0 {
+		workspaceRoles = make([]permittable.WorkspaceRole, 0, len(d.WorkspaceRoles))
+		for _, r := range d.WorkspaceRoles {
+			workspaceID, wErr := id.WorkspaceIDFrom(r.WorkspaceID)
+			if wErr != nil {
+				return nil, wErr
+			}
+
+			roleID, rErr := id.RoleIDFrom(r.RoleID)
+			if rErr != nil {
+				return nil, rErr
+			}
+
+			workspaceRole := permittable.NewWorkspaceRole(workspaceID, roleID)
+			workspaceRoles = append(workspaceRoles, workspaceRole)
+		}
 	}
 
 	return permittable.New().
 		ID(uid).
 		UserID(userId).
 		RoleIDs(roleIds).
+		WorkspaceRoles(workspaceRoles).
 		Build()
 }

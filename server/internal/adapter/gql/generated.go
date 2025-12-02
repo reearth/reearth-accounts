@@ -1390,6 +1390,7 @@ schema {
   service: String!
   resource: String!
   action: String!
+  workspaceAlias: String
 }
 
 type CheckPermissionPayload {
@@ -8222,7 +8223,7 @@ func (ec *executionContext) unmarshalInputCheckPermissionInput(ctx context.Conte
 		asMap[k] = v
 	}
 
-	fieldsInOrder := [...]string{"service", "resource", "action"}
+	fieldsInOrder := [...]string{"service", "resource", "action", "workspaceAlias"}
 	for _, k := range fieldsInOrder {
 		v, ok := asMap[k]
 		if !ok {
@@ -8250,6 +8251,13 @@ func (ec *executionContext) unmarshalInputCheckPermissionInput(ctx context.Conte
 				return it, err
 			}
 			it.Action = data
+		case "workspaceAlias":
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("workspaceAlias"))
+			data, err := ec.unmarshalOString2ᚖstring(ctx, v)
+			if err != nil {
+				return it, err
+			}
+			it.WorkspaceAlias = data
 		}
 	}
 

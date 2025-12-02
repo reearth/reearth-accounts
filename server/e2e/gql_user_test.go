@@ -8,16 +8,65 @@ import (
 	"testing"
 
 	"github.com/reearth/reearth-accounts/server/internal/app"
+	"github.com/reearth/reearth-accounts/server/internal/usecase/interfaces"
 	"github.com/reearth/reearth-accounts/server/internal/usecase/repo"
 	"github.com/reearth/reearth-accounts/server/pkg/id"
+	"github.com/reearth/reearth-accounts/server/pkg/permittable"
+	"github.com/reearth/reearth-accounts/server/pkg/role"
 	"github.com/reearth/reearth-accounts/server/pkg/user"
 	"github.com/reearth/reearth-accounts/server/pkg/workspace"
 	"github.com/reearth/reearthx/idx"
 	"github.com/reearth/reearthx/rerror"
+	"github.com/samber/lo"
 	"github.com/stretchr/testify/assert"
 )
 
+// seedRoles creates the required roles for RBAC
+func seedRoles(ctx context.Context, r *repo.Container) error {
+	selfRole := role.New().NewID().Name(interfaces.RoleSelf).MustBuild()
+	ownerRole := role.New().NewID().Name(workspace.RoleOwner.String()).MustBuild()
+	readerRole := role.New().NewID().Name(workspace.RoleReader.String()).MustBuild()
+	writerRole := role.New().NewID().Name(workspace.RoleWriter.String()).MustBuild()
+
+	if err := r.Role.Save(ctx, *selfRole); err != nil {
+		return err
+	}
+	if err := r.Role.Save(ctx, *ownerRole); err != nil {
+		return err
+	}
+	if err := r.Role.Save(ctx, *readerRole); err != nil {
+		return err
+	}
+	if err := r.Role.Save(ctx, *writerRole); err != nil {
+		return err
+	}
+	return nil
+}
+
+// createPermittable creates a permittable for a user with workspace roles
+func createPermittable(ctx context.Context, r *repo.Container, userId user.ID, wsRoles []permittable.WorkspaceRole) error {
+	// Find self role
+	selfRole, err := r.Role.FindByName(ctx, interfaces.RoleSelf)
+	if err != nil {
+		return err
+	}
+
+	perm := permittable.New().
+		NewID().
+		UserID(userId).
+		RoleIDs([]id.RoleID{selfRole.ID()}).
+		WorkspaceRoles(wsRoles).
+		MustBuild()
+
+	return r.Permittable.Save(ctx, lo.FromPtr(perm))
+}
+
 func baseSeederOneUser(ctx context.Context, r *repo.Container) error {
+	// Seed roles first
+	if err := seedRoles(ctx, r); err != nil {
+		return err
+	}
+
 	auth := user.ReearthSub(uId.String())
 	metadata := user.NewMetadata()
 	metadata.LangFrom("ja")
@@ -50,10 +99,26 @@ func baseSeederOneUser(ctx context.Context, r *repo.Container) error {
 	if err := r.Workspace.Save(ctx, w); err != nil {
 		return err
 	}
+
+	// Create permittable for the user
+	ownerRoleDoc, err := r.Role.FindByName(ctx, workspace.RoleOwner.String())
+	if err != nil {
+		return err
+	}
+	wsRole := permittable.NewWorkspaceRole(wId, ownerRoleDoc.ID())
+	if err := createPermittable(ctx, r, uId, []permittable.WorkspaceRole{wsRole}); err != nil {
+		return err
+	}
+
 	return nil
 }
 
 func baseSeederUser(ctx context.Context, r *repo.Container) error {
+	// Seed roles first
+	if err := seedRoles(ctx, r); err != nil {
+		return err
+	}
+
 	auth := user.ReearthSub(uId.String())
 	metadata := user.NewMetadata()
 	metadata.LangFrom("ja")
@@ -120,6 +185,46 @@ func baseSeederUser(ctx context.Context, r *repo.Container) error {
 		}).
 		MustBuild()
 	if err := r.Workspace.Save(ctx, w2); err != nil {
+		return err
+	}
+
+	// Create permittables for all users
+	ownerRoleDoc, err := r.Role.FindByName(ctx, workspace.RoleOwner.String())
+	if err != nil {
+		return err
+	}
+	readerRoleDoc, err := r.Role.FindByName(ctx, workspace.RoleReader.String())
+	if err != nil {
+		return err
+	}
+
+	// User 1: owner of wId
+	wsRole1 := permittable.NewWorkspaceRole(wId, ownerRoleDoc.ID())
+	if err := createPermittable(ctx, r, uId, []permittable.WorkspaceRole{wsRole1}); err != nil {
+		return err
+	}
+
+	// User 1 also owner of wId2
+	wsRole1_2 := permittable.NewWorkspaceRole(wId2, ownerRoleDoc.ID())
+	// Update permittable to add second workspace role
+	perm1, err := r.Permittable.FindByUserID(ctx, uId)
+	if err != nil {
+		return err
+	}
+	perm1.EditWorkspaceRoles(append(perm1.WorkspaceRoles(), wsRole1_2))
+	if err := r.Permittable.Save(ctx, *perm1); err != nil {
+		return err
+	}
+
+	// User 2: owner of wId2 (only has workspace wId2)
+	wsRole2 := permittable.NewWorkspaceRole(wId2, ownerRoleDoc.ID())
+	if err := createPermittable(ctx, r, uId2, []permittable.WorkspaceRole{wsRole2}); err != nil {
+		return err
+	}
+
+	// User 3: reader of wId2
+	wsRole3 := permittable.NewWorkspaceRole(wId2, readerRoleDoc.ID())
+	if err := createPermittable(ctx, r, uId3, []permittable.WorkspaceRole{wsRole3}); err != nil {
 		return err
 	}
 
@@ -278,7 +383,7 @@ func TestNodes(t *testing.T) {
 }
 
 func TestSignup(t *testing.T) {
-	e, _ := StartServer(t, &app.Config{}, true, nil)
+	e, _ := StartServer(t, &app.Config{}, true, seedRoles)
 	email := "newuser@example.com"
 	query := `mutation($input: SignupInput!) {
 		signup(input: $input) {
@@ -310,7 +415,7 @@ func TestSignup(t *testing.T) {
 }
 
 func TestSignupOIDC(t *testing.T) {
-	e, _ := StartServer(t, &app.Config{}, true, nil)
+	e, _ := StartServer(t, &app.Config{}, true, seedRoles)
 	email := "testSignupOIDC@example.com"
 	auth := user.ReearthSub(uId.String())
 	query := `mutation($input: SignupOIDCInput!) {

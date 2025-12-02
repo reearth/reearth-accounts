@@ -6,10 +6,21 @@ import (
 	"github.com/reearth/reearth-accounts/server/pkg/user"
 )
 
+const (
+	ResourceWorkspace = "workspace"
+	ResourceUser      = "user"
+	ResourceProject   = "project"
+)
+
+const (
+	RoleSelf = "self"
+)
+
 type CheckPermissionParam struct {
-	Service  string
-	Resource string
-	Action   string
+	Service        string
+	Resource       string
+	Action         string
+	WorkspaceAlias string
 }
 
 type CheckPermissionResult struct {

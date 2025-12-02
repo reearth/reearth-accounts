@@ -23,9 +23,13 @@ func NewPermittable(client *mongox.Client) *Permittable {
 }
 
 func (r *Permittable) FindByUserID(ctx context.Context, id user.ID) (*permittable.Permittable, error) {
-	return r.findOne(ctx, bson.M{
+	res, err := r.findOne(ctx, bson.M{
 		"userid": id.String(),
 	})
+	if err != nil {
+		return nil, err
+	}
+	return res, nil
 }
 
 func (r *Permittable) FindByUserIDs(ctx context.Context, ids user.IDList) (permittable.List, error) {

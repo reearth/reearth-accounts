@@ -11,6 +11,10 @@ import (
 	"go.mongodb.org/mongo-driver/bson/primitive"
 )
 
+func init() {
+	mongotest.Env = "REEARTH_ACCOUNTS_DB"
+}
+
 func TestMoveWorkspaceMembersRoleToPermittable(t *testing.T) {
 	if testing.Short() {
 		t.Skip("skipping integration test")
@@ -80,11 +84,11 @@ func TestMoveWorkspaceMembersRoleToPermittable(t *testing.T) {
 		assert.Equal(t, "workspace1", wsRole["workspace_id"])
 		assert.Equal(t, "role1", wsRole["role_id"]) // owner role
 
-		// Verify user_roles contains "self"
-		userRoles, ok := result1["user_roles"].(primitive.A)
+		// Verify roleids contains "self"
+		roleids, ok := result1["roleids"].(primitive.A)
 		assert.True(t, ok)
-		assert.Len(t, userRoles, 1)
-		assert.Equal(t, "role4", userRoles[0]) // self role
+		assert.Len(t, roleids, 1)
+		assert.Equal(t, "role4", roleids[0]) // self role
 
 		// Verify permittable for user2 was created
 		var result2 bson.M
@@ -119,12 +123,12 @@ func TestMoveWorkspaceMembersRoleToPermittable(t *testing.T) {
 		_, err := roleCol.InsertMany(ctx, roles)
 		assert.NoError(t, err)
 
-		// Insert existing permittable with user_roles
+		// Insert existing permittable with roleids
 		existingPermittable := bson.M{
-			"_id":        primitive.NewObjectID(),
-			"id":         "permittable1",
-			"userid":     "user1",
-			"user_roles": []string{"role3"}, // self role
+			"_id":     primitive.NewObjectID(),
+			"id":      "permittable1",
+			"userid":  "user1",
+			"roleids": []string{"role3"}, // self role
 		}
 		_, err = permittableCol.InsertOne(ctx, existingPermittable)
 		assert.NoError(t, err)
@@ -158,11 +162,11 @@ func TestMoveWorkspaceMembersRoleToPermittable(t *testing.T) {
 		err = permittableCol.FindOne(ctx, bson.M{"userid": "user1"}).Decode(&result)
 		assert.NoError(t, err)
 
-		// Check that user_roles is preserved
-		userRoles, ok := result["user_roles"].(primitive.A)
+		// Check that roleids is preserved
+		roleids, ok := result["roleids"].(primitive.A)
 		assert.True(t, ok)
-		assert.Len(t, userRoles, 1)
-		assert.Equal(t, "role3", userRoles[0])
+		assert.Len(t, roleids, 1)
+		assert.Equal(t, "role3", roleids[0])
 
 		// Check workspace_roles was added
 		workspaceRoles, ok := result["workspace_roles"].(primitive.A)
@@ -424,5 +428,274 @@ func TestMoveWorkspaceMembersRoleToPermittable(t *testing.T) {
 		count, err := permittableCol.CountDocuments(ctx, bson.M{})
 		assert.NoError(t, err)
 		assert.Equal(t, int64(0), count)
+	})
+
+	t.Run("Create permittable when self role exists", func(t *testing.T) {
+		ctx := context.Background()
+		db := mongotest.Connect(t)(t)
+		c := mongox.NewClientWithDatabase(db)
+
+		roleCol := db.Collection("role")
+		workspaceCol := db.Collection("workspace")
+		permittableCol := db.Collection("permittable")
+
+		// Insert test roles including "self"
+		roles := []interface{}{
+			bson.M{"_id": primitive.NewObjectID(), "id": "role1", "name": "owner"},
+			bson.M{"_id": primitive.NewObjectID(), "id": "role2", "name": "self"},
+		}
+		_, err := roleCol.InsertMany(ctx, roles)
+		assert.NoError(t, err)
+
+		// Insert test workspace
+		testWorkspace := bson.M{
+			"_id":   primitive.NewObjectID(),
+			"id":    "workspace1",
+			"alias": "test-workspace",
+			"name":  "Test Workspace",
+			"email": "test@example.com",
+			"members": bson.M{
+				"user1": bson.M{
+					"role":      "owner",
+					"invitedby": "user1",
+					"disabled":  false,
+				},
+			},
+			"integrations": bson.M{},
+			"personal":     false,
+		}
+		_, err = workspaceCol.InsertOne(ctx, testWorkspace)
+		assert.NoError(t, err)
+
+		// Run migration
+		err = MoveWorkspaceMembersRoleToPermittable(ctx, c)
+		assert.NoError(t, err)
+
+		// Verify permittable was created with "self" role
+		var result bson.M
+		err = permittableCol.FindOne(ctx, bson.M{"userid": "user1"}).Decode(&result)
+		assert.NoError(t, err)
+
+		// Verify roleids contains "self"
+		roleids, ok := result["roleids"].(primitive.A)
+		assert.True(t, ok)
+		assert.Len(t, roleids, 1)
+		assert.Equal(t, "role2", roleids[0]) // self role
+
+		// Verify workspace_roles was created
+		workspaceRoles, ok := result["workspace_roles"].(primitive.A)
+		assert.True(t, ok)
+		assert.Len(t, workspaceRoles, 1)
+
+		wsRole := workspaceRoles[0].(bson.M)
+		assert.Equal(t, "workspace1", wsRole["workspace_id"])
+		assert.Equal(t, "role1", wsRole["role_id"]) // owner role
+	})
+
+	t.Run("Create permittable when self role does not exist", func(t *testing.T) {
+		ctx := context.Background()
+		db := mongotest.Connect(t)(t)
+		c := mongox.NewClientWithDatabase(db)
+
+		roleCol := db.Collection("role")
+		workspaceCol := db.Collection("workspace")
+		permittableCol := db.Collection("permittable")
+
+		// Insert test roles WITHOUT "self"
+		roles := []interface{}{
+			bson.M{"_id": primitive.NewObjectID(), "id": "role1", "name": "owner"},
+			bson.M{"_id": primitive.NewObjectID(), "id": "role2", "name": "writer"},
+		}
+		_, err := roleCol.InsertMany(ctx, roles)
+		assert.NoError(t, err)
+
+		// Insert test workspace
+		testWorkspace := bson.M{
+			"_id":   primitive.NewObjectID(),
+			"id":    "workspace1",
+			"alias": "test-workspace",
+			"name":  "Test Workspace",
+			"email": "test@example.com",
+			"members": bson.M{
+				"user1": bson.M{
+					"role":      "owner",
+					"invitedby": "user1",
+					"disabled":  false,
+				},
+			},
+			"integrations": bson.M{},
+			"personal":     false,
+		}
+		_, err = workspaceCol.InsertOne(ctx, testWorkspace)
+		assert.NoError(t, err)
+
+		// Run migration
+		err = MoveWorkspaceMembersRoleToPermittable(ctx, c)
+		assert.NoError(t, err)
+
+		// Verify permittable was created
+		var result bson.M
+		err = permittableCol.FindOne(ctx, bson.M{"userid": "user1"}).Decode(&result)
+		assert.NoError(t, err)
+
+		// Verify roleids contains empty string (since "self" doesn't exist)
+		roleids, ok := result["roleids"].(primitive.A)
+		assert.True(t, ok)
+		assert.Len(t, roleids, 1)
+		assert.Equal(t, "", roleids[0]) // empty string when self role doesn't exist
+
+		// Verify workspace_roles was still created correctly
+		workspaceRoles, ok := result["workspace_roles"].(primitive.A)
+		assert.True(t, ok)
+		assert.Len(t, workspaceRoles, 1)
+
+		wsRole := workspaceRoles[0].(bson.M)
+		assert.Equal(t, "workspace1", wsRole["workspace_id"])
+		assert.Equal(t, "role1", wsRole["role_id"]) // owner role
+	})
+
+	t.Run("Update existing permittable when self role exists", func(t *testing.T) {
+		ctx := context.Background()
+		db := mongotest.Connect(t)(t)
+		c := mongox.NewClientWithDatabase(db)
+
+		roleCol := db.Collection("role")
+		workspaceCol := db.Collection("workspace")
+		permittableCol := db.Collection("permittable")
+
+		// Insert test roles including "self"
+		roles := []interface{}{
+			bson.M{"_id": primitive.NewObjectID(), "id": "role1", "name": "owner"},
+			bson.M{"_id": primitive.NewObjectID(), "id": "role2", "name": "self"},
+		}
+		_, err := roleCol.InsertMany(ctx, roles)
+		assert.NoError(t, err)
+
+		// Insert existing permittable WITHOUT self role
+		existingPermittable := bson.M{
+			"_id":     primitive.NewObjectID(),
+			"id":      "permittable1",
+			"userid":  "user1",
+			"roleids": []string{}, // empty roleids
+		}
+		_, err = permittableCol.InsertOne(ctx, existingPermittable)
+		assert.NoError(t, err)
+
+		// Insert test workspace
+		testWorkspace := bson.M{
+			"_id":   primitive.NewObjectID(),
+			"id":    "workspace1",
+			"alias": "test-workspace",
+			"name":  "Test Workspace",
+			"email": "test@example.com",
+			"members": bson.M{
+				"user1": bson.M{
+					"role":      "owner",
+					"invitedby": "user1",
+					"disabled":  false,
+				},
+			},
+			"integrations": bson.M{},
+			"personal":     false,
+		}
+		_, err = workspaceCol.InsertOne(ctx, testWorkspace)
+		assert.NoError(t, err)
+
+		// Run migration
+		err = MoveWorkspaceMembersRoleToPermittable(ctx, c)
+		assert.NoError(t, err)
+
+		// Verify permittable was updated with "self" role
+		var result bson.M
+		err = permittableCol.FindOne(ctx, bson.M{"userid": "user1"}).Decode(&result)
+		assert.NoError(t, err)
+
+		// Verify roleids now contains "self"
+		roleids, ok := result["roleids"].(primitive.A)
+		assert.True(t, ok)
+		assert.Len(t, roleids, 1)
+		assert.Equal(t, "role2", roleids[0]) // self role was added
+
+		// Verify workspace_roles was added
+		workspaceRoles, ok := result["workspace_roles"].(primitive.A)
+		assert.True(t, ok)
+		assert.Len(t, workspaceRoles, 1)
+
+		wsRole := workspaceRoles[0].(bson.M)
+		assert.Equal(t, "workspace1", wsRole["workspace_id"])
+		assert.Equal(t, "role1", wsRole["role_id"])
+	})
+
+	t.Run("Update existing permittable when self role does not exist", func(t *testing.T) {
+		ctx := context.Background()
+		db := mongotest.Connect(t)(t)
+		c := mongox.NewClientWithDatabase(db)
+
+		roleCol := db.Collection("role")
+		workspaceCol := db.Collection("workspace")
+		permittableCol := db.Collection("permittable")
+
+		// Insert test roles WITHOUT "self"
+		roles := []interface{}{
+			bson.M{"_id": primitive.NewObjectID(), "id": "role1", "name": "owner"},
+			bson.M{"_id": primitive.NewObjectID(), "id": "role2", "name": "writer"},
+		}
+		_, err := roleCol.InsertMany(ctx, roles)
+		assert.NoError(t, err)
+
+		// Insert existing permittable with some existing roleids
+		existingPermittable := bson.M{
+			"_id":     primitive.NewObjectID(),
+			"id":      "permittable1",
+			"userid":  "user1",
+			"roleids": []string{"role2"}, // has writer role
+		}
+		_, err = permittableCol.InsertOne(ctx, existingPermittable)
+		assert.NoError(t, err)
+
+		// Insert test workspace
+		testWorkspace := bson.M{
+			"_id":   primitive.NewObjectID(),
+			"id":    "workspace1",
+			"alias": "test-workspace",
+			"name":  "Test Workspace",
+			"email": "test@example.com",
+			"members": bson.M{
+				"user1": bson.M{
+					"role":      "owner",
+					"invitedby": "user1",
+					"disabled":  false,
+				},
+			},
+			"integrations": bson.M{},
+			"personal":     false,
+		}
+		_, err = workspaceCol.InsertOne(ctx, testWorkspace)
+		assert.NoError(t, err)
+
+		// Run migration
+		err = MoveWorkspaceMembersRoleToPermittable(ctx, c)
+		assert.NoError(t, err)
+
+		// Verify permittable was updated
+		var result bson.M
+		err = permittableCol.FindOne(ctx, bson.M{"userid": "user1"}).Decode(&result)
+		assert.NoError(t, err)
+
+		// Verify roleids has empty string appended (since "self" doesn't exist)
+		roleids, ok := result["roleids"].(primitive.A)
+		assert.True(t, ok)
+		assert.Len(t, roleids, 2)
+		assert.Equal(t, "role2", roleids[0]) // original role
+		assert.Equal(t, "", roleids[1])      // empty string when self doesn't exist
+
+		// Verify workspace_roles was still added correctly
+		workspaceRoles, ok := result["workspace_roles"].(primitive.A)
+		assert.True(t, ok)
+		assert.Len(t, workspaceRoles, 1)
+
+		wsRole := workspaceRoles[0].(bson.M)
+		assert.Equal(t, "workspace1", wsRole["workspace_id"])
+		assert.Equal(t, "role1", wsRole["role_id"])
 	})
 }

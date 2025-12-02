@@ -7,6 +7,7 @@ import (
 
 	"github.com/oklog/ulid"
 	"github.com/reearth/reearth-accounts/server/internal/infrastructure/mongo/mongodoc"
+	"github.com/reearth/reearth-accounts/server/internal/usecase/interfaces"
 	"github.com/reearth/reearthx/mongox"
 	"go.mongodb.org/mongo-driver/bson"
 )
@@ -90,11 +91,24 @@ func MoveWorkspaceMembersRoleToPermittable(ctx context.Context, c DBClient) erro
 						permittableDoc = &mongodoc.PermittableDocument{
 							ID:             newPermittableID,
 							UserID:         userIDStr,
-							UserRoles:      []string{roleNameToID["self"]},
+							RoleIDs:        []string{roleNameToID[interfaces.RoleSelf]},
 							WorkspaceRoles: []mongodoc.WorkspaceRoleDocument{workspaceRole},
 						}
 						permittablesByUserID[userIDStr] = permittableDoc
 					} else {
+						// Set Role ID to "self" if not already present
+						roleIdsExists := false
+						for _, rid := range permittableDoc.RoleIDs {
+							if rid == roleNameToID[interfaces.RoleSelf] {
+								roleIdsExists = true
+								break
+							}
+						}
+
+						if !roleIdsExists {
+							permittableDoc.RoleIDs = append(permittableDoc.RoleIDs, roleNameToID[interfaces.RoleSelf])
+						}
+
 						// Check if this workspace role already exists
 						roleExists := false
 						for _, wr := range permittableDoc.WorkspaceRoles {

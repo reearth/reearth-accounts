@@ -50,3 +50,8 @@ func (b *Builder) RoleIDs(roleIDs []id.RoleID) *Builder {
 	b.p.roleIDs = roleIDs
 	return b
 }
+
+func (b *Builder) WorkspaceRoles(workspaceRoles []WorkspaceRole) *Builder {
+	b.p.workspaceRoles = workspaceRoles
+	return b
+}

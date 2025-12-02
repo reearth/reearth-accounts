@@ -1,9 +1,10 @@
-package redis
+package cerbos
 
 import (
 	"context"
 
 	"github.com/cerbos/cerbos-sdk-go/cerbos"
+	"github.com/reearth/reearth-accounts/server/internal/adapter"
 )
 
 type CerbosAdapter struct {
@@ -19,5 +20,12 @@ func (c *CerbosAdapter) CheckPermissions(ctx context.Context, principal *cerbos.
 	for _, resource := range resources {
 		batch.Add(resource, actions...)
 	}
-	return c.client.CheckResources(ctx, principal, batch)
+
+	authInfo := adapter.GetAuthInfo(ctx)
+	var token string
+	if authInfo != nil {
+		token = authInfo.Token
+	}
+
+	return c.client.With(cerbos.AuxDataJWT(token, "test")).CheckResources(ctx, principal, batch)
 }

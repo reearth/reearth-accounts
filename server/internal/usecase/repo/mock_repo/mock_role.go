@@ -87,6 +87,21 @@ func (mr *MockRoleMockRecorder) FindByIDs(arg0, arg1 any) *gomock.Call {
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "FindByIDs", reflect.TypeOf((*MockRole)(nil).FindByIDs), arg0, arg1)
 }
 
+// FindByName mocks base method.
+func (m *MockRole) FindByName(ctx context.Context, name string) (*role.Role, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "FindByName", ctx, name)
+	ret0, _ := ret[0].(*role.Role)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// FindByName indicates an expected call of FindByName.
+func (mr *MockRoleMockRecorder) FindByName(ctx, name any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "FindByName", reflect.TypeOf((*MockRole)(nil).FindByName), ctx, name)
+}
+
 // Remove mocks base method.
 func (m *MockRole) Remove(arg0 context.Context, arg1 id.RoleID) error {
 	m.ctrl.T.Helper()
