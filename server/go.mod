@@ -20,7 +20,7 @@ require (
 	github.com/labstack/gommon v0.4.2
 	github.com/oklog/ulid v1.3.1
 	github.com/ravilushqa/otelgqlgen v0.19.0
-	github.com/reearth/reearthx v0.0.0-20251128044232-3067c04f34da
+	github.com/reearth/reearthx v0.0.0-20251202081949-5abca579aec6
 	github.com/samber/lo v1.52.0
 	github.com/square/mongo-lock v0.0.0-20230808145049-cfcf499f6bf0
 	github.com/stretchr/testify v1.11.1

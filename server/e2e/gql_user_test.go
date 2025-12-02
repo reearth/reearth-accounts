@@ -61,6 +61,7 @@ func createPermittable(ctx context.Context, r *repo.Container, userId user.ID, w
 	return r.Permittable.Save(ctx, lo.FromPtr(perm))
 }
 
+//nolint:all
 func baseSeederOneUser(ctx context.Context, r *repo.Container) error {
 	// Seed roles first
 	if err := seedRoles(ctx, r); err != nil {
