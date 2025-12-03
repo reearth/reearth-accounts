@@ -76,12 +76,16 @@ func (r *queryResolver) Nodes(ctx context.Context, ids []gqlmodel.ID, typeArg gq
 }
 
 func (r *queryResolver) UserByNameOrEmail(ctx context.Context, nameOrEmail string) (*gqlmodel.User, error) {
-	return loaders(ctx).User.SearchUser(ctx, nameOrEmail)
+	res, err := loaders(ctx).User.UserByNameOrEmail(ctx, nameOrEmail)
+	if err != nil {
+		return nil, err
+	}
+	return res, nil
 }
 
 // Temporary stub implementation to satisfy gqlgen after migrating GraphQL files from reearthx/account.
 // This resolver was added to avoid compile-time errors.
 // Will be implemented if needed, or removed if unused after migration.
-func (r *queryResolver) SearchUser(ctx context.Context, nameOrEmail string) ([]*gqlmodel.User, error) {
-	return nil, nil
+func (r *queryResolver) SearchUser(ctx context.Context, keyword string) ([]*gqlmodel.User, error) {
+	return loaders(ctx).User.SearchUser(ctx, keyword)
 }
