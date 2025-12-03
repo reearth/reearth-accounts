@@ -16,6 +16,7 @@ import (
 	"github.com/reearth/reearthx/i18n"
 	"github.com/reearth/reearthx/mailer"
 	"github.com/reearth/reearthx/rerror"
+	"github.com/samber/lo"
 )
 
 type User struct {
@@ -74,7 +75,7 @@ func (i *User) FetchByNameOrEmail(ctx context.Context, nameOrEmail string) (*use
 	return i.query.FetchByNameOrEmail(ctx, nameOrEmail)
 }
 
-func (i *User) SearchUser(ctx context.Context, keyword string) (user.List, error) {
+func (i *User) SearchUser(ctx context.Context, keyword string) (user.SimpleList, error) {
 	return i.query.SearchUser(ctx, keyword)
 }
 
@@ -429,7 +430,7 @@ func (q *UserQuery) FetchByNameOrEmail(ctx context.Context, nameOrEmail string) 
 	return nil, nil
 }
 
-func (q *UserQuery) SearchUser(ctx context.Context, keyword string) (user.List, error) {
+func (q *UserQuery) SearchUser(ctx context.Context, keyword string) (user.SimpleList, error) {
 	for _, r := range q.repos {
 		u, err := r.SearchByKeyword(ctx, keyword)
 		if errors.Is(err, rerror.ErrNotFound) {
@@ -438,8 +439,15 @@ func (q *UserQuery) SearchUser(ctx context.Context, keyword string) (user.List, 
 		if err != nil {
 			return nil, err
 		}
-
-		return u, nil
+		if len(u) > 0 {
+			return lo.FilterMap(u, func(u *user.User, _ int) (*user.Simple, bool) {
+				su := user.SimpleFrom(u)
+				if su == nil {
+					return nil, false
+				}
+				return su, true
+			}), nil
+		}
 	}
 	return nil, nil
 }

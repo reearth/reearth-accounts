@@ -47,7 +47,3 @@ type signupMutation struct {
 		User gqlmodel.User
 	} `graphql:"signup(input: {name: $name, email: $email, password: $password, secret: $secret, id: $id, workspaceID: $workspaceID})"`
 }
-
-type createVerificationMutation struct {
-	CreateVerification bool `graphql:"createVerification(input: {email: $email})"`
-}

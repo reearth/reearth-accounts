@@ -7,7 +7,6 @@ query Me {
 fragment FragmentUser on User {
     id
     name
-    alias
     email
     metadata {
         description
@@ -18,11 +17,6 @@ fragment FragmentUser on User {
     }
     workspace
     auths
-    verification {
-        code
-        expiration
-        verified
-    }
 }
 
 
