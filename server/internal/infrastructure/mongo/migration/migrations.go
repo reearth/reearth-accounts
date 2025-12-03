@@ -35,4 +35,5 @@ var migrations = migration.Migrations[DBClient]{
 	251120200000: GenerateMissingWorkspaceAliases,
 	251120210000: AddCaseInsensitiveWorkspaceAliasIndex,
 	251120220000: ReplaceWorkspaceAliasMembersIndex,
+	251203132548: ApplyCollectionSchemas1,
 }

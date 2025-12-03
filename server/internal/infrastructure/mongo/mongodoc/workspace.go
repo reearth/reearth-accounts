@@ -7,30 +7,30 @@ import (
 )
 
 type WorkspaceMemberDocument struct {
-	Role      string
-	InvitedBy string
-	Disabled  bool
+	Role      string `json:"role" jsonschema:"description=Member role (owner, maintainer, writer, reader). Default: \"\""`
+	InvitedBy string `json:"invitedby" jsonschema:"description=User ID of the inviter"`
+	Disabled  bool   `json:"disabled" jsonschema:"description=Whether the member is disabled"`
 }
 
 type WorkspaceMetadataDocument struct {
-	Description  string
-	Website      string
-	Location     string
-	BillingEmail string
-	PhotoURL     string
+	Description  string `json:"description" jsonschema:"description=Workspace description. Default: \"\""`
+	Website      string `json:"website" jsonschema:"description=Workspace website URL. Default: \"\""`
+	Location     string `json:"location" jsonschema:"description=Workspace location. Default: \"\""`
+	BillingEmail string `json:"billingemail" jsonschema:"description=Billing email address. Default: \"\""`
+	PhotoURL     string `json:"photourl" jsonschema:"description=Workspace photo URL. Default: \"\""`
 }
 
 type WorkspaceDocument struct {
-	ID           string
-	Name         string
-	Alias        string
-	Email        string
-	Metadata     WorkspaceMetadataDocument
-	Members      map[string]WorkspaceMemberDocument
-	Integrations map[string]WorkspaceMemberDocument
-	MembersHash  string `bson:"members_hash,omitempty"`
-	Personal     bool
-	Policy       string `bson:",omitempty"`
+	ID           string                             `json:"id" jsonschema:"description=Workspace ID (ULID format)"`
+	Name         string                             `json:"name" jsonschema:"description=Workspace name"`
+	Alias        string                             `json:"alias" jsonschema:"description=Unique workspace handle/alias"`
+	Email        string                             `json:"email" jsonschema:"description=Workspace contact email"`
+	Metadata     WorkspaceMetadataDocument          `json:"metadata" jsonschema:"description=Extended workspace metadata"`
+	Members      map[string]WorkspaceMemberDocument `json:"members" jsonschema:"description=Map of user ID to member document"`
+	Integrations map[string]WorkspaceMemberDocument `json:"integrations" jsonschema:"description=Map of integration ID to member document. Default: {}"`
+	MembersHash  string                             `json:"members_hash" bson:"members_hash,omitempty" jsonschema:"description=SHA256 hash of members and integrations for uniqueness tracking. Default: \"\""`
+	Personal     bool                               `json:"personal" jsonschema:"description=Whether this is a personal workspace. Default: false"`
+	Policy       string                             `json:"policy" bson:",omitempty" jsonschema:"description=Policy ID reference. Default: \"\""`
 }
 
 

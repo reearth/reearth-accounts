@@ -1,0 +1,479 @@
+// Package main provides MongoDB JSON Schema generation from Go struct definitions.
+//
+// This file contains the core generator logic that can be extracted to a separate
+// library package for use in other projects.
+//
+// Usage as a library:
+//
+//	g := NewGenerator()
+//	g.RegisterType("UserDocument", UserDocument{})
+//	schemas, _ := g.LoadConfig("schemas.yml")
+//	g.Generate(schemas, "./output")
+//
+// Or use RunCLI() for command-line interface:
+//
+//	g := NewGenerator()
+//	g.RegisterType("UserDocument", UserDocument{})
+//	g.RunCLI()
+package main
+
+import (
+	"encoding/json"
+	"flag"
+	"fmt"
+	"os"
+	"path/filepath"
+	"reflect"
+	"strings"
+	"time"
+
+	"github.com/invopop/jsonschema"
+	"gopkg.in/yaml.v3"
+)
+
+// SchemaConfigFile represents the YAML configuration file structure
+type SchemaConfigFile struct {
+	Schemas []SchemaConfigYAML `yaml:"schemas"`
+}
+
+// SchemaConfigYAML represents a single schema configuration in YAML
+type SchemaConfigYAML struct {
+	Collection  string   `yaml:"collection"`
+	Type        string   `yaml:"type"`
+	Title       string   `yaml:"title"`
+	Description string   `yaml:"description"`
+	Required    []string `yaml:"required"`
+}
+
+// SchemaConfig defines the configuration for generating a collection schema
+type SchemaConfig struct {
+	CollectionName string
+	Type           any
+	Title          string
+	Description    string
+	Required       []string
+}
+
+// Generator holds the type registry and generates schemas
+type Generator struct {
+	typeRegistry map[string]any
+}
+
+// NewGenerator creates a new schema generator
+func NewGenerator() *Generator {
+	return &Generator{
+		typeRegistry: make(map[string]any),
+	}
+}
+
+// RegisterType registers a Go type with a name for schema generation
+func (g *Generator) RegisterType(name string, t any) {
+	g.typeRegistry[name] = t
+}
+
+// LoadConfig loads schema configurations from a YAML file
+func (g *Generator) LoadConfig(configPath string) ([]SchemaConfig, error) {
+	data, err := os.ReadFile(configPath)
+	if err != nil {
+		return nil, fmt.Errorf("failed to read config file: %w", err)
+	}
+
+	var configFile SchemaConfigFile
+	if err := yaml.Unmarshal(data, &configFile); err != nil {
+		return nil, fmt.Errorf("failed to parse config file: %w", err)
+	}
+
+	var schemas []SchemaConfig
+	for _, cfg := range configFile.Schemas {
+		t, ok := g.typeRegistry[cfg.Type]
+		if !ok {
+			return nil, fmt.Errorf("type %q not found in registry for collection %q", cfg.Type, cfg.Collection)
+		}
+
+		schemas = append(schemas, SchemaConfig{
+			CollectionName: cfg.Collection,
+			Type:           t,
+			Title:          cfg.Title,
+			Description:    cfg.Description,
+			Required:       cfg.Required,
+		})
+	}
+
+	return schemas, nil
+}
+
+// Generate generates schema files for all configured collections
+func (g *Generator) Generate(schemas []SchemaConfig, outputDir string) error {
+	if err := os.MkdirAll(outputDir, 0755); err != nil {
+		return fmt.Errorf("failed to create output directory: %w", err)
+	}
+
+	for _, cfg := range schemas {
+		schema := g.generateMongoSchema(cfg)
+
+		data, err := json.MarshalIndent(schema, "", "  ")
+		if err != nil {
+			return fmt.Errorf("failed to marshal schema for %s: %w", cfg.CollectionName, err)
+		}
+
+		outputPath := filepath.Join(outputDir, cfg.CollectionName+".json")
+		if err := os.WriteFile(outputPath, append(data, '\n'), 0644); err != nil {
+			return fmt.Errorf("failed to write schema file %s: %w", outputPath, err)
+		}
+
+		fmt.Printf("Generated schema: %s\n", outputPath)
+	}
+
+	return nil
+}
+
+// RunCLI runs the generator as a command-line tool
+func (g *Generator) RunCLI() {
+	configPath := flag.String("config", "schemas.yml", "Path to YAML configuration file")
+	outputDir := flag.String("output", "./internal/infrastructure/mongo/schema", "Output directory for schema files")
+	flag.Parse()
+
+	schemas, err := g.LoadConfig(*configPath)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "Error loading config: %v\n", err)
+		os.Exit(1)
+	}
+
+	if err := g.Generate(schemas, *outputDir); err != nil {
+		fmt.Fprintf(os.Stderr, "Error generating schemas: %v\n", err)
+		os.Exit(1)
+	}
+}
+
+func (g *Generator) generateMongoSchema(cfg SchemaConfig) map[string]any {
+	r := &jsonschema.Reflector{
+		DoNotReference: true,
+		Anonymous:      true,
+	}
+
+	jsonSchema := r.Reflect(cfg.Type)
+	mongoSchema := g.convertToMongoSchema(jsonSchema, cfg)
+
+	return map[string]any{
+		"$jsonSchema": mongoSchema,
+	}
+}
+
+func (g *Generator) convertToMongoSchema(schema *jsonschema.Schema, cfg SchemaConfig) map[string]any {
+	result := map[string]any{
+		"bsonType":    "object",
+		"title":       cfg.Title,
+		"description": cfg.Description,
+	}
+
+	if len(cfg.Required) > 0 {
+		result["required"] = cfg.Required
+	}
+
+	properties := make(map[string]any)
+
+	// Add _id field
+	properties["_id"] = map[string]any{
+		"bsonType":    "objectId",
+		"description": "MongoDB internal ID",
+	}
+
+	// Convert properties from JSON Schema
+	if schema.Properties != nil {
+		for pair := schema.Properties.Oldest(); pair != nil; pair = pair.Next() {
+			fieldName := toBsonFieldName(pair.Key)
+			prop := pair.Value
+			properties[fieldName] = g.convertPropertyToMongo(prop, cfg.Type, pair.Key)
+		}
+	}
+
+	result["properties"] = properties
+	result["additionalProperties"] = false
+
+	return result
+}
+
+func (g *Generator) convertPropertyToMongo(prop *jsonschema.Schema, parentType any, originalFieldName string) map[string]any {
+	result := make(map[string]any)
+
+	// Get field info from struct for nullable detection
+	isPointer := isPointerField(parentType, originalFieldName)
+
+	// Determine BSON type
+	bsonType := determineBsonType(prop, parentType, originalFieldName)
+
+	if isPointer {
+		result["bsonType"] = []string{bsonType, "null"}
+	} else {
+		result["bsonType"] = bsonType
+	}
+
+	// Get description from struct tag (more reliable than prop.Description which truncates on commas)
+	description := getDescriptionFromTag(parentType, originalFieldName)
+	if description == "" && prop.Description != "" {
+		description = prop.Description
+	}
+	if description != "" {
+		result["description"] = description
+	}
+
+	// Handle array items
+	if bsonType == "array" && prop.Items != nil {
+		result["items"] = g.convertPropertyToMongo(prop.Items, nil, "")
+	}
+
+	// Handle nested object properties
+	if bsonType == "object" && prop.Properties != nil {
+		// Get the nested struct type for proper description lookup
+		nestedType := getNestedType(parentType, originalFieldName)
+		nestedProps := make(map[string]any)
+		for pair := prop.Properties.Oldest(); pair != nil; pair = pair.Next() {
+			nestedFieldName := toBsonFieldName(pair.Key)
+			nestedProps[nestedFieldName] = g.convertPropertyToMongo(pair.Value, nestedType, pair.Key)
+		}
+		result["properties"] = nestedProps
+	}
+
+	// Handle map types (additionalProperties) - only for true map types without Properties
+	if prop.AdditionalProperties != nil && prop.Properties == nil {
+		// Get the map value type for proper description lookup
+		mapValueType := getMapValueType(parentType, originalFieldName)
+		result["additionalProperties"] = g.convertPropertyToMongo(prop.AdditionalProperties, mapValueType, "")
+	}
+
+	return result
+}
+
+func determineBsonType(prop *jsonschema.Schema, parentType any, fieldName string) string {
+	if prop == nil {
+		return "string"
+	}
+
+	// Check for time.Time
+	if isTimeField(parentType, fieldName) {
+		return "date"
+	}
+
+	// Check for []byte
+	if isByteSlice(parentType, fieldName) {
+		return "binData"
+	}
+
+	// Handle types from JSON Schema
+	types := prop.Type
+	if types == "" && len(prop.AnyOf) > 0 {
+		// Handle anyOf for nullable types
+		for _, anyOf := range prop.AnyOf {
+			if anyOf.Type != "" && anyOf.Type != "null" {
+				types = anyOf.Type
+				break
+			}
+		}
+	}
+
+	switch types {
+	case "string":
+		if prop.Format == "date-time" {
+			return "date"
+		}
+		return "string"
+	case "integer":
+		return "long"
+	case "number":
+		return "double"
+	case "boolean":
+		return "bool"
+	case "array":
+		return "array"
+	case "object":
+		return "object"
+	default:
+		return "string"
+	}
+}
+
+func toBsonFieldName(fieldName string) string {
+	// Convert to lowercase for BSON field naming convention
+	return strings.ToLower(fieldName)
+}
+
+func findFieldByJSONName(t reflect.Type, jsonFieldName string) (reflect.StructField, bool) {
+	for i := 0; i < t.NumField(); i++ {
+		f := t.Field(i)
+		jsonTag := f.Tag.Get("json")
+		// Handle json tag like "fieldname" or "fieldname,omitempty"
+		jsonName := strings.Split(jsonTag, ",")[0]
+		if jsonName == jsonFieldName {
+			return f, true
+		}
+	}
+	return reflect.StructField{}, false
+}
+
+func getNestedType(parentType any, jsonFieldName string) any {
+	if parentType == nil {
+		return nil
+	}
+
+	t := reflect.TypeOf(parentType)
+	if t.Kind() == reflect.Ptr {
+		t = t.Elem()
+	}
+	if t.Kind() != reflect.Struct {
+		return nil
+	}
+
+	// If no field name is provided, return the parentType itself
+	// This handles cases like additionalProperties where parentType is already the nested type
+	if jsonFieldName == "" {
+		return parentType
+	}
+
+	field, found := findFieldByJSONName(t, jsonFieldName)
+	if !found {
+		return nil
+	}
+
+	fieldType := field.Type
+	if fieldType.Kind() == reflect.Ptr {
+		fieldType = fieldType.Elem()
+	}
+
+	if fieldType.Kind() == reflect.Struct {
+		return reflect.New(fieldType).Elem().Interface()
+	}
+
+	return nil
+}
+
+func getMapValueType(parentType any, jsonFieldName string) any {
+	if parentType == nil || jsonFieldName == "" {
+		return nil
+	}
+
+	t := reflect.TypeOf(parentType)
+	if t.Kind() == reflect.Ptr {
+		t = t.Elem()
+	}
+	if t.Kind() != reflect.Struct {
+		return nil
+	}
+
+	field, found := findFieldByJSONName(t, jsonFieldName)
+	if !found {
+		return nil
+	}
+
+	fieldType := field.Type
+	if fieldType.Kind() == reflect.Map {
+		valueType := fieldType.Elem()
+		if valueType.Kind() == reflect.Struct {
+			return reflect.New(valueType).Elem().Interface()
+		}
+	}
+
+	return nil
+}
+
+func isPointerField(parentType any, jsonFieldName string) bool {
+	if parentType == nil {
+		return false
+	}
+
+	t := reflect.TypeOf(parentType)
+	if t.Kind() == reflect.Ptr {
+		t = t.Elem()
+	}
+	if t.Kind() != reflect.Struct {
+		return false
+	}
+
+	field, found := findFieldByJSONName(t, jsonFieldName)
+	if !found {
+		return false
+	}
+
+	return field.Type.Kind() == reflect.Ptr
+}
+
+func isTimeField(parentType any, jsonFieldName string) bool {
+	if parentType == nil {
+		return false
+	}
+
+	t := reflect.TypeOf(parentType)
+	if t.Kind() == reflect.Ptr {
+		t = t.Elem()
+	}
+	if t.Kind() != reflect.Struct {
+		return false
+	}
+
+	field, found := findFieldByJSONName(t, jsonFieldName)
+	if !found {
+		return false
+	}
+
+	fieldType := field.Type
+	if fieldType.Kind() == reflect.Ptr {
+		fieldType = fieldType.Elem()
+	}
+
+	return fieldType == reflect.TypeOf(time.Time{})
+}
+
+func isByteSlice(parentType any, jsonFieldName string) bool {
+	if parentType == nil {
+		return false
+	}
+
+	t := reflect.TypeOf(parentType)
+	if t.Kind() == reflect.Ptr {
+		t = t.Elem()
+	}
+	if t.Kind() != reflect.Struct {
+		return false
+	}
+
+	field, found := findFieldByJSONName(t, jsonFieldName)
+	if !found {
+		return false
+	}
+
+	return field.Type == reflect.TypeOf([]byte{})
+}
+
+func getDescriptionFromTag(parentType any, jsonFieldName string) string {
+	if parentType == nil || jsonFieldName == "" {
+		return ""
+	}
+
+	t := reflect.TypeOf(parentType)
+	if t.Kind() == reflect.Ptr {
+		t = t.Elem()
+	}
+	if t.Kind() != reflect.Struct {
+		return ""
+	}
+
+	field, found := findFieldByJSONName(t, jsonFieldName)
+	if !found {
+		return ""
+	}
+
+	tag := field.Tag.Get("jsonschema")
+	if tag == "" {
+		return ""
+	}
+
+	// Parse description from jsonschema tag
+	// Format: jsonschema:"description=Some description here"
+	const prefix = "description="
+	if idx := strings.Index(tag, prefix); idx != -1 {
+		desc := tag[idx+len(prefix):]
+		// The description continues until the end of the tag value
+		return desc
+	}
+
+	return ""
+}

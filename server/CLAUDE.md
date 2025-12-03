@@ -120,6 +120,7 @@ server/
 - Migrations located in `internal/infrastructure/mongo/migration/`
 - Naming pattern: `YYMMDDHHMMSS_description.go`
 - Migrations run automatically on startup
+- Schema management: See [internal/infrastructure/mongo/SCHEMA.md](internal/infrastructure/mongo/SCHEMA.md)
 
 ## GraphQL Schema Management
 - Schema files in `schemas/` directory
