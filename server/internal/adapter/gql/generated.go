@@ -186,13 +186,15 @@ type ComplexityRoot struct {
 	}
 
 	User struct {
-		Auths     func(childComplexity int) int
-		Email     func(childComplexity int) int
-		Host      func(childComplexity int) int
-		ID        func(childComplexity int) int
-		Metadata  func(childComplexity int) int
-		Name      func(childComplexity int) int
-		Workspace func(childComplexity int) int
+		Alias        func(childComplexity int) int
+		Auths        func(childComplexity int) int
+		Email        func(childComplexity int) int
+		Host         func(childComplexity int) int
+		ID           func(childComplexity int) int
+		Metadata     func(childComplexity int) int
+		Name         func(childComplexity int) int
+		Verification func(childComplexity int) int
+		Workspace    func(childComplexity int) int
 	}
 
 	UserMetadata struct {
@@ -210,6 +212,12 @@ type ComplexityRoot struct {
 	UserWithRoles struct {
 		Roles func(childComplexity int) int
 		User  func(childComplexity int) int
+	}
+
+	Verification struct {
+		Code       func(childComplexity int) int
+		Expiration func(childComplexity int) int
+		Verified   func(childComplexity int) int
 	}
 
 	Workspace struct {
@@ -953,6 +961,12 @@ func (e *executableSchema) Complexity(ctx context.Context, typeName, field strin
 
 		return e.complexity.UpdateWorkspacePayload.Workspace(childComplexity), true
 
+	case "User.alias":
+		if e.complexity.User.Alias == nil {
+			break
+		}
+
+		return e.complexity.User.Alias(childComplexity), true
 	case "User.auths":
 		if e.complexity.User.Auths == nil {
 			break
@@ -989,6 +1003,12 @@ func (e *executableSchema) Complexity(ctx context.Context, typeName, field strin
 		}
 
 		return e.complexity.User.Name(childComplexity), true
+	case "User.verification":
+		if e.complexity.User.Verification == nil {
+			break
+		}
+
+		return e.complexity.User.Verification(childComplexity), true
 	case "User.workspace":
 		if e.complexity.User.Workspace == nil {
 			break
@@ -1046,6 +1066,25 @@ func (e *executableSchema) Complexity(ctx context.Context, typeName, field strin
 		}
 
 		return e.complexity.UserWithRoles.User(childComplexity), true
+
+	case "Verification.code":
+		if e.complexity.Verification.Code == nil {
+			break
+		}
+
+		return e.complexity.Verification.Code(childComplexity), true
+	case "Verification.expiration":
+		if e.complexity.Verification.Expiration == nil {
+			break
+		}
+
+		return e.complexity.Verification.Expiration(childComplexity), true
+	case "Verification.verified":
+		if e.complexity.Verification.Verified == nil {
+			break
+		}
+
+		return e.complexity.Verification.Verified(childComplexity), true
 
 	case "Workspace.alias":
 		if e.complexity.Workspace.Alias == nil {
@@ -1440,11 +1479,13 @@ extend type Mutation {
 	{Name: "../../../schemas/user.graphql", Input: `type User implements Node {
   id: ID!
   name: String!
+  alias: String!
   email: String!
   host: String
   workspace: ID!
   auths: [String!]!
   metadata: UserMetadata!
+  verification: Verification
 }
 
 type Me {
@@ -1465,6 +1506,12 @@ type UserMetadata {
   photoURL: String!
   lang: Lang!
   theme: Theme!
+}
+
+type Verification {
+  code: String!
+  expiration: String!
+  verified: Boolean!
 }
 
 input SignupInput {
@@ -4228,6 +4275,8 @@ func (ec *executionContext) fieldContext_Query_userByNameOrEmail(ctx context.Con
 				return ec.fieldContext_User_id(ctx, field)
 			case "name":
 				return ec.fieldContext_User_name(ctx, field)
+			case "alias":
+				return ec.fieldContext_User_alias(ctx, field)
 			case "email":
 				return ec.fieldContext_User_email(ctx, field)
 			case "host":
@@ -4238,6 +4287,8 @@ func (ec *executionContext) fieldContext_Query_userByNameOrEmail(ctx context.Con
 				return ec.fieldContext_User_auths(ctx, field)
 			case "metadata":
 				return ec.fieldContext_User_metadata(ctx, field)
+			case "verification":
+				return ec.fieldContext_User_verification(ctx, field)
 			}
 			return nil, fmt.Errorf("no field named %q was found under type User", field.Name)
 		},
@@ -4285,6 +4336,8 @@ func (ec *executionContext) fieldContext_Query_searchUser(ctx context.Context, f
 				return ec.fieldContext_User_id(ctx, field)
 			case "name":
 				return ec.fieldContext_User_name(ctx, field)
+			case "alias":
+				return ec.fieldContext_User_alias(ctx, field)
 			case "email":
 				return ec.fieldContext_User_email(ctx, field)
 			case "host":
@@ -4295,6 +4348,8 @@ func (ec *executionContext) fieldContext_Query_searchUser(ctx context.Context, f
 				return ec.fieldContext_User_auths(ctx, field)
 			case "metadata":
 				return ec.fieldContext_User_metadata(ctx, field)
+			case "verification":
+				return ec.fieldContext_User_verification(ctx, field)
 			}
 			return nil, fmt.Errorf("no field named %q was found under type User", field.Name)
 		},
@@ -4342,6 +4397,8 @@ func (ec *executionContext) fieldContext_Query_findUsersByIDs(ctx context.Contex
 				return ec.fieldContext_User_id(ctx, field)
 			case "name":
 				return ec.fieldContext_User_name(ctx, field)
+			case "alias":
+				return ec.fieldContext_User_alias(ctx, field)
 			case "email":
 				return ec.fieldContext_User_email(ctx, field)
 			case "host":
@@ -4352,6 +4409,8 @@ func (ec *executionContext) fieldContext_Query_findUsersByIDs(ctx context.Contex
 				return ec.fieldContext_User_auths(ctx, field)
 			case "metadata":
 				return ec.fieldContext_User_metadata(ctx, field)
+			case "verification":
+				return ec.fieldContext_User_verification(ctx, field)
 			}
 			return nil, fmt.Errorf("no field named %q was found under type User", field.Name)
 		},
@@ -5316,6 +5375,35 @@ func (ec *executionContext) fieldContext_User_name(_ context.Context, field grap
 	return fc, nil
 }
 
+func (ec *executionContext) _User_alias(ctx context.Context, field graphql.CollectedField, obj *gqlmodel.User) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		ec.fieldContext_User_alias,
+		func(ctx context.Context) (any, error) {
+			return obj.Alias, nil
+		},
+		nil,
+		ec.marshalNString2string,
+		true,
+		true,
+	)
+}
+
+func (ec *executionContext) fieldContext_User_alias(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "User",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type String does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
 func (ec *executionContext) _User_email(ctx context.Context, field graphql.CollectedField, obj *gqlmodel.User) (ret graphql.Marshaler) {
 	return graphql.ResolveField(
 		ctx,
@@ -5468,6 +5556,43 @@ func (ec *executionContext) fieldContext_User_metadata(_ context.Context, field 
 				return ec.fieldContext_UserMetadata_theme(ctx, field)
 			}
 			return nil, fmt.Errorf("no field named %q was found under type UserMetadata", field.Name)
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _User_verification(ctx context.Context, field graphql.CollectedField, obj *gqlmodel.User) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		ec.fieldContext_User_verification,
+		func(ctx context.Context) (any, error) {
+			return obj.Verification, nil
+		},
+		nil,
+		ec.marshalOVerification2ᚖgithubᚗcomᚋreearthᚋreearthᚑaccountsᚋserverᚋinternalᚋadapterᚋgqlᚋgqlmodelᚐVerification,
+		true,
+		false,
+	)
+}
+
+func (ec *executionContext) fieldContext_User_verification(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "User",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			switch field.Name {
+			case "code":
+				return ec.fieldContext_Verification_code(ctx, field)
+			case "expiration":
+				return ec.fieldContext_Verification_expiration(ctx, field)
+			case "verified":
+				return ec.fieldContext_Verification_verified(ctx, field)
+			}
+			return nil, fmt.Errorf("no field named %q was found under type Verification", field.Name)
 		},
 	}
 	return fc, nil
@@ -5646,6 +5771,8 @@ func (ec *executionContext) fieldContext_UserPayload_user(_ context.Context, fie
 				return ec.fieldContext_User_id(ctx, field)
 			case "name":
 				return ec.fieldContext_User_name(ctx, field)
+			case "alias":
+				return ec.fieldContext_User_alias(ctx, field)
 			case "email":
 				return ec.fieldContext_User_email(ctx, field)
 			case "host":
@@ -5656,6 +5783,8 @@ func (ec *executionContext) fieldContext_UserPayload_user(_ context.Context, fie
 				return ec.fieldContext_User_auths(ctx, field)
 			case "metadata":
 				return ec.fieldContext_User_metadata(ctx, field)
+			case "verification":
+				return ec.fieldContext_User_verification(ctx, field)
 			}
 			return nil, fmt.Errorf("no field named %q was found under type User", field.Name)
 		},
@@ -5691,6 +5820,8 @@ func (ec *executionContext) fieldContext_UserWithRoles_user(_ context.Context, f
 				return ec.fieldContext_User_id(ctx, field)
 			case "name":
 				return ec.fieldContext_User_name(ctx, field)
+			case "alias":
+				return ec.fieldContext_User_alias(ctx, field)
 			case "email":
 				return ec.fieldContext_User_email(ctx, field)
 			case "host":
@@ -5701,6 +5832,8 @@ func (ec *executionContext) fieldContext_UserWithRoles_user(_ context.Context, f
 				return ec.fieldContext_User_auths(ctx, field)
 			case "metadata":
 				return ec.fieldContext_User_metadata(ctx, field)
+			case "verification":
+				return ec.fieldContext_User_verification(ctx, field)
 			}
 			return nil, fmt.Errorf("no field named %q was found under type User", field.Name)
 		},
@@ -5738,6 +5871,93 @@ func (ec *executionContext) fieldContext_UserWithRoles_roles(_ context.Context, 
 				return ec.fieldContext_RoleForAuthorization_name(ctx, field)
 			}
 			return nil, fmt.Errorf("no field named %q was found under type RoleForAuthorization", field.Name)
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _Verification_code(ctx context.Context, field graphql.CollectedField, obj *gqlmodel.Verification) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		ec.fieldContext_Verification_code,
+		func(ctx context.Context) (any, error) {
+			return obj.Code, nil
+		},
+		nil,
+		ec.marshalNString2string,
+		true,
+		true,
+	)
+}
+
+func (ec *executionContext) fieldContext_Verification_code(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "Verification",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type String does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _Verification_expiration(ctx context.Context, field graphql.CollectedField, obj *gqlmodel.Verification) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		ec.fieldContext_Verification_expiration,
+		func(ctx context.Context) (any, error) {
+			return obj.Expiration, nil
+		},
+		nil,
+		ec.marshalNString2string,
+		true,
+		true,
+	)
+}
+
+func (ec *executionContext) fieldContext_Verification_expiration(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "Verification",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type String does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _Verification_verified(ctx context.Context, field graphql.CollectedField, obj *gqlmodel.Verification) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		ec.fieldContext_Verification_verified,
+		func(ctx context.Context) (any, error) {
+			return obj.Verified, nil
+		},
+		nil,
+		ec.marshalNBoolean2bool,
+		true,
+		true,
+	)
+}
+
+func (ec *executionContext) fieldContext_Verification_verified(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "Verification",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type Boolean does not have child fields")
 		},
 	}
 	return fc, nil
@@ -6073,6 +6293,8 @@ func (ec *executionContext) fieldContext_WorkspaceIntegrationMember_invitedBy(_ 
 				return ec.fieldContext_User_id(ctx, field)
 			case "name":
 				return ec.fieldContext_User_name(ctx, field)
+			case "alias":
+				return ec.fieldContext_User_alias(ctx, field)
 			case "email":
 				return ec.fieldContext_User_email(ctx, field)
 			case "host":
@@ -6083,6 +6305,8 @@ func (ec *executionContext) fieldContext_WorkspaceIntegrationMember_invitedBy(_ 
 				return ec.fieldContext_User_auths(ctx, field)
 			case "metadata":
 				return ec.fieldContext_User_metadata(ctx, field)
+			case "verification":
+				return ec.fieldContext_User_verification(ctx, field)
 			}
 			return nil, fmt.Errorf("no field named %q was found under type User", field.Name)
 		},
@@ -6350,6 +6574,8 @@ func (ec *executionContext) fieldContext_WorkspaceUserMember_user(_ context.Cont
 				return ec.fieldContext_User_id(ctx, field)
 			case "name":
 				return ec.fieldContext_User_name(ctx, field)
+			case "alias":
+				return ec.fieldContext_User_alias(ctx, field)
 			case "email":
 				return ec.fieldContext_User_email(ctx, field)
 			case "host":
@@ -6360,6 +6586,8 @@ func (ec *executionContext) fieldContext_WorkspaceUserMember_user(_ context.Cont
 				return ec.fieldContext_User_auths(ctx, field)
 			case "metadata":
 				return ec.fieldContext_User_metadata(ctx, field)
+			case "verification":
+				return ec.fieldContext_User_verification(ctx, field)
 			}
 			return nil, fmt.Errorf("no field named %q was found under type User", field.Name)
 		},
@@ -10368,6 +10596,11 @@ func (ec *executionContext) _User(ctx context.Context, sel ast.SelectionSet, obj
 			if out.Values[i] == graphql.Null {
 				out.Invalids++
 			}
+		case "alias":
+			out.Values[i] = ec._User_alias(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
 		case "email":
 			out.Values[i] = ec._User_email(ctx, field, obj)
 			if out.Values[i] == graphql.Null {
@@ -10390,6 +10623,8 @@ func (ec *executionContext) _User(ctx context.Context, sel ast.SelectionSet, obj
 			if out.Values[i] == graphql.Null {
 				out.Invalids++
 			}
+		case "verification":
+			out.Values[i] = ec._User_verification(ctx, field, obj)
 		default:
 			panic("unknown field " + strconv.Quote(field.Name))
 		}
@@ -10529,6 +10764,55 @@ func (ec *executionContext) _UserWithRoles(ctx context.Context, sel ast.Selectio
 			}
 		case "roles":
 			out.Values[i] = ec._UserWithRoles_roles(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		default:
+			panic("unknown field " + strconv.Quote(field.Name))
+		}
+	}
+	out.Dispatch(ctx)
+	if out.Invalids > 0 {
+		return graphql.Null
+	}
+
+	atomic.AddInt32(&ec.deferred, int32(len(deferred)))
+
+	for label, dfs := range deferred {
+		ec.processDeferredGroup(graphql.DeferredGroup{
+			Label:    label,
+			Path:     graphql.GetPath(ctx),
+			FieldSet: dfs,
+			Context:  ctx,
+		})
+	}
+
+	return out
+}
+
+var verificationImplementors = []string{"Verification"}
+
+func (ec *executionContext) _Verification(ctx context.Context, sel ast.SelectionSet, obj *gqlmodel.Verification) graphql.Marshaler {
+	fields := graphql.CollectFields(ec.OperationContext, sel, verificationImplementors)
+
+	out := graphql.NewFieldSet(fields)
+	deferred := make(map[string]*graphql.FieldSet)
+	for i, field := range fields {
+		switch field.Name {
+		case "__typename":
+			out.Values[i] = graphql.MarshalString("Verification")
+		case "code":
+			out.Values[i] = ec._Verification_code(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "expiration":
+			out.Values[i] = ec._Verification_expiration(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "verified":
+			out.Values[i] = ec._Verification_verified(ctx, field, obj)
 			if out.Values[i] == graphql.Null {
 				out.Invalids++
 			}
@@ -12393,6 +12677,13 @@ func (ec *executionContext) marshalOUserPayload2ᚖgithubᚗcomᚋreearthᚋreea
 		return graphql.Null
 	}
 	return ec._UserPayload(ctx, sel, v)
+}
+
+func (ec *executionContext) marshalOVerification2ᚖgithubᚗcomᚋreearthᚋreearthᚑaccountsᚋserverᚋinternalᚋadapterᚋgqlᚋgqlmodelᚐVerification(ctx context.Context, sel ast.SelectionSet, v *gqlmodel.Verification) graphql.Marshaler {
+	if v == nil {
+		return graphql.Null
+	}
+	return ec._Verification(ctx, sel, v)
 }
 
 func (ec *executionContext) marshalOWorkspace2ᚕᚖgithubᚗcomᚋreearthᚋreearthᚑaccountsᚋserverᚋinternalᚋadapterᚋgqlᚋgqlmodelᚐWorkspace(ctx context.Context, sel ast.SelectionSet, v []*gqlmodel.Workspace) graphql.Marshaler {

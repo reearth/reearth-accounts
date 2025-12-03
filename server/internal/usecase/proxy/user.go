@@ -120,7 +120,7 @@ func (u *User) FetchByNameOrEmail(ctx context.Context, nameOrEmail string) (*use
 	return user.SimpleFrom(r), nil
 }
 
-func (u *User) SearchUser(ctx context.Context, keyword string) (user.SimpleList, error) {
+func (u *User) SearchUser(ctx context.Context, keyword string) (user.List, error) {
 	res, err := SearchUser(ctx, u.gql, keyword)
 	if err != nil {
 		return nil, err
@@ -131,9 +131,7 @@ func (u *User) SearchUser(ctx context.Context, keyword string) (user.SimpleList,
 	if err != nil {
 		return nil, err
 	}
-	return util.Map(r, func(u *user.User) *user.Simple {
-		return user.SimpleFrom(u)
-	}), nil
+	return r, nil
 }
 
 func (u *User) DeleteMe(ctx context.Context, id user.ID, op *usecase.Operator) error {
