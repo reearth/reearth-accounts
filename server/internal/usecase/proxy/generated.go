@@ -991,6 +991,9 @@ func (v *FindOrCreateFindOrCreateUserPayloadUser) GetId() string { return v.Frag
 // GetName returns FindOrCreateFindOrCreateUserPayloadUser.Name, and is useful for accessing the field via an interface.
 func (v *FindOrCreateFindOrCreateUserPayloadUser) GetName() string { return v.FragmentUser.Name }
 
+// GetAlias returns FindOrCreateFindOrCreateUserPayloadUser.Alias, and is useful for accessing the field via an interface.
+func (v *FindOrCreateFindOrCreateUserPayloadUser) GetAlias() string { return v.FragmentUser.Alias }
+
 // GetEmail returns FindOrCreateFindOrCreateUserPayloadUser.Email, and is useful for accessing the field via an interface.
 func (v *FindOrCreateFindOrCreateUserPayloadUser) GetEmail() string { return v.FragmentUser.Email }
 
@@ -1006,6 +1009,11 @@ func (v *FindOrCreateFindOrCreateUserPayloadUser) GetWorkspace() string {
 
 // GetAuths returns FindOrCreateFindOrCreateUserPayloadUser.Auths, and is useful for accessing the field via an interface.
 func (v *FindOrCreateFindOrCreateUserPayloadUser) GetAuths() []string { return v.FragmentUser.Auths }
+
+// GetVerification returns FindOrCreateFindOrCreateUserPayloadUser.Verification, and is useful for accessing the field via an interface.
+func (v *FindOrCreateFindOrCreateUserPayloadUser) GetVerification() FragmentUserVerification {
+	return v.FragmentUser.Verification
+}
 
 func (v *FindOrCreateFindOrCreateUserPayloadUser) UnmarshalJSON(b []byte) error {
 
@@ -1037,6 +1045,8 @@ type __premarshalFindOrCreateFindOrCreateUserPayloadUser struct {
 
 	Name string `json:"name"`
 
+	Alias string `json:"alias"`
+
 	Email string `json:"email"`
 
 	Metadata FragmentUserMetadata `json:"metadata"`
@@ -1044,6 +1054,8 @@ type __premarshalFindOrCreateFindOrCreateUserPayloadUser struct {
 	Workspace string `json:"workspace"`
 
 	Auths []string `json:"auths"`
+
+	Verification FragmentUserVerification `json:"verification"`
 }
 
 func (v *FindOrCreateFindOrCreateUserPayloadUser) MarshalJSON() ([]byte, error) {
@@ -1059,10 +1071,12 @@ func (v *FindOrCreateFindOrCreateUserPayloadUser) __premarshalJSON() (*__premars
 
 	retval.Id = v.FragmentUser.Id
 	retval.Name = v.FragmentUser.Name
+	retval.Alias = v.FragmentUser.Alias
 	retval.Email = v.FragmentUser.Email
 	retval.Metadata = v.FragmentUser.Metadata
 	retval.Workspace = v.FragmentUser.Workspace
 	retval.Auths = v.FragmentUser.Auths
+	retval.Verification = v.FragmentUser.Verification
 	return &retval, nil
 }
 
@@ -1145,12 +1159,14 @@ func (v *FragmentMeMetadataUserMetadata) GetWebsite() string { return v.Website 
 
 // FragmentUser includes the GraphQL fields of User requested by the fragment FragmentUser.
 type FragmentUser struct {
-	Id        string               `json:"id"`
-	Name      string               `json:"name"`
-	Email     string               `json:"email"`
-	Metadata  FragmentUserMetadata `json:"metadata"`
-	Workspace string               `json:"workspace"`
-	Auths     []string             `json:"auths"`
+	Id           string                   `json:"id"`
+	Name         string                   `json:"name"`
+	Alias        string                   `json:"alias"`
+	Email        string                   `json:"email"`
+	Metadata     FragmentUserMetadata     `json:"metadata"`
+	Workspace    string                   `json:"workspace"`
+	Auths        []string                 `json:"auths"`
+	Verification FragmentUserVerification `json:"verification"`
 }
 
 // GetId returns FragmentUser.Id, and is useful for accessing the field via an interface.
@@ -1158,6 +1174,9 @@ func (v *FragmentUser) GetId() string { return v.Id }
 
 // GetName returns FragmentUser.Name, and is useful for accessing the field via an interface.
 func (v *FragmentUser) GetName() string { return v.Name }
+
+// GetAlias returns FragmentUser.Alias, and is useful for accessing the field via an interface.
+func (v *FragmentUser) GetAlias() string { return v.Alias }
 
 // GetEmail returns FragmentUser.Email, and is useful for accessing the field via an interface.
 func (v *FragmentUser) GetEmail() string { return v.Email }
@@ -1170,6 +1189,9 @@ func (v *FragmentUser) GetWorkspace() string { return v.Workspace }
 
 // GetAuths returns FragmentUser.Auths, and is useful for accessing the field via an interface.
 func (v *FragmentUser) GetAuths() []string { return v.Auths }
+
+// GetVerification returns FragmentUser.Verification, and is useful for accessing the field via an interface.
+func (v *FragmentUser) GetVerification() FragmentUserVerification { return v.Verification }
 
 // FragmentUserMetadata includes the requested fields of the GraphQL type UserMetadata.
 type FragmentUserMetadata struct {
@@ -1194,6 +1216,22 @@ func (v *FragmentUserMetadata) GetTheme() string { return v.Theme }
 
 // GetWebsite returns FragmentUserMetadata.Website, and is useful for accessing the field via an interface.
 func (v *FragmentUserMetadata) GetWebsite() string { return v.Website }
+
+// FragmentUserVerification includes the requested fields of the GraphQL type Verification.
+type FragmentUserVerification struct {
+	Code       string `json:"code"`
+	Expiration string `json:"expiration"`
+	Verified   bool   `json:"verified"`
+}
+
+// GetCode returns FragmentUserVerification.Code, and is useful for accessing the field via an interface.
+func (v *FragmentUserVerification) GetCode() string { return v.Code }
+
+// GetExpiration returns FragmentUserVerification.Expiration, and is useful for accessing the field via an interface.
+func (v *FragmentUserVerification) GetExpiration() string { return v.Expiration }
+
+// GetVerified returns FragmentUserVerification.Verified, and is useful for accessing the field via an interface.
+func (v *FragmentUserVerification) GetVerified() bool { return v.Verified }
 
 // FragmentWorkspace includes the GraphQL fields of Workspace requested by the fragment FragmentWorkspace.
 type FragmentWorkspace struct {
@@ -2114,6 +2152,9 @@ func (v *SearchUserSearchUser) GetId() string { return v.FragmentUser.Id }
 // GetName returns SearchUserSearchUser.Name, and is useful for accessing the field via an interface.
 func (v *SearchUserSearchUser) GetName() string { return v.FragmentUser.Name }
 
+// GetAlias returns SearchUserSearchUser.Alias, and is useful for accessing the field via an interface.
+func (v *SearchUserSearchUser) GetAlias() string { return v.FragmentUser.Alias }
+
 // GetEmail returns SearchUserSearchUser.Email, and is useful for accessing the field via an interface.
 func (v *SearchUserSearchUser) GetEmail() string { return v.FragmentUser.Email }
 
@@ -2125,6 +2166,11 @@ func (v *SearchUserSearchUser) GetWorkspace() string { return v.FragmentUser.Wor
 
 // GetAuths returns SearchUserSearchUser.Auths, and is useful for accessing the field via an interface.
 func (v *SearchUserSearchUser) GetAuths() []string { return v.FragmentUser.Auths }
+
+// GetVerification returns SearchUserSearchUser.Verification, and is useful for accessing the field via an interface.
+func (v *SearchUserSearchUser) GetVerification() FragmentUserVerification {
+	return v.FragmentUser.Verification
+}
 
 func (v *SearchUserSearchUser) UnmarshalJSON(b []byte) error {
 
@@ -2156,6 +2202,8 @@ type __premarshalSearchUserSearchUser struct {
 
 	Name string `json:"name"`
 
+	Alias string `json:"alias"`
+
 	Email string `json:"email"`
 
 	Metadata FragmentUserMetadata `json:"metadata"`
@@ -2163,6 +2211,8 @@ type __premarshalSearchUserSearchUser struct {
 	Workspace string `json:"workspace"`
 
 	Auths []string `json:"auths"`
+
+	Verification FragmentUserVerification `json:"verification"`
 }
 
 func (v *SearchUserSearchUser) MarshalJSON() ([]byte, error) {
@@ -2178,10 +2228,12 @@ func (v *SearchUserSearchUser) __premarshalJSON() (*__premarshalSearchUserSearch
 
 	retval.Id = v.FragmentUser.Id
 	retval.Name = v.FragmentUser.Name
+	retval.Alias = v.FragmentUser.Alias
 	retval.Email = v.FragmentUser.Email
 	retval.Metadata = v.FragmentUser.Metadata
 	retval.Workspace = v.FragmentUser.Workspace
 	retval.Auths = v.FragmentUser.Auths
+	retval.Verification = v.FragmentUser.Verification
 	return &retval, nil
 }
 
@@ -2284,6 +2336,9 @@ func (v *SignupOIDCSignupOIDCUserPayloadUser) GetId() string { return v.Fragment
 // GetName returns SignupOIDCSignupOIDCUserPayloadUser.Name, and is useful for accessing the field via an interface.
 func (v *SignupOIDCSignupOIDCUserPayloadUser) GetName() string { return v.FragmentUser.Name }
 
+// GetAlias returns SignupOIDCSignupOIDCUserPayloadUser.Alias, and is useful for accessing the field via an interface.
+func (v *SignupOIDCSignupOIDCUserPayloadUser) GetAlias() string { return v.FragmentUser.Alias }
+
 // GetEmail returns SignupOIDCSignupOIDCUserPayloadUser.Email, and is useful for accessing the field via an interface.
 func (v *SignupOIDCSignupOIDCUserPayloadUser) GetEmail() string { return v.FragmentUser.Email }
 
@@ -2297,6 +2352,11 @@ func (v *SignupOIDCSignupOIDCUserPayloadUser) GetWorkspace() string { return v.F
 
 // GetAuths returns SignupOIDCSignupOIDCUserPayloadUser.Auths, and is useful for accessing the field via an interface.
 func (v *SignupOIDCSignupOIDCUserPayloadUser) GetAuths() []string { return v.FragmentUser.Auths }
+
+// GetVerification returns SignupOIDCSignupOIDCUserPayloadUser.Verification, and is useful for accessing the field via an interface.
+func (v *SignupOIDCSignupOIDCUserPayloadUser) GetVerification() FragmentUserVerification {
+	return v.FragmentUser.Verification
+}
 
 func (v *SignupOIDCSignupOIDCUserPayloadUser) UnmarshalJSON(b []byte) error {
 
@@ -2328,6 +2388,8 @@ type __premarshalSignupOIDCSignupOIDCUserPayloadUser struct {
 
 	Name string `json:"name"`
 
+	Alias string `json:"alias"`
+
 	Email string `json:"email"`
 
 	Metadata FragmentUserMetadata `json:"metadata"`
@@ -2335,6 +2397,8 @@ type __premarshalSignupOIDCSignupOIDCUserPayloadUser struct {
 	Workspace string `json:"workspace"`
 
 	Auths []string `json:"auths"`
+
+	Verification FragmentUserVerification `json:"verification"`
 }
 
 func (v *SignupOIDCSignupOIDCUserPayloadUser) MarshalJSON() ([]byte, error) {
@@ -2350,10 +2414,12 @@ func (v *SignupOIDCSignupOIDCUserPayloadUser) __premarshalJSON() (*__premarshalS
 
 	retval.Id = v.FragmentUser.Id
 	retval.Name = v.FragmentUser.Name
+	retval.Alias = v.FragmentUser.Alias
 	retval.Email = v.FragmentUser.Email
 	retval.Metadata = v.FragmentUser.Metadata
 	retval.Workspace = v.FragmentUser.Workspace
 	retval.Auths = v.FragmentUser.Auths
+	retval.Verification = v.FragmentUser.Verification
 	return &retval, nil
 }
 
@@ -2384,6 +2450,9 @@ func (v *SignupSignupUserPayloadUser) GetId() string { return v.FragmentUser.Id 
 // GetName returns SignupSignupUserPayloadUser.Name, and is useful for accessing the field via an interface.
 func (v *SignupSignupUserPayloadUser) GetName() string { return v.FragmentUser.Name }
 
+// GetAlias returns SignupSignupUserPayloadUser.Alias, and is useful for accessing the field via an interface.
+func (v *SignupSignupUserPayloadUser) GetAlias() string { return v.FragmentUser.Alias }
+
 // GetEmail returns SignupSignupUserPayloadUser.Email, and is useful for accessing the field via an interface.
 func (v *SignupSignupUserPayloadUser) GetEmail() string { return v.FragmentUser.Email }
 
@@ -2397,6 +2466,11 @@ func (v *SignupSignupUserPayloadUser) GetWorkspace() string { return v.FragmentU
 
 // GetAuths returns SignupSignupUserPayloadUser.Auths, and is useful for accessing the field via an interface.
 func (v *SignupSignupUserPayloadUser) GetAuths() []string { return v.FragmentUser.Auths }
+
+// GetVerification returns SignupSignupUserPayloadUser.Verification, and is useful for accessing the field via an interface.
+func (v *SignupSignupUserPayloadUser) GetVerification() FragmentUserVerification {
+	return v.FragmentUser.Verification
+}
 
 func (v *SignupSignupUserPayloadUser) UnmarshalJSON(b []byte) error {
 
@@ -2428,6 +2502,8 @@ type __premarshalSignupSignupUserPayloadUser struct {
 
 	Name string `json:"name"`
 
+	Alias string `json:"alias"`
+
 	Email string `json:"email"`
 
 	Metadata FragmentUserMetadata `json:"metadata"`
@@ -2435,6 +2511,8 @@ type __premarshalSignupSignupUserPayloadUser struct {
 	Workspace string `json:"workspace"`
 
 	Auths []string `json:"auths"`
+
+	Verification FragmentUserVerification `json:"verification"`
 }
 
 func (v *SignupSignupUserPayloadUser) MarshalJSON() ([]byte, error) {
@@ -2450,10 +2528,12 @@ func (v *SignupSignupUserPayloadUser) __premarshalJSON() (*__premarshalSignupSig
 
 	retval.Id = v.FragmentUser.Id
 	retval.Name = v.FragmentUser.Name
+	retval.Alias = v.FragmentUser.Alias
 	retval.Email = v.FragmentUser.Email
 	retval.Metadata = v.FragmentUser.Metadata
 	retval.Workspace = v.FragmentUser.Workspace
 	retval.Auths = v.FragmentUser.Auths
+	retval.Verification = v.FragmentUser.Verification
 	return &retval, nil
 }
 
@@ -3226,6 +3306,9 @@ func (v *UserByNameOrEmailUserByNameOrEmailUser) GetId() string { return v.Fragm
 // GetName returns UserByNameOrEmailUserByNameOrEmailUser.Name, and is useful for accessing the field via an interface.
 func (v *UserByNameOrEmailUserByNameOrEmailUser) GetName() string { return v.FragmentUser.Name }
 
+// GetAlias returns UserByNameOrEmailUserByNameOrEmailUser.Alias, and is useful for accessing the field via an interface.
+func (v *UserByNameOrEmailUserByNameOrEmailUser) GetAlias() string { return v.FragmentUser.Alias }
+
 // GetEmail returns UserByNameOrEmailUserByNameOrEmailUser.Email, and is useful for accessing the field via an interface.
 func (v *UserByNameOrEmailUserByNameOrEmailUser) GetEmail() string { return v.FragmentUser.Email }
 
@@ -3241,6 +3324,11 @@ func (v *UserByNameOrEmailUserByNameOrEmailUser) GetWorkspace() string {
 
 // GetAuths returns UserByNameOrEmailUserByNameOrEmailUser.Auths, and is useful for accessing the field via an interface.
 func (v *UserByNameOrEmailUserByNameOrEmailUser) GetAuths() []string { return v.FragmentUser.Auths }
+
+// GetVerification returns UserByNameOrEmailUserByNameOrEmailUser.Verification, and is useful for accessing the field via an interface.
+func (v *UserByNameOrEmailUserByNameOrEmailUser) GetVerification() FragmentUserVerification {
+	return v.FragmentUser.Verification
+}
 
 func (v *UserByNameOrEmailUserByNameOrEmailUser) UnmarshalJSON(b []byte) error {
 
@@ -3272,6 +3360,8 @@ type __premarshalUserByNameOrEmailUserByNameOrEmailUser struct {
 
 	Name string `json:"name"`
 
+	Alias string `json:"alias"`
+
 	Email string `json:"email"`
 
 	Metadata FragmentUserMetadata `json:"metadata"`
@@ -3279,6 +3369,8 @@ type __premarshalUserByNameOrEmailUserByNameOrEmailUser struct {
 	Workspace string `json:"workspace"`
 
 	Auths []string `json:"auths"`
+
+	Verification FragmentUserVerification `json:"verification"`
 }
 
 func (v *UserByNameOrEmailUserByNameOrEmailUser) MarshalJSON() ([]byte, error) {
@@ -3294,10 +3386,12 @@ func (v *UserByNameOrEmailUserByNameOrEmailUser) __premarshalJSON() (*__premarsh
 
 	retval.Id = v.FragmentUser.Id
 	retval.Name = v.FragmentUser.Name
+	retval.Alias = v.FragmentUser.Alias
 	retval.Email = v.FragmentUser.Email
 	retval.Metadata = v.FragmentUser.Metadata
 	retval.Workspace = v.FragmentUser.Workspace
 	retval.Auths = v.FragmentUser.Auths
+	retval.Verification = v.FragmentUser.Verification
 	return &retval, nil
 }
 
@@ -3337,6 +3431,9 @@ func (v *VerifyUserVerifyUserUserPayloadUser) GetId() string { return v.Fragment
 // GetName returns VerifyUserVerifyUserUserPayloadUser.Name, and is useful for accessing the field via an interface.
 func (v *VerifyUserVerifyUserUserPayloadUser) GetName() string { return v.FragmentUser.Name }
 
+// GetAlias returns VerifyUserVerifyUserUserPayloadUser.Alias, and is useful for accessing the field via an interface.
+func (v *VerifyUserVerifyUserUserPayloadUser) GetAlias() string { return v.FragmentUser.Alias }
+
 // GetEmail returns VerifyUserVerifyUserUserPayloadUser.Email, and is useful for accessing the field via an interface.
 func (v *VerifyUserVerifyUserUserPayloadUser) GetEmail() string { return v.FragmentUser.Email }
 
@@ -3350,6 +3447,11 @@ func (v *VerifyUserVerifyUserUserPayloadUser) GetWorkspace() string { return v.F
 
 // GetAuths returns VerifyUserVerifyUserUserPayloadUser.Auths, and is useful for accessing the field via an interface.
 func (v *VerifyUserVerifyUserUserPayloadUser) GetAuths() []string { return v.FragmentUser.Auths }
+
+// GetVerification returns VerifyUserVerifyUserUserPayloadUser.Verification, and is useful for accessing the field via an interface.
+func (v *VerifyUserVerifyUserUserPayloadUser) GetVerification() FragmentUserVerification {
+	return v.FragmentUser.Verification
+}
 
 func (v *VerifyUserVerifyUserUserPayloadUser) UnmarshalJSON(b []byte) error {
 
@@ -3381,6 +3483,8 @@ type __premarshalVerifyUserVerifyUserUserPayloadUser struct {
 
 	Name string `json:"name"`
 
+	Alias string `json:"alias"`
+
 	Email string `json:"email"`
 
 	Metadata FragmentUserMetadata `json:"metadata"`
@@ -3388,6 +3492,8 @@ type __premarshalVerifyUserVerifyUserUserPayloadUser struct {
 	Workspace string `json:"workspace"`
 
 	Auths []string `json:"auths"`
+
+	Verification FragmentUserVerification `json:"verification"`
 }
 
 func (v *VerifyUserVerifyUserUserPayloadUser) MarshalJSON() ([]byte, error) {
@@ -3403,10 +3509,12 @@ func (v *VerifyUserVerifyUserUserPayloadUser) __premarshalJSON() (*__premarshalV
 
 	retval.Id = v.FragmentUser.Id
 	retval.Name = v.FragmentUser.Name
+	retval.Alias = v.FragmentUser.Alias
 	retval.Email = v.FragmentUser.Email
 	retval.Metadata = v.FragmentUser.Metadata
 	retval.Workspace = v.FragmentUser.Workspace
 	retval.Auths = v.FragmentUser.Auths
+	retval.Verification = v.FragmentUser.Verification
 	return &retval, nil
 }
 
@@ -4469,6 +4577,7 @@ mutation FindOrCreate ($input: FindOrCreateInput!) {
 fragment FragmentUser on User {
 	id
 	name
+	alias
 	email
 	metadata {
 		description
@@ -4479,6 +4588,11 @@ fragment FragmentUser on User {
 	}
 	workspace
 	auths
+	verification {
+		code
+		expiration
+		verified
+	}
 }
 `
 
@@ -4845,6 +4959,7 @@ query SearchUser ($keyword: String!) {
 fragment FragmentUser on User {
 	id
 	name
+	alias
 	email
 	metadata {
 		description
@@ -4855,6 +4970,11 @@ fragment FragmentUser on User {
 	}
 	workspace
 	auths
+	verification {
+		code
+		expiration
+		verified
+	}
 }
 `
 
@@ -4895,6 +5015,7 @@ mutation Signup ($input: SignupInput!) {
 fragment FragmentUser on User {
 	id
 	name
+	alias
 	email
 	metadata {
 		description
@@ -4905,6 +5026,11 @@ fragment FragmentUser on User {
 	}
 	workspace
 	auths
+	verification {
+		code
+		expiration
+		verified
+	}
 }
 `
 
@@ -4945,6 +5071,7 @@ mutation SignupOIDC ($input: SignupOIDCInput!) {
 fragment FragmentUser on User {
 	id
 	name
+	alias
 	email
 	metadata {
 		description
@@ -4955,6 +5082,11 @@ fragment FragmentUser on User {
 	}
 	workspace
 	auths
+	verification {
+		code
+		expiration
+		verified
+	}
 }
 `
 
@@ -5285,6 +5417,7 @@ query UserByNameOrEmail ($nameOrEmail: String!) {
 fragment FragmentUser on User {
 	id
 	name
+	alias
 	email
 	metadata {
 		description
@@ -5295,6 +5428,11 @@ fragment FragmentUser on User {
 	}
 	workspace
 	auths
+	verification {
+		code
+		expiration
+		verified
+	}
 }
 `
 
@@ -5335,6 +5473,7 @@ mutation VerifyUser ($input: VerifyUserInput!) {
 fragment FragmentUser on User {
 	id
 	name
+	alias
 	email
 	metadata {
 		description
@@ -5345,6 +5484,11 @@ fragment FragmentUser on User {
 	}
 	workspace
 	auths
+	verification {
+		code
+		expiration
+		verified
+	}
 }
 `
 
