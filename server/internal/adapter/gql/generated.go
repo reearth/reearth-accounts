@@ -989,7 +989,6 @@ func (e *executableSchema) Complexity(ctx context.Context, typeName, field strin
 		}
 
 		return e.complexity.User.Name(childComplexity), true
-
 	case "User.workspace":
 		if e.complexity.User.Workspace == nil {
 			break
