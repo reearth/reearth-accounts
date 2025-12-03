@@ -11,6 +11,8 @@ import (
 	"github.com/reearth/reearth-accounts/server/internal/usecase/gateway"
 	"github.com/reearth/reearth-accounts/server/internal/usecase/interfaces"
 	"github.com/reearth/reearth-accounts/server/internal/usecase/repo"
+	"github.com/reearth/reearth-accounts/server/pkg/id"
+	"github.com/reearth/reearth-accounts/server/pkg/permittable"
 	"github.com/reearth/reearth-accounts/server/pkg/user"
 	"github.com/reearth/reearthx/rerror"
 )
@@ -19,6 +21,7 @@ type Cerbos struct {
 	cerbos          gateway.CerbosGateway
 	roleRepo        repo.Role
 	permittableRepo repo.Permittable
+	workspaceRepo   repo.Workspace
 }
 
 func NewCerbos(r *repo.Container, cerbos gateway.CerbosGateway) interfaces.Cerbos {
@@ -26,21 +29,56 @@ func NewCerbos(r *repo.Container, cerbos gateway.CerbosGateway) interfaces.Cerbo
 		cerbos:          cerbos,
 		roleRepo:        r.Role,
 		permittableRepo: r.Permittable,
+		workspaceRepo:   r.Workspace,
 	}
 }
 
 func (i *Cerbos) CheckPermission(ctx context.Context, userId user.ID, param interfaces.CheckPermissionParam) (*interfaces.CheckPermissionResult, error) {
-	permittable, err := i.permittableRepo.FindByUserID(ctx, userId)
+	var roleIDList id.RoleIDList
+	var resourceId string
+	p, err := i.permittableRepo.FindByUserID(ctx, userId)
 	if err != nil && !errors.Is(err, rerror.ErrNotFound) {
 		return nil, err
 	}
-	if permittable == nil {
+	if p == nil {
 		return &interfaces.CheckPermissionResult{
 			Allowed: false,
 		}, nil
 	}
 
-	roleDomains, err := i.roleRepo.FindByIDs(ctx, permittable.RoleIDs())
+	roleSelf, err := i.roleRepo.FindByName(ctx, interfaces.RoleSelf)
+	if err != nil {
+		return nil, err
+	}
+
+	switch param.Resource {
+	case interfaces.ResourceWorkspace:
+		if param.WorkspaceAlias == "" {
+			return &interfaces.CheckPermissionResult{
+				Allowed: false,
+			}, nil
+		}
+
+		roleIDList, err = i.checkWorkspacePermission(ctx, p, param.WorkspaceAlias)
+		if err != nil {
+			return nil, err
+		}
+		if len(roleIDList) == 0 {
+			return &interfaces.CheckPermissionResult{
+				Allowed: false,
+			}, nil
+		}
+
+		// Added role self
+		roleIDList = append(roleIDList, roleSelf.ID())
+
+		resourceId = fmt.Sprintf("%s:%s:%s:%s:%s", param.WorkspaceAlias, userId.String(), param.Service, param.Resource, param.Action)
+	default:
+		roleIDList = p.RoleIDs()
+		resourceId = fmt.Sprintf("%s:%s:%s:%s", userId.String(), param.Service, param.Resource, param.Action)
+	}
+
+	roleDomains, err := i.roleRepo.FindByIDs(ctx, roleIDList)
 	if err != nil {
 		return nil, err
 	}
@@ -53,7 +91,6 @@ func (i *Cerbos) CheckPermission(ctx context.Context, userId user.ID, param inte
 	principal := cerbos.NewPrincipal(userId.String(), roleNames...)
 
 	resourceKind := fmt.Sprintf("%s:%s", param.Service, param.Resource)
-	resourceId := fmt.Sprintf("%s:%s:%s:%s", userId.String(), param.Service, param.Resource, param.Action)
 	resource := cerbos.NewResource(resourceKind, resourceId)
 	resources := []*cerbos.Resource{resource}
 
@@ -84,4 +121,25 @@ func (i *Cerbos) CheckPermission(ctx context.Context, userId user.ID, param inte
 	return &interfaces.CheckPermissionResult{
 		Allowed: allowed,
 	}, nil
+}
+
+func (i *Cerbos) checkWorkspacePermission(ctx context.Context, permittable *permittable.Permittable, workspaceAlias string) (id.RoleIDList, error) {
+	ws, err := i.workspaceRepo.FindByAlias(ctx, workspaceAlias)
+	if err != nil && !errors.Is(err, rerror.ErrNotFound) {
+		return nil, err
+	}
+	if ws == nil {
+		return nil, nil
+	}
+
+	var workspaceRoleIds id.RoleIDList
+	for _, workspaceRole := range permittable.WorkspaceRoles() {
+		if workspaceRole.ID() != ws.ID() {
+			continue
+		}
+
+		workspaceRoleIds = append(workspaceRoleIds, workspaceRole.RoleID())
+	}
+
+	return workspaceRoleIds, nil
 }

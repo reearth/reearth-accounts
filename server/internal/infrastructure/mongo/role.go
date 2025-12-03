@@ -44,6 +44,12 @@ func (r *Role) FindByIDs(ctx context.Context, ids id.RoleIDList) (role.List, err
 	return r.find(ctx, filter)
 }
 
+func (r *Role) FindByName(ctx context.Context, name string) (*role.Role, error) {
+	return r.findOne(ctx, bson.M{
+		"name": name,
+	})
+}
+
 func (r *Role) Save(ctx context.Context, role role.Role) error {
 	doc, gId := mongodoc.NewRole(role)
 	return r.client.SaveOne(ctx, gId, doc)

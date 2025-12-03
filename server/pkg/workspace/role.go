@@ -32,6 +32,10 @@ func (r Role) Valid() bool {
 	return slices.Contains(roles, r)
 }
 
+func (r Role) String() string {
+	return string(r)
+}
+
 func RoleFrom(r string) (Role, error) {
 	role := Role(strings.ToLower(r))
 	if role.Valid() {

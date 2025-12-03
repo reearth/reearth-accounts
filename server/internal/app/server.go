@@ -91,9 +91,7 @@ func Start(debug bool) {
 
 	// Cerbos
 	var opts []cerbos.Opt
-	if os.Getenv("REEARTH_ACCOUNTS_DEV") == "true" {
-		opts = append(opts, cerbos.WithPlaintext(), cerbos.WithTLSInsecure())
-	}
+	opts = append(opts, cerbos.WithPlaintext(), cerbos.WithTLSInsecure())
 
 	cerbosClient, err := cerbos.New(conf.CerbosHost, opts...)
 	if err != nil {

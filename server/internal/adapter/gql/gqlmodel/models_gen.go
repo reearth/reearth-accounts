@@ -42,9 +42,10 @@ type AddUsersToWorkspacePayload struct {
 }
 
 type CheckPermissionInput struct {
-	Service  string `json:"service"`
-	Resource string `json:"resource"`
-	Action   string `json:"action"`
+	Service        string  `json:"service"`
+	Resource       string  `json:"resource"`
+	Action         string  `json:"action"`
+	WorkspaceAlias *string `json:"workspaceAlias,omitempty"`
 }
 
 type CheckPermissionPayload struct {

@@ -8,6 +8,8 @@ import (
 	"github.com/reearth/reearthx/usecasex"
 )
 
+//go:generate mockgen -source=./workspace.go -destination=./mock_repo/mock_workspace.go -package mock_repo
+
 type Workspace interface {
 	Filtered(WorkspaceFilter) Workspace
 	FindByID(context.Context, workspace.ID) (*workspace.Workspace, error)
