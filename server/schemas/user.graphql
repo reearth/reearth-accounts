@@ -1,13 +1,11 @@
 type User implements Node {
   id: ID!
   name: String!
-  alias: String!
   email: String!
   host: String
   workspace: ID!
   auths: [String!]!
   metadata: UserMetadata!
-  verification: Verification
 }
 
 type Me {
@@ -28,12 +26,6 @@ type UserMetadata {
   photoURL: String!
   lang: Lang!
   theme: Theme!
-}
-
-type Verification {
-  code: String!
-  expiration: String!
-  verified: Boolean!
 }
 
 input SignupInput {
