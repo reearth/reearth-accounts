@@ -16,3 +16,15 @@ func NewMemoryWorkspace() repo.Workspace {
 	internal := memory.NewWorkspace()
 	return NewWorkspaceAdapter(internal)
 }
+
+// NewMemoryRole creates a new in-memory Role repository
+func NewMemoryRole() repo.Role {
+	// Role interface is the same in internal and pkg, no adapter needed
+	return memory.NewRole()
+}
+
+// NewMemoryPermittable creates a new in-memory Permittable repository
+func NewMemoryPermittable() repo.Permittable {
+	// Permittable interface is the same in internal and pkg, no adapter needed
+	return memory.NewPermittable()
+}
