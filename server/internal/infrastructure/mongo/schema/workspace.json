@@ -1,0 +1,113 @@
+{
+  "$jsonSchema": {
+    "bsonType": "object",
+    "title": "Workspace Collection Schema",
+    "description": "Schema for workspace documents in the reearth-accounts database",
+    "required": ["id", "name", "alias", "metadata", "email", "members", "personal"],
+    "properties": {
+      "_id": {
+        "bsonType": "objectId",
+        "description": "MongoDB internal ID"
+      },
+      "id": {
+        "bsonType": "string",
+        "description": "Workspace ID (ULID format)"
+      },
+      "name": {
+        "bsonType": "string",
+        "description": "Workspace name"
+      },
+      "alias": {
+        "bsonType": "string",
+        "description": "Unique workspace handle/alias"
+      },
+      "email": {
+        "bsonType": "string",
+        "description": "Workspace contact email"
+      },
+      "metadata": {
+        "bsonType": "object",
+        "description": "Extended workspace metadata",
+        "properties": {
+          "description": {
+            "bsonType": "string",
+            "description": "Workspace description. Default: \"\""
+          },
+          "website": {
+            "bsonType": "string",
+            "description": "Workspace website URL. Default: \"\""
+          },
+          "location": {
+            "bsonType": "string",
+            "description": "Workspace location. Default: \"\""
+          },
+          "billingemail": {
+            "bsonType": "string",
+            "description": "Billing email address. Default: \"\""
+          },
+          "photourl": {
+            "bsonType": "string",
+            "description": "Workspace photo URL. Default: \"\""
+          }
+        }
+      },
+      "members": {
+        "bsonType": "object",
+        "description": "Map of user ID to member document",
+        "additionalProperties": {
+          "bsonType": "object",
+          "description": "Workspace member information",
+          "properties": {
+            "role": {
+              "bsonType": "string",
+              "description": "Member role (owner, maintainer, writer, reader). Default: \"\""
+            },
+            "invitedby": {
+              "bsonType": "string",
+              "description": "User ID of the inviter"
+            },
+            "disabled": {
+              "bsonType": "bool",
+              "description": "Whether the member is disabled"
+            }
+          }
+        }
+      },
+      "integrations": {
+        "bsonType": "object",
+        "description": "Map of integration ID to member document. Default: {}",
+        "additionalProperties": {
+          "bsonType": "object",
+          "description": "Integration member information",
+          "properties": {
+            "role": {
+              "bsonType": "string",
+              "description": "Integration role. Default: \"\""
+            },
+            "invitedby": {
+              "bsonType": "string",
+              "description": "User ID of the inviter. Default: \"\""
+            },
+            "disabled": {
+              "bsonType": "bool",
+              "description": "Whether the integration is disabled. Default: false"
+            }
+          }
+        }
+      },
+      "members_hash": {
+        "bsonType": "string",
+        "description": "SHA256 hash of members and integrations for uniqueness tracking. Default: \"\""
+      },
+      "personal": {
+        "bsonType": "bool",
+        "description": "Whether this is a personal workspace. Default: false"
+      },
+      "policy": {
+        "bsonType": "string",
+        "description": "Policy ID reference. Default: \"\""
+      }
+    },
+    "additionalProperties": false
+  }
+}

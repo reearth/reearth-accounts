@@ -6,8 +6,8 @@ import (
 )
 
 type RoleDocument struct {
-	ID   string
-	Name string
+	ID   string `json:"id" jsonschema:"description=Role ID (ULID format)"`
+	Name string `json:"name" jsonschema:"description=Role name"`
 }
 
 type RoleConsumer = Consumer[*RoleDocument, *role.Role]
