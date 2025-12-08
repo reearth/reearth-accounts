@@ -7,7 +7,6 @@ import (
 	"github.com/reearth/reearth-accounts/server/pkg/gqlclient"
 	"github.com/reearth/reearth-accounts/server/pkg/gqlclient/user"
 	"github.com/reearth/reearth-accounts/server/pkg/gqlclient/workspace"
-	"github.com/reearth/reearth-accounts/server/pkg/id"
 	"github.com/reearth/reearth-accounts/server/pkg/repo"
 	accountsUser "github.com/reearth/reearth-accounts/server/pkg/user"
 	accountsWorkspace "github.com/reearth/reearth-accounts/server/pkg/workspace"
@@ -34,7 +33,7 @@ func (a *WorkspaceRepoAdapter) Filtered(f repo.WorkspaceFilter) repo.Workspace {
 	}
 }
 
-func (a *WorkspaceRepoAdapter) FindByID(ctx context.Context, wsid id.WorkspaceID) (*accountsWorkspace.Workspace, error) {
+func (a *WorkspaceRepoAdapter) FindByID(ctx context.Context, wsid accountsWorkspace.ID) (*accountsWorkspace.Workspace, error) {
 	return nil, rerror.ErrNotImplemented
 }
 
@@ -46,18 +45,18 @@ func (a *WorkspaceRepoAdapter) FindByAlias(ctx context.Context, alias string) (*
 	return nil, rerror.ErrNotImplemented
 }
 
-func (a *WorkspaceRepoAdapter) FindByIDs(ctx context.Context, ids id.WorkspaceIDList) ([]*accountsWorkspace.Workspace, error) {
+func (a *WorkspaceRepoAdapter) FindByIDs(ctx context.Context, ids accountsWorkspace.IDList) (accountsWorkspace.List, error) {
 	return nil, rerror.ErrNotImplemented
 }
 
-func (a *WorkspaceRepoAdapter) FindByUser(ctx context.Context, uid id.UserID) ([]*accountsWorkspace.Workspace, error) {
+func (a *WorkspaceRepoAdapter) FindByUser(ctx context.Context, uid accountsUser.ID) (accountsWorkspace.List, error) {
 	workspaces, err := a.inner.FindByUser(ctx, uid.String())
 	if err != nil {
 		return nil, err
 	}
 	// Filter based on permissions
 	if a.filter.Readable != nil {
-		filtered := make([]*accountsWorkspace.Workspace, 0, len(workspaces))
+		filtered := make(accountsWorkspace.List, 0, len(workspaces))
 		for _, ws := range workspaces {
 			if a.filter.CanRead(ws.ID()) {
 				filtered = append(filtered, ws)
@@ -65,23 +64,19 @@ func (a *WorkspaceRepoAdapter) FindByUser(ctx context.Context, uid id.UserID) ([
 		}
 		return filtered, nil
 	}
-	return workspaces, nil
+	return accountsWorkspace.List(workspaces), nil
 }
 
-func (a *WorkspaceRepoAdapter) FindByUserWithPagination(ctx context.Context, uid id.UserID, pagination *usecasex.Pagination) ([]*accountsWorkspace.Workspace, *usecasex.PageInfo, error) {
+func (a *WorkspaceRepoAdapter) FindByUserWithPagination(ctx context.Context, uid accountsUser.ID, pagination *usecasex.Pagination) (accountsWorkspace.List, *usecasex.PageInfo, error) {
 	return nil, nil, rerror.ErrNotImplemented
 }
 
-func (a *WorkspaceRepoAdapter) FindByIntegration(ctx context.Context, iid id.IntegrationID) ([]*accountsWorkspace.Workspace, error) {
+func (a *WorkspaceRepoAdapter) FindByIntegration(ctx context.Context, iid accountsWorkspace.IntegrationID) (accountsWorkspace.List, error) {
 	return nil, rerror.ErrNotImplemented
 }
 
-func (a *WorkspaceRepoAdapter) FindByIntegrations(ctx context.Context, iids id.IntegrationIDList) ([]*accountsWorkspace.Workspace, error) {
+func (a *WorkspaceRepoAdapter) FindByIntegrations(ctx context.Context, iids accountsWorkspace.IntegrationIDList) (accountsWorkspace.List, error) {
 	return nil, rerror.ErrNotImplemented
-}
-
-func (a *WorkspaceRepoAdapter) CheckWorkspaceAliasUnique(ctx context.Context, wsid id.WorkspaceID, alias string) error {
-	return rerror.ErrNotImplemented
 }
 
 func (a *WorkspaceRepoAdapter) Create(ctx context.Context, ws *accountsWorkspace.Workspace) error {
@@ -92,15 +87,15 @@ func (a *WorkspaceRepoAdapter) Save(ctx context.Context, ws *accountsWorkspace.W
 	return rerror.ErrNotImplemented
 }
 
-func (a *WorkspaceRepoAdapter) SaveAll(ctx context.Context, wsList []*accountsWorkspace.Workspace) error {
+func (a *WorkspaceRepoAdapter) SaveAll(ctx context.Context, wsList accountsWorkspace.List) error {
 	return rerror.ErrNotImplemented
 }
 
-func (a *WorkspaceRepoAdapter) Remove(ctx context.Context, wsid id.WorkspaceID) error {
+func (a *WorkspaceRepoAdapter) Remove(ctx context.Context, wsid accountsWorkspace.ID) error {
 	return rerror.ErrNotImplemented
 }
 
-func (a *WorkspaceRepoAdapter) RemoveAll(ctx context.Context, ids id.WorkspaceIDList) error {
+func (a *WorkspaceRepoAdapter) RemoveAll(ctx context.Context, ids accountsWorkspace.IDList) error {
 	return rerror.ErrNotImplemented
 }
 
@@ -115,20 +110,16 @@ func NewUserRepo(gqlClient *gqlclient.Client) repo.User {
 	}
 }
 
-func (a *UserRepoAdapter) FindAll(ctx context.Context) ([]*accountsUser.User, error) {
+func (a *UserRepoAdapter) FindAll(ctx context.Context) (accountsUser.List, error) {
 	return nil, rerror.ErrNotImplemented
 }
 
-func (a *UserRepoAdapter) FindByID(ctx context.Context, uid id.UserID) (*accountsUser.User, error) {
+func (a *UserRepoAdapter) FindByID(ctx context.Context, uid accountsUser.ID) (*accountsUser.User, error) {
 	return a.inner.FindByID(ctx, uid.String())
 }
 
-func (a *UserRepoAdapter) FindByIDs(ctx context.Context, ids id.UserIDList) ([]*accountsUser.User, error) {
+func (a *UserRepoAdapter) FindByIDs(ctx context.Context, ids accountsUser.IDList) (accountsUser.List, error) {
 	return nil, rerror.ErrNotImplemented
-}
-
-func (a *UserRepoAdapter) FindByIDsWithPagination(ctx context.Context, ids id.UserIDList, p *usecasex.Pagination, orders ...string) ([]*accountsUser.User, *usecasex.PageInfo, error) {
-	return nil, nil, rerror.ErrNotImplemented
 }
 
 func (a *UserRepoAdapter) FindBySub(ctx context.Context, sub string) (*accountsUser.User, error) {
@@ -151,7 +142,7 @@ func (a *UserRepoAdapter) FindByNameOrEmail(ctx context.Context, nameOrEmail str
 	return nil, rerror.ErrNotImplemented
 }
 
-func (a *UserRepoAdapter) SearchByKeyword(ctx context.Context, keyword string, orders ...string) ([]*accountsUser.User, error) {
+func (a *UserRepoAdapter) SearchByKeyword(ctx context.Context, keyword string) (accountsUser.List, error) {
 	return nil, rerror.ErrNotImplemented
 }
 
@@ -175,7 +166,7 @@ func (a *UserRepoAdapter) Save(ctx context.Context, u *accountsUser.User) error 
 	return fmt.Errorf("save user: %w", rerror.ErrNotImplemented)
 }
 
-func (a *UserRepoAdapter) Remove(ctx context.Context, uid id.UserID) error {
+func (a *UserRepoAdapter) Remove(ctx context.Context, uid accountsUser.ID) error {
 	return rerror.ErrNotImplemented
 }
 

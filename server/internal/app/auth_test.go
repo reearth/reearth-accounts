@@ -5,6 +5,7 @@ import (
 	"errors"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 
 	"github.com/reearth/reearth-accounts/server/internal/adapter"
@@ -21,6 +22,9 @@ import (
 func TestAuthMiddleware(t *testing.T) {
 	t.Run("should return 401 when no AuthInfo and not in debug mode", func(t *testing.T) {
 		cfg := &ServerConfig{
+			Config: &Config{
+				Mock_Auth: false,
+			},
 			Debug: false,
 			Repos: memory.New(),
 		}
@@ -46,6 +50,9 @@ func TestAuthMiddleware(t *testing.T) {
 		ctx := context.WithValue(context.Background(), adapter.AuthInfoKey, ai)
 
 		cfg := &ServerConfig{
+			Config: &Config{
+				Mock_Auth: false,
+			},
 			Debug: false,
 			Repos: memory.New(),
 		}
@@ -72,6 +79,9 @@ func TestAuthMiddleware(t *testing.T) {
 
 		repos := memory.New()
 		cfg := &ServerConfig{
+			Config: &Config{
+				Mock_Auth: false,
+			},
 			Debug: false,
 			Repos: repos,
 		}
@@ -99,6 +109,9 @@ func TestAuthMiddleware(t *testing.T) {
 		repos := memory.New()
 		repos.User = &mockUserRepoWithError{err: errors.New("database error")}
 		cfg := &ServerConfig{
+			Config: &Config{
+				Mock_Auth: false,
+			},
 			Debug: false,
 			Repos: repos,
 		}
@@ -148,6 +161,9 @@ func TestAuthMiddleware(t *testing.T) {
 		ctx := context.WithValue(context.Background(), adapter.AuthInfoKey, ai)
 
 		cfg := &ServerConfig{
+			Config: &Config{
+				Mock_Auth: false,
+			},
 			Debug: false,
 			Repos: repos,
 		}
@@ -179,6 +195,9 @@ func TestAuthMiddleware(t *testing.T) {
 
 	t.Run("should allow request in debug mode without AuthInfo", func(t *testing.T) {
 		cfg := &ServerConfig{
+			Config: &Config{
+				Mock_Auth: false,
+			},
 			Debug: true,
 			Repos: memory.New(),
 		}
@@ -204,6 +223,9 @@ func TestAuthMiddleware(t *testing.T) {
 		ctx := context.WithValue(context.Background(), adapter.AuthInfoKey, ai)
 
 		cfg := &ServerConfig{
+			Config: &Config{
+				Mock_Auth: false,
+			},
 			Debug: true,
 			Repos: memory.New(),
 		}
@@ -258,6 +280,9 @@ func TestAuthMiddleware(t *testing.T) {
 		repos.Workspace = memory.NewWorkspaceWith(w)
 
 		cfg := &ServerConfig{
+			Config: &Config{
+				Mock_Auth: false,
+			},
 			Debug: true,
 			Repos: repos,
 		}
@@ -314,6 +339,9 @@ func TestAuthMiddleware(t *testing.T) {
 		ctx := context.WithValue(context.Background(), adapter.AuthInfoKey, ai)
 
 		cfg := &ServerConfig{
+			Config: &Config{
+				Mock_Auth: false,
+			},
 			Debug: false,
 			Repos: repos,
 		}
@@ -325,6 +353,142 @@ func TestAuthMiddleware(t *testing.T) {
 
 		req := httptest.NewRequest(http.MethodGet, "/", nil)
 		req = req.WithContext(ctx)
+		rr := httptest.NewRecorder()
+
+		middleware(nextHandler).ServeHTTP(rr, req)
+
+		assert.Equal(t, http.StatusInternalServerError, rr.Code)
+	})
+}
+
+func TestMockAuthMiddleware(t *testing.T) {
+	t.Run("should skip auth for signup mutation", func(t *testing.T) {
+		cfg := &ServerConfig{
+			Config: &Config{
+				Mock_Auth: true,
+			},
+			Debug: false,
+			Repos: memory.New(),
+		}
+		middleware := authMiddleware(cfg)
+
+		nextHandler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			w.WriteHeader(http.StatusOK)
+		})
+
+		body := `{"query":"mutation { signup(input: {}) { id } }","operationName":"signup"}`
+		req := httptest.NewRequest(http.MethodPost, "/graphql", strings.NewReader(body))
+		req.Header.Set("Content-Type", "application/json")
+		rr := httptest.NewRecorder()
+
+		middleware(nextHandler).ServeHTTP(rr, req)
+
+		assert.Equal(t, http.StatusOK, rr.Code)
+	})
+
+	t.Run("should return 500 when demo user not found", func(t *testing.T) {
+		cfg := &ServerConfig{
+			Config: &Config{
+				Mock_Auth: true,
+			},
+			Debug: false,
+			Repos: memory.New(),
+		}
+		middleware := authMiddleware(cfg)
+
+		nextHandler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			w.WriteHeader(http.StatusOK)
+		})
+
+		req := httptest.NewRequest(http.MethodGet, "/", nil)
+		rr := httptest.NewRecorder()
+
+		middleware(nextHandler).ServeHTTP(rr, req)
+
+		assert.Equal(t, http.StatusInternalServerError, rr.Code)
+	})
+
+	t.Run("should successfully authenticate with demo user", func(t *testing.T) {
+		uid := user.NewID()
+		demoUser := user.New().
+			ID(uid).
+			Name("Demo User").
+			Email("demo@example.com").
+			MustBuild()
+
+		wid := workspace.NewID()
+		w := workspace.New().
+			ID(wid).
+			Name("demo-workspace").
+			Members(map[id.UserID]workspace.Member{
+				uid: {
+					Role:      workspace.RoleOwner,
+					InvitedBy: uid,
+				},
+			}).
+			MustBuild()
+
+		repos := memory.New()
+		repos.User = memory.NewUserWith(demoUser)
+		repos.Workspace = memory.NewWorkspaceWith(w)
+
+		cfg := &ServerConfig{
+			Config: &Config{
+				Mock_Auth: true,
+			},
+			Debug: false,
+			Repos: repos,
+		}
+		middleware := authMiddleware(cfg)
+
+		var capturedCtx context.Context
+		nextHandler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			capturedCtx = r.Context()
+			w.WriteHeader(http.StatusOK)
+		})
+
+		req := httptest.NewRequest(http.MethodGet, "/", nil)
+		rr := httptest.NewRecorder()
+
+		middleware(nextHandler).ServeHTTP(rr, req)
+
+		assert.Equal(t, http.StatusOK, rr.Code)
+
+		usr := adapter.User(capturedCtx)
+		assert.NotNil(t, usr)
+		assert.Equal(t, "Demo User", usr.Name())
+
+		op := adapter.Operator(capturedCtx)
+		assert.NotNil(t, op)
+		assert.NotNil(t, op.User)
+	})
+
+	t.Run("should return 500 when generateUserOperator fails", func(t *testing.T) {
+		uid := user.NewID()
+		demoUser := user.New().
+			ID(uid).
+			Name("Demo User").
+			Email("demo@example.com").
+			MustBuild()
+
+		repos := memory.New()
+		repos.User = memory.NewUserWith(demoUser)
+		repos.Workspace = &mockWorkspaceRepoWithError{err: errors.New("workspace error")}
+
+		cfg := &ServerConfig{
+			Config: &Config{
+				Mock_Auth: true,
+			},
+			Debug: false,
+			Repos: repos,
+		}
+		middleware := authMiddleware(cfg)
+
+		nextHandler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			w.WriteHeader(http.StatusOK)
+		})
+
+		req := httptest.NewRequest(http.MethodGet, "/", nil)
 		rr := httptest.NewRecorder()
 
 		middleware(nextHandler).ServeHTTP(rr, req)
@@ -358,6 +522,9 @@ func TestAuthMiddleware_DebugUserHeader(t *testing.T) {
 	repos.Workspace = memory.NewWorkspaceWith(w)
 
 	cfg := &ServerConfig{
+		Config: &Config{
+			Mock_Auth: false,
+		},
 		Debug: true,
 		Repos: repos,
 	}
@@ -384,7 +551,10 @@ func TestAuthMiddleware_DebugUserHeader(t *testing.T) {
 
 func TestGenerateUserOperator(t *testing.T) {
 	t.Run("should return nil when user is nil", func(t *testing.T) {
-		cfg := &ServerConfig{Repos: memory.New()}
+		cfg := &ServerConfig{
+			Config: &Config{},
+			Repos:  memory.New(),
+		}
 		op, err := generateUserOperator(context.Background(), cfg, nil)
 
 		assert.NoError(t, err)
@@ -427,7 +597,10 @@ func TestGenerateUserOperator(t *testing.T) {
 		repos.User = memory.NewUserWith(u)
 		repos.Workspace = memory.NewWorkspaceWith(w1, w2)
 
-		cfg := &ServerConfig{Repos: repos}
+		cfg := &ServerConfig{
+			Config: &Config{},
+			Repos:  repos,
+		}
 		op, err := generateUserOperator(context.Background(), cfg, u)
 
 		assert.NoError(t, err)
@@ -449,7 +622,10 @@ func TestGenerateUserOperator(t *testing.T) {
 		repos.User = memory.NewUserWith(u)
 		repos.Workspace = &mockWorkspaceRepoWithError{err: errors.New("workspace error")}
 
-		cfg := &ServerConfig{Repos: repos}
+		cfg := &ServerConfig{
+			Config: &Config{},
+			Repos:  repos,
+		}
 		op, err := generateUserOperator(context.Background(), cfg, u)
 
 		assert.Error(t, err)
@@ -460,7 +636,10 @@ func TestGenerateUserOperator(t *testing.T) {
 func TestIsDebugUserExists(t *testing.T) {
 	t.Run("should return nil when no debug header", func(t *testing.T) {
 		req := httptest.NewRequest(http.MethodGet, "/", nil)
-		cfg := &ServerConfig{Repos: memory.New()}
+		cfg := &ServerConfig{
+			Config: &Config{},
+			Repos:  memory.New(),
+		}
 		u := isDebugUserExists(req, cfg, context.Background())
 
 		assert.Nil(t, u)
@@ -469,7 +648,10 @@ func TestIsDebugUserExists(t *testing.T) {
 	t.Run("should return nil when user ID is invalid", func(t *testing.T) {
 		req := httptest.NewRequest(http.MethodGet, "/", nil)
 		req.Header.Set(debugUserHeader, "invalid-id")
-		cfg := &ServerConfig{Repos: memory.New()}
+		cfg := &ServerConfig{
+			Config: &Config{},
+			Repos:  memory.New(),
+		}
 		u := isDebugUserExists(req, cfg, context.Background())
 
 		assert.Nil(t, u)
@@ -479,7 +661,10 @@ func TestIsDebugUserExists(t *testing.T) {
 		uid := user.NewID()
 		req := httptest.NewRequest(http.MethodGet, "/", nil)
 		req.Header.Set(debugUserHeader, uid.String())
-		cfg := &ServerConfig{Repos: memory.New()}
+		cfg := &ServerConfig{
+			Config: &Config{},
+			Repos:  memory.New(),
+		}
 		u := isDebugUserExists(req, cfg, context.Background())
 
 		assert.Nil(t, u)
@@ -498,7 +683,10 @@ func TestIsDebugUserExists(t *testing.T) {
 
 		req := httptest.NewRequest(http.MethodGet, "/", nil)
 		req.Header.Set(debugUserHeader, uid.String())
-		cfg := &ServerConfig{Repos: repos}
+		cfg := &ServerConfig{
+			Config: &Config{},
+			Repos:  repos,
+		}
 		foundUser := isDebugUserExists(req, cfg, context.Background())
 
 		assert.NotNil(t, foundUser)
