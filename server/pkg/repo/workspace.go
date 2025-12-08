@@ -25,30 +25,3 @@ type Workspace interface {
 	Remove(context.Context, id.WorkspaceID) error
 	RemoveAll(context.Context, id.WorkspaceIDList) error
 }
-
-type WorkspaceFilter struct {
-	Readable id.WorkspaceIDList
-	Writable id.WorkspaceIDList
-}
-
-func (f WorkspaceFilter) Merge(g WorkspaceFilter) WorkspaceFilter {
-	return WorkspaceFilter{
-		Readable: f.Readable.Intersect(g.Readable),
-		Writable: f.Writable.Intersect(g.Writable),
-	}
-}
-
-func (f WorkspaceFilter) Clone() WorkspaceFilter {
-	return WorkspaceFilter{
-		Readable: f.Readable.Clone(),
-		Writable: f.Writable.Clone(),
-	}
-}
-
-func (f WorkspaceFilter) CanRead(ws id.WorkspaceID) bool {
-	return f.Readable == nil || f.Readable.Has(ws)
-}
-
-func (f WorkspaceFilter) CanWrite(ws id.WorkspaceID) bool {
-	return f.Writable == nil || f.Writable.Has(ws)
-}
