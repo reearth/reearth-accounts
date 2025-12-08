@@ -225,7 +225,6 @@ func (r *Workspace) RemoveAll(ctx context.Context, ids id.WorkspaceIDList) error
 
 func (r *Workspace) find(ctx context.Context, filter any) ([]*workspace.Workspace, error) {
 	c := mongodoc.NewWorkspaceConsumer()
-	filter = r.f.Filter(filter)
 	if err := r.client.Find(ctx, filter, c); err != nil {
 		return nil, err
 	}
@@ -234,7 +233,6 @@ func (r *Workspace) find(ctx context.Context, filter any) ([]*workspace.Workspac
 
 func (r *Workspace) findOne(ctx context.Context, filter any) (*workspace.Workspace, error) {
 	c := mongodoc.NewWorkspaceConsumer()
-	filter = r.f.Filter(filter)
 	if err := r.client.FindOne(ctx, filter, c); err != nil {
 		return nil, err
 	}
