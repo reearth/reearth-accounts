@@ -2,6 +2,7 @@ package mongo
 
 import (
 	"context"
+	"errors"
 	"strings"
 
 	"github.com/reearth/reearth-accounts/server/internal/infrastructure/mongo/mongodoc"
@@ -154,7 +155,7 @@ func (r *Workspace) CheckWorkspaceAliasUnique(ctx context.Context, id id.Workspa
 
 	w, err := r.findOne(ctx, filter)
 	if err != nil {
-		if rerror.IsNotFound(err) {
+		if errors.Is(err, rerror.ErrNotFound) {
 			return nil // No conflict, alias is unique
 		}
 		return err

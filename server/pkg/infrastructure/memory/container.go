@@ -14,3 +14,23 @@ func New() *repo.Container {
 		Transaction: &usecasex.NopTransaction{},
 	}
 }
+
+// NewMemoryUser returns a new in-memory User repository
+func NewMemoryUser() repo.User {
+	return NewUser()
+}
+
+// NewMemoryWorkspace returns a new in-memory Workspace repository
+func NewMemoryWorkspace() repo.Workspace {
+	return NewWorkspace()
+}
+
+// NewMemoryRole returns a new in-memory Role repository
+func NewMemoryRole() repo.Role {
+	return NewRole()
+}
+
+// NewMemoryPermittable returns a new in-memory Permittable repository
+func NewMemoryPermittable() repo.Permittable {
+	return NewPermittable()
+}
