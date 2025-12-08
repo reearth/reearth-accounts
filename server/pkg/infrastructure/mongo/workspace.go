@@ -141,6 +141,32 @@ func (r *Workspace) FindByAlias(ctx context.Context, alias string) (*workspace.W
 	return w, nil
 }
 
+func (r *Workspace) CheckWorkspaceAliasUnique(ctx context.Context, id id.WorkspaceID, alias string) error {
+	if alias == "" {
+		return nil
+	}
+
+	// Check if any other workspace (excluding the current one) has this alias
+	filter := bson.M{
+		"alias": alias,
+		"id":    bson.M{"$ne": id.String()},
+	}
+
+	w, err := r.findOne(ctx, filter)
+	if err != nil {
+		if rerror.IsNotFound(err) {
+			return nil // No conflict, alias is unique
+		}
+		return err
+	}
+
+	if w != nil {
+		return rerror.ErrAlreadyExists
+	}
+
+	return nil
+}
+
 func (r *Workspace) Create(ctx context.Context, workspace *workspace.Workspace) error {
 	doc, id := mongodoc.NewWorkspace(workspace)
 	return r.client.CreateOne(ctx, id, doc)

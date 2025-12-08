@@ -7,6 +7,7 @@ import (
 	"github.com/reearth/reearth-accounts/server/pkg/repo"
 	"github.com/reearth/reearth-accounts/server/pkg/user"
 	"github.com/reearth/reearthx/rerror"
+	"github.com/reearth/reearthx/usecasex"
 	"github.com/reearth/reearthx/util"
 )
 
@@ -29,7 +30,7 @@ func NewUserWith(users ...*user.User) *User {
 	return r
 }
 
-func (r *User) FindAll(ctx context.Context) (user.List, error) {
+func (r *User) FindAll(ctx context.Context) ([]*user.User, error) {
 	if r.err != nil {
 		return nil, r.err
 	}
@@ -41,7 +42,7 @@ func (r *User) FindAll(ctx context.Context) (user.List, error) {
 	return res, nil
 }
 
-func (r *User) FindByIDs(_ context.Context, ids user.IDList) (user.List, error) {
+func (r *User) FindByIDs(_ context.Context, ids user.IDList) ([]*user.User, error) {
 	if r.err != nil {
 		return nil, r.err
 	}
@@ -51,6 +52,30 @@ func (r *User) FindByIDs(_ context.Context, ids user.IDList) (user.List, error) 
 	})
 
 	return res, nil
+}
+
+func (r *User) FindByIDsWithPagination(_ context.Context, ids user.IDList, pagination *usecasex.Pagination, _ ...string) ([]*user.User, *usecasex.PageInfo, error) {
+	if r.err != nil {
+		return nil, nil, r.err
+	}
+
+	res := r.data.FindAll(func(key user.ID, value *user.User) bool {
+		return ids.Has(key)
+	})
+
+	if len(res) == 0 {
+		return nil, nil, rerror.ErrNotFound
+	}
+
+	startCursor, endCursor := usecasex.Cursor(res[0].ID().String()), usecasex.Cursor(res[len(res)-1].ID().String())
+
+	return res, usecasex.NewPageInfo(
+		int64(len(res)),
+		&startCursor,
+		&endCursor,
+		true,
+		true,
+	), nil
 }
 
 func (r *User) FindByID(_ context.Context, v user.ID) (*user.User, error) {
@@ -147,7 +172,7 @@ func (r *User) FindByAlias(_ context.Context, alias string) (*user.User, error) 
 	}), rerror.ErrNotFound)
 }
 
-func (r *User) SearchByKeyword(_ context.Context, keyword string) (user.List, error) {
+func (r *User) SearchByKeyword(_ context.Context, keyword string, _ ...string) ([]*user.User, error) {
 	if r.err != nil {
 		return nil, r.err
 	}

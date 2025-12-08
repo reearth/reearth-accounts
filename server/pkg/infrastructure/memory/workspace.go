@@ -39,7 +39,7 @@ func (r *Workspace) Filtered(f repo.WorkspaceFilter) repo.Workspace {
 	}
 }
 
-func (r *Workspace) FindByUser(_ context.Context, i id.UserID) (workspace.List, error) {
+func (r *Workspace) FindByUser(_ context.Context, i id.UserID) ([]*workspace.Workspace, error) {
 	if r.err != nil {
 		return nil, r.err
 	}
@@ -49,14 +49,14 @@ func (r *Workspace) FindByUser(_ context.Context, i id.UserID) (workspace.List, 
 	}), rerror.ErrNotFound)
 }
 
-func (r *Workspace) FindByUserWithPagination(ctx context.Context, id user.ID, pagination *usecasex.Pagination) (workspace.List, *usecasex.PageInfo, error) {
+func (r *Workspace) FindByUserWithPagination(ctx context.Context, id user.ID, pagination *usecasex.Pagination) ([]*workspace.Workspace, *usecasex.PageInfo, error) {
 	if r.err != nil {
 		return nil, nil, r.err
 	}
 
-	workspaces := workspace.List(r.data.FindAll(func(key workspace.ID, value *workspace.Workspace) bool {
+	workspaces := r.data.FindAll(func(key workspace.ID, value *workspace.Workspace) bool {
 		return value.Members().HasUser(id)
-	}))
+	})
 
 	if len(workspaces) == 0 {
 		return nil, nil, rerror.ErrNotFound
@@ -73,7 +73,7 @@ func (r *Workspace) FindByUserWithPagination(ctx context.Context, id user.ID, pa
 	), nil
 }
 
-func (r *Workspace) FindByIntegration(_ context.Context, i workspace.IntegrationID) (workspace.List, error) {
+func (r *Workspace) FindByIntegration(_ context.Context, i workspace.IntegrationID) ([]*workspace.Workspace, error) {
 	if r.err != nil {
 		return nil, r.err
 	}
@@ -84,7 +84,7 @@ func (r *Workspace) FindByIntegration(_ context.Context, i workspace.Integration
 }
 
 // FindByIntegrations finds workspace list based on integrations IDs
-func (r *Workspace) FindByIntegrations(_ context.Context, ids workspace.IntegrationIDList) (workspace.List, error) {
+func (r *Workspace) FindByIntegrations(_ context.Context, ids workspace.IntegrationIDList) ([]*workspace.Workspace, error) {
 	if r.err != nil {
 		return nil, r.err
 	}
@@ -102,7 +102,7 @@ func (r *Workspace) FindByIntegrations(_ context.Context, ids workspace.Integrat
 	return res, nil
 }
 
-func (r *Workspace) FindByIDs(_ context.Context, ids workspace.IDList) (workspace.List, error) {
+func (r *Workspace) FindByIDs(_ context.Context, ids workspace.IDList) ([]*workspace.Workspace, error) {
 	if r.err != nil {
 		return nil, r.err
 	}
@@ -148,6 +148,25 @@ func (r *Workspace) FindByAlias(_ context.Context, alias string) (*workspace.Wor
 	}), rerror.ErrNotFound)
 }
 
+func (r *Workspace) CheckWorkspaceAliasUnique(_ context.Context, id id.WorkspaceID, alias string) error {
+	if r.err != nil {
+		return r.err
+	}
+	if alias == "" {
+		return nil
+	}
+
+	// Check if any other workspace (excluding the current one) has this alias
+	found := r.data.Find(func(key workspace.ID, value *workspace.Workspace) bool {
+		return key != id && value.Alias() == alias
+	})
+
+	if found != nil {
+		return rerror.ErrAlreadyExists
+	}
+	return nil
+}
+
 func (r *Workspace) Create(_ context.Context, t *workspace.Workspace) error {
 	if r.err != nil {
 		return r.err
@@ -170,7 +189,7 @@ func (r *Workspace) Save(_ context.Context, t *workspace.Workspace) error {
 	return nil
 }
 
-func (r *Workspace) SaveAll(_ context.Context, workspaces workspace.List) error {
+func (r *Workspace) SaveAll(_ context.Context, workspaces []*workspace.Workspace) error {
 	if r.err != nil {
 		return r.err
 	}

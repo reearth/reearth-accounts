@@ -21,11 +21,6 @@ func New(ctx context.Context, db *mongo.Database, useTransaction, needCompat boo
 		ws = NewWorkspace(client)
 	}
 
-	lock, err := NewLock(db.Collection("locks"))
-	if err != nil {
-		return nil, err
-	}
-
 	c := &repo.Container{
 		User:        NewUser(client),
 		Workspace:   ws,
@@ -33,7 +28,6 @@ func New(ctx context.Context, db *mongo.Database, useTransaction, needCompat boo
 		Permittable: NewPermittable(client),
 		Transaction: client.Transaction(),
 		Users:       users,
-		Config:      NewConfig(db.Collection("config"), lock),
 	}
 
 	return c, nil
