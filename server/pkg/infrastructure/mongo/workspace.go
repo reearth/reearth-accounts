@@ -35,7 +35,7 @@ func (r *Workspace) Filtered(f repo.WorkspaceFilter) repo.Workspace {
 	}
 }
 
-func (r *Workspace) FindByUser(ctx context.Context, id user.ID) (workspace.List, error) {
+func (r *Workspace) FindByUser(ctx context.Context, id user.ID) ([]*workspace.Workspace, error) {
 	return r.find(ctx, bson.M{
 		"members." + strings.Replace(id.String(), ".", "", -1): bson.M{
 			"$exists": true,
@@ -43,7 +43,7 @@ func (r *Workspace) FindByUser(ctx context.Context, id user.ID) (workspace.List,
 	})
 }
 
-func (r *Workspace) FindByUserWithPagination(ctx context.Context, id user.ID, pagination *usecasex.Pagination) (workspace.List, *usecasex.PageInfo, error) {
+func (r *Workspace) FindByUserWithPagination(ctx context.Context, id user.ID, pagination *usecasex.Pagination) ([]*workspace.Workspace, *usecasex.PageInfo, error) {
 	filter := bson.M{
 		"members." + strings.Replace(id.String(), ".", "", -1): bson.M{
 			"$exists": true,
@@ -53,7 +53,7 @@ func (r *Workspace) FindByUserWithPagination(ctx context.Context, id user.ID, pa
 	return r.paginate(ctx, filter, pagination)
 }
 
-func (r *Workspace) FindByIntegration(ctx context.Context, id workspace.IntegrationID) (workspace.List, error) {
+func (r *Workspace) FindByIntegration(ctx context.Context, id workspace.IntegrationID) ([]*workspace.Workspace, error) {
 	return r.find(ctx, bson.M{
 		"integrations." + strings.Replace(id.String(), ".", "", -1): bson.M{
 			"$exists": true,
@@ -62,7 +62,7 @@ func (r *Workspace) FindByIntegration(ctx context.Context, id workspace.Integrat
 }
 
 // FindByIntegrations finds workspace list based on integrations IDs
-func (r *Workspace) FindByIntegrations(ctx context.Context, integrationIDs workspace.IntegrationIDList) (workspace.List, error) {
+func (r *Workspace) FindByIntegrations(ctx context.Context, integrationIDs workspace.IntegrationIDList) ([]*workspace.Workspace, error) {
 	if len(integrationIDs) == 0 {
 		return nil, nil
 	}
@@ -81,7 +81,7 @@ func (r *Workspace) FindByIntegrations(ctx context.Context, integrationIDs works
 	})
 }
 
-func (r *Workspace) FindByIDs(ctx context.Context, ids id.WorkspaceIDList) (workspace.List, error) {
+func (r *Workspace) FindByIDs(ctx context.Context, ids id.WorkspaceIDList) ([]*workspace.Workspace, error) {
 	if len(ids) == 0 {
 		return nil, nil
 	}
@@ -181,7 +181,7 @@ func (r *Workspace) Save(ctx context.Context, workspace *workspace.Workspace) er
 	return r.client.SaveOne(ctx, id, doc)
 }
 
-func (r *Workspace) SaveAll(ctx context.Context, workspaces workspace.List) error {
+func (r *Workspace) SaveAll(ctx context.Context, workspaces []*workspace.Workspace) error {
 	if len(workspaces) == 0 {
 		return nil
 	}
@@ -223,7 +223,7 @@ func (r *Workspace) RemoveAll(ctx context.Context, ids id.WorkspaceIDList) error
 	})
 }
 
-func (r *Workspace) find(ctx context.Context, filter any) (workspace.List, error) {
+func (r *Workspace) find(ctx context.Context, filter any) ([]*workspace.Workspace, error) {
 	c := mongodoc.NewWorkspaceConsumer()
 	filter = r.f.Filter(filter)
 	if err := r.client.Find(ctx, filter, c); err != nil {
@@ -241,11 +241,11 @@ func (r *Workspace) findOne(ctx context.Context, filter any) (*workspace.Workspa
 	return c.Result[0], nil
 }
 
-func filterWorkspaces(ids []id.WorkspaceID, rows workspace.List) workspace.List {
-	return rows.FilterByID(ids...)
+func filterWorkspaces(ids []id.WorkspaceID, rows []*workspace.Workspace) []*workspace.Workspace {
+	return workspace.List(rows).FilterByID(ids...)
 }
 
-func (r *Workspace) paginate(ctx context.Context, filter bson.M, pagination *usecasex.Pagination) (workspace.List, *usecasex.PageInfo, error) {
+func (r *Workspace) paginate(ctx context.Context, filter bson.M, pagination *usecasex.Pagination) ([]*workspace.Workspace, *usecasex.PageInfo, error) {
 	c := mongodoc.NewWorkspaceConsumer()
 	pageInfo, err := r.client.Paginate(ctx, filter, nil, pagination, c)
 	if err != nil {

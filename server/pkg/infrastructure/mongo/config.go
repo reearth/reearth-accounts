@@ -1,5 +1,9 @@
 package mongo
 
+// DISABLED: This file references repo.Lock which no longer exists in pkg/repo
+// If Config functionality is needed, it should be reimplemented without Lock dependency
+
+/*
 import (
 	"context"
 	"errors"
@@ -88,3 +92,4 @@ func (r *Config) Unlock(ctx context.Context) error {
 
 	return nil
 }
+*/

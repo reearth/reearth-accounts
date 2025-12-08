@@ -29,7 +29,7 @@ func NewUserWithHost(client *mongox.Client, host string) repo.User {
 	return &User{client: client.WithCollection("user"), host: host}
 }
 
-func (r *User) FindAll(ctx context.Context) (user.List, error) {
+func (r *User) FindAll(ctx context.Context) ([]*user.User, error) {
 	res, err := r.find(ctx, bson.M{})
 	if err != nil {
 		return nil, err
@@ -41,7 +41,7 @@ func (r *User) FindByID(ctx context.Context, id2 user.ID) (*user.User, error) {
 	return r.findOne(ctx, bson.M{"id": id2.String()})
 }
 
-func (r *User) FindByIDs(ctx context.Context, ids user.IDList) (user.List, error) {
+func (r *User) FindByIDs(ctx context.Context, ids user.IDList) ([]*user.User, error) {
 	if len(ids) == 0 {
 		return nil, nil
 	}
@@ -53,6 +53,23 @@ func (r *User) FindByIDs(ctx context.Context, ids user.IDList) (user.List, error
 		return nil, err
 	}
 	return filterUsers(ids, res), nil
+}
+
+func (r *User) FindByIDsWithPagination(ctx context.Context, ids user.IDList, pagination *usecasex.Pagination, host ...string) ([]*user.User, *usecasex.PageInfo, error) {
+	if len(ids) == 0 {
+		return nil, nil, nil
+	}
+
+	filter := bson.M{
+		"id": bson.M{"$in": ids.Strings()},
+	}
+
+	c := mongodoc.NewUserConsumer(r.host)
+	pageInfo, err := r.client.Paginate(ctx, filter, nil, pagination, c)
+	if err != nil {
+		return nil, nil, rerror.ErrInternalBy(err)
+	}
+	return c.Result, pageInfo, nil
 }
 
 func (r *User) FindBySub(ctx context.Context, auth0sub string) (*user.User, error) {
@@ -98,7 +115,7 @@ func (r *User) FindByAlias(ctx context.Context, alias string) (*user.User, error
 	return r.findOne(ctx, bson.M{"alias": alias})
 }
 
-func (r *User) SearchByKeyword(ctx context.Context, keyword string) (user.List, error) {
+func (r *User) SearchByKeyword(ctx context.Context, keyword string, host ...string) ([]*user.User, error) {
 	if len(keyword) < 3 {
 		return nil, nil
 	}
@@ -173,7 +190,7 @@ func (r *User) Remove(ctx context.Context, user user.ID) error {
 	return r.client.RemoveOne(ctx, bson.M{"id": user.String()})
 }
 
-func (r *User) find(ctx context.Context, filter any, options ...*options.FindOptions) (user.List, error) {
+func (r *User) find(ctx context.Context, filter any, options ...*options.FindOptions) ([]*user.User, error) {
 	c := mongodoc.NewUserConsumer(r.host)
 	if err := r.client.Find(ctx, filter, c, options...); err != nil {
 		return nil, err

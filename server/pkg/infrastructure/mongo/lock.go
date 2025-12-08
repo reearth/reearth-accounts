@@ -1,5 +1,9 @@
 package mongo
 
+// DISABLED: This file references repo.Lock errors which no longer exist in pkg/repo
+// If Lock functionality is needed, it should be reimplemented without repo error dependencies
+
+/*
 import (
 	"context"
 	"errors"
@@ -106,3 +110,4 @@ func (r *Lock) deleteLockID(key string) {
 
 	r.locks.Delete(key)
 }
+*/
