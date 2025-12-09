@@ -33,6 +33,7 @@ func ToUser(u *user.User) *User {
 	return &User{
 		ID:        IDFrom(u.ID()),
 		Name:      u.Name(),
+		Alias:     u.Alias(),
 		Email:     u.Email(),
 		Host:      lo.EmptyableToPtr(u.Host()),
 		Workspace: IDFrom(u.Workspace()),

@@ -3067,6 +3067,114 @@ func (v *UpdateWorkspaceUpdateWorkspaceUpdateWorkspacePayloadWorkspace) __premar
 	return &retval, nil
 }
 
+// UserByAliasFindUserByAliasUser includes the requested fields of the GraphQL type User.
+type UserByAliasFindUserByAliasUser struct {
+	FragmentUser `json:"-"`
+}
+
+// GetId returns UserByAliasFindUserByAliasUser.Id, and is useful for accessing the field via an interface.
+func (v *UserByAliasFindUserByAliasUser) GetId() string { return v.FragmentUser.Id }
+
+// GetName returns UserByAliasFindUserByAliasUser.Name, and is useful for accessing the field via an interface.
+func (v *UserByAliasFindUserByAliasUser) GetName() string { return v.FragmentUser.Name }
+
+// GetAlias returns UserByAliasFindUserByAliasUser.Alias, and is useful for accessing the field via an interface.
+func (v *UserByAliasFindUserByAliasUser) GetAlias() string { return v.FragmentUser.Alias }
+
+// GetEmail returns UserByAliasFindUserByAliasUser.Email, and is useful for accessing the field via an interface.
+func (v *UserByAliasFindUserByAliasUser) GetEmail() string { return v.FragmentUser.Email }
+
+// GetMetadata returns UserByAliasFindUserByAliasUser.Metadata, and is useful for accessing the field via an interface.
+func (v *UserByAliasFindUserByAliasUser) GetMetadata() FragmentUserMetadata {
+	return v.FragmentUser.Metadata
+}
+
+// GetWorkspace returns UserByAliasFindUserByAliasUser.Workspace, and is useful for accessing the field via an interface.
+func (v *UserByAliasFindUserByAliasUser) GetWorkspace() string { return v.FragmentUser.Workspace }
+
+// GetAuths returns UserByAliasFindUserByAliasUser.Auths, and is useful for accessing the field via an interface.
+func (v *UserByAliasFindUserByAliasUser) GetAuths() []string { return v.FragmentUser.Auths }
+
+// GetVerification returns UserByAliasFindUserByAliasUser.Verification, and is useful for accessing the field via an interface.
+func (v *UserByAliasFindUserByAliasUser) GetVerification() FragmentUserVerification {
+	return v.FragmentUser.Verification
+}
+
+func (v *UserByAliasFindUserByAliasUser) UnmarshalJSON(b []byte) error {
+
+	if string(b) == "null" {
+		return nil
+	}
+
+	var firstPass struct {
+		*UserByAliasFindUserByAliasUser
+		graphql.NoUnmarshalJSON
+	}
+	firstPass.UserByAliasFindUserByAliasUser = v
+
+	err := json.Unmarshal(b, &firstPass)
+	if err != nil {
+		return err
+	}
+
+	err = json.Unmarshal(
+		b, &v.FragmentUser)
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
+type __premarshalUserByAliasFindUserByAliasUser struct {
+	Id string `json:"id"`
+
+	Name string `json:"name"`
+
+	Alias string `json:"alias"`
+
+	Email string `json:"email"`
+
+	Metadata FragmentUserMetadata `json:"metadata"`
+
+	Workspace string `json:"workspace"`
+
+	Auths []string `json:"auths"`
+
+	Verification FragmentUserVerification `json:"verification"`
+}
+
+func (v *UserByAliasFindUserByAliasUser) MarshalJSON() ([]byte, error) {
+	premarshaled, err := v.__premarshalJSON()
+	if err != nil {
+		return nil, err
+	}
+	return json.Marshal(premarshaled)
+}
+
+func (v *UserByAliasFindUserByAliasUser) __premarshalJSON() (*__premarshalUserByAliasFindUserByAliasUser, error) {
+	var retval __premarshalUserByAliasFindUserByAliasUser
+
+	retval.Id = v.FragmentUser.Id
+	retval.Name = v.FragmentUser.Name
+	retval.Alias = v.FragmentUser.Alias
+	retval.Email = v.FragmentUser.Email
+	retval.Metadata = v.FragmentUser.Metadata
+	retval.Workspace = v.FragmentUser.Workspace
+	retval.Auths = v.FragmentUser.Auths
+	retval.Verification = v.FragmentUser.Verification
+	return &retval, nil
+}
+
+// UserByAliasResponse is returned by UserByAlias on success.
+type UserByAliasResponse struct {
+	FindUserByAlias UserByAliasFindUserByAliasUser `json:"findUserByAlias"`
+}
+
+// GetFindUserByAlias returns UserByAliasResponse.FindUserByAlias, and is useful for accessing the field via an interface.
+func (v *UserByAliasResponse) GetFindUserByAlias() UserByAliasFindUserByAliasUser {
+	return v.FindUserByAlias
+}
+
 // UserByIDsNodesNode includes the requested fields of the GraphQL interface Node.
 //
 // UserByIDsNodesNode is implemented by the following types:
@@ -4003,6 +4111,14 @@ type __UpdateWorkspaceInput struct {
 
 // GetInput returns __UpdateWorkspaceInput.Input, and is useful for accessing the field via an interface.
 func (v *__UpdateWorkspaceInput) GetInput() UpdateWorkspaceInput { return v.Input }
+
+// __UserByAliasInput is used internally by genqlient
+type __UserByAliasInput struct {
+	Alias string `json:"alias"`
+}
+
+// GetAlias returns __UserByAliasInput.Alias, and is useful for accessing the field via an interface.
+func (v *__UserByAliasInput) GetAlias() string { return v.Alias }
 
 // __UserByIDsInput is used internally by genqlient
 type __UserByIDsInput struct {
@@ -5348,6 +5464,60 @@ func UpdateWorkspace(
 	}
 
 	data_ = &UpdateWorkspaceResponse{}
+	resp_ := &graphql.Response{Data: data_}
+
+	err_ = client_.MakeRequest(
+		ctx_,
+		req_,
+		resp_,
+	)
+
+	return data_, err_
+}
+
+// The query executed by UserByAlias.
+const UserByAlias_Operation = `
+query UserByAlias ($alias: String!) {
+	findUserByAlias(alias: $alias) {
+		... FragmentUser
+	}
+}
+fragment FragmentUser on User {
+	id
+	name
+	alias
+	email
+	metadata {
+		description
+		lang
+		photoURL
+		theme
+		website
+	}
+	workspace
+	auths
+	verification {
+		code
+		expiration
+		verified
+	}
+}
+`
+
+func UserByAlias(
+	ctx_ context.Context,
+	client_ graphql.Client,
+	alias string,
+) (data_ *UserByAliasResponse, err_ error) {
+	req_ := &graphql.Request{
+		OpName: "UserByAlias",
+		Query:  UserByAlias_Operation,
+		Variables: &__UserByAliasInput{
+			Alias: alias,
+		},
+	}
+
+	data_ = &UserByAliasResponse{}
 	resp_ := &graphql.Response{Data: data_}
 
 	err_ = client_.MakeRequest(

@@ -23,7 +23,7 @@ func (c *CerbosAdapter) CheckPermissions(ctx context.Context, principal *cerbos.
 
 	authInfo := adapter.GetAuthInfo(ctx)
 	if authInfo != nil {
-		return c.client.With(cerbos.AuxDataJWT(authInfo.Token, "test")).CheckResources(ctx, principal, batch)
+		return c.client.With(cerbos.AuxDataJWT(authInfo.Token, "jwt")).CheckResources(ctx, principal, batch)
 	}
 
 	return c.client.CheckResources(ctx, principal, batch)

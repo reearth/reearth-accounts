@@ -87,6 +87,21 @@ func (mr *MockWorkspaceMockRecorder) FindByAlias(ctx, alias any) *gomock.Call {
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "FindByAlias", reflect.TypeOf((*MockWorkspace)(nil).FindByAlias), ctx, alias)
 }
 
+// FindByAliases mocks base method.
+func (m *MockWorkspace) FindByAliases(ctx context.Context, aliases []string) (workspace.List, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "FindByAliases", ctx, aliases)
+	ret0, _ := ret[0].(workspace.List)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// FindByAliases indicates an expected call of FindByAliases.
+func (mr *MockWorkspaceMockRecorder) FindByAliases(ctx, aliases any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "FindByAliases", reflect.TypeOf((*MockWorkspace)(nil).FindByAliases), ctx, aliases)
+}
+
 // FindByID mocks base method.
 func (m *MockWorkspace) FindByID(arg0 context.Context, arg1 workspace.ID) (*workspace.Workspace, error) {
 	m.ctrl.T.Helper()

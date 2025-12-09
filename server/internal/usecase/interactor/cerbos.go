@@ -34,7 +34,7 @@ func NewCerbos(r *repo.Container, cerbos gateway.CerbosGateway) interfaces.Cerbo
 }
 
 func (i *Cerbos) CheckPermission(ctx context.Context, userId user.ID, param interfaces.CheckPermissionParam) (*interfaces.CheckPermissionResult, error) {
-	var roleIDList id.RoleIDList
+	var roleIDList, workspaceRoleIDs id.RoleIDList
 	var resourceId string
 	p, err := i.permittableRepo.FindByUserID(ctx, userId)
 	if err != nil && !errors.Is(err, rerror.ErrNotFound) {
@@ -46,37 +46,20 @@ func (i *Cerbos) CheckPermission(ctx context.Context, userId user.ID, param inte
 		}, nil
 	}
 
-	roleSelf, err := i.roleRepo.FindByName(ctx, interfaces.RoleSelf)
-	if err != nil {
-		return nil, err
-	}
-
-	switch param.Resource {
-	case interfaces.ResourceWorkspace:
-		if param.WorkspaceAlias == "" {
-			return &interfaces.CheckPermissionResult{
-				Allowed: false,
-			}, nil
-		}
-
-		roleIDList, err = i.checkWorkspacePermission(ctx, p, param.WorkspaceAlias)
+	if param.WorkspaceAlias != "" {
+		workspaceRoleIDs, err = i.checkWorkspacePermission(ctx, p, param.WorkspaceAlias)
 		if err != nil {
 			return nil, err
 		}
-		if len(roleIDList) == 0 {
-			return &interfaces.CheckPermissionResult{
-				Allowed: false,
-			}, nil
-		}
-
-		// Added role self
-		roleIDList = append(roleIDList, roleSelf.ID())
-
-		resourceId = fmt.Sprintf("%s:%s:%s:%s:%s", param.WorkspaceAlias, userId.String(), param.Service, param.Resource, param.Action)
-	default:
-		roleIDList = p.RoleIDs()
-		resourceId = fmt.Sprintf("%s:%s:%s:%s", userId.String(), param.Service, param.Resource, param.Action)
+		roleIDList = append(roleIDList, workspaceRoleIDs...)
+		// Resource ID includes workspace context
+		resourceId = fmt.Sprintf("%s:%s:%s:%s", param.Service, param.Resource, param.WorkspaceAlias, userId.String())
+	} else {
+		// Resource ID without workspace context
+		resourceId = fmt.Sprintf("%s:%s:%s", param.Service, param.Resource, userId.String())
 	}
+
+	roleIDList = append(roleIDList, p.RoleIDs()...)
 
 	roleDomains, err := i.roleRepo.FindByIDs(ctx, roleIDList)
 	if err != nil {

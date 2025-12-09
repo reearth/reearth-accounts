@@ -134,6 +134,14 @@ func (u *User) SearchUser(ctx context.Context, keyword string) (user.List, error
 	return r, nil
 }
 
+func (u *User) FetchByAlias(ctx context.Context, alias string) (*user.User, error) {
+	res, err := UserByAlias(ctx, u.gql, alias)
+	if err != nil {
+		return nil, err
+	}
+	return FragmentToUser(res.FindUserByAlias.FragmentUser)
+}
+
 func (u *User) DeleteMe(ctx context.Context, id user.ID, op *usecase.Operator) error {
 	_, err := DeleteMe(ctx, u.gql, DeleteMeInput{UserId: id.String()})
 	if err != nil {

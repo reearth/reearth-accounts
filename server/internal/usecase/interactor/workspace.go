@@ -177,20 +177,9 @@ func (i *Workspace) AddUserMember(ctx context.Context, workspaceID workspace.ID,
 			}
 		}
 
-		// TODO: Delete this once the permission check migration is complete.
-		maintainerRole, err := i.getMaintainerRole(ctx)
-		if err != nil {
-			return nil, err
-		}
-
 		for _, m := range ul {
 			if m == nil {
 				continue
-			}
-
-			// TODO: Delete this once the permission check migration is complete.
-			if err := i.ensureUserHasMaintainerRole(ctx, m.ID(), maintainerRole.ID()); err != nil {
-				return nil, err
 			}
 
 			err = ws.Members().Join(m, users[m.ID()], *operator.User)

@@ -40,7 +40,6 @@ func TestCheckPermission(t *testing.T) {
 	ctx := context.Background()
 	uid := user.NewID()
 	r := role.New().NewID().Name("role1").MustBuild()
-	selfRole := role.New().NewID().Name(interfaces.RoleSelf).MustBuild()
 	rs := role.List{r}
 	p := permittable.New().
 		NewID().
@@ -74,9 +73,6 @@ func TestCheckPermission(t *testing.T) {
 			FindByUserID(gomock.Any(), uid).
 			Return(p, nil)
 		mockRoleRepo.EXPECT().
-			FindByName(gomock.Any(), interfaces.RoleSelf).
-			Return(selfRole, nil)
-		mockRoleRepo.EXPECT().
 			FindByIDs(gomock.Any(), p.RoleIDs()).
 			Return(rs, nil)
 		mockCerbos.EXPECT().
@@ -103,9 +99,6 @@ func TestCheckPermission(t *testing.T) {
 		mockPermittableRepo.EXPECT().
 			FindByUserID(gomock.Any(), uid).
 			Return(p, nil)
-		mockRoleRepo.EXPECT().
-			FindByName(gomock.Any(), interfaces.RoleSelf).
-			Return(selfRole, nil)
 		mockRoleRepo.EXPECT().
 			FindByIDs(gomock.Any(), p.RoleIDs()).
 			Return(rs, nil)
@@ -150,26 +143,10 @@ func TestCheckPermission(t *testing.T) {
 		assert.False(t, res.Allowed)
 	})
 
-	t.Run("role.FindByName returns error", func(t *testing.T) {
-		mockPermittableRepo.EXPECT().
-			FindByUserID(gomock.Any(), uid).
-			Return(p, nil)
-		mockRoleRepo.EXPECT().
-			FindByName(gomock.Any(), interfaces.RoleSelf).
-			Return(nil, errors.New("db error"))
-
-		res, err := c.CheckPermission(ctx, uid, param)
-		assert.Error(t, err)
-		assert.Nil(t, res)
-	})
-
 	t.Run("role.FindByIDs returns error", func(t *testing.T) {
 		mockPermittableRepo.EXPECT().
 			FindByUserID(gomock.Any(), uid).
 			Return(p, nil)
-		mockRoleRepo.EXPECT().
-			FindByName(gomock.Any(), interfaces.RoleSelf).
-			Return(selfRole, nil)
 		mockRoleRepo.EXPECT().
 			FindByIDs(gomock.Any(), p.RoleIDs()).
 			Return(nil, errors.New("db error"))
@@ -183,9 +160,6 @@ func TestCheckPermission(t *testing.T) {
 		mockPermittableRepo.EXPECT().
 			FindByUserID(gomock.Any(), uid).
 			Return(p, nil)
-		mockRoleRepo.EXPECT().
-			FindByName(gomock.Any(), interfaces.RoleSelf).
-			Return(selfRole, nil)
 		mockRoleRepo.EXPECT().
 			FindByIDs(gomock.Any(), p.RoleIDs()).
 			Return(rs, nil)
@@ -203,9 +177,6 @@ func TestCheckPermission(t *testing.T) {
 			FindByUserID(gomock.Any(), uid).
 			Return(p, nil)
 		mockRoleRepo.EXPECT().
-			FindByName(gomock.Any(), interfaces.RoleSelf).
-			Return(selfRole, nil)
-		mockRoleRepo.EXPECT().
 			FindByIDs(gomock.Any(), p.RoleIDs()).
 			Return(rs, nil)
 		mockCerbos.EXPECT().
@@ -221,9 +192,6 @@ func TestCheckPermission(t *testing.T) {
 		mockPermittableRepo.EXPECT().
 			FindByUserID(gomock.Any(), uid).
 			Return(p, nil)
-		mockRoleRepo.EXPECT().
-			FindByName(gomock.Any(), interfaces.RoleSelf).
-			Return(selfRole, nil)
 		mockRoleRepo.EXPECT().
 			FindByIDs(gomock.Any(), p.RoleIDs()).
 			Return(rs, nil)
@@ -257,8 +225,7 @@ func TestCheckPermission_WorkspaceResource(t *testing.T) {
 
 	// Create roles
 	ownerRole := role.New().NewID().Name("owner").MustBuild()
-	selfRole := role.New().NewID().Name(interfaces.RoleSelf).MustBuild()
-	rs := role.List{ownerRole, selfRole}
+	rs := role.List{ownerRole}
 
 	// Create permittable with workspace role
 	p := permittable.New().
@@ -303,9 +270,6 @@ func TestCheckPermission_WorkspaceResource(t *testing.T) {
 		mockPermittableRepo.EXPECT().
 			FindByUserID(gomock.Any(), uid).
 			Return(p, nil)
-		mockRoleRepo.EXPECT().
-			FindByName(gomock.Any(), interfaces.RoleSelf).
-			Return(selfRole, nil)
 		mockWorkspaceRepo.EXPECT().
 			FindByAlias(gomock.Any(), wsAlias).
 			Return(ws, nil)
@@ -336,12 +300,25 @@ func TestCheckPermission_WorkspaceResource(t *testing.T) {
 		mockPermittableRepo.EXPECT().
 			FindByUserID(gomock.Any(), uid).
 			Return(p, nil)
-		mockRoleRepo.EXPECT().
-			FindByName(gomock.Any(), interfaces.RoleSelf).
-			Return(selfRole, nil)
 		mockWorkspaceRepo.EXPECT().
 			FindByAlias(gomock.Any(), wsAlias).
 			Return(nil, nil)
+		mockRoleRepo.EXPECT().
+			FindByIDs(gomock.Any(), gomock.Any()).
+			Return(role.List{}, nil)
+		mockCerbos.EXPECT().
+			CheckPermissions(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).
+			Return(&cerbos.CheckResourcesResponse{
+				CheckResourcesResponse: &responsev1.CheckResourcesResponse{
+					Results: []*responsev1.CheckResourcesResponse_ResultEntry{
+						{
+							Actions: map[string]effectv1.Effect{
+								"read": effectv1.Effect_EFFECT_DENY,
+							},
+						},
+					},
+				},
+			}, nil)
 
 		res, err := c.CheckPermission(ctx, uid, param)
 		assert.NoError(t, err)
@@ -361,12 +338,25 @@ func TestCheckPermission_WorkspaceResource(t *testing.T) {
 		mockPermittableRepo.EXPECT().
 			FindByUserID(gomock.Any(), uid).
 			Return(pNoWorkspace, nil)
-		mockRoleRepo.EXPECT().
-			FindByName(gomock.Any(), interfaces.RoleSelf).
-			Return(selfRole, nil)
 		mockWorkspaceRepo.EXPECT().
 			FindByAlias(gomock.Any(), wsAlias).
 			Return(ws, nil)
+		mockRoleRepo.EXPECT().
+			FindByIDs(gomock.Any(), gomock.Any()).
+			Return(role.List{}, nil)
+		mockCerbos.EXPECT().
+			CheckPermissions(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).
+			Return(&cerbos.CheckResourcesResponse{
+				CheckResourcesResponse: &responsev1.CheckResourcesResponse{
+					Results: []*responsev1.CheckResourcesResponse_ResultEntry{
+						{
+							Actions: map[string]effectv1.Effect{
+								"read": effectv1.Effect_EFFECT_DENY,
+							},
+						},
+					},
+				},
+			}, nil)
 
 		res, err := c.CheckPermission(ctx, uid, param)
 		assert.NoError(t, err)
@@ -386,8 +376,21 @@ func TestCheckPermission_WorkspaceResource(t *testing.T) {
 			FindByUserID(gomock.Any(), uid).
 			Return(p, nil)
 		mockRoleRepo.EXPECT().
-			FindByName(gomock.Any(), interfaces.RoleSelf).
-			Return(selfRole, nil)
+			FindByIDs(gomock.Any(), gomock.Any()).
+			Return(rs, nil)
+		mockCerbos.EXPECT().
+			CheckPermissions(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).
+			Return(&cerbos.CheckResourcesResponse{
+				CheckResourcesResponse: &responsev1.CheckResourcesResponse{
+					Results: []*responsev1.CheckResourcesResponse_ResultEntry{
+						{
+							Actions: map[string]effectv1.Effect{
+								"read": effectv1.Effect_EFFECT_DENY,
+							},
+						},
+					},
+				},
+			}, nil)
 
 		res, err := c.CheckPermission(ctx, uid, emptyAliasParam)
 		assert.NoError(t, err)
@@ -399,9 +402,6 @@ func TestCheckPermission_WorkspaceResource(t *testing.T) {
 		mockPermittableRepo.EXPECT().
 			FindByUserID(gomock.Any(), uid).
 			Return(p, nil)
-		mockRoleRepo.EXPECT().
-			FindByName(gomock.Any(), interfaces.RoleSelf).
-			Return(selfRole, nil)
 		mockWorkspaceRepo.EXPECT().
 			FindByAlias(gomock.Any(), wsAlias).
 			Return(nil, errors.New("db error"))
@@ -415,9 +415,6 @@ func TestCheckPermission_WorkspaceResource(t *testing.T) {
 		mockPermittableRepo.EXPECT().
 			FindByUserID(gomock.Any(), uid).
 			Return(p, nil)
-		mockRoleRepo.EXPECT().
-			FindByName(gomock.Any(), interfaces.RoleSelf).
-			Return(selfRole, nil)
 		mockWorkspaceRepo.EXPECT().
 			FindByAlias(gomock.Any(), wsAlias).
 			Return(ws, nil)
@@ -461,12 +458,25 @@ func TestCheckPermission_WorkspaceResource(t *testing.T) {
 		mockPermittableRepo.EXPECT().
 			FindByUserID(gomock.Any(), uid).
 			Return(pDifferentWs, nil)
-		mockRoleRepo.EXPECT().
-			FindByName(gomock.Any(), interfaces.RoleSelf).
-			Return(selfRole, nil)
 		mockWorkspaceRepo.EXPECT().
 			FindByAlias(gomock.Any(), wsAlias).
 			Return(ws, nil)
+		mockRoleRepo.EXPECT().
+			FindByIDs(gomock.Any(), gomock.Any()).
+			Return(role.List{}, nil)
+		mockCerbos.EXPECT().
+			CheckPermissions(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).
+			Return(&cerbos.CheckResourcesResponse{
+				CheckResourcesResponse: &responsev1.CheckResourcesResponse{
+					Results: []*responsev1.CheckResourcesResponse_ResultEntry{
+						{
+							Actions: map[string]effectv1.Effect{
+								"read": effectv1.Effect_EFFECT_DENY,
+							},
+						},
+					},
+				},
+			}, nil)
 
 		res, err := c.CheckPermission(ctx, uid, param)
 		assert.NoError(t, err)
@@ -477,7 +487,7 @@ func TestCheckPermission_WorkspaceResource(t *testing.T) {
 	t.Run("Multiple workspace roles for same user in workspace", func(t *testing.T) {
 		// Create additional roles
 		readerRole := role.New().NewID().Name("reader").MustBuild()
-		multiRoles := role.List{ownerRole, readerRole, selfRole}
+		multiRoles := role.List{ownerRole, readerRole}
 
 		// Create permittable with multiple workspace roles for same workspace
 		pMultiRoles := permittable.New().
@@ -493,22 +503,17 @@ func TestCheckPermission_WorkspaceResource(t *testing.T) {
 		mockPermittableRepo.EXPECT().
 			FindByUserID(gomock.Any(), uid).
 			Return(pMultiRoles, nil)
-		mockRoleRepo.EXPECT().
-			FindByName(gomock.Any(), interfaces.RoleSelf).
-			Return(selfRole, nil)
 		mockWorkspaceRepo.EXPECT().
 			FindByAlias(gomock.Any(), wsAlias).
 			Return(ws, nil)
 		mockRoleRepo.EXPECT().
 			FindByIDs(gomock.Any(), gomock.Any()).
 			Do(func(_ context.Context, roleIDs id.RoleIDList) {
-				// Verify that self role is included in the role IDs
-				assert.Contains(t, roleIDs, selfRole.ID())
 				// Verify that both workspace roles are included
 				assert.Contains(t, roleIDs, ownerRole.ID())
 				assert.Contains(t, roleIDs, readerRole.ID())
-				// Verify total count (owner + reader + self)
-				assert.Len(t, roleIDs, 3)
+				// Verify total count (owner + reader)
+				assert.Len(t, roleIDs, 2)
 			}).
 			Return(multiRoles, nil)
 		mockCerbos.EXPECT().
@@ -535,9 +540,6 @@ func TestCheckPermission_WorkspaceResource(t *testing.T) {
 		mockPermittableRepo.EXPECT().
 			FindByUserID(gomock.Any(), uid).
 			Return(p, nil)
-		mockRoleRepo.EXPECT().
-			FindByName(gomock.Any(), interfaces.RoleSelf).
-			Return(selfRole, nil)
 		mockWorkspaceRepo.EXPECT().
 			FindByAlias(gomock.Any(), wsAlias).
 			Return(ws, nil)
@@ -554,9 +556,6 @@ func TestCheckPermission_WorkspaceResource(t *testing.T) {
 		mockPermittableRepo.EXPECT().
 			FindByUserID(gomock.Any(), uid).
 			Return(p, nil)
-		mockRoleRepo.EXPECT().
-			FindByName(gomock.Any(), interfaces.RoleSelf).
-			Return(selfRole, nil)
 		mockWorkspaceRepo.EXPECT().
 			FindByAlias(gomock.Any(), wsAlias).
 			Return(ws, nil)
@@ -576,9 +575,6 @@ func TestCheckPermission_WorkspaceResource(t *testing.T) {
 		mockPermittableRepo.EXPECT().
 			FindByUserID(gomock.Any(), uid).
 			Return(p, nil)
-		mockRoleRepo.EXPECT().
-			FindByName(gomock.Any(), interfaces.RoleSelf).
-			Return(selfRole, nil)
 		mockWorkspaceRepo.EXPECT().
 			FindByAlias(gomock.Any(), wsAlias).
 			Return(ws, nil)
@@ -598,9 +594,6 @@ func TestCheckPermission_WorkspaceResource(t *testing.T) {
 		mockPermittableRepo.EXPECT().
 			FindByUserID(gomock.Any(), uid).
 			Return(p, nil)
-		mockRoleRepo.EXPECT().
-			FindByName(gomock.Any(), interfaces.RoleSelf).
-			Return(selfRole, nil)
 		mockWorkspaceRepo.EXPECT().
 			FindByAlias(gomock.Any(), wsAlias).
 			Return(ws, nil)
@@ -627,35 +620,29 @@ func TestCheckPermission_WorkspaceResource(t *testing.T) {
 		assert.False(t, res.Allowed)
 	})
 
-	t.Run("Self role is properly included with workspace roles", func(t *testing.T) {
+	t.Run("Workspace role is properly included", func(t *testing.T) {
 		mockPermittableRepo.EXPECT().
 			FindByUserID(gomock.Any(), uid).
 			Return(p, nil)
-		mockRoleRepo.EXPECT().
-			FindByName(gomock.Any(), interfaces.RoleSelf).
-			Return(selfRole, nil)
 		mockWorkspaceRepo.EXPECT().
 			FindByAlias(gomock.Any(), wsAlias).
 			Return(ws, nil)
 		mockRoleRepo.EXPECT().
 			FindByIDs(gomock.Any(), gomock.Any()).
 			Do(func(_ context.Context, roleIDs id.RoleIDList) {
-				// Verify that self role is included
-				assert.Contains(t, roleIDs, selfRole.ID())
 				// Verify that workspace role is included
 				assert.Contains(t, roleIDs, ownerRole.ID())
-				// Verify count (owner + self = 2)
-				assert.Len(t, roleIDs, 2)
+				// Verify count (only owner role)
+				assert.Len(t, roleIDs, 1)
 			}).
 			Return(rs, nil)
 		mockCerbos.EXPECT().
 			CheckPermissions(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).
 			Do(func(_ context.Context, principal *cerbos.Principal, _ []*cerbos.Resource, _ []string) {
-				// Verify principal contains both role names
+				// Verify principal contains the role name
 				roles := principal.Roles()
 				assert.Contains(t, roles, ownerRole.Name())
-				assert.Contains(t, roles, selfRole.Name())
-				assert.Len(t, roles, 2)
+				assert.Len(t, roles, 1)
 			}).
 			Return(&cerbos.CheckResourcesResponse{
 				CheckResourcesResponse: &responsev1.CheckResourcesResponse{
