@@ -242,3 +242,31 @@ func (r *mutationResolver) UpdateIntegrationOfWorkspace(ctx context.Context, inp
 
 	return &gqlmodel.UpdateMemberOfWorkspacePayload{Workspace: converted}, nil
 }
+
+func (r *mutationResolver) TransferWorkspaceOwnership(ctx context.Context, input gqlmodel.TransferWorkspaceOwnershipInput) (*gqlmodel.UpdateMemberOfWorkspacePayload, error) {
+	wId, err := gqlmodel.ToID[id.Workspace](input.WorkspaceID)
+	if err != nil {
+		return nil, err
+	}
+
+	newOwnerId, err := gqlmodel.ToID[id.User](input.NewOwnerID)
+	if err != nil {
+		return nil, err
+	}
+	w, err := usecases(ctx).Workspace.TransferOwnership(ctx, wId, newOwnerId, getOperator(ctx))
+	if err != nil {
+		return nil, err
+	}
+
+	exists, err := buildExistingUserSetFromWorkspace(ctx, w)
+	if err != nil {
+		return nil, err
+	}
+
+	converted, err := gqlmodel.ToWorkspace(w, exists, r.Storage)
+	if err != nil {
+		log.Errorf("failed to convert workspace: %s", err.Error())
+	}
+
+	return &gqlmodel.UpdateMemberOfWorkspacePayload{Workspace: converted}, nil
+}

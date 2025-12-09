@@ -210,6 +210,11 @@ type StartPasswordResetInput struct {
 	Email string `json:"email"`
 }
 
+type TransferWorkspaceOwnershipInput struct {
+	WorkspaceID ID `json:"workspaceId"`
+	NewOwnerID  ID `json:"newOwnerId"`
+}
+
 type UpdateIntegrationOfWorkspaceInput struct {
 	WorkspaceID   ID   `json:"workspaceId"`
 	IntegrationID ID   `json:"integrationId"`

@@ -411,6 +411,49 @@ func (i *Workspace) Remove(ctx context.Context, id workspace.ID, operator *useca
 	})
 }
 
+func (i *Workspace) TransferOwnership(ctx context.Context, workspaceID workspace.ID, newOwnerID workspace.UserID, operator *usecase.Operator) (*workspace.Workspace, error) {
+	if operator.User == nil {
+		return nil, interfaces.ErrInvalidOperator
+	}
+
+	return Run1(ctx, operator, i.repos, Usecase().Transaction().WithOwnableWorkspaces(workspaceID), func(ctx context.Context) (*workspace.Workspace, error) {
+		ws, err := i.repos.Workspace.FindByID(ctx, workspaceID)
+		if err != nil {
+			return nil, err
+		}
+
+		if ws.IsPersonal() {
+			return nil, workspace.ErrCannotModifyPersonalWorkspace
+		}
+
+		if !ws.Members().HasUser(newOwnerID) {
+			return nil, workspace.ErrTargetUserNotInTheWorkspace
+		}
+
+		if ws.Members().UserRole(newOwnerID) == workspace.RoleReader {
+			return nil, workspace.ErrCannotChangeRoleToOwner
+		}
+
+		err = ws.Members().UpdateUserRole(newOwnerID, workspace.RoleOwner)
+		if err != nil {
+			return nil, err
+		}
+
+		err = ws.Members().UpdateUserRole(*operator.User, workspace.RoleMaintainer)
+		if err != nil {
+			return nil, err
+		}
+
+		err = i.repos.Workspace.Save(ctx, ws)
+		if err != nil {
+			return nil, err
+		}
+
+		i.applyDefaultPolicy(ws, operator)
+		return ws, nil
+	})
+}
+
 func (i *Workspace) applyDefaultPolicy(ws *workspace.Workspace, o *usecase.Operator) {
 	if ws.Policy() == nil && o.DefaultPolicy != nil {
 		ws.SetPolicy(o.DefaultPolicy)

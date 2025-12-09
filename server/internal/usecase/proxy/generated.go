@@ -2552,6 +2552,132 @@ type StartPasswordResetResponse struct {
 // GetStartPasswordReset returns StartPasswordResetResponse.StartPasswordReset, and is useful for accessing the field via an interface.
 func (v *StartPasswordResetResponse) GetStartPasswordReset() bool { return v.StartPasswordReset }
 
+type TransferWorkspaceOwnershipInput struct {
+	WorkspaceId string `json:"workspaceId"`
+	NewOwnerId  string `json:"newOwnerId"`
+}
+
+// GetWorkspaceId returns TransferWorkspaceOwnershipInput.WorkspaceId, and is useful for accessing the field via an interface.
+func (v *TransferWorkspaceOwnershipInput) GetWorkspaceId() string { return v.WorkspaceId }
+
+// GetNewOwnerId returns TransferWorkspaceOwnershipInput.NewOwnerId, and is useful for accessing the field via an interface.
+func (v *TransferWorkspaceOwnershipInput) GetNewOwnerId() string { return v.NewOwnerId }
+
+// TransferWorkspaceOwnershipResponse is returned by TransferWorkspaceOwnership on success.
+type TransferWorkspaceOwnershipResponse struct {
+	TransferWorkspaceOwnership TransferWorkspaceOwnershipTransferWorkspaceOwnershipUpdateMemberOfWorkspacePayload `json:"transferWorkspaceOwnership"`
+}
+
+// GetTransferWorkspaceOwnership returns TransferWorkspaceOwnershipResponse.TransferWorkspaceOwnership, and is useful for accessing the field via an interface.
+func (v *TransferWorkspaceOwnershipResponse) GetTransferWorkspaceOwnership() TransferWorkspaceOwnershipTransferWorkspaceOwnershipUpdateMemberOfWorkspacePayload {
+	return v.TransferWorkspaceOwnership
+}
+
+// TransferWorkspaceOwnershipTransferWorkspaceOwnershipUpdateMemberOfWorkspacePayload includes the requested fields of the GraphQL type UpdateMemberOfWorkspacePayload.
+type TransferWorkspaceOwnershipTransferWorkspaceOwnershipUpdateMemberOfWorkspacePayload struct {
+	Workspace TransferWorkspaceOwnershipTransferWorkspaceOwnershipUpdateMemberOfWorkspacePayloadWorkspace `json:"workspace"`
+}
+
+// GetWorkspace returns TransferWorkspaceOwnershipTransferWorkspaceOwnershipUpdateMemberOfWorkspacePayload.Workspace, and is useful for accessing the field via an interface.
+func (v *TransferWorkspaceOwnershipTransferWorkspaceOwnershipUpdateMemberOfWorkspacePayload) GetWorkspace() TransferWorkspaceOwnershipTransferWorkspaceOwnershipUpdateMemberOfWorkspacePayloadWorkspace {
+	return v.Workspace
+}
+
+// TransferWorkspaceOwnershipTransferWorkspaceOwnershipUpdateMemberOfWorkspacePayloadWorkspace includes the requested fields of the GraphQL type Workspace.
+type TransferWorkspaceOwnershipTransferWorkspaceOwnershipUpdateMemberOfWorkspacePayloadWorkspace struct {
+	FragmentWorkspace `json:"-"`
+}
+
+// GetId returns TransferWorkspaceOwnershipTransferWorkspaceOwnershipUpdateMemberOfWorkspacePayloadWorkspace.Id, and is useful for accessing the field via an interface.
+func (v *TransferWorkspaceOwnershipTransferWorkspaceOwnershipUpdateMemberOfWorkspacePayloadWorkspace) GetId() string {
+	return v.FragmentWorkspace.Id
+}
+
+// GetName returns TransferWorkspaceOwnershipTransferWorkspaceOwnershipUpdateMemberOfWorkspacePayloadWorkspace.Name, and is useful for accessing the field via an interface.
+func (v *TransferWorkspaceOwnershipTransferWorkspaceOwnershipUpdateMemberOfWorkspacePayloadWorkspace) GetName() string {
+	return v.FragmentWorkspace.Name
+}
+
+// GetPersonal returns TransferWorkspaceOwnershipTransferWorkspaceOwnershipUpdateMemberOfWorkspacePayloadWorkspace.Personal, and is useful for accessing the field via an interface.
+func (v *TransferWorkspaceOwnershipTransferWorkspaceOwnershipUpdateMemberOfWorkspacePayloadWorkspace) GetPersonal() bool {
+	return v.FragmentWorkspace.Personal
+}
+
+// GetMembers returns TransferWorkspaceOwnershipTransferWorkspaceOwnershipUpdateMemberOfWorkspacePayloadWorkspace.Members, and is useful for accessing the field via an interface.
+func (v *TransferWorkspaceOwnershipTransferWorkspaceOwnershipUpdateMemberOfWorkspacePayloadWorkspace) GetMembers() []FragmentWorkspaceMembersWorkspaceMember {
+	return v.FragmentWorkspace.Members
+}
+
+func (v *TransferWorkspaceOwnershipTransferWorkspaceOwnershipUpdateMemberOfWorkspacePayloadWorkspace) UnmarshalJSON(b []byte) error {
+
+	if string(b) == "null" {
+		return nil
+	}
+
+	var firstPass struct {
+		*TransferWorkspaceOwnershipTransferWorkspaceOwnershipUpdateMemberOfWorkspacePayloadWorkspace
+		graphql.NoUnmarshalJSON
+	}
+	firstPass.TransferWorkspaceOwnershipTransferWorkspaceOwnershipUpdateMemberOfWorkspacePayloadWorkspace = v
+
+	err := json.Unmarshal(b, &firstPass)
+	if err != nil {
+		return err
+	}
+
+	err = json.Unmarshal(
+		b, &v.FragmentWorkspace)
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
+type __premarshalTransferWorkspaceOwnershipTransferWorkspaceOwnershipUpdateMemberOfWorkspacePayloadWorkspace struct {
+	Id string `json:"id"`
+
+	Name string `json:"name"`
+
+	Personal bool `json:"personal"`
+
+	Members []json.RawMessage `json:"members"`
+}
+
+func (v *TransferWorkspaceOwnershipTransferWorkspaceOwnershipUpdateMemberOfWorkspacePayloadWorkspace) MarshalJSON() ([]byte, error) {
+	premarshaled, err := v.__premarshalJSON()
+	if err != nil {
+		return nil, err
+	}
+	return json.Marshal(premarshaled)
+}
+
+func (v *TransferWorkspaceOwnershipTransferWorkspaceOwnershipUpdateMemberOfWorkspacePayloadWorkspace) __premarshalJSON() (*__premarshalTransferWorkspaceOwnershipTransferWorkspaceOwnershipUpdateMemberOfWorkspacePayloadWorkspace, error) {
+	var retval __premarshalTransferWorkspaceOwnershipTransferWorkspaceOwnershipUpdateMemberOfWorkspacePayloadWorkspace
+
+	retval.Id = v.FragmentWorkspace.Id
+	retval.Name = v.FragmentWorkspace.Name
+	retval.Personal = v.FragmentWorkspace.Personal
+	{
+
+		dst := &retval.Members
+		src := v.FragmentWorkspace.Members
+		*dst = make(
+			[]json.RawMessage,
+			len(src))
+		for i, src := range src {
+			dst := &(*dst)[i]
+			var err error
+			*dst, err = __marshalFragmentWorkspaceMembersWorkspaceMember(
+				&src)
+			if err != nil {
+				return nil, fmt.Errorf(
+					"unable to marshal TransferWorkspaceOwnershipTransferWorkspaceOwnershipUpdateMemberOfWorkspacePayloadWorkspace.FragmentWorkspace.Members: %w", err)
+			}
+		}
+	}
+	return &retval, nil
+}
+
 type UpdateIntegrationOfWorkspaceInput struct {
 	WorkspaceId   string `json:"workspaceId"`
 	IntegrationId string `json:"integrationId"`
@@ -4078,6 +4204,16 @@ type __StartPasswordResetInput struct {
 // GetInput returns __StartPasswordResetInput.Input, and is useful for accessing the field via an interface.
 func (v *__StartPasswordResetInput) GetInput() StartPasswordResetInput { return v.Input }
 
+// __TransferWorkspaceOwnershipInput is used internally by genqlient
+type __TransferWorkspaceOwnershipInput struct {
+	Input TransferWorkspaceOwnershipInput `json:"input"`
+}
+
+// GetInput returns __TransferWorkspaceOwnershipInput.Input, and is useful for accessing the field via an interface.
+func (v *__TransferWorkspaceOwnershipInput) GetInput() TransferWorkspaceOwnershipInput {
+	return v.Input
+}
+
 // __UpdateIntegrationOfWorkspaceInput is used internally by genqlient
 type __UpdateIntegrationOfWorkspaceInput struct {
 	Input UpdateIntegrationOfWorkspaceInput `json:"input"`
@@ -5252,6 +5388,60 @@ func StartPasswordReset(
 	}
 
 	data_ = &StartPasswordResetResponse{}
+	resp_ := &graphql.Response{Data: data_}
+
+	err_ = client_.MakeRequest(
+		ctx_,
+		req_,
+		resp_,
+	)
+
+	return data_, err_
+}
+
+// The mutation executed by TransferWorkspaceOwnership.
+const TransferWorkspaceOwnership_Operation = `
+mutation TransferWorkspaceOwnership ($input: TransferWorkspaceOwnershipInput!) {
+	transferWorkspaceOwnership(input: $input) {
+		workspace {
+			... FragmentWorkspace
+		}
+	}
+}
+fragment FragmentWorkspace on Workspace {
+	id
+	name
+	personal
+	members {
+		__typename
+		... on WorkspaceUserMember {
+			userId
+			role
+		}
+		... on WorkspaceIntegrationMember {
+			integrationId
+			role
+			active
+			invitedById
+		}
+	}
+}
+`
+
+func TransferWorkspaceOwnership(
+	ctx_ context.Context,
+	client_ graphql.Client,
+	input TransferWorkspaceOwnershipInput,
+) (data_ *TransferWorkspaceOwnershipResponse, err_ error) {
+	req_ := &graphql.Request{
+		OpName: "TransferWorkspaceOwnership",
+		Query:  TransferWorkspaceOwnership_Operation,
+		Variables: &__TransferWorkspaceOwnershipInput{
+			Input: input,
+		},
+	}
+
+	data_ = &TransferWorkspaceOwnershipResponse{}
 	resp_ := &graphql.Response{Data: data_}
 
 	err_ = client_.MakeRequest(

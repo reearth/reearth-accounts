@@ -256,3 +256,9 @@ mutation UpdateIntegrationOfWorkspace($input: UpdateIntegrationOfWorkspaceInput!
         workspace{...FragmentWorkspace}
     }
 }
+
+mutation TransferWorkspaceOwnership($input: TransferWorkspaceOwnershipInput!) {
+    transferWorkspaceOwnership(input: $input) {
+        workspace{...FragmentWorkspace}
+    }
+}
