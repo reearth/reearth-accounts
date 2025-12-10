@@ -60,6 +60,7 @@ func isBypassed(req *http.Request) bool {
 		"signup(",
 		"signupoidc(",
 		"findbyalias(",
+		"createverification(",
 	}
 
 	for _, q := range list {
