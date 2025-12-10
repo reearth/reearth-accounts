@@ -29,9 +29,9 @@ const (
 )
 
 type graphqlRequest struct {
-	Query         string                 `json:"query"`
-	OperationName string                 `json:"operationName"`
-	Variables     map[string]interface{} `json:"variables"`
+	Query         string         `json:"query"`
+	OperationName string         `json:"operationName"`
+	Variables     map[string]any `json:"variables"`
 }
 
 func isBypassed(req *http.Request) bool {
@@ -126,6 +126,8 @@ func authMiddleware(cfg *ServerConfig) func(http.Handler) http.Handler {
 					} else {
 						usr = existingUsr
 					}
+				} else {
+					log.Errorfc(ctx, "[authMiddleware] sub is empty")
 				}
 			}
 

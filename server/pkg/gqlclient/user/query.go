@@ -49,5 +49,5 @@ type signupMutation struct {
 }
 
 type createVerificationMutation struct {
-	CreateVerification bool `graphql:"createVerification(input: {email: $email})"`
+	CreateVerification *bool `graphql:"createVerification(input: {email: $email})"`
 }
