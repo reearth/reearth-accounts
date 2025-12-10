@@ -7,9 +7,9 @@ import (
 )
 
 type PermittableDocument struct {
-	ID      string
-	UserID  string
-	RoleIDs []string
+	ID      string   `json:"id" jsonschema:"description=Permittable ID (ULID format)"`
+	UserID  string   `json:"userid" jsonschema:"description=User ID this permittable represents"`
+	RoleIDs []string `json:"roleids" jsonschema:"description=List of role IDs assigned to this user. Default: []"`
 }
 
 type PermittableConsumer = Consumer[*PermittableDocument, *permittable.Permittable]

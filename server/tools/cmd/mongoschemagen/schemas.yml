@@ -1,0 +1,49 @@
+schemas:
+  - collection: user
+    type: UserDocument
+    title: User Collection Schema
+    description: Schema for user documents in the reearth-accounts database
+    required:
+      - id
+      - name
+      - alias
+      - email
+      - subs
+      - workspace
+      - metadata
+      - password
+
+  - collection: workspace
+    type: WorkspaceDocument
+    title: Workspace Collection Schema
+    description: Schema for workspace documents in the reearth-accounts database
+    required:
+      - id
+      - name
+      - alias
+      - metadata
+      - email
+      - members
+      - personal
+
+  - collection: role
+    type: RoleDocument
+    title: Role Collection Schema
+    description: Schema for role documents in the reearth-accounts database
+    required:
+      - id
+      - name
+
+  - collection: permittable
+    type: PermittableDocument
+    title: Permittable Collection Schema
+    description: Schema for permittable documents in the reearth-accounts database
+    required:
+      - id
+      - userid
+
+  - collection: config
+    type: ConfigDocument
+    title: Config Collection Schema
+    description: Schema for config documents in the reearth-accounts database
+    required: []
