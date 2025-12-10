@@ -275,5 +275,5 @@ func (r *userRepo) CreateVerification(ctx context.Context, email string) (bool, 
 		return false, err
 	}
 
-	return m.CreateVerification, nil
+	return *m.CreateVerification, nil
 }

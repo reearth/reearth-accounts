@@ -379,10 +379,12 @@ func (i *User) CreateVerification(ctx context.Context, email string) error {
 		}
 
 		if u.Verification().IsVerified() {
+			log.Warnc(ctx, "user is already verified")
 			return nil
 		}
 
 		if !u.Verification().IsExpired() {
+			log.Warnc(ctx, "user verification is not expired")
 			return nil
 		}
 
