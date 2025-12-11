@@ -30,6 +30,6 @@ var migrations = migration.Migrations[DBClient]{
 	251209150000: AddCaseInsensitiveUserAliasIndex,
 	251209160000: AddCaseInsensitiveUserEmailIndex,
 	251209170000: AddCaseInsensitiveUserWorkspaceIndex,
-	251126032440: AddRoles,
-	251126032442: MoveWorkspaceMembersRoleToPermittable,
+	251209170001: AddRoles,
+	251209170002: MoveWorkspaceMembersRoleToPermittable,
 }
