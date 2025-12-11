@@ -38,7 +38,7 @@ func Init(p InitParams) (*user.User, *Workspace, error) {
 	metadata.LangFrom(p.Lang.String())
 	metadata.SetTheme(*p.Theme)
 
-	alias := "user-" + p.UserID.String()
+	alias := p.Name
 	b := user.New().
 		ID(*p.UserID).
 		Name(p.Name).
