@@ -44,14 +44,14 @@ func TestUser_Signup(t *testing.T) {
 		wantError        error
 	}{
 		{
-			name: "duplicate user alias",
-			signupSecret: "",
+			name:            "duplicate user alias",
+			signupSecret:    "",
 			authSrvUIDomain: "",
 			createUserBefore: user.New().
 				ID(uid).
 				Workspace(tid).
 				Name("NAME").
-				Alias("user-" + uid.String()).
+				Alias("NAME").
 				Email("aaa@bbb.com").
 				MustBuild(),
 			args: interfaces.SignupParam{
@@ -65,43 +65,43 @@ func TestUser_Signup(t *testing.T) {
 			wantWorkspace: nil,
 			wantError:     interfaces.ErrUserAlreadyExists,
 		},
-	{
-		name: "duplicate workspace alias - memory repo allows",
-		signupSecret: "",
-		authSrvUIDomain: "",
-		createUserBefore: nil,
-		args: interfaces.SignupParam{
-			Email:       "unique@bbb.com",
-			Name:        "NAME",
-			Password:    "PAss00!!",
-			UserID:      &uid,
-			WorkspaceID: &tid,
-		},
-		wantUser: func(u *user.User) *user.User {
-			return user.New().
-				ID(uid).
-				Workspace(tid).
+		{
+			name:             "duplicate workspace alias - memory repo allows",
+			signupSecret:     "",
+			authSrvUIDomain:  "",
+			createUserBefore: nil,
+			args: interfaces.SignupParam{
+				Email:       "unique@bbb.com",
+				Name:        "NAME",
+				Password:    "PAss00!!",
+				UserID:      &uid,
+				WorkspaceID: &tid,
+			},
+			wantUser: func(u *user.User) *user.User {
+				return user.New().
+					ID(uid).
+					Workspace(tid).
+					Name("NAME").
+					Alias("NAME").
+					Auths(u.Auths()).
+					Metadata(*u.Metadata()).
+					Email("unique@bbb.com").
+					PasswordPlainText("PAss00!!").
+					Verification(user.VerificationFrom(mockcode, mocktime.Add(24*time.Hour), false)).
+					MustBuild()
+			},
+			wantWorkspace: workspace.New().
+				ID(tid).
 				Name("NAME").
-				Alias("user-" + uid.String()).
-				Auths(u.Auths()).
-				Metadata(*u.Metadata()).
-				Email("unique@bbb.com").
-				PasswordPlainText("PAss00!!").
-				Verification(user.VerificationFrom(mockcode, mocktime.Add(24*time.Hour), false)).
-				MustBuild()
+				Alias("NAME").
+				Members(map[user.ID]workspace.Member{uid: {Role: workspace.RoleOwner, Disabled: false, InvitedBy: uid}}).
+				Personal(true).
+				MustBuild(),
+			wantMailTo:      []mailer.Contact{{Email: "unique@bbb.com", Name: "NAME"}},
+			wantMailSubject: "email verification",
+			wantMailContent: "/?user-verification-token=CODECODE",
+			wantError:       nil,
 		},
-		wantWorkspace: workspace.New().
-			ID(tid).
-			Name("NAME").
-			Alias("user-" + uid.String()).
-			Members(map[user.ID]workspace.Member{uid: {Role: workspace.RoleOwner, Disabled: false, InvitedBy: uid}}).
-			Personal(true).
-			MustBuild(),
-		wantMailTo:      []mailer.Contact{{Email: "unique@bbb.com", Name: "NAME"}},
-		wantMailSubject: "email verification",
-		wantMailContent: "/?user-verification-token=CODECODE",
-		wantError:       nil,
-	},
 		{
 			name:            "without secret",
 			signupSecret:    "",
@@ -118,7 +118,7 @@ func TestUser_Signup(t *testing.T) {
 					ID(uid).
 					Workspace(tid).
 					Name("NAME").
-					Alias("user-" + uid.String()).
+					Alias("NAME").
 					Auths(u.Auths()).
 					Metadata(*u.Metadata()).
 					Email("aaa@bbb.com").
@@ -129,7 +129,7 @@ func TestUser_Signup(t *testing.T) {
 			wantWorkspace: workspace.New().
 				ID(tid).
 				Name("NAME").
-				Alias("user-" + uid.String()).
+				Alias("NAME").
 				Members(map[user.ID]workspace.Member{uid: {Role: workspace.RoleOwner, Disabled: false, InvitedBy: uid}}).
 				Personal(true).
 				MustBuild(),
@@ -198,7 +198,7 @@ func TestUser_Signup(t *testing.T) {
 					ID(uid).
 					Workspace(tid).
 					Name("NAME").
-					Alias("user-" + uid.String()).
+					Alias("NAME").
 					Auths(u.Auths()).
 					Metadata(*u.Metadata()).
 					Email("aaa@bbb.com").
@@ -209,7 +209,7 @@ func TestUser_Signup(t *testing.T) {
 			wantWorkspace: workspace.New().
 				ID(tid).
 				Name("NAME").
-				Alias("user-" + uid.String()).
+				Alias("NAME").
 				Members(map[user.ID]workspace.Member{uid: {Role: workspace.RoleOwner, Disabled: false, InvitedBy: uid}}).
 				Personal(true).
 				MustBuild(),
@@ -241,7 +241,7 @@ func TestUser_Signup(t *testing.T) {
 					ID(uid).
 					Workspace(tid).
 					Name("NAME").
-					Alias("user-" + uid.String()).
+					Alias("NAME").
 					Auths(u.Auths()).
 					Email("aaa@bbb.com").
 					PasswordPlainText("PAss00!!").
@@ -252,7 +252,7 @@ func TestUser_Signup(t *testing.T) {
 			wantWorkspace: workspace.New().
 				ID(tid).
 				Name("NAME").
-				Alias("user-" + uid.String()).
+				Alias("NAME").
 				Members(map[user.ID]workspace.Member{uid: {Role: workspace.RoleOwner, Disabled: false, InvitedBy: uid}}).
 				Personal(true).
 				MustBuild(),
