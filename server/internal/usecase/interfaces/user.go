@@ -20,6 +20,8 @@ var (
 	ErrNotVerifiedUser                 = rerror.NewE(i18n.T("not verified user"))
 	ErrInvalidEmailOrPassword          = rerror.NewE(i18n.T("invalid email or password"))
 	ErrUserAlreadyExists               = rerror.NewE(i18n.T("user already exists"))
+	ErrUserAliasAlreadyExists          = rerror.NewE(i18n.T("user alias already exists"))
+	ErrWorkspaceAliasAlreadyExists     = rerror.NewE(i18n.T("workspace alias already exists"))
 )
 
 type SignupOIDCParam struct {
