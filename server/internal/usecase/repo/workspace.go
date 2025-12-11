@@ -5,11 +5,14 @@ import (
 
 	"github.com/reearth/reearth-accounts/server/pkg/user"
 	"github.com/reearth/reearth-accounts/server/pkg/workspace"
+	"github.com/reearth/reearthx/i18n"
+	"github.com/reearth/reearthx/rerror"
 	"github.com/reearth/reearthx/usecasex"
 )
 
-//go:generate mockgen -source=./workspace.go -destination=./mock_repo/mock_workspace.go -package mock_repo
+var ErrDuplicateWorkspaceAlias = rerror.NewE(i18n.T("duplicate workspace alias"))
 
+//go:generate mockgen -source=./workspace.go -destination=./mock_repo/mock_workspace.go -package mock_repo
 type Workspace interface {
 	Filtered(WorkspaceFilter) Workspace
 	FindByID(context.Context, workspace.ID) (*workspace.Workspace, error)

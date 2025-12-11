@@ -97,6 +97,12 @@ func (i *User) Signup(ctx context.Context, param interfaces.SignupParam) (u *use
 		return nil, err
 	}
 	if err = i.repos.Workspace.Save(ctx, ws); err != nil {
+		if errors.Is(err, repo.ErrDuplicatedUser) {
+			return nil, interfaces.ErrUserAliasAlreadyExists
+		}
+		if errors.Is(err, repo.ErrDuplicateWorkspaceAlias) {
+			return nil, interfaces.ErrWorkspaceAliasAlreadyExists
+		}
 		return nil, err
 	}
 
@@ -413,10 +419,12 @@ func (i *User) CreateVerification(ctx context.Context, email string) error {
 		}
 
 		if u.Verification().IsVerified() {
+			log.Warnc(ctx, "user is already verified")
 			return nil
 		}
 
 		if !u.Verification().IsExpired() {
+			log.Warnc(ctx, "user verification is not expired")
 			return nil
 		}
 
