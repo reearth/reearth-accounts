@@ -55,25 +55,25 @@ func TestUser_Signup(t *testing.T) {
 				WorkspaceID: &tid,
 			},
 			wantUser: func(u *user.User) *user.User {
-				   return user.New().
-					   ID(uid).
-					   Workspace(tid).
-					   Name("NAME").
-					   Alias("user-" + uid.String()).
-					   Auths(u.Auths()).
-					   Metadata(*u.Metadata()).
-					   Email("aaa@bbb.com").
-					   PasswordPlainText("PAss00!!").
-					   Verification(user.VerificationFrom(mockcode, mocktime.Add(24*time.Hour), false)).
-					   MustBuild()
+				return user.New().
+					ID(uid).
+					Workspace(tid).
+					Name("NAME").
+					Alias("user-" + uid.String()).
+					Auths(u.Auths()).
+					Metadata(*u.Metadata()).
+					Email("aaa@bbb.com").
+					PasswordPlainText("PAss00!!").
+					Verification(user.VerificationFrom(mockcode, mocktime.Add(24*time.Hour), false)).
+					MustBuild()
 			},
-			   wantWorkspace: workspace.New().
-				   ID(tid).
-				   Name("NAME").
-				   Alias("user-" + uid.String()).
-				   Members(map[user.ID]workspace.Member{uid: {Role: workspace.RoleOwner, Disabled: false, InvitedBy: uid}}).
-				   Personal(true).
-				   MustBuild(),
+			wantWorkspace: workspace.New().
+				ID(tid).
+				Name("NAME").
+				Alias("user-" + uid.String()).
+				Members(map[user.ID]workspace.Member{uid: {Role: workspace.RoleOwner, Disabled: false, InvitedBy: uid}}).
+				Personal(true).
+				MustBuild(),
 			wantMailTo:      []mailer.Contact{{Email: "aaa@bbb.com", Name: "NAME"}},
 			wantMailSubject: "email verification",
 			wantMailContent: "https://reearth.io/?user-verification-token=CODECODE",
@@ -135,25 +135,25 @@ func TestUser_Signup(t *testing.T) {
 				WorkspaceID: &tid,
 			},
 			wantUser: func(u *user.User) *user.User {
-				   return user.New().
-					   ID(uid).
-					   Workspace(tid).
-					   Name("NAME").
-					   Alias("user-" + uid.String()).
-					   Auths(u.Auths()).
-					   Metadata(*u.Metadata()).
-					   Email("aaa@bbb.com").
-					   PasswordPlainText("PAss00!!").
-					   Verification(user.VerificationFrom(mockcode, mocktime.Add(24*time.Hour), false)).
-					   MustBuild()
+				return user.New().
+					ID(uid).
+					Workspace(tid).
+					Name("NAME").
+					Alias("user-" + uid.String()).
+					Auths(u.Auths()).
+					Metadata(*u.Metadata()).
+					Email("aaa@bbb.com").
+					PasswordPlainText("PAss00!!").
+					Verification(user.VerificationFrom(mockcode, mocktime.Add(24*time.Hour), false)).
+					MustBuild()
 			},
-			   wantWorkspace: workspace.New().
-				   ID(tid).
-				   Name("NAME").
-				   Alias("user-" + uid.String()).
-				   Members(map[user.ID]workspace.Member{uid: {Role: workspace.RoleOwner, Disabled: false, InvitedBy: uid}}).
-				   Personal(true).
-				   MustBuild(),
+			wantWorkspace: workspace.New().
+				ID(tid).
+				Name("NAME").
+				Alias("user-" + uid.String()).
+				Members(map[user.ID]workspace.Member{uid: {Role: workspace.RoleOwner, Disabled: false, InvitedBy: uid}}).
+				Personal(true).
+				MustBuild(),
 			wantMailTo:      []mailer.Contact{{Email: "aaa@bbb.com", Name: "NAME"}},
 			wantMailSubject: "email verification",
 			wantMailContent: "/?user-verification-token=CODECODE",
@@ -178,25 +178,25 @@ func TestUser_Signup(t *testing.T) {
 				metadata.LangFrom(language.Japanese.String())
 				metadata.SetTheme(user.ThemeDark)
 
-				   return user.New().
-					   ID(uid).
-					   Workspace(tid).
-					   Name("NAME").
-					   Alias("user-" + uid.String()).
-					   Auths(u.Auths()).
-					   Email("aaa@bbb.com").
-					   PasswordPlainText("PAss00!!").
-					   Metadata(metadata).
-					   Verification(user.VerificationFrom(mockcode, mocktime.Add(24*time.Hour), false)).
-					   MustBuild()
+				return user.New().
+					ID(uid).
+					Workspace(tid).
+					Name("NAME").
+					Alias("user-" + uid.String()).
+					Auths(u.Auths()).
+					Email("aaa@bbb.com").
+					PasswordPlainText("PAss00!!").
+					Metadata(metadata).
+					Verification(user.VerificationFrom(mockcode, mocktime.Add(24*time.Hour), false)).
+					MustBuild()
 			},
-			   wantWorkspace: workspace.New().
-				   ID(tid).
-				   Name("NAME").
-				   Alias("user-" + uid.String()).
-				   Members(map[user.ID]workspace.Member{uid: {Role: workspace.RoleOwner, Disabled: false, InvitedBy: uid}}).
-				   Personal(true).
-				   MustBuild(),
+			wantWorkspace: workspace.New().
+				ID(tid).
+				Name("NAME").
+				Alias("user-" + uid.String()).
+				Members(map[user.ID]workspace.Member{uid: {Role: workspace.RoleOwner, Disabled: false, InvitedBy: uid}}).
+				Personal(true).
+				MustBuild(),
 			wantMailTo:      []mailer.Contact{{Email: "aaa@bbb.com", Name: "NAME"}},
 			wantMailSubject: "email verification",
 			wantMailContent: "/?user-verification-token=CODECODE",
