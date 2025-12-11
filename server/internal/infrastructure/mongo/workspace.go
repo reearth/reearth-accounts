@@ -13,6 +13,7 @@ import (
 	"github.com/reearth/reearthx/rerror"
 	"github.com/reearth/reearthx/usecasex"
 	"go.mongodb.org/mongo-driver/bson"
+	"go.mongodb.org/mongo-driver/mongo"
 )
 
 type Workspace struct {
@@ -152,7 +153,11 @@ func (r *Workspace) Save(ctx context.Context, workspace *workspace.Workspace) er
 	}
 
 	doc, id := mongodoc.NewWorkspace(workspace)
-	return r.client.SaveOne(ctx, id, doc)
+	err := r.client.SaveOne(ctx, id, doc)
+	if mongo.IsDuplicateKeyError(err) {
+		return repo.ErrDuplicateWorkspaceAlias
+	}
+	return err
 }
 
 func (r *Workspace) SaveAll(ctx context.Context, workspaces workspace.List) error {

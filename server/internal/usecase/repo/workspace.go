@@ -5,8 +5,12 @@ import (
 
 	"github.com/reearth/reearth-accounts/server/pkg/user"
 	"github.com/reearth/reearth-accounts/server/pkg/workspace"
+	"github.com/reearth/reearthx/i18n"
+	"github.com/reearth/reearthx/rerror"
 	"github.com/reearth/reearthx/usecasex"
 )
+
+var ErrDuplicateWorkspaceAlias = rerror.NewE(i18n.T("duplicate workspace alias"))
 
 type Workspace interface {
 	Filtered(WorkspaceFilter) Workspace

@@ -44,6 +44,44 @@ func TestUser_Signup(t *testing.T) {
 		wantError        error
 	}{
 		{
+			name: "duplicate user alias",
+			signupSecret: "",
+			authSrvUIDomain: "",
+			createUserBefore: user.New().
+				ID(uid).
+				Workspace(tid).
+				Name("NAME").
+				Alias("user-" + uid.String()).
+				Email("aaa@bbb.com").
+				MustBuild(),
+			args: interfaces.SignupParam{
+				Email:       "other@bbb.com",
+				Name:        "NAME",
+				Password:    "PAss00!!",
+				UserID:      &uid,
+				WorkspaceID: &tid,
+			},
+			wantUser:      nil,
+			wantWorkspace: nil,
+			wantError:     interfaces.ErrUserAliasAlreadyExists,
+		},
+	{
+		name: "duplicate workspace alias",
+		signupSecret: "",
+		authSrvUIDomain: "",
+		createUserBefore: nil,
+		args: interfaces.SignupParam{
+			Email:       "unique@bbb.com",
+			Name:        "NAME",
+			Password:    "PAss00!!",
+			UserID:      &uid,
+			WorkspaceID: &tid,
+		},
+		wantUser:      nil,
+		wantWorkspace: nil,
+		wantError:     interfaces.ErrWorkspaceAliasAlreadyExists,
+	},
+		{
 			name:            "without secret",
 			signupSecret:    "",
 			authSrvUIDomain: "https://reearth.io",
