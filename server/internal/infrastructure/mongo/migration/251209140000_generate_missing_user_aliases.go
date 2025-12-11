@@ -34,7 +34,11 @@ func GenerateMissingUserAliases(ctx context.Context, c DBClient) error {
 				}
 
 				// All returned documents need new aliases (due to our query filter)
-				doc.Alias = random.String(10, random.Lowercase)
+				alias := random.String(10, random.Lowercase)
+				if doc.Name != "" && doc.ID != "" {
+					alias = doc.Name + doc.ID
+				}
+				doc.Alias = alias
 
 				ids = append(ids, doc.ID)
 				newRows = append(newRows, doc)

@@ -17,15 +17,6 @@ var migrations = migration.Migrations[DBClient]{
 	250724212700: AddMetadataUserV3,
 	250725020842: ConvertNonValidUserAlias,
 	250725020843: ConvertNonValidWorkspaceAlias,
-	/**
-	Commented out migrations for production deployment due to having some bug on mongodb.
-	After resolving the issues, these migrations can be uncommented and applied.
-	*/
-	//250911120000: GenerateMissingUserAliases,
-	//250911120002: AddWorkspaceAliasMembersCompositeUniqueIndex, // Replaced by 251119144501 with members_hash
-	//250911120003: AddCaseInsensitiveUserAliasIndex,
-	//250911120004: AddCaseInsensitiveUserEmailIndex,
-	//250911120005: AddCaseInsensitiveUserWorkspaceIndex,
 	250919170404: ConvertInvalidUserAlias,
 	250919170408: ConvertInvalidUserWorkspaceAlias,
 	251106072200: ReplaceEmailFormattedNames,
@@ -33,8 +24,12 @@ var migrations = migration.Migrations[DBClient]{
 	251114101525: SyncUserNameToWorkspace,
 	251119144500: AddWorkspaceMembersHash,
 	251120200000: GenerateMissingWorkspaceAliases,
-	//251120210000: AddCaseInsensitiveWorkspaceAliasIndex,
+	251120210000: AddCaseInsensitiveWorkspaceAliasIndex,
 	251120220000: ReplaceWorkspaceAliasMembersIndex,
+	251209140000: GenerateMissingUserAliases,
+	251209150000: AddCaseInsensitiveUserAliasIndex,
+	251209160000: AddCaseInsensitiveUserEmailIndex,
+	251209170000: AddCaseInsensitiveUserWorkspaceIndex,
 	251126032440: AddRoles,
 	251126032442: MoveWorkspaceMembersRoleToPermittable,
 }
