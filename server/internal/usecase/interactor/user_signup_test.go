@@ -63,10 +63,10 @@ func TestUser_Signup(t *testing.T) {
 			},
 			wantUser:      nil,
 			wantWorkspace: nil,
-			wantError:     interfaces.ErrUserAliasAlreadyExists,
+			wantError:     interfaces.ErrUserAlreadyExists,
 		},
 	{
-		name: "duplicate workspace alias",
+		name: "duplicate workspace alias - memory repo allows",
 		signupSecret: "",
 		authSrvUIDomain: "",
 		createUserBefore: nil,
@@ -77,9 +77,30 @@ func TestUser_Signup(t *testing.T) {
 			UserID:      &uid,
 			WorkspaceID: &tid,
 		},
-		wantUser:      nil,
-		wantWorkspace: nil,
-		wantError:     interfaces.ErrWorkspaceAliasAlreadyExists,
+		wantUser: func(u *user.User) *user.User {
+			return user.New().
+				ID(uid).
+				Workspace(tid).
+				Name("NAME").
+				Alias("user-" + uid.String()).
+				Auths(u.Auths()).
+				Metadata(*u.Metadata()).
+				Email("unique@bbb.com").
+				PasswordPlainText("PAss00!!").
+				Verification(user.VerificationFrom(mockcode, mocktime.Add(24*time.Hour), false)).
+				MustBuild()
+		},
+		wantWorkspace: workspace.New().
+			ID(tid).
+			Name("NAME").
+			Alias("user-" + uid.String()).
+			Members(map[user.ID]workspace.Member{uid: {Role: workspace.RoleOwner, Disabled: false, InvitedBy: uid}}).
+			Personal(true).
+			MustBuild(),
+		wantMailTo:      []mailer.Contact{{Email: "unique@bbb.com", Name: "NAME"}},
+		wantMailSubject: "email verification",
+		wantMailContent: "/?user-verification-token=CODECODE",
+		wantError:       nil,
 	},
 		{
 			name:            "without secret",
