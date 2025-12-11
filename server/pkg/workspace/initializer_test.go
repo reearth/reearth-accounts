@@ -37,13 +37,15 @@ func TestInit(t *testing.T) {
 				ID(uid).
 				Email("xx@yy.zz").
 				Name("nnn").
+				Alias("user-" + uid.String()).
 				Workspace(tid).
 				Auths([]user.Auth{expectedSub}).
 				MustBuild(),
 			ExpectedWorkspace: New().
 				ID(tid).
 				Name("nnn").
-				Members(map[user.ID]Member{uid: {Role: RoleOwner}}).
+				Alias("user-" + uid.String()).
+				Members(map[user.ID]Member{uid: {Role: RoleOwner, Disabled: false, InvitedBy: uid}}).
 				Personal(true).
 				MustBuild(),
 			Err: nil,
@@ -62,13 +64,15 @@ func TestInit(t *testing.T) {
 				ID(uid).
 				Email("xx@yy.zz").
 				Name("nnn").
+				Alias("user-" + uid.String()).
 				Workspace(tid).
 				Auths([]user.Auth{expectedSub}).
 				MustBuild(),
 			ExpectedWorkspace: New().
 				NewID().
 				Name("nnn").
-				Members(map[user.ID]Member{uid: {Role: RoleOwner}}).
+				Alias("user-" + uid.String()).
+				Members(map[user.ID]Member{uid: {Role: RoleOwner, Disabled: false, InvitedBy: uid}}).
 				Personal(true).
 				MustBuild(),
 			Err: nil,
@@ -87,13 +91,15 @@ func TestInit(t *testing.T) {
 				NewID().
 				Email("xx@yy.zz").
 				Name("nnn").
+				Alias("user-" + user.NewID().String()).
 				Workspace(tid).
 				Auths([]user.Auth{expectedSub}).
 				MustBuild(),
 			ExpectedWorkspace: New().
 				ID(tid).
 				Name("nnn").
-				Members(map[user.ID]Member{uid: {Role: RoleOwner}}).
+				Alias("user-" + user.NewID().String()).
+				Members(map[user.ID]Member{user.NewID(): {Role: RoleOwner, Disabled: false, InvitedBy: user.NewID()}}).
 				Personal(true).
 				MustBuild(),
 			Err: nil,

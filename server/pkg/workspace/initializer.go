@@ -38,9 +38,11 @@ func Init(p InitParams) (*user.User, *Workspace, error) {
 	metadata.LangFrom(p.Lang.String())
 	metadata.SetTheme(*p.Theme)
 
+	alias := "user-" + p.UserID.String()
 	b := user.New().
 		ID(*p.UserID).
 		Name(p.Name).
+		Alias(alias).
 		Email(p.Email).
 		Metadata(metadata).
 		Auths([]user.Auth{*p.Sub})
@@ -56,6 +58,7 @@ func Init(p InitParams) (*user.User, *Workspace, error) {
 	t, err := New().
 		ID(*p.WorkspaceID).
 		Name(p.Name).
+		Alias(alias).
 		Members(map[user.ID]Member{u.ID(): {Role: RoleOwner, Disabled: false, InvitedBy: u.ID()}}).
 		Personal(true).
 		Metadata(NewMetadata()).
