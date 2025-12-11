@@ -2,7 +2,6 @@ package interactor
 
 import (
 	"context"
-	"fmt"
 	"maps"
 	"slices"
 	"strings"
@@ -10,13 +9,9 @@ import (
 	"github.com/reearth/reearth-accounts/server/internal/usecase"
 	"github.com/reearth/reearth-accounts/server/internal/usecase/interfaces"
 	"github.com/reearth/reearth-accounts/server/internal/usecase/repo"
-	"github.com/reearth/reearth-accounts/server/pkg/id"
 	"github.com/reearth/reearth-accounts/server/pkg/pagination"
-	"github.com/reearth/reearth-accounts/server/pkg/permittable"
-	"github.com/reearth/reearth-accounts/server/pkg/role"
 	"github.com/reearth/reearth-accounts/server/pkg/user"
 	"github.com/reearth/reearth-accounts/server/pkg/workspace"
-	"github.com/reearth/reearthx/log"
 	"github.com/reearth/reearthx/rerror"
 	"github.com/samber/lo"
 )
@@ -177,20 +172,9 @@ func (i *Workspace) AddUserMember(ctx context.Context, workspaceID workspace.ID,
 			}
 		}
 
-		// TODO: Delete this once the permission check migration is complete.
-		maintainerRole, err := i.getMaintainerRole(ctx)
-		if err != nil {
-			return nil, err
-		}
-
 		for _, m := range ul {
 			if m == nil {
 				continue
-			}
-
-			// TODO: Delete this once the permission check migration is complete.
-			if err := i.ensureUserHasMaintainerRole(ctx, m.ID(), maintainerRole.ID()); err != nil {
-				return nil, err
 			}
 
 			err = ws.Members().Join(m, users[m.ID()], *operator.User)
@@ -422,6 +406,49 @@ func (i *Workspace) Remove(ctx context.Context, id workspace.ID, operator *useca
 	})
 }
 
+func (i *Workspace) TransferOwnership(ctx context.Context, workspaceID workspace.ID, newOwnerID workspace.UserID, operator *usecase.Operator) (*workspace.Workspace, error) {
+	if operator.User == nil {
+		return nil, interfaces.ErrInvalidOperator
+	}
+
+	return Run1(ctx, operator, i.repos, Usecase().Transaction().WithOwnableWorkspaces(workspaceID), func(ctx context.Context) (*workspace.Workspace, error) {
+		ws, err := i.repos.Workspace.FindByID(ctx, workspaceID)
+		if err != nil {
+			return nil, err
+		}
+
+		if ws.IsPersonal() {
+			return nil, workspace.ErrCannotModifyPersonalWorkspace
+		}
+
+		if !ws.Members().HasUser(newOwnerID) {
+			return nil, workspace.ErrTargetUserNotInTheWorkspace
+		}
+
+		if ws.Members().UserRole(newOwnerID) == workspace.RoleReader {
+			return nil, workspace.ErrCannotChangeRoleToOwner
+		}
+
+		err = ws.Members().UpdateUserRole(newOwnerID, workspace.RoleOwner)
+		if err != nil {
+			return nil, err
+		}
+
+		err = ws.Members().UpdateUserRole(*operator.User, workspace.RoleMaintainer)
+		if err != nil {
+			return nil, err
+		}
+
+		err = i.repos.Workspace.Save(ctx, ws)
+		if err != nil {
+			return nil, err
+		}
+
+		i.applyDefaultPolicy(ws, operator)
+		return ws, nil
+	})
+}
+
 func (i *Workspace) applyDefaultPolicy(ws *workspace.Workspace, o *usecase.Operator) {
 	if ws.Policy() == nil && o.DefaultPolicy != nil {
 		ws.SetPolicy(o.DefaultPolicy)
@@ -469,100 +496,4 @@ func filterWorkspaces(
 	}
 
 	return workspaces, nil
-}
-
-// TODO: Delete this once the permission check migration is complete.
-func (i *Workspace) getMaintainerRole(ctx context.Context) (*role.Role, error) {
-	// check and create maintainer role
-	if i.repos.Role == nil {
-		log.Print("Role repository is not set")
-		return nil, nil
-	}
-
-	roles, err := i.repos.Role.FindAll(ctx)
-	if err != nil {
-		return nil, fmt.Errorf("failed to get roles: %w", err)
-	}
-
-	var maintainerRole *role.Role
-	for _, r := range roles {
-		if r.Name() == "maintainer" {
-			maintainerRole = r
-			log.Info("Found maintainer role")
-			break
-		}
-	}
-
-	if maintainerRole == nil {
-		r, err := role.New().
-			NewID().
-			Name("maintainer").
-			Build()
-		if err != nil {
-			return nil, fmt.Errorf("failed to create maintainer role domain: %w", err)
-		}
-
-		err = i.repos.Role.Save(ctx, *r)
-		if err != nil {
-			return nil, fmt.Errorf("failed to save maintainer role: %w", err)
-		}
-
-		maintainerRole = r
-		log.Info("Created maintainer role")
-	}
-
-	return maintainerRole, nil
-}
-
-// TODO: Delete this once the permission check migration is complete.
-func (i *Workspace) ensureUserHasMaintainerRole(ctx context.Context, userID user.ID, maintainerRoleID id.RoleID) error {
-	if i.repos.Permittable == nil {
-		log.Print("Role repository is not set")
-		return nil
-	}
-
-	var p *permittable.Permittable
-	var err error
-
-	p, err = i.repos.Permittable.FindByUserID(ctx, userID)
-	if err != nil && err != rerror.ErrNotFound {
-		return err
-	}
-
-	if hasRole(p, maintainerRoleID) {
-		return nil
-	}
-
-	if p == nil {
-		p, err = permittable.New().
-			NewID().
-			UserID(userID).
-			RoleIDs([]id.RoleID{maintainerRoleID}).
-			Build()
-		if err != nil {
-			return err
-		}
-	} else {
-		p.EditRoleIDs(append(p.RoleIDs(), maintainerRoleID))
-	}
-
-	err = i.repos.Permittable.Save(ctx, *p)
-	if err != nil {
-		return err
-	}
-
-	return nil
-}
-
-// TODO: Delete this once the permission check migration is complete.
-func hasRole(p *permittable.Permittable, roleID role.ID) bool {
-	if p == nil {
-		return false
-	}
-	for _, r := range p.RoleIDs() {
-		if r == roleID {
-			return true
-		}
-	}
-	return false
 }

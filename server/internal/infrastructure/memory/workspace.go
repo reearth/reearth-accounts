@@ -148,6 +148,25 @@ func (r *Workspace) FindByAlias(_ context.Context, alias string) (*workspace.Wor
 	}), rerror.ErrNotFound)
 }
 
+func (r *Workspace) FindByAliases(_ context.Context, aliases []string) (workspace.List, error) {
+	if r.err != nil {
+		return nil, r.err
+	}
+	if len(aliases) == 0 {
+		return nil, nil
+	}
+	aliasSet := make(map[string]struct{})
+	for _, a := range aliases {
+		aliasSet[a] = struct{}{}
+	}
+	res := r.data.FindAll(func(key workspace.ID, value *workspace.Workspace) bool {
+		_, ok := aliasSet[value.Alias()]
+		return ok
+	})
+	slices.SortFunc(res, func(a, b *workspace.Workspace) int { return a.ID().Compare(b.ID()) })
+	return res, nil
+}
+
 func (r *Workspace) Create(_ context.Context, t *workspace.Workspace) error {
 	if r.err != nil {
 		return r.err

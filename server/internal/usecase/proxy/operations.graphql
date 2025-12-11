@@ -58,6 +58,12 @@ query SearchUser($keyword: String!) {
   }
 }
 
+query UserByAlias($alias: String!) {
+  findUserByAlias(alias: $alias) {
+     ...FragmentUser
+  }
+}
+
 mutation Signup($input: SignupInput!) {
     signup(input: $input) {
         user {...FragmentUser}
@@ -247,6 +253,12 @@ mutation UpdateUserOfWorkspace($input: UpdateUserOfWorkspaceInput!) {
 
 mutation UpdateIntegrationOfWorkspace($input: UpdateIntegrationOfWorkspaceInput!) {
     updateIntegrationOfWorkspace(input: $input) {
+        workspace{...FragmentWorkspace}
+    }
+}
+
+mutation TransferWorkspaceOwnership($input: TransferWorkspaceOwnershipInput!) {
+    transferWorkspaceOwnership(input: $input) {
         workspace{...FragmentWorkspace}
     }
 }

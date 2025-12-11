@@ -77,6 +77,7 @@ type UserQuery interface {
 	FetchByID(context.Context, user.IDList) (user.List, error)
 	FetchBySub(context.Context, string) (*user.User, error)
 	FetchByNameOrEmail(context.Context, string) (*user.Simple, error)
+	FetchByAlias(context.Context, string) (*user.User, error)
 	SearchUser(ctx context.Context, keyword string) (user.List, error)
 }
 

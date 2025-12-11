@@ -2,6 +2,7 @@ input CheckPermissionInput {
   service: String!
   resource: String!
   action: String!
+  workspaceAlias: String
 }
 
 type CheckPermissionPayload {

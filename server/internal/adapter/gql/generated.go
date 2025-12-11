@@ -107,6 +107,7 @@ type ComplexityRoot struct {
 		Signup                           func(childComplexity int, input gqlmodel.SignupInput) int
 		SignupOidc                       func(childComplexity int, input gqlmodel.SignupOIDCInput) int
 		StartPasswordReset               func(childComplexity int, input gqlmodel.StartPasswordResetInput) int
+		TransferWorkspaceOwnership       func(childComplexity int, input gqlmodel.TransferWorkspaceOwnershipInput) int
 		UpdateIntegrationOfWorkspace     func(childComplexity int, input gqlmodel.UpdateIntegrationOfWorkspaceInput) int
 		UpdateMe                         func(childComplexity int, input gqlmodel.UpdateMeInput) int
 		UpdatePermittable                func(childComplexity int, input gqlmodel.UpdatePermittableInput) int
@@ -130,6 +131,7 @@ type ComplexityRoot struct {
 		FindByName               func(childComplexity int, name string) int
 		FindByUser               func(childComplexity int, userID gqlmodel.ID) int
 		FindByUserWithPagination func(childComplexity int, userID gqlmodel.ID, pagination gqlmodel.Pagination) int
+		FindUserByAlias          func(childComplexity int, alias string) int
 		FindUsersByIDs           func(childComplexity int, ids []gqlmodel.ID) int
 		GetUsersWithRoles        func(childComplexity int) int
 		Me                       func(childComplexity int) int
@@ -287,6 +289,7 @@ type MutationResolver interface {
 	RemoveIntegrationsFromWorkspace(ctx context.Context, input gqlmodel.RemoveIntegrationsFromWorkspaceInput) (*gqlmodel.RemoveIntegrationsFromWorkspacePayload, error)
 	UpdateUserOfWorkspace(ctx context.Context, input gqlmodel.UpdateUserOfWorkspaceInput) (*gqlmodel.UpdateMemberOfWorkspacePayload, error)
 	UpdateIntegrationOfWorkspace(ctx context.Context, input gqlmodel.UpdateIntegrationOfWorkspaceInput) (*gqlmodel.UpdateMemberOfWorkspacePayload, error)
+	TransferWorkspaceOwnership(ctx context.Context, input gqlmodel.TransferWorkspaceOwnershipInput) (*gqlmodel.UpdateMemberOfWorkspacePayload, error)
 }
 type QueryResolver interface {
 	Node(ctx context.Context, id gqlmodel.ID, typeArg gqlmodel.NodeType) (gqlmodel.Node, error)
@@ -298,6 +301,7 @@ type QueryResolver interface {
 	UserByNameOrEmail(ctx context.Context, nameOrEmail string) (*gqlmodel.User, error)
 	SearchUser(ctx context.Context, keyword string) ([]*gqlmodel.User, error)
 	FindUsersByIDs(ctx context.Context, ids []gqlmodel.ID) ([]*gqlmodel.User, error)
+	FindUserByAlias(ctx context.Context, alias string) (*gqlmodel.User, error)
 	FindByID(ctx context.Context, id gqlmodel.ID) (*gqlmodel.Workspace, error)
 	FindByIDs(ctx context.Context, ids []gqlmodel.ID) ([]*gqlmodel.Workspace, error)
 	FindByName(ctx context.Context, name string) (*gqlmodel.Workspace, error)
@@ -630,6 +634,17 @@ func (e *executableSchema) Complexity(ctx context.Context, typeName, field strin
 		}
 
 		return e.complexity.Mutation.StartPasswordReset(childComplexity, args["input"].(gqlmodel.StartPasswordResetInput)), true
+	case "Mutation.transferWorkspaceOwnership":
+		if e.complexity.Mutation.TransferWorkspaceOwnership == nil {
+			break
+		}
+
+		args, err := ec.field_Mutation_transferWorkspaceOwnership_args(ctx, rawArgs)
+		if err != nil {
+			return 0, false
+		}
+
+		return e.complexity.Mutation.TransferWorkspaceOwnership(childComplexity, args["input"].(gqlmodel.TransferWorkspaceOwnershipInput)), true
 	case "Mutation.updateIntegrationOfWorkspace":
 		if e.complexity.Mutation.UpdateIntegrationOfWorkspace == nil {
 			break
@@ -804,6 +819,17 @@ func (e *executableSchema) Complexity(ctx context.Context, typeName, field strin
 		}
 
 		return e.complexity.Query.FindByUserWithPagination(childComplexity, args["userId"].(gqlmodel.ID), args["pagination"].(gqlmodel.Pagination)), true
+	case "Query.findUserByAlias":
+		if e.complexity.Query.FindUserByAlias == nil {
+			break
+		}
+
+		args, err := ec.field_Query_findUserByAlias_args(ctx, rawArgs)
+		if err != nil {
+			return 0, false
+		}
+
+		return e.complexity.Query.FindUserByAlias(childComplexity, args["alias"].(string)), true
 	case "Query.findUsersByIDs":
 		if e.complexity.Query.FindUsersByIDs == nil {
 			break
@@ -1252,6 +1278,7 @@ func (e *executableSchema) Exec(ctx context.Context) graphql.ResponseHandler {
 		ec.unmarshalInputSignupInput,
 		ec.unmarshalInputSignupOIDCInput,
 		ec.unmarshalInputStartPasswordResetInput,
+		ec.unmarshalInputTransferWorkspaceOwnershipInput,
 		ec.unmarshalInputUpdateIntegrationOfWorkspaceInput,
 		ec.unmarshalInputUpdateMeInput,
 		ec.unmarshalInputUpdatePermittableInput,
@@ -1390,6 +1417,7 @@ schema {
   service: String!
   resource: String!
   action: String!
+  workspaceAlias: String
 }
 
 type CheckPermissionPayload {
@@ -1581,6 +1609,7 @@ extend type Query {
   userByNameOrEmail(nameOrEmail: String!): User
   searchUser(keyword: String!): [User!]!
   findUsersByIDs(ids: [ID!]!): [User!]!
+  findUserByAlias(alias: String!): User
 }
 
 type UserPayload {
@@ -1652,9 +1681,9 @@ enum Role {
     READER
     # a role who can read and write project
     WRITER
-    # a eole who can have full control of project
+    # a role who can have full control of project
     OWNER
-    # a eole who can maintain a project
+    # a role who can maintain a project
     MAINTAINER
 }
 
@@ -1726,6 +1755,11 @@ input DeleteWorkspaceInput {
     workspaceId: ID!
 }
 
+input TransferWorkspaceOwnershipInput {
+    workspaceId: ID!
+    newOwnerId: ID!
+}
+
 # extend type Query { }
 
 type CreateWorkspacePayload {
@@ -1781,6 +1815,7 @@ extend type Mutation {
     removeIntegrationsFromWorkspace(input: RemoveIntegrationsFromWorkspaceInput!): RemoveIntegrationsFromWorkspacePayload
     updateUserOfWorkspace(input: UpdateUserOfWorkspaceInput!): UpdateMemberOfWorkspacePayload
     updateIntegrationOfWorkspace(input: UpdateIntegrationOfWorkspaceInput!): UpdateMemberOfWorkspacePayload
+    transferWorkspaceOwnership(input: TransferWorkspaceOwnershipInput!): UpdateMemberOfWorkspacePayload
 }`, BuiltIn: false},
 }
 var parsedSchema = gqlparser.MustLoadSchema(sources...)
@@ -1987,6 +2022,17 @@ func (ec *executionContext) field_Mutation_startPasswordReset_args(ctx context.C
 	return args, nil
 }
 
+func (ec *executionContext) field_Mutation_transferWorkspaceOwnership_args(ctx context.Context, rawArgs map[string]any) (map[string]any, error) {
+	var err error
+	args := map[string]any{}
+	arg0, err := graphql.ProcessArgField(ctx, rawArgs, "input", ec.unmarshalNTransferWorkspaceOwnershipInput2githubᚗcomᚋreearthᚋreearthᚑaccountsᚋserverᚋinternalᚋadapterᚋgqlᚋgqlmodelᚐTransferWorkspaceOwnershipInput)
+	if err != nil {
+		return nil, err
+	}
+	args["input"] = arg0
+	return args, nil
+}
+
 func (ec *executionContext) field_Mutation_updateIntegrationOfWorkspace_args(ctx context.Context, rawArgs map[string]any) (map[string]any, error) {
 	var err error
 	args := map[string]any{}
@@ -2154,6 +2200,17 @@ func (ec *executionContext) field_Query_findByUser_args(ctx context.Context, raw
 		return nil, err
 	}
 	args["userId"] = arg0
+	return args, nil
+}
+
+func (ec *executionContext) field_Query_findUserByAlias_args(ctx context.Context, rawArgs map[string]any) (map[string]any, error) {
+	var err error
+	args := map[string]any{}
+	arg0, err := graphql.ProcessArgField(ctx, rawArgs, "alias", ec.unmarshalNString2string)
+	if err != nil {
+		return nil, err
+	}
+	args["alias"] = arg0
 	return args, nil
 }
 
@@ -3917,6 +3974,51 @@ func (ec *executionContext) fieldContext_Mutation_updateIntegrationOfWorkspace(c
 	return fc, nil
 }
 
+func (ec *executionContext) _Mutation_transferWorkspaceOwnership(ctx context.Context, field graphql.CollectedField) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		ec.fieldContext_Mutation_transferWorkspaceOwnership,
+		func(ctx context.Context) (any, error) {
+			fc := graphql.GetFieldContext(ctx)
+			return ec.resolvers.Mutation().TransferWorkspaceOwnership(ctx, fc.Args["input"].(gqlmodel.TransferWorkspaceOwnershipInput))
+		},
+		nil,
+		ec.marshalOUpdateMemberOfWorkspacePayload2ᚖgithubᚗcomᚋreearthᚋreearthᚑaccountsᚋserverᚋinternalᚋadapterᚋgqlᚋgqlmodelᚐUpdateMemberOfWorkspacePayload,
+		true,
+		false,
+	)
+}
+
+func (ec *executionContext) fieldContext_Mutation_transferWorkspaceOwnership(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "Mutation",
+		Field:      field,
+		IsMethod:   true,
+		IsResolver: true,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			switch field.Name {
+			case "workspace":
+				return ec.fieldContext_UpdateMemberOfWorkspacePayload_workspace(ctx, field)
+			}
+			return nil, fmt.Errorf("no field named %q was found under type UpdateMemberOfWorkspacePayload", field.Name)
+		},
+	}
+	defer func() {
+		if r := recover(); r != nil {
+			err = ec.Recover(ctx, r)
+			ec.Error(ctx, err)
+		}
+	}()
+	ctx = graphql.WithFieldContext(ctx, fc)
+	if fc.Args, err = ec.field_Mutation_transferWorkspaceOwnership_args(ctx, field.ArgumentMap(ec.Variables)); err != nil {
+		ec.Error(ctx, err)
+		return fc, err
+	}
+	return fc, nil
+}
+
 func (ec *executionContext) _Permittable_id(ctx context.Context, field graphql.CollectedField, obj *gqlmodel.Permittable) (ret graphql.Marshaler) {
 	return graphql.ResolveField(
 		ctx,
@@ -4423,6 +4525,67 @@ func (ec *executionContext) fieldContext_Query_findUsersByIDs(ctx context.Contex
 	}()
 	ctx = graphql.WithFieldContext(ctx, fc)
 	if fc.Args, err = ec.field_Query_findUsersByIDs_args(ctx, field.ArgumentMap(ec.Variables)); err != nil {
+		ec.Error(ctx, err)
+		return fc, err
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _Query_findUserByAlias(ctx context.Context, field graphql.CollectedField) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		ec.fieldContext_Query_findUserByAlias,
+		func(ctx context.Context) (any, error) {
+			fc := graphql.GetFieldContext(ctx)
+			return ec.resolvers.Query().FindUserByAlias(ctx, fc.Args["alias"].(string))
+		},
+		nil,
+		ec.marshalOUser2ᚖgithubᚗcomᚋreearthᚋreearthᚑaccountsᚋserverᚋinternalᚋadapterᚋgqlᚋgqlmodelᚐUser,
+		true,
+		false,
+	)
+}
+
+func (ec *executionContext) fieldContext_Query_findUserByAlias(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "Query",
+		Field:      field,
+		IsMethod:   true,
+		IsResolver: true,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			switch field.Name {
+			case "id":
+				return ec.fieldContext_User_id(ctx, field)
+			case "name":
+				return ec.fieldContext_User_name(ctx, field)
+			case "alias":
+				return ec.fieldContext_User_alias(ctx, field)
+			case "email":
+				return ec.fieldContext_User_email(ctx, field)
+			case "host":
+				return ec.fieldContext_User_host(ctx, field)
+			case "workspace":
+				return ec.fieldContext_User_workspace(ctx, field)
+			case "auths":
+				return ec.fieldContext_User_auths(ctx, field)
+			case "metadata":
+				return ec.fieldContext_User_metadata(ctx, field)
+			case "verification":
+				return ec.fieldContext_User_verification(ctx, field)
+			}
+			return nil, fmt.Errorf("no field named %q was found under type User", field.Name)
+		},
+	}
+	defer func() {
+		if r := recover(); r != nil {
+			err = ec.Recover(ctx, r)
+			ec.Error(ctx, err)
+		}
+	}()
+	ctx = graphql.WithFieldContext(ctx, fc)
+	if fc.Args, err = ec.field_Query_findUserByAlias_args(ctx, field.ArgumentMap(ec.Variables)); err != nil {
 		ec.Error(ctx, err)
 		return fc, err
 	}
@@ -8222,7 +8385,7 @@ func (ec *executionContext) unmarshalInputCheckPermissionInput(ctx context.Conte
 		asMap[k] = v
 	}
 
-	fieldsInOrder := [...]string{"service", "resource", "action"}
+	fieldsInOrder := [...]string{"service", "resource", "action", "workspaceAlias"}
 	for _, k := range fieldsInOrder {
 		v, ok := asMap[k]
 		if !ok {
@@ -8250,6 +8413,13 @@ func (ec *executionContext) unmarshalInputCheckPermissionInput(ctx context.Conte
 				return it, err
 			}
 			it.Action = data
+		case "workspaceAlias":
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("workspaceAlias"))
+			data, err := ec.unmarshalOString2ᚖstring(ctx, v)
+			if err != nil {
+				return it, err
+			}
+			it.WorkspaceAlias = data
 		}
 	}
 
@@ -8884,6 +9054,40 @@ func (ec *executionContext) unmarshalInputStartPasswordResetInput(ctx context.Co
 				return it, err
 			}
 			it.Email = data
+		}
+	}
+
+	return it, nil
+}
+
+func (ec *executionContext) unmarshalInputTransferWorkspaceOwnershipInput(ctx context.Context, obj any) (gqlmodel.TransferWorkspaceOwnershipInput, error) {
+	var it gqlmodel.TransferWorkspaceOwnershipInput
+	asMap := map[string]any{}
+	for k, v := range obj.(map[string]any) {
+		asMap[k] = v
+	}
+
+	fieldsInOrder := [...]string{"workspaceId", "newOwnerId"}
+	for _, k := range fieldsInOrder {
+		v, ok := asMap[k]
+		if !ok {
+			continue
+		}
+		switch k {
+		case "workspaceId":
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("workspaceId"))
+			data, err := ec.unmarshalNID2githubᚗcomᚋreearthᚋreearthᚑaccountsᚋserverᚋinternalᚋadapterᚋgqlᚋgqlmodelᚐID(ctx, v)
+			if err != nil {
+				return it, err
+			}
+			it.WorkspaceID = data
+		case "newOwnerId":
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("newOwnerId"))
+			data, err := ec.unmarshalNID2githubᚗcomᚋreearthᚋreearthᚑaccountsᚋserverᚋinternalᚋadapterᚋgqlᚋgqlmodelᚐID(ctx, v)
+			if err != nil {
+				return it, err
+			}
+			it.NewOwnerID = data
 		}
 	}
 
@@ -9716,6 +9920,10 @@ func (ec *executionContext) _Mutation(ctx context.Context, sel ast.SelectionSet)
 			out.Values[i] = ec.OperationContext.RootResolverMiddleware(innerCtx, func(ctx context.Context) (res graphql.Marshaler) {
 				return ec._Mutation_updateIntegrationOfWorkspace(ctx, field)
 			})
+		case "transferWorkspaceOwnership":
+			out.Values[i] = ec.OperationContext.RootResolverMiddleware(innerCtx, func(ctx context.Context) (res graphql.Marshaler) {
+				return ec._Mutation_transferWorkspaceOwnership(ctx, field)
+			})
 		default:
 			panic("unknown field " + strconv.Quote(field.Name))
 		}
@@ -9978,6 +10186,25 @@ func (ec *executionContext) _Query(ctx context.Context, sel ast.SelectionSet) gr
 				if res == graphql.Null {
 					atomic.AddUint32(&fs.Invalids, 1)
 				}
+				return res
+			}
+
+			rrm := func(ctx context.Context) graphql.Marshaler {
+				return ec.OperationContext.RootResolverMiddleware(ctx,
+					func(ctx context.Context) graphql.Marshaler { return innerFunc(ctx, out) })
+			}
+
+			out.Concurrently(i, func(ctx context.Context) graphql.Marshaler { return rrm(innerCtx) })
+		case "findUserByAlias":
+			field := field
+
+			innerFunc := func(ctx context.Context, _ *graphql.FieldSet) (res graphql.Marshaler) {
+				defer func() {
+					if r := recover(); r != nil {
+						ec.Error(ctx, ec.Recover(ctx, r))
+					}
+				}()
+				res = ec._Query_findUserByAlias(ctx, field)
 				return res
 			}
 
@@ -11853,6 +12080,11 @@ func (ec *executionContext) unmarshalNTheme2githubᚗcomᚋreearthᚋreearthᚑa
 
 func (ec *executionContext) marshalNTheme2githubᚗcomᚋreearthᚋreearthᚑaccountsᚋserverᚋinternalᚋadapterᚋgqlᚋgqlmodelᚐTheme(ctx context.Context, sel ast.SelectionSet, v gqlmodel.Theme) graphql.Marshaler {
 	return v
+}
+
+func (ec *executionContext) unmarshalNTransferWorkspaceOwnershipInput2githubᚗcomᚋreearthᚋreearthᚑaccountsᚋserverᚋinternalᚋadapterᚋgqlᚋgqlmodelᚐTransferWorkspaceOwnershipInput(ctx context.Context, v any) (gqlmodel.TransferWorkspaceOwnershipInput, error) {
+	res, err := ec.unmarshalInputTransferWorkspaceOwnershipInput(ctx, v)
+	return res, graphql.ErrorOnPath(ctx, err)
 }
 
 func (ec *executionContext) unmarshalNUpdateIntegrationOfWorkspaceInput2githubᚗcomᚋreearthᚋreearthᚑaccountsᚋserverᚋinternalᚋadapterᚋgqlᚋgqlmodelᚐUpdateIntegrationOfWorkspaceInput(ctx context.Context, v any) (gqlmodel.UpdateIntegrationOfWorkspaceInput, error) {

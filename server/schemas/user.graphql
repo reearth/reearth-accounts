@@ -103,6 +103,7 @@ extend type Query {
   userByNameOrEmail(nameOrEmail: String!): User
   searchUser(keyword: String!): [User!]!
   findUsersByIDs(ids: [ID!]!): [User!]!
+  findUserByAlias(alias: String!): User
 }
 
 type UserPayload {

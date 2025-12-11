@@ -182,3 +182,11 @@ func (w *Workspace) Remove(ctx context.Context, id workspace.ID, op *usecase.Ope
 	}
 	return nil
 }
+
+func (w *Workspace) TransferOwnership(ctx context.Context, id workspace.ID, newOwnerID accountid.UserID, op *usecase.Operator) (*workspace.Workspace, error) {
+	res, err := TransferWorkspaceOwnership(ctx, w.gql, TransferWorkspaceOwnershipInput{WorkspaceId: id.String(), NewOwnerId: newOwnerID.String()})
+	if err != nil {
+		return nil, err
+	}
+	return ToWorkspace(res.TransferWorkspaceOwnership.Workspace.FragmentWorkspace)
+}

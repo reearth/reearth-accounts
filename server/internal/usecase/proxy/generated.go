@@ -2552,6 +2552,132 @@ type StartPasswordResetResponse struct {
 // GetStartPasswordReset returns StartPasswordResetResponse.StartPasswordReset, and is useful for accessing the field via an interface.
 func (v *StartPasswordResetResponse) GetStartPasswordReset() bool { return v.StartPasswordReset }
 
+type TransferWorkspaceOwnershipInput struct {
+	WorkspaceId string `json:"workspaceId"`
+	NewOwnerId  string `json:"newOwnerId"`
+}
+
+// GetWorkspaceId returns TransferWorkspaceOwnershipInput.WorkspaceId, and is useful for accessing the field via an interface.
+func (v *TransferWorkspaceOwnershipInput) GetWorkspaceId() string { return v.WorkspaceId }
+
+// GetNewOwnerId returns TransferWorkspaceOwnershipInput.NewOwnerId, and is useful for accessing the field via an interface.
+func (v *TransferWorkspaceOwnershipInput) GetNewOwnerId() string { return v.NewOwnerId }
+
+// TransferWorkspaceOwnershipResponse is returned by TransferWorkspaceOwnership on success.
+type TransferWorkspaceOwnershipResponse struct {
+	TransferWorkspaceOwnership TransferWorkspaceOwnershipTransferWorkspaceOwnershipUpdateMemberOfWorkspacePayload `json:"transferWorkspaceOwnership"`
+}
+
+// GetTransferWorkspaceOwnership returns TransferWorkspaceOwnershipResponse.TransferWorkspaceOwnership, and is useful for accessing the field via an interface.
+func (v *TransferWorkspaceOwnershipResponse) GetTransferWorkspaceOwnership() TransferWorkspaceOwnershipTransferWorkspaceOwnershipUpdateMemberOfWorkspacePayload {
+	return v.TransferWorkspaceOwnership
+}
+
+// TransferWorkspaceOwnershipTransferWorkspaceOwnershipUpdateMemberOfWorkspacePayload includes the requested fields of the GraphQL type UpdateMemberOfWorkspacePayload.
+type TransferWorkspaceOwnershipTransferWorkspaceOwnershipUpdateMemberOfWorkspacePayload struct {
+	Workspace TransferWorkspaceOwnershipTransferWorkspaceOwnershipUpdateMemberOfWorkspacePayloadWorkspace `json:"workspace"`
+}
+
+// GetWorkspace returns TransferWorkspaceOwnershipTransferWorkspaceOwnershipUpdateMemberOfWorkspacePayload.Workspace, and is useful for accessing the field via an interface.
+func (v *TransferWorkspaceOwnershipTransferWorkspaceOwnershipUpdateMemberOfWorkspacePayload) GetWorkspace() TransferWorkspaceOwnershipTransferWorkspaceOwnershipUpdateMemberOfWorkspacePayloadWorkspace {
+	return v.Workspace
+}
+
+// TransferWorkspaceOwnershipTransferWorkspaceOwnershipUpdateMemberOfWorkspacePayloadWorkspace includes the requested fields of the GraphQL type Workspace.
+type TransferWorkspaceOwnershipTransferWorkspaceOwnershipUpdateMemberOfWorkspacePayloadWorkspace struct {
+	FragmentWorkspace `json:"-"`
+}
+
+// GetId returns TransferWorkspaceOwnershipTransferWorkspaceOwnershipUpdateMemberOfWorkspacePayloadWorkspace.Id, and is useful for accessing the field via an interface.
+func (v *TransferWorkspaceOwnershipTransferWorkspaceOwnershipUpdateMemberOfWorkspacePayloadWorkspace) GetId() string {
+	return v.FragmentWorkspace.Id
+}
+
+// GetName returns TransferWorkspaceOwnershipTransferWorkspaceOwnershipUpdateMemberOfWorkspacePayloadWorkspace.Name, and is useful for accessing the field via an interface.
+func (v *TransferWorkspaceOwnershipTransferWorkspaceOwnershipUpdateMemberOfWorkspacePayloadWorkspace) GetName() string {
+	return v.FragmentWorkspace.Name
+}
+
+// GetPersonal returns TransferWorkspaceOwnershipTransferWorkspaceOwnershipUpdateMemberOfWorkspacePayloadWorkspace.Personal, and is useful for accessing the field via an interface.
+func (v *TransferWorkspaceOwnershipTransferWorkspaceOwnershipUpdateMemberOfWorkspacePayloadWorkspace) GetPersonal() bool {
+	return v.FragmentWorkspace.Personal
+}
+
+// GetMembers returns TransferWorkspaceOwnershipTransferWorkspaceOwnershipUpdateMemberOfWorkspacePayloadWorkspace.Members, and is useful for accessing the field via an interface.
+func (v *TransferWorkspaceOwnershipTransferWorkspaceOwnershipUpdateMemberOfWorkspacePayloadWorkspace) GetMembers() []FragmentWorkspaceMembersWorkspaceMember {
+	return v.FragmentWorkspace.Members
+}
+
+func (v *TransferWorkspaceOwnershipTransferWorkspaceOwnershipUpdateMemberOfWorkspacePayloadWorkspace) UnmarshalJSON(b []byte) error {
+
+	if string(b) == "null" {
+		return nil
+	}
+
+	var firstPass struct {
+		*TransferWorkspaceOwnershipTransferWorkspaceOwnershipUpdateMemberOfWorkspacePayloadWorkspace
+		graphql.NoUnmarshalJSON
+	}
+	firstPass.TransferWorkspaceOwnershipTransferWorkspaceOwnershipUpdateMemberOfWorkspacePayloadWorkspace = v
+
+	err := json.Unmarshal(b, &firstPass)
+	if err != nil {
+		return err
+	}
+
+	err = json.Unmarshal(
+		b, &v.FragmentWorkspace)
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
+type __premarshalTransferWorkspaceOwnershipTransferWorkspaceOwnershipUpdateMemberOfWorkspacePayloadWorkspace struct {
+	Id string `json:"id"`
+
+	Name string `json:"name"`
+
+	Personal bool `json:"personal"`
+
+	Members []json.RawMessage `json:"members"`
+}
+
+func (v *TransferWorkspaceOwnershipTransferWorkspaceOwnershipUpdateMemberOfWorkspacePayloadWorkspace) MarshalJSON() ([]byte, error) {
+	premarshaled, err := v.__premarshalJSON()
+	if err != nil {
+		return nil, err
+	}
+	return json.Marshal(premarshaled)
+}
+
+func (v *TransferWorkspaceOwnershipTransferWorkspaceOwnershipUpdateMemberOfWorkspacePayloadWorkspace) __premarshalJSON() (*__premarshalTransferWorkspaceOwnershipTransferWorkspaceOwnershipUpdateMemberOfWorkspacePayloadWorkspace, error) {
+	var retval __premarshalTransferWorkspaceOwnershipTransferWorkspaceOwnershipUpdateMemberOfWorkspacePayloadWorkspace
+
+	retval.Id = v.FragmentWorkspace.Id
+	retval.Name = v.FragmentWorkspace.Name
+	retval.Personal = v.FragmentWorkspace.Personal
+	{
+
+		dst := &retval.Members
+		src := v.FragmentWorkspace.Members
+		*dst = make(
+			[]json.RawMessage,
+			len(src))
+		for i, src := range src {
+			dst := &(*dst)[i]
+			var err error
+			*dst, err = __marshalFragmentWorkspaceMembersWorkspaceMember(
+				&src)
+			if err != nil {
+				return nil, fmt.Errorf(
+					"unable to marshal TransferWorkspaceOwnershipTransferWorkspaceOwnershipUpdateMemberOfWorkspacePayloadWorkspace.FragmentWorkspace.Members: %w", err)
+			}
+		}
+	}
+	return &retval, nil
+}
+
 type UpdateIntegrationOfWorkspaceInput struct {
 	WorkspaceId   string `json:"workspaceId"`
 	IntegrationId string `json:"integrationId"`
@@ -3065,6 +3191,114 @@ func (v *UpdateWorkspaceUpdateWorkspaceUpdateWorkspacePayloadWorkspace) __premar
 		}
 	}
 	return &retval, nil
+}
+
+// UserByAliasFindUserByAliasUser includes the requested fields of the GraphQL type User.
+type UserByAliasFindUserByAliasUser struct {
+	FragmentUser `json:"-"`
+}
+
+// GetId returns UserByAliasFindUserByAliasUser.Id, and is useful for accessing the field via an interface.
+func (v *UserByAliasFindUserByAliasUser) GetId() string { return v.FragmentUser.Id }
+
+// GetName returns UserByAliasFindUserByAliasUser.Name, and is useful for accessing the field via an interface.
+func (v *UserByAliasFindUserByAliasUser) GetName() string { return v.FragmentUser.Name }
+
+// GetAlias returns UserByAliasFindUserByAliasUser.Alias, and is useful for accessing the field via an interface.
+func (v *UserByAliasFindUserByAliasUser) GetAlias() string { return v.FragmentUser.Alias }
+
+// GetEmail returns UserByAliasFindUserByAliasUser.Email, and is useful for accessing the field via an interface.
+func (v *UserByAliasFindUserByAliasUser) GetEmail() string { return v.FragmentUser.Email }
+
+// GetMetadata returns UserByAliasFindUserByAliasUser.Metadata, and is useful for accessing the field via an interface.
+func (v *UserByAliasFindUserByAliasUser) GetMetadata() FragmentUserMetadata {
+	return v.FragmentUser.Metadata
+}
+
+// GetWorkspace returns UserByAliasFindUserByAliasUser.Workspace, and is useful for accessing the field via an interface.
+func (v *UserByAliasFindUserByAliasUser) GetWorkspace() string { return v.FragmentUser.Workspace }
+
+// GetAuths returns UserByAliasFindUserByAliasUser.Auths, and is useful for accessing the field via an interface.
+func (v *UserByAliasFindUserByAliasUser) GetAuths() []string { return v.FragmentUser.Auths }
+
+// GetVerification returns UserByAliasFindUserByAliasUser.Verification, and is useful for accessing the field via an interface.
+func (v *UserByAliasFindUserByAliasUser) GetVerification() FragmentUserVerification {
+	return v.FragmentUser.Verification
+}
+
+func (v *UserByAliasFindUserByAliasUser) UnmarshalJSON(b []byte) error {
+
+	if string(b) == "null" {
+		return nil
+	}
+
+	var firstPass struct {
+		*UserByAliasFindUserByAliasUser
+		graphql.NoUnmarshalJSON
+	}
+	firstPass.UserByAliasFindUserByAliasUser = v
+
+	err := json.Unmarshal(b, &firstPass)
+	if err != nil {
+		return err
+	}
+
+	err = json.Unmarshal(
+		b, &v.FragmentUser)
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
+type __premarshalUserByAliasFindUserByAliasUser struct {
+	Id string `json:"id"`
+
+	Name string `json:"name"`
+
+	Alias string `json:"alias"`
+
+	Email string `json:"email"`
+
+	Metadata FragmentUserMetadata `json:"metadata"`
+
+	Workspace string `json:"workspace"`
+
+	Auths []string `json:"auths"`
+
+	Verification FragmentUserVerification `json:"verification"`
+}
+
+func (v *UserByAliasFindUserByAliasUser) MarshalJSON() ([]byte, error) {
+	premarshaled, err := v.__premarshalJSON()
+	if err != nil {
+		return nil, err
+	}
+	return json.Marshal(premarshaled)
+}
+
+func (v *UserByAliasFindUserByAliasUser) __premarshalJSON() (*__premarshalUserByAliasFindUserByAliasUser, error) {
+	var retval __premarshalUserByAliasFindUserByAliasUser
+
+	retval.Id = v.FragmentUser.Id
+	retval.Name = v.FragmentUser.Name
+	retval.Alias = v.FragmentUser.Alias
+	retval.Email = v.FragmentUser.Email
+	retval.Metadata = v.FragmentUser.Metadata
+	retval.Workspace = v.FragmentUser.Workspace
+	retval.Auths = v.FragmentUser.Auths
+	retval.Verification = v.FragmentUser.Verification
+	return &retval, nil
+}
+
+// UserByAliasResponse is returned by UserByAlias on success.
+type UserByAliasResponse struct {
+	FindUserByAlias UserByAliasFindUserByAliasUser `json:"findUserByAlias"`
+}
+
+// GetFindUserByAlias returns UserByAliasResponse.FindUserByAlias, and is useful for accessing the field via an interface.
+func (v *UserByAliasResponse) GetFindUserByAlias() UserByAliasFindUserByAliasUser {
+	return v.FindUserByAlias
 }
 
 // UserByIDsNodesNode includes the requested fields of the GraphQL interface Node.
@@ -3970,6 +4204,16 @@ type __StartPasswordResetInput struct {
 // GetInput returns __StartPasswordResetInput.Input, and is useful for accessing the field via an interface.
 func (v *__StartPasswordResetInput) GetInput() StartPasswordResetInput { return v.Input }
 
+// __TransferWorkspaceOwnershipInput is used internally by genqlient
+type __TransferWorkspaceOwnershipInput struct {
+	Input TransferWorkspaceOwnershipInput `json:"input"`
+}
+
+// GetInput returns __TransferWorkspaceOwnershipInput.Input, and is useful for accessing the field via an interface.
+func (v *__TransferWorkspaceOwnershipInput) GetInput() TransferWorkspaceOwnershipInput {
+	return v.Input
+}
+
 // __UpdateIntegrationOfWorkspaceInput is used internally by genqlient
 type __UpdateIntegrationOfWorkspaceInput struct {
 	Input UpdateIntegrationOfWorkspaceInput `json:"input"`
@@ -4003,6 +4247,14 @@ type __UpdateWorkspaceInput struct {
 
 // GetInput returns __UpdateWorkspaceInput.Input, and is useful for accessing the field via an interface.
 func (v *__UpdateWorkspaceInput) GetInput() UpdateWorkspaceInput { return v.Input }
+
+// __UserByAliasInput is used internally by genqlient
+type __UserByAliasInput struct {
+	Alias string `json:"alias"`
+}
+
+// GetAlias returns __UserByAliasInput.Alias, and is useful for accessing the field via an interface.
+func (v *__UserByAliasInput) GetAlias() string { return v.Alias }
 
 // __UserByIDsInput is used internally by genqlient
 type __UserByIDsInput struct {
@@ -5147,6 +5399,60 @@ func StartPasswordReset(
 	return data_, err_
 }
 
+// The mutation executed by TransferWorkspaceOwnership.
+const TransferWorkspaceOwnership_Operation = `
+mutation TransferWorkspaceOwnership ($input: TransferWorkspaceOwnershipInput!) {
+	transferWorkspaceOwnership(input: $input) {
+		workspace {
+			... FragmentWorkspace
+		}
+	}
+}
+fragment FragmentWorkspace on Workspace {
+	id
+	name
+	personal
+	members {
+		__typename
+		... on WorkspaceUserMember {
+			userId
+			role
+		}
+		... on WorkspaceIntegrationMember {
+			integrationId
+			role
+			active
+			invitedById
+		}
+	}
+}
+`
+
+func TransferWorkspaceOwnership(
+	ctx_ context.Context,
+	client_ graphql.Client,
+	input TransferWorkspaceOwnershipInput,
+) (data_ *TransferWorkspaceOwnershipResponse, err_ error) {
+	req_ := &graphql.Request{
+		OpName: "TransferWorkspaceOwnership",
+		Query:  TransferWorkspaceOwnership_Operation,
+		Variables: &__TransferWorkspaceOwnershipInput{
+			Input: input,
+		},
+	}
+
+	data_ = &TransferWorkspaceOwnershipResponse{}
+	resp_ := &graphql.Response{Data: data_}
+
+	err_ = client_.MakeRequest(
+		ctx_,
+		req_,
+		resp_,
+	)
+
+	return data_, err_
+}
+
 // The mutation executed by UpdateIntegrationOfWorkspace.
 const UpdateIntegrationOfWorkspace_Operation = `
 mutation UpdateIntegrationOfWorkspace ($input: UpdateIntegrationOfWorkspaceInput!) {
@@ -5348,6 +5654,60 @@ func UpdateWorkspace(
 	}
 
 	data_ = &UpdateWorkspaceResponse{}
+	resp_ := &graphql.Response{Data: data_}
+
+	err_ = client_.MakeRequest(
+		ctx_,
+		req_,
+		resp_,
+	)
+
+	return data_, err_
+}
+
+// The query executed by UserByAlias.
+const UserByAlias_Operation = `
+query UserByAlias ($alias: String!) {
+	findUserByAlias(alias: $alias) {
+		... FragmentUser
+	}
+}
+fragment FragmentUser on User {
+	id
+	name
+	alias
+	email
+	metadata {
+		description
+		lang
+		photoURL
+		theme
+		website
+	}
+	workspace
+	auths
+	verification {
+		code
+		expiration
+		verified
+	}
+}
+`
+
+func UserByAlias(
+	ctx_ context.Context,
+	client_ graphql.Client,
+	alias string,
+) (data_ *UserByAliasResponse, err_ error) {
+	req_ := &graphql.Request{
+		OpName: "UserByAlias",
+		Query:  UserByAlias_Operation,
+		Variables: &__UserByAliasInput{
+			Alias: alias,
+		},
+	}
+
+	data_ = &UserByAliasResponse{}
 	resp_ := &graphql.Response{Data: data_}
 
 	err_ = client_.MakeRequest(

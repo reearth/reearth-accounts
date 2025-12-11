@@ -136,10 +136,21 @@ func (r *Workspace) FindByAlias(ctx context.Context, alias string) (*workspace.W
 	if err != nil {
 		return nil, err
 	}
-	if !r.f.CanRead(w.ID()) {
-		return nil, rerror.ErrNotFound
-	}
 	return w, nil
+}
+
+func (r *Workspace) FindByAliases(ctx context.Context, aliases []string) (workspace.List, error) {
+	if len(aliases) == 0 {
+		return nil, nil
+	}
+
+	res, err := r.find(ctx, bson.M{
+		"alias": bson.M{"$in": aliases},
+	})
+	if err != nil {
+		return nil, err
+	}
+	return res, nil
 }
 
 func (r *Workspace) Create(ctx context.Context, workspace *workspace.Workspace) error {
@@ -204,7 +215,6 @@ func (r *Workspace) RemoveAll(ctx context.Context, ids id.WorkspaceIDList) error
 
 func (r *Workspace) find(ctx context.Context, filter any) (workspace.List, error) {
 	c := mongodoc.NewWorkspaceConsumer()
-	filter = r.f.Filter(filter)
 	if err := r.client.Find(ctx, filter, c); err != nil {
 		return nil, err
 	}
@@ -213,7 +223,6 @@ func (r *Workspace) find(ctx context.Context, filter any) (workspace.List, error
 
 func (r *Workspace) findOne(ctx context.Context, filter any) (*workspace.Workspace, error) {
 	c := mongodoc.NewWorkspaceConsumer()
-	filter = r.f.Filter(filter)
 	if err := r.client.FindOne(ctx, filter, c); err != nil {
 		return nil, err
 	}
