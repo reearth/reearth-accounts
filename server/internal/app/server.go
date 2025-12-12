@@ -91,7 +91,9 @@ func Start(debug bool) {
 
 	// Cerbos
 	var opts []cerbos.Opt
-	opts = append(opts, cerbos.WithPlaintext(), cerbos.WithTLSInsecure())
+	if !conf.CerbosUseSSL {
+		opts = append(opts, cerbos.WithPlaintext(), cerbos.WithTLSInsecure())
+	}
 
 	cerbosClient, err := cerbos.New(conf.CerbosHost, opts...)
 	if err != nil {
