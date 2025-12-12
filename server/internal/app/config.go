@@ -46,7 +46,8 @@ type Config struct {
 	Published_Host string
 
 	// cerbos
-	CerbosHost string `envconfig:"CERBOS_HOST"`
+	CerbosUseSSL bool   `envconfig:"REEARTH_ACCOUNTS_CERBOS_USE_SSL" default:"true"`
+	CerbosHost   string `envconfig:"CERBOS_HOST"`
 
 	// Storage
 	StorageIsLocal          bool   `envconfig:"REEARTH_ACCOUNTS_STORAGE_IS_LOCAL"`
