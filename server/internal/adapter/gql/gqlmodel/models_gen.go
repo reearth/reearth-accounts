@@ -415,10 +415,10 @@ func (e NodeType) MarshalJSON() ([]byte, error) {
 type Role string
 
 const (
-	RoleReader     Role = "READER"
-	RoleWriter     Role = "WRITER"
-	RoleOwner      Role = "OWNER"
-	RoleMaintainer Role = "MAINTAINER"
+	RoleReader     Role = "reader"
+	RoleWriter     Role = "writer"
+	RoleOwner      Role = "owner"
+	RoleMaintainer Role = "maintainer"
 )
 
 var AllRole = []Role{
