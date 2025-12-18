@@ -94,7 +94,7 @@ func mockAuthMiddleware(cfg *ServerConfig) func(http.Handler) http.Handler {
 			}
 
 			// Load demo user from database by name
-			const demoUserName = "Demo User"
+			const demoUserName = "Demo user"
 			usr, err := cfg.Repos.User.FindByName(ctx, demoUserName)
 			if err != nil {
 				log.Errorfc(ctx, "[mockAuthMiddleware] failed to find demo user by name: %s, error: %s", demoUserName, err.Error())
