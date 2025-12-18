@@ -74,61 +74,75 @@ func (i *User) Signup(ctx context.Context, param interfaces.SignupParam) (u *use
 		return nil, err
 	}
 
-	u, ws, err := workspace.Init(workspace.InitParams{
-		Email:       param.Email,
-		Name:        param.Name,
-		Password:    lo.ToPtr(param.Password),
-		Lang:        param.Lang,
-		Theme:       param.Theme,
-		UserID:      param.UserID,
-		WorkspaceID: param.WorkspaceID,
-	})
-	if err != nil {
-		return nil, err
-	}
-
-	vr := user.NewVerification()
-	u.SetVerification(vr)
-
-	if err = i.repos.User.Create(ctx, u); err != nil {
-		if errors.Is(err, repo.ErrDuplicatedUser) {
-			return nil, interfaces.ErrUserAlreadyExists
-		}
-		return nil, err
-	}
-	if err = i.repos.Workspace.Save(ctx, ws); err != nil {
-		if errors.Is(err, repo.ErrDuplicatedUser) {
-			return nil, interfaces.ErrUserAliasAlreadyExists
-		}
-		if errors.Is(err, repo.ErrDuplicateWorkspaceAlias) {
-			return nil, interfaces.ErrWorkspaceAliasAlreadyExists
-		}
-		return nil, err
-	}
-
-	roleSelf, err := i.repos.Role.FindByName(ctx, interfaces.RoleSelf)
-	if err != nil {
-		return nil, err
-	}
-
-	roleOwner, err := i.repos.Role.FindByName(ctx, workspace.RoleOwner.String())
-	if err != nil {
-		return nil, err
-	}
-
-	wsRole := permittable.NewWorkspaceRole(ws.ID(), roleOwner.ID())
-	perm := permittable.New().NewID().RoleIDs([]id.RoleID{roleSelf.ID()}).UserID(u.ID()).WorkspaceRoles([]permittable.WorkspaceRole{wsRole}).MustBuild()
-	if err = i.repos.Permittable.Save(ctx, lo.FromPtr(perm)); err != nil {
-		return nil, err
-	}
-
-	if !param.MockAuth {
-		if err = i.sendVerificationMail(ctx, u, vr); err != nil {
+	return Run1(ctx, nil, i.repos, Usecase().Transaction(), func(ctx context.Context) (*user.User, error) {
+		log.Debugfc(ctx, "[Signup] Inside transaction")
+		// Check for duplicate email
+		eu, err := i.repos.User.FindByEmail(ctx, param.Email)
+		if err != nil && !errors.Is(err, rerror.ErrNotFound) {
+			log.Errorfc(ctx, "[Signup] Error finding user by email: %v", err)
 			return nil, err
 		}
-	}
+		if eu != nil {
+			log.Warnfc(ctx, "[Signup] User already exists with email: %s", param.Email)
+			return nil, interfaces.ErrUserAlreadyExists
+		}
 
-	return u, nil
+		u, ws, err := workspace.Init(workspace.InitParams{
+			Email:       param.Email,
+			Name:        param.Name,
+			Password:    lo.ToPtr(param.Password),
+			Lang:        param.Lang,
+			Theme:       param.Theme,
+			UserID:      param.UserID,
+			WorkspaceID: param.WorkspaceID,
+		})
+		if err != nil {
+			return nil, err
+		}
+
+		vr := user.NewVerification()
+		u.SetVerification(vr)
+
+		if err = i.repos.User.Create(ctx, u); err != nil {
+			if errors.Is(err, repo.ErrDuplicatedUser) {
+				return nil, interfaces.ErrUserAlreadyExists
+			}
+			return nil, err
+		}
+		if err = i.repos.Workspace.Save(ctx, ws); err != nil {
+			if errors.Is(err, repo.ErrDuplicatedUser) {
+				return nil, interfaces.ErrUserAliasAlreadyExists
+			}
+			if errors.Is(err, repo.ErrDuplicateWorkspaceAlias) {
+				return nil, interfaces.ErrWorkspaceAliasAlreadyExists
+			}
+			return nil, err
+		}
+
+		roleSelf, err := i.repos.Role.FindByName(ctx, interfaces.RoleSelf)
+		if err != nil {
+			return nil, err
+		}
+
+		roleOwner, err := i.repos.Role.FindByName(ctx, workspace.RoleOwner.String())
+		if err != nil {
+			return nil, err
+		}
+
+		wsRole := permittable.NewWorkspaceRole(ws.ID(), roleOwner.ID())
+		perm := permittable.New().NewID().RoleIDs([]id.RoleID{roleSelf.ID()}).UserID(u.ID()).WorkspaceRoles([]permittable.WorkspaceRole{wsRole}).MustBuild()
+		if err = i.repos.Permittable.Save(ctx, lo.FromPtr(perm)); err != nil {
+			return nil, err
+		}
+
+		if !param.MockAuth {
+			if err = i.sendVerificationMail(ctx, u, vr); err != nil {
+				return nil, err
+			}
+		}
+
+		return u, nil
+	})
 }
 
 func (i *User) SignupOIDC(ctx context.Context, param interfaces.SignupOIDCParam) (*user.User, error) {
@@ -148,61 +162,63 @@ func (i *User) SignupOIDC(ctx context.Context, param interfaces.SignupOIDCParam)
 		email = ui.Email
 	}
 
-	eu, err := i.repos.User.FindByEmail(ctx, param.Email)
-	if err != nil && !errors.Is(err, rerror.ErrNotFound) {
-		return nil, err
-	}
-	if eu != nil {
-		return nil, repo.ErrDuplicatedUser
-	}
+	return Run1(ctx, nil, i.repos, Usecase().Transaction(), func(ctx context.Context) (*user.User, error) {
+		eu, err := i.repos.User.FindByEmail(ctx, param.Email)
+		if err != nil && !errors.Is(err, rerror.ErrNotFound) {
+			return nil, err
+		}
+		if eu != nil {
+			return nil, repo.ErrDuplicatedUser
+		}
 
-	eu, err = i.repos.User.FindBySub(ctx, param.Sub)
-	if err != nil && !errors.Is(err, rerror.ErrNotFound) {
-		return nil, err
-	}
-	if eu != nil {
-		return nil, repo.ErrDuplicatedUser
-	}
+		eu, err = i.repos.User.FindBySub(ctx, param.Sub)
+		if err != nil && !errors.Is(err, rerror.ErrNotFound) {
+			return nil, err
+		}
+		if eu != nil {
+			return nil, repo.ErrDuplicatedUser
+		}
 
-	// Initialize user and ws
-	u, ws, err := workspace.Init(workspace.InitParams{
-		Email:       email,
-		Name:        name,
-		Sub:         user.AuthFrom(sub).Ref(),
-		Lang:        param.User.Lang,
-		Theme:       param.User.Theme,
-		UserID:      param.User.UserID,
-		WorkspaceID: param.User.WorkspaceID,
+		// Initialize user and ws
+		u, ws, err := workspace.Init(workspace.InitParams{
+			Email:       email,
+			Name:        name,
+			Sub:         user.AuthFrom(sub).Ref(),
+			Lang:        param.User.Lang,
+			Theme:       param.User.Theme,
+			UserID:      param.User.UserID,
+			WorkspaceID: param.User.WorkspaceID,
+		})
+		if err != nil {
+			return nil, err
+		}
+
+		if err = i.repos.User.Create(ctx, u); err != nil {
+			return nil, err
+		}
+
+		if err = i.repos.Workspace.Save(ctx, ws); err != nil {
+			return nil, err
+		}
+
+		roleSelf, err := i.repos.Role.FindByName(ctx, interfaces.RoleSelf)
+		if err != nil {
+			return nil, err
+		}
+
+		roleOwner, err := i.repos.Role.FindByName(ctx, workspace.RoleOwner.String())
+		if err != nil {
+			return nil, err
+		}
+
+		wsRole := permittable.NewWorkspaceRole(ws.ID(), roleOwner.ID())
+		perm := permittable.New().NewID().RoleIDs([]id.RoleID{roleSelf.ID()}).UserID(u.ID()).WorkspaceRoles([]permittable.WorkspaceRole{wsRole}).MustBuild()
+		if err = i.repos.Permittable.Save(ctx, lo.FromPtr(perm)); err != nil {
+			return nil, err
+		}
+
+		return u, nil
 	})
-	if err != nil {
-		return nil, err
-	}
-
-	if err = i.repos.User.Create(ctx, u); err != nil {
-		return nil, err
-	}
-
-	if err = i.repos.Workspace.Save(ctx, ws); err != nil {
-		return nil, err
-	}
-
-	roleSelf, err := i.repos.Role.FindByName(ctx, interfaces.RoleSelf)
-	if err != nil {
-		return nil, err
-	}
-
-	roleOwner, err := i.repos.Role.FindByName(ctx, workspace.RoleOwner.String())
-	if err != nil {
-		return nil, err
-	}
-
-	wsRole := permittable.NewWorkspaceRole(ws.ID(), roleOwner.ID())
-	perm := permittable.New().NewID().RoleIDs([]id.RoleID{roleSelf.ID()}).UserID(u.ID()).WorkspaceRoles([]permittable.WorkspaceRole{wsRole}).MustBuild()
-	if err = i.repos.Permittable.Save(ctx, lo.FromPtr(perm)); err != nil {
-		return nil, err
-	}
-
-	return u, nil
 }
 
 func (i *User) FindOrCreate(ctx context.Context, param interfaces.UserFindOrCreateParam) (u *user.User, err error) {

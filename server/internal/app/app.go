@@ -92,10 +92,10 @@ func initEcho(ctx context.Context, cfg *ServerConfig) *echo.Echo {
 	api.POST(
 		"/graphql", GraphqlAPI(cfg.Config, cfg.Config.Dev),
 		middleware.CORSWithConfig(middleware.CORSConfig{AllowOrigins: origins}),
+		usecaseMiddleware,
 		echo.WrapMiddleware(jwt),
 		echo.WrapMiddleware(authMiddleware(cfg)),
 		cacheControl,
-		usecaseMiddleware,
 	)
 
 	return e

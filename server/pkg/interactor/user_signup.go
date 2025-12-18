@@ -72,39 +72,50 @@ func (i *User) Signup(ctx context.Context, param interfaces.SignupParam) (u *use
 		return nil, err
 	}
 
-	u, ws, err := workspace.Init(workspace.InitParams{
-		Email:       param.Email,
-		Name:        param.Name,
-		Password:    lo.ToPtr(param.Password),
-		Lang:        param.Lang,
-		Theme:       param.Theme,
-		UserID:      param.UserID,
-		WorkspaceID: param.WorkspaceID,
-	})
-	if err != nil {
-		return nil, err
-	}
-
-	vr := user.NewVerification()
-	u.SetVerification(vr)
-
-	if err = i.repos.User.Create(ctx, u); err != nil {
-		if errors.Is(err, repo.ErrDuplicatedUser) {
-			return nil, interfaces.ErrUserAlreadyExists
-		}
-		return nil, err
-	}
-	if err = i.repos.Workspace.Save(ctx, ws); err != nil {
-		return nil, err
-	}
-
-	if !param.MockAuth {
-		if err = i.sendVerificationMail(ctx, u, vr); err != nil {
+	return Run1(ctx, nil, i.repos, Usecase().Transaction(), func(ctx context.Context) (*user.User, error) {
+		// Check for duplicate email
+		eu, err := i.repos.User.FindByEmail(ctx, param.Email)
+		if err != nil && !errors.Is(err, rerror.ErrNotFound) {
 			return nil, err
 		}
-	}
+		if eu != nil {
+			return nil, interfaces.ErrUserAlreadyExists
+		}
 
-	return u, nil
+		u, ws, err := workspace.Init(workspace.InitParams{
+			Email:       param.Email,
+			Name:        param.Name,
+			Password:    lo.ToPtr(param.Password),
+			Lang:        param.Lang,
+			Theme:       param.Theme,
+			UserID:      param.UserID,
+			WorkspaceID: param.WorkspaceID,
+		})
+		if err != nil {
+			return nil, err
+		}
+
+		vr := user.NewVerification()
+		u.SetVerification(vr)
+
+		if err = i.repos.User.Create(ctx, u); err != nil {
+			if errors.Is(err, repo.ErrDuplicatedUser) {
+				return nil, interfaces.ErrUserAlreadyExists
+			}
+			return nil, err
+		}
+		if err = i.repos.Workspace.Save(ctx, ws); err != nil {
+			return nil, err
+		}
+
+		if !param.MockAuth {
+			if err = i.sendVerificationMail(ctx, u, vr); err != nil {
+				return nil, err
+			}
+		}
+
+		return u, nil
+	})
 }
 
 func (i *User) SignupOIDC(ctx context.Context, param interfaces.SignupOIDCParam) (*user.User, error) {
@@ -124,45 +135,47 @@ func (i *User) SignupOIDC(ctx context.Context, param interfaces.SignupOIDCParam)
 		email = ui.Email
 	}
 
-	eu, err := i.repos.User.FindByEmail(ctx, param.Email)
-	if err != nil && !errors.Is(err, rerror.ErrNotFound) {
-		return nil, err
-	}
-	if eu != nil {
-		return nil, repo.ErrDuplicatedUser
-	}
+	return Run1(ctx, nil, i.repos, Usecase().Transaction(), func(ctx context.Context) (*user.User, error) {
+		eu, err := i.repos.User.FindByEmail(ctx, param.Email)
+		if err != nil && !errors.Is(err, rerror.ErrNotFound) {
+			return nil, err
+		}
+		if eu != nil {
+			return nil, repo.ErrDuplicatedUser
+		}
 
-	eu, err = i.repos.User.FindBySub(ctx, param.Sub)
-	if err != nil && !errors.Is(err, rerror.ErrNotFound) {
-		return nil, err
-	}
-	if eu != nil {
-		return nil, repo.ErrDuplicatedUser
-	}
+		eu, err = i.repos.User.FindBySub(ctx, param.Sub)
+		if err != nil && !errors.Is(err, rerror.ErrNotFound) {
+			return nil, err
+		}
+		if eu != nil {
+			return nil, repo.ErrDuplicatedUser
+		}
 
-	// Initialize user and ws
-	u, ws, err := workspace.Init(workspace.InitParams{
-		Email:       email,
-		Name:        name,
-		Sub:         user.AuthFrom(sub).Ref(),
-		Lang:        param.User.Lang,
-		Theme:       param.User.Theme,
-		UserID:      param.User.UserID,
-		WorkspaceID: param.User.WorkspaceID,
+		// Initialize user and ws
+		u, ws, err := workspace.Init(workspace.InitParams{
+			Email:       email,
+			Name:        name,
+			Sub:         user.AuthFrom(sub).Ref(),
+			Lang:        param.User.Lang,
+			Theme:       param.User.Theme,
+			UserID:      param.User.UserID,
+			WorkspaceID: param.User.WorkspaceID,
+		})
+		if err != nil {
+			return nil, err
+		}
+
+		if err = i.repos.User.Create(ctx, u); err != nil {
+			return nil, err
+		}
+
+		if err = i.repos.Workspace.Save(ctx, ws); err != nil {
+			return nil, err
+		}
+
+		return u, nil
 	})
-	if err != nil {
-		return nil, err
-	}
-
-	if err = i.repos.User.Create(ctx, u); err != nil {
-		return nil, err
-	}
-
-	if err = i.repos.Workspace.Save(ctx, ws); err != nil {
-		return nil, err
-	}
-
-	return u, nil
 }
 
 func (i *User) FindOrCreate(ctx context.Context, param interfaces.UserFindOrCreateParam) (u *user.User, err error) {
