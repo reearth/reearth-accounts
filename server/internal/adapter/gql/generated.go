@@ -1678,13 +1678,13 @@ type WorkspacesWithPagination {
 
 enum Role {
     # a role who can read project
-    READER
+    reader
     # a role who can read and write project
-    WRITER
+    writer
     # a role who can have full control of project
-    OWNER
+    owner
     # a role who can maintain a project
-    MAINTAINER
+    maintainer
 }
 
 input Pagination {

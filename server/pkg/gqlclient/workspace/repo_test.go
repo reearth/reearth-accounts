@@ -45,7 +45,7 @@ func TestWorkspaceRepo_FindByUser(t *testing.T) {
 								"members": [
 									{
 										"userId": "01j9x0yy00000000000000000a",
-										"role": "OWNER"
+										"role": "owner"
 									}
 								]
 							},
@@ -68,7 +68,7 @@ func TestWorkspaceRepo_FindByUser(t *testing.T) {
 									},
 									{
 										"userId": "01j9x0yy00000000000000000b",
-										"role": "OWNER"
+										"role": "owner"
 									}
 								]
 							}
