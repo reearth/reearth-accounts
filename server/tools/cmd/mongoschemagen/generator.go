@@ -260,8 +260,9 @@ func determineBsonType(prop *jsonschema.Schema, parentType any, fieldName string
 }
 
 func toBsonFieldName(fieldName string) string {
-	// Convert to lowercase for BSON field naming convention
-	return strings.ToLower(fieldName)
+	// The fieldName comes from jsonschema library which uses the json tag value.
+	// We use it as-is since json tags should match bson field names.
+	return fieldName
 }
 
 func findFieldByJSONName(t reflect.Type, jsonFieldName string) (reflect.StructField, bool) {
