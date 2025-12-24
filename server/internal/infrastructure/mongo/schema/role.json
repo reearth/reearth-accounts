@@ -1,0 +1,26 @@
+{
+  "$jsonSchema": {
+    "additionalProperties": false,
+    "bsonType": "object",
+    "description": "Schema for role documents in the reearth-accounts database",
+    "properties": {
+      "_id": {
+        "bsonType": "objectId",
+        "description": "MongoDB internal ID"
+      },
+      "id": {
+        "bsonType": "string",
+        "description": "Role ID (ULID format)"
+      },
+      "name": {
+        "bsonType": "string",
+        "description": "Role name"
+      }
+    },
+    "required": [
+      "id",
+      "name"
+    ],
+    "title": "Role Collection Schema"
+  }
+}

@@ -6,14 +6,14 @@ import (
 )
 
 type ConfigDocument struct {
-	Migration     int64
-	Auth          *Auth
-	DefaultPolicy *policy.ID
+	Migration     int64      `json:"migration" jsonschema:"description=Current migration version number. Default: 0"`
+	Auth          *Auth      `json:"auth" jsonschema:"description=Authentication certificates configuration. Default: null"`
+	DefaultPolicy *policy.ID `json:"defaultpolicy" jsonschema:"description=Default policy ID. Default: null"`
 }
 
 type Auth struct {
-	Cert string
-	Key  string
+	Cert string `json:"cert" jsonschema:"description=Auth certificate (PEM format). Default: \"\""`
+	Key  string `json:"key" jsonschema:"description=Auth private key (PEM format). Default: \"\""`
 }
 
 func NewConfig(c config.Config) ConfigDocument {

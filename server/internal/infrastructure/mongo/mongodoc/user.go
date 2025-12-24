@@ -10,38 +10,38 @@ import (
 )
 
 type PasswordResetDocument struct {
-	Token     string
-	CreatedAt time.Time
+	Token     string    `json:"token" jsonschema:"description=Password reset token. Default: \"\""`
+	CreatedAt time.Time `json:"createdat" jsonschema:"description=Token creation timestamp"`
 }
 
 type UserDocument struct {
-	ID            string
-	Name          string
-	Alias         string
-	Email         string
-	Subs          []string
-	Workspace     string
-	Team          string `bson:",omitempty"`
-	Lang          string
-	Theme         string
-	Password      []byte
-	PasswordReset *PasswordResetDocument
-	Verification  *UserVerificationDoc
-	Metadata      UserMetadataDoc
+	ID            string                 `json:"id" bson:"id" jsonschema:"required,description=User ID (ULID format)"`
+	Name          string                 `json:"name" bson:"name" jsonschema:"required,description=User display name"`
+	Alias         string                 `json:"alias" bson:"alias" jsonschema:"required,description=Unique user handle/alias. Default: \"\""`
+	Email         string                 `json:"email" bson:"email" jsonschema:"required,description=User email address"`
+	Subs          []string               `json:"subs" bson:"subs" jsonschema:"required,description=OAuth subject identifiers for authentication providers. Default: []"`
+	Workspace     string                 `json:"workspace" bson:"workspace" jsonschema:"required,foreignkey=workspace,description=Personal workspace ID (ULID format)"`
+	Team          string                 `json:"team" bson:",omitempty" jsonschema:"description=Legacy team field (deprecated, use workspace)"`
+	Lang          string                 `json:"lang" bson:"lang" jsonschema:"description=User language preference. Default: \"\" (deprecated, move to metadata)"`
+	Theme         string                 `json:"theme" bson:"theme" jsonschema:"description=User UI theme preference. Default: \"\" (deprecated, move to metadata)"`
+	Password      []byte                 `json:"password" bson:"password" jsonschema:"required,description=Hashed password (bcrypt)"`
+	PasswordReset *PasswordResetDocument `json:"passwordreset" bson:"passwordreset" jsonschema:"description=Password reset token information"`
+	Verification  *UserVerificationDoc   `json:"verification" bson:"verification" jsonschema:"description=Email verification state. Default: null"`
+	Metadata      UserMetadataDoc        `json:"metadata" bson:"metadata" jsonschema:"required,description=Extended user metadata. Default: {}"`
 }
 
 type UserVerificationDoc struct {
-	Code       string
-	Expiration time.Time
-	Verified   bool
+	Code       string    `json:"code" jsonschema:"description=Verification code. Default: \"\""`
+	Expiration time.Time `json:"expiration" jsonschema:"description=Verification code expiration timestamp"`
+	Verified   bool      `json:"verified" jsonschema:"description=Whether the email has been verified. Default: false"`
 }
 
 type UserMetadataDoc struct {
-	Description string
-	Website     string
-	PhotoURL    string
-	Lang        string
-	Theme       string
+	Description string `json:"description" jsonschema:"description=User bio/description. Default: \"\""`
+	Website     string `json:"website" jsonschema:"description=User website URL. Default: \"\""`
+	PhotoURL    string `json:"photourl" jsonschema:"description=Profile photo URL. Default: \"\""`
+	Lang        string `json:"lang" jsonschema:"description=Language metadata. Default: \"\""`
+	Theme       string `json:"theme" jsonschema:"description=Theme metadata. Default: \"\""`
 }
 
 func NewUser(user *user.User) (*UserDocument, string) {
