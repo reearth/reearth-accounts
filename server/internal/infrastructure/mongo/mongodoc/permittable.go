@@ -7,8 +7,8 @@ import (
 )
 
 type WorkspaceRoleDocument struct {
-	WorkspaceID string `bson:"workspace_id"`
-	RoleID      string `bson:"role_id"`
+	WorkspaceID string `json:"workspace_id" bson:"workspace_id" jsonschema:"description=Workspace ID (ULID format)"`
+	RoleID      string `json:"role_id" bson:"role_id" jsonschema:"description=Role ID (ULID format)"`
 }
 
 type PermittableDocument struct {

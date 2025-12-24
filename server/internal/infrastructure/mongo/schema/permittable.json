@@ -28,11 +28,13 @@
         "items": {
           "bsonType": "object",
           "properties": {
-            "roleid": {
-              "bsonType": "string"
+            "role_id": {
+              "bsonType": "string",
+              "description": "Role ID (ULID format)"
             },
-            "workspaceid": {
-              "bsonType": "string"
+            "workspace_id": {
+              "bsonType": "string",
+              "description": "Workspace ID (ULID format)"
             }
           }
         }
