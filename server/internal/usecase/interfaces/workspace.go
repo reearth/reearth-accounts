@@ -45,4 +45,5 @@ type Workspace interface {
 	RemoveIntegration(context.Context, workspace.ID, workspace.IntegrationID, *usecase.Operator) (*workspace.Workspace, error)
 	RemoveIntegrations(context.Context, workspace.ID, workspace.IntegrationIDList, *usecase.Operator) (*workspace.Workspace, error)
 	Remove(context.Context, workspace.ID, *usecase.Operator) error
+	TransferOwnership(ctx context.Context, workspaceID workspace.ID, newOwnerID workspace.UserID, operator *usecase.Operator) (*workspace.Workspace, error)
 }

@@ -13,6 +13,7 @@ import (
 	"github.com/reearth/reearth-accounts/server/internal/usecase/gateway"
 	"github.com/reearth/reearth-accounts/server/internal/usecase/interfaces"
 	"github.com/reearth/reearth-accounts/server/pkg/id"
+	"github.com/reearth/reearth-accounts/server/pkg/role"
 	"github.com/reearth/reearth-accounts/server/pkg/user"
 	"github.com/reearth/reearth-accounts/server/pkg/workspace"
 	"github.com/reearth/reearthx/i18n"
@@ -44,6 +45,65 @@ func TestUser_Signup(t *testing.T) {
 		wantError        error
 	}{
 		{
+			name:            "duplicate user alias",
+			signupSecret:    "",
+			authSrvUIDomain: "",
+			createUserBefore: user.New().
+				ID(uid).
+				Workspace(tid).
+				Name("NAME").
+				Alias("NAME").
+				Email("aaa@bbb.com").
+				MustBuild(),
+			args: interfaces.SignupParam{
+				Email:       "other@bbb.com",
+				Name:        "NAME",
+				Password:    "PAss00!!",
+				UserID:      &uid,
+				WorkspaceID: &tid,
+			},
+			wantUser:      nil,
+			wantWorkspace: nil,
+			wantError:     interfaces.ErrUserAlreadyExists,
+		},
+		{
+			name:             "duplicate workspace alias - memory repo allows",
+			signupSecret:     "",
+			authSrvUIDomain:  "",
+			createUserBefore: nil,
+			args: interfaces.SignupParam{
+				Email:       "unique@bbb.com",
+				Name:        "NAME",
+				Password:    "PAss00!!",
+				UserID:      &uid,
+				WorkspaceID: &tid,
+			},
+			wantUser: func(u *user.User) *user.User {
+				return user.New().
+					ID(uid).
+					Workspace(tid).
+					Name("NAME").
+					Alias("NAME").
+					Auths(u.Auths()).
+					Metadata(*u.Metadata()).
+					Email("unique@bbb.com").
+					PasswordPlainText("PAss00!!").
+					Verification(user.VerificationFrom(mockcode, mocktime.Add(24*time.Hour), false)).
+					MustBuild()
+			},
+			wantWorkspace: workspace.New().
+				ID(tid).
+				Name("NAME").
+				Alias("NAME").
+				Members(map[user.ID]workspace.Member{uid: {Role: workspace.RoleOwner, Disabled: false, InvitedBy: uid}}).
+				Personal(true).
+				MustBuild(),
+			wantMailTo:      []mailer.Contact{{Email: "unique@bbb.com", Name: "NAME"}},
+			wantMailSubject: "email verification",
+			wantMailContent: "/?user-verification-token=CODECODE",
+			wantError:       nil,
+		},
+		{
 			name:            "without secret",
 			signupSecret:    "",
 			authSrvUIDomain: "https://reearth.io",
@@ -59,6 +119,7 @@ func TestUser_Signup(t *testing.T) {
 					ID(uid).
 					Workspace(tid).
 					Name("NAME").
+					Alias("NAME").
 					Auths(u.Auths()).
 					Metadata(*u.Metadata()).
 					Email("aaa@bbb.com").
@@ -69,6 +130,7 @@ func TestUser_Signup(t *testing.T) {
 			wantWorkspace: workspace.New().
 				ID(tid).
 				Name("NAME").
+				Alias("NAME").
 				Members(map[user.ID]workspace.Member{uid: {Role: workspace.RoleOwner, Disabled: false, InvitedBy: uid}}).
 				Personal(true).
 				MustBuild(),
@@ -137,6 +199,7 @@ func TestUser_Signup(t *testing.T) {
 					ID(uid).
 					Workspace(tid).
 					Name("NAME").
+					Alias("NAME").
 					Auths(u.Auths()).
 					Metadata(*u.Metadata()).
 					Email("aaa@bbb.com").
@@ -147,6 +210,7 @@ func TestUser_Signup(t *testing.T) {
 			wantWorkspace: workspace.New().
 				ID(tid).
 				Name("NAME").
+				Alias("NAME").
 				Members(map[user.ID]workspace.Member{uid: {Role: workspace.RoleOwner, Disabled: false, InvitedBy: uid}}).
 				Personal(true).
 				MustBuild(),
@@ -178,6 +242,7 @@ func TestUser_Signup(t *testing.T) {
 					ID(uid).
 					Workspace(tid).
 					Name("NAME").
+					Alias("NAME").
 					Auths(u.Auths()).
 					Email("aaa@bbb.com").
 					PasswordPlainText("PAss00!!").
@@ -188,6 +253,7 @@ func TestUser_Signup(t *testing.T) {
 			wantWorkspace: workspace.New().
 				ID(tid).
 				Name("NAME").
+				Alias("NAME").
 				Members(map[user.ID]workspace.Member{uid: {Role: workspace.RoleOwner, Disabled: false, InvitedBy: uid}}).
 				Personal(true).
 				MustBuild(),
@@ -249,6 +315,13 @@ func TestUser_Signup(t *testing.T) {
 
 			ctx := context.Background()
 			r := accountmemory.New()
+
+			// Create required roles for signup
+			selfRole := role.New().NewID().Name(interfaces.RoleSelf).MustBuild()
+			ownerRole := role.New().NewID().Name(workspace.RoleOwner.String()).MustBuild()
+			assert.NoError(t, r.Role.Save(ctx, *selfRole))
+			assert.NoError(t, r.Role.Save(ctx, *ownerRole))
+
 			if tt.createUserBefore != nil {
 				assert.NoError(t, r.User.Save(ctx, tt.createUserBefore))
 			}

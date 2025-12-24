@@ -1,9 +1,8 @@
 {
   "$jsonSchema": {
+    "additionalProperties": false,
     "bsonType": "object",
-    "title": "Role Collection Schema",
     "description": "Schema for role documents in the reearth-accounts database",
-    "required": ["id", "name"],
     "properties": {
       "_id": {
         "bsonType": "objectId",
@@ -18,6 +17,10 @@
         "description": "Role name"
       }
     },
-    "additionalProperties": false
+    "required": [
+      "id",
+      "name"
+    ],
+    "title": "Role Collection Schema"
   }
 }

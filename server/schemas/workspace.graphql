@@ -39,13 +39,13 @@ type WorkspacesWithPagination {
 
 enum Role {
     # a role who can read project
-    READER
+    reader
     # a role who can read and write project
-    WRITER
-    # a eole who can have full control of project
-    OWNER
-    # a eole who can maintain a project
-    MAINTAINER
+    writer
+    # a role who can have full control of project
+    owner
+    # a role who can maintain a project
+    maintainer
 }
 
 input Pagination {
@@ -116,6 +116,11 @@ input DeleteWorkspaceInput {
     workspaceId: ID!
 }
 
+input TransferWorkspaceOwnershipInput {
+    workspaceId: ID!
+    newOwnerId: ID!
+}
+
 # extend type Query { }
 
 type CreateWorkspacePayload {
@@ -171,4 +176,5 @@ extend type Mutation {
     removeIntegrationsFromWorkspace(input: RemoveIntegrationsFromWorkspaceInput!): RemoveIntegrationsFromWorkspacePayload
     updateUserOfWorkspace(input: UpdateUserOfWorkspaceInput!): UpdateMemberOfWorkspacePayload
     updateIntegrationOfWorkspace(input: UpdateIntegrationOfWorkspaceInput!): UpdateMemberOfWorkspacePayload
+    transferWorkspaceOwnership(input: TransferWorkspaceOwnershipInput!): UpdateMemberOfWorkspacePayload
 }

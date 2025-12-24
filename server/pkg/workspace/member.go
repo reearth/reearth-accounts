@@ -18,6 +18,7 @@ var (
 	ErrTargetUserNotInTheWorkspace   = rerror.NewE(i18n.T("target user does not exist in the workspace"))
 	ErrInvalidWorkspaceName          = rerror.NewE(i18n.T("invalid workspace name"))
 	ErrNoSpecifiedUsers              = rerror.NewE(i18n.T("no specified users for removal"))
+	ErrCannotChangeRoleToOwner       = rerror.NewE(i18n.T("cannot change role to owner"))
 )
 
 type Member struct {

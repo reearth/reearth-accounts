@@ -1,21 +1,12 @@
 {
   "$jsonSchema": {
+    "additionalProperties": false,
     "bsonType": "object",
-    "title": "User Collection Schema",
     "description": "Schema for user documents in the reearth-accounts database",
-    "required": ["id", "name", "alias", "email", "subs", "workspace", "metadata", "password"],
     "properties": {
       "_id": {
         "bsonType": "objectId",
         "description": "MongoDB internal ID"
-      },
-      "id": {
-        "bsonType": "string",
-        "description": "User ID (ULID format)"
-      },
-      "name": {
-        "bsonType": "string",
-        "description": "User display name"
       },
       "alias": {
         "bsonType": "string",
@@ -25,6 +16,65 @@
         "bsonType": "string",
         "description": "User email address"
       },
+      "id": {
+        "bsonType": "string",
+        "description": "User ID (ULID format)"
+      },
+      "lang": {
+        "bsonType": "string",
+        "description": "User language preference. Default: \"\" (deprecated, move to metadata)"
+      },
+      "metadata": {
+        "bsonType": "object",
+        "description": "Extended user metadata. Default: {}",
+        "properties": {
+          "description": {
+            "bsonType": "string",
+            "description": "User bio/description. Default: \"\""
+          },
+          "lang": {
+            "bsonType": "string",
+            "description": "Language metadata. Default: \"\""
+          },
+          "photourl": {
+            "bsonType": "string",
+            "description": "Profile photo URL. Default: \"\""
+          },
+          "theme": {
+            "bsonType": "string",
+            "description": "Theme metadata. Default: \"\""
+          },
+          "website": {
+            "bsonType": "string",
+            "description": "User website URL. Default: \"\""
+          }
+        }
+      },
+      "name": {
+        "bsonType": "string",
+        "description": "User display name"
+      },
+      "password": {
+        "bsonType": "binData",
+        "description": "Hashed password (bcrypt)"
+      },
+      "passwordreset": {
+        "bsonType": [
+          "object",
+          "null"
+        ],
+        "description": "Password reset token information",
+        "properties": {
+          "createdat": {
+            "bsonType": "date",
+            "description": "Token creation timestamp"
+          },
+          "token": {
+            "bsonType": "string",
+            "description": "Password reset token. Default: \"\""
+          }
+        }
+      },
       "subs": {
         "bsonType": "array",
         "description": "OAuth subject identifiers for authentication providers. Default: []",
@@ -32,42 +82,19 @@
           "bsonType": "string"
         }
       },
-      "workspace": {
-        "bsonType": "string",
-        "description": "Personal workspace ID (ULID format)"
-      },
       "team": {
         "bsonType": "string",
         "description": "Legacy team field (deprecated, use workspace)"
-      },
-      "lang": {
-        "bsonType": "string",
-        "description": "User language preference. Default: \"\" (deprecated, move to metadata)"
       },
       "theme": {
         "bsonType": "string",
         "description": "User UI theme preference. Default: \"\" (deprecated, move to metadata)"
       },
-      "password": {
-        "bsonType": "binData",
-        "description": "Hashed password (bcrypt)"
-      },
-      "passwordreset": {
-        "bsonType": ["object", "null"],
-        "description": "Password reset token information",
-        "properties": {
-          "token": {
-            "bsonType": "string",
-            "description": "Password reset token. Default: \"\""
-          },
-          "createdat": {
-            "bsonType": "date",
-            "description": "Token creation timestamp"
-          }
-        }
-      },
       "verification": {
-        "bsonType": ["object", "null"],
+        "bsonType": [
+          "object",
+          "null"
+        ],
         "description": "Email verification state. Default: null",
         "properties": {
           "code": {
@@ -84,33 +111,21 @@
           }
         }
       },
-      "metadata": {
-        "bsonType": "object",
-        "description": "Extended user metadata. Default: {}",
-        "properties": {
-          "description": {
-            "bsonType": "string",
-            "description": "User bio/description. Default: \"\""
-          },
-          "website": {
-            "bsonType": "string",
-            "description": "User website URL. Default: \"\""
-          },
-          "photourl": {
-            "bsonType": "string",
-            "description": "Profile photo URL. Default: \"\""
-          },
-          "lang": {
-            "bsonType": "string",
-            "description": "Language metadata. Default: \"\""
-          },
-          "theme": {
-            "bsonType": "string",
-            "description": "Theme metadata. Default: \"\""
-          }
-        }
+      "workspace": {
+        "bsonType": "string",
+        "description": "Personal workspace ID (ULID format)"
       }
     },
-    "additionalProperties": false
+    "required": [
+      "id",
+      "name",
+      "alias",
+      "email",
+      "subs",
+      "workspace",
+      "metadata",
+      "password"
+    ],
+    "title": "User Collection Schema"
   }
 }

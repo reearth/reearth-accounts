@@ -1,9 +1,8 @@
 {
   "$jsonSchema": {
+    "additionalProperties": false,
     "bsonType": "object",
-    "title": "Permittable Collection Schema",
     "description": "Schema for permittable documents in the reearth-accounts database",
-    "required": ["id", "userid"],
     "properties": {
       "_id": {
         "bsonType": "objectId",
@@ -13,19 +12,36 @@
         "bsonType": "string",
         "description": "Permittable ID (ULID format)"
       },
-      "userid": {
-        "bsonType": "string",
-        "description": "User ID this permittable represents"
-      },
       "roleids": {
         "bsonType": "array",
         "description": "List of role IDs assigned to this user. Default: []",
         "items": {
-          "bsonType": "string",
-          "description": "Role ID (ULID format)"
+          "bsonType": "string"
+        }
+      },
+      "userid": {
+        "bsonType": "string",
+        "description": "User ID this permittable represents"
+      },
+      "workspace_roles": {
+        "bsonType": "array",
+        "items": {
+          "bsonType": "object",
+          "properties": {
+            "roleid": {
+              "bsonType": "string"
+            },
+            "workspaceid": {
+              "bsonType": "string"
+            }
+          }
         }
       }
     },
-    "additionalProperties": false
+    "required": [
+      "id",
+      "userid"
+    ],
+    "title": "Permittable Collection Schema"
   }
 }

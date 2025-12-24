@@ -13,6 +13,7 @@ import (
 	"github.com/reearth/reearthx/rerror"
 	"github.com/reearth/reearthx/usecasex"
 	"go.mongodb.org/mongo-driver/bson"
+	"go.mongodb.org/mongo-driver/mongo"
 )
 
 type Workspace struct {
@@ -135,10 +136,21 @@ func (r *Workspace) FindByAlias(ctx context.Context, alias string) (*workspace.W
 	if err != nil {
 		return nil, err
 	}
-	if !r.f.CanRead(w.ID()) {
-		return nil, rerror.ErrNotFound
-	}
 	return w, nil
+}
+
+func (r *Workspace) FindByAliases(ctx context.Context, aliases []string) (workspace.List, error) {
+	if len(aliases) == 0 {
+		return nil, nil
+	}
+
+	res, err := r.find(ctx, bson.M{
+		"alias": bson.M{"$in": aliases},
+	})
+	if err != nil {
+		return nil, err
+	}
+	return res, nil
 }
 
 func (r *Workspace) Create(ctx context.Context, workspace *workspace.Workspace) error {
@@ -152,7 +164,11 @@ func (r *Workspace) Save(ctx context.Context, workspace *workspace.Workspace) er
 	}
 
 	doc, id := mongodoc.NewWorkspace(workspace)
-	return r.client.SaveOne(ctx, id, doc)
+	err := r.client.SaveOne(ctx, id, doc)
+	if mongo.IsDuplicateKeyError(err) {
+		return repo.ErrDuplicateWorkspaceAlias
+	}
+	return err
 }
 
 func (r *Workspace) SaveAll(ctx context.Context, workspaces workspace.List) error {
@@ -199,7 +215,6 @@ func (r *Workspace) RemoveAll(ctx context.Context, ids id.WorkspaceIDList) error
 
 func (r *Workspace) find(ctx context.Context, filter any) (workspace.List, error) {
 	c := mongodoc.NewWorkspaceConsumer()
-	filter = r.f.Filter(filter)
 	if err := r.client.Find(ctx, filter, c); err != nil {
 		return nil, err
 	}
@@ -208,7 +223,6 @@ func (r *Workspace) find(ctx context.Context, filter any) (workspace.List, error
 
 func (r *Workspace) findOne(ctx context.Context, filter any) (*workspace.Workspace, error) {
 	c := mongodoc.NewWorkspaceConsumer()
-	filter = r.f.Filter(filter)
 	if err := r.client.FindOne(ctx, filter, c); err != nil {
 		return nil, err
 	}

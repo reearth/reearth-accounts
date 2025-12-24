@@ -60,23 +60,34 @@ func TestGenerateMissingUserAliases(t *testing.T) {
 	assert.NoError(t, err)
 
 	// Check that user1, user2, and user3 got new aliases
-	updatedUsers := map[string]string{
-		"user1": "",      // originally empty
-		"user2": "",      // originally empty
-		"user3": "waqas", // originally "waqas"
+	// Check that user1, user2, and user3 got new aliases
+	testCases := []struct {
+		id            string
+		name          string
+		originalAlias string
+	}{
+		{"user1", "User One", ""},
+		{"user2", "User Two", ""},
+		{"user3", "User Three", "waqas"},
 	}
 
-	for id, originalAlias := range updatedUsers {
+	for _, tc := range testCases {
 		var result bson.M
-		err := userCollection.FindOne(ctx, bson.M{"id": id}).Decode(&result)
+		err := userCollection.FindOne(ctx, bson.M{"id": tc.id}).Decode(&result)
 		assert.NoError(t, err)
 
 		alias, exists := result["alias"]
-		assert.True(t, exists, "Alias should exist for user %s", id)
+		assert.True(t, exists, "Alias should exist for user %s", tc.id)
 		aliasStr := alias.(string)
-		assert.NotEmpty(t, aliasStr, "Alias should not be empty for user %s", id)
-		assert.Len(t, aliasStr, 10, "Generated alias should be 10 characters for user %s", id)
-		assert.NotEqual(t, originalAlias, aliasStr, "Original problematic alias should be replaced for user %s", id)
+		assert.NotEmpty(t, aliasStr, "Alias should not be empty for user %s", tc.id)
+
+		if tc.name != "" && tc.id != "" {
+			expected := tc.name + tc.id
+			assert.Equal(t, expected, aliasStr, "Alias should be name+id for user %s", tc.id)
+		} else {
+			assert.Len(t, aliasStr, 10, "Generated alias should be 10 characters for user %s", tc.id)
+		}
+		assert.NotEqual(t, tc.originalAlias, aliasStr, "Original problematic alias should be replaced for user %s", tc.id)
 	}
 
 	// Check that user4 kept its original alias

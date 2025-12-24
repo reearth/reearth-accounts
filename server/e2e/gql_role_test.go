@@ -1,12 +1,95 @@
 package e2e
 
 import (
+	"context"
 	"net/http"
 	"testing"
 
 	httpexpect "github.com/gavv/httpexpect/v2"
 	"github.com/reearth/reearth-accounts/server/internal/app"
+	"github.com/reearth/reearth-accounts/server/internal/usecase/repo"
+	"github.com/reearth/reearth-accounts/server/pkg/id"
+	"github.com/reearth/reearth-accounts/server/pkg/user"
+	"github.com/reearth/reearth-accounts/server/pkg/workspace"
+	"github.com/reearth/reearthx/idx"
 )
+
+// baseSeederUserNoRoles creates users and workspaces WITHOUT creating roles
+// This is used for testing role CRUD operations from scratch
+func baseSeederUserNoRoles(ctx context.Context, r *repo.Container) error {
+	auth := user.ReearthSub(uId.String())
+	metadata := user.NewMetadata()
+	metadata.LangFrom("ja")
+	metadata.SetTheme(user.ThemeDark)
+
+	u := user.New().ID(uId).
+		Name("e2e").
+		Email("e2e@e2e.com").
+		Auths([]user.Auth{*auth}).
+		Metadata(metadata).
+		Workspace(wId).
+		MustBuild()
+	if err := r.User.Save(ctx, u); err != nil {
+		return err
+	}
+	u2 := user.New().ID(uId2).
+		Name("e2e2").
+		Workspace(wId2).
+		Metadata(metadata).
+		Email("e2e2@e2e.com").
+		MustBuild()
+	if err := r.User.Save(ctx, u2); err != nil {
+		return err
+	}
+	u3 := user.New().ID(uId3).
+		Name("e2e3").
+		Workspace(wId2).
+		Metadata(metadata).
+		Email("e2e3@e2e.com").
+		MustBuild()
+	if err := r.User.Save(ctx, u3); err != nil {
+		return err
+	}
+	roleOwner := workspace.Member{
+		Role:      workspace.RoleOwner,
+		InvitedBy: uId,
+	}
+	roleReader := workspace.Member{
+		Role:      workspace.RoleReader,
+		InvitedBy: uId2,
+	}
+
+	w := workspace.New().ID(wId).
+		Name("e2e").
+		Members(map[idx.ID[id.User]]workspace.Member{
+			uId: roleOwner,
+		}).
+		Integrations(map[idx.ID[id.Integration]]workspace.Member{
+			iId: roleOwner,
+		}).
+		MustBuild()
+	if err := r.Workspace.Save(ctx, w); err != nil {
+		return err
+	}
+
+	w2 := workspace.New().ID(wId2).
+		Name("e2e2").
+		Members(map[idx.ID[id.User]]workspace.Member{
+			uId:  roleOwner,
+			uId3: roleReader,
+		}).
+		Integrations(map[idx.ID[id.Integration]]workspace.Member{
+			iId: roleOwner,
+		}).
+		MustBuild()
+	if err := r.Workspace.Save(ctx, w2); err != nil {
+		return err
+	}
+
+	// NOTE: Intentionally NOT creating roles - this test wants to test role CRUD from scratch
+	// NOTE: Also NOT creating permittables since roles don't exist yet
+	return nil
+}
 
 func getRoles(e *httpexpect.Expect) (GraphQLRequest, *httpexpect.Value) {
 	getRolesRequestBody := GraphQLRequest{
@@ -131,7 +214,7 @@ func removeRole(e *httpexpect.Expect, roleID string) (GraphQLRequest, *httpexpec
 }
 
 func TestRoleCRUD(t *testing.T) {
-	e, _ := StartServer(t, &app.Config{}, true, baseSeederUser)
+	e, _ := StartServer(t, &app.Config{}, true, baseSeederUserNoRoles)
 
 	// Get roles and check if there are no roles
 	_, res1 := getRoles(e)

@@ -78,6 +78,10 @@ func (i *User) SearchUser(ctx context.Context, keyword string) (user.List, error
 	return i.query.SearchUser(ctx, keyword)
 }
 
+func (i *User) FetchByAlias(ctx context.Context, alias string) (*user.User, error) {
+	return i.query.FetchByAlias(ctx, alias)
+}
+
 func (i *User) GetUserByCredentials(ctx context.Context, inp interfaces.GetUserByCredentials) (u *user.User, err error) {
 	return Run1(ctx, nil, i.repos, Usecase().Transaction(), func(ctx context.Context) (*user.User, error) {
 		u, err = i.repos.User.FindByNameOrEmail(ctx, inp.Email)
@@ -426,7 +430,7 @@ func (q *UserQuery) FetchByNameOrEmail(ctx context.Context, nameOrEmail string) 
 		}
 		return user.SimpleFrom(u), nil
 	}
-	return nil, nil
+	return nil, rerror.ErrNotFound
 }
 
 func (q *UserQuery) SearchUser(ctx context.Context, keyword string) (user.List, error) {
@@ -441,5 +445,20 @@ func (q *UserQuery) SearchUser(ctx context.Context, keyword string) (user.List, 
 
 		return u, nil
 	}
-	return nil, nil
+	return nil, rerror.ErrNotFound
+}
+
+func (q *UserQuery) FetchByAlias(ctx context.Context, alias string) (*user.User, error) {
+	for _, r := range q.repos {
+		u, err := r.FindByAlias(ctx, alias)
+		if errors.Is(err, rerror.ErrNotFound) {
+			continue
+		}
+		if err != nil {
+			return nil, err
+		}
+		return u, nil
+	}
+
+	return nil, rerror.ErrNotFound
 }

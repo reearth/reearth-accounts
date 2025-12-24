@@ -64,6 +64,18 @@ func (r *Role) FindByIDs(ctx context.Context, ids id.RoleIDList) (role.List, err
 	return res, nil
 }
 
+func (r *Role) FindByName(ctx context.Context, name string) (*role.Role, error) {
+	r.lock.Lock()
+	defer r.lock.Unlock()
+
+	for _, v := range r.data {
+		if v.Name() == name {
+			return v, nil
+		}
+	}
+	return nil, rerror.ErrNotFound
+}
+
 func (r *Role) Save(ctx context.Context, rl role.Role) error {
 	r.lock.Lock()
 	defer r.lock.Unlock()

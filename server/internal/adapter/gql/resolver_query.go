@@ -89,3 +89,7 @@ func (r *queryResolver) UserByNameOrEmail(ctx context.Context, nameOrEmail strin
 func (r *queryResolver) SearchUser(ctx context.Context, keyword string) ([]*gqlmodel.User, error) {
 	return loaders(ctx).User.SearchUser(ctx, keyword)
 }
+
+func (r *queryResolver) FindUserByAlias(ctx context.Context, alias string) (*gqlmodel.User, error) {
+	return loaders(ctx).User.FetchByAlias(ctx, alias)
+}

@@ -219,7 +219,7 @@ func TestAddUsersToWorkspace(t *testing.T) {
 	assert.Nil(t, err)
 	assert.False(t, w.Members().HasUser(uId2))
 
-	query := fmt.Sprintf(`mutation { addUsersToWorkspace(input: {workspaceId: "%s", users: [{userId: "%s", role: READER}]}){ workspace{ id } }}`, wId, uId2)
+	query := fmt.Sprintf(`mutation { addUsersToWorkspace(input: {workspaceId: "%s", users: [{userId: "%s", role: reader}]}){ workspace{ id } }}`, wId, uId2)
 	request := GraphQLRequest{
 		Query: query,
 	}
@@ -271,7 +271,7 @@ func TestUpdateMemberOfWorkspace(t *testing.T) {
 	w, err := r.Workspace.FindByID(context.Background(), wId2)
 	assert.Nil(t, err)
 	assert.Equal(t, w.Members().User(uId3).Role, workspace.RoleReader)
-	query := fmt.Sprintf(`mutation { updateUserOfWorkspace(input: {workspaceId: "%s", userId: "%s", role: MAINTAINER}){ workspace{ id } }}`, wId2, uId3)
+	query := fmt.Sprintf(`mutation { updateUserOfWorkspace(input: {workspaceId: "%s", userId: "%s", role: maintainer}){ workspace{ id } }}`, wId2, uId3)
 	request := GraphQLRequest{
 		Query: query,
 	}
@@ -297,7 +297,7 @@ func TestAddIntegrationToWorkspace(t *testing.T) {
 	assert.Nil(t, err)
 	assert.False(t, w.Members().HasUser(uId2))
 
-	query := fmt.Sprintf(`mutation { addIntegrationToWorkspace(input: {workspaceId: "%s", integrationId: "%s",  role: READER}){ workspace{ id } }}`, wId, iId2)
+	query := fmt.Sprintf(`mutation { addIntegrationToWorkspace(input: {workspaceId: "%s", integrationId: "%s",  role: reader}){ workspace{ id } }}`, wId, iId2)
 	request := GraphQLRequest{
 		Query: query,
 	}
@@ -349,7 +349,7 @@ func TestUpdateIntegrationOfWorkspace(t *testing.T) {
 	w, err := r.Workspace.FindByID(context.Background(), wId)
 	assert.Nil(t, err)
 	assert.Equal(t, w.Members().Integration(iId3).Role, workspace.RoleReader)
-	query := fmt.Sprintf(`mutation { updateIntegrationOfWorkspace(input: {workspaceId: "%s", integrationId: "%s", role: MAINTAINER}){ workspace{ id } }}`, wId, iId3)
+	query := fmt.Sprintf(`mutation { updateIntegrationOfWorkspace(input: {workspaceId: "%s", integrationId: "%s", role: maintainer}){ workspace{ id } }}`, wId, iId3)
 	request := GraphQLRequest{
 		Query: query,
 	}

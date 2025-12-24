@@ -2,6 +2,7 @@ package gql
 
 import (
 	"context"
+
 	"github.com/reearth/reearth-accounts/server/internal/adapter/gql/gqldataloader"
 	"github.com/reearth/reearth-accounts/server/internal/adapter/gql/gqlmodel"
 	"github.com/reearth/reearth-accounts/server/internal/usecase/interfaces"
@@ -60,6 +61,19 @@ func (c *UserLoader) SearchUser(ctx context.Context, keyword string) ([]*gqlmode
 	}
 
 	return gqlmodel.ToUsers(res), nil
+}
+
+func (c *UserLoader) FetchByAlias(ctx context.Context, alias string) (*gqlmodel.User, error) {
+	res, err := c.usecase.FetchByAlias(ctx, alias)
+	if err != nil {
+		return nil, err
+	}
+
+	if res == nil {
+		return nil, nil
+	}
+
+	return gqlmodel.ToUser(res), nil
 }
 
 // data loader

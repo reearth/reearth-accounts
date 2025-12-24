@@ -76,6 +76,7 @@ func FragmentToUser(me FragmentUser) (*user.User, error) {
 	metadata.SetWebsite(me.Metadata.Website)
 
 	u, err := user.New().ID(id).Name(me.Name).
+		Alias(me.Alias).
 		Email(me.Email).
 		Metadata(metadata).
 		Auths(auths).

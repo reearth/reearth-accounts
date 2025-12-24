@@ -1,19 +1,18 @@
 {
   "$jsonSchema": {
+    "additionalProperties": false,
     "bsonType": "object",
-    "title": "Config Collection Schema",
     "description": "Schema for config documents in the reearth-accounts database",
     "properties": {
       "_id": {
         "bsonType": "objectId",
         "description": "MongoDB internal ID"
       },
-      "migration": {
-        "bsonType": "long",
-        "description": "Current migration version number. Default: 0"
-      },
       "auth": {
-        "bsonType": ["object", "null"],
+        "bsonType": [
+          "object",
+          "null"
+        ],
         "description": "Authentication certificates configuration. Default: null",
         "properties": {
           "cert": {
@@ -27,10 +26,17 @@
         }
       },
       "defaultpolicy": {
-        "bsonType": ["string", "null"],
+        "bsonType": [
+          "string",
+          "null"
+        ],
         "description": "Default policy ID. Default: null"
+      },
+      "migration": {
+        "bsonType": "long",
+        "description": "Current migration version number. Default: 0"
       }
     },
-    "additionalProperties": false
+    "title": "Config Collection Schema"
   }
 }

@@ -91,7 +91,7 @@ func Start(debug bool) {
 
 	// Cerbos
 	var opts []cerbos.Opt
-	if os.Getenv("REEARTH_ACCOUNTS_DEV") == "true" {
+	if !conf.CerbosUseSSL {
 		opts = append(opts, cerbos.WithPlaintext(), cerbos.WithTLSInsecure())
 	}
 

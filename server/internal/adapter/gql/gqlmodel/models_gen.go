@@ -42,9 +42,10 @@ type AddUsersToWorkspacePayload struct {
 }
 
 type CheckPermissionInput struct {
-	Service  string `json:"service"`
-	Resource string `json:"resource"`
-	Action   string `json:"action"`
+	Service        string  `json:"service"`
+	Resource       string  `json:"resource"`
+	Action         string  `json:"action"`
+	WorkspaceAlias *string `json:"workspaceAlias,omitempty"`
 }
 
 type CheckPermissionPayload struct {
@@ -207,6 +208,11 @@ type SignupOIDCInput struct {
 
 type StartPasswordResetInput struct {
 	Email string `json:"email"`
+}
+
+type TransferWorkspaceOwnershipInput struct {
+	WorkspaceID ID `json:"workspaceId"`
+	NewOwnerID  ID `json:"newOwnerId"`
 }
 
 type UpdateIntegrationOfWorkspaceInput struct {
@@ -409,10 +415,10 @@ func (e NodeType) MarshalJSON() ([]byte, error) {
 type Role string
 
 const (
-	RoleReader     Role = "READER"
-	RoleWriter     Role = "WRITER"
-	RoleOwner      Role = "OWNER"
-	RoleMaintainer Role = "MAINTAINER"
+	RoleReader     Role = "reader"
+	RoleWriter     Role = "writer"
+	RoleOwner      Role = "owner"
+	RoleMaintainer Role = "maintainer"
 )
 
 var AllRole = []Role{
