@@ -45,8 +45,11 @@ func applySchema(ctx context.Context, db *mongo.Database, collName string, schem
 	}
 
 	if len(collections) == 0 {
-		// Collection doesn't exist, create it with the schema
-		opts := options.CreateCollection().SetValidator(schema)
+		// Collection doesn't exist, create it with the schema (strict validation for new collections)
+		opts := options.CreateCollection().
+			SetValidator(schema).
+			SetValidationLevel("strict").
+			SetValidationAction("error")
 		if err := db.CreateCollection(ctx, collName, opts); err != nil {
 			return fmt.Errorf("failed to create collection %s: %w", collName, err)
 		}
