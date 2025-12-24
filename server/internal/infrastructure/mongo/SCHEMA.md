@@ -102,10 +102,15 @@ func Update<CollectionName>Schema(ctx context.Context, c DBClient) error {
 
 ## Schema Validation Settings
 
-Schemas are applied with:
+Schemas are applied with different settings for new vs existing collections:
 
+**New collections:**
+- **validationLevel**: `strict` - Validates all inserts and updates
+- **validationAction**: `error` - Rejects operations that fail validation
+
+**Existing collections:**
 - **validationLevel**: `moderate` - Validates inserts and updates on existing valid documents
-- **validationAction**: `warn` - Logs validation failures but allows the operation
+- **validationAction**: `error` - Rejects operations that fail validation
 
 ## additionalProperties
 
