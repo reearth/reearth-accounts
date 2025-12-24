@@ -132,17 +132,20 @@ Add or modify the document struct in `internal/infrastructure/mongo/mongodoc/`:
 
 ```go
 type UserDocument struct {
-    ID    string `json:"id" jsonschema:"required,description=User ID (ULID format)"`
-    Name  string `json:"name" jsonschema:"required,description=User display name"`
-    Email string `json:"email" jsonschema:"description=User email address. Default: \"\""`
+    ID        string `json:"id" jsonschema:"required,description=User ID (ULID format)"`
+    Name      string `json:"name" jsonschema:"required,description=User display name"`
+    Email     string `json:"email" jsonschema:"description=User email address. Default: \"\""`
+    Workspace string `json:"workspace" jsonschema:"required,foreignkey=workspace,description=Personal workspace ID (ULID format)"`
 }
 ```
 
 - Use `json` tag for field name (lowercase)
 - Use `jsonschema` tag with:
   - `required` - marks the field as required in the schema
+  - `foreignkey=<collection>` - foreign key reference for ER diagram (not output to JSON schema)
   - `description=` - field documentation
 - Include default values in description for optional fields: `Default: ""`
+- Note: `foreignkey` is used by `ergen` to generate ER diagram relationships but is NOT included in MongoDB JSON schema (MongoDB doesn't support custom keywords)
 
 #### 2. Register schema (if adding new collection)
 
@@ -169,7 +172,7 @@ make update-schema-json
 
 This command:
 - Generates JSON schema files from Go structs (`mongoschemagen`)
-- Updates the ER diagram (`ergen`)
+- Updates the ER diagram (`ergen`) - parses `foreignkey` tags from mongodoc Go files to detect relationships
 
 #### 4. Create migration file
 

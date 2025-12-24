@@ -2,15 +2,19 @@
 //
 // Usage:
 //
-//	go run ./tools/cmd/ergen -schema ./internal/infrastructure/mongo/schema -output ./internal/infrastructure/mongo/schema/ER.md
+//	go run ./tools/cmd/ergen -schema ./internal/infrastructure/mongo/schema -mongodoc ./internal/infrastructure/mongo/mongodoc -output ./internal/infrastructure/mongo/schema/ER.md
 package main
 
 import (
 	"encoding/json"
 	"flag"
 	"fmt"
+	"go/ast"
+	"go/parser"
+	"go/token"
 	"os"
 	"path/filepath"
+	"reflect"
 	"sort"
 	"strings"
 )
@@ -20,10 +24,10 @@ type JSONSchema struct {
 }
 
 type SchemaDefinition struct {
-	BsonType    interface{}                  `json:"bsonType"`
-	Title       string                       `json:"title"`
-	Description string                       `json:"description"`
-	Required    []string                     `json:"required"`
+	BsonType    interface{}                   `json:"bsonType"`
+	Title       string                        `json:"title"`
+	Description string                        `json:"description"`
+	Required    []string                      `json:"required"`
 	Properties  map[string]PropertyDefinition `json:"properties"`
 }
 
@@ -51,12 +55,27 @@ type Property struct {
 	FKRef       string
 }
 
+// ForeignKeyInfo holds foreign key information extracted from Go struct tags
+type ForeignKeyInfo struct {
+	Collection string // e.g., "user"
+	Field      string // e.g., "workspace" (json field name)
+	Reference  string // e.g., "workspace" (target collection)
+}
+
 func main() {
 	schemaDir := flag.String("schema", "./internal/infrastructure/mongo/schema", "Path to schema directory")
+	mongodocDir := flag.String("mongodoc", "./internal/infrastructure/mongo/mongodoc", "Path to mongodoc directory")
 	outputFile := flag.String("output", "", "Output file path (stdout if not specified)")
 	flag.Parse()
 
-	collections, err := loadSchemas(*schemaDir)
+	// Load foreign key info from Go struct tags
+	foreignKeys, err := loadForeignKeys(*mongodocDir)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "Warning: Could not load foreign keys from mongodoc: %v\n", err)
+		foreignKeys = make(map[string]map[string]string)
+	}
+
+	collections, err := loadSchemas(*schemaDir, foreignKeys)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "Error loading schemas: %v\n", err)
 		os.Exit(1)
@@ -75,7 +94,118 @@ func main() {
 	}
 }
 
-func loadSchemas(dir string) ([]Collection, error) {
+// loadForeignKeys parses Go files in the mongodoc directory and extracts foreignkey tags
+// Returns a map of collection -> field -> target collection
+func loadForeignKeys(dir string) (map[string]map[string]string, error) {
+	result := make(map[string]map[string]string)
+
+	files, err := filepath.Glob(filepath.Join(dir, "*.go"))
+	if err != nil {
+		return nil, err
+	}
+
+	fset := token.NewFileSet()
+	for _, file := range files {
+		node, err := parser.ParseFile(fset, file, nil, parser.ParseComments)
+		if err != nil {
+			continue // Skip files that can't be parsed
+		}
+
+		ast.Inspect(node, func(n ast.Node) bool {
+			typeSpec, ok := n.(*ast.TypeSpec)
+			if !ok {
+				return true
+			}
+
+			structType, ok := typeSpec.Type.(*ast.StructType)
+			if !ok {
+				return true
+			}
+
+			typeName := typeSpec.Name.Name
+			// Extract collection name from type name (e.g., "UserDocument" -> "user")
+			collectionName := extractCollectionName(typeName)
+			if collectionName == "" {
+				return true
+			}
+
+			for _, field := range structType.Fields.List {
+				if field.Tag == nil {
+					continue
+				}
+
+				tag := field.Tag.Value
+				// Remove backticks
+				tag = strings.Trim(tag, "`")
+
+				// Parse json field name
+				jsonName := parseTagValue(tag, "json")
+				if jsonName == "" {
+					continue
+				}
+				// Handle "fieldname,omitempty" format
+				if idx := strings.Index(jsonName, ","); idx != -1 {
+					jsonName = jsonName[:idx]
+				}
+
+				// Parse foreignkey value
+				fkValue := parseTagValue(tag, "foreignkey")
+				if fkValue == "" {
+					// Also check jsonschema tag for foreignkey
+					jsonschemaTag := parseTagValue(tag, "jsonschema")
+					fkValue = parseJsonSchemaTagValue(jsonschemaTag, "foreignkey")
+				}
+
+				if fkValue != "" {
+					if result[collectionName] == nil {
+						result[collectionName] = make(map[string]string)
+					}
+					result[collectionName][jsonName] = fkValue
+				}
+			}
+
+			return true
+		})
+	}
+
+	return result, nil
+}
+
+// extractCollectionName extracts collection name from struct type name
+func extractCollectionName(typeName string) string {
+	// Handle "XxxDocument" pattern
+	if strings.HasSuffix(typeName, "Document") {
+		name := strings.TrimSuffix(typeName, "Document")
+		return strings.ToLower(name)
+	}
+	return ""
+}
+
+// parseTagValue extracts a value from a struct tag string
+func parseTagValue(tag, key string) string {
+	// Use reflect.StructTag for proper parsing
+	structTag := reflect.StructTag(tag)
+	return structTag.Get(key)
+}
+
+// parseJsonSchemaTagValue extracts a value from jsonschema tag content
+// Format: "required,foreignkey=workspace,description=..."
+func parseJsonSchemaTagValue(jsonschemaTag, key string) string {
+	if jsonschemaTag == "" {
+		return ""
+	}
+
+	prefix := key + "="
+	parts := strings.Split(jsonschemaTag, ",")
+	for _, part := range parts {
+		if strings.HasPrefix(part, prefix) {
+			return strings.TrimPrefix(part, prefix)
+		}
+	}
+	return ""
+}
+
+func loadSchemas(dir string, foreignKeys map[string]map[string]string) ([]Collection, error) {
 	files, err := filepath.Glob(filepath.Join(dir, "*.json"))
 	if err != nil {
 		return nil, err
@@ -98,7 +228,8 @@ func loadSchemas(dir string) ([]Collection, error) {
 		}
 
 		name := strings.TrimSuffix(filepath.Base(file), ".json")
-		collection := parseCollection(name, schema.Schema)
+		fkMap := foreignKeys[name]
+		collection := parseCollection(name, schema.Schema, fkMap)
 		collections = append(collections, collection)
 	}
 
@@ -109,7 +240,7 @@ func loadSchemas(dir string) ([]Collection, error) {
 	return collections, nil
 }
 
-func parseCollection(name string, schema *SchemaDefinition) Collection {
+func parseCollection(name string, schema *SchemaDefinition, foreignKeys map[string]string) Collection {
 	required := make(map[string]bool)
 	for _, r := range schema.Required {
 		required[r] = true
@@ -117,7 +248,7 @@ func parseCollection(name string, schema *SchemaDefinition) Collection {
 
 	var properties []Property
 	for propName, propDef := range schema.Properties {
-		prop := parseProperty(propName, propDef, required[propName])
+		prop := parseProperty(propName, propDef, required[propName], foreignKeys)
 		properties = append(properties, prop)
 	}
 
@@ -145,7 +276,7 @@ func parseCollection(name string, schema *SchemaDefinition) Collection {
 	}
 }
 
-func parseProperty(name string, def PropertyDefinition, isRequired bool) Property {
+func parseProperty(name string, def PropertyDefinition, isRequired bool, foreignKeys map[string]string) Property {
 	prop := Property{
 		Name:        name,
 		Type:        getBsonType(def.BsonType),
@@ -158,17 +289,12 @@ func parseProperty(name string, def PropertyDefinition, isRequired bool) Propert
 		prop.IsPK = true
 	}
 
-	// Detect foreign keys from description
-	desc := strings.ToLower(def.Description)
-	if strings.Contains(desc, "workspace id") && name != "id" {
-		prop.IsFK = true
-		prop.FKRef = "workspace.id"
-	} else if strings.Contains(desc, "user id") && name != "id" {
-		prop.IsFK = true
-		prop.FKRef = "user.id"
-	} else if strings.Contains(desc, "role id") && name != "id" {
-		prop.IsFK = true
-		prop.FKRef = "role.id"
+	// Check foreign keys from Go struct tags
+	if foreignKeys != nil {
+		if fkTarget, ok := foreignKeys[name]; ok {
+			prop.IsFK = true
+			prop.FKRef = fkTarget + ".id"
+		}
 	}
 
 	// Handle array types

@@ -7,15 +7,15 @@ import (
 )
 
 type WorkspaceRoleDocument struct {
-	WorkspaceID string `json:"workspace_id" bson:"workspace_id" jsonschema:"description=Workspace ID (ULID format)"`
-	RoleID      string `json:"role_id" bson:"role_id" jsonschema:"description=Role ID (ULID format)"`
+	WorkspaceID string `json:"workspace_id" bson:"workspace_id" jsonschema:"foreignkey=workspace,description=Workspace ID (ULID format)"`
+	RoleID      string `json:"role_id" bson:"role_id" jsonschema:"foreignkey=role,description=Role ID (ULID format)"`
 }
 
 type PermittableDocument struct {
 	ID             string                  `json:"id" bson:"id" jsonschema:"required,description=Permittable ID (ULID format)"`
-	UserID         string                  `json:"userid" bson:"userid" jsonschema:"required,description=User ID this permittable represents"`
-	RoleIDs        []string                `json:"roleids" bson:"roleids" jsonschema:"description=List of role IDs assigned to this user. Default: []"`
-	WorkspaceRoles []WorkspaceRoleDocument `json:"workspace_roles,omitempty" bson:"workspace_roles,omitempty"`
+	UserID         string                  `json:"userid" bson:"userid" jsonschema:"required,foreignkey=user,description=User ID this permittable represents"`
+	RoleIDs        []string                `json:"roleids" bson:"roleids" jsonschema:"foreignkey=role,description=List of role IDs assigned to this user. Default: []"`
+	WorkspaceRoles []WorkspaceRoleDocument `json:"workspace_roles,omitempty" bson:"workspace_roles,omitempty" jsonschema:"description=Workspace-specific role assignments"`
 }
 
 type PermittableConsumer = Consumer[*PermittableDocument, *permittable.Permittable]

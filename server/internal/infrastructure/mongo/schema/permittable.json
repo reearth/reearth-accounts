@@ -25,6 +25,7 @@
       },
       "workspace_roles": {
         "bsonType": "array",
+        "description": "Workspace-specific role assignments",
         "items": {
           "bsonType": "object",
           "properties": {

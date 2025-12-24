@@ -412,6 +412,10 @@ func isByteSlice(parentType any, jsonFieldName string) bool {
 }
 
 func getDescriptionFromTag(parentType any, jsonFieldName string) string {
+	return getTagValue(parentType, jsonFieldName, "description")
+}
+
+func getTagValue(parentType any, jsonFieldName string, key string) string {
 	if parentType == nil || jsonFieldName == "" {
 		return ""
 	}
@@ -434,16 +438,24 @@ func getDescriptionFromTag(parentType any, jsonFieldName string) string {
 		return ""
 	}
 
-	// Parse description from jsonschema tag
-	// Format: jsonschema:"description=Some description here"
-	const prefix = "description="
-	if idx := strings.Index(tag, prefix); idx != -1 {
-		desc := tag[idx+len(prefix):]
-		// The description continues until the end of the tag value
-		return desc
+	// Parse value from jsonschema tag
+	// Format: jsonschema:"key=value,key2=value2" or jsonschema:"required,description=value"
+	prefix := key + "="
+	idx := strings.Index(tag, prefix)
+	if idx == -1 {
+		return ""
 	}
 
-	return ""
+	value := tag[idx+len(prefix):]
+	// Value continues until the next comma or end of tag
+	// But for "description=", it continues to the end (description is always last)
+	if key != "description" {
+		if commaIdx := strings.Index(value, ","); commaIdx != -1 {
+			value = value[:commaIdx]
+		}
+	}
+
+	return value
 }
 
 func getRequiredFieldsFromType(t any) []string {

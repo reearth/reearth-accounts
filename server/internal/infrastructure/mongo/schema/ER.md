@@ -16,6 +16,7 @@ erDiagram
         string id UK
         string[] roleids FK "role.id"
         string userid FK "user.id"
+        object[] workspace_roles "optional"
     }
 
     Role {
@@ -47,7 +48,7 @@ erDiagram
         string alias
         string email
         object integrations "optional"
-        object members FK "user.id"
+        object members
         string members_hash "optional"
         object metadata
         string name

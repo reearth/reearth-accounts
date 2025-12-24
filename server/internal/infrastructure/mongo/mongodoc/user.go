@@ -20,7 +20,7 @@ type UserDocument struct {
 	Alias         string                 `json:"alias" bson:"alias" jsonschema:"required,description=Unique user handle/alias. Default: \"\""`
 	Email         string                 `json:"email" bson:"email" jsonschema:"required,description=User email address"`
 	Subs          []string               `json:"subs" bson:"subs" jsonschema:"required,description=OAuth subject identifiers for authentication providers. Default: []"`
-	Workspace     string                 `json:"workspace" bson:"workspace" jsonschema:"required,description=Personal workspace ID (ULID format)"`
+	Workspace     string                 `json:"workspace" bson:"workspace" jsonschema:"required,foreignkey=workspace,description=Personal workspace ID (ULID format)"`
 	Team          string                 `json:"team" bson:",omitempty" jsonschema:"description=Legacy team field (deprecated, use workspace)"`
 	Lang          string                 `json:"lang" bson:"lang" jsonschema:"description=User language preference. Default: \"\" (deprecated, move to metadata)"`
 	Theme         string                 `json:"theme" bson:"theme" jsonschema:"description=User UI theme preference. Default: \"\" (deprecated, move to metadata)"`
