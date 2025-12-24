@@ -15,19 +15,19 @@ type PasswordResetDocument struct {
 }
 
 type UserDocument struct {
-	ID            string                 `json:"id" jsonschema:"description=User ID (ULID format)"`
-	Name          string                 `json:"name" jsonschema:"description=User display name"`
-	Alias         string                 `json:"alias" jsonschema:"description=Unique user handle/alias. Default: \"\""`
-	Email         string                 `json:"email" jsonschema:"description=User email address"`
-	Subs          []string               `json:"subs" jsonschema:"description=OAuth subject identifiers for authentication providers. Default: []"`
-	Workspace     string                 `json:"workspace" jsonschema:"description=Personal workspace ID (ULID format)"`
+	ID            string                 `json:"id" bson:"id" jsonschema:"description=User ID (ULID format)"`
+	Name          string                 `json:"name" bson:"name" jsonschema:"description=User display name"`
+	Alias         string                 `json:"alias" bson:"alias" jsonschema:"description=Unique user handle/alias. Default: \"\""`
+	Email         string                 `json:"email" bson:"email" jsonschema:"description=User email address"`
+	Subs          []string               `json:"subs" bson:"subs" jsonschema:"description=OAuth subject identifiers for authentication providers. Default: []"`
+	Workspace     string                 `json:"workspace" bson:"workspace" jsonschema:"description=Personal workspace ID (ULID format)"`
 	Team          string                 `json:"team" bson:",omitempty" jsonschema:"description=Legacy team field (deprecated, use workspace)"`
-	Lang          string                 `json:"lang" jsonschema:"description=User language preference. Default: \"\" (deprecated, move to metadata)"`
-	Theme         string                 `json:"theme" jsonschema:"description=User UI theme preference. Default: \"\" (deprecated, move to metadata)"`
-	Password      []byte                 `json:"password" jsonschema:"description=Hashed password (bcrypt)"`
-	PasswordReset *PasswordResetDocument `json:"passwordreset" jsonschema:"description=Password reset token information"`
-	Verification  *UserVerificationDoc   `json:"verification" jsonschema:"description=Email verification state. Default: null"`
-	Metadata      UserMetadataDoc        `json:"metadata" jsonschema:"description=Extended user metadata. Default: {}"`
+	Lang          string                 `json:"lang" bson:"lang" jsonschema:"description=User language preference. Default: \"\" (deprecated, move to metadata)"`
+	Theme         string                 `json:"theme" bson:"theme" jsonschema:"description=User UI theme preference. Default: \"\" (deprecated, move to metadata)"`
+	Password      []byte                 `json:"password" bson:"password" jsonschema:"description=Hashed password (bcrypt)"`
+	PasswordReset *PasswordResetDocument `json:"passwordreset" bson:"passwordreset" jsonschema:"description=Password reset token information"`
+	Verification  *UserVerificationDoc   `json:"verification" bson:"verification" jsonschema:"description=Email verification state. Default: null"`
+	Metadata      UserMetadataDoc        `json:"metadata" bson:"metadata" jsonschema:"description=Extended user metadata. Default: {}"`
 }
 
 type UserVerificationDoc struct {

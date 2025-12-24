@@ -21,18 +21,17 @@ type WorkspaceMetadataDocument struct {
 }
 
 type WorkspaceDocument struct {
-	ID           string                             `json:"id" jsonschema:"description=Workspace ID (ULID format)"`
-	Name         string                             `json:"name" jsonschema:"description=Workspace name"`
-	Alias        string                             `json:"alias" jsonschema:"description=Unique workspace handle/alias"`
-	Email        string                             `json:"email" jsonschema:"description=Workspace contact email"`
-	Metadata     WorkspaceMetadataDocument          `json:"metadata" jsonschema:"description=Extended workspace metadata"`
-	Members      map[string]WorkspaceMemberDocument `json:"members" jsonschema:"description=Map of user ID to member document"`
-	Integrations map[string]WorkspaceMemberDocument `json:"integrations" jsonschema:"description=Map of integration ID to member document. Default: {}"`
+	ID           string                             `json:"id" bson:"id" jsonschema:"description=Workspace ID (ULID format)"`
+	Name         string                             `json:"name" bson:"name" jsonschema:"description=Workspace name"`
+	Alias        string                             `json:"alias" bson:"alias" jsonschema:"description=Unique workspace handle/alias"`
+	Email        string                             `json:"email" bson:"email" jsonschema:"description=Workspace contact email"`
+	Metadata     WorkspaceMetadataDocument          `json:"metadata" bson:"metadata" jsonschema:"description=Extended workspace metadata"`
+	Members      map[string]WorkspaceMemberDocument `json:"members" bson:"members" jsonschema:"description=Map of user ID to member document"`
+	Integrations map[string]WorkspaceMemberDocument `json:"integrations" bson:"integrations" jsonschema:"description=Map of integration ID to member document. Default: {}"`
 	MembersHash  string                             `json:"members_hash" bson:"members_hash,omitempty" jsonschema:"description=SHA256 hash of members and integrations for uniqueness tracking. Default: \"\""`
-	Personal     bool                               `json:"personal" jsonschema:"description=Whether this is a personal workspace. Default: false"`
-	Policy       string                             `json:"policy" bson:",omitempty" jsonschema:"description=Policy ID reference. Default: \"\""`
+	Personal     bool                               `json:"personal" bson:"personal" jsonschema:"description=Whether this is a personal workspace. Default: false"`
+	Policy       string                             `json:"policy" bson:"policy,omitempty" jsonschema:"description=Policy ID reference. Default: \"\""`
 }
-
 
 func NewWorkspace(ws *workspace.Workspace) (*WorkspaceDocument, string) {
 	membersDoc := map[string]WorkspaceMemberDocument{}
