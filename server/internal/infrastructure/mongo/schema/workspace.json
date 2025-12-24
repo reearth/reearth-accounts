@@ -109,8 +109,8 @@
       "id",
       "name",
       "alias",
-      "metadata",
       "email",
+      "metadata",
       "members",
       "personal"
     ],

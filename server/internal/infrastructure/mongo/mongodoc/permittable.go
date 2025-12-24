@@ -12,8 +12,8 @@ type WorkspaceRoleDocument struct {
 }
 
 type PermittableDocument struct {
-	ID             string                  `json:"id" bson:"id" jsonschema:"description=Permittable ID (ULID format)"`
-	UserID         string                  `json:"userid" bson:"userid" jsonschema:"description=User ID this permittable represents"`
+	ID             string                  `json:"id" bson:"id" jsonschema:"required,description=Permittable ID (ULID format)"`
+	UserID         string                  `json:"userid" bson:"userid" jsonschema:"required,description=User ID this permittable represents"`
 	RoleIDs        []string                `json:"roleids" bson:"roleids" jsonschema:"description=List of role IDs assigned to this user. Default: []"`
 	WorkspaceRoles []WorkspaceRoleDocument `json:"workspace_roles,omitempty" bson:"workspace_roles,omitempty"`
 }

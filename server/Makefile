@@ -63,4 +63,8 @@ gql:
 run-migration:
 	RUN_MIGRATION=true go run ./cmd/reearth-accounts
 
+update-schema-json:
+	go run ./tools/cmd/mongoschemagen -output ./internal/infrastructure/mongo/schema
+	go run ./tools/cmd/ergen
+
 .PHONY: dev-install dev run down run-app run-cerbos run-migration gql

@@ -6,14 +6,13 @@
 // Usage as a library:
 //
 //	g := NewGenerator()
-//	g.RegisterType("UserDocument", UserDocument{})
-//	schemas, _ := g.LoadConfig("schemas.yml")
-//	g.Generate(schemas, "./output")
+//	g.RegisterSchema("users", UserDocument{}, "User Schema", "Schema for user documents")
+//	g.Generate(g.GetSchemas(), "./output")
 //
 // Or use RunCLI() for command-line interface:
 //
 //	g := NewGenerator()
-//	g.RegisterType("UserDocument", UserDocument{})
+//	g.RegisterSchema("users", UserDocument{}, "User Schema", "Schema for user documents")
 //	g.RunCLI()
 package main
 
@@ -28,22 +27,7 @@ import (
 	"time"
 
 	"github.com/invopop/jsonschema"
-	"gopkg.in/yaml.v3"
 )
-
-// SchemaConfigFile represents the YAML configuration file structure
-type SchemaConfigFile struct {
-	Schemas []SchemaConfigYAML `yaml:"schemas"`
-}
-
-// SchemaConfigYAML represents a single schema configuration in YAML
-type SchemaConfigYAML struct {
-	Collection  string   `yaml:"collection"`
-	Type        string   `yaml:"type"`
-	Title       string   `yaml:"title"`
-	Description string   `yaml:"description"`
-	Required    []string `yaml:"required"`
-}
 
 // SchemaConfig defines the configuration for generating a collection schema
 type SchemaConfig struct {
@@ -56,50 +40,29 @@ type SchemaConfig struct {
 
 // Generator holds the type registry and generates schemas
 type Generator struct {
-	typeRegistry map[string]any
+	schemas []SchemaConfig
 }
 
 // NewGenerator creates a new schema generator
 func NewGenerator() *Generator {
 	return &Generator{
-		typeRegistry: make(map[string]any),
+		schemas: make([]SchemaConfig, 0),
 	}
 }
 
-// RegisterType registers a Go type with a name for schema generation
-func (g *Generator) RegisterType(name string, t any) {
-	g.typeRegistry[name] = t
+// RegisterSchema registers a collection schema with its type and metadata
+func (g *Generator) RegisterSchema(collection string, t any, title, description string) {
+	g.schemas = append(g.schemas, SchemaConfig{
+		CollectionName: collection,
+		Type:           t,
+		Title:          title,
+		Description:    description,
+	})
 }
 
-// LoadConfig loads schema configurations from a YAML file
-func (g *Generator) LoadConfig(configPath string) ([]SchemaConfig, error) {
-	data, err := os.ReadFile(configPath)
-	if err != nil {
-		return nil, fmt.Errorf("failed to read config file: %w", err)
-	}
-
-	var configFile SchemaConfigFile
-	if err := yaml.Unmarshal(data, &configFile); err != nil {
-		return nil, fmt.Errorf("failed to parse config file: %w", err)
-	}
-
-	var schemas []SchemaConfig
-	for _, cfg := range configFile.Schemas {
-		t, ok := g.typeRegistry[cfg.Type]
-		if !ok {
-			return nil, fmt.Errorf("type %q not found in registry for collection %q", cfg.Type, cfg.Collection)
-		}
-
-		schemas = append(schemas, SchemaConfig{
-			CollectionName: cfg.Collection,
-			Type:           t,
-			Title:          cfg.Title,
-			Description:    cfg.Description,
-			Required:       cfg.Required,
-		})
-	}
-
-	return schemas, nil
+// GetSchemas returns all registered schemas
+func (g *Generator) GetSchemas() []SchemaConfig {
+	return g.schemas
 }
 
 // Generate generates schema files for all configured collections
@@ -129,13 +92,12 @@ func (g *Generator) Generate(schemas []SchemaConfig, outputDir string) error {
 
 // RunCLI runs the generator as a command-line tool
 func (g *Generator) RunCLI() {
-	configPath := flag.String("config", "schemas.yml", "Path to YAML configuration file")
 	outputDir := flag.String("output", "./internal/infrastructure/mongo/schema", "Output directory for schema files")
 	flag.Parse()
 
-	schemas, err := g.LoadConfig(*configPath)
-	if err != nil {
-		fmt.Fprintf(os.Stderr, "Error loading config: %v\n", err)
+	schemas := g.GetSchemas()
+	if len(schemas) == 0 {
+		fmt.Fprintf(os.Stderr, "Error: no schemas registered\n")
 		os.Exit(1)
 	}
 
@@ -166,8 +128,13 @@ func (g *Generator) convertToMongoSchema(schema *jsonschema.Schema, cfg SchemaCo
 		"description": cfg.Description,
 	}
 
-	if len(cfg.Required) > 0 {
-		result["required"] = cfg.Required
+	// Get required fields from struct tags if not specified in config
+	required := cfg.Required
+	if len(required) == 0 {
+		required = getRequiredFieldsFromType(cfg.Type)
+	}
+	if len(required) > 0 {
+		result["required"] = required
 	}
 
 	properties := make(map[string]any)
@@ -476,4 +443,51 @@ func getDescriptionFromTag(parentType any, jsonFieldName string) string {
 	}
 
 	return ""
+}
+
+func getRequiredFieldsFromType(t any) []string {
+	if t == nil {
+		return nil
+	}
+
+	rt := reflect.TypeOf(t)
+	if rt.Kind() == reflect.Ptr {
+		rt = rt.Elem()
+	}
+	if rt.Kind() != reflect.Struct {
+		return nil
+	}
+
+	var required []string
+	for i := 0; i < rt.NumField(); i++ {
+		field := rt.Field(i)
+
+		// Get JSON field name
+		jsonTag := field.Tag.Get("json")
+		if jsonTag == "" || jsonTag == "-" {
+			continue
+		}
+		jsonName := strings.Split(jsonTag, ",")[0]
+		if jsonName == "" {
+			continue
+		}
+
+		// Check for jsonschema:"required" tag
+		jsonschemaTag := field.Tag.Get("jsonschema")
+		if jsonschemaTag == "" {
+			continue
+		}
+
+		// Parse comma-separated parts to find "required"
+		parts := strings.Split(jsonschemaTag, ",")
+		for _, part := range parts {
+			part = strings.TrimSpace(part)
+			if part == "required" {
+				required = append(required, jsonName)
+				break
+			}
+		}
+	}
+
+	return required
 }

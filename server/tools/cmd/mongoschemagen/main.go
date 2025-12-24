@@ -2,11 +2,11 @@
 //
 // Usage:
 //
-//	go run ./tools/cmd/mongoschemagen -config schemas.yml -output ./internal/infrastructure/mongo/schema
+//	go run ./tools/cmd/mongoschemagen -output ./internal/infrastructure/mongo/schema
 package main
 
 func main() {
 	g := NewGenerator()
-	RegisterTypes(g)
+	RegisterSchemas(g)
 	g.RunCLI()
 }

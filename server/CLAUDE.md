@@ -122,6 +122,83 @@ server/
 - Migrations run automatically on startup
 - Schema management: See [internal/infrastructure/mongo/SCHEMA.md](internal/infrastructure/mongo/SCHEMA.md)
 
+### MongoDB Schema Changes
+
+When adding or modifying MongoDB collection schemas, follow these steps:
+
+#### 1. Update the Go struct (mongodoc)
+
+Add or modify the document struct in `internal/infrastructure/mongo/mongodoc/`:
+
+```go
+type UserDocument struct {
+    ID    string `json:"id" jsonschema:"required,description=User ID (ULID format)"`
+    Name  string `json:"name" jsonschema:"required,description=User display name"`
+    Email string `json:"email" jsonschema:"description=User email address. Default: \"\""`
+}
+```
+
+- Use `json` tag for field name (lowercase)
+- Use `jsonschema` tag with:
+  - `required` - marks the field as required in the schema
+  - `description=` - field documentation
+- Include default values in description for optional fields: `Default: ""`
+
+#### 2. Register schema (if adding new collection)
+
+Add the schema registration in `tools/cmd/mongoschemagen/registry.go`:
+
+```go
+func RegisterSchemas(g *Generator) {
+    g.RegisterSchema(
+        "newcollection",                              // collection name
+        mongodoc.NewCollectionDocument{},             // Go struct type
+        "NewCollection Collection Schema",            // title
+        "Schema for newcollection documents",         // description
+    )
+}
+```
+
+Note: `required` fields are automatically extracted from struct tags (`jsonschema:"required,..."`)
+
+#### 3. Generate JSON schema files
+
+```bash
+make update-schema-json
+```
+
+This command:
+- Generates JSON schema files from Go structs (`mongoschemagen`)
+- Updates the ER diagram (`ergen`)
+
+#### 4. Create migration file
+
+Create `internal/infrastructure/mongo/migration/YYMMDDHHMMSS_description.go`:
+
+```go
+package migration
+
+import "context"
+
+func ApplyNewCollectionSchema(ctx context.Context, c DBClient) error {
+    return ApplyCollectionSchemas(ctx, []string{"newcollection"}, c)
+}
+```
+
+Register in `migrations.go`:
+
+```go
+var migrations = migration.Migrations[DBClient]{
+    YYMMDDHHMMSS: ApplyNewCollectionSchema,
+}
+```
+
+#### Related Files
+- Schema JSON files: `internal/infrastructure/mongo/schema/*.json`
+- ER diagram: `internal/infrastructure/mongo/schema/ER.md`
+- Schema generator: `tools/cmd/mongoschemagen/`
+- ER diagram generator: `tools/cmd/ergen/`
+
 ## GraphQL Schema Management
 - Schema files in `schemas/` directory
 - Combined schema generation via `gqlgen.yml`

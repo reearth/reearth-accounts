@@ -123,8 +123,8 @@
       "email",
       "subs",
       "workspace",
-      "metadata",
-      "password"
+      "password",
+      "metadata"
     ],
     "title": "User Collection Schema"
   }
