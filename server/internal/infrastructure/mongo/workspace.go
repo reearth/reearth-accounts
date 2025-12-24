@@ -155,7 +155,11 @@ func (r *Workspace) FindByAliases(ctx context.Context, aliases []string) (worksp
 
 func (r *Workspace) Create(ctx context.Context, workspace *workspace.Workspace) error {
 	doc, id := mongodoc.NewWorkspace(workspace)
-	return r.client.CreateOne(ctx, id, doc)
+	err := r.client.CreateOne(ctx, id, doc)
+	if mongo.IsDuplicateKeyError(err) {
+		return repo.ErrDuplicateWorkspaceAlias
+	}
+	return err
 }
 
 func (r *Workspace) Save(ctx context.Context, workspace *workspace.Workspace) error {

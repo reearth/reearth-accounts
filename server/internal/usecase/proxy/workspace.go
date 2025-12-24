@@ -99,8 +99,8 @@ func (w *Workspace) Create(ctx context.Context, alias, name, description string,
 	return ToWorkspace(res.CreateWorkspace.Workspace.FragmentWorkspace)
 }
 
-func (w *Workspace) Update(ctx context.Context, id workspace.ID, name string, op *usecase.Operator) (*workspace.Workspace, error) {
-	res, err := UpdateWorkspace(ctx, w.gql, UpdateWorkspaceInput{WorkspaceId: id.String(), Name: name})
+func (w *Workspace) Update(ctx context.Context, id workspace.ID, name string, alias *string, op *usecase.Operator) (*workspace.Workspace, error) {
+	res, err := UpdateWorkspace(ctx, w.gql, UpdateWorkspaceInput{WorkspaceId: id.String(), Name: name, Alias: alias})
 	if err != nil {
 		return nil, err
 	}
