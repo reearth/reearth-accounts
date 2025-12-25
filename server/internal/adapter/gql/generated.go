@@ -139,6 +139,7 @@ type ComplexityRoot struct {
 		Nodes                    func(childComplexity int, id []gqlmodel.ID, typeArg gqlmodel.NodeType) int
 		Roles                    func(childComplexity int) int
 		SearchUser               func(childComplexity int, keyword string) int
+		User                     func(childComplexity int, id gqlmodel.ID) int
 		UserByNameOrEmail        func(childComplexity int, nameOrEmail string) int
 	}
 
@@ -298,6 +299,7 @@ type QueryResolver interface {
 	Roles(ctx context.Context) (*gqlmodel.RolesPayload, error)
 	GetUsersWithRoles(ctx context.Context) (*gqlmodel.GetUsersWithRolesPayload, error)
 	Me(ctx context.Context) (*gqlmodel.Me, error)
+	User(ctx context.Context, id gqlmodel.ID) (*gqlmodel.User, error)
 	UserByNameOrEmail(ctx context.Context, nameOrEmail string) (*gqlmodel.User, error)
 	SearchUser(ctx context.Context, keyword string) ([]*gqlmodel.User, error)
 	FindUsersByIDs(ctx context.Context, ids []gqlmodel.ID) ([]*gqlmodel.User, error)
@@ -892,6 +894,17 @@ func (e *executableSchema) Complexity(ctx context.Context, typeName, field strin
 		}
 
 		return e.complexity.Query.SearchUser(childComplexity, args["keyword"].(string)), true
+	case "Query.user":
+		if e.complexity.Query.User == nil {
+			break
+		}
+
+		args, err := ec.field_Query_user_args(ctx, rawArgs)
+		if err != nil {
+			return 0, false
+		}
+
+		return e.complexity.Query.User(childComplexity, args["id"].(gqlmodel.ID)), true
 	case "Query.userByNameOrEmail":
 		if e.complexity.Query.UserByNameOrEmail == nil {
 			break
@@ -1606,6 +1619,7 @@ input DeleteMeInput {
 
 extend type Query {
   me: Me
+  user(id: ID!): User
   userByNameOrEmail(nameOrEmail: String!): User
   searchUser(keyword: String!): [User!]!
   findUsersByIDs(ids: [ID!]!): [User!]!
@@ -1701,6 +1715,7 @@ input CreateWorkspaceInput {
 input UpdateWorkspaceInput {
     workspaceId: ID!
     name: String!
+    alias: String
 }
 
 input MemberInput {
@@ -2276,6 +2291,17 @@ func (ec *executionContext) field_Query_userByNameOrEmail_args(ctx context.Conte
 		return nil, err
 	}
 	args["nameOrEmail"] = arg0
+	return args, nil
+}
+
+func (ec *executionContext) field_Query_user_args(ctx context.Context, rawArgs map[string]any) (map[string]any, error) {
+	var err error
+	args := map[string]any{}
+	arg0, err := graphql.ProcessArgField(ctx, rawArgs, "id", ec.unmarshalNID2githubᚗcomᚋreearthᚋreearthᚑaccountsᚋserverᚋinternalᚋadapterᚋgqlᚋgqlmodelᚐID)
+	if err != nil {
+		return nil, err
+	}
+	args["id"] = arg0
 	return args, nil
 }
 
@@ -4344,6 +4370,67 @@ func (ec *executionContext) fieldContext_Query_me(_ context.Context, field graph
 			}
 			return nil, fmt.Errorf("no field named %q was found under type Me", field.Name)
 		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _Query_user(ctx context.Context, field graphql.CollectedField) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		ec.fieldContext_Query_user,
+		func(ctx context.Context) (any, error) {
+			fc := graphql.GetFieldContext(ctx)
+			return ec.resolvers.Query().User(ctx, fc.Args["id"].(gqlmodel.ID))
+		},
+		nil,
+		ec.marshalOUser2ᚖgithubᚗcomᚋreearthᚋreearthᚑaccountsᚋserverᚋinternalᚋadapterᚋgqlᚋgqlmodelᚐUser,
+		true,
+		false,
+	)
+}
+
+func (ec *executionContext) fieldContext_Query_user(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "Query",
+		Field:      field,
+		IsMethod:   true,
+		IsResolver: true,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			switch field.Name {
+			case "id":
+				return ec.fieldContext_User_id(ctx, field)
+			case "name":
+				return ec.fieldContext_User_name(ctx, field)
+			case "alias":
+				return ec.fieldContext_User_alias(ctx, field)
+			case "email":
+				return ec.fieldContext_User_email(ctx, field)
+			case "host":
+				return ec.fieldContext_User_host(ctx, field)
+			case "workspace":
+				return ec.fieldContext_User_workspace(ctx, field)
+			case "auths":
+				return ec.fieldContext_User_auths(ctx, field)
+			case "metadata":
+				return ec.fieldContext_User_metadata(ctx, field)
+			case "verification":
+				return ec.fieldContext_User_verification(ctx, field)
+			}
+			return nil, fmt.Errorf("no field named %q was found under type User", field.Name)
+		},
+	}
+	defer func() {
+		if r := recover(); r != nil {
+			err = ec.Recover(ctx, r)
+			ec.Error(ctx, err)
+		}
+	}()
+	ctx = graphql.WithFieldContext(ctx, fc)
+	if fc.Args, err = ec.field_Query_user_args(ctx, field.ArgumentMap(ec.Variables)); err != nil {
+		ec.Error(ctx, err)
+		return fc, err
 	}
 	return fc, nil
 }
@@ -9313,7 +9400,7 @@ func (ec *executionContext) unmarshalInputUpdateWorkspaceInput(ctx context.Conte
 		asMap[k] = v
 	}
 
-	fieldsInOrder := [...]string{"workspaceId", "name"}
+	fieldsInOrder := [...]string{"workspaceId", "name", "alias"}
 	for _, k := range fieldsInOrder {
 		v, ok := asMap[k]
 		if !ok {
@@ -9334,6 +9421,13 @@ func (ec *executionContext) unmarshalInputUpdateWorkspaceInput(ctx context.Conte
 				return it, err
 			}
 			it.Name = data
+		case "alias":
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("alias"))
+			data, err := ec.unmarshalOString2ᚖstring(ctx, v)
+			if err != nil {
+				return it, err
+			}
+			it.Alias = data
 		}
 	}
 
@@ -10123,6 +10217,25 @@ func (ec *executionContext) _Query(ctx context.Context, sel ast.SelectionSet) gr
 					}
 				}()
 				res = ec._Query_me(ctx, field)
+				return res
+			}
+
+			rrm := func(ctx context.Context) graphql.Marshaler {
+				return ec.OperationContext.RootResolverMiddleware(ctx,
+					func(ctx context.Context) graphql.Marshaler { return innerFunc(ctx, out) })
+			}
+
+			out.Concurrently(i, func(ctx context.Context) graphql.Marshaler { return rrm(innerCtx) })
+		case "user":
+			field := field
+
+			innerFunc := func(ctx context.Context, _ *graphql.FieldSet) (res graphql.Marshaler) {
+				defer func() {
+					if r := recover(); r != nil {
+						ec.Error(ctx, ec.Recover(ctx, r))
+					}
+				}()
+				res = ec._Query_user(ctx, field)
 				return res
 			}
 

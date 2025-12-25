@@ -18,22 +18,31 @@ import (
 
 func TestUser_VerifyUser(t *testing.T) {
 	user.DefaultPasswordEncoder = &user.NoopPasswordEncoder{}
-	uid := id.NewUserID()
-	tid := id.NewWorkspaceID()
-	r := memory.New()
-	uc := NewUser(r, nil, "", "")
-	expired := time.Now().Add(24 * time.Hour)
+
 	tests := []struct {
 		name             string
 		code             string
-		createUserBefore *user.User
-		wantUser         func(u *user.User) *user.User
+		createUserBefore func() *user.User
+		wantUser         func(u *user.User, uid user.ID, tid user.WorkspaceID, expired time.Time) *user.User
 		wantError        error
 	}{
 		{
 			name: "ok",
 			code: "code",
-			wantUser: func(u *user.User) *user.User {
+			createUserBefore: func() *user.User {
+				uid := id.NewUserID()
+				tid := id.NewWorkspaceID()
+				expired := time.Now().Add(24 * time.Hour)
+				return user.New().
+					ID(uid).
+					Workspace(tid).
+					Name("NAME").
+					Email("aaa@bbb.com").
+					PasswordPlainText("PAss00!!").
+					Verification(user.VerificationFrom("code", expired, false)).
+					MustBuild()
+			},
+			wantUser: func(u *user.User, uid user.ID, tid user.WorkspaceID, expired time.Time) *user.User {
 				return user.New().
 					ID(uid).
 					Workspace(tid).
@@ -43,58 +52,67 @@ func TestUser_VerifyUser(t *testing.T) {
 					Verification(user.VerificationFrom("code", expired, true)).
 					MustBuild()
 			},
-			createUserBefore: user.New().
-				ID(uid).
-				Workspace(tid).
-				Name("NAME").
-				Email("aaa@bbb.com").
-				PasswordPlainText("PAss00!!").
-				Verification(user.VerificationFrom("code", expired, false)).
-				MustBuild(),
 			wantError: nil,
 		},
 		{
-			name:     "expired",
-			code:     "code",
-			wantUser: nil,
-			createUserBefore: user.New().
-				ID(uid).
-				Workspace(tid).
-				Name("NAME").
-				Email("aaa@bbb.com").
-				PasswordPlainText("PAss00!!").
-				Verification(user.VerificationFrom("code", time.Now().Add(-24*time.Hour), false)).
-				MustBuild(),
+			name: "expired",
+			code: "code",
+			createUserBefore: func() *user.User {
+				uid := id.NewUserID()
+				tid := id.NewWorkspaceID()
+				return user.New().
+					ID(uid).
+					Workspace(tid).
+					Name("NAME").
+					Email("aaa@bbb.com").
+					PasswordPlainText("PAss00!!").
+					Verification(user.VerificationFrom("code", time.Now().Add(-24*time.Hour), false)).
+					MustBuild()
+			},
+			wantUser:  nil,
 			wantError: errors.New("verification expired"),
 		},
 		{
-			name:     "not found",
-			code:     "codesss",
-			wantUser: nil,
-			createUserBefore: user.New().
-				ID(uid).
-				Workspace(tid).
-				Name("NAME").
-				Email("aaa@bbb.com").
-				PasswordPlainText("PAss00!!").
-				Verification(user.VerificationFrom("code", expired, false)).
-				MustBuild(),
+			name: "not found",
+			code: "codesss",
+			createUserBefore: func() *user.User {
+				uid := id.NewUserID()
+				tid := id.NewWorkspaceID()
+				expired := time.Now().Add(24 * time.Hour)
+				return user.New().
+					ID(uid).
+					Workspace(tid).
+					Name("NAME").
+					Email("aaa@bbb.com").
+					PasswordPlainText("PAss00!!").
+					Verification(user.VerificationFrom("code", expired, false)).
+					MustBuild()
+			},
+			wantUser:  nil,
 			wantError: rerror.ErrNotFound,
 		},
 	}
 
 	for _, tt := range tests {
-		tt := tt
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 			ctx := context.Background()
+
+			// Create a new repository instance for each subtest to avoid race conditions
+			r := memory.New()
+			uc := NewUser(r, nil, "", "")
+
+			var createdUser *user.User
 			if tt.createUserBefore != nil {
-				assert.NoError(t, r.User.Save(ctx, tt.createUserBefore))
+				createdUser = tt.createUserBefore()
+				assert.NoError(t, r.User.Save(ctx, createdUser))
 			}
+
 			u, err := uc.VerifyUser(ctx, tt.code)
 
-			if tt.wantUser != nil {
-				assert.Equal(t, tt.wantUser(u), u)
+			if tt.wantUser != nil && createdUser != nil {
+				expired := createdUser.Verification().Expiration()
+				assert.Equal(t, tt.wantUser(u, createdUser.ID(), createdUser.Workspace(), expired), u)
 			} else {
 				assert.Nil(t, u)
 			}
@@ -152,7 +170,6 @@ func TestUser_StartPasswordReset(t *testing.T) {
 	}
 
 	for _, tt := range tests {
-		tt := tt
 		t.Run(tt.name, func(t *testing.T) {
 			ctx := context.Background()
 			if tt.createUserBefore != nil {
@@ -258,7 +275,6 @@ func TestUser_PasswordReset(t *testing.T) {
 	}
 
 	for _, tt := range tests {
-		tt := tt
 		t.Run(tt.name, func(t *testing.T) {
 			ctx := context.Background()
 			if tt.createUserBefore != nil {

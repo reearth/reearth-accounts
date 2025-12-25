@@ -263,8 +263,9 @@ type UpdateUserOfWorkspaceInput struct {
 }
 
 type UpdateWorkspaceInput struct {
-	WorkspaceID ID     `json:"workspaceId"`
-	Name        string `json:"name"`
+	WorkspaceID ID      `json:"workspaceId"`
+	Name        string  `json:"name"`
+	Alias       *string `json:"alias,omitempty"`
 }
 
 type UpdateWorkspacePayload struct {
