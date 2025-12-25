@@ -75,21 +75,16 @@ func (i *User) Signup(ctx context.Context, param interfaces.SignupParam) (u *use
 	}
 
 	return Run1(ctx, nil, i.repos, Usecase().Transaction(), func(ctx context.Context) (*user.User, error) {
-		log.Debugfc(ctx, "[Signup] Inside transaction")
 		// Check for duplicate email
-		log.Debugfc(ctx, "[Signup] Checking for duplicate email: %s", param.Email)
 		eu, err := i.repos.User.FindByEmail(ctx, param.Email)
 		if err != nil && !errors.Is(err, rerror.ErrNotFound) {
-			log.Errorfc(ctx, "[Signup] Error finding user by email: %v", err)
+			log.Errorfc(ctx, "[Signup] FindByEmail failed: %v", err)
 			return nil, fmt.Errorf("FindByEmail failed: %w", err)
 		}
 		if eu != nil {
-			log.Warnfc(ctx, "[Signup] User already exists with email: %s", param.Email)
 			return nil, interfaces.ErrUserAlreadyExists
 		}
-		log.Debugfc(ctx, "[Signup] No duplicate email found")
 
-		log.Debugfc(ctx, "[Signup] Initializing workspace with email: %s, name: %s", param.Email, param.Name)
 		u, ws, err := workspace.Init(workspace.InitParams{
 			Email:       param.Email,
 			Name:        param.Name,
@@ -103,74 +98,55 @@ func (i *User) Signup(ctx context.Context, param interfaces.SignupParam) (u *use
 			log.Errorfc(ctx, "[Signup] workspace.Init failed: %v", err)
 			return nil, fmt.Errorf("workspace.Init failed: %w", err)
 		}
-		log.Debugfc(ctx, "[Signup] Workspace initialized successfully, UserID: %s, WorkspaceID: %s", u.ID(), ws.ID())
 
 		vr := user.NewVerification()
 		u.SetVerification(vr)
 
-		log.Debugfc(ctx, "[Signup] Creating user in repository")
 		if err = i.repos.User.Create(ctx, u); err != nil {
 			if errors.Is(err, repo.ErrDuplicatedUser) {
-				log.Warnfc(ctx, "[Signup] Duplicate user error during Create")
 				return nil, interfaces.ErrUserAlreadyExists
 			}
 			log.Errorfc(ctx, "[Signup] User.Create failed: %v", err)
 			return nil, fmt.Errorf("User.Create failed: %w", err)
 		}
-		log.Debugfc(ctx, "[Signup] User created successfully")
 
-		log.Debugfc(ctx, "[Signup] Saving workspace in repository")
 		if err = i.repos.Workspace.Save(ctx, ws); err != nil {
 			if errors.Is(err, repo.ErrDuplicatedUser) {
-				log.Errorfc(ctx, "[Signup] Duplicate user error during Workspace.Save")
 				return nil, interfaces.ErrUserAliasAlreadyExists
 			}
 			if errors.Is(err, repo.ErrDuplicateWorkspaceAlias) {
-				log.Errorfc(ctx, "[Signup] Duplicate workspace alias error during Workspace.Save")
 				return nil, interfaces.ErrWorkspaceAliasAlreadyExists
 			}
 			log.Errorfc(ctx, "[Signup] Workspace.Save failed: %v", err)
 			return nil, fmt.Errorf("Workspace.Save failed: %w", err)
 		}
-		log.Debugfc(ctx, "[Signup] Workspace saved successfully")
 
-		log.Debugfc(ctx, "[Signup] Finding role: %s", interfaces.RoleSelf)
 		roleSelf, err := i.repos.Role.FindByName(ctx, interfaces.RoleSelf)
 		if err != nil {
 			log.Errorfc(ctx, "[Signup] Role.FindByName failed for '%s': %v", interfaces.RoleSelf, err)
 			return nil, fmt.Errorf("Role.FindByName failed for '%s': %w", interfaces.RoleSelf, err)
 		}
-		log.Debugfc(ctx, "[Signup] Found roleSelf: %s", roleSelf.ID())
 
-		log.Debugfc(ctx, "[Signup] Finding role: %s", workspace.RoleOwner.String())
 		roleOwner, err := i.repos.Role.FindByName(ctx, workspace.RoleOwner.String())
 		if err != nil {
 			log.Errorfc(ctx, "[Signup] Role.FindByName failed for '%s': %v", workspace.RoleOwner.String(), err)
 			return nil, fmt.Errorf("Role.FindByName failed for '%s': %w", workspace.RoleOwner.String(), err)
 		}
-		log.Debugfc(ctx, "[Signup] Found roleOwner: %s", roleOwner.ID())
 
-		log.Debugfc(ctx, "[Signup] Creating permittable")
 		wsRole := permittable.NewWorkspaceRole(ws.ID(), roleOwner.ID())
 		perm := permittable.New().NewID().RoleIDs([]id.RoleID{roleSelf.ID()}).UserID(u.ID()).WorkspaceRoles([]permittable.WorkspaceRole{wsRole}).MustBuild()
 		if err = i.repos.Permittable.Save(ctx, lo.FromPtr(perm)); err != nil {
 			log.Errorfc(ctx, "[Signup] Permittable.Save failed: %v", err)
 			return nil, fmt.Errorf("Permittable.Save failed: %w", err)
 		}
-		log.Debugfc(ctx, "[Signup] Permittable saved successfully")
 
 		if !param.MockAuth {
-			log.Debugfc(ctx, "[Signup] Sending verification mail")
 			if err = i.sendVerificationMail(ctx, u, vr); err != nil {
 				log.Errorfc(ctx, "[Signup] sendVerificationMail failed: %v", err)
 				return nil, fmt.Errorf("sendVerificationMail failed: %w", err)
 			}
-			log.Debugfc(ctx, "[Signup] Verification mail sent successfully")
-		} else {
-			log.Debugfc(ctx, "[Signup] Skipping verification mail (MockAuth enabled)")
 		}
 
-		log.Debugfc(ctx, "[Signup] Signup completed successfully")
 		return u, nil
 	})
 }
