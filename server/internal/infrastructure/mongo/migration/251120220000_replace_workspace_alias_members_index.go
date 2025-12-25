@@ -45,7 +45,9 @@ func AddWorkspaceMembersHash(ctx context.Context, c DBClient) error {
 	if err != nil {
 		return fmt.Errorf("failed to find workspaces: %w", err)
 	}
-	defer cursor.Close(ctx)
+	defer func() {
+		_ = cursor.Close(ctx)
+	}()
 
 	fmt.Printf("Starting to process workspaces without members_hash field...\n")
 	updateCount := 0

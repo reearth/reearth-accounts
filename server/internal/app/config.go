@@ -28,6 +28,9 @@ type Config struct {
 	Cert       CertConfig
 	Policy     PolicyConfig
 
+	// mock
+	Mock_Auth bool `envconfig:"REEARTH_MOCK_AUTH" pp:",omitempty"`
+
 	// auth
 	Auth     AuthConfigs `pp:",omitempty"`
 	Auth_ISS string      `pp:",omitempty"`

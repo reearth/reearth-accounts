@@ -53,7 +53,7 @@ func (r *mutationResolver) UpdateWorkspace(ctx context.Context, input gqlmodel.U
 		return nil, err
 	}
 
-	w, err := usecases(ctx).Workspace.Update(ctx, tid, input.Name, getOperator(ctx))
+	w, err := usecases(ctx).Workspace.Update(ctx, tid, input.Name, input.Alias, getOperator(ctx))
 	if err != nil {
 		return nil, err
 	}
