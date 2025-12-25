@@ -45,7 +45,7 @@ type signupOIDCMutation struct {
 type signupMutation struct {
 	Signup struct {
 		User gqlmodel.User
-	} `graphql:"signup(input: {name: $name, email: $email, password: $password, secret: $secret, id: $id, workspaceID: $workspaceID})"`
+	} `graphql:"signup(input: {name: $name, email: $email, password: $password, secret: $secret, id: $id, workspaceID: $workspaceID, mockAuth: $mockAuth})"`
 }
 
 type createVerificationMutation struct {

@@ -7,6 +7,7 @@ import (
 	"errors"
 	"io"
 	"net/http"
+	"os"
 	"strings"
 
 	"github.com/reearth/reearth-accounts/server/internal/adapter"
@@ -73,7 +74,83 @@ func isBypassed(req *http.Request) bool {
 	return false
 }
 
+func canUseDebugHeaders(req *http.Request, cfg *ServerConfig) bool {
+	if cfg.Debug || cfg.Config.Dev || os.Getenv("REEARTH_ACCOUNTS_DEV") == "true" {
+		return true
+	}
+	if req.Header.Get("X-Internal-Service") == "visualizer-api" {
+		return true
+	}
+	return false
+}
+
 func authMiddleware(cfg *ServerConfig) func(http.Handler) http.Handler {
+	if cfg.Config.Mock_Auth {
+		return mockAuthMiddleware(cfg)
+	}
+	return identityProviderAuthMiddleware(cfg)
+}
+
+func mockAuthMiddleware(cfg *ServerConfig) func(http.Handler) http.Handler {
+	return func(next http.Handler) http.Handler {
+		return http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
+			ctx := req.Context()
+
+			log.Debugfc(ctx, "[mockAuthMiddleware] Using mock authentication")
+
+			// bypass some queries & mutations
+			if isBypassed(req) {
+				log.Debugfc(ctx, "[mockAuthMiddleware] Skipping auth for signup mutation")
+				next.ServeHTTP(w, req.WithContext(ctx))
+				return
+			}
+
+			var usr *user.User
+			var err error
+
+			// Allow selecting a specific user via debug header.
+			if debugUser := req.Header.Get(debugUserHeader); debugUser != "" {
+				if uID, idErr := id.UserIDFrom(debugUser); idErr == nil {
+					usr, err = cfg.Repos.User.FindByID(ctx, uID)
+				} else {
+					usr, err = cfg.Repos.User.FindByName(ctx, debugUser)
+				}
+				if err != nil {
+					log.Warnfc(ctx, "[mockAuthMiddleware] failed to find debug user: %s, error: %s", debugUser, err.Error())
+					usr = nil
+				}
+			}
+
+			// Load demo user from database by name when no debug user is provided.
+			if usr == nil {
+				const demoUserName = "Demo user"
+				usr, err = cfg.Repos.User.FindByName(ctx, demoUserName)
+				if err != nil {
+					log.Errorfc(ctx, "[mockAuthMiddleware] failed to find demo user by name: %s, error: %s", demoUserName, err.Error())
+					http.Error(w, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
+					return
+				}
+			}
+
+			log.Debugfc(ctx, "[mockAuthMiddleware] Loaded demo user: %s (%s)", usr.Name(), usr.ID())
+
+			if usr != nil {
+				ctx = adapter.AttachUser(ctx, usr)
+				op, err := generateUserOperator(ctx, cfg, usr)
+				if err != nil {
+					log.Errorfc(ctx, "[mockAuthMiddleware] failed to generate user operator: %s, error: %s", usr.ID(), err.Error())
+					http.Error(w, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
+					return
+				}
+				ctx = adapter.AttachOperator(ctx, op)
+			}
+
+			next.ServeHTTP(w, req.WithContext(ctx))
+		})
+	}
+}
+
+func identityProviderAuthMiddleware(cfg *ServerConfig) func(http.Handler) http.Handler {
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
 			ctx := req.Context()
@@ -92,7 +169,7 @@ func authMiddleware(cfg *ServerConfig) func(http.Handler) http.Handler {
 				ai = a
 			}
 
-			if cfg.Debug {
+			if canUseDebugHeaders(req, cfg) {
 				if newCtx, dai := injectDebugAuthInfo(ctx, req); dai != nil {
 					ctx = newCtx
 					ai = *dai
@@ -154,6 +231,20 @@ func isDebugUserExists(req *http.Request, cfg *ServerConfig, ctx context.Context
 
 		if uID, err := id.UserIDFrom(userID); err == nil {
 			u, err := cfg.Repos.User.FindByID(ctx, uID)
+			if err == nil {
+				existingUsr = u
+			}
+		}
+
+		if existingUsr == nil && strings.Contains(userID, "@") {
+			u, err := cfg.Repos.User.FindByEmail(ctx, userID)
+			if err == nil {
+				existingUsr = u
+			}
+		}
+
+		if existingUsr == nil {
+			u, err := cfg.Repos.User.FindByName(ctx, userID)
 			if err == nil {
 				existingUsr = u
 			}

@@ -62,6 +62,7 @@ input CreateWorkspaceInput {
 input UpdateWorkspaceInput {
     workspaceId: ID!
     name: String!
+    alias: String
 }
 
 input MemberInput {

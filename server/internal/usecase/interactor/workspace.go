@@ -94,9 +94,15 @@ func (i *Workspace) Create(ctx context.Context, alias, name, description string,
 		metadata := workspace.NewMetadata()
 		metadata.SetDescription(description)
 
+		aliasVal := strings.TrimSpace(alias)
+		wid := workspace.NewID()
+		if aliasVal == "" {
+			aliasVal = "w-" + wid.String()
+		}
+
 		ws, wErr := workspace.New().
-			NewID().
-			Alias(alias).
+			ID(wid).
+			Alias(aliasVal).
 			Name(name).
 			Metadata(metadata).
 			Build()
@@ -109,6 +115,9 @@ func (i *Workspace) Create(ctx context.Context, alias, name, description string,
 		}
 
 		if err = i.repos.Workspace.Create(ctx, ws); err != nil {
+			if errors.Is(err, repo.ErrDuplicateWorkspaceAlias) {
+				return nil, interfaces.ErrWorkspaceAliasAlreadyExists
+			}
 			return nil, err
 		}
 
@@ -122,7 +131,7 @@ func (i *Workspace) Create(ctx context.Context, alias, name, description string,
 	})
 }
 
-func (i *Workspace) Update(ctx context.Context, id workspace.ID, name string, operator *usecase.Operator) (_ *workspace.Workspace, err error) {
+func (i *Workspace) Update(ctx context.Context, id workspace.ID, name string, alias *string, operator *usecase.Operator) (_ *workspace.Workspace, err error) {
 	if operator.User == nil {
 		return nil, interfaces.ErrInvalidOperator
 	}
@@ -145,6 +154,19 @@ func (i *Workspace) Update(ctx context.Context, id workspace.ID, name string, op
 		}
 
 		ws.Rename(name)
+
+		if alias != nil {
+			aliasVal := strings.TrimSpace(*alias)
+			if aliasVal == "" {
+				aliasVal = "w-" + id.String()
+			}
+			if aliasVal != ws.Alias() {
+				if existing, ferr := i.repos.Workspace.FindByAlias(ctx, aliasVal); ferr == nil && existing != nil && existing.ID() != ws.ID() {
+					return nil, interfaces.ErrWorkspaceAliasAlreadyExists
+				}
+				ws.UpdateAlias(aliasVal)
+			}
+		}
 
 		err = i.repos.Workspace.Save(ctx, ws)
 		if err != nil {

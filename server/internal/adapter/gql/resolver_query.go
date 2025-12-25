@@ -75,6 +75,14 @@ func (r *queryResolver) Nodes(ctx context.Context, ids []gqlmodel.ID, typeArg gq
 	return nil, nil
 }
 
+func (r *queryResolver) User(ctx context.Context, id gqlmodel.ID) (*gqlmodel.User, error) {
+	res, err := loaders(ctx).User.FetchByID(ctx, id)
+	if err != nil {
+		return nil, err
+	}
+	return res, nil
+}
+
 func (r *queryResolver) UserByNameOrEmail(ctx context.Context, nameOrEmail string) (*gqlmodel.User, error) {
 	res, err := loaders(ctx).User.UserByNameOrEmail(ctx, nameOrEmail)
 	if err != nil {
