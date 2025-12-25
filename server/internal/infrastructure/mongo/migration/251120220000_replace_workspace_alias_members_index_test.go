@@ -93,7 +93,9 @@ func TestReplaceWorkspaceAliasMembersIndex(t *testing.T) {
 	col := db.Collection("workspace")
 	cursor, err := col.Indexes().List(ctx)
 	assert.NoError(t, err)
-	defer cursor.Close(ctx)
+	defer func() {
+		_ = cursor.Close(ctx)
+	}()
 
 	var indexes []bson.M
 	err = cursor.All(ctx, &indexes)

@@ -100,7 +100,11 @@ func (w *Workspace) Create(ctx context.Context, alias, name, description string,
 }
 
 func (w *Workspace) Update(ctx context.Context, id workspace.ID, name string, alias *string, op *usecase.Operator) (*workspace.Workspace, error) {
-	res, err := UpdateWorkspace(ctx, w.gql, UpdateWorkspaceInput{WorkspaceId: id.String(), Name: name, Alias: alias})
+	aliasStr := ""
+	if alias != nil {
+		aliasStr = *alias
+	}
+	res, err := UpdateWorkspace(ctx, w.gql, UpdateWorkspaceInput{WorkspaceId: id.String(), Name: name, Alias: aliasStr})
 	if err != nil {
 		return nil, err
 	}

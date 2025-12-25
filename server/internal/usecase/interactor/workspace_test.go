@@ -279,6 +279,7 @@ func TestWorkspace_Update(t *testing.T) {
 		args  struct {
 			wId      workspace.ID
 			newName  string
+			alias    *string
 			operator *usecase.Operator
 		}
 		want             *workspace.Workspace
@@ -291,10 +292,12 @@ func TestWorkspace_Update(t *testing.T) {
 			args: struct {
 				wId      workspace.ID
 				newName  string
+				alias    *string
 				operator *usecase.Operator
 			}{
 				wId:      id1,
 				newName:  "WW1",
+				alias:    nil,
 				operator: op,
 			},
 			want:    w1Updated,
@@ -306,10 +309,12 @@ func TestWorkspace_Update(t *testing.T) {
 			args: struct {
 				wId      workspace.ID
 				newName  string
+				alias    *string
 				operator *usecase.Operator
 			}{
 				wId:      id2,
 				newName:  "WW2",
+				alias:    nil,
 				operator: op,
 			},
 			want:    nil,
@@ -321,10 +326,12 @@ func TestWorkspace_Update(t *testing.T) {
 			args: struct {
 				wId      workspace.ID
 				newName  string
+				alias    *string
 				operator *usecase.Operator
 			}{
 				wId:      id3,
 				newName:  "WW3",
+				alias:    nil,
 				operator: op,
 			},
 			want:    nil,
@@ -335,6 +342,7 @@ func TestWorkspace_Update(t *testing.T) {
 			args: struct {
 				wId      workspace.ID
 				newName  string
+				alias    *string
 				operator *usecase.Operator
 			}{
 				operator: op,
@@ -360,7 +368,7 @@ func TestWorkspace_Update(t *testing.T) {
 			}
 			workspaceUC := NewWorkspace(db, nil)
 
-			got, err := workspaceUC.Update(ctx, tc.args.wId, tc.args.newName, tc.args.operator)
+			got, err := workspaceUC.Update(ctx, tc.args.wId, tc.args.newName, tc.args.alias, tc.args.operator)
 			if tc.wantErr != nil {
 				assert.Equal(t, tc.wantErr, err)
 				assert.Nil(t, got)
