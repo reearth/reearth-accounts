@@ -72,7 +72,9 @@ func FindDuplicateWorkspaceAliases(ctx context.Context, col *mongo.Collection) (
 	if err != nil {
 		return nil, err
 	}
-	defer cursor.Close(ctx)
+	defer func() {
+		_ = cursor.Close(ctx)
+	}()
 
 	duplicates := make(map[string][]interface{})
 	for cursor.Next(ctx) {

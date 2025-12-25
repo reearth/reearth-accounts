@@ -3,15 +3,14 @@ package repo
 import (
 	"context"
 
-	"github.com/reearth/reearth-accounts/server/pkg/id"
 	"github.com/reearth/reearth-accounts/server/pkg/user"
 	"github.com/reearth/reearthx/i18n"
 	"github.com/reearth/reearthx/rerror"
-	"github.com/reearth/reearthx/usecasex"
 )
 
 var ErrDuplicatedUser = rerror.NewE(i18n.T("duplicated user"))
 
+//go:generate mockgen -source=./user.go -destination=./mock_repo/mock_user.go -package mock_repo
 type User interface {
 	UserQuery
 	FindByVerification(context.Context, string) (*user.User, error)
@@ -19,18 +18,17 @@ type User interface {
 	FindBySubOrCreate(context.Context, *user.User, string) (*user.User, error)
 	Create(context.Context, *user.User) error
 	Save(context.Context, *user.User) error
-	Remove(context.Context, id.UserID) error
+	Remove(context.Context, user.ID) error
 }
 
 type UserQuery interface {
-	FindAll(context.Context) ([]*user.User, error)
-	FindByID(context.Context, id.UserID) (*user.User, error)
-	FindByIDs(context.Context, id.UserIDList) ([]*user.User, error)
-	FindByIDsWithPagination(context.Context, id.UserIDList, *usecasex.Pagination, ...string) ([]*user.User, *usecasex.PageInfo, error)
+	FindAll(context.Context) (user.List, error)
+	FindByID(context.Context, user.ID) (*user.User, error)
+	FindByIDs(context.Context, user.IDList) (user.List, error)
 	FindBySub(context.Context, string) (*user.User, error)
 	FindByEmail(context.Context, string) (*user.User, error)
 	FindByName(context.Context, string) (*user.User, error)
 	FindByAlias(context.Context, string) (*user.User, error)
 	FindByNameOrEmail(context.Context, string) (*user.User, error)
-	SearchByKeyword(context.Context, string, ...string) ([]*user.User, error)
+	SearchByKeyword(context.Context, string) (user.List, error)
 }

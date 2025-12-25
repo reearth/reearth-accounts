@@ -72,7 +72,9 @@ func FindDuplicateUserAliases(ctx context.Context, col *mongo.Collection) (map[s
 	if err != nil {
 		return nil, err
 	}
-	defer cursor.Close(ctx)
+	defer func() {
+		_ = cursor.Close(ctx)
+	}()
 
 	duplicates := make(map[string][]interface{})
 	for cursor.Next(ctx) {

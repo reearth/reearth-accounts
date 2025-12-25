@@ -84,19 +84,30 @@ func initEcho(ctx context.Context, cfg *ServerConfig) *echo.Echo {
 
 	// API
 	api := e.Group("/api")
-	jwt, err := appx.AuthMiddleware(cfg.Config.Auths(), adapter.AuthInfoKey, true)
-	if err != nil {
-		log.Panicc(ctx, err)
-	}
 
-	api.POST(
-		"/graphql", GraphqlAPI(cfg.Config, cfg.Config.Dev),
+	// Prepare middlewares based on Mock_Auth setting
+	var middlewares []echo.MiddlewareFunc
+	middlewares = append(middlewares,
 		middleware.CORSWithConfig(middleware.CORSConfig{AllowOrigins: origins}),
-		echo.WrapMiddleware(jwt),
-		echo.WrapMiddleware(authMiddleware(cfg)),
-		cacheControl,
 		usecaseMiddleware,
 	)
+
+	// Only apply JWT validation middleware if not using mock auth
+	if !cfg.Config.Mock_Auth {
+		jwt, err := appx.AuthMiddleware(cfg.Config.Auths(), adapter.AuthInfoKey, true)
+		if err != nil {
+			log.Panicc(ctx, err)
+		}
+		middlewares = append(middlewares, echo.WrapMiddleware(jwt))
+	}
+
+	// Always apply the app's auth middleware (handles both mock and real auth)
+	middlewares = append(middlewares,
+		echo.WrapMiddleware(authMiddleware(cfg)),
+		cacheControl,
+	)
+
+	api.POST("/graphql", GraphqlAPI(cfg.Config, cfg.Config.Dev), middlewares...)
 
 	return e
 }
