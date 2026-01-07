@@ -234,7 +234,7 @@ func (i *Workspace) RemoveMultipleUserMembers(ctx context.Context, id workspace.
 		return nil, workspace.ErrNoSpecifiedUsers
 	}
 
-	return Run1(ctx, operator, i.repos, Usecase().Transaction(), func(ctx context.Context) (*workspace.Workspace, error) {
+	return Run1(ctx, operator, i.repos, Usecase().Transaction().WithWritableWorkspaces(id), func(ctx context.Context) (*workspace.Workspace, error) {
 		ws, err := i.repos.Workspace.FindByID(ctx, id)
 		if err != nil {
 			return nil, err
