@@ -80,7 +80,8 @@ make run
 Once the `reearth` network and `reearth-mongo` are available, start this service:
 
 ```bash
-cd server
+git clone https://github.com/reearth/reearth-accounts.git
+cd reearth-accounts/server
 make run
 ```
 
@@ -88,7 +89,7 @@ This will:
 - Start Cerbos authorization server on port 3593
 - Start Re:Earth Accounts server on port 8090
 - Attach to the external `reearth` Docker network, making the service accessible to all Re:Earth microservices
-- Connect to the `reearth-mongo` database
+- Connecting to reearth-mongo database in reearth-visualizer
 
 The GraphQL endpoint will be available at:
 - From host machine: `http://localhost:8090/graphql`
@@ -99,7 +100,7 @@ The GraphQL endpoint will be available at:
 To stop the services:
 
 ```bash
-cd server
+cd reearth-accounts/server
 make down
 ```
 
