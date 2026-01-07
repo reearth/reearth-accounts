@@ -801,9 +801,10 @@ func TestWorkspace_RemoveMember(t *testing.T) {
 	w4 := workspace.New().ID(id4).Name("W4").Members(map[user.ID]workspace.Member{userID: {Role: workspace.RoleOwner}}).Personal(false).MustBuild()
 
 	op := &usecase.Operator{
-		User:               &userID,
-		ReadableWorkspaces: []workspace.ID{id1, id2},
-		OwningWorkspaces:   []workspace.ID{id1},
+		User:                   &userID,
+		ReadableWorkspaces:     []workspace.ID{id1, id2},
+		OwningWorkspaces:       []workspace.ID{id1},
+		MaintainableWorkspaces: []workspace.ID{id2, id3, id4},
 	}
 
 	tests := []struct {
@@ -889,7 +890,11 @@ func TestWorkspace_RemoveMember(t *testing.T) {
 				wId      workspace.ID
 				uId      user.ID
 				operator *usecase.Operator
-			}{operator: op},
+			}{
+				wId:      id1,
+				uId:      userID,
+				operator: op,
+			},
 			wantErr:          errors.New("test"),
 			mockWorkspaceErr: true,
 		},
@@ -1134,6 +1139,7 @@ func TestWorkspace_RemoveMultipleMembers(t *testing.T) {
 				uIds     workspace.UserIDList
 				operator *usecase.Operator
 			}{
+				wId:      id1,
 				uIds:     workspace.UserIDList{userID2, userID3},
 				operator: op,
 			},
