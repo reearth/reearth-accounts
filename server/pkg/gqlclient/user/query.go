@@ -51,3 +51,15 @@ type signupMutation struct {
 type createVerificationMutation struct {
 	CreateVerification *bool `graphql:"createVerification(input: {email: $email})"`
 }
+
+type deleteMeMutation struct {
+	DeleteMe struct {
+		UserID graphql.ID `json:"userId"`
+	} `graphql:"deleteMe(input: {userId: $userId})"`
+}
+
+type removeMyAuthMutation struct {
+	RemoveMyAuth struct {
+		Me gqlmodel.Me
+	} `graphql:"removeMyAuth(input: {auth: $auth})"`
+}
