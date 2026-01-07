@@ -152,6 +152,7 @@ func (i *Workspace) AddUserMember(ctx context.Context, workspaceID workspace.ID,
 	}
 
 	keys := slices.Collect(maps.Keys(users))
+
 	ul, err := i.userquery.FetchByID(ctx, keys)
 	if err != nil {
 		return nil, applog.ErrorWithCallerLogging(ctx, "failed to fetch user", err)
