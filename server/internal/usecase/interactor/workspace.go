@@ -244,14 +244,9 @@ func (i *Workspace) RemoveMultipleUserMembers(ctx context.Context, id workspace.
 			return nil, workspace.ErrCannotModifyPersonalWorkspace
 		}
 
-		isOwner := ws.Members().UserRole(*operator.User) == workspace.RoleOwner
-
 		for _, uId := range userIds {
 			isSelfLeave := *operator.User == uId
 
-			if !isOwner && !isSelfLeave {
-				return nil, interfaces.ErrOperationDenied
-			}
 			if isSelfLeave && ws.Members().IsOnlyOwner(uId) {
 				return nil, interfaces.ErrOwnerCannotLeaveTheWorkspace
 			}
