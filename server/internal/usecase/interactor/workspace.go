@@ -152,12 +152,13 @@ func (i *Workspace) AddUserMember(ctx context.Context, workspaceID workspace.ID,
 	}
 
 	keys := slices.Collect(maps.Keys(users))
+
 	ul, err := i.userquery.FetchByID(ctx, keys)
 	if err != nil {
 		return nil, applog.ErrorWithCallerLogging(ctx, "failed to fetch user", err)
 	}
 
-	return Run1(ctx, operator, i.repos, Usecase().Transaction().WithOwnableWorkspaces(workspaceID), func(ctx context.Context) (*workspace.Workspace, error) {
+	return Run1(ctx, operator, i.repos, Usecase().Transaction().WithWritableWorkspaces(workspaceID), func(ctx context.Context) (*workspace.Workspace, error) {
 		ws, err := i.repos.Workspace.FindByID(ctx, workspaceID)
 		if err != nil {
 			return nil, applog.ErrorWithCallerLogging(ctx, "failed to fetch workspace", err)
