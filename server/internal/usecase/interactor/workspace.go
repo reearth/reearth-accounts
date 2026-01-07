@@ -9,6 +9,7 @@ import (
 	"github.com/reearth/reearth-accounts/server/internal/usecase"
 	"github.com/reearth/reearth-accounts/server/internal/usecase/interfaces"
 	"github.com/reearth/reearth-accounts/server/internal/usecase/repo"
+	"github.com/reearth/reearth-accounts/server/pkg/applog"
 	"github.com/reearth/reearth-accounts/server/pkg/pagination"
 	"github.com/reearth/reearth-accounts/server/pkg/user"
 	"github.com/reearth/reearth-accounts/server/pkg/workspace"
@@ -153,13 +154,13 @@ func (i *Workspace) AddUserMember(ctx context.Context, workspaceID workspace.ID,
 	keys := slices.Collect(maps.Keys(users))
 	ul, err := i.userquery.FetchByID(ctx, keys)
 	if err != nil {
-		return nil, err
+		return nil, applog.ErrorWithCallerLogging(ctx, "failed to fetch user", err)
 	}
 
 	return Run1(ctx, operator, i.repos, Usecase().Transaction().WithOwnableWorkspaces(workspaceID), func(ctx context.Context) (*workspace.Workspace, error) {
 		ws, err := i.repos.Workspace.FindByID(ctx, workspaceID)
 		if err != nil {
-			return nil, err
+			return nil, applog.ErrorWithCallerLogging(ctx, "failed to fetch workspace", err)
 		}
 
 		if ws.IsPersonal() {
@@ -168,7 +169,7 @@ func (i *Workspace) AddUserMember(ctx context.Context, workspaceID workspace.ID,
 
 		if i.enforceMemberCount != nil {
 			if err := i.enforceMemberCount(ctx, ws, ul, operator); err != nil {
-				return nil, err
+				return nil, applog.ErrorWithCallerLogging(ctx, "failed to enforce member count", err)
 			}
 		}
 
@@ -179,13 +180,13 @@ func (i *Workspace) AddUserMember(ctx context.Context, workspaceID workspace.ID,
 
 			err = ws.Members().Join(m, users[m.ID()], *operator.User)
 			if err != nil {
-				return nil, err
+				return nil, applog.ErrorWithCallerLogging(ctx, "failed to join user to workspace", err)
 			}
 		}
 
 		err = i.repos.Workspace.Save(ctx, ws)
 		if err != nil {
-			return nil, err
+			return nil, applog.ErrorWithCallerLogging(ctx, "failed to save workspace", err)
 		}
 
 		i.applyDefaultPolicy(ws, operator)

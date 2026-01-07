@@ -2,10 +2,12 @@ package mongo
 
 import (
 	"context"
+	"log"
 	"strings"
 
 	"github.com/reearth/reearth-accounts/server/internal/infrastructure/mongo/mongodoc"
 	"github.com/reearth/reearth-accounts/server/internal/usecase/repo"
+	"github.com/reearth/reearth-accounts/server/pkg/applog"
 	"github.com/reearth/reearth-accounts/server/pkg/id"
 	"github.com/reearth/reearth-accounts/server/pkg/user"
 	"github.com/reearth/reearth-accounts/server/pkg/workspace"
@@ -160,13 +162,15 @@ func (r *Workspace) Create(ctx context.Context, workspace *workspace.Workspace) 
 
 func (r *Workspace) Save(ctx context.Context, workspace *workspace.Workspace) error {
 	if !r.f.CanWrite(workspace.ID()) {
-		return repo.ErrOperationDenied
+		log.Printf("WorkspaceFilter: %+v", r.f)
+		log.Printf("Workspace: %+v", workspace.ID().String())
+		return applog.ErrorWithCallerLogging(ctx, "failed to save workspace", repo.ErrOperationDenied)
 	}
 
 	doc, id := mongodoc.NewWorkspace(workspace)
 	err := r.client.SaveOne(ctx, id, doc)
 	if mongo.IsDuplicateKeyError(err) {
-		return repo.ErrDuplicateWorkspaceAlias
+		return applog.ErrorWithCallerLogging(ctx, "failed to save workspace", repo.ErrDuplicateWorkspaceAlias)
 	}
 	return err
 }
