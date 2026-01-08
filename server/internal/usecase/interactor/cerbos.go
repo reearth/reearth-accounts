@@ -42,7 +42,7 @@ func (i *Cerbos) CheckPermission(ctx context.Context, userId user.ID, param inte
 		return nil, err
 	}
 	if p == nil {
-		applog.WarnWithCallerLogging(ctx, "user not found")
+		applog.WarnWithCallerLogging(ctx, "permittable not found for user")
 		return &interfaces.CheckPermissionResult{
 			Allowed: false,
 		}, nil
