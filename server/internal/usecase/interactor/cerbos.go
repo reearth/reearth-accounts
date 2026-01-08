@@ -11,6 +11,7 @@ import (
 	"github.com/reearth/reearth-accounts/server/internal/usecase/gateway"
 	"github.com/reearth/reearth-accounts/server/internal/usecase/interfaces"
 	"github.com/reearth/reearth-accounts/server/internal/usecase/repo"
+	"github.com/reearth/reearth-accounts/server/pkg/applog"
 	"github.com/reearth/reearth-accounts/server/pkg/id"
 	"github.com/reearth/reearth-accounts/server/pkg/permittable"
 	"github.com/reearth/reearth-accounts/server/pkg/user"
@@ -41,6 +42,7 @@ func (i *Cerbos) CheckPermission(ctx context.Context, userId user.ID, param inte
 		return nil, err
 	}
 	if p == nil {
+		applog.WarnWithCallerLogging(ctx, "user not found")
 		return &interfaces.CheckPermissionResult{
 			Allowed: false,
 		}, nil
@@ -79,15 +81,15 @@ func (i *Cerbos) CheckPermission(ctx context.Context, userId user.ID, param inte
 
 	resp, err := checkPermissions(ctx, i.cerbos, principal, resources, []string{param.Action})
 	if err != nil {
-		return nil, err
+		return nil, applog.ErrorWithCallerLogging(ctx, "cerbos check permission failed", err)
 	}
 	if resp == nil {
-		return nil, interfaces.ErrOperationDenied
+		return nil, applog.ErrorWithCallerLogging(ctx, "cerbos response is nil", interfaces.ErrOperationDenied)
 	}
 
 	allowed := false
 	for _, result := range resp.Results {
-		log.Printf("Result Actions: %+v", result.Actions)
+		log.Printf("RoleNames: %+v, Result Actions: %+v", roleNames, result.Actions)
 
 		actionResult, exists := result.Actions[param.Action]
 		if !exists {
@@ -101,6 +103,7 @@ func (i *Cerbos) CheckPermission(ctx context.Context, userId user.ID, param inte
 	}
 
 	log.Printf("Final permission result for user %s: %v", userId.String(), allowed)
+
 	return &interfaces.CheckPermissionResult{
 		Allowed: allowed,
 	}, nil
