@@ -2,6 +2,7 @@ package interactor
 
 import (
 	"context"
+	"errors"
 	"maps"
 	"slices"
 	"strings"
@@ -11,6 +12,7 @@ import (
 	"github.com/reearth/reearth-accounts/server/internal/usecase/repo"
 	"github.com/reearth/reearth-accounts/server/pkg/applog"
 	"github.com/reearth/reearth-accounts/server/pkg/pagination"
+	"github.com/reearth/reearth-accounts/server/pkg/permittable"
 	"github.com/reearth/reearth-accounts/server/pkg/user"
 	"github.com/reearth/reearth-accounts/server/pkg/workspace"
 	"github.com/reearth/reearthx/rerror"
@@ -23,6 +25,8 @@ type Workspace struct {
 	repos              *repo.Container
 	enforceMemberCount WorkspaceMemberCountEnforcer
 	userquery          interfaces.UserQuery
+	permittableRepo    repo.Permittable
+	roleRepo           repo.Role
 }
 
 func NewWorkspace(r *repo.Container, enforceMemberCount WorkspaceMemberCountEnforcer) interfaces.Workspace {
@@ -30,6 +34,8 @@ func NewWorkspace(r *repo.Container, enforceMemberCount WorkspaceMemberCountEnfo
 		repos:              r,
 		enforceMemberCount: enforceMemberCount,
 		userquery:          NewUserQuery(r.User, r.Users...),
+		permittableRepo:    r.Permittable,
+		roleRepo:           r.Role,
 	}
 }
 
@@ -103,6 +109,10 @@ func (i *Workspace) Create(ctx context.Context, alias, name, description string,
 		}
 
 		if err = i.repos.Workspace.Create(ctx, ws); err != nil {
+			return nil, err
+		}
+
+		if err := i.updatePermittable(ctx, firstUsers[0].ID(), ws.ID(), workspace.RoleOwner); err != nil {
 			return nil, err
 		}
 
@@ -183,6 +193,10 @@ func (i *Workspace) AddUserMember(ctx context.Context, workspaceID workspace.ID,
 			if err != nil {
 				return nil, applog.ErrorWithCallerLogging(ctx, "failed to join user to workspace", err)
 			}
+
+			if err := i.updatePermittable(ctx, m.ID(), ws.ID(), users[m.ID()]); err != nil {
+				return nil, applog.ErrorWithCallerLogging(ctx, "failed to update permittable", err)
+			}
 		}
 
 		err = i.repos.Workspace.Save(ctx, ws)
@@ -253,6 +267,10 @@ func (i *Workspace) RemoveMultipleUserMembers(ctx context.Context, id workspace.
 
 			err := ws.Members().Leave(uId)
 			if err != nil {
+				return nil, err
+			}
+
+			if err := i.removePermittable(ctx, uId, ws.ID()); err != nil {
 				return nil, err
 			}
 		}
@@ -343,6 +361,10 @@ func (i *Workspace) UpdateUserMember(ctx context.Context, id workspace.ID, u wor
 			return nil, err
 		}
 
+		if err := i.updatePermittable(ctx, u, ws.ID(), role); err != nil {
+			return nil, err
+		}
+
 		err = i.repos.Workspace.Save(ctx, ws)
 		if err != nil {
 			return nil, err
@@ -394,6 +416,12 @@ func (i *Workspace) Remove(ctx context.Context, id workspace.ID, operator *useca
 			return workspace.ErrCannotModifyPersonalWorkspace
 		}
 
+		for uId := range ws.Members().Users() {
+			if err := i.removePermittable(ctx, uId, id); err != nil {
+				return err
+			}
+		}
+
 		err = i.repos.Workspace.Remove(ctx, id)
 		if err != nil {
 			return err
@@ -431,8 +459,16 @@ func (i *Workspace) TransferOwnership(ctx context.Context, workspaceID workspace
 			return nil, err
 		}
 
+		if err := i.updatePermittable(ctx, newOwnerID, ws.ID(), workspace.RoleOwner); err != nil {
+			return nil, err
+		}
+
 		err = ws.Members().UpdateUserRole(*operator.User, workspace.RoleMaintainer)
 		if err != nil {
+			return nil, err
+		}
+
+		if err := i.updatePermittable(ctx, *operator.User, ws.ID(), workspace.RoleMaintainer); err != nil {
 			return nil, err
 		}
 
@@ -493,4 +529,44 @@ func filterWorkspaces(
 	}
 
 	return workspaces, nil
+}
+
+func (i *Workspace) updatePermittable(ctx context.Context, userID user.ID, workspaceID workspace.ID, roleName workspace.Role) error {
+	r, err := i.roleRepo.FindByName(ctx, string(roleName))
+	if err != nil {
+		return err
+	}
+
+	p, err := i.permittableRepo.FindByUserID(ctx, userID)
+	if err != nil && !errors.Is(err, rerror.ErrNotFound) {
+		return err
+	}
+
+	if p == nil {
+		p, err = permittable.New().
+			NewID().
+			UserID(userID).
+			Build()
+		if err != nil {
+			return err
+		}
+	}
+
+	p.UpdateWorkspaceRole(workspaceID, r.ID())
+
+	return i.permittableRepo.Save(ctx, *p)
+}
+
+func (i *Workspace) removePermittable(ctx context.Context, userID user.ID, workspaceID workspace.ID) error {
+	p, err := i.permittableRepo.FindByUserID(ctx, userID)
+	if err != nil {
+		if errors.Is(err, rerror.ErrNotFound) {
+			return nil
+		}
+		return err
+	}
+
+	p.RemoveWorkspaceRole(workspaceID)
+
+	return i.permittableRepo.Save(ctx, *p)
 }

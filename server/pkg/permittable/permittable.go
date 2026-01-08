@@ -70,6 +70,34 @@ func (p *Permittable) EditWorkspaceRoles(workspaceRoles []WorkspaceRole) {
 	p.workspaceRoles = workspaceRoles
 }
 
+func (p *Permittable) UpdateWorkspaceRole(wId workspace.ID, rId role.ID) {
+	if p == nil {
+		return
+	}
+
+	for i, wr := range p.workspaceRoles {
+		if wr.id == wId {
+			p.workspaceRoles[i].roleID = rId
+			return
+		}
+	}
+
+	p.workspaceRoles = append(p.workspaceRoles, NewWorkspaceRole(wId, rId))
+}
+
+func (p *Permittable) RemoveWorkspaceRole(wId workspace.ID) {
+	if p == nil {
+		return
+	}
+
+	for i, wr := range p.workspaceRoles {
+		if wr.id == wId {
+			p.workspaceRoles = append(p.workspaceRoles[:i], p.workspaceRoles[i+1:]...)
+			return
+		}
+	}
+}
+
 func (p *WorkspaceRole) ID() workspace.ID {
 	if p == nil {
 		return workspace.ID{}

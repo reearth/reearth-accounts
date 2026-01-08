@@ -11,6 +11,7 @@ import (
 	"github.com/reearth/reearth-accounts/server/internal/app"
 	"github.com/reearth/reearth-accounts/server/internal/usecase/repo"
 	"github.com/reearth/reearth-accounts/server/pkg/id"
+	"github.com/reearth/reearth-accounts/server/pkg/role"
 	"github.com/reearth/reearth-accounts/server/pkg/user"
 	"github.com/reearth/reearth-accounts/server/pkg/workspace"
 	"github.com/reearth/reearthx/idx"
@@ -36,6 +37,11 @@ func baseSeederWorkspace(ctx context.Context, r *repo.Container) error {
 		Email("e2e@e2e.com").
 		Workspace(wId).
 		MustBuild()
+
+	for _, roleName := range []string{"owner", "maintainer", "writer", "reader", "self"} {
+		_ = r.Role.Save(ctx, *role.New().NewID().Name(roleName).MustBuild())
+	}
+
 	if err := r.User.Save(ctx, u); err != nil {
 		return err
 	}
