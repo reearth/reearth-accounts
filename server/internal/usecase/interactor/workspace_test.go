@@ -10,6 +10,7 @@ import (
 	"github.com/reearth/reearth-accounts/server/internal/usecase"
 	"github.com/reearth/reearth-accounts/server/internal/usecase/interfaces"
 	"github.com/reearth/reearth-accounts/server/pkg/id"
+	"github.com/reearth/reearth-accounts/server/pkg/role"
 	"github.com/reearth/reearth-accounts/server/pkg/user"
 	"github.com/reearth/reearth-accounts/server/pkg/workspace"
 	"github.com/reearth/reearthx/rerror"
@@ -21,6 +22,9 @@ func TestWorkspace_Create(t *testing.T) {
 	ctx := context.Background()
 
 	db := memory.New()
+	for _, r := range []string{"owner", "maintainer", "writer", "reader"} {
+		_ = db.Role.Save(ctx, *role.New().NewID().Name(r).MustBuild())
+	}
 
 	u := user.New().NewID().Name("aaa").Email("aaa@bbb.com").Workspace(id.NewWorkspaceID()).MustBuild()
 	_ = db.User.Save(ctx, u)
@@ -479,6 +483,9 @@ func TestWorkspace_Remove(t *testing.T) {
 
 			ctx := context.Background()
 			db := memory.New()
+			for _, r := range []string{"owner", "maintainer", "writer", "reader"} {
+				_ = db.Role.Save(ctx, *role.New().NewID().Name(r).MustBuild())
+			}
 			if tc.mockWorkspaceErr {
 				memory.SetWorkspaceError(db.Workspace, tc.wantErr)
 			}
@@ -660,6 +667,9 @@ func TestWorkspace_AddMember(t *testing.T) {
 
 			ctx := context.Background()
 			db := memory.New()
+			for _, r := range []string{"owner", "maintainer", "writer", "reader"} {
+				_ = db.Role.Save(ctx, *role.New().NewID().Name(r).MustBuild())
+			}
 			if tc.mockWorkspaceErr {
 				memory.SetWorkspaceError(db.Workspace, tc.wantErr)
 			}
@@ -907,6 +917,9 @@ func TestWorkspace_RemoveMember(t *testing.T) {
 
 			ctx := context.Background()
 			db := memory.New()
+			for _, r := range []string{"owner", "maintainer", "writer", "reader"} {
+				_ = db.Role.Save(ctx, *role.New().NewID().Name(r).MustBuild())
+			}
 			if tc.mockWorkspaceErr {
 				memory.SetWorkspaceError(db.Workspace, tc.wantErr)
 			}
@@ -1155,6 +1168,9 @@ func TestWorkspace_RemoveMultipleMembers(t *testing.T) {
 
 			ctx := context.Background()
 			db := memory.New()
+			for _, r := range []string{"owner", "maintainer", "writer", "reader"} {
+				_ = db.Role.Save(ctx, *role.New().NewID().Name(r).MustBuild())
+			}
 			if tc.mockWorkspaceErr {
 				memory.SetWorkspaceError(db.Workspace, tc.wantErr)
 			}
@@ -1294,6 +1310,9 @@ func TestWorkspace_UpdateMember(t *testing.T) {
 
 			ctx := context.Background()
 			db := memory.New()
+			for _, r := range []string{"owner", "maintainer", "writer", "reader"} {
+				_ = db.Role.Save(ctx, *role.New().NewID().Name(r).MustBuild())
+			}
 			if tc.mockWorkspaceErr {
 				memory.SetWorkspaceError(db.Workspace, tc.wantErr)
 			}
