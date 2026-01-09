@@ -36,11 +36,17 @@ func FixPermittableRoleIDs(ctx context.Context, c DBClient) error {
 	}
 
 	// Identify IDs to remove and "self" ID
-	rolesToRemove := []string{
-		roleNameToID[string(workspace.RoleOwner)],
-		roleNameToID[string(workspace.RoleMaintainer)],
-		roleNameToID[string(workspace.RoleWriter)],
-		roleNameToID[string(workspace.RoleReader)],
+	// Filter out empty strings to avoid unintended removal of legitimate values
+	var rolesToRemove []string
+	for _, roleName := range []string{
+		string(workspace.RoleOwner),
+		string(workspace.RoleMaintainer),
+		string(workspace.RoleWriter),
+		string(workspace.RoleReader),
+	} {
+		if roleID, exists := roleNameToID[roleName]; exists && roleID != "" {
+			rolesToRemove = append(rolesToRemove, roleID)
+		}
 	}
 	selfRoleID := roleNameToID[interfaces.RoleSelf]
 
