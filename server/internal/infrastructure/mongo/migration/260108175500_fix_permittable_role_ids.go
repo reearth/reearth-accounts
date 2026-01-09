@@ -63,9 +63,9 @@ func FixPermittableRoleIDs(ctx context.Context, c DBClient) error {
 				originalRoleIDs := make([]string, len(permittableDoc.RoleIDs))
 				copy(originalRoleIDs, permittableDoc.RoleIDs)
 
-				// Filter out workspace roles
+				// Filter out workspace roles and empty strings
 				newRoleIDs := lo.Filter(permittableDoc.RoleIDs, func(id string, _ int) bool {
-					return !lo.Contains(rolesToRemove, id)
+					return id != "" && !lo.Contains(rolesToRemove, id)
 				})
 
 				// Ensure "self" role exists

@@ -444,6 +444,98 @@ func TestFixPermittableRoleIDs(t *testing.T) {
 		assert.Len(t, roleids, 0)
 	})
 
+	t.Run("Remove empty strings from roleids", func(t *testing.T) {
+		ctx := context.Background()
+		db := mongotest.Connect(t)(t)
+		c := mongox.NewClientWithDatabase(db)
+
+		roleCol := db.Collection("role")
+		permittableCol := db.Collection("permittable")
+
+		// Insert roles
+		roles := []interface{}{
+			bson.M{"_id": primitive.NewObjectID(), "id": "role_owner", "name": "owner"},
+			bson.M{"_id": primitive.NewObjectID(), "id": "role_self", "name": "self"},
+		}
+		_, err := roleCol.InsertMany(ctx, roles)
+		assert.NoError(t, err)
+
+		// Insert permittable with empty string in roleids
+		existingPermittable := bson.M{
+			"_id":     primitive.NewObjectID(),
+			"id":      "permittable1",
+			"userid":  "user1",
+			"roleids": []string{"", "role_self"}, // contains empty string
+		}
+		_, err = permittableCol.InsertOne(ctx, existingPermittable)
+		assert.NoError(t, err)
+
+		// Run migration
+		err = FixPermittableRoleIDs(ctx, c)
+		assert.NoError(t, err)
+
+		// Verify empty string was removed
+		var result bson.M
+		err = permittableCol.FindOne(ctx, bson.M{"userid": "user1"}).Decode(&result)
+		assert.NoError(t, err)
+
+		roleids, ok := result["roleids"].(primitive.A)
+		assert.True(t, ok)
+		assert.Len(t, roleids, 1)
+		assert.Equal(t, "role_self", roleids[0])
+	})
+
+	t.Run("Remove empty strings and workspace roles together", func(t *testing.T) {
+		ctx := context.Background()
+		db := mongotest.Connect(t)(t)
+		c := mongox.NewClientWithDatabase(db)
+
+		roleCol := db.Collection("role")
+		permittableCol := db.Collection("permittable")
+
+		// Insert roles
+		roles := []interface{}{
+			bson.M{"_id": primitive.NewObjectID(), "id": "role_owner", "name": "owner"},
+			bson.M{"_id": primitive.NewObjectID(), "id": "role_writer", "name": "writer"},
+			bson.M{"_id": primitive.NewObjectID(), "id": "role_self", "name": "self"},
+			bson.M{"_id": primitive.NewObjectID(), "id": "role_custom", "name": "custom"},
+		}
+		_, err := roleCol.InsertMany(ctx, roles)
+		assert.NoError(t, err)
+
+		// Insert permittable with empty string and workspace roles
+		existingPermittable := bson.M{
+			"_id":     primitive.NewObjectID(),
+			"id":      "permittable1",
+			"userid":  "user1",
+			"roleids": []string{"", "role_owner", "role_custom", ""}, // empty strings and workspace role
+		}
+		_, err = permittableCol.InsertOne(ctx, existingPermittable)
+		assert.NoError(t, err)
+
+		// Run migration
+		err = FixPermittableRoleIDs(ctx, c)
+		assert.NoError(t, err)
+
+		// Verify empty strings and workspace roles were removed, self was added
+		var result bson.M
+		err = permittableCol.FindOne(ctx, bson.M{"userid": "user1"}).Decode(&result)
+		assert.NoError(t, err)
+
+		roleids, ok := result["roleids"].(primitive.A)
+		assert.True(t, ok)
+		assert.Len(t, roleids, 2)
+
+		roleIDStrs := make([]string, len(roleids))
+		for i, r := range roleids {
+			roleIDStrs[i] = r.(string)
+		}
+		assert.Contains(t, roleIDStrs, "role_custom")
+		assert.Contains(t, roleIDStrs, "role_self")
+		assert.NotContains(t, roleIDStrs, "")
+		assert.NotContains(t, roleIDStrs, "role_owner")
+	})
+
 	t.Run("Preserve workspace_roles field", func(t *testing.T) {
 		ctx := context.Background()
 		db := mongotest.Connect(t)(t)
