@@ -33,4 +33,5 @@ var migrations = migration.Migrations[DBClient]{
 	251209170001: AddRoles,
 	251209170002: MoveWorkspaceMembersRoleToPermittable,
 	251224140400: ApplyCollectionSchemas1,
+	260109104153: FixPermittableWorkspaceRoles,
 }
