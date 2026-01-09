@@ -2,6 +2,7 @@ package migration
 
 import (
 	"context"
+	"slices"
 
 	"github.com/reearth/reearth-accounts/server/internal/infrastructure/mongo/mongodoc"
 	"github.com/reearth/reearth-accounts/server/internal/usecase/interfaces"
@@ -67,7 +68,7 @@ func FixPermittableRoleIDs(ctx context.Context, c DBClient) error {
 				}
 
 				// Update if changed
-				if !lo.Equal(originalRoleIDs, newRoleIDs) {
+				if !slices.Equal(originalRoleIDs, newRoleIDs) {
 					permittableDoc.RoleIDs = newRoleIDs
 					if err := permittableCol.SaveOne(ctx, permittableDoc.ID, permittableDoc); err != nil {
 						return err
