@@ -11,8 +11,16 @@ import (
 /*
 Fix permittable.workspace_roles to match the current workspace membership.
 This migration rebuilds workspace_roles for each permittable based on:
-1. The user must be a member of the workspace
+1. The user must be an active (non-disabled) member of the workspace
 2. The role must match the current role in workspace.members
+
+Memory consideration:
+This migration loads all workspace membership data into memory (expectedWorkspaceRoles map).
+For large datasets (e.g., 10,000 workspaces with 10 members each = 100,000 entries),
+this may consume significant memory. Each entry stores two strings (userID as key,
+WorkspaceID + RoleID as value), roughly ~100 bytes per entry.
+For most deployments this should be acceptable, but for very large datasets,
+consider running this migration during off-peak hours or on a machine with adequate RAM.
 */
 
 func FixPermittableWorkspaceRoles(ctx context.Context, c DBClient) error {
@@ -55,6 +63,11 @@ func FixPermittableWorkspaceRoles(ctx context.Context, c DBClient) error {
 
 				// Process each member in the workspace
 				for userIDStr, member := range wsDoc.Members {
+					// Skip disabled members
+					if member.Disabled {
+						continue
+					}
+
 					// Get the role ID from the role name
 					roleID, exists := roleNameToID[member.Role]
 					if !exists {
@@ -106,22 +119,31 @@ func FixPermittableWorkspaceRoles(ctx context.Context, c DBClient) error {
 	})
 }
 
-// workspaceRolesEqual checks if two slices of WorkspaceRoleDocument are equal
+// workspaceRolesEqual checks if two slices of WorkspaceRoleDocument are equal.
+// Note: This function assumes no duplicate WorkspaceIDs exist in either slice.
+// In valid data, each user should have at most one role per workspace.
+// If duplicates exist, the comparison may produce incorrect results.
 func workspaceRolesEqual(a, b []mongodoc.WorkspaceRoleDocument) bool {
 	if len(a) != len(b) {
 		return false
 	}
 
-	// Create a map of workspace roles from slice a
-	aMap := make(map[string]string)
-	for _, wr := range a {
-		aMap[wr.WorkspaceID] = wr.RoleID
+	if len(a) == 0 {
+		return true
 	}
 
-	// Check if all elements in b exist in a with same role
+	// Create a map of workspace roles from slice a
+	// Key: "workspaceID:roleID" to handle potential duplicates correctly
+	aSet := make(map[string]struct{})
+	for _, wr := range a {
+		key := wr.WorkspaceID + ":" + wr.RoleID
+		aSet[key] = struct{}{}
+	}
+
+	// Check if all elements in b exist in a
 	for _, wr := range b {
-		roleID, exists := aMap[wr.WorkspaceID]
-		if !exists || roleID != wr.RoleID {
+		key := wr.WorkspaceID + ":" + wr.RoleID
+		if _, exists := aSet[key]; !exists {
 			return false
 		}
 	}
