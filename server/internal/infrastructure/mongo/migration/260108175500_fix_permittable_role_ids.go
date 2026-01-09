@@ -67,7 +67,7 @@ func FixPermittableRoleIDs(ctx context.Context, c DBClient) error {
 				}
 
 				// Update if changed
-				if len(originalRoleIDs) != len(newRoleIDs) || !lo.Every(originalRoleIDs, newRoleIDs) {
+				if !lo.Equal(originalRoleIDs, newRoleIDs) {
 					permittableDoc.RoleIDs = newRoleIDs
 					if err := permittableCol.SaveOne(ctx, permittableDoc.ID, permittableDoc); err != nil {
 						return err
