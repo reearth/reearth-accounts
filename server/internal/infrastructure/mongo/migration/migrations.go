@@ -33,7 +33,7 @@ var migrations = migration.Migrations[DBClient]{
 	251209170001: AddRoles,
 	251209170002: MoveWorkspaceMembersRoleToPermittable,
 	// TODO:
-	// it doesn't have engouht test
+	// it doesn't have enough test
 	// so skip it for now
 	// 251224140400: ApplyCollectionSchemas1,
 	260108175500: FixPermittableRoleIDs,
