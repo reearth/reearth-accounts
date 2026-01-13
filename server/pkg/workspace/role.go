@@ -7,7 +7,7 @@ import (
 )
 
 var (
-	// RoleOwner is a role who can have full controll of projects and workspaces
+	// RoleOwner is a role who can have full control of projects and workspaces
 	RoleOwner = Role("owner")
 	// RoleMaintainer is a role who can manage projects
 	RoleMaintainer = Role("maintainer")
