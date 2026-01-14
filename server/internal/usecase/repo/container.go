@@ -1,8 +1,8 @@
 package repo
 
 import (
-	"github.com/reearth/reearth-accounts/server/internal/usecase"
 	"github.com/reearth/reearth-accounts/server/pkg/id"
+	"github.com/reearth/reearth-accounts/server/pkg/workspace"
 	"github.com/reearth/reearthx/i18n"
 	"github.com/reearth/reearthx/rerror"
 	"github.com/reearth/reearthx/usecasex"
@@ -42,7 +42,7 @@ type WorkspaceFilter struct {
 	Writable id.WorkspaceIDList
 }
 
-func WorkspaceFilterFromOperator(o *usecase.Operator) WorkspaceFilter {
+func WorkspaceFilterFromOperator(o *workspace.Operator) WorkspaceFilter {
 	return WorkspaceFilter{
 		Readable: o.AllReadableWorkspaces(),
 		Writable: o.AllWritableWorkspaces(),

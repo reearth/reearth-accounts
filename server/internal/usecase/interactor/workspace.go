@@ -7,7 +7,6 @@ import (
 	"slices"
 	"strings"
 
-	"github.com/reearth/reearth-accounts/server/internal/usecase"
 	"github.com/reearth/reearth-accounts/server/internal/usecase/interfaces"
 	"github.com/reearth/reearth-accounts/server/internal/usecase/repo"
 	"github.com/reearth/reearth-accounts/server/pkg/applog"
@@ -19,7 +18,7 @@ import (
 	"github.com/samber/lo"
 )
 
-type WorkspaceMemberCountEnforcer func(context.Context, *workspace.Workspace, user.List, *usecase.Operator) error
+type WorkspaceMemberCountEnforcer func(context.Context, *workspace.Workspace, user.List, *workspace.Operator) error
 
 type Workspace struct {
 	repos              *repo.Container
@@ -39,7 +38,7 @@ func NewWorkspace(r *repo.Container, enforceMemberCount WorkspaceMemberCountEnfo
 	}
 }
 
-func (i *Workspace) Fetch(ctx context.Context, ids workspace.IDList, operator *usecase.Operator) (workspace.List, error) {
+func (i *Workspace) Fetch(ctx context.Context, ids workspace.IDList, operator *workspace.Operator) (workspace.List, error) {
 	res, err := i.repos.Workspace.FindByIDs(ctx, ids)
 	return filterWorkspaces(res, operator, err, false, true)
 }
@@ -56,7 +55,7 @@ func (i *Workspace) FetchByAlias(ctx context.Context, alias string) (*workspace.
 	return i.repos.Workspace.FindByAlias(ctx, alias)
 }
 
-func (i *Workspace) FindByUser(ctx context.Context, id workspace.UserID, operator *usecase.Operator) (workspace.List, error) {
+func (i *Workspace) FindByUser(ctx context.Context, id workspace.UserID, operator *workspace.Operator) (workspace.List, error) {
 	res, err := i.repos.Workspace.FindByUser(ctx, id)
 	return filterWorkspaces(res, operator, err, true, true)
 }
@@ -73,7 +72,7 @@ func (i *Workspace) FetchByUserWithPagination(ctx context.Context, userID worksp
 	}, nil
 }
 
-func (i *Workspace) Create(ctx context.Context, alias, name, description string, firstUser workspace.UserID, operator *usecase.Operator) (_ *workspace.Workspace, err error) {
+func (i *Workspace) Create(ctx context.Context, alias, name, description string, firstUser workspace.UserID, operator *workspace.Operator) (_ *workspace.Workspace, err error) {
 	if operator.User == nil {
 		return nil, interfaces.ErrInvalidOperator
 	}
@@ -131,7 +130,7 @@ func (i *Workspace) Create(ctx context.Context, alias, name, description string,
 	})
 }
 
-func (i *Workspace) Update(ctx context.Context, id workspace.ID, name string, alias *string, operator *usecase.Operator) (_ *workspace.Workspace, err error) {
+func (i *Workspace) Update(ctx context.Context, id workspace.ID, name string, alias *string, operator *workspace.Operator) (_ *workspace.Workspace, err error) {
 	if operator.User == nil {
 		return nil, interfaces.ErrInvalidOperator
 	}
@@ -178,7 +177,7 @@ func (i *Workspace) Update(ctx context.Context, id workspace.ID, name string, al
 	})
 }
 
-func (i *Workspace) AddUserMember(ctx context.Context, workspaceID workspace.ID, users map[workspace.UserID]workspace.Role, operator *usecase.Operator) (_ *workspace.Workspace, err error) {
+func (i *Workspace) AddUserMember(ctx context.Context, workspaceID workspace.ID, users map[workspace.UserID]workspace.Role, operator *workspace.Operator) (_ *workspace.Workspace, err error) {
 	if operator.User == nil {
 		return nil, interfaces.ErrInvalidOperator
 	}
@@ -231,7 +230,7 @@ func (i *Workspace) AddUserMember(ctx context.Context, workspaceID workspace.ID,
 	})
 }
 
-func (i *Workspace) AddIntegrationMember(ctx context.Context, wId workspace.ID, iId workspace.IntegrationID, role workspace.Role, operator *usecase.Operator) (_ *workspace.Workspace, err error) {
+func (i *Workspace) AddIntegrationMember(ctx context.Context, wId workspace.ID, iId workspace.IntegrationID, role workspace.Role, operator *workspace.Operator) (_ *workspace.Workspace, err error) {
 	if operator.User == nil {
 		return nil, interfaces.ErrInvalidOperator
 	}
@@ -257,11 +256,11 @@ func (i *Workspace) AddIntegrationMember(ctx context.Context, wId workspace.ID, 
 	})
 }
 
-func (i *Workspace) RemoveUserMember(ctx context.Context, id workspace.ID, u workspace.UserID, operator *usecase.Operator) (*workspace.Workspace, error) {
+func (i *Workspace) RemoveUserMember(ctx context.Context, id workspace.ID, u workspace.UserID, operator *workspace.Operator) (*workspace.Workspace, error) {
 	return i.RemoveMultipleUserMembers(ctx, id, workspace.UserIDList{u}, operator)
 }
 
-func (i *Workspace) RemoveMultipleUserMembers(ctx context.Context, id workspace.ID, userIds workspace.UserIDList, operator *usecase.Operator) (_ *workspace.Workspace, err error) {
+func (i *Workspace) RemoveMultipleUserMembers(ctx context.Context, id workspace.ID, userIds workspace.UserIDList, operator *workspace.Operator) (_ *workspace.Workspace, err error) {
 	if operator.User == nil {
 		return nil, interfaces.ErrInvalidOperator
 	}
@@ -307,7 +306,7 @@ func (i *Workspace) RemoveMultipleUserMembers(ctx context.Context, id workspace.
 	})
 }
 
-func (i *Workspace) RemoveIntegration(ctx context.Context, wId workspace.ID, iId workspace.IntegrationID, operator *usecase.Operator) (_ *workspace.Workspace, err error) {
+func (i *Workspace) RemoveIntegration(ctx context.Context, wId workspace.ID, iId workspace.IntegrationID, operator *workspace.Operator) (_ *workspace.Workspace, err error) {
 	if operator.User == nil {
 		return nil, interfaces.ErrInvalidOperator
 	}
@@ -333,7 +332,7 @@ func (i *Workspace) RemoveIntegration(ctx context.Context, wId workspace.ID, iId
 	})
 }
 
-func (i *Workspace) RemoveIntegrations(ctx context.Context, wId workspace.ID, iIDs workspace.IntegrationIDList, operator *usecase.Operator) (_ *workspace.Workspace, err error) {
+func (i *Workspace) RemoveIntegrations(ctx context.Context, wId workspace.ID, iIDs workspace.IntegrationIDList, operator *workspace.Operator) (_ *workspace.Workspace, err error) {
 	if operator.User == nil {
 		return nil, interfaces.ErrInvalidOperator
 	}
@@ -359,7 +358,7 @@ func (i *Workspace) RemoveIntegrations(ctx context.Context, wId workspace.ID, iI
 	})
 }
 
-func (i *Workspace) UpdateUserMember(ctx context.Context, id workspace.ID, u workspace.UserID, role workspace.Role, operator *usecase.Operator) (_ *workspace.Workspace, err error) {
+func (i *Workspace) UpdateUserMember(ctx context.Context, id workspace.ID, u workspace.UserID, role workspace.Role, operator *workspace.Operator) (_ *workspace.Workspace, err error) {
 	if operator.User == nil {
 		return nil, interfaces.ErrInvalidOperator
 	}
@@ -397,7 +396,7 @@ func (i *Workspace) UpdateUserMember(ctx context.Context, id workspace.ID, u wor
 	})
 }
 
-func (i *Workspace) UpdateIntegration(ctx context.Context, wId workspace.ID, iId workspace.IntegrationID, role workspace.Role, operator *usecase.Operator) (_ *workspace.Workspace, err error) {
+func (i *Workspace) UpdateIntegration(ctx context.Context, wId workspace.ID, iId workspace.IntegrationID, role workspace.Role, operator *workspace.Operator) (_ *workspace.Workspace, err error) {
 	if operator.User == nil {
 		return nil, interfaces.ErrInvalidOperator
 	}
@@ -423,7 +422,7 @@ func (i *Workspace) UpdateIntegration(ctx context.Context, wId workspace.ID, iId
 	})
 }
 
-func (i *Workspace) Remove(ctx context.Context, id workspace.ID, operator *usecase.Operator) error {
+func (i *Workspace) Remove(ctx context.Context, id workspace.ID, operator *workspace.Operator) error {
 	if operator.User == nil {
 		return interfaces.ErrInvalidOperator
 	}
@@ -453,7 +452,7 @@ func (i *Workspace) Remove(ctx context.Context, id workspace.ID, operator *useca
 	})
 }
 
-func (i *Workspace) TransferOwnership(ctx context.Context, workspaceID workspace.ID, newOwnerID workspace.UserID, operator *usecase.Operator) (*workspace.Workspace, error) {
+func (i *Workspace) TransferOwnership(ctx context.Context, workspaceID workspace.ID, newOwnerID workspace.UserID, operator *workspace.Operator) (*workspace.Workspace, error) {
 	if operator.User == nil {
 		return nil, interfaces.ErrInvalidOperator
 	}
@@ -504,7 +503,7 @@ func (i *Workspace) TransferOwnership(ctx context.Context, workspaceID workspace
 	})
 }
 
-func (i *Workspace) applyDefaultPolicy(ws *workspace.Workspace, o *usecase.Operator) {
+func (i *Workspace) applyDefaultPolicy(ws *workspace.Workspace, o *workspace.Operator) {
 	if ws.Policy() == nil && o.DefaultPolicy != nil {
 		ws.SetPolicy(o.DefaultPolicy)
 	}
@@ -512,7 +511,7 @@ func (i *Workspace) applyDefaultPolicy(ws *workspace.Workspace, o *usecase.Opera
 
 func filterWorkspaces(
 	workspaces workspace.List,
-	operator *usecase.Operator,
+	operator *workspace.Operator,
 	err error,
 	omitNil, applyDefaultPolicy bool,
 ) (workspace.List, error) {

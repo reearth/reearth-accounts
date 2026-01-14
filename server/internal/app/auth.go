@@ -11,7 +11,6 @@ import (
 	"strings"
 
 	"github.com/reearth/reearth-accounts/server/internal/adapter"
-	"github.com/reearth/reearth-accounts/server/internal/usecase"
 	"github.com/reearth/reearth-accounts/server/pkg/id"
 	"github.com/reearth/reearth-accounts/server/pkg/user"
 	"github.com/reearth/reearth-accounts/server/pkg/workspace"
@@ -256,7 +255,7 @@ func isDebugUserExists(req *http.Request, cfg *ServerConfig, ctx context.Context
 	return nil
 }
 
-func generateUserOperator(ctx context.Context, cfg *ServerConfig, u *user.User) (*usecase.Operator, error) {
+func generateUserOperator(ctx context.Context, cfg *ServerConfig, u *user.User) (*workspace.Operator, error) {
 	if u == nil {
 		return nil, nil
 	}
@@ -273,7 +272,7 @@ func generateUserOperator(ctx context.Context, cfg *ServerConfig, u *user.User) 
 	mw := w.FilterByUserRole(uid, workspace.RoleMaintainer).IDs()
 	ow := w.FilterByUserRole(uid, workspace.RoleOwner).IDs()
 
-	return &usecase.Operator{
+	return &workspace.Operator{
 		User: &uid,
 
 		ReadableWorkspaces:     rw,
