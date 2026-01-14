@@ -24,9 +24,9 @@ import (
 // seedRoles creates the required roles for RBAC
 func seedRoles(ctx context.Context, r *repo.Container) error {
 	selfRole := role.New().NewID().Name(interfaces.RoleSelf).MustBuild()
-	ownerRole := role.New().NewID().Name(workspace.RoleOwner.String()).MustBuild()
-	readerRole := role.New().NewID().Name(workspace.RoleReader.String()).MustBuild()
-	writerRole := role.New().NewID().Name(workspace.RoleWriter.String()).MustBuild()
+	ownerRole := role.New().NewID().Name(role.RoleOwner.String()).MustBuild()
+	readerRole := role.New().NewID().Name(role.RoleReader.String()).MustBuild()
+	writerRole := role.New().NewID().Name(role.RoleWriter.String()).MustBuild()
 
 	if err := r.Role.Save(ctx, *selfRole); err != nil {
 		return err
@@ -84,7 +84,7 @@ func baseSeederOneUser(ctx context.Context, r *repo.Container) error {
 		return err
 	}
 	roleOwner := workspace.Member{
-		Role:      workspace.RoleOwner,
+		Role:      role.RoleOwner,
 		InvitedBy: uId,
 	}
 
@@ -102,7 +102,7 @@ func baseSeederOneUser(ctx context.Context, r *repo.Container) error {
 	}
 
 	// Create permittable for the user
-	ownerRoleDoc, err := r.Role.FindByName(ctx, workspace.RoleOwner.String())
+	ownerRoleDoc, err := r.Role.FindByName(ctx, role.RoleOwner.String())
 	if err != nil {
 		return err
 	}
@@ -154,11 +154,11 @@ func baseSeederUser(ctx context.Context, r *repo.Container) error {
 		return err
 	}
 	roleOwner := workspace.Member{
-		Role:      workspace.RoleOwner,
+		Role:      role.RoleOwner,
 		InvitedBy: uId,
 	}
 	roleReader := workspace.Member{
-		Role:      workspace.RoleReader,
+		Role:      role.RoleReader,
 		InvitedBy: uId2,
 	}
 
@@ -190,11 +190,11 @@ func baseSeederUser(ctx context.Context, r *repo.Container) error {
 	}
 
 	// Create permittables for all users
-	ownerRoleDoc, err := r.Role.FindByName(ctx, workspace.RoleOwner.String())
+	ownerRoleDoc, err := r.Role.FindByName(ctx, role.RoleOwner.String())
 	if err != nil {
 		return err
 	}
-	readerRoleDoc, err := r.Role.FindByName(ctx, workspace.RoleReader.String())
+	readerRoleDoc, err := r.Role.FindByName(ctx, role.RoleReader.String())
 	if err != nil {
 		return err
 	}

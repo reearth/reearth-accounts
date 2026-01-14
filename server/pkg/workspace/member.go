@@ -6,6 +6,7 @@ import (
 	"sort"
 	"sync"
 
+	"github.com/reearth/reearth-accounts/server/pkg/role"
 	"github.com/reearth/reearth-accounts/server/pkg/user"
 	"github.com/reearth/reearthx/i18n"
 	"github.com/reearth/reearthx/rerror"
@@ -22,7 +23,7 @@ var (
 )
 
 type Member struct {
-	Role      Role
+	Role      role.RoleType
 	Disabled  bool
 	InvitedBy UserID
 	Host      string
@@ -55,7 +56,7 @@ func InitMembers(u UserID) *Members {
 	return NewMembersWith(
 		map[UserID]Member{
 			u: {
-				Role:      RoleOwner,
+				Role:      role.RoleOwner,
 				Disabled:  false,
 				InvitedBy: u,
 			},
@@ -160,14 +161,14 @@ func (m *Members) Count() int {
 	return len(m.users)
 }
 
-func (m *Members) UserRole(u UserID) Role {
+func (m *Members) UserRole(u UserID) role.RoleType {
 	m.mu.RLock()
 	defer m.mu.RUnlock()
 
 	return m.users[u].Role
 }
 
-func (m *Members) IntegrationRole(iId IntegrationID) Role {
+func (m *Members) IntegrationRole(iId IntegrationID) role.RoleType {
 	m.mu.RLock()
 	defer m.mu.RUnlock()
 
@@ -186,17 +187,17 @@ func (m *Members) IsOnlyOwner(u UserID) bool {
 	m.mu.RLock()
 	defer m.mu.RUnlock()
 
-	return len(m.UsersByRole(RoleOwner)) == 1 && m.users[u].Role == RoleOwner
+	return len(m.UsersByRole(role.RoleOwner)) == 1 && m.users[u].Role == role.RoleOwner
 }
 
 func (m *Members) IsOwnerOrMaintainer(u UserID) bool {
 	m.mu.RLock()
 	defer m.mu.RUnlock()
 
-	return m.users[u].Role == RoleOwner || m.users[u].Role == RoleMaintainer
+	return m.users[u].Role == role.RoleOwner || m.users[u].Role == role.RoleMaintainer
 }
 
-func (m *Members) UpdateUserRole(u UserID, role Role) error {
+func (m *Members) UpdateUserRole(u UserID, role role.RoleType) error {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 
@@ -215,7 +216,7 @@ func (m *Members) UpdateUserRole(u UserID, role Role) error {
 	return nil
 }
 
-func (m *Members) UpdateIntegrationRole(iId IntegrationID, role Role) error {
+func (m *Members) UpdateIntegrationRole(iId IntegrationID, role role.RoleType) error {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 
@@ -231,7 +232,7 @@ func (m *Members) UpdateIntegrationRole(iId IntegrationID, role Role) error {
 	return nil
 }
 
-func (m *Members) Join(u *user.User, role Role, i UserID) error {
+func (m *Members) Join(u *user.User, roleType role.RoleType, i UserID) error {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 
@@ -241,14 +242,14 @@ func (m *Members) Join(u *user.User, role Role, i UserID) error {
 	if _, ok := m.users[u.ID()]; ok {
 		return ErrUserAlreadyJoined
 	}
-	if role == Role("") {
-		role = RoleReader
+	if roleType == role.RoleType("") {
+		roleType = role.RoleReader
 	}
 	if m.users == nil {
 		m.users = map[UserID]Member{}
 	}
 	m.users[u.ID()] = Member{
-		Role:      role,
+		Role:      roleType,
 		Disabled:  false,
 		InvitedBy: i,
 		Host:      u.Host(),
@@ -256,21 +257,21 @@ func (m *Members) Join(u *user.User, role Role, i UserID) error {
 	return nil
 }
 
-func (m *Members) AddIntegration(iid IntegrationID, role Role, i UserID) error {
+func (m *Members) AddIntegration(iid IntegrationID, roleType role.RoleType, i UserID) error {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 
 	if _, ok := m.integrations[iid]; ok {
 		return ErrUserAlreadyJoined
 	}
-	if role == Role("") {
-		role = RoleReader
+	if roleType == role.RoleType("") {
+		roleType = role.RoleReader
 	}
 	if m.integrations == nil {
 		m.integrations = map[IntegrationID]Member{}
 	}
 	m.integrations[iid] = Member{
-		Role:      role,
+		Role:      roleType,
 		Disabled:  false,
 		InvitedBy: i,
 	}
@@ -329,7 +330,7 @@ func (m *Members) DeleteIntegrations(iids IntegrationIDList) error {
 	return nil
 }
 
-func (m *Members) UsersByRole(role Role) []UserID {
+func (m *Members) UsersByRole(role role.RoleType) []UserID {
 	m.mu.RLock()
 	defer m.mu.RUnlock()
 

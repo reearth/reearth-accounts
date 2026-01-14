@@ -9,6 +9,7 @@ import (
 	"github.com/Khan/genqlient/graphql"
 	"github.com/reearth/reearth-accounts/server/internal/usecase/interfaces"
 	accountid "github.com/reearth/reearth-accounts/server/pkg/id"
+	"github.com/reearth/reearth-accounts/server/pkg/role"
 	"github.com/reearth/reearth-accounts/server/pkg/workspace"
 	"github.com/samber/lo"
 )
@@ -110,7 +111,7 @@ func (w *Workspace) Update(ctx context.Context, id workspace.ID, name string, al
 	return ToWorkspace(res.UpdateWorkspace.Workspace.FragmentWorkspace)
 }
 
-func (w *Workspace) AddUserMember(ctx context.Context, id workspace.ID, users map[accountid.UserID]workspace.Role, op *workspace.Operator) (*workspace.Workspace, error) {
+func (w *Workspace) AddUserMember(ctx context.Context, id workspace.ID, users map[accountid.UserID]role.RoleType, op *workspace.Operator) (*workspace.Workspace, error) {
 	members := []MemberInput{}
 	for id, role := range users {
 		members = append(members, MemberInput{UserId: id.String(), Role: Role(string(role))})
@@ -122,7 +123,7 @@ func (w *Workspace) AddUserMember(ctx context.Context, id workspace.ID, users ma
 	return ToWorkspace(res.AddUsersToWorkspace.Workspace.FragmentWorkspace)
 }
 
-func (w *Workspace) AddIntegrationMember(ctx context.Context, id workspace.ID, integrationId workspace.IntegrationID, role workspace.Role, op *workspace.Operator) (*workspace.Workspace, error) {
+func (w *Workspace) AddIntegrationMember(ctx context.Context, id workspace.ID, integrationId workspace.IntegrationID, role role.RoleType, op *workspace.Operator) (*workspace.Workspace, error) {
 	res, err := AddIntegrationToWorkspace(ctx, w.gql, AddIntegrationToWorkspaceInput{WorkspaceId: id.String(), IntegrationId: integrationId.String(), Role: Role(string(role))})
 	if err != nil {
 		return nil, err
@@ -130,7 +131,7 @@ func (w *Workspace) AddIntegrationMember(ctx context.Context, id workspace.ID, i
 	return ToWorkspace(res.AddIntegrationToWorkspace.Workspace.FragmentWorkspace)
 }
 
-func (w *Workspace) UpdateUserMember(ctx context.Context, id workspace.ID, userID accountid.UserID, role workspace.Role, op *workspace.Operator) (*workspace.Workspace, error) {
+func (w *Workspace) UpdateUserMember(ctx context.Context, id workspace.ID, userID accountid.UserID, role role.RoleType, op *workspace.Operator) (*workspace.Workspace, error) {
 	res, err := UpdateUserOfWorkspace(ctx, w.gql, UpdateUserOfWorkspaceInput{WorkspaceId: id.String(), UserId: userID.String(), Role: Role(string(role))})
 	if err != nil {
 		return nil, err
@@ -138,7 +139,7 @@ func (w *Workspace) UpdateUserMember(ctx context.Context, id workspace.ID, userI
 	return ToWorkspace(res.UpdateUserOfWorkspace.Workspace.FragmentWorkspace)
 }
 
-func (w *Workspace) UpdateIntegration(ctx context.Context, id workspace.ID, integrationID workspace.IntegrationID, role workspace.Role, op *workspace.Operator) (*workspace.Workspace, error) {
+func (w *Workspace) UpdateIntegration(ctx context.Context, id workspace.ID, integrationID workspace.IntegrationID, role role.RoleType, op *workspace.Operator) (*workspace.Workspace, error) {
 	res, err := UpdateIntegrationOfWorkspace(ctx, w.gql, UpdateIntegrationOfWorkspaceInput{WorkspaceId: id.String(), IntegrationId: integrationID.String(), Role: Role(string(role))})
 	if err != nil {
 		return nil, err

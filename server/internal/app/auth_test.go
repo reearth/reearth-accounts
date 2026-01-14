@@ -12,6 +12,7 @@ import (
 	"github.com/reearth/reearth-accounts/server/internal/infrastructure/memory"
 	"github.com/reearth/reearth-accounts/server/internal/usecase/repo"
 	"github.com/reearth/reearth-accounts/server/pkg/id"
+	"github.com/reearth/reearth-accounts/server/pkg/role"
 	"github.com/reearth/reearth-accounts/server/pkg/user"
 	"github.com/reearth/reearth-accounts/server/pkg/workspace"
 	"github.com/reearth/reearthx/appx"
@@ -145,7 +146,7 @@ func TestAuthMiddleware(t *testing.T) {
 			Name("test-workspace").
 			Members(map[id.UserID]workspace.Member{
 				uid: {
-					Role:      workspace.RoleOwner,
+					Role:      role.RoleOwner,
 					InvitedBy: uid,
 				},
 			}).
@@ -269,7 +270,7 @@ func TestAuthMiddleware(t *testing.T) {
 			Name("debug-auth-workspace").
 			Members(map[id.UserID]workspace.Member{
 				uid: {
-					Role:      workspace.RoleOwner,
+					Role:      role.RoleOwner,
 					InvitedBy: uid,
 				},
 			}).
@@ -422,7 +423,7 @@ func TestMockAuthMiddleware(t *testing.T) {
 			Name("demo-workspace").
 			Members(map[id.UserID]workspace.Member{
 				uid: {
-					Role:      workspace.RoleOwner,
+					Role:      role.RoleOwner,
 					InvitedBy: uid,
 				},
 			}).
@@ -511,7 +512,7 @@ func TestAuthMiddleware_DebugUserHeader(t *testing.T) {
 		Name("debug-workspace").
 		Members(map[id.UserID]workspace.Member{
 			uid: {
-				Role:      workspace.RoleOwner,
+				Role:      role.RoleOwner,
 				InvitedBy: uid,
 			},
 		}).
@@ -575,7 +576,7 @@ func TestGenerateUserOperator(t *testing.T) {
 			Name("workspace1").
 			Members(map[id.UserID]workspace.Member{
 				uid: {
-					Role:      workspace.RoleOwner,
+					Role:      role.RoleOwner,
 					InvitedBy: uid,
 				},
 			}).
@@ -587,7 +588,7 @@ func TestGenerateUserOperator(t *testing.T) {
 			Name("workspace2").
 			Members(map[id.UserID]workspace.Member{
 				uid: {
-					Role:      workspace.RoleReader,
+					Role:      role.RoleReader,
 					InvitedBy: uid,
 				},
 			}).

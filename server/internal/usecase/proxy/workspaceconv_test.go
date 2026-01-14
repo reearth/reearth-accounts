@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/reearth/reearth-accounts/server/pkg/id"
+	"github.com/reearth/reearth-accounts/server/pkg/role"
 	"github.com/reearth/reearth-accounts/server/pkg/workspace"
 )
 
@@ -38,10 +39,10 @@ func TestWorkspaceByIDsResponseTo(t *testing.T) {
 		Typename: "Workspace",
 	}
 	owner := workspace.Member{
-		Role: workspace.RoleOwner,
+		Role: role.RoleOwner,
 	}
 	reader := workspace.Member{
-		Role:      workspace.RoleReader,
+		Role:      role.RoleReader,
 		InvitedBy: uid,
 	}
 
@@ -140,10 +141,10 @@ func TestWorkspaceByIDsNodeTo(t *testing.T) {
 		Typename: "Workspace",
 	}
 	owner := workspace.Member{
-		Role: workspace.RoleOwner,
+		Role: role.RoleOwner,
 	}
 	reader := workspace.Member{
-		Role:      workspace.RoleReader,
+		Role:      role.RoleReader,
 		InvitedBy: uid,
 	}
 
@@ -215,10 +216,10 @@ func TestToWorkspaces(t *testing.T) {
 		},
 	}
 	owner := workspace.Member{
-		Role: workspace.RoleOwner,
+		Role: role.RoleOwner,
 	}
 	reader := workspace.Member{
-		Role:      workspace.RoleReader,
+		Role:      role.RoleReader,
 		InvitedBy: uid,
 	}
 
@@ -292,10 +293,10 @@ func TestToWorkspace(t *testing.T) {
 		},
 	}
 	owner := workspace.Member{
-		Role: workspace.RoleOwner,
+		Role: role.RoleOwner,
 	}
 	reader := workspace.Member{
-		Role:      workspace.RoleReader,
+		Role:      role.RoleReader,
 		InvitedBy: uid,
 	}
 
@@ -353,35 +354,35 @@ func TestToRole(t *testing.T) {
 	tests := []struct {
 		name string
 		args args
-		want workspace.Role
+		want role.RoleType
 	}{
 		{
 			name: "ok maintainer",
 			args: args{
 				r: RoleMaintainer,
 			},
-			want: workspace.RoleMaintainer,
+			want: role.RoleMaintainer,
 		},
 		{
 			name: "ok reader",
 			args: args{
 				r: RoleReader,
 			},
-			want: workspace.RoleReader,
+			want: role.RoleReader,
 		},
 		{
 			name: "ok owner",
 			args: args{
 				r: RoleOwner,
 			},
-			want: workspace.RoleOwner,
+			want: role.RoleOwner,
 		},
 		{
 			name: "ok writer",
 			args: args{
 				r: RoleWriter,
 			},
-			want: workspace.RoleWriter,
+			want: role.RoleWriter,
 		},
 	}
 	for _, tt := range tests {

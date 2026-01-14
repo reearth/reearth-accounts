@@ -1,4 +1,4 @@
-package interfaces
+package user
 
 import (
 	"context"
@@ -35,7 +35,7 @@ type SignupUserParam struct {
 	UserID      *user.ID
 	Lang        *language.Tag
 	Theme       *user.Theme
-	WorkspaceID *workspace.ID
+	WorkspaceID *string
 }
 
 type SignupParam struct {
@@ -46,7 +46,7 @@ type SignupParam struct {
 	Lang        *language.Tag
 	Theme       *user.Theme
 	UserID      *user.ID
-	WorkspaceID *workspace.ID
+	WorkspaceID *string
 	MockAuth    bool
 }
 
@@ -77,7 +77,7 @@ type UserQuery interface {
 	SearchUser(ctx context.Context, keyword string) (user.List, error)
 }
 
-type User interface {
+type UserUseCase interface {
 	UserQuery
 
 	// sign up

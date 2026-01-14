@@ -1,5 +1,7 @@
 package workspace
 
+import "github.com/reearth/reearth-accounts/server/pkg/role"
+
 type List []*Workspace
 
 func (l List) FilterByID(ids ...ID) List {
@@ -23,7 +25,7 @@ func (l List) FilterByID(ids ...ID) List {
 	return res
 }
 
-func (l List) FilterByUserRole(u UserID, r Role) List {
+func (l List) FilterByUserRole(u UserID, r role.RoleType) List {
 	if l == nil || u.IsEmpty() || r == "" {
 		return nil
 	}
@@ -37,7 +39,7 @@ func (l List) FilterByUserRole(u UserID, r Role) List {
 	return res
 }
 
-func (l List) FilterByIntegrationRole(i IntegrationID, r Role) List {
+func (l List) FilterByIntegrationRole(i IntegrationID, r role.RoleType) List {
 	if l == nil || i.IsEmpty() || r == "" {
 		return nil
 	}
@@ -51,7 +53,7 @@ func (l List) FilterByIntegrationRole(i IntegrationID, r Role) List {
 	return res
 }
 
-func (l List) FilterByUserRoleIncluding(u UserID, r Role) List {
+func (l List) FilterByUserRoleIncluding(u UserID, r role.RoleType) List {
 	if l == nil || u.IsEmpty() || r == "" {
 		return nil
 	}
@@ -65,7 +67,7 @@ func (l List) FilterByUserRoleIncluding(u UserID, r Role) List {
 	return res
 }
 
-func (l List) FilterByIntegrationRoleIncluding(i IntegrationID, r Role) List {
+func (l List) FilterByIntegrationRoleIncluding(i IntegrationID, r role.RoleType) List {
 	if l == nil || i.IsEmpty() || r == "" {
 		return nil
 	}
