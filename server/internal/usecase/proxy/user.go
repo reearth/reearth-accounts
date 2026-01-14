@@ -6,11 +6,11 @@ import (
 	"context"
 
 	"github.com/reearth/reearth-accounts/server/pkg/user"
+	"github.com/reearth/reearth-accounts/server/pkg/workspace"
 	"github.com/reearth/reearthx/util"
 
 	_ "github.com/Khan/genqlient/generate"
 	"github.com/Khan/genqlient/graphql"
-	"github.com/reearth/reearth-accounts/server/internal/usecase"
 	"github.com/reearth/reearth-accounts/server/internal/usecase/interfaces"
 )
 
@@ -84,7 +84,7 @@ func (u *User) FindOrCreate(ctx context.Context, param interfaces.UserFindOrCrea
 	return FragmentToUser(res.FindOrCreate.User.FragmentUser)
 }
 
-func (u *User) UpdateMe(ctx context.Context, param interfaces.UpdateMeParam, op *usecase.Operator) (*user.User, error) {
+func (u *User) UpdateMe(ctx context.Context, param interfaces.UpdateMeParam, op *workspace.Operator) (*user.User, error) {
 	input := UpdateMeInput{
 		Name:                 *param.Name,
 		Email:                *param.Email,
@@ -100,7 +100,7 @@ func (u *User) UpdateMe(ctx context.Context, param interfaces.UpdateMeParam, op 
 	return MeToUser(res.UpdateMe.Me.FragmentMe)
 }
 
-func (u *User) RemoveMyAuth(ctx context.Context, auth string, op *usecase.Operator) (*user.User, error) {
+func (u *User) RemoveMyAuth(ctx context.Context, auth string, op *workspace.Operator) (*user.User, error) {
 	res, err := RemoveMyAuth(ctx, u.gql, RemoveMyAuthInput{Auth: auth})
 	if err != nil {
 		return nil, err
@@ -142,7 +142,7 @@ func (u *User) FetchByAlias(ctx context.Context, alias string) (*user.User, erro
 	return FragmentToUser(res.FindUserByAlias.FragmentUser)
 }
 
-func (u *User) DeleteMe(ctx context.Context, id user.ID, op *usecase.Operator) error {
+func (u *User) DeleteMe(ctx context.Context, id user.ID, op *workspace.Operator) error {
 	_, err := DeleteMe(ctx, u.gql, DeleteMeInput{UserId: id.String()})
 	if err != nil {
 		return err

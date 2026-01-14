@@ -7,7 +7,6 @@ import (
 	"errors"
 	htmlTmpl "html/template"
 
-	"github.com/reearth/reearth-accounts/server/internal/usecase"
 	"github.com/reearth/reearth-accounts/server/internal/usecase/gateway"
 	"github.com/reearth/reearth-accounts/server/internal/usecase/interfaces"
 	"github.com/reearth/reearth-accounts/server/internal/usecase/repo"
@@ -114,7 +113,7 @@ func (i *User) GetUserBySubject(ctx context.Context, sub string) (u *user.User, 
 	})
 }
 
-func (i *User) UpdateMe(ctx context.Context, p interfaces.UpdateMeParam, operator *usecase.Operator) (u *user.User, err error) {
+func (i *User) UpdateMe(ctx context.Context, p interfaces.UpdateMeParam, operator *workspace.Operator) (u *user.User, err error) {
 	if operator.User == nil {
 		return nil, interfaces.ErrInvalidOperator
 	}
@@ -204,7 +203,7 @@ func (i *User) UpdateMe(ctx context.Context, p interfaces.UpdateMeParam, operato
 	})
 }
 
-func (i *User) RemoveMyAuth(ctx context.Context, authProvider string, operator *usecase.Operator) (u *user.User, err error) {
+func (i *User) RemoveMyAuth(ctx context.Context, authProvider string, operator *workspace.Operator) (u *user.User, err error) {
 	if operator.User == nil {
 		return nil, interfaces.ErrInvalidOperator
 	}
@@ -226,7 +225,7 @@ func (i *User) RemoveMyAuth(ctx context.Context, authProvider string, operator *
 	})
 }
 
-func (i *User) DeleteMe(ctx context.Context, userID user.ID, operator *usecase.Operator) (err error) {
+func (i *User) DeleteMe(ctx context.Context, userID user.ID, operator *workspace.Operator) (err error) {
 	if operator.User == nil {
 		return interfaces.ErrInvalidOperator
 	}
