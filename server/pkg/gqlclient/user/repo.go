@@ -33,6 +33,8 @@ type UserRepo interface {
 	SignupOIDC(ctx context.Context, name string, email string, sub string, secret string) (*user.User, error)
 	Signup(ctx context.Context, userID, name, email, password, secret, workspaceID string) (*user.User, error)
 	CreateVerification(ctx context.Context, email string) (bool, error)
+	RemoveMyAuth(ctx context.Context, auth string) (*user.User, error)
+	DeleteMe(ctx context.Context, userID string) error
 }
 
 func NewRepo(gql *graphql.Client) UserRepo {
@@ -276,4 +278,50 @@ func (r *userRepo) CreateVerification(ctx context.Context, email string) (bool, 
 	}
 
 	return *m.CreateVerification, nil
+}
+
+func (r *userRepo) DeleteMe(ctx context.Context, userID string) error {
+	var m deleteMeMutation
+	vars := map[string]interface{}{
+		"userId": graphql.ID(userID),
+	}
+	return r.client.Mutate(ctx, &m, vars)
+}
+
+func (r *userRepo) RemoveMyAuth(ctx context.Context, auth string) (*user.User, error) {
+	var m removeMyAuthMutation
+	vars := map[string]interface{}{
+		"auth": graphql.String(auth),
+	}
+	if err := r.client.Mutate(ctx, &m, vars); err != nil {
+		return nil, gqlerror.ReturnAccountsError(ctx, err)
+	}
+
+	id, err := user.IDFrom(string(m.RemoveMyAuth.Me.ID))
+	if err != nil {
+		log.Errorf("[RemoveMyAuth] failed to convert user id: %s", m.RemoveMyAuth.Me.ID)
+		return nil, gqlerror.ReturnAccountsError(ctx, err)
+	}
+
+	wid, err := user.WorkspaceIDFrom(string(m.RemoveMyAuth.Me.MyWorkspaceID))
+	if err != nil {
+		log.Errorf("[RemoveMyAuth] failed to convert workspace id: %s", m.RemoveMyAuth.Me.MyWorkspaceID)
+		return nil, gqlerror.ReturnAccountsError(ctx, err)
+	}
+
+	auths := gqlutil.ToStringSlice(m.RemoveMyAuth.Me.Auths)
+	auths2 := make([]user.Auth, len(auths))
+	for i, auth := range auths {
+		auths2[i] = user.AuthFrom(auth)
+	}
+
+	return user.New().
+		ID(id).
+		Name(string(m.RemoveMyAuth.Me.Name)).
+		Alias(string(m.RemoveMyAuth.Me.Alias)).
+		Email(string(m.RemoveMyAuth.Me.Email)).
+		Metadata(gqlmodel.ToUserMetadata(m.RemoveMyAuth.Me.Metadata)).
+		Workspace(wid).
+		Auths(auths2).
+		Build()
 }
