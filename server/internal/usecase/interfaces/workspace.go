@@ -3,6 +3,7 @@ package interfaces
 import (
 	"context"
 
+	"github.com/reearth/reearth-accounts/server/pkg/role"
 	"github.com/reearth/reearth-accounts/server/pkg/user"
 	"github.com/reearth/reearth-accounts/server/pkg/workspace"
 	"github.com/reearth/reearthx/i18n"
@@ -35,10 +36,10 @@ type Workspace interface {
 	FindByUser(context.Context, user.ID, *workspace.Operator) (workspace.List, error)
 	Create(ctx context.Context, alias, name, description string, firstUser workspace.UserID, operator *workspace.Operator) (_ *workspace.Workspace, err error)
 	Update(context.Context, workspace.ID, string, *string, *workspace.Operator) (*workspace.Workspace, error)
-	AddUserMember(context.Context, workspace.ID, map[user.ID]workspace.Role, *workspace.Operator) (*workspace.Workspace, error)
-	AddIntegrationMember(context.Context, workspace.ID, workspace.IntegrationID, workspace.Role, *workspace.Operator) (*workspace.Workspace, error)
-	UpdateUserMember(context.Context, workspace.ID, user.ID, workspace.Role, *workspace.Operator) (*workspace.Workspace, error)
-	UpdateIntegration(context.Context, workspace.ID, workspace.IntegrationID, workspace.Role, *workspace.Operator) (*workspace.Workspace, error)
+	AddUserMember(context.Context, workspace.ID, map[user.ID]role.RoleType, *workspace.Operator) (*workspace.Workspace, error)
+	AddIntegrationMember(context.Context, workspace.ID, workspace.IntegrationID, role.RoleType, *workspace.Operator) (*workspace.Workspace, error)
+	UpdateUserMember(context.Context, workspace.ID, user.ID, role.RoleType, *workspace.Operator) (*workspace.Workspace, error)
+	UpdateIntegration(context.Context, workspace.ID, workspace.IntegrationID, role.RoleType, *workspace.Operator) (*workspace.Workspace, error)
 	RemoveUserMember(context.Context, workspace.ID, user.ID, *workspace.Operator) (*workspace.Workspace, error)
 	RemoveMultipleUserMembers(context.Context, workspace.ID, user.IDList, *workspace.Operator) (*workspace.Workspace, error)
 	RemoveIntegration(context.Context, workspace.ID, workspace.IntegrationID, *workspace.Operator) (*workspace.Workspace, error)

@@ -2,6 +2,7 @@ package proxy
 
 import (
 	accountid "github.com/reearth/reearth-accounts/server/pkg/id"
+	"github.com/reearth/reearth-accounts/server/pkg/role"
 	"github.com/reearth/reearth-accounts/server/pkg/user"
 	"github.com/reearth/reearth-accounts/server/pkg/workspace"
 	"github.com/reearth/reearthx/util"
@@ -82,17 +83,17 @@ func ToWorkspace(r FragmentWorkspace) (*workspace.Workspace, error) {
 		Name(r.Name).Personal(r.Personal).Members(members).Integrations(integrations).Build()
 }
 
-func ToRole(r Role) workspace.Role {
+func ToRole(r Role) role.RoleType {
 	switch r {
 	case RoleMaintainer:
-		return workspace.RoleMaintainer
+		return role.RoleMaintainer
 	case RoleReader:
-		return workspace.RoleReader
+		return role.RoleReader
 	case RoleOwner:
-		return workspace.RoleOwner
+		return role.RoleOwner
 	case RoleWriter:
-		return workspace.RoleWriter
+		return role.RoleWriter
 	default:
-		return workspace.RoleOwner
+		return role.RoleOwner
 	}
 }

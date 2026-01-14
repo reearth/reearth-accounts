@@ -19,8 +19,8 @@ func TestWorkspace_TransferOwnership(t *testing.T) {
 
 	// Initial state: Owner has Owner role, NewOwner has Maintainer role
 	w1 := workspace.New().ID(id1).Name("W1").Members(map[user.ID]workspace.Member{
-		ownerID:    {Role: workspace.RoleOwner},
-		newOwnerID: {Role: workspace.RoleMaintainer},
+		ownerID:    {Role: role.RoleOwner},
+		newOwnerID: {Role: role.RoleMaintainer},
 	}).Personal(false).MustBuild()
 
 	op := &workspace.Operator{
@@ -41,8 +41,8 @@ func TestWorkspace_TransferOwnership(t *testing.T) {
 	workspaceUC := NewWorkspace(db, nil)
 	ws, err := workspaceUC.TransferOwnership(ctx, id1, newOwnerID, op)
 	assert.NoError(t, err)
-	assert.Equal(t, workspace.RoleOwner, ws.Members().UserRole(newOwnerID))
-	assert.Equal(t, workspace.RoleMaintainer, ws.Members().UserRole(ownerID))
+	assert.Equal(t, role.RoleOwner, ws.Members().UserRole(newOwnerID))
+	assert.Equal(t, role.RoleMaintainer, ws.Members().UserRole(ownerID))
 
 	// Verify Permittable for new owner
 	pNew, err := db.Permittable.FindByUserID(ctx, newOwnerID)

@@ -3,6 +3,7 @@ package workspace
 import (
 	"testing"
 
+	"github.com/reearth/reearth-accounts/server/pkg/role"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -19,14 +20,14 @@ func TestWorkspace_Alias(t *testing.T) {
 }
 func TestWorkspace_Members(t *testing.T) {
 	m := NewMembersWith(map[UserID]Member{
-		NewUserID(): {Role: RoleOwner},
+		NewUserID(): {Role: role.RoleOwner},
 	}, nil, false)
 	assert.Equal(t, m, (&Workspace{members: m}).Members())
 }
 
 func TestWorkspace_IsPersonal(t *testing.T) {
 	m := NewMembersWith(map[UserID]Member{
-		NewUserID(): {Role: RoleOwner},
+		NewUserID(): {Role: role.RoleOwner},
 	}, nil, true)
 	assert.True(t, (&Workspace{members: m}).IsPersonal())
 	assert.False(t, (&Workspace{}).IsPersonal())

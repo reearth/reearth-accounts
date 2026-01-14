@@ -12,6 +12,7 @@ import (
 
 	"github.com/reearth/reearth-accounts/server/internal/adapter"
 	"github.com/reearth/reearth-accounts/server/pkg/id"
+	"github.com/reearth/reearth-accounts/server/pkg/role"
 	"github.com/reearth/reearth-accounts/server/pkg/user"
 	"github.com/reearth/reearth-accounts/server/pkg/workspace"
 	"github.com/reearth/reearthx/appx"
@@ -266,10 +267,10 @@ func generateUserOperator(ctx context.Context, cfg *ServerConfig, u *user.User) 
 		return nil, err
 	}
 
-	rw := w.FilterByUserRole(uid, workspace.RoleReader).IDs()
-	ww := w.FilterByUserRole(uid, workspace.RoleWriter).IDs()
-	mw := w.FilterByUserRole(uid, workspace.RoleMaintainer).IDs()
-	ow := w.FilterByUserRole(uid, workspace.RoleOwner).IDs()
+	rw := w.FilterByUserRole(uid, role.RoleReader).IDs()
+	ww := w.FilterByUserRole(uid, role.RoleWriter).IDs()
+	mw := w.FilterByUserRole(uid, role.RoleMaintainer).IDs()
+	ow := w.FilterByUserRole(uid, role.RoleOwner).IDs()
 
 	return &workspace.Operator{
 		User: &uid,

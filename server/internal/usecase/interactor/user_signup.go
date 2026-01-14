@@ -126,7 +126,7 @@ func (i *User) Signup(ctx context.Context, param interfaces.SignupParam) (u *use
 			return nil, err
 		}
 
-		roleOwner, err := i.findOrCreateRole(ctx, workspace.RoleOwner.String(), param.MockAuth)
+		roleOwner, err := i.findOrCreateRole(ctx, role.RoleOwner.String(), param.MockAuth)
 		if err != nil {
 			return nil, err
 		}
@@ -210,7 +210,7 @@ func (i *User) SignupOIDC(ctx context.Context, param interfaces.SignupOIDCParam)
 			return nil, err
 		}
 
-		roleOwner, err := i.repos.Role.FindByName(ctx, workspace.RoleOwner.String())
+		roleOwner, err := i.repos.Role.FindByName(ctx, role.RoleOwner.String())
 		if err != nil {
 			return nil, err
 		}

@@ -6,7 +6,7 @@ import (
 	"github.com/labstack/gommon/log"
 	"github.com/reearth/reearth-accounts/server/internal/adapter/gql/gqlmodel"
 	"github.com/reearth/reearth-accounts/server/pkg/id"
-	"github.com/reearth/reearth-accounts/server/pkg/workspace"
+	"github.com/reearth/reearth-accounts/server/pkg/role"
 )
 
 func (r *mutationResolver) CreateWorkspace(ctx context.Context, input gqlmodel.CreateWorkspaceInput) (*gqlmodel.CreateWorkspacePayload, error) {
@@ -77,7 +77,7 @@ func (r *mutationResolver) AddUsersToWorkspace(ctx context.Context, input gqlmod
 	if err != nil {
 		return nil, err
 	}
-	usersMap := make(map[id.UserID]workspace.Role, len(input.Users))
+	usersMap := make(map[id.UserID]role.RoleType, len(input.Users))
 	for _, u := range input.Users {
 		uid, err := gqlmodel.ToID[id.User](u.UserID)
 		if err != nil {

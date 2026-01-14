@@ -2,6 +2,7 @@ package workspace
 
 import (
 	"github.com/reearth/reearth-accounts/server/pkg/id"
+	"github.com/reearth/reearth-accounts/server/pkg/role"
 	"github.com/reearth/reearthx/util"
 )
 
@@ -14,20 +15,20 @@ type Operator struct {
 	DefaultPolicy          *PolicyID
 }
 
-func (o *Operator) Workspaces(r Role) id.WorkspaceIDList {
+func (o *Operator) Workspaces(r role.RoleType) id.WorkspaceIDList {
 	if o == nil {
 		return nil
 	}
-	if r == RoleReader {
+	if r == role.RoleReader {
 		return o.ReadableWorkspaces
 	}
-	if r == RoleWriter {
+	if r == role.RoleWriter {
 		return o.WritableWorkspaces
 	}
-	if r == RoleMaintainer {
+	if r == role.RoleMaintainer {
 		return o.MaintainableWorkspaces
 	}
-	if r == RoleOwner {
+	if r == role.RoleOwner {
 		return o.OwningWorkspaces
 	}
 	return nil

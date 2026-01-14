@@ -12,6 +12,7 @@ import (
 	"github.com/reearth/reearth-accounts/server/pkg/applog"
 	"github.com/reearth/reearth-accounts/server/pkg/pagination"
 	"github.com/reearth/reearth-accounts/server/pkg/permittable"
+	"github.com/reearth/reearth-accounts/server/pkg/role"
 	"github.com/reearth/reearth-accounts/server/pkg/user"
 	"github.com/reearth/reearth-accounts/server/pkg/workspace"
 	"github.com/reearth/reearthx/rerror"
@@ -109,7 +110,7 @@ func (i *Workspace) Create(ctx context.Context, alias, name, description string,
 			return nil, wErr
 		}
 
-		if err = ws.Members().Join(firstUsers[0], workspace.RoleOwner, *operator.User); err != nil {
+		if err = ws.Members().Join(firstUsers[0], role.RoleOwner, *operator.User); err != nil {
 			return nil, err
 		}
 
@@ -120,7 +121,7 @@ func (i *Workspace) Create(ctx context.Context, alias, name, description string,
 			return nil, err
 		}
 
-		if err := i.updatePermittable(ctx, firstUsers[0].ID(), ws.ID(), workspace.RoleOwner); err != nil {
+		if err := i.updatePermittable(ctx, firstUsers[0].ID(), ws.ID(), role.RoleOwner); err != nil {
 			return nil, err
 		}
 
@@ -144,7 +145,7 @@ func (i *Workspace) Update(ctx context.Context, id workspace.ID, name string, al
 		if ws.IsPersonal() {
 			return nil, workspace.ErrCannotModifyPersonalWorkspace
 		}
-		if ws.Members().UserRole(*operator.User) != workspace.RoleOwner {
+		if ws.Members().UserRole(*operator.User) != role.RoleOwner {
 			return nil, interfaces.ErrOperationDenied
 		}
 
@@ -177,7 +178,7 @@ func (i *Workspace) Update(ctx context.Context, id workspace.ID, name string, al
 	})
 }
 
-func (i *Workspace) AddUserMember(ctx context.Context, workspaceID workspace.ID, users map[workspace.UserID]workspace.Role, operator *workspace.Operator) (_ *workspace.Workspace, err error) {
+func (i *Workspace) AddUserMember(ctx context.Context, workspaceID workspace.ID, users map[workspace.UserID]role.RoleType, operator *workspace.Operator) (_ *workspace.Workspace, err error) {
 	if operator.User == nil {
 		return nil, interfaces.ErrInvalidOperator
 	}
@@ -230,7 +231,7 @@ func (i *Workspace) AddUserMember(ctx context.Context, workspaceID workspace.ID,
 	})
 }
 
-func (i *Workspace) AddIntegrationMember(ctx context.Context, wId workspace.ID, iId workspace.IntegrationID, role workspace.Role, operator *workspace.Operator) (_ *workspace.Workspace, err error) {
+func (i *Workspace) AddIntegrationMember(ctx context.Context, wId workspace.ID, iId workspace.IntegrationID, role role.RoleType, operator *workspace.Operator) (_ *workspace.Workspace, err error) {
 	if operator.User == nil {
 		return nil, interfaces.ErrInvalidOperator
 	}
@@ -358,7 +359,7 @@ func (i *Workspace) RemoveIntegrations(ctx context.Context, wId workspace.ID, iI
 	})
 }
 
-func (i *Workspace) UpdateUserMember(ctx context.Context, id workspace.ID, u workspace.UserID, role workspace.Role, operator *workspace.Operator) (_ *workspace.Workspace, err error) {
+func (i *Workspace) UpdateUserMember(ctx context.Context, id workspace.ID, u workspace.UserID, role role.RoleType, operator *workspace.Operator) (_ *workspace.Workspace, err error) {
 	if operator.User == nil {
 		return nil, interfaces.ErrInvalidOperator
 	}
@@ -396,7 +397,7 @@ func (i *Workspace) UpdateUserMember(ctx context.Context, id workspace.ID, u wor
 	})
 }
 
-func (i *Workspace) UpdateIntegration(ctx context.Context, wId workspace.ID, iId workspace.IntegrationID, role workspace.Role, operator *workspace.Operator) (_ *workspace.Workspace, err error) {
+func (i *Workspace) UpdateIntegration(ctx context.Context, wId workspace.ID, iId workspace.IntegrationID, role role.RoleType, operator *workspace.Operator) (_ *workspace.Workspace, err error) {
 	if operator.User == nil {
 		return nil, interfaces.ErrInvalidOperator
 	}
@@ -471,25 +472,25 @@ func (i *Workspace) TransferOwnership(ctx context.Context, workspaceID workspace
 			return nil, workspace.ErrTargetUserNotInTheWorkspace
 		}
 
-		if ws.Members().UserRole(newOwnerID) == workspace.RoleReader {
+		if ws.Members().UserRole(newOwnerID) == role.RoleReader {
 			return nil, workspace.ErrCannotChangeRoleToOwner
 		}
 
-		err = ws.Members().UpdateUserRole(newOwnerID, workspace.RoleOwner)
+		err = ws.Members().UpdateUserRole(newOwnerID, role.RoleOwner)
 		if err != nil {
 			return nil, err
 		}
 
-		if err := i.updatePermittable(ctx, newOwnerID, ws.ID(), workspace.RoleOwner); err != nil {
+		if err := i.updatePermittable(ctx, newOwnerID, ws.ID(), role.RoleOwner); err != nil {
 			return nil, err
 		}
 
-		err = ws.Members().UpdateUserRole(*operator.User, workspace.RoleMaintainer)
+		err = ws.Members().UpdateUserRole(*operator.User, role.RoleMaintainer)
 		if err != nil {
 			return nil, err
 		}
 
-		if err := i.updatePermittable(ctx, *operator.User, ws.ID(), workspace.RoleMaintainer); err != nil {
+		if err := i.updatePermittable(ctx, *operator.User, ws.ID(), role.RoleMaintainer); err != nil {
 			return nil, err
 		}
 
@@ -552,7 +553,7 @@ func filterWorkspaces(
 	return workspaces, nil
 }
 
-func (i *Workspace) updatePermittable(ctx context.Context, userID user.ID, workspaceID workspace.ID, roleName workspace.Role) error {
+func (i *Workspace) updatePermittable(ctx context.Context, userID user.ID, workspaceID workspace.ID, roleName role.RoleType) error {
 	r, err := i.roleRepo.FindByName(ctx, string(roleName))
 	if err != nil {
 		return err
