@@ -12,7 +12,6 @@ import (
 	"github.com/reearth/reearth-accounts/server/internal/infrastructure/memory"
 	"github.com/reearth/reearth-accounts/server/internal/usecase/gateway/mock_gateway"
 	"github.com/reearth/reearth-accounts/server/internal/usecase/interfaces"
-	"github.com/reearth/reearth-accounts/server/internal/usecase/repo/mock_repo"
 	"github.com/reearth/reearth-accounts/server/pkg/id"
 	"github.com/reearth/reearth-accounts/server/pkg/permittable"
 	"github.com/reearth/reearth-accounts/server/pkg/role"
@@ -56,9 +55,9 @@ func TestCheckPermission(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
 
-	mockRoleRepo := mock_repo.NewMockRole(ctrl)
-	mockPermittableRepo := mock_repo.NewMockPermittable(ctrl)
-	mockWorkspaceRepo := mock_repo.NewMockWorkspace(ctrl)
+	mockRoleRepo := role.NewMockRepo(ctrl)
+	mockPermittableRepo := permittable.NewMockRepo(ctrl)
+	mockWorkspaceRepo := workspace.NewMockRepo(ctrl)
 	mockCerbos := mock_gateway.NewMockCerbosGateway(ctrl)
 
 	c := &Cerbos{
@@ -254,9 +253,9 @@ func TestCheckPermission_WorkspaceResource(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
 
-	mockRoleRepo := mock_repo.NewMockRole(ctrl)
-	mockPermittableRepo := mock_repo.NewMockPermittable(ctrl)
-	mockWorkspaceRepo := mock_repo.NewMockWorkspace(ctrl)
+	mockRoleRepo := role.NewMockRepo(ctrl)
+	mockPermittableRepo := permittable.NewMockRepo(ctrl)
+	mockWorkspaceRepo := workspace.NewMockRepo(ctrl)
 	mockCerbos := mock_gateway.NewMockCerbosGateway(ctrl)
 
 	c := &Cerbos{

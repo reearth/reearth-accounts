@@ -14,9 +14,9 @@ import (
 )
 
 type Permittable struct {
-	permittableRepo repo.Permittable
-	roleRepo        repo.Role
-	userRepo        repo.User
+	permittableRepo permittable.Repo
+	roleRepo        role.Repo
+	userRepo        user.Repo
 	transaction     usecasex.Transaction
 }
 

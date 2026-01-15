@@ -4,7 +4,6 @@ import (
 	"context"
 	"slices"
 
-	"github.com/reearth/reearth-accounts/server/internal/usecase/repo"
 	"github.com/reearth/reearth-accounts/server/pkg/id"
 	"github.com/reearth/reearth-accounts/server/pkg/user"
 	"github.com/reearth/reearth-accounts/server/pkg/workspace"
@@ -32,7 +31,7 @@ func NewWorkspaceWith(workspaces ...*workspace.Workspace) *Workspace {
 	return r
 }
 
-func (r *Workspace) Filtered(f repo.WorkspaceFilter) repo.Workspace {
+func (r *Workspace) Filtered(f workspace.WorkspaceFilter) workspace.Repo {
 	return &Workspace{
 		data: r.data,
 		err:  r.err,
@@ -220,6 +219,6 @@ func (r *Workspace) RemoveAll(_ context.Context, ids workspace.IDList) error {
 	return nil
 }
 
-func SetWorkspaceError(r repo.Workspace, err error) {
+func SetWorkspaceError(r workspace.Repo, err error) {
 	r.(*Workspace).err = err
 }

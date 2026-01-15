@@ -5,7 +5,6 @@ import (
 	"errors"
 	"sync"
 
-	"github.com/reearth/reearth-accounts/server/internal/usecase/repo"
 	"github.com/reearth/reearth-accounts/server/pkg/config"
 	"github.com/reearth/reearthx/mongox"
 	"github.com/reearth/reearthx/usecasex/migration"
@@ -16,23 +15,23 @@ import (
 
 type DBClient = *mongox.Client
 
-func Do(ctx context.Context, db *mongox.Client, config repo.Config) error {
+func Do(ctx context.Context, db *mongox.Client, cfg config.Repo) error {
 	return migration.NewClient(
 		db,
-		NewConfig(config),
+		NewConfig(cfg),
 		migrations,
 		0,
 	).Migrate(ctx)
 }
 
 type Config struct {
-	c       repo.Config
+	c       config.Repo
 	locked  bool
 	current config.Config
 	m       sync.Mutex
 }
 
-func NewConfig(c repo.Config) *Config {
+func NewConfig(c config.Repo) *Config {
 	return &Config{c: c}
 }
 

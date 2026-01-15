@@ -25,8 +25,8 @@ type Workspace struct {
 	repos              *repo.Container
 	enforceMemberCount WorkspaceMemberCountEnforcer
 	userquery          interfaces.UserQuery
-	permittableRepo    repo.Permittable
-	roleRepo           repo.Role
+	permittableRepo    permittable.Repo
+	roleRepo           role.Repo
 }
 
 func NewWorkspace(r *repo.Container, enforceMemberCount WorkspaceMemberCountEnforcer) interfaces.Workspace {
@@ -115,7 +115,7 @@ func (i *Workspace) Create(ctx context.Context, alias, name, description string,
 		}
 
 		if err = i.repos.Workspace.Create(ctx, ws); err != nil {
-			if errors.Is(err, repo.ErrDuplicateWorkspaceAlias) {
+			if errors.Is(err, workspace.ErrDuplicateWorkspaceAlias) {
 				return nil, interfaces.ErrWorkspaceAliasAlreadyExists
 			}
 			return nil, err
