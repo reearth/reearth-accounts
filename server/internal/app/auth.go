@@ -27,6 +27,8 @@ const (
 	debugAuthTokenHeader = "X-Reearth-Debug-Auth-Token"
 	debugAuthNameHeader  = "X-Reearth-Debug-Auth-Name"
 	debugAuthEmailHeader = "X-Reearth-Debug-Auth-Email"
+	FIXED_MOCK_USERNAME  = "Demo User"
+	FIXED_MOCK_USERMAILE = "demo@example.com"
 )
 
 type graphqlRequest struct {
@@ -123,10 +125,9 @@ func mockAuthMiddleware(cfg *ServerConfig) func(http.Handler) http.Handler {
 
 			// Load demo user from database by name when no debug user is provided.
 			if usr == nil {
-				const demoUserName = "Demo user"
-				usr, err = cfg.Repos.User.FindByName(ctx, demoUserName)
+				usr, err = cfg.Repos.User.FindByName(ctx, FIXED_MOCK_USERNAME)
 				if err != nil {
-					log.Errorfc(ctx, "[mockAuthMiddleware] failed to find demo user by name: %s, error: %s", demoUserName, err.Error())
+					log.Errorfc(ctx, "[mockAuthMiddleware] failed to find demo user by name: %s, error: %s", FIXED_MOCK_USERNAME, err.Error())
 					http.Error(w, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
 					return
 				}
