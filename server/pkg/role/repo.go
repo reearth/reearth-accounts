@@ -2,12 +2,16 @@ package role
 
 import (
 	"context"
+
+	"github.com/reearth/reearth-accounts/server/pkg/id"
 )
 
+//go:generate mockgen -source=./role.go -destination=./mock_role.go -package role
 type Repo interface {
 	FindAll(context.Context) (List, error)
-	FindByID(context.Context, ID) (*Role, error)
-	FindByIDs(context.Context, IDList) (List, error)
+	FindByID(context.Context, id.RoleID) (*Role, error)
+	FindByIDs(context.Context, id.RoleIDList) (List, error)
+	FindByName(ctx context.Context, name string) (*Role, error)
 	Save(context.Context, Role) error
-	Remove(context.Context, ID) error
+	Remove(context.Context, id.RoleID) error
 }
