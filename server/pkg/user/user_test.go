@@ -65,26 +65,25 @@ func TestUser_Auths(t *testing.T) {
 	u := &User{}
 
 	assert.True(t, u.AddAuth(Auth{Provider: "xxx", Sub: "zzz"}))
-	assert.Equal(t, &User{auths: []Auth{{Provider: "xxx", Sub: "zzz"}}}, u)
 	assert.Equal(t, Auths([]Auth{{Provider: "xxx", Sub: "zzz"}}), u.Auths())
 	assert.Equal(t, &Auth{Provider: "xxx", Sub: "zzz"}, u.GetAuthByProvider("xxx"))
 	assert.Nil(t, u.GetAuthByProvider("xx"))
 
 	assert.False(t, u.AddAuth(Auth{Provider: "xxx", Sub: "yyy"}))
-	assert.Equal(t, &User{auths: []Auth{{Provider: "xxx", Sub: "zzz"}}}, u)
+	assert.Equal(t, Auths([]Auth{{Provider: "xxx", Sub: "zzz"}}), u.Auths())
 
 	assert.False(t, u.RemoveAuth(Auth{Provider: "xxx", Sub: "yyy"}))
-	assert.Equal(t, &User{auths: []Auth{{Provider: "xxx", Sub: "zzz"}}}, u)
+	assert.Equal(t, Auths([]Auth{{Provider: "xxx", Sub: "zzz"}}), u.Auths())
 	assert.True(t, u.RemoveAuth(Auth{Provider: "xxx", Sub: "zzz"}))
-	assert.Equal(t, &User{auths: []Auth{}}, u)
+	assert.Equal(t, Auths([]Auth{}), u.Auths())
 
 	assert.True(t, u.AddAuth(Auth{Provider: "xxx", Sub: "zzz"}))
 	assert.False(t, u.RemoveAuthByProvider("yyy"))
 	assert.True(t, u.RemoveAuthByProvider("xxx"))
-	assert.Equal(t, &User{auths: []Auth{}}, u)
+	assert.Equal(t, Auths([]Auth{}), u.Auths())
 
 	u.ClearAuths()
-	assert.Equal(t, &User{}, u)
+	assert.Nil(t, u.auths)
 }
 
 func TestUser_Password(t *testing.T) {
@@ -142,4 +141,97 @@ func TestUser_Verification(t *testing.T) {
 	u := &User{}
 	u.SetVerification(v)
 	assert.Equal(t, v, u.Verification())
+}
+
+func TestUser_UpdatedAt(t *testing.T) {
+	u := &User{}
+	now := time.Now()
+
+	// Test UpdateName updates timestamp
+	u.UpdateName("newname")
+	assert.False(t, u.updatedAt.IsZero())
+	assert.True(t, u.updatedAt.After(now) || u.updatedAt.Equal(now))
+
+	// Test UpdateAlias updates timestamp
+	prevTime := u.updatedAt
+	time.Sleep(time.Millisecond)
+	u.UpdateAlias("newalias")
+	assert.True(t, u.updatedAt.After(prevTime))
+
+	// Test UpdateEmail updates timestamp
+	prevTime = u.updatedAt
+	time.Sleep(time.Millisecond)
+	err := u.UpdateEmail("new@example.com")
+	assert.NoError(t, err)
+	assert.True(t, u.updatedAt.After(prevTime))
+
+	// Test UpdateWorkspace updates timestamp
+	prevTime = u.updatedAt
+	time.Sleep(time.Millisecond)
+	u.UpdateWorkspace(NewWorkspaceID())
+	assert.True(t, u.updatedAt.After(prevTime))
+
+	// Test SetPassword updates timestamp
+	DefaultPasswordEncoder = &NoopPasswordEncoder{}
+	prevTime = u.updatedAt
+	time.Sleep(time.Millisecond)
+	err = u.SetPassword("abcDEF0!")
+	assert.NoError(t, err)
+	assert.True(t, u.updatedAt.After(prevTime))
+
+	// Test SetPasswordReset updates timestamp
+	prevTime = u.updatedAt
+	time.Sleep(time.Millisecond)
+	u.SetPasswordReset(&PasswordReset{Token: "xxx", CreatedAt: time.Now()})
+	assert.True(t, u.updatedAt.After(prevTime))
+
+	// Test SetVerification updates timestamp
+	prevTime = u.updatedAt
+	time.Sleep(time.Millisecond)
+	u.SetVerification(NewVerification())
+	assert.True(t, u.updatedAt.After(prevTime))
+
+	// Test SetMetadata updates timestamp
+	prevTime = u.updatedAt
+	time.Sleep(time.Millisecond)
+	u.SetMetadata(NewMetadata())
+	assert.True(t, u.updatedAt.After(prevTime))
+
+	// Test AddAuth updates timestamp
+	prevTime = u.updatedAt
+	time.Sleep(time.Millisecond)
+	u.AddAuth(Auth{Provider: "test", Sub: "sub"})
+	assert.True(t, u.updatedAt.After(prevTime))
+
+	// Test RemoveAuth updates timestamp
+	prevTime = u.updatedAt
+	time.Sleep(time.Millisecond)
+	u.RemoveAuth(Auth{Provider: "test", Sub: "sub"})
+	assert.True(t, u.updatedAt.After(prevTime))
+
+	// Test RemoveAuthByProvider updates timestamp
+	u.AddAuth(Auth{Provider: "test2", Sub: "sub2"})
+	prevTime = u.updatedAt
+	time.Sleep(time.Millisecond)
+	u.RemoveAuthByProvider("test2")
+	assert.True(t, u.updatedAt.After(prevTime))
+
+	// Test ClearAuths updates timestamp
+	prevTime = u.updatedAt
+	time.Sleep(time.Millisecond)
+	u.ClearAuths()
+	assert.True(t, u.updatedAt.After(prevTime))
+}
+
+func TestUser_Clone_UpdatedAt(t *testing.T) {
+	now := time.Now()
+	u := &User{
+		id:        NewID(),
+		name:      "test",
+		updatedAt: now,
+	}
+
+	cloned := u.Clone()
+	assert.Equal(t, now, cloned.updatedAt)
+	assert.Equal(t, u.updatedAt, cloned.updatedAt)
 }

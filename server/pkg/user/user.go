@@ -4,6 +4,7 @@ import (
 	"errors"
 	"net/mail"
 	"slices"
+	"time"
 
 	"github.com/reearth/reearthx/util"
 )
@@ -24,6 +25,7 @@ type User struct {
 	verification  *Verification
 	passwordReset *PasswordReset
 	host          string
+	updatedAt     time.Time
 }
 
 func (u *User) ID() ID {
@@ -52,10 +54,12 @@ func (u *User) Password() []byte {
 
 func (u *User) UpdateName(name string) {
 	u.name = name
+	u.updatedAt = time.Now()
 }
 
 func (u *User) UpdateAlias(alias string) {
 	u.alias = alias
+	u.updatedAt = time.Now()
 }
 
 func (u *User) UpdateEmail(email string) error {
@@ -63,11 +67,13 @@ func (u *User) UpdateEmail(email string) error {
 		return ErrInvalidEmail
 	}
 	u.email = email
+	u.updatedAt = time.Now()
 	return nil
 }
 
 func (u *User) UpdateWorkspace(workspace WorkspaceID) {
 	u.workspace = workspace
+	u.updatedAt = time.Now()
 }
 
 func (u *User) Verification() *Verification {
@@ -115,6 +121,7 @@ func (u *User) AddAuth(a Auth) bool {
 	}
 	if !u.ContainAuth(a) {
 		u.auths = append(u.auths, a)
+		u.updatedAt = time.Now()
 		return true
 	}
 	return false
@@ -127,6 +134,7 @@ func (u *User) RemoveAuth(a Auth) bool {
 	for i, b := range u.auths {
 		if a == b {
 			u.auths = append(u.auths[:i], u.auths[i+1:]...)
+			u.updatedAt = time.Now()
 			return true
 		}
 	}
@@ -152,6 +160,7 @@ func (u *User) RemoveAuthByProvider(provider string) bool {
 	for i, b := range u.auths {
 		if provider == b.Provider {
 			u.auths = append(u.auths[:i], u.auths[i+1:]...)
+			u.updatedAt = time.Now()
 			return true
 		}
 	}
@@ -160,6 +169,7 @@ func (u *User) RemoveAuthByProvider(provider string) bool {
 
 func (u *User) ClearAuths() {
 	u.auths = nil
+	u.updatedAt = time.Now()
 }
 
 func (u *User) SetPassword(pass string) error {
@@ -168,6 +178,7 @@ func (u *User) SetPassword(pass string) error {
 		return err
 	}
 	u.password = p
+	u.updatedAt = time.Now()
 	return nil
 }
 
@@ -184,18 +195,25 @@ func (u *User) PasswordReset() *PasswordReset {
 
 func (u *User) SetPasswordReset(pr *PasswordReset) {
 	u.passwordReset = pr.Clone()
+	u.updatedAt = time.Now()
 }
 
 func (u *User) SetVerification(v *Verification) {
 	u.verification = v
+	u.updatedAt = time.Now()
 }
 
 func (u *User) SetMetadata(m Metadata) {
 	u.metadata = m
+	u.updatedAt = time.Now()
 }
 
 func (u *User) Host() string {
 	return u.host
+}
+
+func (u *User) UpdatedAt() time.Time {
+	return u.updatedAt
 }
 
 func (u *User) Clone() *User {
@@ -210,6 +228,7 @@ func (u *User) Clone() *User {
 		metadata:      u.metadata,
 		verification:  util.CloneRef(u.verification),
 		passwordReset: util.CloneRef(u.passwordReset),
+		updatedAt:     u.updatedAt,
 	}
 }
 

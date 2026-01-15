@@ -1,15 +1,20 @@
 package workspace
 
-import "github.com/reearth/reearthx/util"
+import (
+	"time"
+
+	"github.com/reearth/reearthx/util"
+)
 
 type Workspace struct {
-	id       ID
-	name     string
-	alias    string
-	email    string
-	metadata Metadata
-	members  *Members
-	policy   *PolicyID
+	id        ID
+	name      string
+	alias     string
+	email     string
+	metadata  Metadata
+	members   *Members
+	policy    *PolicyID
+	updatedAt time.Time
 }
 
 func (w *Workspace) ID() ID {
@@ -42,18 +47,22 @@ func (w *Workspace) IsPersonal() bool {
 
 func (w *Workspace) Rename(name string) {
 	w.name = name
+	w.updatedAt = time.Now()
 }
 
 func (w *Workspace) UpdateAlias(alias string) {
 	w.alias = alias
+	w.updatedAt = time.Now()
 }
 
 func (w *Workspace) UpdateEmail(email string) {
 	w.email = email
+	w.updatedAt = time.Now()
 }
 
 func (w *Workspace) SetMetadata(metadata Metadata) {
 	w.metadata = metadata
+	w.updatedAt = time.Now()
 }
 
 func (w *Workspace) Policy() *PolicyID {
@@ -69,4 +78,9 @@ func (w *Workspace) PolicytOr(def PolicyID) PolicyID {
 
 func (w *Workspace) SetPolicy(policy *PolicyID) {
 	w.policy = util.CloneRef(policy)
+	w.updatedAt = time.Now()
+}
+
+func (w *Workspace) UpdatedAt() time.Time {
+	return w.updatedAt
 }

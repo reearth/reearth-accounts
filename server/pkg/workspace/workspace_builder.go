@@ -2,6 +2,7 @@ package workspace
 
 import (
 	"errors"
+	"time"
 
 	"github.com/reearth/reearthx/util"
 )
@@ -28,6 +29,9 @@ func (b *Builder) Build() (*Workspace, error) {
 		return nil, ErrInvalidID
 	}
 
+	// Save the explicitly set updatedAt (if any) before calling mutating methods
+	preservedUpdatedAt := b.w.updatedAt
+
 	if b.members == nil && b.integrations == nil {
 		b.w.members = NewMembers()
 	} else {
@@ -37,6 +41,14 @@ func (b *Builder) Build() (*Workspace, error) {
 	b.w.SetMetadata(b.w.metadata)
 
 	b.w.members.fixed = b.personal
+
+	// Restore explicitly set updatedAt, or set default if not specified
+	if !preservedUpdatedAt.IsZero() {
+		b.w.updatedAt = preservedUpdatedAt
+	} else {
+		b.w.updatedAt = time.Now()
+	}
+
 	return b.w, nil
 }
 
@@ -100,5 +112,10 @@ func (b *Builder) Personal(p bool) *Builder {
 
 func (b *Builder) Policy(p *PolicyID) *Builder {
 	b.w.policy = util.CloneRef(p)
+	return b
+}
+
+func (b *Builder) UpdatedAt(updatedAt time.Time) *Builder {
+	b.w.updatedAt = updatedAt
 	return b
 }

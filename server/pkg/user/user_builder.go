@@ -1,6 +1,8 @@
 package user
 
 import (
+	"time"
+
 	"github.com/reearth/reearth-accounts/server/pkg/id"
 	"github.com/reearth/reearthx/i18n"
 	"github.com/reearth/reearthx/rerror"
@@ -27,6 +29,10 @@ func (b *Builder) Build() (*User, error) {
 	if b.u.id.IsEmpty() {
 		return nil, ErrInvalidID
 	}
+
+	// Save the explicitly set updatedAt (if any) before calling mutating methods
+	preservedUpdatedAt := b.u.updatedAt
+
 	if b.passwordText != "" {
 		if err := b.u.SetPassword(b.passwordText); err != nil {
 			return nil, err
@@ -40,6 +46,14 @@ func (b *Builder) Build() (*User, error) {
 	if err := b.u.UpdateEmail(b.email); err != nil {
 		return nil, err
 	}
+
+	// Restore explicitly set updatedAt, or set default if not specified
+	if !preservedUpdatedAt.IsZero() {
+		b.u.updatedAt = preservedUpdatedAt
+	} else {
+		b.u.updatedAt = time.Now()
+	}
+
 	return b.u, nil
 }
 
@@ -115,5 +129,10 @@ func (b *Builder) Verification(v *Verification) *Builder {
 
 func (b *Builder) Metadata(m Metadata) *Builder {
 	b.u.metadata = m
+	return b
+}
+
+func (b *Builder) UpdatedAt(updatedAt time.Time) *Builder {
+	b.u.updatedAt = updatedAt
 	return b
 }
