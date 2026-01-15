@@ -5,32 +5,33 @@ import (
 
 	"github.com/reearth/reearth-accounts/server/internal/infrastructure/mongo"
 	internalRepo "github.com/reearth/reearth-accounts/server/internal/usecase/repo"
-	"github.com/reearth/reearth-accounts/server/pkg/repo"
+	"github.com/reearth/reearth-accounts/server/pkg/user"
+	"github.com/reearth/reearth-accounts/server/pkg/workspace"
 	"github.com/reearth/reearthx/mongox"
 	mongodriver "go.mongodb.org/mongo-driver/mongo"
 )
 
 // NewMongoUser creates a new MongoDB-backed User repository
-func NewMongoUser(client *mongox.Client) repo.User {
+func NewMongoUser(client *mongox.Client) user.Repo {
 	internal := mongo.NewUser(client)
 	return NewUserAdapter(internal)
 }
 
 // NewMongoWorkspace creates a new MongoDB-backed Workspace repository
-func NewMongoWorkspace(client *mongox.Client) repo.Workspace {
+func NewMongoWorkspace(client *mongox.Client) workspace.Repo {
 	internal := mongo.NewWorkspace(client)
 	return NewWorkspaceAdapter(internal)
 }
 
 // NewMongoUserWithHost creates a new MongoDB-backed User repository with host
-func NewMongoUserWithHost(client *mongox.Client, host string) repo.User {
+func NewMongoUserWithHost(client *mongox.Client, host string) user.Repo {
 	internal := mongo.NewUserWithHost(client, host)
 	return NewUserAdapter(internal)
 }
 
 // New creates a new MongoDB-backed repository container
 // This matches the signature used by reearthx accountmongo
-func New(ctx context.Context, client *mongodriver.Client, databaseName string, useTransaction, needCompat bool, users []repo.User) (*repo.Container, error) {
+func New(ctx context.Context, client *mongodriver.Client, databaseName string, useTransaction, needCompat bool, users []user.Repo) (*Container, error) {
 	// Get database from client
 	db := client.Database(databaseName)
 
@@ -55,12 +56,12 @@ func New(ctx context.Context, client *mongodriver.Client, databaseName string, u
 	}
 
 	// Convert internal container to pkg container
-	pkgUsers := make([]repo.User, len(internalContainer.Users))
+	pkgUsers := make([]user.Repo, len(internalContainer.Users))
 	for i, u := range internalContainer.Users {
 		pkgUsers[i] = NewUserAdapter(u)
 	}
 
-	return &repo.Container{
+	return &Container{
 		User:        NewUserAdapter(internalContainer.User),
 		Workspace:   NewWorkspaceAdapter(internalContainer.Workspace),
 		Role:        internalContainer.Role,        // Same interface

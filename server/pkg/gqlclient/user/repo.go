@@ -24,7 +24,7 @@ type UpdateMeInput struct {
 	PasswordConfirmation *string
 }
 
-type UserRepo interface {
+type Repo interface {
 	FindMe(ctx context.Context) (*user.User, error)
 	FindByID(ctx context.Context, id string) (*user.User, error)
 	FindByAlias(ctx context.Context, name string) (*user.User, error)
@@ -35,7 +35,7 @@ type UserRepo interface {
 	CreateVerification(ctx context.Context, email string) (bool, error)
 }
 
-func NewRepo(gql *graphql.Client) UserRepo {
+func NewRepo(gql *graphql.Client) Repo {
 	return &userRepo{client: gql}
 }
 

@@ -3,20 +3,17 @@ package infrastructure
 import (
 	"context"
 
-	"github.com/reearth/reearth-accounts/server/pkg/id"
-	"github.com/reearth/reearth-accounts/server/pkg/repo"
 	"github.com/reearth/reearth-accounts/server/pkg/user"
 	internalRepo "github.com/reearth/reearth-accounts/server/internal/usecase/repo"
-	"github.com/reearth/reearthx/usecasex"
 )
 
-// userAdapter adapts internal repo.User to pkg repo.User interface
+// userAdapter adapts internal repo.User to pkg user.Repo interface
 type userAdapter struct {
 	internal internalRepo.User
 }
 
 // NewUserAdapter creates an adapter that bridges internal User implementation to pkg User interface
-func NewUserAdapter(internal internalRepo.User) repo.User {
+func NewUserAdapter(internal internalRepo.User) user.Repo {
 	return &userAdapter{internal: internal}
 }
 
@@ -25,68 +22,13 @@ func (a *userAdapter) FindAll(ctx context.Context) (user.List, error) {
 	return user.List(list), err
 }
 
-func (a *userAdapter) FindByID(ctx context.Context, uid id.UserID) (*user.User, error) {
-	return a.internal.FindByID(ctx, user.ID(uid))
+func (a *userAdapter) FindByID(ctx context.Context, uid user.ID) (*user.User, error) {
+	return a.internal.FindByID(ctx, uid)
 }
 
-func (a *userAdapter) FindByIDs(ctx context.Context, ids id.UserIDList) (user.List, error) {
-	userIDs := make(user.IDList, len(ids))
-	for i, uid := range ids {
-		userIDs[i] = user.ID(uid)
-	}
-	list, err := a.internal.FindByIDs(ctx, userIDs)
+func (a *userAdapter) FindByIDs(ctx context.Context, ids user.IDList) (user.List, error) {
+	list, err := a.internal.FindByIDs(ctx, ids)
 	return user.List(list), err
-}
-
-func (a *userAdapter) FindByIDsWithPagination(ctx context.Context, ids id.UserIDList, pagination *usecasex.Pagination, nameOrAlias ...string) ([]*user.User, *usecasex.PageInfo, error) {
-	// Internal implementation doesn't have pagination for FindByIDs
-	// We'll implement a simple version here
-	users, err := a.FindByIDs(ctx, ids)
-	if err != nil {
-		return nil, nil, err
-	}
-
-	// Apply name/alias filter if provided
-	if len(nameOrAlias) > 0 && nameOrAlias[0] != "" {
-		filtered := make([]*user.User, 0)
-		for _, u := range users {
-			if u.Name() == nameOrAlias[0] || u.Alias() == nameOrAlias[0] {
-				filtered = append(filtered, u)
-			}
-		}
-		users = filtered
-	}
-
-	// Apply pagination
-	total := int64(len(users))
-	start, end := 0, len(users)
-
-	if pagination != nil {
-		if pagination.Offset != nil {
-			start = int(pagination.Offset.Offset)
-			if start > len(users) {
-				start = len(users)
-			}
-			if pagination.Offset.Limit > 0 {
-				end = start + int(pagination.Offset.Limit)
-				if end > len(users) {
-					end = len(users)
-				}
-			}
-		} else if pagination.Cursor != nil {
-			// For cursor-based pagination, use First
-			if pagination.Cursor.First != nil {
-				end = int(*pagination.Cursor.First)
-				if end > len(users) {
-					end = len(users)
-				}
-			}
-		}
-	}
-
-	return users[start:end], &usecasex.PageInfo{
-		TotalCount: total,
-	}, nil
 }
 
 func (a *userAdapter) FindBySub(ctx context.Context, sub string) (*user.User, error) {
@@ -134,6 +76,6 @@ func (a *userAdapter) Save(ctx context.Context, u *user.User) error {
 	return a.internal.Save(ctx, u)
 }
 
-func (a *userAdapter) Remove(ctx context.Context, uid id.UserID) error {
-	return a.internal.Remove(ctx, user.ID(uid))
+func (a *userAdapter) Remove(ctx context.Context, uid user.ID) error {
+	return a.internal.Remove(ctx, uid)
 }

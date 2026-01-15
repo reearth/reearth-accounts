@@ -9,6 +9,7 @@ import (
 
 var ErrDuplicatedUser = rerror.NewE(i18n.T("duplicated user"))
 
+//go:generate mockgen -source=./user.go -destination=./mock_user.go -package user
 type Repo interface {
 	Query
 	FindByVerification(context.Context, string) (*User, error)
