@@ -24,7 +24,7 @@ type UpdateMeInput struct {
 	PasswordConfirmation *string
 }
 
-type UserRepo interface {
+type Repo interface {
 	FindMe(ctx context.Context) (*user.User, error)
 	FindByID(ctx context.Context, id string) (*user.User, error)
 	FindByAlias(ctx context.Context, name string) (*user.User, error)
@@ -37,7 +37,7 @@ type UserRepo interface {
 	DeleteMe(ctx context.Context, userID string) error
 }
 
-func NewRepo(gql *graphql.Client) UserRepo {
+func NewRepo(gql *graphql.Client) Repo {
 	return &userRepo{client: gql}
 }
 

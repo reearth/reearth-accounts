@@ -1,4 +1,4 @@
-package repo
+package infrastructure
 
 import (
 	"github.com/reearth/reearth-accounts/server/pkg/config"
@@ -25,21 +25,16 @@ var (
 	ErrOperationDenied = rerror.NewE(i18n.T("operation denied"))
 )
 
-func (c *Container) Filtered(f workspace.WorkspaceFilter) *Container {
+func (c *Container) Filtered(workspace workspace.WorkspaceFilter) *Container {
 	if c == nil {
 		return c
 	}
 	return &Container{
-		Workspace:   c.Workspace.Filtered(f),
+		Workspace:   c.Workspace.Filtered(workspace),
 		User:        c.User,
 		Users:       c.Users,
 		Role:        c.Role,
 		Permittable: c.Permittable,
 		Transaction: c.Transaction,
 	}
-}
-
-// WorkspaceFilterFromOperator creates a WorkspaceFilter from an Operator
-func WorkspaceFilterFromOperator(o *workspace.Operator) workspace.WorkspaceFilter {
-	return workspace.WorkspaceFilterFromOperator(o)
 }

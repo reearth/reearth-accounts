@@ -6,7 +6,6 @@ import (
 	"regexp"
 
 	"github.com/reearth/reearth-accounts/server/internal/infrastructure/mongo/mongodoc"
-	"github.com/reearth/reearth-accounts/server/internal/usecase/repo"
 	"github.com/reearth/reearth-accounts/server/pkg/user"
 	"github.com/reearth/reearthx/mongox"
 	"github.com/reearth/reearthx/rerror"
@@ -21,11 +20,11 @@ type User struct {
 	host   string
 }
 
-func NewUser(client *mongox.Client) repo.User {
+func NewUser(client *mongox.Client) user.Repo {
 	return &User{client: client.WithCollection("user")}
 }
 
-func NewUserWithHost(client *mongox.Client, host string) repo.User {
+func NewUserWithHost(client *mongox.Client, host string) user.Repo {
 	return &User{client: client.WithCollection("user"), host: host}
 }
 
@@ -140,37 +139,37 @@ func (r *User) FindBySubOrCreate(ctx context.Context, u *user.User, sub string) 
 		options.FindOneAndUpdate().SetUpsert(true).SetReturnDocument(options.After),
 	).Decode(&userDoc); err != nil {
 		if mongo.IsDuplicateKeyError(err) {
-			return nil, repo.ErrDuplicatedUser
+			return nil, user.ErrDuplicatedUser
 		}
 		return nil, rerror.ErrInternalByWithContext(ctx, err)
 	}
 	return userDoc.Model()
 }
 
-func (r *User) Create(ctx context.Context, user *user.User) error {
-	doc, _ := mongodoc.NewUser(user)
+func (r *User) Create(ctx context.Context, u *user.User) error {
+	doc, _ := mongodoc.NewUser(u)
 	if _, err := r.client.Client().InsertOne(
 		ctx,
 		doc,
 	); err != nil {
 		if mongo.IsDuplicateKeyError(err) {
-			return repo.ErrDuplicatedUser
+			return user.ErrDuplicatedUser
 		}
 		return rerror.ErrInternalByWithContext(ctx, err)
 	}
 	return nil
 }
 
-func (r *User) Save(ctx context.Context, user *user.User) error {
-	if user.Host() != "" {
-		return fmt.Errorf("cannot save an user on the different tenant(host=%s)", user.Host())
+func (r *User) Save(ctx context.Context, u *user.User) error {
+	if u.Host() != "" {
+		return fmt.Errorf("cannot save an user on the different tenant(host=%s)", u.Host())
 	}
-	doc, id := mongodoc.NewUser(user)
+	doc, id := mongodoc.NewUser(u)
 	return r.client.SaveOne(ctx, id, doc)
 }
 
-func (r *User) Remove(ctx context.Context, user user.ID) error {
-	return r.client.RemoveOne(ctx, bson.M{"id": user.String()})
+func (r *User) Remove(ctx context.Context, id user.ID) error {
+	return r.client.RemoveOne(ctx, bson.M{"id": id.String()})
 }
 
 func (r *User) find(ctx context.Context, filter any, options ...*options.FindOptions) (user.List, error) {

@@ -1,9 +1,8 @@
-package interfaces
+package user
 
 import (
 	"context"
 
-	"github.com/reearth/reearth-accounts/server/pkg/usecase"
 	"github.com/reearth/reearth-accounts/server/pkg/user"
 	"github.com/reearth/reearth-accounts/server/pkg/workspace"
 	"github.com/reearth/reearthx/i18n"
@@ -36,7 +35,7 @@ type SignupUserParam struct {
 	UserID      *user.ID
 	Lang        *language.Tag
 	Theme       *user.Theme
-	WorkspaceID *workspace.ID
+	WorkspaceID *string
 }
 
 type SignupParam struct {
@@ -47,7 +46,7 @@ type SignupParam struct {
 	Lang        *language.Tag
 	Theme       *user.Theme
 	UserID      *user.ID
-	WorkspaceID *workspace.ID
+	WorkspaceID *string
 	MockAuth    bool
 }
 
@@ -78,7 +77,7 @@ type UserQuery interface {
 	SearchUser(ctx context.Context, keyword string) (user.List, error)
 }
 
-type User interface {
+type UserUseCase interface {
 	UserQuery
 
 	// sign up
@@ -86,9 +85,9 @@ type User interface {
 	SignupOIDC(context.Context, SignupOIDCParam) (*user.User, error)
 
 	// editing me
-	UpdateMe(context.Context, UpdateMeParam, *usecase.Operator) (*user.User, error)
-	RemoveMyAuth(context.Context, string, *usecase.Operator) (*user.User, error)
-	DeleteMe(context.Context, user.ID, *usecase.Operator) error
+	UpdateMe(context.Context, UpdateMeParam, *workspace.Operator) (*user.User, error)
+	RemoveMyAuth(context.Context, string, *workspace.Operator) (*user.User, error)
+	DeleteMe(context.Context, user.ID, *workspace.Operator) error
 
 	// built-in auth server
 	CreateVerification(context.Context, string) error

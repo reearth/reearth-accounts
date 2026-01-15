@@ -1,4 +1,4 @@
-package workspace
+package role
 
 import (
 	"errors"
@@ -8,15 +8,15 @@ import (
 
 var (
 	// RoleOwner is a role who can have full control of projects and workspaces
-	RoleOwner = Role("owner")
+	RoleOwner = RoleType("owner")
 	// RoleMaintainer is a role who can manage projects
-	RoleMaintainer = Role("maintainer")
+	RoleMaintainer = RoleType("maintainer")
 	// RoleWriter is a role who can read and write projects
-	RoleWriter = Role("writer")
+	RoleWriter = RoleType("writer")
 	// RoleReader is a role who can read projects
-	RoleReader = Role("reader")
+	RoleReader = RoleType("reader")
 
-	roles = []Role{
+	roleTypes = []RoleType{
 		RoleOwner,
 		RoleMaintainer,
 		RoleWriter,
@@ -26,32 +26,32 @@ var (
 	ErrInvalidRole = errors.New("invalid role")
 )
 
-type Role string
+type RoleType string
 
-func (r Role) Valid() bool {
-	return slices.Contains(roles, r)
+func (r RoleType) Valid() bool {
+	return slices.Contains(roleTypes, r)
 }
 
-func (r Role) String() string {
+func (r RoleType) String() string {
 	return string(r)
 }
 
-func RoleFrom(r string) (Role, error) {
-	role := Role(strings.ToLower(r))
+func RoleFrom(r string) (RoleType, error) {
+	role := RoleType(strings.ToLower(r))
 	if role.Valid() {
 		return role, nil
 	}
 	return role, ErrInvalidRole
 }
 
-func (r Role) Includes(role Role) bool {
+func (r RoleType) Includes(role RoleType) bool {
 	if !r.Valid() {
 		return false
 	}
 
-	for i, r2 := range roles {
+	for i, r2 := range roleTypes {
 		if r == r2 {
-			for _, r3 := range roles[i:] {
+			for _, r3 := range roleTypes[i:] {
 				if role == r3 {
 					return true
 				}

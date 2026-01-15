@@ -5,10 +5,10 @@ import (
 	"errors"
 	"testing"
 
-	"github.com/reearth/reearth-accounts/server/internal/usecase"
 	"github.com/reearth/reearth-accounts/server/internal/usecase/interfaces"
 	"github.com/reearth/reearth-accounts/server/internal/usecase/repo"
 	"github.com/reearth/reearth-accounts/server/pkg/id"
+	"github.com/reearth/reearth-accounts/server/pkg/workspace"
 	"github.com/reearth/reearthx/usecasex"
 	"github.com/stretchr/testify/assert"
 )
@@ -18,7 +18,7 @@ func TestUc_checkPermission(t *testing.T) {
 
 	tests := []struct {
 		name               string
-		op                 *usecase.Operator
+		op                 *workspace.Operator
 		readableWorkspaces id.WorkspaceIDList
 		writableWorkspaces id.WorkspaceIDList
 		wantErr            bool
@@ -35,7 +35,7 @@ func TestUc_checkPermission(t *testing.T) {
 		{
 			name:               "can read a workspace",
 			readableWorkspaces: id.WorkspaceIDList{tid},
-			op: &usecase.Operator{
+			op: &workspace.Operator{
 				ReadableWorkspaces: id.WorkspaceIDList{tid},
 			},
 			wantErr: false,
@@ -43,7 +43,7 @@ func TestUc_checkPermission(t *testing.T) {
 		{
 			name:               "cannot read a workspace",
 			readableWorkspaces: id.WorkspaceIDList{id.NewWorkspaceID()},
-			op: &usecase.Operator{
+			op: &workspace.Operator{
 				ReadableWorkspaces: id.WorkspaceIDList{},
 			},
 			wantErr: true,
@@ -51,7 +51,7 @@ func TestUc_checkPermission(t *testing.T) {
 		{
 			name:               "can write a workspace",
 			writableWorkspaces: id.WorkspaceIDList{tid},
-			op: &usecase.Operator{
+			op: &workspace.Operator{
 				WritableWorkspaces: id.WorkspaceIDList{tid},
 			},
 			wantErr: false,
@@ -59,7 +59,7 @@ func TestUc_checkPermission(t *testing.T) {
 		{
 			name:               "cannot write a workspace",
 			writableWorkspaces: id.WorkspaceIDList{tid},
-			op: &usecase.Operator{
+			op: &workspace.Operator{
 				WritableWorkspaces: id.WorkspaceIDList{},
 			},
 			wantErr: true,

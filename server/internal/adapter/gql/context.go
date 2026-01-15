@@ -4,10 +4,10 @@ import (
 	"context"
 
 	"github.com/reearth/reearth-accounts/server/internal/adapter"
-	"github.com/reearth/reearth-accounts/server/internal/usecase"
 	"github.com/reearth/reearth-accounts/server/internal/usecase/gateway"
 	"github.com/reearth/reearth-accounts/server/internal/usecase/interfaces"
 	"github.com/reearth/reearth-accounts/server/pkg/user"
+	"github.com/reearth/reearth-accounts/server/pkg/workspace"
 )
 
 type ContextKey string
@@ -32,7 +32,7 @@ func getUser(ctx context.Context) *user.User {
 	return adapter.User(ctx)
 }
 
-func getOperator(ctx context.Context) *usecase.Operator {
+func getOperator(ctx context.Context) *workspace.Operator {
 	return adapter.Operator(ctx)
 }
 

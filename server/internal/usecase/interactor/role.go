@@ -7,14 +7,15 @@ import (
 	"github.com/reearth/reearth-accounts/server/internal/usecase/interfaces"
 	"github.com/reearth/reearth-accounts/server/internal/usecase/repo"
 	"github.com/reearth/reearth-accounts/server/pkg/id"
+	"github.com/reearth/reearth-accounts/server/pkg/permittable"
 	"github.com/reearth/reearth-accounts/server/pkg/role"
 	"github.com/reearth/reearthx/rerror"
 	"github.com/reearth/reearthx/usecasex"
 )
 
 type Role struct {
-	permittableRepo repo.Permittable
-	roleRepo        repo.Role
+	permittableRepo permittable.Repo
+	roleRepo        role.Repo
 	transaction     usecasex.Transaction
 }
 

@@ -4,6 +4,7 @@ import (
 	"testing"
 
 	accountsid "github.com/reearth/reearth-accounts/server/pkg/id"
+	"github.com/reearth/reearth-accounts/server/pkg/role"
 	"github.com/reearth/reearthx/idx"
 	"github.com/stretchr/testify/assert"
 )
@@ -29,7 +30,7 @@ func TestBuilder_ParseID(t *testing.T) {
 }
 
 func TestBuilder_Members(t *testing.T) {
-	m := map[UserID]Member{NewUserID(): {Role: RoleOwner}}
+	m := map[UserID]Member{NewUserID(): {Role: role.RoleOwner}}
 	b := New().Members(m)
 	assert.Equal(t, m, b.members)
 }
@@ -45,8 +46,8 @@ func TestBuilder_Alias(t *testing.T) {
 }
 
 func TestBuilder_Build(t *testing.T) {
-	m := map[UserID]Member{NewUserID(): {Role: RoleOwner}}
-	i := map[IntegrationID]Member{NewIntegrationID(): {Role: RoleOwner}}
+	m := map[UserID]Member{NewUserID(): {Role: role.RoleOwner}}
+	i := map[IntegrationID]Member{NewIntegrationID(): {Role: role.RoleOwner}}
 	id := NewID()
 	metadata := NewMetadata()
 	metadata.SetDescription("description")
@@ -84,8 +85,8 @@ func TestBuilder_Build(t *testing.T) {
 }
 
 func TestBuilder_MustBuild(t *testing.T) {
-	m := map[UserID]Member{NewUserID(): {Role: RoleOwner}}
-	i := map[IntegrationID]Member{NewIntegrationID(): {Role: RoleOwner}}
+	m := map[UserID]Member{NewUserID(): {Role: role.RoleOwner}}
+	i := map[IntegrationID]Member{NewIntegrationID(): {Role: role.RoleOwner}}
 	id := NewID()
 
 	metadata := NewMetadata()
@@ -108,7 +109,7 @@ func TestBuilder_MustBuild(t *testing.T) {
 }
 
 func TestBuilder_Integrations(t *testing.T) {
-	i := map[IntegrationID]Member{NewIntegrationID(): {Role: RoleOwner}}
+	i := map[IntegrationID]Member{NewIntegrationID(): {Role: role.RoleOwner}}
 	assert.Equal(t, &Builder{
 		w:            &Workspace{},
 		integrations: i,

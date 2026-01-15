@@ -15,7 +15,6 @@ import (
 	textTmpl "text/template"
 
 	"github.com/reearth/reearth-accounts/server/internal/usecase/interfaces"
-	"github.com/reearth/reearth-accounts/server/internal/usecase/repo"
 	"github.com/reearth/reearth-accounts/server/pkg/id"
 	"github.com/reearth/reearth-accounts/server/pkg/permittable"
 	"github.com/reearth/reearth-accounts/server/pkg/role"
@@ -105,16 +104,16 @@ func (i *User) Signup(ctx context.Context, param interfaces.SignupParam) (u *use
 		u.SetVerification(vr)
 
 		if err = i.repos.User.Create(ctx, u); err != nil {
-			if errors.Is(err, repo.ErrDuplicatedUser) {
+			if errors.Is(err, user.ErrDuplicatedUser) {
 				return nil, interfaces.ErrUserAlreadyExists
 			}
 			return nil, err
 		}
 		if err = i.repos.Workspace.Save(ctx, ws); err != nil {
-			if errors.Is(err, repo.ErrDuplicatedUser) {
+			if errors.Is(err, user.ErrDuplicatedUser) {
 				return nil, interfaces.ErrUserAliasAlreadyExists
 			}
-			if errors.Is(err, repo.ErrDuplicateWorkspaceAlias) {
+			if errors.Is(err, workspace.ErrDuplicateWorkspaceAlias) {
 				return nil, interfaces.ErrWorkspaceAliasAlreadyExists
 			}
 			return nil, err
@@ -126,7 +125,7 @@ func (i *User) Signup(ctx context.Context, param interfaces.SignupParam) (u *use
 			return nil, err
 		}
 
-		roleOwner, err := i.findOrCreateRole(ctx, workspace.RoleOwner.String(), param.MockAuth)
+		roleOwner, err := i.findOrCreateRole(ctx, role.RoleOwner.String(), param.MockAuth)
 		if err != nil {
 			return nil, err
 		}
@@ -170,7 +169,7 @@ func (i *User) SignupOIDC(ctx context.Context, param interfaces.SignupOIDCParam)
 			return nil, err
 		}
 		if eu != nil {
-			return nil, repo.ErrDuplicatedUser
+			return nil, user.ErrDuplicatedUser
 		}
 
 		eu, err = i.repos.User.FindBySub(ctx, param.Sub)
@@ -178,7 +177,7 @@ func (i *User) SignupOIDC(ctx context.Context, param interfaces.SignupOIDCParam)
 			return nil, err
 		}
 		if eu != nil {
-			return nil, repo.ErrDuplicatedUser
+			return nil, user.ErrDuplicatedUser
 		}
 
 		// Initialize user and ws
@@ -210,7 +209,7 @@ func (i *User) SignupOIDC(ctx context.Context, param interfaces.SignupOIDCParam)
 			return nil, err
 		}
 
-		roleOwner, err := i.repos.Role.FindByName(ctx, workspace.RoleOwner.String())
+		roleOwner, err := i.repos.Role.FindByName(ctx, role.RoleOwner.String())
 		if err != nil {
 			return nil, err
 		}

@@ -95,7 +95,7 @@ func TestUser_Signup(t *testing.T) {
 				ID(tid).
 				Name("NAME").
 				Alias("NAME").
-				Members(map[user.ID]workspace.Member{uid: {Role: workspace.RoleOwner, Disabled: false, InvitedBy: uid}}).
+				Members(map[user.ID]workspace.Member{uid: {Role: role.RoleOwner, Disabled: false, InvitedBy: uid}}).
 				Personal(true).
 				MustBuild(),
 			wantMailTo:      []mailer.Contact{{Email: "unique@bbb.com", Name: "NAME"}},
@@ -131,7 +131,7 @@ func TestUser_Signup(t *testing.T) {
 				ID(tid).
 				Name("NAME").
 				Alias("NAME").
-				Members(map[user.ID]workspace.Member{uid: {Role: workspace.RoleOwner, Disabled: false, InvitedBy: uid}}).
+				Members(map[user.ID]workspace.Member{uid: {Role: role.RoleOwner, Disabled: false, InvitedBy: uid}}).
 				Personal(true).
 				MustBuild(),
 			wantMailTo:      []mailer.Contact{{Email: "aaa@bbb.com", Name: "NAME"}},
@@ -211,7 +211,7 @@ func TestUser_Signup(t *testing.T) {
 				ID(tid).
 				Name("NAME").
 				Alias("NAME").
-				Members(map[user.ID]workspace.Member{uid: {Role: workspace.RoleOwner, Disabled: false, InvitedBy: uid}}).
+				Members(map[user.ID]workspace.Member{uid: {Role: role.RoleOwner, Disabled: false, InvitedBy: uid}}).
 				Personal(true).
 				MustBuild(),
 			wantMailTo:      []mailer.Contact{{Email: "aaa@bbb.com", Name: "NAME"}},
@@ -254,7 +254,7 @@ func TestUser_Signup(t *testing.T) {
 				ID(tid).
 				Name("NAME").
 				Alias("NAME").
-				Members(map[user.ID]workspace.Member{uid: {Role: workspace.RoleOwner, Disabled: false, InvitedBy: uid}}).
+				Members(map[user.ID]workspace.Member{uid: {Role: role.RoleOwner, Disabled: false, InvitedBy: uid}}).
 				Personal(true).
 				MustBuild(),
 			wantMailTo:      []mailer.Contact{{Email: "aaa@bbb.com", Name: "NAME"}},
@@ -318,7 +318,7 @@ func TestUser_Signup(t *testing.T) {
 
 			// Create required roles for signup
 			selfRole := role.New().NewID().Name(interfaces.RoleSelf).MustBuild()
-			ownerRole := role.New().NewID().Name(workspace.RoleOwner.String()).MustBuild()
+			ownerRole := role.New().NewID().Name(role.RoleOwner.String()).MustBuild()
 			assert.NoError(t, r.Role.Save(ctx, *selfRole))
 			assert.NoError(t, r.Role.Save(ctx, *ownerRole))
 

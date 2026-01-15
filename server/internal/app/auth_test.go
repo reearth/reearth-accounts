@@ -10,8 +10,8 @@ import (
 
 	"github.com/reearth/reearth-accounts/server/internal/adapter"
 	"github.com/reearth/reearth-accounts/server/internal/infrastructure/memory"
-	"github.com/reearth/reearth-accounts/server/internal/usecase/repo"
 	"github.com/reearth/reearth-accounts/server/pkg/id"
+	"github.com/reearth/reearth-accounts/server/pkg/role"
 	"github.com/reearth/reearth-accounts/server/pkg/user"
 	"github.com/reearth/reearth-accounts/server/pkg/workspace"
 	"github.com/reearth/reearthx/appx"
@@ -145,7 +145,7 @@ func TestAuthMiddleware(t *testing.T) {
 			Name("test-workspace").
 			Members(map[id.UserID]workspace.Member{
 				uid: {
-					Role:      workspace.RoleOwner,
+					Role:      role.RoleOwner,
 					InvitedBy: uid,
 				},
 			}).
@@ -269,7 +269,7 @@ func TestAuthMiddleware(t *testing.T) {
 			Name("debug-auth-workspace").
 			Members(map[id.UserID]workspace.Member{
 				uid: {
-					Role:      workspace.RoleOwner,
+					Role:      role.RoleOwner,
 					InvitedBy: uid,
 				},
 			}).
@@ -412,8 +412,8 @@ func TestMockAuthMiddleware(t *testing.T) {
 		uid := user.NewID()
 		demoUser := user.New().
 			ID(uid).
-			Name("Demo user").
-			Email("demo@example.com").
+			Name(FIXED_MOCK_USERNAME).
+			Email(FIXED_MOCK_USERMAILE).
 			MustBuild()
 
 		wid := workspace.NewID()
@@ -422,7 +422,7 @@ func TestMockAuthMiddleware(t *testing.T) {
 			Name("demo-workspace").
 			Members(map[id.UserID]workspace.Member{
 				uid: {
-					Role:      workspace.RoleOwner,
+					Role:      role.RoleOwner,
 					InvitedBy: uid,
 				},
 			}).
@@ -456,7 +456,7 @@ func TestMockAuthMiddleware(t *testing.T) {
 
 		usr := adapter.User(capturedCtx)
 		assert.NotNil(t, usr)
-		assert.Equal(t, "Demo user", usr.Name())
+		assert.Equal(t, FIXED_MOCK_USERNAME, usr.Name())
 
 		op := adapter.Operator(capturedCtx)
 		assert.NotNil(t, op)
@@ -467,8 +467,8 @@ func TestMockAuthMiddleware(t *testing.T) {
 		uid := user.NewID()
 		demoUser := user.New().
 			ID(uid).
-			Name("Demo user").
-			Email("demo@example.com").
+			Name(FIXED_MOCK_USERNAME).
+			Email(FIXED_MOCK_USERMAILE).
 			MustBuild()
 
 		repos := memory.New()
@@ -511,7 +511,7 @@ func TestAuthMiddleware_DebugUserHeader(t *testing.T) {
 		Name("debug-workspace").
 		Members(map[id.UserID]workspace.Member{
 			uid: {
-				Role:      workspace.RoleOwner,
+				Role:      role.RoleOwner,
 				InvitedBy: uid,
 			},
 		}).
@@ -575,7 +575,7 @@ func TestGenerateUserOperator(t *testing.T) {
 			Name("workspace1").
 			Members(map[id.UserID]workspace.Member{
 				uid: {
-					Role:      workspace.RoleOwner,
+					Role:      role.RoleOwner,
 					InvitedBy: uid,
 				},
 			}).
@@ -587,7 +587,7 @@ func TestGenerateUserOperator(t *testing.T) {
 			Name("workspace2").
 			Members(map[id.UserID]workspace.Member{
 				uid: {
-					Role:      workspace.RoleReader,
+					Role:      role.RoleReader,
 					InvitedBy: uid,
 				},
 			}).
@@ -744,7 +744,7 @@ func TestInjectDebugAuthInfo(t *testing.T) {
 // Mock implementations for error testing
 
 type mockUserRepoWithError struct {
-	repo.User
+	user.Repo
 	err error
 }
 
@@ -756,7 +756,7 @@ func (m *mockUserRepoWithError) FindBySub(ctx context.Context, sub string) (*use
 }
 
 type mockWorkspaceRepoWithError struct {
-	repo.Workspace
+	workspace.Repo
 	err error
 }
 

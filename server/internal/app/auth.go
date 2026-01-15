@@ -11,8 +11,8 @@ import (
 	"strings"
 
 	"github.com/reearth/reearth-accounts/server/internal/adapter"
-	"github.com/reearth/reearth-accounts/server/internal/usecase"
 	"github.com/reearth/reearth-accounts/server/pkg/id"
+	"github.com/reearth/reearth-accounts/server/pkg/role"
 	"github.com/reearth/reearth-accounts/server/pkg/user"
 	"github.com/reearth/reearth-accounts/server/pkg/workspace"
 	"github.com/reearth/reearthx/appx"
@@ -27,6 +27,8 @@ const (
 	debugAuthTokenHeader = "X-Reearth-Debug-Auth-Token"
 	debugAuthNameHeader  = "X-Reearth-Debug-Auth-Name"
 	debugAuthEmailHeader = "X-Reearth-Debug-Auth-Email"
+	FIXED_MOCK_USERNAME  = "Demo User"
+	FIXED_MOCK_USERMAILE = "demo@example.com"
 )
 
 type graphqlRequest struct {
@@ -123,10 +125,9 @@ func mockAuthMiddleware(cfg *ServerConfig) func(http.Handler) http.Handler {
 
 			// Load demo user from database by name when no debug user is provided.
 			if usr == nil {
-				const demoUserName = "Demo user"
-				usr, err = cfg.Repos.User.FindByName(ctx, demoUserName)
+				usr, err = cfg.Repos.User.FindByName(ctx, FIXED_MOCK_USERNAME)
 				if err != nil {
-					log.Errorfc(ctx, "[mockAuthMiddleware] failed to find demo user by name: %s, error: %s", demoUserName, err.Error())
+					log.Errorfc(ctx, "[mockAuthMiddleware] failed to find demo user by name: %s, error: %s", FIXED_MOCK_USERNAME, err.Error())
 					http.Error(w, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
 					return
 				}
@@ -256,7 +257,7 @@ func isDebugUserExists(req *http.Request, cfg *ServerConfig, ctx context.Context
 	return nil
 }
 
-func generateUserOperator(ctx context.Context, cfg *ServerConfig, u *user.User) (*usecase.Operator, error) {
+func generateUserOperator(ctx context.Context, cfg *ServerConfig, u *user.User) (*workspace.Operator, error) {
 	if u == nil {
 		return nil, nil
 	}
@@ -268,12 +269,12 @@ func generateUserOperator(ctx context.Context, cfg *ServerConfig, u *user.User) 
 		return nil, err
 	}
 
-	rw := w.FilterByUserRole(uid, workspace.RoleReader).IDs()
-	ww := w.FilterByUserRole(uid, workspace.RoleWriter).IDs()
-	mw := w.FilterByUserRole(uid, workspace.RoleMaintainer).IDs()
-	ow := w.FilterByUserRole(uid, workspace.RoleOwner).IDs()
+	rw := w.FilterByUserRole(uid, role.RoleReader).IDs()
+	ww := w.FilterByUserRole(uid, role.RoleWriter).IDs()
+	mw := w.FilterByUserRole(uid, role.RoleMaintainer).IDs()
+	ow := w.FilterByUserRole(uid, role.RoleOwner).IDs()
 
-	return &usecase.Operator{
+	return &workspace.Operator{
 		User: &uid,
 
 		ReadableWorkspaces:     rw,

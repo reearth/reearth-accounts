@@ -1,4 +1,4 @@
-package workspace
+package role
 
 import (
 	"testing"
@@ -6,10 +6,10 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-func TestRoleFrom(t *testing.T) {
+func TestRoleTypeFrom(t *testing.T) {
 	tests := []struct {
 		Name, Role string
-		Expected   Role
+		Expected   RoleType
 		Err        error
 	}{
 		{
@@ -21,7 +21,7 @@ func TestRoleFrom(t *testing.T) {
 		{
 			Name:     "fail invalid role",
 			Role:     "xxx",
-			Expected: Role("xxx"),
+			Expected: RoleType("xxx"),
 			Err:      ErrInvalidRole,
 		},
 	}
@@ -40,15 +40,15 @@ func TestRoleFrom(t *testing.T) {
 	}
 }
 
-func TestRole_Valid(t *testing.T) {
+func TestRoleType_Valid(t *testing.T) {
 	assert.True(t, RoleOwner.Valid())
 	assert.True(t, RoleMaintainer.Valid())
 	assert.True(t, RoleWriter.Valid())
 	assert.True(t, RoleReader.Valid())
-	assert.False(t, Role("").Valid())
+	assert.False(t, RoleType("").Valid())
 }
 
-func TestRole_Includes(t *testing.T) {
+func TestRoleType_Includes(t *testing.T) {
 	assert.True(t, RoleOwner.Includes(RoleOwner))
 	assert.True(t, RoleOwner.Includes(RoleMaintainer))
 	assert.True(t, RoleOwner.Includes(RoleWriter))
@@ -69,5 +69,5 @@ func TestRole_Includes(t *testing.T) {
 	assert.False(t, RoleReader.Includes(RoleWriter))
 	assert.True(t, RoleReader.Includes(RoleReader))
 
-	assert.False(t, Role("").Includes(RoleReader))
+	assert.False(t, RoleType("").Includes(RoleReader))
 }

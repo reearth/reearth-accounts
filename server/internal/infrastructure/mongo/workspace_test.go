@@ -5,6 +5,7 @@ import (
 	"testing"
 
 	"github.com/reearth/reearth-accounts/server/pkg/id"
+	"github.com/reearth/reearth-accounts/server/pkg/role"
 	"github.com/reearth/reearth-accounts/server/pkg/user"
 	"github.com/reearth/reearth-accounts/server/pkg/workspace"
 	"github.com/reearth/reearthx/mongox"
@@ -226,7 +227,7 @@ func TestWorkspace_FindByAlias(t *testing.T) {
 
 func TestWorkspace_FindByUser(t *testing.T) {
 	u := user.New().Name("aaa").NewID().Email("aaa@bbb.com").MustBuild()
-	ws := workspace.New().NewID().Name("hoge").Members(map[user.ID]workspace.Member{u.ID(): {Role: workspace.RoleOwner, InvitedBy: u.ID()}}).MustBuild()
+	ws := workspace.New().NewID().Name("hoge").Members(map[user.ID]workspace.Member{u.ID(): {Role: role.RoleOwner, InvitedBy: u.ID()}}).MustBuild()
 	tests := []struct {
 		Name     string
 		Input    id.UserID
@@ -275,9 +276,9 @@ func TestWorkspace_FindByUser(t *testing.T) {
 
 func TestWorkspace_FindByUserWithPagination(t *testing.T) {
 	u := user.New().Name("aaa").NewID().Email("test@mail.com").MustBuild()
-	ws1 := workspace.New().NewID().Name("hoge").Members(map[user.ID]workspace.Member{u.ID(): {Role: workspace.RoleOwner, InvitedBy: u.ID()}}).MustBuild()
-	ws2 := workspace.New().NewID().Name("foo").Members(map[user.ID]workspace.Member{u.ID(): {Role: workspace.RoleOwner, InvitedBy: u.ID()}}).MustBuild()
-	ws3 := workspace.New().NewID().Name("xxx").Members(map[user.ID]workspace.Member{u.ID(): {Role: workspace.RoleOwner, InvitedBy: u.ID()}}).MustBuild()
+	ws1 := workspace.New().NewID().Name("hoge").Members(map[user.ID]workspace.Member{u.ID(): {Role: role.RoleOwner, InvitedBy: u.ID()}}).MustBuild()
+	ws2 := workspace.New().NewID().Name("foo").Members(map[user.ID]workspace.Member{u.ID(): {Role: role.RoleOwner, InvitedBy: u.ID()}}).MustBuild()
+	ws3 := workspace.New().NewID().Name("xxx").Members(map[user.ID]workspace.Member{u.ID(): {Role: role.RoleOwner, InvitedBy: u.ID()}}).MustBuild()
 	tests := []struct {
 		Name     string
 		Input    id.UserID
@@ -359,11 +360,11 @@ func TestWorkspace_FindByIntegrations(t *testing.T) {
 	i1 := workspace.NewIntegrationID()
 	i2 := workspace.NewIntegrationID()
 	ws1 := workspace.New().NewID().Name("hoge").Integrations(map[workspace.IntegrationID]workspace.Member{i1: {
-		Role:      workspace.RoleOwner,
+		Role:      role.RoleOwner,
 		InvitedBy: u.ID(),
 	}}).MustBuild()
 	ws2 := workspace.New().NewID().Name("foo").Integrations(map[workspace.IntegrationID]workspace.Member{i2: {
-		Role:      workspace.RoleOwner,
+		Role:      role.RoleOwner,
 		InvitedBy: u.ID(),
 	}}).MustBuild()
 

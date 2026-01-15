@@ -7,7 +7,6 @@ import (
 	"errors"
 	htmlTmpl "html/template"
 
-	"github.com/reearth/reearth-accounts/server/internal/usecase"
 	"github.com/reearth/reearth-accounts/server/internal/usecase/gateway"
 	"github.com/reearth/reearth-accounts/server/internal/usecase/interfaces"
 	"github.com/reearth/reearth-accounts/server/internal/usecase/repo"
@@ -35,9 +34,9 @@ var (
 )
 
 func NewUser(r *repo.Container, g *gateway.Container, signupSecret, authSrcUIDomain string) interfaces.User {
-	var repos []repo.User
+	var repos []user.Repo
 	if r != nil {
-		repos = []repo.User{r.User}
+		repos = []user.Repo{r.User}
 	}
 	return &User{
 		repos:           r,
@@ -50,14 +49,14 @@ func NewUser(r *repo.Container, g *gateway.Container, signupSecret, authSrcUIDom
 	}
 }
 
-func NewMultiUser(r *repo.Container, g *gateway.Container, signupSecret, authSrcUIDomain string, users []repo.User) interfaces.User {
+func NewMultiUser(r *repo.Container, g *gateway.Container, signupSecret, authSrcUIDomain string, users []user.Repo) interfaces.User {
 	return &User{
 		repos:           r,
 		gateways:        g,
 		signupSecret:    signupSecret,
 		authSrvUIDomain: authSrcUIDomain,
 		query: &UserQuery{
-			repos: append([]repo.User{r.User}, users...),
+			repos: append([]user.Repo{r.User}, users...),
 		},
 	}
 }
@@ -114,7 +113,7 @@ func (i *User) GetUserBySubject(ctx context.Context, sub string) (u *user.User, 
 	})
 }
 
-func (i *User) UpdateMe(ctx context.Context, p interfaces.UpdateMeParam, operator *usecase.Operator) (u *user.User, err error) {
+func (i *User) UpdateMe(ctx context.Context, p interfaces.UpdateMeParam, operator *workspace.Operator) (u *user.User, err error) {
 	if operator.User == nil {
 		return nil, interfaces.ErrInvalidOperator
 	}
@@ -204,7 +203,7 @@ func (i *User) UpdateMe(ctx context.Context, p interfaces.UpdateMeParam, operato
 	})
 }
 
-func (i *User) RemoveMyAuth(ctx context.Context, authProvider string, operator *usecase.Operator) (u *user.User, err error) {
+func (i *User) RemoveMyAuth(ctx context.Context, authProvider string, operator *workspace.Operator) (u *user.User, err error) {
 	if operator.User == nil {
 		return nil, interfaces.ErrInvalidOperator
 	}
@@ -226,7 +225,7 @@ func (i *User) RemoveMyAuth(ctx context.Context, authProvider string, operator *
 	})
 }
 
-func (i *User) DeleteMe(ctx context.Context, userID user.ID, operator *usecase.Operator) (err error) {
+func (i *User) DeleteMe(ctx context.Context, userID user.ID, operator *workspace.Operator) (err error) {
 	if operator.User == nil {
 		return interfaces.ErrInvalidOperator
 	}
@@ -378,12 +377,12 @@ func (i *User) PasswordReset(ctx context.Context, password string, token string)
 }
 
 type UserQuery struct {
-	repos []repo.User
+	repos []user.Repo
 }
 
-func NewUserQuery(primary repo.User, repos ...repo.User) *UserQuery {
+func NewUserQuery(primary user.Repo, repos ...user.Repo) *UserQuery {
 	return &UserQuery{
-		repos: append([]repo.User{primary}, repos...),
+		repos: append([]user.Repo{primary}, repos...),
 	}
 }
 
