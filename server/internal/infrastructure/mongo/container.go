@@ -4,17 +4,19 @@ import (
 	"context"
 
 	"github.com/reearth/reearth-accounts/server/internal/usecase/repo"
+	"github.com/reearth/reearth-accounts/server/pkg/user"
+	"github.com/reearth/reearth-accounts/server/pkg/workspace"
 	"github.com/reearth/reearthx/mongox"
 	"go.mongodb.org/mongo-driver/mongo"
 )
 
-func New(ctx context.Context, db *mongo.Database, useTransaction, needCompat bool, users []repo.User) (*repo.Container, error) {
+func New(ctx context.Context, db *mongo.Database, useTransaction, needCompat bool, users []user.Repo) (*repo.Container, error) {
 	client := mongox.NewClientWithDatabase(db)
 	if useTransaction {
 		client = client.WithTransaction()
 	}
 
-	var ws repo.Workspace
+	var ws workspace.Repo
 	if needCompat {
 		ws = NewWorkspaceCompat(client)
 	} else {

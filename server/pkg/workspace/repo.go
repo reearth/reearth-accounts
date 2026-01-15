@@ -2,11 +2,17 @@ package workspace
 
 import (
 	"context"
+	"errors"
 
 	"github.com/reearth/reearth-accounts/server/pkg/user"
 	"github.com/reearth/reearthx/usecasex"
 )
 
+var (
+	ErrDuplicateWorkspaceAlias = errors.New("duplicate workspace alias")
+)
+
+//go:generate mockgen -source=./repo.go -destination=./mock_workspace.go -package workspace
 type Repo interface {
 	Filtered(WorkspaceFilter) Repo
 	FindByID(context.Context, ID) (*Workspace, error)

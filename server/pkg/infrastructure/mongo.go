@@ -4,7 +4,6 @@ import (
 	"context"
 
 	"github.com/reearth/reearth-accounts/server/internal/infrastructure/mongo"
-	internalRepo "github.com/reearth/reearth-accounts/server/internal/usecase/repo"
 	"github.com/reearth/reearth-accounts/server/pkg/user"
 	"github.com/reearth/reearth-accounts/server/pkg/workspace"
 	"github.com/reearth/reearthx/mongox"
@@ -13,20 +12,17 @@ import (
 
 // NewMongoUser creates a new MongoDB-backed User repository
 func NewMongoUser(client *mongox.Client) user.Repo {
-	internal := mongo.NewUser(client)
-	return NewUserAdapter(internal)
+	return mongo.NewUser(client)
 }
 
 // NewMongoWorkspace creates a new MongoDB-backed Workspace repository
 func NewMongoWorkspace(client *mongox.Client) workspace.Repo {
-	internal := mongo.NewWorkspace(client)
-	return NewWorkspaceAdapter(internal)
+	return mongo.NewWorkspace(client)
 }
 
 // NewMongoUserWithHost creates a new MongoDB-backed User repository with host
 func NewMongoUserWithHost(client *mongox.Client, host string) user.Repo {
-	internal := mongo.NewUserWithHost(client, host)
-	return NewUserAdapter(internal)
+	return mongo.NewUserWithHost(client, host)
 }
 
 // New creates a new MongoDB-backed repository container
@@ -35,38 +31,18 @@ func New(ctx context.Context, client *mongodriver.Client, databaseName string, u
 	// Get database from client
 	db := client.Database(databaseName)
 
-	// Convert pkg users to internal users (reverse adapter)
-	internalUsers := make([]internalRepo.User, len(users))
-	for i, u := range users {
-		if ua, ok := u.(*userAdapter); ok {
-			// If it's already a userAdapter, extract the internal implementation
-			internalUsers[i] = ua.internal
-		} else {
-			// This shouldn't happen in normal usage, but handle it gracefully
-			// Create a temporary adapter and extract internal
-			internal := mongo.NewUser(mongox.NewClient(databaseName, client))
-			internalUsers[i] = internal
-		}
-	}
-
 	// Call internal New
-	internalContainer, err := mongo.New(ctx, db, useTransaction, needCompat, internalUsers)
+	internalContainer, err := mongo.New(ctx, db, useTransaction, needCompat, users)
 	if err != nil {
 		return nil, err
 	}
 
-	// Convert internal container to pkg container
-	pkgUsers := make([]user.Repo, len(internalContainer.Users))
-	for i, u := range internalContainer.Users {
-		pkgUsers[i] = NewUserAdapter(u)
-	}
-
 	return &Container{
-		User:        NewUserAdapter(internalContainer.User),
-		Workspace:   NewWorkspaceAdapter(internalContainer.Workspace),
-		Role:        internalContainer.Role,        // Same interface
-		Permittable: internalContainer.Permittable, // Same interface
+		User:        internalContainer.User,
+		Workspace:   internalContainer.Workspace,
+		Role:        internalContainer.Role,
+		Permittable: internalContainer.Permittable,
 		Transaction: internalContainer.Transaction,
-		Users:       pkgUsers,
+		Users:       internalContainer.Users,
 	}, nil
 }

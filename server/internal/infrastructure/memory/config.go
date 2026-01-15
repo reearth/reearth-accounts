@@ -4,7 +4,6 @@ import (
 	"context"
 	"sync"
 
-	"github.com/reearth/reearth-accounts/server/internal/usecase/repo"
 	"github.com/reearth/reearth-accounts/server/pkg/config"
 )
 
@@ -14,7 +13,7 @@ type Config struct {
 	data   *config.Config
 }
 
-func NewConfig() repo.Config {
+func NewConfig() config.Repo {
 	return &Config{}
 }
 
