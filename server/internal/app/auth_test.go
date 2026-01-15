@@ -412,8 +412,8 @@ func TestMockAuthMiddleware(t *testing.T) {
 		uid := user.NewID()
 		demoUser := user.New().
 			ID(uid).
-			Name("Demo user").
-			Email("demo@example.com").
+			Name(FIXED_MOCK_USERNAME).
+			Email(FIXED_MOCK_USERMAILE).
 			MustBuild()
 
 		wid := workspace.NewID()
@@ -456,7 +456,7 @@ func TestMockAuthMiddleware(t *testing.T) {
 
 		usr := adapter.User(capturedCtx)
 		assert.NotNil(t, usr)
-		assert.Equal(t, "Demo user", usr.Name())
+		assert.Equal(t, FIXED_MOCK_USERNAME, usr.Name())
 
 		op := adapter.Operator(capturedCtx)
 		assert.NotNil(t, op)
@@ -467,8 +467,8 @@ func TestMockAuthMiddleware(t *testing.T) {
 		uid := user.NewID()
 		demoUser := user.New().
 			ID(uid).
-			Name("Demo user").
-			Email("demo@example.com").
+			Name(FIXED_MOCK_USERNAME).
+			Email(FIXED_MOCK_USERMAILE).
 			MustBuild()
 
 		repos := memory.New()
