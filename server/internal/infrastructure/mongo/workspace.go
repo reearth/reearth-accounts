@@ -105,10 +105,6 @@ func (r *Workspace) FindByIDs(ctx context.Context, ids id.WorkspaceIDList) (work
 }
 
 func (r *Workspace) FindByID(ctx context.Context, id id.WorkspaceID) (*workspace.Workspace, error) {
-	if !r.f.CanRead(id) {
-		return nil, rerror.ErrNotFound
-	}
-
 	return r.findOne(ctx, bson.M{"id": id.String()})
 }
 
