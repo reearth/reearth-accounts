@@ -59,6 +59,7 @@ func isBypassed(req *http.Request) bool {
 	list := []string{
 		"signup(",
 		"signupoidc(",
+		"findbyid(",
 		"findbyalias(",
 		"createverification(",
 	}
