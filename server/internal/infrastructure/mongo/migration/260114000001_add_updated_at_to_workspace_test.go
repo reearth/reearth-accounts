@@ -78,7 +78,7 @@ func TestApplyWorkspaceUpdatedAtSchema(t *testing.T) {
 	assert.NotNil(t, workspace1["updatedAt"])
 	updatedAt1, ok := workspace1["updatedAt"].(primitive.DateTime)
 	assert.True(t, ok, "updatedAt should be a DateTime")
-	assert.Equal(t, workspace1ID.Timestamp(), updatedAt1.Time())
+	assert.Equal(t, workspace1ID.Timestamp().UTC(), updatedAt1.Time().UTC())
 
 	// Test case 2: workspace2 should have updatedAt from ObjectId timestamp
 	var workspace2 bson.M
@@ -87,7 +87,7 @@ func TestApplyWorkspaceUpdatedAtSchema(t *testing.T) {
 	assert.NotNil(t, workspace2["updatedAt"])
 	updatedAt2, ok := workspace2["updatedAt"].(primitive.DateTime)
 	assert.True(t, ok, "updatedAt should be a DateTime")
-	assert.Equal(t, workspace2ID.Timestamp(), updatedAt2.Time())
+	assert.Equal(t, workspace2ID.Timestamp().UTC(), updatedAt2.Time().UTC())
 
 	// Test case 3: workspace3 already had updatedAt, should remain unchanged
 	var workspace3 bson.M
@@ -97,7 +97,7 @@ func TestApplyWorkspaceUpdatedAtSchema(t *testing.T) {
 	updatedAt3, ok := workspace3["updatedAt"].(primitive.DateTime)
 	assert.True(t, ok, "updatedAt should be a DateTime")
 	expectedTime := time.Date(2023, 1, 1, 0, 0, 0, 0, time.UTC)
-	assert.Equal(t, expectedTime, updatedAt3.Time())
+	assert.Equal(t, expectedTime.UTC(), updatedAt3.Time().UTC())
 
 	// Test case 4: Verify migration is idempotent
 	err = ApplyWorkspaceUpdatedAtSchema(ctx, mongoxClient)
@@ -108,5 +108,5 @@ func TestApplyWorkspaceUpdatedAtSchema(t *testing.T) {
 	assert.NoError(t, err)
 	updatedAt1After, ok := workspace1After["updatedAt"].(primitive.DateTime)
 	assert.True(t, ok)
-	assert.Equal(t, updatedAt1.Time(), updatedAt1After.Time(), "updatedAt should not change on second run")
+	assert.Equal(t, updatedAt1.Time().UTC(), updatedAt1After.Time().UTC(), "updatedAt should not change on second run")
 }

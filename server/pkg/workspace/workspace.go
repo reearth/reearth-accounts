@@ -81,6 +81,15 @@ func (w *Workspace) SetPolicy(policy *PolicyID) {
 	w.updatedAt = time.Now()
 }
 
+func (w *Workspace) DeleteIntegrations(iids IntegrationIDList) error {
+	err := w.members.DeleteIntegrations(iids)
+	if err != nil {
+		return err
+	}
+	w.updatedAt = time.Now()
+	return nil
+}
+
 func (w *Workspace) UpdatedAt() time.Time {
 	return w.updatedAt
 }

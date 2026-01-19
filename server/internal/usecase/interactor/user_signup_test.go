@@ -332,7 +332,17 @@ func TestUser_Signup(t *testing.T) {
 			u, err := uc.Signup(ctx, tt.args)
 
 			if tt.wantUser != nil {
-				assert.Equal(t, tt.wantUser(u), u)
+				expectedUser := tt.wantUser(u)
+				assert.NotNil(t, u)
+				assert.Equal(t, expectedUser.ID(), u.ID())
+				assert.Equal(t, expectedUser.Name(), u.Name())
+				assert.Equal(t, expectedUser.Alias(), u.Alias())
+				assert.Equal(t, expectedUser.Email(), u.Email())
+				assert.Equal(t, expectedUser.Workspace(), u.Workspace())
+				assert.Equal(t, expectedUser.Auths(), u.Auths())
+				assert.Equal(t, expectedUser.Metadata(), u.Metadata())
+				assert.Equal(t, expectedUser.Verification(), u.Verification())
+				assert.NotZero(t, u.UpdatedAt(), "updatedAt should be set")
 			} else {
 				assert.Nil(t, u)
 			}
@@ -341,7 +351,16 @@ func TestUser_Signup(t *testing.T) {
 			if u != nil {
 				ws, _ = r.Workspace.FindByID(ctx, u.Workspace())
 			}
-			assert.Equal(t, tt.wantWorkspace, ws)
+			if tt.wantWorkspace != nil {
+				assert.NotNil(t, ws)
+				assert.Equal(t, tt.wantWorkspace.ID(), ws.ID())
+				assert.Equal(t, tt.wantWorkspace.Name(), ws.Name())
+				assert.Equal(t, tt.wantWorkspace.Alias(), ws.Alias())
+				assert.Equal(t, tt.wantWorkspace.Members(), ws.Members())
+				assert.NotZero(t, ws.UpdatedAt(), "updatedAt should be set")
+			} else {
+				assert.Nil(t, ws)
+			}
 
 			assert.Equal(t, tt.wantError, err)
 

@@ -372,10 +372,17 @@ func TestWorkspace_Update(t *testing.T) {
 			}
 
 			assert.NoError(t, err)
-			assert.Equal(t, tc.want, got)
+			assert.NotNil(t, got)
+			assert.Equal(t, tc.want.ID(), got.ID())
+			assert.Equal(t, tc.want.Name(), got.Name())
+			assert.Equal(t, tc.want.Members(), got.Members())
+			assert.NotZero(t, got.UpdatedAt(), "updatedAt should be set")
 			got2, err := db.Workspace.FindByID(ctx, tc.args.wId)
 			assert.NoError(t, err)
-			assert.Equal(t, tc.want, got2)
+			assert.Equal(t, tc.want.ID(), got2.ID())
+			assert.Equal(t, tc.want.Name(), got2.Name())
+			assert.Equal(t, tc.want.Members(), got2.Members())
+			assert.NotZero(t, got2.UpdatedAt(), "updatedAt should be set")
 		})
 	}
 }
@@ -1477,8 +1484,12 @@ func TestWorkspace_RemoveIntegrations(t *testing.T) {
 				assert.Equal(t, tc.wantErr, err)
 				return
 			}
-			assert.Equal(t, tc.want, got)
-			assert.Equal(t, tc.wantErr, err)
+			assert.NoError(t, err)
+			assert.NotNil(t, got)
+			assert.Equal(t, tc.want.ID(), got.ID())
+			assert.Equal(t, tc.want.Name(), got.Name())
+			assert.Equal(t, tc.want.Members(), got.Members())
+			assert.NotZero(t, got.UpdatedAt(), "updatedAt should be set")
 		})
 	}
 }
