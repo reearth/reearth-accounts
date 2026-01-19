@@ -11,7 +11,7 @@ import (
 func ApplyUserUpdatedAtSchema(ctx context.Context, c DBClient) error {
 	col := c.Database().Collection("user")
 
-	cursor, err := col.Find(ctx, bson.M{"updatedAt": bson.M{"$exists": false}})
+	cursor, err := col.Find(ctx, bson.M{"updatedat": bson.M{"$exists": false}})
 	if err != nil {
 		return err
 	}
@@ -31,7 +31,7 @@ func ApplyUserUpdatedAtSchema(ctx context.Context, c DBClient) error {
 		}
 
 		filter := bson.M{"_id": doc["_id"]}
-		update := bson.M{"$set": bson.M{"updatedAt": updatedAt}}
+		update := bson.M{"$set": bson.M{"updatedat": updatedAt}}
 
 		if _, err := col.UpdateOne(ctx, filter, update); err != nil {
 			return err

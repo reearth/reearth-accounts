@@ -104,7 +104,7 @@
         "bsonType": "string",
         "description": "Policy ID reference. Default: \"\""
       },
-      "updatedAt": {
+      "updatedat": {
         "bsonType": "date",
         "description": "Last update timestamp"
       }
@@ -117,7 +117,7 @@
       "metadata",
       "members",
       "personal",
-      "updatedAt"
+      "updatedat"
     ],
     "title": "Workspace Collection Schema"
   }

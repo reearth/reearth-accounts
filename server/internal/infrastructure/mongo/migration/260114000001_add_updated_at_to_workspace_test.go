@@ -37,7 +37,7 @@ func TestApplyWorkspaceUpdatedAtSchema(t *testing.T) {
 			"members":  bson.M{},
 			"metadata": bson.M{},
 			"personal": false,
-			// No updatedAt field
+			// No updatedat field
 		},
 		bson.M{
 			"_id":      workspace2ID,
@@ -48,7 +48,7 @@ func TestApplyWorkspaceUpdatedAtSchema(t *testing.T) {
 			"members":  bson.M{},
 			"metadata": bson.M{},
 			"personal": false,
-			// No updatedAt field
+			// No updatedat field
 		},
 		bson.M{
 			"_id":       primitive.NewObjectID(),
@@ -59,8 +59,8 @@ func TestApplyWorkspaceUpdatedAtSchema(t *testing.T) {
 			"members":   bson.M{},
 			"metadata":  bson.M{},
 			"personal":  true,
-			"updatedAt": time.Date(2023, 1, 1, 0, 0, 0, 0, time.UTC),
-			// Already has updatedAt
+			"updatedat": time.Date(2023, 1, 1, 0, 0, 0, 0, time.UTC),
+			// Already has updatedat
 		},
 	}
 
@@ -71,31 +71,31 @@ func TestApplyWorkspaceUpdatedAtSchema(t *testing.T) {
 	err = ApplyWorkspaceUpdatedAtSchema(ctx, mongoxClient)
 	assert.NoError(t, err)
 
-	// Test case 1: workspace1 should have updatedAt from ObjectId timestamp
+	// Test case 1: workspace1 should have updatedat from ObjectId timestamp
 	var workspace1 bson.M
 	err = workspaceCollection.FindOne(ctx, bson.M{"id": "workspace1"}).Decode(&workspace1)
 	assert.NoError(t, err)
-	assert.NotNil(t, workspace1["updatedAt"])
-	updatedAt1, ok := workspace1["updatedAt"].(primitive.DateTime)
-	assert.True(t, ok, "updatedAt should be a DateTime")
+	assert.NotNil(t, workspace1["updatedat"])
+	updatedAt1, ok := workspace1["updatedat"].(primitive.DateTime)
+	assert.True(t, ok, "updatedat should be a DateTime")
 	assert.Equal(t, workspace1ID.Timestamp().UTC(), updatedAt1.Time().UTC())
 
-	// Test case 2: workspace2 should have updatedAt from ObjectId timestamp
+	// Test case 2: workspace2 should have updatedat from ObjectId timestamp
 	var workspace2 bson.M
 	err = workspaceCollection.FindOne(ctx, bson.M{"id": "workspace2"}).Decode(&workspace2)
 	assert.NoError(t, err)
-	assert.NotNil(t, workspace2["updatedAt"])
-	updatedAt2, ok := workspace2["updatedAt"].(primitive.DateTime)
-	assert.True(t, ok, "updatedAt should be a DateTime")
+	assert.NotNil(t, workspace2["updatedat"])
+	updatedAt2, ok := workspace2["updatedat"].(primitive.DateTime)
+	assert.True(t, ok, "updatedat should be a DateTime")
 	assert.Equal(t, workspace2ID.Timestamp().UTC(), updatedAt2.Time().UTC())
 
-	// Test case 3: workspace3 already had updatedAt, should remain unchanged
+	// Test case 3: workspace3 already had updatedat, should remain unchanged
 	var workspace3 bson.M
 	err = workspaceCollection.FindOne(ctx, bson.M{"id": "workspace3"}).Decode(&workspace3)
 	assert.NoError(t, err)
-	assert.NotNil(t, workspace3["updatedAt"])
-	updatedAt3, ok := workspace3["updatedAt"].(primitive.DateTime)
-	assert.True(t, ok, "updatedAt should be a DateTime")
+	assert.NotNil(t, workspace3["updatedat"])
+	updatedAt3, ok := workspace3["updatedat"].(primitive.DateTime)
+	assert.True(t, ok, "updatedat should be a DateTime")
 	expectedTime := time.Date(2023, 1, 1, 0, 0, 0, 0, time.UTC)
 	assert.Equal(t, expectedTime.UTC(), updatedAt3.Time().UTC())
 
@@ -106,7 +106,7 @@ func TestApplyWorkspaceUpdatedAtSchema(t *testing.T) {
 	var workspace1After bson.M
 	err = workspaceCollection.FindOne(ctx, bson.M{"id": "workspace1"}).Decode(&workspace1After)
 	assert.NoError(t, err)
-	updatedAt1After, ok := workspace1After["updatedAt"].(primitive.DateTime)
+	updatedAt1After, ok := workspace1After["updatedat"].(primitive.DateTime)
 	assert.True(t, ok)
-	assert.Equal(t, updatedAt1.Time().UTC(), updatedAt1After.Time().UTC(), "updatedAt should not change on second run")
+	assert.Equal(t, updatedAt1.Time().UTC(), updatedAt1After.Time().UTC(), "updatedat should not change on second run")
 }

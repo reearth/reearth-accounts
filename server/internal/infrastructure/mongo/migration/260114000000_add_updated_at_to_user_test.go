@@ -38,7 +38,7 @@ func TestApplyUserUpdatedAtSchema(t *testing.T) {
 			"subs":      []string{},
 			"password":  []byte("password1"),
 			"metadata":  bson.M{},
-			// No updatedAt field
+			// No updatedat field
 		},
 		bson.M{
 			"_id":       user2ID,
@@ -50,7 +50,7 @@ func TestApplyUserUpdatedAtSchema(t *testing.T) {
 			"subs":      []string{},
 			"password":  []byte("password2"),
 			"metadata":  bson.M{},
-			// No updatedAt field
+			// No updatedat field
 		},
 		bson.M{
 			"_id":       primitive.NewObjectID(),
@@ -62,8 +62,8 @@ func TestApplyUserUpdatedAtSchema(t *testing.T) {
 			"subs":      []string{},
 			"password":  []byte("password3"),
 			"metadata":  bson.M{},
-			"updatedAt": time.Date(2023, 1, 1, 0, 0, 0, 0, time.UTC),
-			// Already has updatedAt
+			"updatedat": time.Date(2023, 1, 1, 0, 0, 0, 0, time.UTC),
+			// Already has updatedat
 		},
 	}
 
@@ -74,31 +74,31 @@ func TestApplyUserUpdatedAtSchema(t *testing.T) {
 	err = ApplyUserUpdatedAtSchema(ctx, mongoxClient)
 	assert.NoError(t, err)
 
-	// Test case 1: user1 should have updatedAt from ObjectId timestamp
+	// Test case 1: user1 should have updatedat from ObjectId timestamp
 	var user1 bson.M
 	err = userCollection.FindOne(ctx, bson.M{"id": "user1"}).Decode(&user1)
 	assert.NoError(t, err)
-	assert.NotNil(t, user1["updatedAt"])
-	updatedAt1, ok := user1["updatedAt"].(primitive.DateTime)
-	assert.True(t, ok, "updatedAt should be a DateTime")
+	assert.NotNil(t, user1["updatedat"])
+	updatedAt1, ok := user1["updatedat"].(primitive.DateTime)
+	assert.True(t, ok, "updatedat should be a DateTime")
 	assert.Equal(t, user1ID.Timestamp().UTC(), updatedAt1.Time().UTC())
 
-	// Test case 2: user2 should have updatedAt from ObjectId timestamp
+	// Test case 2: user2 should have updatedat from ObjectId timestamp
 	var user2 bson.M
 	err = userCollection.FindOne(ctx, bson.M{"id": "user2"}).Decode(&user2)
 	assert.NoError(t, err)
-	assert.NotNil(t, user2["updatedAt"])
-	updatedAt2, ok := user2["updatedAt"].(primitive.DateTime)
-	assert.True(t, ok, "updatedAt should be a DateTime")
+	assert.NotNil(t, user2["updatedat"])
+	updatedAt2, ok := user2["updatedat"].(primitive.DateTime)
+	assert.True(t, ok, "updatedat should be a DateTime")
 	assert.Equal(t, user2ID.Timestamp().UTC(), updatedAt2.Time().UTC())
 
-	// Test case 3: user3 already had updatedAt, should remain unchanged
+	// Test case 3: user3 already had updatedat, should remain unchanged
 	var user3 bson.M
 	err = userCollection.FindOne(ctx, bson.M{"id": "user3"}).Decode(&user3)
 	assert.NoError(t, err)
-	assert.NotNil(t, user3["updatedAt"])
-	updatedAt3, ok := user3["updatedAt"].(primitive.DateTime)
-	assert.True(t, ok, "updatedAt should be a DateTime")
+	assert.NotNil(t, user3["updatedat"])
+	updatedAt3, ok := user3["updatedat"].(primitive.DateTime)
+	assert.True(t, ok, "updatedat should be a DateTime")
 	expectedTime := time.Date(2023, 1, 1, 0, 0, 0, 0, time.UTC)
 	assert.Equal(t, expectedTime.UTC(), updatedAt3.Time().UTC())
 
@@ -109,7 +109,7 @@ func TestApplyUserUpdatedAtSchema(t *testing.T) {
 	var user1After bson.M
 	err = userCollection.FindOne(ctx, bson.M{"id": "user1"}).Decode(&user1After)
 	assert.NoError(t, err)
-	updatedAt1After, ok := user1After["updatedAt"].(primitive.DateTime)
+	updatedAt1After, ok := user1After["updatedat"].(primitive.DateTime)
 	assert.True(t, ok)
-	assert.Equal(t, updatedAt1.Time().UTC(), updatedAt1After.Time().UTC(), "updatedAt should not change on second run")
+	assert.Equal(t, updatedAt1.Time().UTC(), updatedAt1After.Time().UTC(), "updatedat should not change on second run")
 }

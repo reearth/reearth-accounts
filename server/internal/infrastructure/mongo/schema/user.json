@@ -90,7 +90,7 @@
         "bsonType": "string",
         "description": "User UI theme preference. Default: \"\" (deprecated, move to metadata)"
       },
-      "updatedAt": {
+      "updatedat": {
         "bsonType": "date",
         "description": "Last update timestamp"
       },
@@ -129,7 +129,7 @@
       "workspace",
       "password",
       "metadata",
-      "updatedAt"
+      "updatedat"
     ],
     "title": "User Collection Schema"
   }
