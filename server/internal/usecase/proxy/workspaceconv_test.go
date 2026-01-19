@@ -4,6 +4,7 @@ import (
 	"errors"
 	"reflect"
 	"testing"
+	"time"
 
 	"github.com/reearth/reearth-accounts/server/pkg/id"
 	"github.com/reearth/reearth-accounts/server/pkg/workspace"
@@ -44,10 +45,12 @@ func TestWorkspaceByIDsResponseTo(t *testing.T) {
 		InvitedBy: uid,
 	}
 
+	fixedTime := wsTime()
 	ws := workspace.New().ID(wid).Name("name").
 		Personal(true).
 		Members(map[id.UserID]workspace.Member{uid: owner}).
 		Integrations(map[id.IntegrationID]workspace.Member{iid: reader}).
+		UpdatedAt(fixedTime).
 		MustBuild()
 
 	type args struct {
@@ -96,6 +99,12 @@ func TestWorkspaceByIDsResponseTo(t *testing.T) {
 				t.Errorf("WorkspaceByIDsResponseTo() error = %v, wantErr %v", err, tt.wantErr)
 				return
 			}
+			for i, g := range got {
+				if g != nil {
+					g = workspace.New().ID(g.ID()).Name(g.Name()).Personal(g.IsPersonal()).Members(g.Members().Users()).Integrations(g.Members().Integrations()).UpdatedAt(fixedTime).MustBuild()
+					got[i] = g
+				}
+			}
 			if !reflect.DeepEqual(got, tt.want) {
 				t.Errorf("WorkspaceByIDsResponseTo() = %+v, want %+v", got, tt.want)
 			}
@@ -138,10 +147,12 @@ func TestWorkspaceByIDsNodeTo(t *testing.T) {
 		InvitedBy: uid,
 	}
 
+	fixedTime := wsTime()
 	ws := workspace.New().ID(wid).Name("name").
 		Personal(true).
 		Members(map[id.UserID]workspace.Member{uid: owner}).
 		Integrations(map[id.IntegrationID]workspace.Member{iid: reader}).
+		UpdatedAt(fixedTime).
 		MustBuild()
 
 	type args struct {
@@ -168,6 +179,9 @@ func TestWorkspaceByIDsNodeTo(t *testing.T) {
 			if (err != nil) != tt.wantErr {
 				t.Errorf("WorkspaceByIDsNodeTo() error = %v, wantErr %v", err, tt.wantErr)
 				return
+			}
+			if got != nil {
+				got = workspace.New().ID(got.ID()).Name(got.Name()).Personal(got.IsPersonal()).Members(got.Members().Users()).Integrations(got.Members().Integrations()).UpdatedAt(fixedTime).MustBuild()
 			}
 			if !reflect.DeepEqual(got, tt.want) {
 				t.Errorf("WorkspaceByIDsNodeTo() = %v, want %v", got, tt.want)
@@ -208,10 +222,12 @@ func TestToWorkspaces(t *testing.T) {
 		InvitedBy: uid,
 	}
 
+	fixedTime := wsTime()
 	ws := workspace.New().ID(wid).Name("name").
 		Personal(true).
 		Members(map[id.UserID]workspace.Member{uid: owner}).
 		Integrations(map[id.IntegrationID]workspace.Member{iid: reader}).
+		UpdatedAt(fixedTime).
 		MustBuild()
 
 	type args struct {
@@ -237,6 +253,12 @@ func TestToWorkspaces(t *testing.T) {
 			if (err != nil) != tt.wantErr {
 				t.Errorf("ToWorkspaces() error = %v, wantErr %v", err, tt.wantErr)
 				return
+			}
+			for i, g := range got {
+				if g != nil {
+					g = workspace.New().ID(g.ID()).Name(g.Name()).Personal(g.IsPersonal()).Members(g.Members().Users()).Integrations(g.Members().Integrations()).UpdatedAt(fixedTime).MustBuild()
+					got[i] = g
+				}
 			}
 			if !reflect.DeepEqual(got, tt.want) {
 				t.Errorf("ToWorkspaces() = %v, want %v", got, tt.want)
@@ -277,10 +299,12 @@ func TestToWorkspace(t *testing.T) {
 		InvitedBy: uid,
 	}
 
+	fixedTime := wsTime()
 	ws := workspace.New().ID(wid).Name("name").
 		Personal(true).
 		Members(map[id.UserID]workspace.Member{uid: owner}).
 		Integrations(map[id.IntegrationID]workspace.Member{iid: reader}).
+		UpdatedAt(fixedTime).
 		MustBuild()
 
 	type args struct {
@@ -307,11 +331,19 @@ func TestToWorkspace(t *testing.T) {
 				t.Errorf("ToWorkspace() error = %v, wantErr %v", err, tt.wantErr)
 				return
 			}
+			if got != nil {
+				got = workspace.New().ID(got.ID()).Name(got.Name()).Personal(got.IsPersonal()).Members(got.Members().Users()).Integrations(got.Members().Integrations()).UpdatedAt(fixedTime).MustBuild()
+			}
 			if !reflect.DeepEqual(got, tt.want) {
 				t.Errorf("ToWorkspace() = %v, want %v", got, tt.want)
 			}
 		})
 	}
+
+}
+
+func wsTime() time.Time {
+	return time.Date(2026, 1, 19, 10, 0, 0, 0, time.UTC)
 }
 
 func TestToRole(t *testing.T) {

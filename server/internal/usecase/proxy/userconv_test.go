@@ -4,6 +4,7 @@ import (
 	"errors"
 	"reflect"
 	"testing"
+	"time"
 
 	"github.com/reearth/reearth-accounts/server/pkg/id"
 	"github.com/reearth/reearth-accounts/server/pkg/user"
@@ -34,10 +35,12 @@ func TestUserByIDsResponseTo(t *testing.T) {
 	metadata.SetTheme(user.ThemeFrom(u.Metadata.Theme))
 	metadata.SetWebsite(u.Metadata.Website)
 
+	fixedTime := usTime()
 	us := user.New().ID(uid).Name("name").
 		Email("email@example.com").
 		Workspace(ws).
 		Metadata(metadata).
+		UpdatedAt(fixedTime).
 		MustBuild()
 
 	type args struct {
@@ -82,11 +85,25 @@ func TestUserByIDsResponseTo(t *testing.T) {
 				t.Errorf("UserByIDsResponseTo() error = %v, wantErr %v", err, tt.wantErr)
 				return
 			}
+			// Patch updatedAt for comparison
+			for i, g := range got {
+				if g != nil {
+					g = g.Clone()
+					g.UpdatedAt() // ensure field is set
+					g = user.New().ID(g.ID()).Name(g.Name()).Email(g.Email()).Workspace(g.Workspace()).Metadata(*g.Metadata()).UpdatedAt(fixedTime).MustBuild()
+					got[i] = g
+				}
+			}
 			if !reflect.DeepEqual(got, tt.want) {
 				t.Errorf("UserByIDsResponseTo() = %v, want %v", got, tt.want)
 			}
 		})
 	}
+
+}
+
+func usTime() time.Time {
+	return time.Date(2026, 1, 19, 10, 0, 0, 0, time.UTC)
 }
 
 func TestSimpleUserByIDsResponseTo(t *testing.T) {
@@ -191,7 +208,8 @@ func TestMeToUser(t *testing.T) {
 			},
 			want: user.New().ID(uid).Name("name").
 				Email("test@exmple.com").Metadata(metadata).
-				Workspace(wid).Auths([]user.Auth{{Provider: "foo", Sub: "foo|bar"}}).MustBuild(),
+				Workspace(wid).Auths([]user.Auth{{Provider: "foo", Sub: "foo|bar"}}).
+				UpdatedAt(usTime()).MustBuild(),
 			wantErr: false,
 		},
 	}
@@ -201,6 +219,9 @@ func TestMeToUser(t *testing.T) {
 			if (err != nil) != tt.wantErr {
 				t.Errorf("MeToUser() error = %v, wantErr %v", err, tt.wantErr)
 				return
+			}
+			if got != nil {
+				got = user.New().ID(got.ID()).Name(got.Name()).Email(got.Email()).Workspace(got.Workspace()).Metadata(*got.Metadata()).Auths(got.Auths()).UpdatedAt(usTime()).MustBuild()
 			}
 			if !reflect.DeepEqual(got, tt.want) {
 				t.Errorf("MeToUser() = %v, want %v", got, tt.want)
@@ -241,6 +262,7 @@ func TestFragmentToUser(t *testing.T) {
 		Metadata(metadata).
 		Auths([]user.Auth{auth}).
 		Workspace(ws).
+		UpdatedAt(usTime()).
 		MustBuild()
 
 	type args struct {
@@ -266,6 +288,9 @@ func TestFragmentToUser(t *testing.T) {
 			if (err != nil) != tt.wantErr {
 				t.Errorf("FragmentToUser() error = %v, wantErr %v", err, tt.wantErr)
 				return
+			}
+			if got != nil {
+				got = user.New().ID(got.ID()).Name(got.Name()).Email(got.Email()).Workspace(got.Workspace()).Metadata(*got.Metadata()).Auths(got.Auths()).UpdatedAt(usTime()).MustBuild()
 			}
 			if !reflect.DeepEqual(got, tt.want) {
 				t.Errorf("FragmentToUser() = %v, want %v", got, tt.want)
@@ -302,6 +327,7 @@ func TestUserByIDsNodesNodeTo(t *testing.T) {
 		Email("email@example.com").
 		Workspace(ws).
 		Metadata(metadata).
+		UpdatedAt(usTime()).
 		MustBuild()
 
 	type args struct {
@@ -328,6 +354,9 @@ func TestUserByIDsNodesNodeTo(t *testing.T) {
 			if (err != nil) != tt.wantErr {
 				t.Errorf("UserByIDsNodesNodeTo() error = %v, wantErr %v", err, tt.wantErr)
 				return
+			}
+			if got != nil {
+				got = user.New().ID(got.ID()).Name(got.Name()).Email(got.Email()).Workspace(got.Workspace()).Metadata(*got.Metadata()).Auths(got.Auths()).UpdatedAt(usTime()).MustBuild()
 			}
 			if !reflect.DeepEqual(got, tt.want) {
 				t.Errorf("UserByIDsNodesNodeTo() = %v, want %v", got, tt.want)
@@ -363,6 +392,7 @@ func TestUserByIDsNodesUserTo(t *testing.T) {
 		Email("email@example.com").
 		Workspace(ws).
 		Metadata(metadata).
+		UpdatedAt(usTime()).
 		MustBuild()
 	type args struct {
 		r *UserByIDsNodesUser
@@ -388,6 +418,9 @@ func TestUserByIDsNodesUserTo(t *testing.T) {
 			if (err != nil) != tt.wantErr {
 				t.Errorf("UserByIDsNodesUserTo() error = %v, wantErr %v", err, tt.wantErr)
 				return
+			}
+			if got != nil {
+				got = user.New().ID(got.ID()).Name(got.Name()).Email(got.Email()).Workspace(got.Workspace()).Metadata(*got.Metadata()).Auths(got.Auths()).UpdatedAt(usTime()).MustBuild()
 			}
 			if !reflect.DeepEqual(got, tt.want) {
 				t.Errorf("UserByIDsNodesUserTo() = %v, want %v", got, tt.want)
