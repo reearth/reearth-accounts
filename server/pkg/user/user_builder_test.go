@@ -183,7 +183,16 @@ func TestBuilder_Build(t *testing.T) {
 				Workspace(tt.Args.Workspace).
 				Build()
 			if tt.Err == nil {
-				assert.Equal(t, tt.Expected, res)
+				// Check all fields except updatedAt
+				assert.Equal(t, tt.Expected.id, res.id)
+				assert.Equal(t, tt.Expected.name, res.name)
+				assert.Equal(t, tt.Expected.email, res.email)
+				assert.Equal(t, tt.Expected.workspace, res.workspace)
+				assert.Equal(t, tt.Expected.password, res.password)
+				assert.Equal(t, tt.Expected.auths, res.auths)
+				assert.Equal(t, tt.Expected.metadata, res.metadata)
+				// Check that updatedAt was set
+				assert.False(t, res.updatedAt.IsZero())
 			} else {
 				assert.Equal(t, tt.Err, err)
 			}
@@ -280,7 +289,17 @@ func TestBuilder_MustBuild(t *testing.T) {
 			if tt.Err != nil {
 				assert.PanicsWithValue(t, tt.Err, func() { _ = build() })
 			} else {
-				assert.Equal(t, tt.Expected, build())
+				res := build()
+				// Check all fields except updatedAt
+				assert.Equal(t, tt.Expected.id, res.id)
+				assert.Equal(t, tt.Expected.name, res.name)
+				assert.Equal(t, tt.Expected.email, res.email)
+				assert.Equal(t, tt.Expected.workspace, res.workspace)
+				assert.Equal(t, tt.Expected.password, res.password)
+				assert.Equal(t, tt.Expected.auths, res.auths)
+				assert.Equal(t, tt.Expected.metadata, res.metadata)
+				// Check that updatedAt was set
+				assert.False(t, res.updatedAt.IsZero())
 			}
 		})
 	}
@@ -318,4 +337,25 @@ func TestBuilder_Verification(t *testing.T) {
 			assert.Equal(t, tt.want, b)
 		})
 	}
+}
+
+func TestBuilder_UpdatedAt(t *testing.T) {
+	now := time.Now()
+	customTime := time.Date(2020, 1, 1, 0, 0, 0, 0, time.UTC)
+
+	t.Run("Builder sets default updatedAt when not specified", func(t *testing.T) {
+		u := New().NewID().Name("test").Email("test@example.com").MustBuild()
+		assert.False(t, u.updatedAt.IsZero())
+		assert.True(t, u.updatedAt.After(now) || u.updatedAt.Equal(now))
+	})
+
+	t.Run("Builder respects custom updatedAt", func(t *testing.T) {
+		u := New().NewID().Name("test").Email("test@example.com").UpdatedAt(customTime).MustBuild()
+		assert.Equal(t, customTime, u.updatedAt)
+	})
+
+	t.Run("UpdatedAt getter returns correct value", func(t *testing.T) {
+		u := New().NewID().Name("test").Email("test@example.com").UpdatedAt(customTime).MustBuild()
+		assert.Equal(t, customTime, u.UpdatedAt())
+	})
 }

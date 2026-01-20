@@ -103,6 +103,10 @@
       "policy": {
         "bsonType": "string",
         "description": "Policy ID reference. Default: \"\""
+      },
+      "updatedat": {
+        "bsonType": "date",
+        "description": "Last update timestamp"
       }
     },
     "required": [
@@ -112,7 +116,8 @@
       "email",
       "metadata",
       "members",
-      "personal"
+      "personal",
+      "updatedat"
     ],
     "title": "Workspace Collection Schema"
   }

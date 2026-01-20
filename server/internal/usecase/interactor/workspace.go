@@ -322,7 +322,7 @@ func (i *Workspace) RemoveIntegrations(ctx context.Context, wId workspace.ID, iI
 			return nil, err
 		}
 
-		err = ws.Members().DeleteIntegrations(iIDs)
+		err = ws.DeleteIntegrations(iIDs)
 		if err != nil {
 			return nil, err
 		}

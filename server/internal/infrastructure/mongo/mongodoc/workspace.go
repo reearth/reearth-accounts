@@ -1,6 +1,8 @@
 package mongodoc
 
 import (
+	"time"
+
 	"github.com/reearth/reearth-accounts/server/pkg/id"
 	"github.com/reearth/reearth-accounts/server/pkg/workspace"
 	"github.com/samber/lo"
@@ -31,6 +33,7 @@ type WorkspaceDocument struct {
 	MembersHash  string                             `json:"members_hash" bson:"members_hash,omitempty" jsonschema:"description=SHA256 hash of members and integrations for uniqueness tracking. Default: \"\""`
 	Personal     bool                               `json:"personal" bson:"personal" jsonschema:"required,description=Whether this is a personal workspace. Default: false"`
 	Policy       string                             `json:"policy" bson:"policy,omitempty" jsonschema:"description=Policy ID reference. Default: \"\""`
+	UpdatedAt    time.Time                          `json:"updatedat" bson:"updatedat" jsonschema:"required,description=Last update timestamp"`
 }
 
 func NewWorkspace(ws *workspace.Workspace) (*WorkspaceDocument, string) {
@@ -80,6 +83,7 @@ func NewWorkspace(ws *workspace.Workspace) (*WorkspaceDocument, string) {
 		MembersHash:  membersHash,
 		Personal:     ws.IsPersonal(),
 		Policy:       lo.FromPtr(ws.Policy()).String(),
+		UpdatedAt:    ws.UpdatedAt(),
 	}, wId
 }
 
@@ -140,6 +144,7 @@ func (d *WorkspaceDocument) Model() (*workspace.Workspace, error) {
 		Integrations(integrations).
 		Personal(d.Personal).
 		Policy(policy).
+		UpdatedAt(d.UpdatedAt).
 		Build()
 }
 

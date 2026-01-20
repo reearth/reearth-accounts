@@ -90,6 +90,10 @@
         "bsonType": "string",
         "description": "User UI theme preference. Default: \"\" (deprecated, move to metadata)"
       },
+      "updatedat": {
+        "bsonType": "date",
+        "description": "Last update timestamp"
+      },
       "verification": {
         "bsonType": [
           "object",
@@ -124,7 +128,8 @@
       "subs",
       "workspace",
       "password",
-      "metadata"
+      "metadata",
+      "updatedat"
     ],
     "title": "User Collection Schema"
   }

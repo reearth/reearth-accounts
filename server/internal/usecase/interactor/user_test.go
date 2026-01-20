@@ -12,6 +12,7 @@ import (
 	"github.com/reearth/reearth-accounts/server/pkg/user"
 	"github.com/reearth/reearthx/mailer"
 	"github.com/reearth/reearthx/rerror"
+	"github.com/reearth/reearthx/util"
 
 	"github.com/stretchr/testify/assert"
 )
@@ -22,7 +23,10 @@ func TestUser_VerifyUser(t *testing.T) {
 	tid := id.NewWorkspaceID()
 	r := memory.New()
 	uc := NewUser(r, nil, "", "")
-	expired := time.Now().Add(24 * time.Hour)
+	fixedNow := time.Date(2026, 1, 19, 10, 0, 0, 0, time.UTC)
+	expired := fixedNow.Add(24 * time.Hour)
+	restoreNow := util.MockNow(fixedNow)
+	defer restoreNow()
 	tests := []struct {
 		name             string
 		code             string
@@ -63,7 +67,7 @@ func TestUser_VerifyUser(t *testing.T) {
 				Name("NAME").
 				Email("aaa@bbb.com").
 				PasswordPlainText("PAss00!!").
-				Verification(user.VerificationFrom("code", time.Now().Add(-24*time.Hour), false)).
+				Verification(user.VerificationFrom("code", fixedNow.Add(-24*time.Hour), false)).
 				MustBuild(),
 			wantError: errors.New("verification expired"),
 		},
@@ -94,7 +98,17 @@ func TestUser_VerifyUser(t *testing.T) {
 			u, err := uc.VerifyUser(ctx, tt.code)
 
 			if tt.wantUser != nil {
-				assert.Equal(t, tt.wantUser(u), u)
+				expectedUser := tt.wantUser(u)
+				assert.NotNil(t, u)
+				assert.Equal(t, expectedUser.ID(), u.ID())
+				assert.Equal(t, expectedUser.Name(), u.Name())
+				assert.Equal(t, expectedUser.Alias(), u.Alias())
+				assert.Equal(t, expectedUser.Email(), u.Email())
+				assert.Equal(t, expectedUser.Workspace(), u.Workspace())
+				assert.Equal(t, expectedUser.Auths(), u.Auths())
+				assert.Equal(t, expectedUser.Metadata(), u.Metadata())
+				assert.Equal(t, expectedUser.Verification(), u.Verification())
+				assert.NotZero(t, u.UpdatedAt(), "updatedAt should be set")
 			} else {
 				assert.Nil(t, u)
 			}

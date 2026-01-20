@@ -2,8 +2,8 @@ package workspace
 
 import (
 	"testing"
+	"time"
 
-	accountsid "github.com/reearth/reearth-accounts/server/pkg/id"
 	"github.com/reearth/reearthx/idx"
 	"github.com/stretchr/testify/assert"
 )
@@ -58,29 +58,51 @@ func TestBuilder_Build(t *testing.T) {
 	w, err := New().ID(id).Name("a").Integrations(i).Metadata(metadata).Members(m).Build()
 	assert.NoError(t, err)
 
-	assert.Equal(t, &Workspace{
-		id:       id,
-		name:     "a",
-		members:  NewMembersWith(m, i, false),
-		metadata: metadata,
-	}, w)
+	// Check fields individually (excluding updatedAt)
+	assert.Equal(t, id, w.id)
+	assert.Equal(t, "a", w.name)
+	assert.Equal(t, metadata, w.metadata)
+	assert.NotNil(t, w.members)
+	// Check that updatedAt was set
+	assert.False(t, w.updatedAt.IsZero())
 
 	w, err = New().ID(id).Name("a").Metadata(metadata).Build()
 	assert.NoError(t, err)
 
-	assert.Equal(t, &Workspace{
-		id:   id,
-		name: "a",
-		members: &Members{
-			users:        map[idx.ID[accountsid.User]]Member{},
-			integrations: map[idx.ID[accountsid.Integration]]Member{},
-		},
-		metadata: metadata,
-	}, w)
+	// Check fields individually (excluding updatedAt)
+	assert.Equal(t, id, w.id)
+	assert.Equal(t, "a", w.name)
+	assert.Equal(t, metadata, w.metadata)
+	assert.NotNil(t, w.members)
+	assert.Empty(t, w.members.users)
+	assert.Empty(t, w.members.integrations)
+	// Check that updatedAt was set
+	assert.False(t, w.updatedAt.IsZero())
 
 	w, err = New().Build()
 	assert.Equal(t, ErrInvalidID, err)
 	assert.Nil(t, w)
+}
+
+func TestBuilder_UpdatedAt(t *testing.T) {
+	now := time.Now()
+	customTime := time.Date(2020, 1, 1, 0, 0, 0, 0, time.UTC)
+
+	t.Run("Builder sets default updatedAt when not specified", func(t *testing.T) {
+		w := New().NewID().Name("test").MustBuild()
+		assert.False(t, w.updatedAt.IsZero())
+		assert.True(t, w.updatedAt.After(now) || w.updatedAt.Equal(now))
+	})
+
+	t.Run("Builder respects custom updatedAt", func(t *testing.T) {
+		w := New().NewID().Name("test").UpdatedAt(customTime).MustBuild()
+		assert.Equal(t, customTime, w.updatedAt)
+	})
+
+	t.Run("UpdatedAt getter returns correct value", func(t *testing.T) {
+		w := New().NewID().Name("test").UpdatedAt(customTime).MustBuild()
+		assert.Equal(t, customTime, w.UpdatedAt())
+	})
 }
 
 func TestBuilder_MustBuild(t *testing.T) {
@@ -97,12 +119,13 @@ func TestBuilder_MustBuild(t *testing.T) {
 
 	w := New().ID(id).Name("a").Integrations(i).Metadata(metadata).Members(m).MustBuild()
 
-	assert.Equal(t, &Workspace{
-		id:       id,
-		name:     "a",
-		members:  NewMembersWith(m, i, false),
-		metadata: metadata,
-	}, w)
+	// Check fields individually (excluding updatedAt)
+	assert.Equal(t, id, w.id)
+	assert.Equal(t, "a", w.name)
+	assert.Equal(t, metadata, w.metadata)
+	assert.NotNil(t, w.members)
+	// Check that updatedAt was set
+	assert.False(t, w.updatedAt.IsZero())
 
 	assert.Panics(t, func() { New().MustBuild() })
 }

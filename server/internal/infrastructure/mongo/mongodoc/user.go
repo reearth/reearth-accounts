@@ -28,6 +28,7 @@ type UserDocument struct {
 	PasswordReset *PasswordResetDocument `json:"passwordreset" bson:"passwordreset" jsonschema:"description=Password reset token information"`
 	Verification  *UserVerificationDoc   `json:"verification" bson:"verification" jsonschema:"description=Email verification state. Default: null"`
 	Metadata      UserMetadataDoc        `json:"metadata" bson:"metadata" jsonschema:"required,description=Extended user metadata. Default: {}"`
+	UpdatedAt     time.Time              `json:"updatedat" bson:"updatedat" jsonschema:"required,description=Last update timestamp"`
 }
 
 type UserVerificationDoc struct {
@@ -88,6 +89,7 @@ func NewUser(user *user.User) (*UserDocument, string) {
 		Password:      user.Password(),
 		PasswordReset: pwdResetDoc,
 		Metadata:      metadataDoc,
+		UpdatedAt:     user.UpdatedAt(),
 	}, id
 }
 
@@ -140,6 +142,7 @@ func (d *UserDocument) Model() (*user.User, error) {
 		Verification(v).
 		EncodedPassword(d.Password).
 		PasswordReset(d.PasswordReset.Model()).
+		UpdatedAt(d.UpdatedAt).
 		Build()
 
 	if err != nil {
