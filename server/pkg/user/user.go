@@ -228,7 +228,7 @@ func (u *User) Clone() *User {
 		metadata:      u.metadata,
 		verification:  util.CloneRef(u.verification),
 		passwordReset: util.CloneRef(u.passwordReset),
-		updatedAt:     u.updatedAt,
+		updatedAt:     time.Now(),
 	}
 }
 
