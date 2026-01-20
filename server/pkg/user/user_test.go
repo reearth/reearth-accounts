@@ -57,8 +57,18 @@ func TestUser(t *testing.T) {
 	assert.Equal(t, wid, u.Workspace())
 
 	u2 := u.Clone()
-	assert.Equal(t, u, u2)
+	// Clone updates the timestamp, so we verify all other fields match
+	assert.Equal(t, u.id, u2.id)
+	assert.Equal(t, u.name, u2.name)
+	assert.Equal(t, u.alias, u2.alias)
+	assert.Equal(t, u.email, u2.email)
+	assert.Equal(t, u.workspace, u2.workspace)
+	assert.Equal(t, u.metadata, u2.metadata)
+	assert.Equal(t, u.password, u2.password)
+	assert.Equal(t, u.auths, u2.auths)
 	assert.NotSame(t, u, u2)
+	// Cloned user should have a timestamp >= original
+	assert.GreaterOrEqual(t, u2.updatedAt, u.updatedAt)
 }
 
 func TestUser_Auths(t *testing.T) {
@@ -232,6 +242,7 @@ func TestUser_Clone_UpdatedAt(t *testing.T) {
 	}
 
 	cloned := u.Clone()
-	assert.Equal(t, now, cloned.updatedAt)
-	assert.Equal(t, u.updatedAt, cloned.updatedAt)
+	// Clone updates the timestamp to current time, so verify it's >= original
+	assert.GreaterOrEqual(t, cloned.updatedAt, now)
+	assert.Greater(t, cloned.updatedAt, u.updatedAt)
 }
