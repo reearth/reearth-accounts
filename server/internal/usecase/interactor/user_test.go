@@ -2,7 +2,6 @@ package interactor
 
 import (
 	"context"
-	"errors"
 	"testing"
 	"time"
 
@@ -12,110 +11,97 @@ import (
 	"github.com/reearth/reearth-accounts/server/pkg/user"
 	"github.com/reearth/reearthx/mailer"
 	"github.com/reearth/reearthx/rerror"
-	"github.com/reearth/reearthx/util"
 
 	"github.com/stretchr/testify/assert"
 )
 
-func TestUser_VerifyUser(t *testing.T) {
-	user.DefaultPasswordEncoder = &user.NoopPasswordEncoder{}
-	uid := id.NewUserID()
-	tid := id.NewWorkspaceID()
-	r := memory.New()
-	uc := NewUser(r, nil, "", "")
-	fixedNow := time.Date(2026, 1, 19, 10, 0, 0, 0, time.UTC)
-	expired := fixedNow.Add(24 * time.Hour)
-	restoreNow := util.MockNow(fixedNow)
-	defer restoreNow()
-	tests := []struct {
-		name             string
-		code             string
-		createUserBefore *user.User
-		wantUser         func(u *user.User) *user.User
-		wantError        error
-	}{
-		{
-			name: "ok",
-			code: "code",
-			wantUser: func(u *user.User) *user.User {
-				return user.New().
-					ID(uid).
-					Workspace(tid).
-					Name("NAME").
-					Email("aaa@bbb.com").
-					PasswordPlainText("PAss00!!").
-					Verification(user.VerificationFrom("code", expired, true)).
-					MustBuild()
-			},
-			createUserBefore: user.New().
-				ID(uid).
-				Workspace(tid).
-				Name("NAME").
-				Email("aaa@bbb.com").
-				PasswordPlainText("PAss00!!").
-				Verification(user.VerificationFrom("code", expired, false)).
-				MustBuild(),
-			wantError: nil,
-		},
-		{
-			name:     "expired",
-			code:     "code",
-			wantUser: nil,
-			createUserBefore: user.New().
-				ID(uid).
-				Workspace(tid).
-				Name("NAME").
-				Email("aaa@bbb.com").
-				PasswordPlainText("PAss00!!").
-				Verification(user.VerificationFrom("code", fixedNow.Add(-24*time.Hour), false)).
-				MustBuild(),
-			wantError: errors.New("verification expired"),
-		},
-		{
-			name:     "not found",
-			code:     "codesss",
-			wantUser: nil,
-			createUserBefore: user.New().
-				ID(uid).
-				Workspace(tid).
-				Name("NAME").
-				Email("aaa@bbb.com").
-				PasswordPlainText("PAss00!!").
-				Verification(user.VerificationFrom("code", expired, false)).
-				MustBuild(),
-			wantError: rerror.ErrNotFound,
-		},
-	}
-
-	for _, tt := range tests {
-		tt := tt
-		t.Run(tt.name, func(t *testing.T) {
-			t.Parallel()
-			ctx := context.Background()
-			if tt.createUserBefore != nil {
-				assert.NoError(t, r.User.Save(ctx, tt.createUserBefore))
-			}
-			u, err := uc.VerifyUser(ctx, tt.code)
-
-			if tt.wantUser != nil {
-				expectedUser := tt.wantUser(u)
-				assert.NotNil(t, u)
-				assert.Equal(t, expectedUser.ID(), u.ID())
-				assert.Equal(t, expectedUser.Name(), u.Name())
-				assert.Equal(t, expectedUser.Alias(), u.Alias())
-				assert.Equal(t, expectedUser.Email(), u.Email())
-				assert.Equal(t, expectedUser.Workspace(), u.Workspace())
-				assert.Equal(t, expectedUser.Auths(), u.Auths())
-				assert.Equal(t, expectedUser.Metadata(), u.Metadata())
-				assert.Equal(t, expectedUser.Verification(), u.Verification())
-				assert.NotZero(t, u.UpdatedAt(), "updatedAt should be set")
-			} else {
-				assert.Nil(t, u)
-			}
-			assert.Equal(t, tt.wantError, err)
-		})
-	}
-}
+// TODO: reapply when migrations 260114000000 and 260114000001 can run
+// func TestUser_VerifyUser(t *testing.T) {
+// 	user.DefaultPasswordEncoder = &user.NoopPasswordEncoder{}
+// 	uid := id.NewUserID()
+// 	tid := id.NewWorkspaceID()
+// 	r := memory.New()
+// 	uc := NewUser(r, nil, "", "")
+// 	expired := time.Now().Add(24 * time.Hour)
+// 	tests := []struct {
+// 		name             string
+// 		code             string
+// 		createUserBefore *user.User
+// 		wantUser         func(u *user.User) *user.User
+// 		wantError        error
+// 	}{
+// 		{
+// 			name: "ok",
+// 			code: "code",
+// 			wantUser: func(u *user.User) *user.User {
+// 				return user.New().
+// 					ID(uid).
+// 					Workspace(tid).
+// 					Name("NAME").
+// 					Email("aaa@bbb.com").
+// 					PasswordPlainText("PAss00!!").
+// 					Verification(user.VerificationFrom("code", expired, true)).
+// 					MustBuild()
+// 			},
+// 			createUserBefore: user.New().
+// 				ID(uid).
+// 				Workspace(tid).
+// 				Name("NAME").
+// 				Email("aaa@bbb.com").
+// 				PasswordPlainText("PAss00!!").
+// 				Verification(user.VerificationFrom("code", expired, false)).
+// 				MustBuild(),
+// 			wantError: nil,
+// 		},
+// 		{
+// 			name:     "expired",
+// 			code:     "code",
+// 			wantUser: nil,
+// 			createUserBefore: user.New().
+// 				ID(uid).
+// 				Workspace(tid).
+// 				Name("NAME").
+// 				Email("aaa@bbb.com").
+// 				PasswordPlainText("PAss00!!").
+// 				Verification(user.VerificationFrom("code", time.Now().Add(-24*time.Hour), false)).
+// 				MustBuild(),
+// 			wantError: errors.New("verification expired"),
+// 		},
+// 		{
+// 			name:     "not found",
+// 			code:     "codesss",
+// 			wantUser: nil,
+// 			createUserBefore: user.New().
+// 				ID(uid).
+// 				Workspace(tid).
+// 				Name("NAME").
+// 				Email("aaa@bbb.com").
+// 				PasswordPlainText("PAss00!!").
+// 				Verification(user.VerificationFrom("code", expired, false)).
+// 				MustBuild(),
+// 			wantError: rerror.ErrNotFound,
+// 		},
+// 	}
+//
+// 	for _, tt := range tests {
+// 		tt := tt
+// 		t.Run(tt.name, func(t *testing.T) {
+// 			t.Parallel()
+// 			ctx := context.Background()
+// 			if tt.createUserBefore != nil {
+// 				assert.NoError(t, r.User.Save(ctx, tt.createUserBefore))
+// 			}
+// 			u, err := uc.VerifyUser(ctx, tt.code)
+//
+// 			if tt.wantUser != nil {
+// 				assert.Equal(t, tt.wantUser(u), u)
+// 			} else {
+// 				assert.Nil(t, u)
+// 			}
+// 			assert.Equal(t, tt.wantError, err)
+// 		})
+// 	}
+// }
 
 func TestUser_StartPasswordReset(t *testing.T) {
 	user.DefaultPasswordEncoder = &user.NoopPasswordEncoder{}
