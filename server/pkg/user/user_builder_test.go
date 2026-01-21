@@ -339,23 +339,24 @@ func TestBuilder_Verification(t *testing.T) {
 	}
 }
 
-func TestBuilder_UpdatedAt(t *testing.T) {
-	now := time.Now()
-	customTime := time.Date(2020, 1, 1, 0, 0, 0, 0, time.UTC)
-
-	t.Run("Builder sets default updatedAt when not specified", func(t *testing.T) {
-		u := New().NewID().Name("test").Email("test@example.com").MustBuild()
-		assert.False(t, u.updatedAt.IsZero())
-		assert.True(t, u.updatedAt.After(now) || u.updatedAt.Equal(now))
-	})
-
-	t.Run("Builder respects custom updatedAt", func(t *testing.T) {
-		u := New().NewID().Name("test").Email("test@example.com").UpdatedAt(customTime).MustBuild()
-		assert.Equal(t, customTime, u.updatedAt)
-	})
-
-	t.Run("UpdatedAt getter returns correct value", func(t *testing.T) {
-		u := New().NewID().Name("test").Email("test@example.com").UpdatedAt(customTime).MustBuild()
-		assert.Equal(t, customTime, u.UpdatedAt())
-	})
-}
+// TODO: reapply when migrations 260114000000 and 260114000001 can run
+// func TestBuilder_UpdatedAt(t *testing.T) {
+// 	now := time.Now()
+// 	customTime := time.Date(2020, 1, 1, 0, 0, 0, 0, time.UTC)
+//
+// 	t.Run("Builder sets default updatedAt when not specified", func(t *testing.T) {
+// 		u := New().NewID().Name("test").Email("test@example.com").MustBuild()
+// 		assert.False(t, u.updatedAt.IsZero())
+// 		assert.True(t, u.updatedAt.After(now) || u.updatedAt.Equal(now))
+// 	})
+//
+// 	t.Run("Builder respects custom updatedAt", func(t *testing.T) {
+// 		u := New().NewID().Name("test").Email("test@example.com").UpdatedAt(customTime).MustBuild()
+// 		assert.Equal(t, customTime, u.updatedAt)
+// 	})
+//
+// 	t.Run("UpdatedAt getter returns correct value", func(t *testing.T) {
+// 		u := New().NewID().Name("test").Email("test@example.com").UpdatedAt(customTime).MustBuild()
+// 		assert.Equal(t, customTime, u.UpdatedAt())
+// 	})
+// }

@@ -38,6 +38,7 @@ var migrations = migration.Migrations[DBClient]{
 	// 251224140400: ApplyCollectionSchemas1,
 	260108175500: FixPermittableRoleIDs,
 	260109104153: FixPermittableWorkspaceRoles,
-	260114000000: ApplyUserUpdatedAtSchema,
-	260114000001: ApplyWorkspaceUpdatedAtSchema,
+	// TODO: need to verify MongoDB permission to use `listCollections` to apply the migrations below
+	// 260114000000: ApplyUserUpdatedAtSchema,
+	// 260114000001: ApplyWorkspaceUpdatedAtSchema,
 }

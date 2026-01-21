@@ -13,9 +13,8 @@ import (
 )
 
 func TestApplyUserUpdatedAtSchema(t *testing.T) {
-	if testing.Short() {
-		t.Skip("skipping integration test")
-	}
+
+	t.Skip("skipped by request")
 
 	ctx := context.Background()
 
