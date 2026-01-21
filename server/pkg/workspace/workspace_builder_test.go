@@ -2,7 +2,6 @@ package workspace
 
 import (
 	"testing"
-	"time"
 
 	"github.com/reearth/reearthx/idx"
 	"github.com/stretchr/testify/assert"
@@ -84,26 +83,27 @@ func TestBuilder_Build(t *testing.T) {
 	assert.Nil(t, w)
 }
 
-func TestBuilder_UpdatedAt(t *testing.T) {
-	now := time.Now()
-	customTime := time.Date(2020, 1, 1, 0, 0, 0, 0, time.UTC)
-
-	t.Run("Builder sets default updatedAt when not specified", func(t *testing.T) {
-		w := New().NewID().Name("test").MustBuild()
-		assert.False(t, w.updatedAt.IsZero())
-		assert.True(t, w.updatedAt.After(now) || w.updatedAt.Equal(now))
-	})
-
-	t.Run("Builder respects custom updatedAt", func(t *testing.T) {
-		w := New().NewID().Name("test").UpdatedAt(customTime).MustBuild()
-		assert.Equal(t, customTime, w.updatedAt)
-	})
-
-	t.Run("UpdatedAt getter returns correct value", func(t *testing.T) {
-		w := New().NewID().Name("test").UpdatedAt(customTime).MustBuild()
-		assert.Equal(t, customTime, w.UpdatedAt())
-	})
-}
+// TODO: reapply when migrations 260114000000 and 260114000001 can run
+// func TestBuilder_UpdatedAt(t *testing.T) {
+// 	now := time.Now()
+// 	customTime := time.Date(2020, 1, 1, 0, 0, 0, 0, time.UTC)
+//
+// 	t.Run("Builder sets default updatedAt when not specified", func(t *testing.T) {
+// 		w := New().NewID().Name("test").MustBuild()
+// 		assert.False(t, w.updatedAt.IsZero())
+// 		assert.True(t, w.updatedAt.After(now) || w.updatedAt.Equal(now))
+// 	})
+//
+// 	t.Run("Builder respects custom updatedAt", func(t *testing.T) {
+// 		w := New().NewID().Name("test").UpdatedAt(customTime).MustBuild()
+// 		assert.Equal(t, customTime, w.updatedAt)
+// 	})
+//
+// 	t.Run("UpdatedAt getter returns correct value", func(t *testing.T) {
+// 		w := New().NewID().Name("test").UpdatedAt(customTime).MustBuild()
+// 		assert.Equal(t, customTime, w.UpdatedAt())
+// 	})
+// }
 
 func TestBuilder_MustBuild(t *testing.T) {
 	m := map[UserID]Member{NewUserID(): {Role: RoleOwner}}
