@@ -24,12 +24,6 @@ var migrations = migration.Migrations[DBClient]{
 	251114101525: SyncUserNameToWorkspace,
 	251119144500: AddWorkspaceMembersHash,
 	251120200000: GenerateMissingWorkspaceAliases,
-	251120210000: AddCaseInsensitiveWorkspaceAliasIndex,
-	251120220000: ReplaceWorkspaceAliasMembersIndex,
-	251209140000: GenerateMissingUserAliases,
-	251209150000: AddCaseInsensitiveUserAliasIndex,
-	251209160000: AddCaseInsensitiveUserEmailIndex,
-	251209170000: AddCaseInsensitiveUserWorkspaceIndex,
 	251209170001: AddRoles,
 	251209170002: MoveWorkspaceMembersRoleToPermittable,
 	// TODO:
@@ -41,4 +35,10 @@ var migrations = migration.Migrations[DBClient]{
 	// TODO: need to verify MongoDB permission to use `listCollections` to apply the migrations below
 	// 260114000000: ApplyUserUpdatedAtSchema,
 	// 260114000001: ApplyWorkspaceUpdatedAtSchema,
+	260122110000: AddCaseInsensitiveWorkspaceAliasIndex,
+	260122110001: ReplaceWorkspaceAliasMembersIndex,
+	260122110002: GenerateMissingUserAliases,
+	260122110003: AddCaseInsensitiveUserAliasIndex,
+	260122110004: AddCaseInsensitiveUserEmailIndex,
+	260122110005: AddCaseInsensitiveUserWorkspaceIndex,
 }
