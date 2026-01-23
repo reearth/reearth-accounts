@@ -41,6 +41,19 @@ type AddUsersToWorkspacePayload struct {
 	Workspace *Workspace `json:"workspace"`
 }
 
+// Authentication configuration for client applications.
+// This is used by external services to configure their auth providers.
+type AuthConfig struct {
+	// Auth0 domain URL (e.g., https://example.auth0.com)
+	Auth0Domain *string `json:"auth0Domain,omitempty"`
+	// Auth0 API audience
+	Auth0Audience *string `json:"auth0Audience,omitempty"`
+	// Auth0 web client ID (public, safe to expose)
+	Auth0ClientID *string `json:"auth0ClientId,omitempty"`
+	// Authentication provider type
+	AuthProvider *string `json:"authProvider,omitempty"`
+}
+
 type CheckPermissionInput struct {
 	Service        string  `json:"service"`
 	Resource       string  `json:"resource"`

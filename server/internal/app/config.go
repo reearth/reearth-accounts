@@ -189,3 +189,16 @@ func (c Config) Print() string {
 	}
 	return s
 }
+
+// Auth0ConfigProvider interface implementation
+func (c Config) GetAuth0Domain() string {
+	return c.Auth0.Domain
+}
+
+func (c Config) GetAuth0Audience() string {
+	return c.Auth0.Audience
+}
+
+func (c Config) GetAuth0WebClientID() string {
+	return c.Auth0.WebClientID
+}

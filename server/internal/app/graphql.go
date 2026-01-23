@@ -100,6 +100,7 @@ func GraphqlAPI(conf *Config, dev bool) echo.HandlerFunc {
 
 		usecases := adapter.Usecases(ctx)
 		ctx = gql.AttachUsecases(ctx, usecases, str, enableDataLoaders)
+		ctx = adapter.AttachConfig(ctx, conf)
 		c.SetRequest(req.WithContext(ctx))
 
 		srv.ServeHTTP(c.Response(), c.Request())

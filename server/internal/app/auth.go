@@ -65,6 +65,7 @@ func isBypassed(req *http.Request) bool {
 		"findbyid(",
 		"findbyalias(",
 		"createverification(",
+		"authconfig",
 	}
 
 	for _, q := range list {

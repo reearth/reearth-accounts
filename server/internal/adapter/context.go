@@ -19,6 +19,7 @@ const (
 	contextUser     ContextKey = "user"
 	contextOperator ContextKey = "operator"
 	contextUsecases ContextKey = "usecases"
+	contextConfig   ContextKey = "config"
 )
 
 func AttachUser(ctx context.Context, u *user.User) context.Context {
@@ -63,4 +64,12 @@ func GetAuthInfo(ctx context.Context) *appx.AuthInfo {
 
 func Usecases(ctx context.Context) *interfaces.Container {
 	return ctx.Value(contextUsecases).(*interfaces.Container)
+}
+
+func AttachConfig(ctx context.Context, config interface{}) context.Context {
+	return context.WithValue(ctx, contextConfig, config)
+}
+
+func GetConfig(ctx context.Context) interface{} {
+	return ctx.Value(contextConfig)
 }
