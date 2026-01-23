@@ -56,6 +56,13 @@ type ComplexityRoot struct {
 		Workspace func(childComplexity int) int
 	}
 
+	AuthConfig struct {
+		Auth0Audience func(childComplexity int) int
+		Auth0ClientID func(childComplexity int) int
+		Auth0Domain   func(childComplexity int) int
+		AuthProvider  func(childComplexity int) int
+	}
+
 	CheckPermissionPayload struct {
 		Allowed func(childComplexity int) int
 	}
@@ -124,6 +131,7 @@ type ComplexityRoot struct {
 	}
 
 	Query struct {
+		AuthConfig               func(childComplexity int) int
 		CheckPermission          func(childComplexity int, input gqlmodel.CheckPermissionInput) int
 		FindByAlias              func(childComplexity int, alias string) int
 		FindByID                 func(childComplexity int, id gqlmodel.ID) int
@@ -139,6 +147,7 @@ type ComplexityRoot struct {
 		Nodes                    func(childComplexity int, id []gqlmodel.ID, typeArg gqlmodel.NodeType) int
 		Roles                    func(childComplexity int) int
 		SearchUser               func(childComplexity int, keyword string) int
+		User                     func(childComplexity int, id gqlmodel.ID) int
 		UserByNameOrEmail        func(childComplexity int, nameOrEmail string) int
 	}
 
@@ -294,10 +303,12 @@ type MutationResolver interface {
 type QueryResolver interface {
 	Node(ctx context.Context, id gqlmodel.ID, typeArg gqlmodel.NodeType) (gqlmodel.Node, error)
 	Nodes(ctx context.Context, id []gqlmodel.ID, typeArg gqlmodel.NodeType) ([]gqlmodel.Node, error)
+	AuthConfig(ctx context.Context) (*gqlmodel.AuthConfig, error)
 	CheckPermission(ctx context.Context, input gqlmodel.CheckPermissionInput) (*gqlmodel.CheckPermissionPayload, error)
 	Roles(ctx context.Context) (*gqlmodel.RolesPayload, error)
 	GetUsersWithRoles(ctx context.Context) (*gqlmodel.GetUsersWithRolesPayload, error)
 	Me(ctx context.Context) (*gqlmodel.Me, error)
+	User(ctx context.Context, id gqlmodel.ID) (*gqlmodel.User, error)
 	UserByNameOrEmail(ctx context.Context, nameOrEmail string) (*gqlmodel.User, error)
 	SearchUser(ctx context.Context, keyword string) ([]*gqlmodel.User, error)
 	FindUsersByIDs(ctx context.Context, ids []gqlmodel.ID) ([]*gqlmodel.User, error)
@@ -345,6 +356,31 @@ func (e *executableSchema) Complexity(ctx context.Context, typeName, field strin
 		}
 
 		return e.complexity.AddUsersToWorkspacePayload.Workspace(childComplexity), true
+
+	case "AuthConfig.auth0Audience":
+		if e.complexity.AuthConfig.Auth0Audience == nil {
+			break
+		}
+
+		return e.complexity.AuthConfig.Auth0Audience(childComplexity), true
+	case "AuthConfig.auth0ClientId":
+		if e.complexity.AuthConfig.Auth0ClientID == nil {
+			break
+		}
+
+		return e.complexity.AuthConfig.Auth0ClientID(childComplexity), true
+	case "AuthConfig.auth0Domain":
+		if e.complexity.AuthConfig.Auth0Domain == nil {
+			break
+		}
+
+		return e.complexity.AuthConfig.Auth0Domain(childComplexity), true
+	case "AuthConfig.authProvider":
+		if e.complexity.AuthConfig.AuthProvider == nil {
+			break
+		}
+
+		return e.complexity.AuthConfig.AuthProvider(childComplexity), true
 
 	case "CheckPermissionPayload.allowed":
 		if e.complexity.CheckPermissionPayload.Allowed == nil {
@@ -742,6 +778,12 @@ func (e *executableSchema) Complexity(ctx context.Context, typeName, field strin
 
 		return e.complexity.Permittable.UserID(childComplexity), true
 
+	case "Query.authConfig":
+		if e.complexity.Query.AuthConfig == nil {
+			break
+		}
+
+		return e.complexity.Query.AuthConfig(childComplexity), true
 	case "Query.checkPermission":
 		if e.complexity.Query.CheckPermission == nil {
 			break
@@ -892,6 +934,17 @@ func (e *executableSchema) Complexity(ctx context.Context, typeName, field strin
 		}
 
 		return e.complexity.Query.SearchUser(childComplexity, args["keyword"].(string)), true
+	case "Query.user":
+		if e.complexity.Query.User == nil {
+			break
+		}
+
+		args, err := ec.field_Query_user_args(ctx, rawArgs)
+		if err != nil {
+			return 0, false
+		}
+
+		return e.complexity.Query.User(childComplexity, args["id"].(gqlmodel.ID)), true
 	case "Query.userByNameOrEmail":
 		if e.complexity.Query.UserByNameOrEmail == nil {
 			break
@@ -1413,6 +1466,32 @@ schema {
   query: Query
   mutation: Mutation
 }`, BuiltIn: false},
+	{Name: "../../../schemas/auth.graphql", Input: `"""
+Authentication configuration for client applications.
+This is used by external services to configure their auth providers.
+"""
+type AuthConfig {
+  """Auth0 domain URL (e.g., https://example.auth0.com)"""
+  auth0Domain: String
+
+  """Auth0 API audience"""
+  auth0Audience: String
+
+  """Auth0 web client ID (public, safe to expose)"""
+  auth0ClientId: String
+
+  """Authentication provider type"""
+  authProvider: String
+}
+
+extend type Query {
+  """
+  Get authentication configuration for client applications.
+  This endpoint does not require authentication and returns public auth configuration.
+  """
+  authConfig: AuthConfig
+}
+`, BuiltIn: false},
 	{Name: "../../../schemas/cerbos.graphql", Input: `input CheckPermissionInput {
   service: String!
   resource: String!
@@ -1606,6 +1685,7 @@ input DeleteMeInput {
 
 extend type Query {
   me: Me
+  user(id: ID!): User
   userByNameOrEmail(nameOrEmail: String!): User
   searchUser(keyword: String!): [User!]!
   findUsersByIDs(ids: [ID!]!): [User!]!
@@ -1701,6 +1781,7 @@ input CreateWorkspaceInput {
 input UpdateWorkspaceInput {
     workspaceId: ID!
     name: String!
+    alias: String
 }
 
 input MemberInput {
@@ -2279,6 +2360,17 @@ func (ec *executionContext) field_Query_userByNameOrEmail_args(ctx context.Conte
 	return args, nil
 }
 
+func (ec *executionContext) field_Query_user_args(ctx context.Context, rawArgs map[string]any) (map[string]any, error) {
+	var err error
+	args := map[string]any{}
+	arg0, err := graphql.ProcessArgField(ctx, rawArgs, "id", ec.unmarshalNID2githubᚗcomᚋreearthᚋreearthᚑaccountsᚋserverᚋinternalᚋadapterᚋgqlᚋgqlmodelᚐID)
+	if err != nil {
+		return nil, err
+	}
+	args["id"] = arg0
+	return args, nil
+}
+
 func (ec *executionContext) field___Directive_args_args(ctx context.Context, rawArgs map[string]any) (map[string]any, error) {
 	var err error
 	args := map[string]any{}
@@ -2404,6 +2496,122 @@ func (ec *executionContext) fieldContext_AddUsersToWorkspacePayload_workspace(_ 
 				return ec.fieldContext_Workspace_personal(ctx, field)
 			}
 			return nil, fmt.Errorf("no field named %q was found under type Workspace", field.Name)
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _AuthConfig_auth0Domain(ctx context.Context, field graphql.CollectedField, obj *gqlmodel.AuthConfig) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		ec.fieldContext_AuthConfig_auth0Domain,
+		func(ctx context.Context) (any, error) {
+			return obj.Auth0Domain, nil
+		},
+		nil,
+		ec.marshalOString2ᚖstring,
+		true,
+		false,
+	)
+}
+
+func (ec *executionContext) fieldContext_AuthConfig_auth0Domain(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "AuthConfig",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type String does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _AuthConfig_auth0Audience(ctx context.Context, field graphql.CollectedField, obj *gqlmodel.AuthConfig) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		ec.fieldContext_AuthConfig_auth0Audience,
+		func(ctx context.Context) (any, error) {
+			return obj.Auth0Audience, nil
+		},
+		nil,
+		ec.marshalOString2ᚖstring,
+		true,
+		false,
+	)
+}
+
+func (ec *executionContext) fieldContext_AuthConfig_auth0Audience(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "AuthConfig",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type String does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _AuthConfig_auth0ClientId(ctx context.Context, field graphql.CollectedField, obj *gqlmodel.AuthConfig) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		ec.fieldContext_AuthConfig_auth0ClientId,
+		func(ctx context.Context) (any, error) {
+			return obj.Auth0ClientID, nil
+		},
+		nil,
+		ec.marshalOString2ᚖstring,
+		true,
+		false,
+	)
+}
+
+func (ec *executionContext) fieldContext_AuthConfig_auth0ClientId(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "AuthConfig",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type String does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _AuthConfig_authProvider(ctx context.Context, field graphql.CollectedField, obj *gqlmodel.AuthConfig) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		ec.fieldContext_AuthConfig_authProvider,
+		func(ctx context.Context) (any, error) {
+			return obj.AuthProvider, nil
+		},
+		nil,
+		ec.marshalOString2ᚖstring,
+		true,
+		false,
+	)
+}
+
+func (ec *executionContext) fieldContext_AuthConfig_authProvider(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "AuthConfig",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type String does not have child fields")
 		},
 	}
 	return fc, nil
@@ -4188,6 +4396,45 @@ func (ec *executionContext) fieldContext_Query_nodes(ctx context.Context, field 
 	return fc, nil
 }
 
+func (ec *executionContext) _Query_authConfig(ctx context.Context, field graphql.CollectedField) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		ec.fieldContext_Query_authConfig,
+		func(ctx context.Context) (any, error) {
+			return ec.resolvers.Query().AuthConfig(ctx)
+		},
+		nil,
+		ec.marshalOAuthConfig2ᚖgithubᚗcomᚋreearthᚋreearthᚑaccountsᚋserverᚋinternalᚋadapterᚋgqlᚋgqlmodelᚐAuthConfig,
+		true,
+		false,
+	)
+}
+
+func (ec *executionContext) fieldContext_Query_authConfig(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "Query",
+		Field:      field,
+		IsMethod:   true,
+		IsResolver: true,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			switch field.Name {
+			case "auth0Domain":
+				return ec.fieldContext_AuthConfig_auth0Domain(ctx, field)
+			case "auth0Audience":
+				return ec.fieldContext_AuthConfig_auth0Audience(ctx, field)
+			case "auth0ClientId":
+				return ec.fieldContext_AuthConfig_auth0ClientId(ctx, field)
+			case "authProvider":
+				return ec.fieldContext_AuthConfig_authProvider(ctx, field)
+			}
+			return nil, fmt.Errorf("no field named %q was found under type AuthConfig", field.Name)
+		},
+	}
+	return fc, nil
+}
+
 func (ec *executionContext) _Query_checkPermission(ctx context.Context, field graphql.CollectedField) (ret graphql.Marshaler) {
 	return graphql.ResolveField(
 		ctx,
@@ -4344,6 +4591,67 @@ func (ec *executionContext) fieldContext_Query_me(_ context.Context, field graph
 			}
 			return nil, fmt.Errorf("no field named %q was found under type Me", field.Name)
 		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _Query_user(ctx context.Context, field graphql.CollectedField) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		ec.fieldContext_Query_user,
+		func(ctx context.Context) (any, error) {
+			fc := graphql.GetFieldContext(ctx)
+			return ec.resolvers.Query().User(ctx, fc.Args["id"].(gqlmodel.ID))
+		},
+		nil,
+		ec.marshalOUser2ᚖgithubᚗcomᚋreearthᚋreearthᚑaccountsᚋserverᚋinternalᚋadapterᚋgqlᚋgqlmodelᚐUser,
+		true,
+		false,
+	)
+}
+
+func (ec *executionContext) fieldContext_Query_user(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "Query",
+		Field:      field,
+		IsMethod:   true,
+		IsResolver: true,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			switch field.Name {
+			case "id":
+				return ec.fieldContext_User_id(ctx, field)
+			case "name":
+				return ec.fieldContext_User_name(ctx, field)
+			case "alias":
+				return ec.fieldContext_User_alias(ctx, field)
+			case "email":
+				return ec.fieldContext_User_email(ctx, field)
+			case "host":
+				return ec.fieldContext_User_host(ctx, field)
+			case "workspace":
+				return ec.fieldContext_User_workspace(ctx, field)
+			case "auths":
+				return ec.fieldContext_User_auths(ctx, field)
+			case "metadata":
+				return ec.fieldContext_User_metadata(ctx, field)
+			case "verification":
+				return ec.fieldContext_User_verification(ctx, field)
+			}
+			return nil, fmt.Errorf("no field named %q was found under type User", field.Name)
+		},
+	}
+	defer func() {
+		if r := recover(); r != nil {
+			err = ec.Recover(ctx, r)
+			ec.Error(ctx, err)
+		}
+	}()
+	ctx = graphql.WithFieldContext(ctx, fc)
+	if fc.Args, err = ec.field_Query_user_args(ctx, field.ArgumentMap(ec.Variables)); err != nil {
+		ec.Error(ctx, err)
+		return fc, err
 	}
 	return fc, nil
 }
@@ -9313,7 +9621,7 @@ func (ec *executionContext) unmarshalInputUpdateWorkspaceInput(ctx context.Conte
 		asMap[k] = v
 	}
 
-	fieldsInOrder := [...]string{"workspaceId", "name"}
+	fieldsInOrder := [...]string{"workspaceId", "name", "alias"}
 	for _, k := range fieldsInOrder {
 		v, ok := asMap[k]
 		if !ok {
@@ -9334,6 +9642,13 @@ func (ec *executionContext) unmarshalInputUpdateWorkspaceInput(ctx context.Conte
 				return it, err
 			}
 			it.Name = data
+		case "alias":
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("alias"))
+			data, err := ec.unmarshalOString2ᚖstring(ctx, v)
+			if err != nil {
+				return it, err
+			}
+			it.Alias = data
 		}
 	}
 
@@ -9476,6 +9791,48 @@ func (ec *executionContext) _AddUsersToWorkspacePayload(ctx context.Context, sel
 			if out.Values[i] == graphql.Null {
 				out.Invalids++
 			}
+		default:
+			panic("unknown field " + strconv.Quote(field.Name))
+		}
+	}
+	out.Dispatch(ctx)
+	if out.Invalids > 0 {
+		return graphql.Null
+	}
+
+	atomic.AddInt32(&ec.deferred, int32(len(deferred)))
+
+	for label, dfs := range deferred {
+		ec.processDeferredGroup(graphql.DeferredGroup{
+			Label:    label,
+			Path:     graphql.GetPath(ctx),
+			FieldSet: dfs,
+			Context:  ctx,
+		})
+	}
+
+	return out
+}
+
+var authConfigImplementors = []string{"AuthConfig"}
+
+func (ec *executionContext) _AuthConfig(ctx context.Context, sel ast.SelectionSet, obj *gqlmodel.AuthConfig) graphql.Marshaler {
+	fields := graphql.CollectFields(ec.OperationContext, sel, authConfigImplementors)
+
+	out := graphql.NewFieldSet(fields)
+	deferred := make(map[string]*graphql.FieldSet)
+	for i, field := range fields {
+		switch field.Name {
+		case "__typename":
+			out.Values[i] = graphql.MarshalString("AuthConfig")
+		case "auth0Domain":
+			out.Values[i] = ec._AuthConfig_auth0Domain(ctx, field, obj)
+		case "auth0Audience":
+			out.Values[i] = ec._AuthConfig_auth0Audience(ctx, field, obj)
+		case "auth0ClientId":
+			out.Values[i] = ec._AuthConfig_auth0ClientId(ctx, field, obj)
+		case "authProvider":
+			out.Values[i] = ec._AuthConfig_authProvider(ctx, field, obj)
 		default:
 			panic("unknown field " + strconv.Quote(field.Name))
 		}
@@ -10053,6 +10410,25 @@ func (ec *executionContext) _Query(ctx context.Context, sel ast.SelectionSet) gr
 			}
 
 			out.Concurrently(i, func(ctx context.Context) graphql.Marshaler { return rrm(innerCtx) })
+		case "authConfig":
+			field := field
+
+			innerFunc := func(ctx context.Context, _ *graphql.FieldSet) (res graphql.Marshaler) {
+				defer func() {
+					if r := recover(); r != nil {
+						ec.Error(ctx, ec.Recover(ctx, r))
+					}
+				}()
+				res = ec._Query_authConfig(ctx, field)
+				return res
+			}
+
+			rrm := func(ctx context.Context) graphql.Marshaler {
+				return ec.OperationContext.RootResolverMiddleware(ctx,
+					func(ctx context.Context) graphql.Marshaler { return innerFunc(ctx, out) })
+			}
+
+			out.Concurrently(i, func(ctx context.Context) graphql.Marshaler { return rrm(innerCtx) })
 		case "checkPermission":
 			field := field
 
@@ -10123,6 +10499,25 @@ func (ec *executionContext) _Query(ctx context.Context, sel ast.SelectionSet) gr
 					}
 				}()
 				res = ec._Query_me(ctx, field)
+				return res
+			}
+
+			rrm := func(ctx context.Context) graphql.Marshaler {
+				return ec.OperationContext.RootResolverMiddleware(ctx,
+					func(ctx context.Context) graphql.Marshaler { return innerFunc(ctx, out) })
+			}
+
+			out.Concurrently(i, func(ctx context.Context) graphql.Marshaler { return rrm(innerCtx) })
+		case "user":
+			field := field
+
+			innerFunc := func(ctx context.Context, _ *graphql.FieldSet) (res graphql.Marshaler) {
+				defer func() {
+					if r := recover(); r != nil {
+						ec.Error(ctx, ec.Recover(ctx, r))
+					}
+				}()
+				res = ec._Query_user(ctx, field)
 				return res
 			}
 
@@ -12641,6 +13036,13 @@ func (ec *executionContext) marshalOAddUsersToWorkspacePayload2ᚖgithubᚗcom�
 		return graphql.Null
 	}
 	return ec._AddUsersToWorkspacePayload(ctx, sel, v)
+}
+
+func (ec *executionContext) marshalOAuthConfig2ᚖgithubᚗcomᚋreearthᚋreearthᚑaccountsᚋserverᚋinternalᚋadapterᚋgqlᚋgqlmodelᚐAuthConfig(ctx context.Context, sel ast.SelectionSet, v *gqlmodel.AuthConfig) graphql.Marshaler {
+	if v == nil {
+		return graphql.Null
+	}
+	return ec._AuthConfig(ctx, sel, v)
 }
 
 func (ec *executionContext) unmarshalOBoolean2bool(ctx context.Context, v any) (bool, error) {

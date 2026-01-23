@@ -3,6 +3,7 @@ package workspace
 import (
 	"testing"
 
+	"github.com/reearth/reearth-accounts/server/pkg/role"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -27,7 +28,7 @@ func TestWorkspaceList_FilterByUserRole(t *testing.T) {
 		id: tid1,
 		members: &Members{
 			users: map[UserID]Member{
-				uid: {Role: RoleReader},
+				uid: {Role: role.RoleReader},
 			},
 		},
 	}
@@ -35,15 +36,15 @@ func TestWorkspaceList_FilterByUserRole(t *testing.T) {
 		id: tid2,
 		members: &Members{
 			users: map[UserID]Member{
-				uid: {Role: RoleOwner},
+				uid: {Role: role.RoleOwner},
 			},
 		},
 	}
 
-	assert.Equal(t, List{t1}, List{t1, t2}.FilterByUserRole(uid, RoleReader))
-	assert.Equal(t, List{}, List{t1, t2}.FilterByUserRole(uid, RoleWriter))
-	assert.Equal(t, List{t2}, List{t1, t2}.FilterByUserRole(uid, RoleOwner))
-	assert.Equal(t, List(nil), List(nil).FilterByUserRole(uid, RoleOwner))
+	assert.Equal(t, List{t1}, List{t1, t2}.FilterByUserRole(uid, role.RoleReader))
+	assert.Equal(t, List{}, List{t1, t2}.FilterByUserRole(uid, role.RoleWriter))
+	assert.Equal(t, List{t2}, List{t1, t2}.FilterByUserRole(uid, role.RoleOwner))
+	assert.Equal(t, List(nil), List(nil).FilterByUserRole(uid, role.RoleOwner))
 }
 
 func TestWorkspaceList_FilterByIntegrationRole(t *testing.T) {
@@ -54,7 +55,7 @@ func TestWorkspaceList_FilterByIntegrationRole(t *testing.T) {
 		id: tid1,
 		members: &Members{
 			integrations: map[IntegrationID]Member{
-				iid: {Role: RoleReader},
+				iid: {Role: role.RoleReader},
 			},
 		},
 	}
@@ -62,15 +63,15 @@ func TestWorkspaceList_FilterByIntegrationRole(t *testing.T) {
 		id: tid2,
 		members: &Members{
 			integrations: map[IntegrationID]Member{
-				iid: {Role: RoleWriter},
+				iid: {Role: role.RoleWriter},
 			},
 		},
 	}
 
-	assert.Equal(t, List{t1}, List{t1, t2}.FilterByIntegrationRole(iid, RoleReader))
-	assert.Equal(t, List{}, List{t1, t2}.FilterByIntegrationRole(iid, RoleOwner))
-	assert.Equal(t, List{t2}, List{t1, t2}.FilterByIntegrationRole(iid, RoleWriter))
-	assert.Equal(t, List(nil), List(nil).FilterByIntegrationRole(iid, RoleOwner))
+	assert.Equal(t, List{t1}, List{t1, t2}.FilterByIntegrationRole(iid, role.RoleReader))
+	assert.Equal(t, List{}, List{t1, t2}.FilterByIntegrationRole(iid, role.RoleOwner))
+	assert.Equal(t, List{t2}, List{t1, t2}.FilterByIntegrationRole(iid, role.RoleWriter))
+	assert.Equal(t, List(nil), List(nil).FilterByIntegrationRole(iid, role.RoleOwner))
 }
 
 func TestWorkspaceList_FilterByUserRoleIncluding(t *testing.T) {
@@ -81,7 +82,7 @@ func TestWorkspaceList_FilterByUserRoleIncluding(t *testing.T) {
 		id: tid1,
 		members: &Members{
 			users: map[UserID]Member{
-				uid: {Role: RoleReader},
+				uid: {Role: role.RoleReader},
 			},
 		},
 	}
@@ -89,15 +90,15 @@ func TestWorkspaceList_FilterByUserRoleIncluding(t *testing.T) {
 		id: tid2,
 		members: &Members{
 			users: map[UserID]Member{
-				uid: {Role: RoleOwner},
+				uid: {Role: role.RoleOwner},
 			},
 		},
 	}
 
-	assert.Equal(t, List{t1, t2}, List{t1, t2}.FilterByUserRoleIncluding(uid, RoleReader))
-	assert.Equal(t, List{t2}, List{t1, t2}.FilterByUserRoleIncluding(uid, RoleWriter))
-	assert.Equal(t, List{t2}, List{t1, t2}.FilterByUserRoleIncluding(uid, RoleOwner))
-	assert.Equal(t, List(nil), List(nil).FilterByUserRoleIncluding(uid, RoleOwner))
+	assert.Equal(t, List{t1, t2}, List{t1, t2}.FilterByUserRoleIncluding(uid, role.RoleReader))
+	assert.Equal(t, List{t2}, List{t1, t2}.FilterByUserRoleIncluding(uid, role.RoleWriter))
+	assert.Equal(t, List{t2}, List{t1, t2}.FilterByUserRoleIncluding(uid, role.RoleOwner))
+	assert.Equal(t, List(nil), List(nil).FilterByUserRoleIncluding(uid, role.RoleOwner))
 }
 
 func TestWorkspaceList_FilterByIntegrationRoleIncluding(t *testing.T) {
@@ -108,7 +109,7 @@ func TestWorkspaceList_FilterByIntegrationRoleIncluding(t *testing.T) {
 		id: tid1,
 		members: &Members{
 			integrations: map[IntegrationID]Member{
-				uid: {Role: RoleReader},
+				uid: {Role: role.RoleReader},
 			},
 		},
 	}
@@ -116,15 +117,15 @@ func TestWorkspaceList_FilterByIntegrationRoleIncluding(t *testing.T) {
 		id: tid2,
 		members: &Members{
 			integrations: map[IntegrationID]Member{
-				uid: {Role: RoleOwner},
+				uid: {Role: role.RoleOwner},
 			},
 		},
 	}
 
-	assert.Equal(t, List{t1, t2}, List{t1, t2}.FilterByIntegrationRoleIncluding(uid, RoleReader))
-	assert.Equal(t, List{t2}, List{t1, t2}.FilterByIntegrationRoleIncluding(uid, RoleWriter))
-	assert.Equal(t, List{t2}, List{t1, t2}.FilterByIntegrationRoleIncluding(uid, RoleOwner))
-	assert.Equal(t, List(nil), List(nil).FilterByIntegrationRoleIncluding(uid, RoleOwner))
+	assert.Equal(t, List{t1, t2}, List{t1, t2}.FilterByIntegrationRoleIncluding(uid, role.RoleReader))
+	assert.Equal(t, List{t2}, List{t1, t2}.FilterByIntegrationRoleIncluding(uid, role.RoleWriter))
+	assert.Equal(t, List{t2}, List{t1, t2}.FilterByIntegrationRoleIncluding(uid, role.RoleOwner))
+	assert.Equal(t, List(nil), List(nil).FilterByIntegrationRoleIncluding(uid, role.RoleOwner))
 }
 
 func TestWorkspaceList_IDs(t *testing.T) {

@@ -6,7 +6,7 @@ import (
 
 	"github.com/reearth/reearth-accounts/server/internal/infrastructure/mongo/mongodoc"
 	"github.com/reearth/reearth-accounts/server/internal/usecase/interfaces"
-	"github.com/reearth/reearth-accounts/server/pkg/workspace"
+	"github.com/reearth/reearth-accounts/server/pkg/role"
 	"github.com/reearth/reearthx/mongox"
 	"github.com/samber/lo"
 	"go.mongodb.org/mongo-driver/bson"
@@ -39,10 +39,10 @@ func FixPermittableRoleIDs(ctx context.Context, c DBClient) error {
 	// Filter out empty strings to avoid unintended removal of legitimate values
 	var rolesToRemove []string
 	for _, roleName := range []string{
-		string(workspace.RoleOwner),
-		string(workspace.RoleMaintainer),
-		string(workspace.RoleWriter),
-		string(workspace.RoleReader),
+		string(role.RoleOwner),
+		string(role.RoleMaintainer),
+		string(role.RoleWriter),
+		string(role.RoleReader),
 	} {
 		if roleID, exists := roleNameToID[roleName]; exists && roleID != "" {
 			rolesToRemove = append(rolesToRemove, roleID)

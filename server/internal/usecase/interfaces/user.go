@@ -3,7 +3,6 @@ package interfaces
 import (
 	"context"
 
-	"github.com/reearth/reearth-accounts/server/internal/usecase"
 	"github.com/reearth/reearth-accounts/server/pkg/user"
 	"github.com/reearth/reearth-accounts/server/pkg/workspace"
 	"github.com/reearth/reearthx/i18n"
@@ -89,9 +88,9 @@ type User interface {
 	SignupOIDC(context.Context, SignupOIDCParam) (*user.User, error)
 
 	// editing me
-	UpdateMe(context.Context, UpdateMeParam, *usecase.Operator) (*user.User, error)
-	RemoveMyAuth(context.Context, string, *usecase.Operator) (*user.User, error)
-	DeleteMe(context.Context, user.ID, *usecase.Operator) error
+	UpdateMe(context.Context, UpdateMeParam, *workspace.Operator) (*user.User, error)
+	RemoveMyAuth(context.Context, string, *workspace.Operator) (*user.User, error)
+	DeleteMe(context.Context, user.ID, *workspace.Operator) error
 
 	// built-in auth server
 	CreateVerification(context.Context, string) error

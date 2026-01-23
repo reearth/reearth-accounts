@@ -5,6 +5,7 @@ import (
 )
 
 type ID = id.RoleID
+type IDList = id.RoleIDList
 
 var NewID = id.NewRoleID
 

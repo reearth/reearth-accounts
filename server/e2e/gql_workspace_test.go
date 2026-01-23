@@ -62,11 +62,11 @@ func baseSeederWorkspace(ctx context.Context, r *repo.Container) error {
 		return err
 	}
 	roleOwner := workspace.Member{
-		Role:      workspace.RoleOwner,
+		Role:      role.RoleOwner,
 		InvitedBy: uId2,
 	}
 	roleReader := workspace.Member{
-		Role:      workspace.RoleReader,
+		Role:      role.RoleReader,
 		InvitedBy: uId,
 	}
 
@@ -242,7 +242,7 @@ func TestAddUsersToWorkspace(t *testing.T) {
 	w, err = r.Workspace.FindByID(context.Background(), wId)
 	assert.Nil(t, err)
 	assert.True(t, w.Members().HasUser(uId2))
-	assert.Equal(t, w.Members().User(uId2).Role, workspace.RoleReader)
+	assert.Equal(t, w.Members().User(uId2).Role, role.RoleReader)
 }
 
 func TestRemoveUserFromWorkspace(t *testing.T) {
@@ -276,7 +276,7 @@ func TestUpdateMemberOfWorkspace(t *testing.T) {
 
 	w, err := r.Workspace.FindByID(context.Background(), wId2)
 	assert.Nil(t, err)
-	assert.Equal(t, w.Members().User(uId3).Role, workspace.RoleReader)
+	assert.Equal(t, w.Members().User(uId3).Role, role.RoleReader)
 	query := fmt.Sprintf(`mutation { updateUserOfWorkspace(input: {workspaceId: "%s", userId: "%s", role: maintainer}){ workspace{ id } }}`, wId2, uId3)
 	request := GraphQLRequest{
 		Query: query,
@@ -293,7 +293,7 @@ func TestUpdateMemberOfWorkspace(t *testing.T) {
 
 	w, err = r.Workspace.FindByID(context.Background(), wId2)
 	assert.Nil(t, err)
-	assert.Equal(t, w.Members().User(uId3).Role, workspace.RoleMaintainer)
+	assert.Equal(t, w.Members().User(uId3).Role, role.RoleMaintainer)
 }
 
 func TestAddIntegrationToWorkspace(t *testing.T) {
@@ -320,7 +320,7 @@ func TestAddIntegrationToWorkspace(t *testing.T) {
 	w, err = r.Workspace.FindByID(context.Background(), wId)
 	assert.Nil(t, err)
 	assert.True(t, w.Members().HasIntegration(iId2))
-	assert.Equal(t, w.Members().Integration(iId2).Role, workspace.RoleReader)
+	assert.Equal(t, w.Members().Integration(iId2).Role, role.RoleReader)
 }
 
 func TestRemoveIntegrationFromWorkspace(t *testing.T) {
@@ -354,7 +354,7 @@ func TestUpdateIntegrationOfWorkspace(t *testing.T) {
 
 	w, err := r.Workspace.FindByID(context.Background(), wId)
 	assert.Nil(t, err)
-	assert.Equal(t, w.Members().Integration(iId3).Role, workspace.RoleReader)
+	assert.Equal(t, w.Members().Integration(iId3).Role, role.RoleReader)
 	query := fmt.Sprintf(`mutation { updateIntegrationOfWorkspace(input: {workspaceId: "%s", integrationId: "%s", role: maintainer}){ workspace{ id } }}`, wId, iId3)
 	request := GraphQLRequest{
 		Query: query,
@@ -371,7 +371,7 @@ func TestUpdateIntegrationOfWorkspace(t *testing.T) {
 
 	w, err = r.Workspace.FindByID(context.Background(), wId)
 	assert.Nil(t, err)
-	assert.Equal(t, w.Members().Integration(iId3).Role, workspace.RoleMaintainer)
+	assert.Equal(t, w.Members().Integration(iId3).Role, role.RoleMaintainer)
 }
 
 func TestFindByUser(t *testing.T) {

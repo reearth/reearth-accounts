@@ -20,18 +20,18 @@ import (
 
 type Workspace struct {
 	client *mongox.Collection
-	f      repo.WorkspaceFilter
+	f      workspace.WorkspaceFilter
 }
 
-func NewWorkspace(client *mongox.Client) repo.Workspace {
+func NewWorkspace(client *mongox.Client) workspace.Repo {
 	return &Workspace{client: client.WithCollection("workspace")}
 }
 
-func NewWorkspaceCompat(client *mongox.Client) repo.Workspace {
+func NewWorkspaceCompat(client *mongox.Client) workspace.Repo {
 	return &Workspace{client: client.WithCollection("team")}
 }
 
-func (r *Workspace) Filtered(f repo.WorkspaceFilter) repo.Workspace {
+func (r *Workspace) Filtered(f workspace.WorkspaceFilter) workspace.Repo {
 	return &Workspace{
 		client: r.client,
 		f:      r.f.Merge(f),
@@ -40,7 +40,7 @@ func (r *Workspace) Filtered(f repo.WorkspaceFilter) repo.Workspace {
 
 func (r *Workspace) FindByUser(ctx context.Context, id user.ID) (workspace.List, error) {
 	return r.find(ctx, bson.M{
-		"members." + strings.Replace(id.String(), ".", "", -1): bson.M{
+		"members." + strings.ReplaceAll(id.String(), ".", ""): bson.M{
 			"$exists": true,
 		},
 	})
@@ -48,7 +48,7 @@ func (r *Workspace) FindByUser(ctx context.Context, id user.ID) (workspace.List,
 
 func (r *Workspace) FindByUserWithPagination(ctx context.Context, id user.ID, pagination *usecasex.Pagination) (workspace.List, *usecasex.PageInfo, error) {
 	filter := bson.M{
-		"members." + strings.Replace(id.String(), ".", "", -1): bson.M{
+		"members." + strings.ReplaceAll(id.String(), ".", ""): bson.M{
 			"$exists": true,
 		},
 	}
@@ -58,7 +58,7 @@ func (r *Workspace) FindByUserWithPagination(ctx context.Context, id user.ID, pa
 
 func (r *Workspace) FindByIntegration(ctx context.Context, id workspace.IntegrationID) (workspace.List, error) {
 	return r.find(ctx, bson.M{
-		"integrations." + strings.Replace(id.String(), ".", "", -1): bson.M{
+		"integrations." + strings.ReplaceAll(id.String(), ".", ""): bson.M{
 			"$exists": true,
 		},
 	})
@@ -73,7 +73,7 @@ func (r *Workspace) FindByIntegrations(ctx context.Context, integrationIDs works
 	orConditions := make([]bson.M, 0)
 	for _, id := range integrationIDs {
 		orConditions = append(orConditions, bson.M{
-			"integrations." + strings.Replace(id.String(), ".", "", -1): bson.M{
+			"integrations." + strings.ReplaceAll(id.String(), ".", ""): bson.M{
 				"$exists": true,
 			},
 		})
@@ -151,22 +151,26 @@ func (r *Workspace) FindByAliases(ctx context.Context, aliases []string) (worksp
 	return res, nil
 }
 
-func (r *Workspace) Create(ctx context.Context, workspace *workspace.Workspace) error {
-	doc, id := mongodoc.NewWorkspace(workspace)
-	return r.client.CreateOne(ctx, id, doc)
+func (r *Workspace) Create(ctx context.Context, ws *workspace.Workspace) error {
+	doc, id := mongodoc.NewWorkspace(ws)
+	err := r.client.CreateOne(ctx, id, doc)
+	if mongo.IsDuplicateKeyError(err) {
+		return workspace.ErrDuplicateWorkspaceAlias
+	}
+	return err
 }
 
-func (r *Workspace) Save(ctx context.Context, workspace *workspace.Workspace) error {
-	if !r.f.CanWrite(workspace.ID()) {
+func (r *Workspace) Save(ctx context.Context, ws *workspace.Workspace) error {
+	if !r.f.CanWrite(ws.ID()) {
 		log.Printf("WorkspaceFilter: %+v", r.f)
-		log.Printf("Workspace: %+v", workspace.ID().String())
+		log.Printf("Workspace: %+v", ws.ID().String())
 		return applog.ErrorWithCallerLogging(ctx, "failed to save workspace", repo.ErrOperationDenied)
 	}
 
-	doc, id := mongodoc.NewWorkspace(workspace)
+	doc, id := mongodoc.NewWorkspace(ws)
 	err := r.client.SaveOne(ctx, id, doc)
 	if mongo.IsDuplicateKeyError(err) {
-		return applog.ErrorWithCallerLogging(ctx, "failed to save workspace", repo.ErrDuplicateWorkspaceAlias)
+		return applog.ErrorWithCallerLogging(ctx, "failed to save workspace", workspace.ErrDuplicateWorkspaceAlias)
 	}
 	return err
 }

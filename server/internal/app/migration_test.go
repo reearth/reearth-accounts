@@ -43,7 +43,7 @@ func TestRunMigration(t *testing.T) {
 	}
 
 	roleOwner := workspace.Member{
-		Role:      workspace.RoleOwner,
+		Role:      role.RoleOwner,
 		InvitedBy: uId1,
 	}
 

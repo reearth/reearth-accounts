@@ -11,7 +11,7 @@ import (
 )
 
 type Client struct {
-	UserRepo      user.UserRepo
+	UserRepo      user.Repo
 	WorkspaceRepo workspace.WorkspaceRepo
 }
 

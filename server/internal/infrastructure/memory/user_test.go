@@ -6,7 +6,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/reearth/reearth-accounts/server/internal/usecase/repo"
 	"github.com/reearth/reearth-accounts/server/pkg/id"
 	"github.com/reearth/reearth-accounts/server/pkg/user"
 	"github.com/reearth/reearthx/rerror"
@@ -423,7 +422,7 @@ func TestUser_Create(t *testing.T) {
 	assert.Equal(t, 1, r.data.Len())
 
 	err = r.Create(ctx, u)
-	assert.Equal(t, repo.ErrDuplicatedUser, err)
+	assert.Equal(t, user.ErrDuplicatedUser, err)
 }
 
 func TestUser_Save(t *testing.T) {

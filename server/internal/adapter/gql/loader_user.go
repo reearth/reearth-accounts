@@ -37,6 +37,24 @@ func (c *UserLoader) Fetch(ctx context.Context, ids []gqlmodel.ID) ([]*gqlmodel.
 	return users, nil
 }
 
+func (c *UserLoader) FetchByID(ctx context.Context, userID gqlmodel.ID) (*gqlmodel.User, error) {
+	uid, err := gqlmodel.ToID[id.User](userID)
+	if err != nil {
+		return nil, err
+	}
+
+	users, err := c.usecase.FetchByID(ctx, id.UserIDList{uid})
+	if err != nil {
+		return nil, err
+	}
+
+	if len(users) == 0 {
+		return nil, nil
+	}
+
+	return gqlmodel.ToUser(users[0]), nil
+}
+
 func (c *UserLoader) UserByNameOrEmail(ctx context.Context, nameOrEmail string) (*gqlmodel.User, error) {
 	res, err := c.usecase.FetchByNameOrEmail(ctx, nameOrEmail)
 	if err != nil {

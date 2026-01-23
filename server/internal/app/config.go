@@ -28,6 +28,9 @@ type Config struct {
 	Cert       CertConfig
 	Policy     PolicyConfig
 
+	// mock
+	Mock_Auth bool `envconfig:"REEARTH_MOCK_AUTH" pp:",omitempty"`
+
 	// auth
 	Auth     AuthConfigs `pp:",omitempty"`
 	Auth_ISS string      `pp:",omitempty"`
@@ -185,4 +188,17 @@ func (c Config) Print() string {
 		s = strings.ReplaceAll(s, secret, "***")
 	}
 	return s
+}
+
+// Auth0ConfigProvider interface implementation
+func (c Config) GetAuth0Domain() string {
+	return c.Auth0.Domain
+}
+
+func (c Config) GetAuth0Audience() string {
+	return c.Auth0.Audience
+}
+
+func (c Config) GetAuth0WebClientID() string {
+	return c.Auth0.WebClientID
 }

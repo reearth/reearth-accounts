@@ -1,0 +1,25 @@
+"""
+Authentication configuration for client applications.
+This is used by external services to configure their auth providers.
+"""
+type AuthConfig {
+  """Auth0 domain URL (e.g., https://example.auth0.com)"""
+  auth0Domain: String
+
+  """Auth0 API audience"""
+  auth0Audience: String
+
+  """Auth0 web client ID (public, safe to expose)"""
+  auth0ClientId: String
+
+  """Authentication provider type"""
+  authProvider: String
+}
+
+extend type Query {
+  """
+  Get authentication configuration for client applications.
+  This endpoint does not require authentication and returns public auth configuration.
+  """
+  authConfig: AuthConfig
+}

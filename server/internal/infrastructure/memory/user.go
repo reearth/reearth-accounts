@@ -4,7 +4,6 @@ import (
 	"context"
 	"strings"
 
-	"github.com/reearth/reearth-accounts/server/internal/usecase/repo"
 	"github.com/reearth/reearth-accounts/server/pkg/user"
 	"github.com/reearth/reearthx/rerror"
 	"github.com/reearth/reearthx/util"
@@ -202,7 +201,7 @@ func (r *User) Create(_ context.Context, u *user.User) error {
 	if _, ok := r.data.Load(u.ID()); !ok {
 		r.data.Store(u.ID(), u)
 	} else {
-		return repo.ErrDuplicatedUser
+		return user.ErrDuplicatedUser
 	}
 
 	return nil
@@ -226,6 +225,6 @@ func (r *User) Remove(_ context.Context, user user.ID) error {
 	return nil
 }
 
-func SetUserError(r repo.User, err error) {
+func SetUserError(r user.Repo, err error) {
 	r.(*User).err = err
 }

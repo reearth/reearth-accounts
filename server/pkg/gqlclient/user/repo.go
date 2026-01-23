@@ -24,20 +24,20 @@ type UpdateMeInput struct {
 	PasswordConfirmation *string
 }
 
-type UserRepo interface {
+type Repo interface {
 	FindMe(ctx context.Context) (*user.User, error)
 	FindByID(ctx context.Context, id string) (*user.User, error)
 	FindByAlias(ctx context.Context, name string) (*user.User, error)
 	Update(ctx context.Context, name string) error
 	UpdateMe(ctx context.Context, input UpdateMeInput) (*user.User, error)
 	SignupOIDC(ctx context.Context, name string, email string, sub string, secret string) (*user.User, error)
-	Signup(ctx context.Context, userID, name, email, password, secret, workspaceID string) (*user.User, error)
+	Signup(ctx context.Context, userID, name, email, password, secret, workspaceID string, mockAuth bool) (*user.User, error)
 	CreateVerification(ctx context.Context, email string) (bool, error)
 	RemoveMyAuth(ctx context.Context, auth string) (*user.User, error)
 	DeleteMe(ctx context.Context, userID string) error
 }
 
-func NewRepo(gql *graphql.Client) UserRepo {
+func NewRepo(gql *graphql.Client) Repo {
 	return &userRepo{client: gql}
 }
 
@@ -234,7 +234,7 @@ func (r *userRepo) SignupOIDC(ctx context.Context, name string, email string, su
 		Build()
 }
 
-func (r *userRepo) Signup(ctx context.Context, userID, name, email, password, secret, workspaceID string) (*user.User, error) {
+func (r *userRepo) Signup(ctx context.Context, userID, name, email, password, secret, workspaceID string, mockAuth bool) (*user.User, error) {
 	var m signupMutation
 	vars := map[string]interface{}{}
 
@@ -250,6 +250,7 @@ func (r *userRepo) Signup(ctx context.Context, userID, name, email, password, se
 	vars["email"] = graphql.String(email)
 	vars["password"] = graphql.String(password)
 	vars["secret"] = graphql.String(secret)
+	vars["mockAuth"] = graphql.Boolean(mockAuth)
 
 	if err := r.client.Mutate(ctx, &m, vars); err != nil {
 		return nil, gqlerror.ReturnAccountsError(ctx, err)

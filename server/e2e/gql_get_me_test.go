@@ -9,6 +9,7 @@ import (
 	"github.com/reearth/reearth-accounts/server/internal/app"
 	"github.com/reearth/reearth-accounts/server/internal/usecase/repo"
 	"github.com/reearth/reearth-accounts/server/pkg/id"
+	"github.com/reearth/reearth-accounts/server/pkg/role"
 	"github.com/reearth/reearth-accounts/server/pkg/user"
 	"github.com/reearth/reearth-accounts/server/pkg/workspace"
 	"github.com/reearth/reearthx/idx"
@@ -46,15 +47,15 @@ func baseSeederGetMe(ctx context.Context, r *repo.Container) error {
 	}
 
 	roleOwner := workspace.Member{
-		Role:      workspace.RoleOwner,
+		Role:      role.RoleOwner,
 		InvitedBy: uId,
 	}
 	roleWriter := workspace.Member{
-		Role:      workspace.RoleWriter,
+		Role:      role.RoleWriter,
 		InvitedBy: uId,
 	}
 	roleReader := workspace.Member{
-		Role:      workspace.RoleReader,
+		Role:      role.RoleReader,
 		InvitedBy: uId,
 	}
 

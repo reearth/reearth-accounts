@@ -3,10 +3,10 @@ package interactor
 import (
 	"context"
 
-	"github.com/reearth/reearth-accounts/server/internal/usecase"
 	"github.com/reearth/reearth-accounts/server/internal/usecase/interfaces"
 	"github.com/reearth/reearth-accounts/server/internal/usecase/repo"
 	"github.com/reearth/reearth-accounts/server/pkg/id"
+	"github.com/reearth/reearth-accounts/server/pkg/workspace"
 	"github.com/reearth/reearthx/usecasex"
 )
 
@@ -47,7 +47,7 @@ func (u *uc) Transaction() *uc {
 	return u
 }
 
-func Run0(ctx context.Context, op *usecase.Operator, r *repo.Container, e *uc, f func(ctx context.Context) error) (err error) {
+func Run0(ctx context.Context, op *workspace.Operator, r *repo.Container, e *uc, f func(ctx context.Context) error) (err error) {
 	_, _, _, err = Run3(
 		ctx, op, r, e,
 		func(ctx context.Context) (_, _, _ any, err error) {
@@ -57,7 +57,7 @@ func Run0(ctx context.Context, op *usecase.Operator, r *repo.Container, e *uc, f
 	return
 }
 
-func Run1[A any](ctx context.Context, op *usecase.Operator, r *repo.Container, e *uc, f func(ctx context.Context) (A, error)) (a A, err error) {
+func Run1[A any](ctx context.Context, op *workspace.Operator, r *repo.Container, e *uc, f func(ctx context.Context) (A, error)) (a A, err error) {
 	a, _, _, err = Run3(
 		ctx, op, r, e,
 		func(ctx context.Context) (a A, _, _ any, err error) {
@@ -67,7 +67,7 @@ func Run1[A any](ctx context.Context, op *usecase.Operator, r *repo.Container, e
 	return
 }
 
-func Run2[A, B any](ctx context.Context, op *usecase.Operator, r *repo.Container, e *uc, f func(ctx context.Context) (A, B, error)) (a A, b B, err error) {
+func Run2[A, B any](ctx context.Context, op *workspace.Operator, r *repo.Container, e *uc, f func(ctx context.Context) (A, B, error)) (a A, b B, err error) {
 	a, b, _, err = Run3(
 		ctx, op, r, e,
 		func(ctx context.Context) (a A, b B, _ any, err error) {
@@ -77,7 +77,7 @@ func Run2[A, B any](ctx context.Context, op *usecase.Operator, r *repo.Container
 	return
 }
 
-func Run3[A, B, C any](ctx context.Context, op *usecase.Operator, r *repo.Container, e *uc, f func(ctx context.Context) (A, B, C, error)) (a A, b B, c C, err error) {
+func Run3[A, B, C any](ctx context.Context, op *workspace.Operator, r *repo.Container, e *uc, f func(ctx context.Context) (A, B, C, error)) (a A, b B, c C, err error) {
 	var tr usecasex.Transaction
 	if e.tx {
 		tr = r.Transaction
@@ -86,7 +86,7 @@ func Run3[A, B, C any](ctx context.Context, op *usecase.Operator, r *repo.Contai
 	return usecasex.Run3(ctx, f, usecasex.TxUsecase{Transaction: tr}.UseTx(), e.EnsurePermission(op))
 }
 
-func (u *uc) EnsurePermission(op *usecase.Operator) usecasex.Middleware {
+func (u *uc) EnsurePermission(op *workspace.Operator) usecasex.Middleware {
 	return func(next usecasex.MiddlewareHandler) usecasex.MiddlewareHandler {
 		return func(ctx context.Context) (context.Context, error) {
 			if err := u.checkPermission(op); err != nil {
@@ -97,7 +97,7 @@ func (u *uc) EnsurePermission(op *usecase.Operator) usecasex.Middleware {
 	}
 }
 
-func (u *uc) checkPermission(op *usecase.Operator) error {
+func (u *uc) checkPermission(op *workspace.Operator) error {
 	ok := true
 	if op != nil {
 		if u.readableWorkspaces != nil {

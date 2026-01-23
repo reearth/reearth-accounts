@@ -4,6 +4,7 @@ import (
 	"time"
 
 	"github.com/reearth/reearth-accounts/server/pkg/id"
+	"github.com/reearth/reearth-accounts/server/pkg/role"
 	"github.com/reearth/reearth-accounts/server/pkg/workspace"
 	"github.com/samber/lo"
 )
@@ -105,7 +106,7 @@ func (d *WorkspaceDocument) Model() (*workspace.Workspace, error) {
 				inviterID = uid
 			}
 			members[uid] = workspace.Member{
-				Role:      workspace.Role(member.Role),
+				Role:      role.RoleType(member.Role),
 				Disabled:  member.Disabled,
 				InvitedBy: inviterID,
 			}
@@ -120,7 +121,7 @@ func (d *WorkspaceDocument) Model() (*workspace.Workspace, error) {
 				return nil, err
 			}
 			integrations[iId] = workspace.Member{
-				Role:      workspace.Role(integrationDoc.Role),
+				Role:      role.RoleType(integrationDoc.Role),
 				Disabled:  integrationDoc.Disabled,
 				InvitedBy: id.MustUserID(integrationDoc.InvitedBy),
 			}
