@@ -2,6 +2,7 @@ package interactor
 
 import (
 	"context"
+	"errors"
 	"testing"
 	"time"
 
