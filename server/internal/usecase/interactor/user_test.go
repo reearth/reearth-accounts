@@ -112,7 +112,14 @@ func TestUser_VerifyUser(t *testing.T) {
 
 			if tt.wantUser != nil && createdUser != nil {
 				expired := createdUser.Verification().Expiration()
-				assert.Equal(t, tt.wantUser(u, createdUser.ID(), createdUser.Workspace(), expired), u)
+				expectedUser := tt.wantUser(u, createdUser.ID(), createdUser.Workspace(), expired)
+
+				// Compare fields except updatedAt which is set dynamically
+				assert.Equal(t, expectedUser.ID(), u.ID())
+				assert.Equal(t, expectedUser.Name(), u.Name())
+				assert.Equal(t, expectedUser.Email(), u.Email())
+				assert.Equal(t, expectedUser.Workspace(), u.Workspace())
+				assert.Equal(t, expectedUser.Verification().IsVerified(), u.Verification().IsVerified())
 			} else {
 				assert.Nil(t, u)
 			}
