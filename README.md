@@ -82,6 +82,13 @@ Once the `reearth` network and `reearth-mongo` are available, start this service
 ```bash
 git clone https://github.com/reearth/reearth-accounts.git
 cd reearth-accounts/server
+
+# Copy example environment file
+cp .env.docker.example .env.docker
+
+# (Optional) To test with demo user without Auth0 IDP:
+# Edit .env.docker and set REEARTH_MOCK_AUTH=true
+
 make run
 ```
 
