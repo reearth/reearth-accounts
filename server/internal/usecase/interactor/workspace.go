@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"maps"
+	"os"
 	"slices"
 	"strings"
 
@@ -15,6 +16,7 @@ import (
 	"github.com/reearth/reearth-accounts/server/pkg/role"
 	"github.com/reearth/reearth-accounts/server/pkg/user"
 	"github.com/reearth/reearth-accounts/server/pkg/workspace"
+	"github.com/reearth/reearthx/log"
 	"github.com/reearth/reearthx/rerror"
 	"github.com/samber/lo"
 )
@@ -556,7 +558,17 @@ func filterWorkspaces(
 func (i *Workspace) updatePermittable(ctx context.Context, userID user.ID, workspaceID workspace.ID, roleName role.RoleType) error {
 	r, err := i.roleRepo.FindByName(ctx, string(roleName))
 	if err != nil {
-		return err
+		// If role not found and MockAuth is enabled, auto-create it
+		if errors.Is(err, rerror.ErrNotFound) && os.Getenv("REEARTH_MOCK_AUTH") == "true" {
+			log.Infof("[MockAuth] Auto-creating role for workspace: %s", roleName)
+			newRole := role.New().NewID().Name(string(roleName)).MustBuild()
+			if saveErr := i.roleRepo.Save(ctx, *newRole); saveErr != nil {
+				return applog.ErrorWithCallerLogging(ctx, "failed to auto-create role", saveErr)
+			}
+			r = newRole
+		} else {
+			return err
+		}
 	}
 
 	p, err := i.permittableRepo.FindByUserID(ctx, userID)
