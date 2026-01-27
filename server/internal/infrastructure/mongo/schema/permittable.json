@@ -24,7 +24,10 @@
         "description": "User ID this permittable represents"
       },
       "workspace_roles": {
-        "bsonType": "array",
+        "bsonType": [
+          "array",
+          "null"
+        ],
         "description": "Workspace-specific role assignments",
         "items": {
           "bsonType": "object",

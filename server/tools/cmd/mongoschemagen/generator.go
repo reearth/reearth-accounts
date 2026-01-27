@@ -164,12 +164,12 @@ func (g *Generator) convertPropertyToMongo(prop *jsonschema.Schema, parentType a
 	result := make(map[string]any)
 
 	// Get field info from struct for nullable detection
-	isPointer := isPointerField(parentType, originalFieldName)
+	isNullable := isPointerField(parentType, originalFieldName) || hasBsonOmitempty(parentType, originalFieldName)
 
 	// Determine BSON type
 	bsonType := determineBsonType(prop, parentType, originalFieldName)
 
-	if isPointer {
+	if isNullable {
 		result["bsonType"] = []string{bsonType, "null"}
 	} else {
 		result["bsonType"] = bsonType
@@ -362,6 +362,28 @@ func isPointerField(parentType any, jsonFieldName string) bool {
 	}
 
 	return field.Type.Kind() == reflect.Ptr
+}
+
+func hasBsonOmitempty(parentType any, jsonFieldName string) bool {
+	if parentType == nil || jsonFieldName == "" {
+		return false
+	}
+
+	t := reflect.TypeOf(parentType)
+	if t.Kind() == reflect.Ptr {
+		t = t.Elem()
+	}
+	if t.Kind() != reflect.Struct {
+		return false
+	}
+
+	field, found := findFieldByJSONName(t, jsonFieldName)
+	if !found {
+		return false
+	}
+
+	bsonTag := field.Tag.Get("bson")
+	return strings.Contains(bsonTag, "omitempty")
 }
 
 func isTimeField(parentType any, jsonFieldName string) bool {

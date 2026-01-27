@@ -63,7 +63,10 @@
         "description": "Map of user ID to member document"
       },
       "members_hash": {
-        "bsonType": "string",
+        "bsonType": [
+          "string",
+          "null"
+        ],
         "description": "SHA256 hash of members and integrations for uniqueness tracking. Default: \"\""
       },
       "metadata": {
@@ -101,7 +104,10 @@
         "description": "Whether this is a personal workspace. Default: false"
       },
       "policy": {
-        "bsonType": "string",
+        "bsonType": [
+          "string",
+          "null"
+        ],
         "description": "Policy ID reference. Default: \"\""
       },
       "updatedat": {
