@@ -56,7 +56,7 @@
       },
       "password": {
         "bsonType": "binData",
-        "description": "Hashed password (bcrypt)"
+        "description": "Hashed password (bcrypt). Null for OIDC-only users"
       },
       "passwordreset": {
         "bsonType": [
@@ -127,7 +127,6 @@
       "email",
       "subs",
       "workspace",
-      "password",
       "metadata",
       "updatedat"
     ],
