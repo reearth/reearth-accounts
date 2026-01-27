@@ -55,7 +55,10 @@
         "description": "User display name"
       },
       "password": {
-        "bsonType": "binData",
+        "bsonType": [
+          "binData",
+          "null"
+        ],
         "description": "Hashed password (bcrypt). Null for OIDC-only users"
       },
       "passwordreset": {
@@ -83,7 +86,10 @@
         }
       },
       "team": {
-        "bsonType": "string",
+        "bsonType": [
+          "string",
+          "null"
+        ],
         "description": "Legacy team field (deprecated, use workspace)"
       },
       "theme": {
