@@ -24,7 +24,7 @@ type UserDocument struct {
 	Team          string                 `json:"team" bson:",omitempty" jsonschema:"description=Legacy team field (deprecated, use workspace)"`
 	Lang          string                 `json:"lang" bson:"lang" jsonschema:"description=User language preference. Default: \"\" (deprecated, move to metadata)"`
 	Theme         string                 `json:"theme" bson:"theme" jsonschema:"description=User UI theme preference. Default: \"\" (deprecated, move to metadata)"`
-	Password      []byte                 `json:"password" bson:"password" jsonschema:"required,description=Hashed password (bcrypt)"`
+	Password      []byte                 `json:"password" bson:"password,omitempty" jsonschema:"description=Hashed password (bcrypt). Null for OIDC-only users"`
 	PasswordReset *PasswordResetDocument `json:"passwordreset" bson:"passwordreset" jsonschema:"description=Password reset token information"`
 	Verification  *UserVerificationDoc   `json:"verification" bson:"verification" jsonschema:"description=Email verification state. Default: null"`
 	Metadata      UserMetadataDoc        `json:"metadata" bson:"metadata" jsonschema:"required,description=Extended user metadata. Default: {}"`

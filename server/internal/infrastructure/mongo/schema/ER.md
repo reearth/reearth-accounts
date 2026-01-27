@@ -33,7 +33,7 @@ erDiagram
         string lang "optional"
         object metadata
         string name
-        binData password
+        binData password "optional"
         object passwordreset "optional"
         string[] subs
         string team "optional"
