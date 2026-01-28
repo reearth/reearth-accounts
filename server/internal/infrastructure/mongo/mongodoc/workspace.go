@@ -73,6 +73,10 @@ func NewWorkspace(ws *workspace.Workspace) (*WorkspaceDocument, string) {
 	}
 
 	wId := ws.ID().String()
+	updatedAt := ws.UpdatedAt()
+	if updatedAt.IsZero() {
+		updatedAt = time.Now()
+	}
 	return &WorkspaceDocument{
 		ID:           wId,
 		Name:         ws.Name(),
@@ -84,7 +88,7 @@ func NewWorkspace(ws *workspace.Workspace) (*WorkspaceDocument, string) {
 		MembersHash:  membersHash,
 		Personal:     ws.IsPersonal(),
 		Policy:       lo.FromPtr(ws.Policy()).String(),
-		UpdatedAt:    ws.UpdatedAt(),
+		UpdatedAt:    updatedAt,
 	}, wId
 }
 

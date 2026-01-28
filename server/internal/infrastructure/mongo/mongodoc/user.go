@@ -78,6 +78,11 @@ func NewUser(user *user.User) (*UserDocument, string) {
 		Theme:       string(user.Metadata().Theme()),
 	}
 
+	updatedAt := user.UpdatedAt()
+	if updatedAt.IsZero() {
+		updatedAt = time.Now()
+	}
+
 	return &UserDocument{
 		ID:            id,
 		Name:          user.Name(),
@@ -89,7 +94,7 @@ func NewUser(user *user.User) (*UserDocument, string) {
 		Password:      user.Password(),
 		PasswordReset: pwdResetDoc,
 		Metadata:      metadataDoc,
-		UpdatedAt:     user.UpdatedAt(),
+		UpdatedAt:     updatedAt,
 	}, id
 }
 
