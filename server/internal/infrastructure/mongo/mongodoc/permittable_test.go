@@ -63,8 +63,18 @@ func TestPermittableDocument_NewPermittableConsumer(t *testing.T) {
 				assert.Error(t, err)
 			} else {
 				assert.NoError(t, err)
+				if tc.result != nil {
+					assert.Len(t, c.Result, len(tc.result))
+					for i, expected := range tc.result {
+						assert.Equal(t, expected.ID(), c.Result[i].ID())
+						assert.Equal(t, expected.UserID(), c.Result[i].UserID())
+						assert.Equal(t, expected.RoleIDs(), c.Result[i].RoleIDs())
+						assert.False(t, c.Result[i].UpdatedAt().IsZero())
+					}
+				} else {
+					assert.Equal(t, tc.result, c.Result)
+				}
 			}
-			assert.Equal(t, tc.result, c.Result)
 		})
 	}
 }
@@ -108,7 +118,10 @@ func TestPermittableDocument_NewPermittable(t *testing.T) {
 			t.Parallel()
 			got, got1 := NewPermittable(tc.args.p)
 			assert.Equal(t, tc.want1, got1)
-			assert.Equal(t, tc.want, got)
+			assert.Equal(t, tc.want.ID, got.ID)
+			assert.Equal(t, tc.want.UserID, got.UserID)
+			assert.Equal(t, tc.want.RoleIDs, got.RoleIDs)
+			assert.False(t, got.UpdatedAt.IsZero())
 		})
 	}
 }

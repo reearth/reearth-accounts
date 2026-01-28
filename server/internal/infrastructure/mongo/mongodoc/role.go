@@ -1,13 +1,16 @@
 package mongodoc
 
 import (
+	"time"
+
 	"github.com/reearth/reearth-accounts/server/pkg/id"
 	"github.com/reearth/reearth-accounts/server/pkg/role"
 )
 
 type RoleDocument struct {
-	ID   string `json:"id" bson:"id" jsonschema:"required,description=Role ID (ULID format)"`
-	Name string `json:"name" bson:"name" jsonschema:"required,description=Role name"`
+	ID        string    `json:"id" bson:"id" jsonschema:"required,description=Role ID (ULID format)"`
+	Name      string    `json:"name" bson:"name" jsonschema:"required,description=Role name"`
+	UpdatedAt time.Time `json:"updatedat" bson:"updatedat" jsonschema:"description=Last update timestamp"`
 }
 
 type RoleConsumer = Consumer[*RoleDocument, *role.Role]
@@ -20,9 +23,16 @@ func NewRoleConsumer() *RoleConsumer {
 
 func NewRole(g role.Role) (*RoleDocument, string) {
 	id := g.ID().String()
+
+	updatedAt := g.UpdatedAt()
+	if updatedAt.IsZero() {
+		updatedAt = time.Now()
+	}
+
 	return &RoleDocument{
-		ID:   id,
-		Name: g.Name(),
+		ID:        id,
+		Name:      g.Name(),
+		UpdatedAt: updatedAt,
 	}, id
 }
 
@@ -39,5 +49,6 @@ func (d *RoleDocument) Model() (*role.Role, error) {
 	return role.New().
 		ID(rid).
 		Name(d.Name).
+		UpdatedAt(d.UpdatedAt).
 		Build()
 }

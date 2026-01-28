@@ -1,14 +1,18 @@
 package role
 
-import "errors"
+import (
+	"errors"
+	"time"
+)
 
 var (
 	ErrEmptyName = errors.New("role name can't be empty")
 )
 
 type Role struct {
-	id   ID
-	name string
+	id        ID
+	name      string
+	updatedAt time.Time
 }
 
 func (r *Role) ID() ID {
@@ -30,4 +34,12 @@ func (r *Role) Rename(name string) {
 		return
 	}
 	r.name = name
+	r.updatedAt = time.Now()
+}
+
+func (r *Role) UpdatedAt() time.Time {
+	if r == nil {
+		return time.Time{}
+	}
+	return r.updatedAt
 }

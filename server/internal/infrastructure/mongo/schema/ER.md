@@ -15,6 +15,7 @@ erDiagram
         objectId _id PK
         string id UK
         string[] roleids FK "role.id"
+        date updatedat "optional"
         string userid FK "user.id"
         object[] workspace_roles "optional"
     }
@@ -23,6 +24,7 @@ erDiagram
         objectId _id PK
         string id UK
         string name
+        date updatedat "optional"
     }
 
     User {

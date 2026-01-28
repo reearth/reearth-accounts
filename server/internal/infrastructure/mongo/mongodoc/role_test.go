@@ -61,8 +61,17 @@ func TestRoleDocument_NewRoleConsumer(t *testing.T) {
 				assert.Error(t, err)
 			} else {
 				assert.NoError(t, err)
+				if tc.result != nil {
+					assert.Len(t, c.Result, len(tc.result))
+					for i, expected := range tc.result {
+						assert.Equal(t, expected.ID(), c.Result[i].ID())
+						assert.Equal(t, expected.Name(), c.Result[i].Name())
+						assert.False(t, c.Result[i].UpdatedAt().IsZero())
+					}
+				} else {
+					assert.Equal(t, tc.result, c.Result)
+				}
 			}
-			assert.Equal(t, tc.result, c.Result)
 		})
 	}
 }
@@ -101,7 +110,9 @@ func TestRoleDocument_NewRole(t *testing.T) {
 			t.Parallel()
 			got, got1 := NewRole(tc.args.r)
 			assert.Equal(t, tc.want1, got1)
-			assert.Equal(t, tc.want, got)
+			assert.Equal(t, tc.want.ID, got.ID)
+			assert.Equal(t, tc.want.Name, got.Name)
+			assert.False(t, got.UpdatedAt.IsZero())
 		})
 	}
 }

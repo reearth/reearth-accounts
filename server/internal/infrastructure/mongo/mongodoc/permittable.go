@@ -1,6 +1,8 @@
 package mongodoc
 
 import (
+	"time"
+
 	"github.com/reearth/reearth-accounts/server/pkg/id"
 	permittable "github.com/reearth/reearth-accounts/server/pkg/permittable"
 	"github.com/reearth/reearth-accounts/server/pkg/user"
@@ -16,6 +18,7 @@ type PermittableDocument struct {
 	UserID         string                  `json:"userid" bson:"userid" jsonschema:"required,foreignkey=user,description=User ID this permittable represents"`
 	RoleIDs        []string                `json:"roleids" bson:"roleids" jsonschema:"foreignkey=role,description=List of role IDs assigned to this user. Default: []"`
 	WorkspaceRoles []WorkspaceRoleDocument `json:"workspace_roles,omitempty" bson:"workspace_roles,omitempty" jsonschema:"description=Workspace-specific role assignments"`
+	UpdatedAt      time.Time               `json:"updatedat" bson:"updatedat" jsonschema:"description=Last update timestamp"`
 }
 
 type PermittableConsumer = Consumer[*PermittableDocument, *permittable.Permittable]
@@ -45,11 +48,17 @@ func NewPermittable(p permittable.Permittable) (*PermittableDocument, string) {
 		}
 	}
 
+	updatedAt := p.UpdatedAt()
+	if updatedAt.IsZero() {
+		updatedAt = time.Now()
+	}
+
 	return &PermittableDocument{
 		ID:             id,
 		UserID:         p.UserID().String(),
 		RoleIDs:        roleIds,
 		WorkspaceRoles: workspaceRoles,
+		UpdatedAt:      updatedAt,
 	}, id
 }
 
@@ -94,6 +103,7 @@ func (d *PermittableDocument) Model() (*permittable.Permittable, error) {
 
 	return permittable.New().
 		ID(uid).
+		UpdatedAt(d.UpdatedAt).
 		UserID(userId).
 		RoleIDs(roleIds).
 		WorkspaceRoles(workspaceRoles).
