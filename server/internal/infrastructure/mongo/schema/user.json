@@ -127,8 +127,7 @@
       "email",
       "subs",
       "workspace",
-      "metadata",
-      "updatedat"
+      "metadata"
     ],
     "title": "User Collection Schema"
   }
