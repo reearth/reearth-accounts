@@ -19,6 +19,10 @@
           "bsonType": "string"
         }
       },
+      "updatedat": {
+        "bsonType": "date",
+        "description": "Last update timestamp"
+      },
       "userid": {
         "bsonType": "string",
         "description": "User ID this permittable represents"

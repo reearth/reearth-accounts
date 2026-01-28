@@ -1,5 +1,7 @@
 package role
 
+import "time"
+
 type Builder struct {
 	r *Role
 }
@@ -15,6 +17,12 @@ func (b *Builder) Build() (*Role, error) {
 	if b.r.name == "" {
 		return nil, ErrEmptyName
 	}
+
+	// Set default updatedAt if not explicitly set
+	if b.r.updatedAt.IsZero() {
+		b.r.updatedAt = time.Now()
+	}
+
 	return b.r, nil
 }
 
@@ -31,12 +39,17 @@ func (b *Builder) ID(id ID) *Builder {
 	return b
 }
 
+func (b *Builder) Name(name string) *Builder {
+	b.r.name = name
+	return b
+}
+
 func (b *Builder) NewID() *Builder {
 	b.r.id = NewID()
 	return b
 }
 
-func (b *Builder) Name(name string) *Builder {
-	b.r.name = name
+func (b *Builder) UpdatedAt(updatedAt time.Time) *Builder {
+	b.r.updatedAt = updatedAt
 	return b
 }

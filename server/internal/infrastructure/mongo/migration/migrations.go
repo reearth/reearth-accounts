@@ -37,4 +37,6 @@ var migrations = migration.Migrations[DBClient]{
 	260126150000: ApplyCollectionSchemas1,
 	260126150001: ApplyUserUpdatedAtSchema,
 	260126150002: ApplyWorkspaceUpdatedAtSchema,
+	260128000001: ApplyRoleUpdatedAtSchema,
+	260128000002: ApplyPermittableUpdatedAtSchema,
 }

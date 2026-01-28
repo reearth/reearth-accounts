@@ -1,6 +1,8 @@
 package permittable
 
 import (
+	"time"
+
 	"github.com/reearth/reearth-accounts/server/pkg/id"
 	"github.com/reearth/reearth-accounts/server/pkg/user"
 )
@@ -20,6 +22,12 @@ func (b *Builder) Build() (*Permittable, error) {
 	if b.p.userID.IsNil() {
 		return nil, ErrInvalidID
 	}
+
+	// Set default updatedAt if not explicitly set
+	if b.p.updatedAt.IsZero() {
+		b.p.updatedAt = time.Now()
+	}
+
 	return b.p, nil
 }
 
@@ -41,13 +49,18 @@ func (b *Builder) NewID() *Builder {
 	return b
 }
 
-func (b *Builder) UserID(userID user.ID) *Builder {
-	b.p.userID = userID
+func (b *Builder) RoleIDs(roleIDs []id.RoleID) *Builder {
+	b.p.roleIDs = roleIDs
 	return b
 }
 
-func (b *Builder) RoleIDs(roleIDs []id.RoleID) *Builder {
-	b.p.roleIDs = roleIDs
+func (b *Builder) UpdatedAt(updatedAt time.Time) *Builder {
+	b.p.updatedAt = updatedAt
+	return b
+}
+
+func (b *Builder) UserID(userID user.ID) *Builder {
+	b.p.userID = userID
 	return b
 }
 

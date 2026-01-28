@@ -62,7 +62,9 @@ func TestBuilder_Build(t *testing.T) {
 				Build()
 
 			if tt.Err == nil {
-				assert.Equal(t, tt.Expected, res)
+				assert.Equal(t, tt.Expected.id, res.id)
+				assert.Equal(t, tt.Expected.name, res.name)
+				assert.False(t, res.updatedAt.IsZero())
 			} else {
 				assert.Equal(t, tt.Err, err)
 			}
@@ -127,7 +129,10 @@ func TestBuilder_MustBuild(t *testing.T) {
 			if tt.Err != nil {
 				assert.PanicsWithValue(t, tt.Err, func() { _ = build() })
 			} else {
-				assert.Equal(t, tt.Expected, build())
+				res := build()
+				assert.Equal(t, tt.Expected.id, res.id)
+				assert.Equal(t, tt.Expected.name, res.name)
+				assert.False(t, res.updatedAt.IsZero())
 			}
 		})
 	}

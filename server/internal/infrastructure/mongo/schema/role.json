@@ -15,6 +15,10 @@
       "name": {
         "bsonType": "string",
         "description": "Role name"
+      },
+      "updatedat": {
+        "bsonType": "date",
+        "description": "Last update timestamp"
       }
     },
     "required": [
