@@ -9,6 +9,11 @@ import (
 )
 
 func ApplyPermittableUpdatedAtSchema(ctx context.Context, c DBClient) error {
+	// Apply schema first to allow the updatedat field
+	if err := ApplyCollectionSchemas(ctx, []string{"permittable"}, c); err != nil {
+		return err
+	}
+
 	col := c.Database().Collection("permittable")
 
 	cursor, err := col.Find(ctx, bson.M{"updatedat": bson.M{"$exists": false}})
@@ -38,9 +43,5 @@ func ApplyPermittableUpdatedAtSchema(ctx context.Context, c DBClient) error {
 		}
 	}
 
-	if err := cursor.Err(); err != nil {
-		return err
-	}
-
-	return ApplyCollectionSchemas(ctx, []string{"permittable"}, c)
+	return cursor.Err()
 }

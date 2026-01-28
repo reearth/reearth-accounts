@@ -9,6 +9,11 @@ import (
 )
 
 func ApplyRoleUpdatedAtSchema(ctx context.Context, c DBClient) error {
+	// Apply schema first to allow the updatedat field
+	if err := ApplyCollectionSchemas(ctx, []string{"role"}, c); err != nil {
+		return err
+	}
+
 	col := c.Database().Collection("role")
 
 	cursor, err := col.Find(ctx, bson.M{"updatedat": bson.M{"$exists": false}})
@@ -38,9 +43,5 @@ func ApplyRoleUpdatedAtSchema(ctx context.Context, c DBClient) error {
 		}
 	}
 
-	if err := cursor.Err(); err != nil {
-		return err
-	}
-
-	return ApplyCollectionSchemas(ctx, []string{"role"}, c)
+	return cursor.Err()
 }
