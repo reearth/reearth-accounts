@@ -122,8 +122,7 @@
       "email",
       "metadata",
       "members",
-      "personal",
-      "updatedat"
+      "personal"
     ],
     "title": "Workspace Collection Schema"
   }

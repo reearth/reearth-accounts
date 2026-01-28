@@ -38,7 +38,7 @@ erDiagram
         string[] subs
         string team "optional"
         string theme "optional"
-        date updatedat
+        date updatedat "optional"
         object verification "optional"
         string workspace FK "workspace.id"
     }
@@ -55,7 +55,7 @@ erDiagram
         string name
         bool personal
         string policy "optional"
-        date updatedat
+        date updatedat "optional"
     }
 
     User ||--o| Workspace : "has personal workspace"
