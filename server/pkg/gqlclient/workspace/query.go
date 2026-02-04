@@ -14,6 +14,10 @@ type findByIDQuery struct {
 	Workspace gqlmodel.Workspace `graphql:"findByID(id: $id)"`
 }
 
+type findByIDsQuery struct {
+	Workspaces []gqlmodel.Workspace `graphql:"findByIDs(ids: $ids)"`
+}
+
 type findByAliasQuery struct {
 	Workspace gqlmodel.Workspace `graphql:"findByAlias(alias: $alias)"`
 }
