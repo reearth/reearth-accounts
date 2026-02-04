@@ -101,6 +101,21 @@ func (mr *MockUserReposMockRecorder) FindByID(ctx, id any) *gomock.Call {
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "FindByID", reflect.TypeOf((*MockUserRepos)(nil).FindByID), ctx, id)
 }
 
+// FindByIDs mocks base method.
+func (m *MockUserRepos) FindByIDs(ctx context.Context, ids []string) ([]*user0.User, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "FindByIDs", ctx, ids)
+	ret0, _ := ret[0].([]*user0.User)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// FindByIDs indicates an expected call of FindByIDs.
+func (mr *MockUserReposMockRecorder) FindByIDs(ctx, ids any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "FindByIDs", reflect.TypeOf((*MockUserRepos)(nil).FindByIDs), ctx, ids)
+}
+
 // FindMe mocks base method.
 func (m *MockUserRepos) FindMe(ctx context.Context) (*user0.User, error) {
 	m.ctrl.T.Helper()
@@ -114,6 +129,20 @@ func (m *MockUserRepos) FindMe(ctx context.Context) (*user0.User, error) {
 func (mr *MockUserReposMockRecorder) FindMe(ctx any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "FindMe", reflect.TypeOf((*MockUserRepos)(nil).FindMe), ctx)
+}
+
+// PasswordReset mocks base method.
+func (m *MockUserRepos) PasswordReset(ctx context.Context, password, token string) error {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "PasswordReset", ctx, password, token)
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
+// PasswordReset indicates an expected call of PasswordReset.
+func (mr *MockUserReposMockRecorder) PasswordReset(ctx, password, token any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "PasswordReset", reflect.TypeOf((*MockUserRepos)(nil).PasswordReset), ctx, password, token)
 }
 
 // RemoveMyAuth mocks base method.
@@ -161,6 +190,20 @@ func (mr *MockUserReposMockRecorder) SignupOIDC(ctx, name, email, sub, secret an
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "SignupOIDC", reflect.TypeOf((*MockUserRepos)(nil).SignupOIDC), ctx, name, email, sub, secret)
 }
 
+// StartPasswordReset mocks base method.
+func (m *MockUserRepos) StartPasswordReset(ctx context.Context, email string) error {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "StartPasswordReset", ctx, email)
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
+// StartPasswordReset indicates an expected call of StartPasswordReset.
+func (mr *MockUserReposMockRecorder) StartPasswordReset(ctx, email any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "StartPasswordReset", reflect.TypeOf((*MockUserRepos)(nil).StartPasswordReset), ctx, email)
+}
+
 // Update mocks base method.
 func (m *MockUserRepos) Update(ctx context.Context, name string) error {
 	m.ctrl.T.Helper()
@@ -188,4 +231,34 @@ func (m *MockUserRepos) UpdateMe(ctx context.Context, input user.UpdateMeInput) 
 func (mr *MockUserReposMockRecorder) UpdateMe(ctx, input any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "UpdateMe", reflect.TypeOf((*MockUserRepos)(nil).UpdateMe), ctx, input)
+}
+
+// UserByNameOrEmail mocks base method.
+func (m *MockUserRepos) UserByNameOrEmail(ctx context.Context, nameOrEmail string) (*user0.User, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "UserByNameOrEmail", ctx, nameOrEmail)
+	ret0, _ := ret[0].(*user0.User)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// UserByNameOrEmail indicates an expected call of UserByNameOrEmail.
+func (mr *MockUserReposMockRecorder) UserByNameOrEmail(ctx, nameOrEmail any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "UserByNameOrEmail", reflect.TypeOf((*MockUserRepos)(nil).UserByNameOrEmail), ctx, nameOrEmail)
+}
+
+// VerifyUser mocks base method.
+func (m *MockUserRepos) VerifyUser(ctx context.Context, code string) (*user0.User, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "VerifyUser", ctx, code)
+	ret0, _ := ret[0].(*user0.User)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// VerifyUser indicates an expected call of VerifyUser.
+func (mr *MockUserReposMockRecorder) VerifyUser(ctx, code any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "VerifyUser", reflect.TypeOf((*MockUserRepos)(nil).VerifyUser), ctx, code)
 }
