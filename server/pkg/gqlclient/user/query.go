@@ -13,15 +13,12 @@ type findByIDQuery struct {
 	User gqlmodel.User `graphql:"user(id: $id)"`
 }
 
-type findByNameQuery struct {
-	User struct {
-		ID        graphql.ID       `json:"id" graphql:"id"`
-		Name      graphql.String   `json:"name" graphql:"name"`
-		Email     graphql.String   `json:"email" graphql:"email"`
-		Host      *graphql.String  `json:"host,omitempty" graphql:"host"`
-		Workspace graphql.ID       `json:"workspace" graphql:"workspace"`
-		Auths     []graphql.String `json:"auths" graphql:"auths"`
-	} `graphql:"userByNameOrEmail(nameOrEmail: $nameOrEmail)"`
+type findUsersByIDsQuery struct {
+	Users []gqlmodel.User `graphql:"findUsersByIDs(ids: $ids)"`
+}
+
+type userByNameOrEmailQuery struct {
+	User gqlmodel.UserSimple `graphql:"userByNameOrEmail(nameOrEmail: $nameOrEmail)"`
 }
 
 type findByAliasQuery struct {
@@ -81,4 +78,31 @@ type removeMyAuthMutation struct {
 	RemoveMyAuth struct {
 		Me gqlmodel.Me
 	} `graphql:"removeMyAuth(input: {auth: $auth})"`
+}
+
+type VerifyUserInput struct {
+	Code graphql.String `json:"code"`
+}
+
+type verifyUserMutation struct {
+	VerifyUser struct {
+		User gqlmodel.User `graphql:"user"`
+	} `graphql:"verifyUser(input: $input)"`
+}
+
+type StartPasswordResetInput struct {
+	Email graphql.String `json:"email"`
+}
+
+type startPasswordResetMutation struct {
+	StartPasswordReset graphql.Boolean `graphql:"startPasswordReset(input: $input)"`
+}
+
+type PasswordResetInput struct {
+	Password graphql.String `json:"password"`
+	Token    graphql.String `json:"token"`
+}
+
+type passwordResetMutation struct {
+	PasswordReset graphql.Boolean `graphql:"passwordReset(input: $input)"`
 }
