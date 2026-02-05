@@ -348,6 +348,10 @@ func (r *userRepo) SignupOIDC(ctx context.Context, name string, email string, su
 }
 
 func (r *userRepo) Signup(ctx context.Context, userID, name, email, password, secret, workspaceID string, mockAuth bool) (*user.User, error) {
+	if userID == "" {
+		return r.SignupNoID(ctx, name, email, password, secret, workspaceID, mockAuth)
+	}
+
 	var m signupMutation
 	vars := map[string]interface{}{}
 
@@ -372,6 +376,37 @@ func (r *userRepo) Signup(ctx context.Context, userID, name, email, password, se
 	uid, err := user.IDFrom(string(m.Signup.User.ID))
 	if err != nil {
 		log.Errorf("[Signup] failed to convert user id: %s", m.Signup.User.ID)
+		return nil, gqlerror.ReturnAccountsError(ctx, err)
+	}
+
+	return user.New().
+		ID(uid).
+		Name(string(m.Signup.User.Name)).
+		Email(string(m.Signup.User.Email)).
+		Build()
+}
+
+func (r *userRepo) SignupNoID(ctx context.Context, name, email, password, secret, workspaceID string, mockAuth bool) (*user.User, error) {
+	var m signupMutationNoID
+	vars := map[string]interface{}{}
+
+	if workspaceID != "" {
+		vars["workspaceID"] = graphql.ID(workspaceID)
+	}
+
+	vars["name"] = graphql.String(name)
+	vars["email"] = graphql.String(email)
+	vars["password"] = graphql.String(password)
+	vars["secret"] = graphql.String(secret)
+	vars["mockAuth"] = graphql.Boolean(mockAuth)
+
+	if err := r.client.Mutate(ctx, &m, vars); err != nil {
+		return nil, gqlerror.ReturnAccountsError(ctx, err)
+	}
+
+	uid, err := user.IDFrom(string(m.Signup.User.ID))
+	if err != nil {
+		log.Errorf("[SignupNoID] failed to convert user id: %s", m.Signup.User.ID)
 		return nil, gqlerror.ReturnAccountsError(ctx, err)
 	}
 
