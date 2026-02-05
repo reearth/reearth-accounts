@@ -258,11 +258,15 @@ func (r *workspaceRepo) RemoveUserFromWorkspace(ctx context.Context, workspaceID
 }
 
 func (r *workspaceRepo) UpdateUserOfWorkspace(ctx context.Context, input UpdateUserOfWorkspaceInput) (*workspace.Workspace, error) {
+	in := gqlmodel.UpdateUserOfWorkspaceInput{
+		WorkspaceID: graphql.ID(input.WorkspaceID),
+		UserID:      graphql.ID(input.UserID),
+		Role:        graphql.String(input.Role),
+	}
+
 	var m updateUserOfWorkspaceMutation
 	vars := map[string]interface{}{
-		"workspaceId": graphql.ID(input.WorkspaceID),
-		"userId":      graphql.ID(input.UserID),
-		"role":        graphql.String(input.Role),
+		"input": in,
 	}
 	if err := r.client.Mutate(ctx, &m, vars); err != nil {
 		return nil, gqlerror.ReturnAccountsError(ctx, err)
