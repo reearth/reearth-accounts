@@ -67,7 +67,7 @@ type signupMutation struct {
 type signupMutationNoID struct {
 	Signup struct {
 		User gqlmodel.User
-	} `graphql:"signup(input: {name: $name, email: $email, password: $password, secret: $secret workspaceID: $workspaceID, mockAuth: $mockAuth})"`
+	} `graphql:"signup(input: {name: $name, email: $email, password: $password, secret: $secret, mockAuth: $mockAuth})"`
 }
 
 type createVerificationMutation struct {
