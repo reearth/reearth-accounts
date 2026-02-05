@@ -90,5 +90,5 @@ type updateUserOfWorkspaceMutation struct {
 			Alias    graphql.String `graphql:"alias"`
 			Personal bool           `graphql:"personal"`
 		} `graphql:"workspace"`
-	} `graphql:"updateUserOfWorkspace(input: {workspaceId: $workspaceId, userId: $userId, role: $role})"`
+	} `graphql:"updateUserOfWorkspace(input: $input)"`
 }
