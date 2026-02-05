@@ -223,13 +223,13 @@ func (r *workspaceRepo) DeleteWorkspace(ctx context.Context, workspaceID string)
 }
 
 func (r *workspaceRepo) AddUsersToWorkspace(ctx context.Context, input AddUsersToWorkspaceInput) (*workspace.Workspace, error) {
-	// Convert WorkspaceMemberInput to gqlmodel.MemberInput for proper GraphQL type inference
-	users := make([]gqlmodel.MemberInput, len(input.Users))
-	for i, u := range input.Users {
-		users[i] = gqlmodel.MemberInput{
+	// Convert MemberInput to GraphQL format
+	users := make([]gqlmodel.MemberInput, 0, len(input.Users))
+	for _, u := range input.Users {
+		users = append(users, gqlmodel.MemberInput{
 			UserID: graphql.ID(u.UserID),
 			Role:   graphql.String(u.Role),
-		}
+		})
 	}
 
 	var m addUsersToWorkspaceMutation
