@@ -118,7 +118,7 @@ func (i *User) UpdateMe(ctx context.Context, p interfaces.UpdateMeParam, operato
 		return nil, interfaces.ErrInvalidOperator
 	}
 
-	return Run1(ctx, operator, i.repos, Usecase().Transaction(), func(ctx context.Context) (*user.User, error) {
+	return Run1(ctx, operator, i.repos, Usecase().Transaction().WithWritableWorkspaces(), func(ctx context.Context) (*user.User, error) {
 		if p.Password != nil {
 			if p.PasswordConfirmation == nil || *p.Password != *p.PasswordConfirmation {
 				return nil, interfaces.ErrUserInvalidPasswordConfirmation
