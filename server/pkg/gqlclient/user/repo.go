@@ -28,7 +28,7 @@ type Repo interface {
 	FindMe(ctx context.Context) (*user.User, error)
 	FindByID(ctx context.Context, id string) (*user.User, error)
 	FindByAlias(ctx context.Context, alias string) (*user.User, error)
-	FindByNameEmail(ctx context.Context, nameOrEmail string) (*user.User, error)
+	FindByNameOrEmail(ctx context.Context, nameOrEmail string) (*user.User, error)
 	Update(ctx context.Context, name string) error
 	UpdateMe(ctx context.Context, input UpdateMeInput) (*user.User, error)
 	SignupOIDC(ctx context.Context, name string, email string, sub string, secret string) (*user.User, error)
@@ -131,7 +131,7 @@ func (r *userRepo) FindByAlias(ctx context.Context, alias string) (*user.User, e
 		Build()
 }
 
-func (r *userRepo) FindByNameEmail(ctx context.Context, nameOrEmail string) (*user.User, error) {
+func (r *userRepo) FindByNameOrEmail(ctx context.Context, nameOrEmail string) (*user.User, error) {
 	var q findByNameQuery
 	vars := map[string]interface{}{
 		"nameOrEmail": graphql.String(nameOrEmail),
@@ -142,7 +142,7 @@ func (r *userRepo) FindByNameEmail(ctx context.Context, nameOrEmail string) (*us
 
 	uid, err := user.IDFrom(string(q.User.ID))
 	if err != nil {
-		log.Errorf("[FindByNameEmail] failed to convert user id: %s", q.User.ID)
+		log.Errorf("[FindByNameOrEmail] failed to convert user id: %s", q.User.ID)
 		return nil, gqlerror.ReturnAccountsError(ctx, err)
 	}
 
@@ -151,6 +151,11 @@ func (r *userRepo) FindByNameEmail(ctx context.Context, nameOrEmail string) (*us
 		Name(string(q.User.Name)).
 		Email(string(q.User.Email)).
 		Build()
+}
+
+// Deprecated: Use FindByNameOrEmail instead
+func (r *userRepo) FindByNameEmail(ctx context.Context, nameOrEmail string) (*user.User, error) {
+	return r.FindByNameOrEmail(ctx, nameOrEmail)
 }
 
 // TODO: Extend the Account server's UpdateMeInput to support alias, photoURL, website, and description.
