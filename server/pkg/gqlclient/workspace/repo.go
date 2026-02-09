@@ -201,11 +201,10 @@ func (r *workspaceRepo) DeleteWorkspace(ctx context.Context, workspaceID string)
 }
 
 func (r *workspaceRepo) AddUsersToWorkspace(ctx context.Context, input AddUsersToWorkspaceInput) (*workspace.Workspace, error) {
-	// Convert WorkspaceMemberInput to GraphQL typed struct for proper type inference
-	// MemberInput struct name must match the server's GraphQL schema type name
-	users := make([]MemberInput, len(input.Users))
+	// Convert WorkspaceMemberInput to gqlmodel.MemberInput for proper GraphQL type inference
+	users := make([]gqlmodel.MemberInput, len(input.Users))
 	for i, u := range input.Users {
-		users[i] = MemberInput{
+		users[i] = gqlmodel.MemberInput{
 			UserID: graphql.ID(u.UserID),
 			Role:   graphql.String(u.Role),
 		}

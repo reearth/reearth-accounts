@@ -5,13 +5,6 @@ import (
 	"github.com/reearth/reearth-accounts/server/pkg/gqlclient/gqlmodel"
 )
 
-// MemberInput is the GraphQL input type for adding users to workspace.
-// The struct name must match the server's GraphQL schema type name exactly.
-type MemberInput struct {
-	UserID graphql.ID     `json:"userId"`
-	Role   graphql.String `json:"role"`
-}
-
 // Query types
 type findByUserQuery struct {
 	FindByUser []gqlmodel.Workspace `graphql:"findByUser(userId: $userId)"`
