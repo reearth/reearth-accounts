@@ -82,14 +82,14 @@ type UpdateWorkspaceInput struct {
 	Name        string
 }
 
-type MemberInput struct {
+type WorkspaceMemberInput struct {
 	UserID string
 	Role   string
 }
 
 type AddUsersToWorkspaceInput struct {
 	WorkspaceID string
-	Users       []MemberInput
+	Users       []WorkspaceMemberInput
 }
 
 type UpdateUserOfWorkspaceInput struct {
@@ -201,12 +201,12 @@ func (r *workspaceRepo) DeleteWorkspace(ctx context.Context, workspaceID string)
 }
 
 func (r *workspaceRepo) AddUsersToWorkspace(ctx context.Context, input AddUsersToWorkspaceInput) (*workspace.Workspace, error) {
-	// Convert MemberInput to GraphQL format
-	users := make([]map[string]interface{}, len(input.Users))
-	for i, user := range input.Users {
-		users[i] = map[string]interface{}{
-			"userId": graphql.ID(user.UserID),
-			"role":   graphql.String(user.Role),
+	// Convert WorkspaceMemberInput to gqlmodel.MemberInput for proper GraphQL type inference
+	users := make([]gqlmodel.MemberInput, len(input.Users))
+	for i, u := range input.Users {
+		users[i] = gqlmodel.MemberInput{
+			UserID: graphql.ID(u.UserID),
+			Role:   graphql.String(u.Role),
 		}
 	}
 

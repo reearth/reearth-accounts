@@ -508,7 +508,7 @@ func TestWorkspaceRepo_AddUsersToWorkspace(t *testing.T) {
 
 		input := accountsGqlWorkspace.AddUsersToWorkspaceInput{
 			WorkspaceID: "01j9x0yy00000000000000001w",
-			Users: []accountsGqlWorkspace.MemberInput{
+			Users: []accountsGqlWorkspace.WorkspaceMemberInput{
 				{
 					UserID: "01j9x0yy00000000000000000a",
 					Role:   "READER",
@@ -552,7 +552,7 @@ func TestWorkspaceRepo_AddUsersToWorkspace(t *testing.T) {
 
 		input := accountsGqlWorkspace.AddUsersToWorkspaceInput{
 			WorkspaceID: "01j9x0yy00000000000000001w",
-			Users: []accountsGqlWorkspace.MemberInput{
+			Users: []accountsGqlWorkspace.WorkspaceMemberInput{
 				{
 					UserID: "01j9x0yy00000000000000000a",
 					Role:   "READER",
@@ -596,7 +596,7 @@ func TestWorkspaceRepo_AddUsersToWorkspace(t *testing.T) {
 
 		input := accountsGqlWorkspace.AddUsersToWorkspaceInput{
 			WorkspaceID: "01j9x0yy00000000000000001w",
-			Users: []accountsGqlWorkspace.MemberInput{
+			Users: []accountsGqlWorkspace.WorkspaceMemberInput{
 				{
 					UserID: "01j9x0yy00000000000000000a",
 					Role:   "READER",
@@ -632,7 +632,7 @@ func TestWorkspaceRepo_AddUsersToWorkspace(t *testing.T) {
 
 		input := accountsGqlWorkspace.AddUsersToWorkspaceInput{
 			WorkspaceID: "01j9x0yy00000000000000001w",
-			Users: []accountsGqlWorkspace.MemberInput{
+			Users: []accountsGqlWorkspace.WorkspaceMemberInput{
 				{
 					UserID: "01j9x0yy00000000000000000a",
 					Role:   "READER",
