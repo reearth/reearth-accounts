@@ -15,6 +15,7 @@ var (
 	ErrCannotChangeOwnerRole        = rerror.NewE(i18n.T("cannot change the role of the workspace owner"))
 	ErrCannotDeleteWorkspace        = rerror.NewE(i18n.T("cannot delete workspace because at least one project is left"))
 	ErrWorkspaceWithProjects        = rerror.NewE(i18n.T("target workspace still has some project"))
+	ErrPermissionDenied             = rerror.NewE(i18n.T("permission denied"))
 )
 
 type FetchByUserWithPaginationParam struct {
@@ -27,6 +28,15 @@ type FetchByUserWithPaginationResult struct {
 	TotalCount int
 }
 
+type UpdateWorkspaceParam struct {
+	ID          workspace.ID
+	Name        *string
+	Alias       *string
+	Description *string
+	Website     *string
+	PhotoURL    *string
+}
+
 type Workspace interface {
 	Fetch(context.Context, workspace.IDList, *workspace.Operator) (workspace.List, error)
 	FetchByID(context.Context, workspace.ID) (*workspace.Workspace, error)
@@ -35,7 +45,7 @@ type Workspace interface {
 	FetchByUserWithPagination(context.Context, user.ID, FetchByUserWithPaginationParam) (FetchByUserWithPaginationResult, error)
 	FindByUser(context.Context, user.ID, *workspace.Operator) (workspace.List, error)
 	Create(ctx context.Context, alias, name, description string, firstUser workspace.UserID, operator *workspace.Operator) (_ *workspace.Workspace, err error)
-	Update(context.Context, workspace.ID, string, *string, *workspace.Operator) (*workspace.Workspace, error)
+	Update(context.Context, UpdateWorkspaceParam, *workspace.Operator) (*workspace.Workspace, error)
 	AddUserMember(context.Context, workspace.ID, map[user.ID]role.RoleType, *workspace.Operator) (*workspace.Workspace, error)
 	AddIntegrationMember(context.Context, workspace.ID, workspace.IntegrationID, role.RoleType, *workspace.Operator) (*workspace.Workspace, error)
 	UpdateUserMember(context.Context, workspace.ID, user.ID, role.RoleType, *workspace.Operator) (*workspace.Workspace, error)

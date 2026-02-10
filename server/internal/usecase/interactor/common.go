@@ -20,10 +20,11 @@ func NewContainer(
 	enforcer WorkspaceMemberCountEnforcer,
 	cerbosAdapter gateway.CerbosGateway,
 	config ContainerConfig) interfaces.Container {
+	cerbos := NewCerbos(r, cerbosAdapter)
 	return interfaces.Container{
 		User:        NewUser(r, acg, config.SignupSecret, config.AuthSrvUIDomain),
-		Workspace:   NewWorkspace(r, enforcer),
-		Cerbos:      NewCerbos(r, cerbosAdapter),
+		Workspace:   NewWorkspace(r, enforcer, cerbos),
+		Cerbos:      cerbos,
 		Role:        NewRole(r),
 		Permittable: NewPermittable(r),
 	}
