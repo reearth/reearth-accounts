@@ -20,7 +20,7 @@ type Config struct {
 	Port    string `default:"8090" envconfig:"PORT"`
 	Dev     bool
 	DB      string   `default:"mongodb://localhost" envconfig:"REEARTH_ACCOUNTS_DB"`
-	DBName  string   `default:"reearth" envconfig:"REEARTH_ACCOUNTS_DB_NAME"`
+	DBName  string   `default:"reearth-account" envconfig:"REEARTH_ACCOUNTS_DB_NAME"`
 	Origins []string `envconfig:"REEARTH_ACCOUNTS_ORIGINS"`
 	Host    string   `default:"0.0.0.0" envconfig:"HOST"`
 
