@@ -27,7 +27,8 @@ type UpdateMeInput struct {
 type Repo interface {
 	FindMe(ctx context.Context) (*user.User, error)
 	FindByID(ctx context.Context, id string) (*user.User, error)
-	FindByAlias(ctx context.Context, name string) (*user.User, error)
+	FindByAlias(ctx context.Context, alias string) (*user.User, error)
+	FindByNameOrEmail(ctx context.Context, nameOrEmail string) (*user.User, error)
 	FindUsersByIDsWithPagination(ctx context.Context, id []string, alias string, page, size int64) (user.List, int, error)
 	Update(ctx context.Context, name string) error
 	UpdateMe(ctx context.Context, input UpdateMeInput) (*user.User, error)
@@ -108,10 +109,10 @@ func (r *userRepo) FindByID(ctx context.Context, id string) (*user.User, error) 
 		Build()
 }
 
-func (r *userRepo) FindByAlias(ctx context.Context, name string) (*user.User, error) {
-	var q findByNameQuery
+func (r *userRepo) FindByAlias(ctx context.Context, alias string) (*user.User, error) {
+	var q findByAliasQuery
 	vars := map[string]interface{}{
-		"nameOrEmail": graphql.String(name),
+		"alias": graphql.String(alias),
 	}
 	if err := r.client.Query(ctx, &q, vars); err != nil {
 		return nil, gqlerror.ReturnAccountsError(ctx, err)
@@ -126,8 +127,36 @@ func (r *userRepo) FindByAlias(ctx context.Context, name string) (*user.User, er
 	return user.New().
 		ID(uid).
 		Name(string(q.User.Name)).
+		Alias(string(q.User.Alias)).
 		Email(string(q.User.Email)).
 		Build()
+}
+
+func (r *userRepo) FindByNameOrEmail(ctx context.Context, nameOrEmail string) (*user.User, error) {
+	var q findByNameQuery
+	vars := map[string]interface{}{
+		"nameOrEmail": graphql.String(nameOrEmail),
+	}
+	if err := r.client.Query(ctx, &q, vars); err != nil {
+		return nil, gqlerror.ReturnAccountsError(ctx, err)
+	}
+
+	uid, err := user.IDFrom(string(q.User.ID))
+	if err != nil {
+		log.Errorf("[FindByNameOrEmail] failed to convert user id: %s", q.User.ID)
+		return nil, gqlerror.ReturnAccountsError(ctx, err)
+	}
+
+	return user.New().
+		ID(uid).
+		Name(string(q.User.Name)).
+		Email(string(q.User.Email)).
+		Build()
+}
+
+// Deprecated: Use FindByNameOrEmail instead
+func (r *userRepo) FindByNameEmail(ctx context.Context, nameOrEmail string) (*user.User, error) {
+	return r.FindByNameOrEmail(ctx, nameOrEmail)
 }
 
 func (r *userRepo) FindUsersByIDsWithPagination(ctx context.Context, id []string, alias string, page, size int64) (user.List, int, error) {
@@ -143,7 +172,9 @@ func (r *userRepo) FindUsersByIDsWithPagination(ctx context.Context, id []string
 	}
 
 	users := gqlmodel.ToUsers(ctx, q.FindUsersByIDsWithPagination.Users)
-	return users, q.FindUsersByIDsWithPagination.TotalCount, nil
+	return users, 	FindByAlias(ctx context.Context, name string) (*user.User, error)
+	FindByAlias(ctx context.Context, name string) (*user.User, error)
+q.FindUsersByIDsWithPagination.TotalCount, nil
 }
 
 // TODO: Extend the Account server's UpdateMeInput to support alias, photoURL, website, and description.

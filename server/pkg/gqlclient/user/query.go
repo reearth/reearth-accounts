@@ -24,6 +24,18 @@ type findByNameQuery struct {
 	} `graphql:"userByNameOrEmail(nameOrEmail: $nameOrEmail)"`
 }
 
+type findByAliasQuery struct {
+	User struct {
+		ID        graphql.ID       `json:"id" graphql:"id"`
+		Name      graphql.String   `json:"name" graphql:"name"`
+		Email     graphql.String   `json:"email" graphql:"email"`
+		Alias     graphql.String   `json:"alias" graphql:"alias"`
+		Host      *graphql.String  `json:"host,omitempty" graphql:"host"`
+		Workspace graphql.ID       `json:"workspace" graphql:"workspace"`
+		Auths     []graphql.String `json:"auths" graphql:"auths"`
+	} `graphql:"findUserByAlias(alias: $alias)"`
+}
+
 type FindUsersByIDsWithPaginationQuery struct {
 	FindUsersByIDsWithPagination struct {
 		Users      []gqlmodel.User `graphql:"users"`
