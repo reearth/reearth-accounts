@@ -195,10 +195,6 @@ func (r *userRepo) FindByAlias(ctx context.Context, alias string) (*user.User, e
 }
 
 func (r *userRepo) FindByNameOrEmail(ctx context.Context, nameOrEmail string) (*user.User, error) {
-	if nameOrEmail == "" {
-		return nil, nil
-	}
-
 	var q userByNameOrEmailQuery
 	vars := map[string]interface{}{
 		"nameOrEmail": graphql.String(nameOrEmail),
@@ -209,7 +205,7 @@ func (r *userRepo) FindByNameOrEmail(ctx context.Context, nameOrEmail string) (*
 
 	uid, err := user.IDFrom(string(q.User.ID))
 	if err != nil {
-		log.Errorf("[UserByNameOrEmail] failed to convert user id: %s", q.User.ID)
+		log.Errorf("[FindByNameOrEmail] failed to convert user id: %s", q.User.ID)
 		return nil, gqlerror.ReturnAccountsError(ctx, err)
 	}
 
