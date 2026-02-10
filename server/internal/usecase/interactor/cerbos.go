@@ -37,6 +37,11 @@ func NewCerbos(r *repo.Container, cerbos gateway.CerbosGateway) interfaces.Cerbo
 }
 
 func (i *Cerbos) CheckPermission(ctx context.Context, userId user.ID, param interfaces.CheckPermissionParam) (*interfaces.CheckPermissionResult, error) {
+	// If cerbos gateway is not configured, skip permission check
+	if i.cerbos == nil {
+		return nil, nil
+	}
+
 	var roleIDList, workspaceRoleIDs id.RoleIDList
 	var resourceId string
 	p, err := i.permittableRepo.FindByUserID(ctx, userId)
