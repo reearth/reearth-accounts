@@ -508,3 +508,249 @@ func TestUserRepo_DeleteMe(t *testing.T) {
 		assert.Error(t, err)
 	})
 }
+
+func TestUserRepo_FindByAlias(t *testing.T) {
+	ctx := context.Background()
+
+	t.Run("successfully find user by alias using findUserByAlias query", func(t *testing.T) {
+		httpmock.Activate()
+		defer httpmock.DeactivateAndReset()
+
+		transport := httpmock.DefaultTransport
+		client := gqlclient.NewClient("https://accounts.example.com", 30, transport)
+
+		// Assert that the request uses findUserByAlias query with $alias variable
+		httpmock.RegisterResponder("POST", "https://accounts.example.com/api/graphql",
+			func(req *http.Request) (*http.Response, error) {
+				bodyBytes, _ := io.ReadAll(req.Body)
+				body := string(bodyBytes)
+				fmt.Printf("\n--- FindByAlias GraphQL Request ---\n%s\n", body)
+
+				// Verify the query uses findUserByAlias with $alias parameter
+				assert.Contains(t, body, "findUserByAlias")
+				assert.Contains(t, body, "$alias")
+				assert.NotContains(t, body, "userByNameOrEmail", "FindByAlias should not use userByNameOrEmail query")
+
+				req.Body = io.NopCloser(bytes.NewBuffer(bodyBytes))
+				return httpmock.NewStringResponse(http.StatusOK, `{
+					"data": {
+						"findUserByAlias": {
+							"id": "01j9x0yy00000000000000000a",
+							"name": "Test User",
+							"alias": "testuser",
+							"email": "test@example.com",
+							"workspace": "01j9x0yy00000000000000001a",
+							"host": "",
+							"auths": ["auth0|123456"]
+						}
+					}
+				}`), nil
+			},
+		)
+
+		got, err := client.UserRepo.FindByAlias(ctx, "testuser")
+
+		assert.NoError(t, err)
+		assert.NotNil(t, got)
+		assert.Equal(t, "Test User", got.Name())
+		assert.Equal(t, "testuser", got.Alias())
+		assert.Equal(t, "test@example.com", got.Email())
+	})
+
+	t.Run("user not found by alias", func(t *testing.T) {
+		httpmock.Activate()
+		defer httpmock.DeactivateAndReset()
+
+		transport := httpmock.DefaultTransport
+		client := gqlclient.NewClient("https://accounts.example.com", 30, transport)
+
+		httpmock.RegisterResponder(
+			"POST",
+			"https://accounts.example.com/api/graphql",
+			httpmock.NewStringResponder(http.StatusOK, `{
+				"errors": [
+					{
+						"message": "input: findUserByAlias not found"
+					}
+				]
+			}`),
+		)
+
+		got, err := client.UserRepo.FindByAlias(ctx, "nonexistent")
+
+		assert.Error(t, err)
+		assert.Nil(t, got)
+	})
+
+	t.Run("invalid user ID in alias lookup", func(t *testing.T) {
+		httpmock.Activate()
+		defer httpmock.DeactivateAndReset()
+
+		transport := httpmock.DefaultTransport
+		client := gqlclient.NewClient("https://accounts.example.com", 30, transport)
+
+		httpmock.RegisterResponder(
+			"POST",
+			"https://accounts.example.com/api/graphql",
+			httpmock.NewStringResponder(http.StatusOK, `{
+				"data": {
+					"findUserByAlias": {
+						"id": "invalid-id",
+						"name": "Test User",
+						"alias": "testuser",
+						"email": "test@example.com",
+						"workspace": "01j9x0yy00000000000000001a",
+						"host": "",
+						"auths": []
+					}
+				}
+			}`),
+		)
+
+		got, err := client.UserRepo.FindByAlias(ctx, "testuser")
+
+		assert.Error(t, err)
+		assert.Nil(t, got)
+	})
+}
+
+func TestUserRepo_FindByNameOrEmail(t *testing.T) {
+	ctx := context.Background()
+
+	t.Run("successfully find user by name or email using userByNameOrEmail query", func(t *testing.T) {
+		httpmock.Activate()
+		defer httpmock.DeactivateAndReset()
+
+		transport := httpmock.DefaultTransport
+		client := gqlclient.NewClient("https://accounts.example.com", 30, transport)
+
+		// Assert that the request uses userByNameOrEmail query with $nameOrEmail variable
+		httpmock.RegisterResponder("POST", "https://accounts.example.com/api/graphql",
+			func(req *http.Request) (*http.Response, error) {
+				bodyBytes, _ := io.ReadAll(req.Body)
+				body := string(bodyBytes)
+				fmt.Printf("\n--- FindByNameOrEmail GraphQL Request ---\n%s\n", body)
+
+				// Verify the query uses userByNameOrEmail with $nameOrEmail parameter
+				assert.Contains(t, body, "userByNameOrEmail")
+				assert.Contains(t, body, "$nameOrEmail")
+				assert.NotContains(t, body, "findUserByAlias", "FindByNameOrEmail should not use findUserByAlias query")
+
+				req.Body = io.NopCloser(bytes.NewBuffer(bodyBytes))
+				return httpmock.NewStringResponse(http.StatusOK, `{
+					"data": {
+						"userByNameOrEmail": {
+							"id": "01j9x0yy00000000000000000a",
+							"name": "Test User",
+							"email": "test@example.com",
+							"workspace": "01j9x0yy00000000000000001a",
+							"host": "",
+							"auths": ["auth0|123456"]
+						}
+					}
+				}`), nil
+			},
+		)
+
+		got, err := client.UserRepo.FindByNameOrEmail(ctx, "test@example.com")
+
+		assert.NoError(t, err)
+		assert.NotNil(t, got)
+		assert.Equal(t, "Test User", got.Name())
+		assert.Equal(t, "test@example.com", got.Email())
+	})
+
+	t.Run("successfully find by name using userByNameOrEmail query", func(t *testing.T) {
+		httpmock.Activate()
+		defer httpmock.DeactivateAndReset()
+
+		transport := httpmock.DefaultTransport
+		client := gqlclient.NewClient("https://accounts.example.com", 30, transport)
+
+		httpmock.RegisterResponder("POST", "https://accounts.example.com/api/graphql",
+			func(req *http.Request) (*http.Response, error) {
+				bodyBytes, _ := io.ReadAll(req.Body)
+				body := string(bodyBytes)
+
+				// Verify the query uses userByNameOrEmail (handles both name and email)
+				assert.Contains(t, body, "userByNameOrEmail")
+				assert.Contains(t, body, "$nameOrEmail")
+
+				req.Body = io.NopCloser(bytes.NewBuffer(bodyBytes))
+				return httpmock.NewStringResponse(http.StatusOK, `{
+					"data": {
+						"userByNameOrEmail": {
+							"id": "01j9x0yy00000000000000000a",
+							"name": "Test User",
+							"email": "test@example.com",
+							"workspace": "01j9x0yy00000000000000001a",
+							"host": "",
+							"auths": ["auth0|123456"]
+						}
+					}
+				}`), nil
+			},
+		)
+
+		got, err := client.UserRepo.FindByNameOrEmail(ctx, "Test User")
+
+		assert.NoError(t, err)
+		assert.NotNil(t, got)
+		assert.Equal(t, "Test User", got.Name())
+	})
+
+	t.Run("user not found by name or email", func(t *testing.T) {
+		httpmock.Activate()
+		defer httpmock.DeactivateAndReset()
+
+		transport := httpmock.DefaultTransport
+		client := gqlclient.NewClient("https://accounts.example.com", 30, transport)
+
+		httpmock.RegisterResponder(
+			"POST",
+			"https://accounts.example.com/api/graphql",
+			httpmock.NewStringResponder(http.StatusOK, `{
+				"errors": [
+					{
+						"message": "input: userByNameOrEmail not found"
+					}
+				]
+			}`),
+		)
+
+		got, err := client.UserRepo.FindByNameOrEmail(ctx, "nonexistent@example.com")
+
+		assert.Error(t, err)
+		assert.Nil(t, got)
+	})
+
+	t.Run("invalid user ID in name or email lookup", func(t *testing.T) {
+		httpmock.Activate()
+		defer httpmock.DeactivateAndReset()
+
+		transport := httpmock.DefaultTransport
+		client := gqlclient.NewClient("https://accounts.example.com", 30, transport)
+
+		httpmock.RegisterResponder(
+			"POST",
+			"https://accounts.example.com/api/graphql",
+			httpmock.NewStringResponder(http.StatusOK, `{
+				"data": {
+					"userByNameOrEmail": {
+						"id": "invalid-id",
+						"name": "Test User",
+						"email": "test@example.com",
+						"workspace": "01j9x0yy00000000000000001a",
+						"host": "",
+						"auths": []
+					}
+				}
+			}`),
+		)
+
+		got, err := client.UserRepo.FindByNameOrEmail(ctx, "test@example.com")
+
+		assert.Error(t, err)
+		assert.Nil(t, got)
+	})
+}
