@@ -72,18 +72,18 @@ func (mr *MockUserReposMockRecorder) DeleteMe(ctx, userID any) *gomock.Call {
 }
 
 // FindByAlias mocks base method.
-func (m *MockUserRepos) FindByAlias(ctx context.Context, name string) (*user0.User, error) {
+func (m *MockUserRepos) FindByAlias(ctx context.Context, alias string) (*user0.User, error) {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "FindByAlias", ctx, name)
+	ret := m.ctrl.Call(m, "FindByAlias", ctx, alias)
 	ret0, _ := ret[0].(*user0.User)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
 
 // FindByAlias indicates an expected call of FindByAlias.
-func (mr *MockUserReposMockRecorder) FindByAlias(ctx, name any) *gomock.Call {
+func (mr *MockUserReposMockRecorder) FindByAlias(ctx, alias any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "FindByAlias", reflect.TypeOf((*MockUserRepos)(nil).FindByAlias), ctx, name)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "FindByAlias", reflect.TypeOf((*MockUserRepos)(nil).FindByAlias), ctx, alias)
 }
 
 // FindByID mocks base method.
@@ -114,6 +114,21 @@ func (m *MockUserRepos) FindByIDs(ctx context.Context, ids []string) ([]*user0.U
 func (mr *MockUserReposMockRecorder) FindByIDs(ctx, ids any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "FindByIDs", reflect.TypeOf((*MockUserRepos)(nil).FindByIDs), ctx, ids)
+}
+
+// FindByNameOrEmail mocks base method.
+func (m *MockUserRepos) FindByNameOrEmail(ctx context.Context, nameOrEmail string) (*user0.User, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "FindByNameOrEmail", ctx, nameOrEmail)
+	ret0, _ := ret[0].(*user0.User)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// FindByNameOrEmail indicates an expected call of FindByNameOrEmail.
+func (mr *MockUserReposMockRecorder) FindByNameOrEmail(ctx, nameOrEmail any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "FindByNameOrEmail", reflect.TypeOf((*MockUserRepos)(nil).FindByNameOrEmail), ctx, nameOrEmail)
 }
 
 // FindMe mocks base method.
@@ -231,21 +246,6 @@ func (m *MockUserRepos) UpdateMe(ctx context.Context, input user.UpdateMeInput) 
 func (mr *MockUserReposMockRecorder) UpdateMe(ctx, input any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "UpdateMe", reflect.TypeOf((*MockUserRepos)(nil).UpdateMe), ctx, input)
-}
-
-// UserByNameOrEmail mocks base method.
-func (m *MockUserRepos) UserByNameOrEmail(ctx context.Context, nameOrEmail string) (*user0.User, error) {
-	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "UserByNameOrEmail", ctx, nameOrEmail)
-	ret0, _ := ret[0].(*user0.User)
-	ret1, _ := ret[1].(error)
-	return ret0, ret1
-}
-
-// UserByNameOrEmail indicates an expected call of UserByNameOrEmail.
-func (mr *MockUserReposMockRecorder) UserByNameOrEmail(ctx, nameOrEmail any) *gomock.Call {
-	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "UserByNameOrEmail", reflect.TypeOf((*MockUserRepos)(nil).UserByNameOrEmail), ctx, nameOrEmail)
 }
 
 // VerifyUser mocks base method.
