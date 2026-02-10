@@ -32,7 +32,6 @@ type Repo interface {
 	FindByIDs(ctx context.Context, ids []string) ([]*user.User, error)
 	FindByAlias(ctx context.Context, alias string) (*user.User, error)
 	FindByNameOrEmail(ctx context.Context, nameOrEmail string) (*user.User, error)
-	FindUsersByIDsWithPagination(ctx context.Context, id []string, alias string, page, size int64) (user.List, int, error)
 	Update(ctx context.Context, name string) error
 	UpdateMe(ctx context.Context, input UpdateMeInput) (*user.User, error)
 	SignupOIDC(ctx context.Context, name string, email string, sub string, secret string) (*user.User, error)
@@ -195,7 +194,7 @@ func (r *userRepo) FindByAlias(ctx context.Context, alias string) (*user.User, e
 		Build()
 }
 
-func (r *userRepo) UserByNameOrEmail(ctx context.Context, nameOrEmail string) (*user.User, error) {
+func (r *userRepo) FindByNameOrEmail(ctx context.Context, nameOrEmail string) (*user.User, error) {
 	if nameOrEmail == "" {
 		return nil, nil
 	}
@@ -205,7 +204,7 @@ func (r *userRepo) UserByNameOrEmail(ctx context.Context, nameOrEmail string) (*
 		"nameOrEmail": graphql.String(nameOrEmail),
 	}
 	if err := r.client.Query(ctx, &q, vars); err != nil {
-		return nil, err
+		return nil, gqlerror.ReturnAccountsError(ctx, err)
 	}
 
 	uid, err := user.IDFrom(string(q.User.ID))
@@ -222,8 +221,8 @@ func (r *userRepo) UserByNameOrEmail(ctx context.Context, nameOrEmail string) (*
 }
 
 // Deprecated: Use FindByNameOrEmail instead
-func (r *userRepo) FindByNameOrEmail(ctx context.Context, nameOrEmail string) (*user.User, error) {
-	return r.UserByNameOrEmail(ctx, nameOrEmail)
+func (r *userRepo) FindByNameEmail(ctx context.Context, nameOrEmail string) (*user.User, error) {
+	return r.FindByNameOrEmail(ctx, nameOrEmail)
 }
 
 func (r *userRepo) FindUsersByIDsWithPagination(ctx context.Context, id []string, alias string, page, size int64) (user.List, int, error) {
