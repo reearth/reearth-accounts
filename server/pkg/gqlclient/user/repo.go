@@ -195,7 +195,7 @@ func (r *userRepo) FindByAlias(ctx context.Context, alias string) (*user.User, e
 }
 
 func (r *userRepo) FindByNameOrEmail(ctx context.Context, nameOrEmail string) (*user.User, error) {
-	var q userByNameOrEmailQuery
+	var q findByNameQuery
 	vars := map[string]interface{}{
 		"nameOrEmail": graphql.String(nameOrEmail),
 	}
