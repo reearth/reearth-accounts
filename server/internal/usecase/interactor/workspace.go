@@ -29,7 +29,9 @@ type Workspace struct {
 	userquery          interfaces.UserQuery
 	permittableRepo    permittable.Repo
 	roleRepo           role.Repo
-	cerbos             interfaces.Cerbos
+	// TODO: we need to generate policy for accounts
+	// after that we need to check permission on each function
+	cerbos interfaces.Cerbos
 }
 
 func NewWorkspace(r *repo.Container, enforceMemberCount WorkspaceMemberCountEnforcer, cerbos interfaces.Cerbos) interfaces.Workspace {
@@ -150,30 +152,36 @@ func (i *Workspace) Update(ctx context.Context, param interfaces.UpdateWorkspace
 			return nil, workspace.ErrCannotModifyPersonalWorkspace
 		}
 
+		// TODO
 		// Check permission via Cerbos or fallback to role-based check
-		var cerbosChecked bool
-		if i.cerbos != nil {
-			result, cErr := i.cerbos.CheckPermission(ctx, *operator.User, interfaces.CheckPermissionParam{
-				Resource:       interfaces.ResourceWorkspace,
-				Action:         "edit",
-				WorkspaceAlias: ws.Alias(),
-			})
-			if cErr != nil {
-				return nil, applog.ErrorWithCallerLogging(ctx, "failed to check permission", cErr)
-			}
-			if result != nil {
-				cerbosChecked = true
-				if !result.Allowed {
-					return nil, interfaces.ErrPermissionDenied
-				}
-			}
-		}
+		// var cerbosChecked bool
+		// if i.cerbos != nil {
+		// 	result, cErr := i.cerbos.CheckPermission(ctx, *operator.User, interfaces.CheckPermissionParam{
+		// 		Service:        "accounts",
+		// 		Resource:       interfaces.ResourceWorkspace,
+		// 		Action:         "edit",
+		// 		WorkspaceAlias: ws.Alias(),
+		// 	})
+		// 	if cErr != nil {
+		// 		return nil, applog.ErrorWithCallerLogging(ctx, "failed to check permission", cErr)
+		// 	}
+		// 	if result != nil {
+		// 		cerbosChecked = true
+		// 		if !result.Allowed {
+		// 			return nil, interfaces.ErrPermissionDenied
+		// 		}
+		// 	}
+		// }
 		// Fallback to role-based check if Cerbos is not available or not configured
-		if !cerbosChecked {
-			if ws.Members().UserRole(*operator.User) != role.RoleOwner {
-				return nil, interfaces.ErrOperationDenied
-			}
+		if ws.Members().UserRole(*operator.User) != role.RoleOwner {
+			return nil, interfaces.ErrOperationDenied
 		}
+
+		// if !cerbosChecked {
+		// 	if ws.Members().UserRole(*operator.User) != role.RoleOwner {
+		// 		return nil, interfaces.ErrOperationDenied
+		// 	}
+		// }
 
 		// Update name if provided
 		if param.Name != nil {
@@ -191,20 +199,22 @@ func (i *Workspace) Update(ctx context.Context, param interfaces.UpdateWorkspace
 				aliasVal = "w-" + param.ID.String()
 			}
 			if aliasVal != ws.Alias() {
+				// TODO
 				// Check permission for alias change via Cerbos (if Cerbos returns nil, already passed owner check above)
-				if i.cerbos != nil {
-					result, cErr := i.cerbos.CheckPermission(ctx, *operator.User, interfaces.CheckPermissionParam{
-						Resource:       interfaces.ResourceWorkspace,
-						Action:         "edit_alias",
-						WorkspaceAlias: ws.Alias(),
-					})
-					if cErr != nil {
-						return nil, applog.ErrorWithCallerLogging(ctx, "failed to check alias edit permission", cErr)
-					}
-					if result != nil && !result.Allowed {
-						return nil, interfaces.ErrPermissionDenied
-					}
-				}
+				// if i.cerbos != nil {
+				// 	result, cErr := i.cerbos.CheckPermission(ctx, *operator.User, interfaces.CheckPermissionParam{
+				// 		Service:        "accounts",
+				// 		Resource:       interfaces.ResourceWorkspace,
+				// 		Action:         "edit_alias",
+				// 		WorkspaceAlias: ws.Alias(),
+				// 	})
+				// 	if cErr != nil {
+				// 		return nil, applog.ErrorWithCallerLogging(ctx, "failed to check alias edit permission", cErr)
+				// 	}
+				// 	if result != nil && !result.Allowed {
+				// 		return nil, interfaces.ErrPermissionDenied
+				// 	}
+				// }
 
 				if existing, ferr := i.repos.Workspace.FindByAlias(ctx, aliasVal); ferr == nil && existing != nil && existing.ID() != ws.ID() {
 					return nil, interfaces.ErrWorkspaceAliasAlreadyExists

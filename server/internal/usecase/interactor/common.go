@@ -19,7 +19,8 @@ func NewContainer(
 	acg *gateway.Container,
 	enforcer WorkspaceMemberCountEnforcer,
 	cerbosAdapter gateway.CerbosGateway,
-	config ContainerConfig) interfaces.Container {
+	config ContainerConfig,
+) interfaces.Container {
 	cerbos := NewCerbos(r, cerbosAdapter)
 	return interfaces.Container{
 		User:        NewUser(r, acg, config.SignupSecret, config.AuthSrvUIDomain),
