@@ -3073,7 +3073,6 @@ type UpdateWorkspaceInput struct {
 	Alias       string `json:"alias"`
 	Description string `json:"description"`
 	Website     string `json:"website"`
-	Photo       any    `json:"photo"`
 	PhotoURL    string `json:"photoURL"`
 }
 
@@ -3091,9 +3090,6 @@ func (v *UpdateWorkspaceInput) GetDescription() string { return v.Description }
 
 // GetWebsite returns UpdateWorkspaceInput.Website, and is useful for accessing the field via an interface.
 func (v *UpdateWorkspaceInput) GetWebsite() string { return v.Website }
-
-// GetPhoto returns UpdateWorkspaceInput.Photo, and is useful for accessing the field via an interface.
-func (v *UpdateWorkspaceInput) GetPhoto() any { return v.Photo }
 
 // GetPhotoURL returns UpdateWorkspaceInput.PhotoURL, and is useful for accessing the field via an interface.
 func (v *UpdateWorkspaceInput) GetPhotoURL() string { return v.PhotoURL }
