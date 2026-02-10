@@ -19,3 +19,11 @@ func ToStringSlice(gqlSlice []graphql.String) []string {
 	}
 	return res
 }
+
+func ToIDSlice(str []string) []graphql.ID {
+	res := make([]graphql.ID, len(str))
+	for i, v := range str {
+		res[i] = graphql.ID(v)
+	}
+	return res
+}

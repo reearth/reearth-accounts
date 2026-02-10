@@ -36,6 +36,11 @@ type Verification {
   verified: Boolean!
 }
 
+type UsersWithPagination {
+  users: [User!]!
+  totalCount: Int!
+}
+
 input SignupInput {
   id: ID
   workspaceID: ID
@@ -105,6 +110,7 @@ extend type Query {
   searchUser(keyword: String!): [User!]!
   findUsersByIDs(ids: [ID!]!): [User!]!
   findUserByAlias(alias: String!): User
+  findUsersByIDsWithPagination(ids: [ID!]!, alias: String, pagination: Pagination!): UsersWithPagination!
 }
 
 type UserPayload {

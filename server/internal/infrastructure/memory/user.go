@@ -6,6 +6,7 @@ import (
 
 	"github.com/reearth/reearth-accounts/server/pkg/user"
 	"github.com/reearth/reearthx/rerror"
+	"github.com/reearth/reearthx/usecasex"
 	"github.com/reearth/reearthx/util"
 )
 
@@ -50,6 +51,41 @@ func (r *User) FindByIDs(_ context.Context, ids user.IDList) (user.List, error) 
 	})
 
 	return res, nil
+}
+
+func (r *User) FindByIDsWithPagination(_ context.Context, ids user.IDList, alias *string, pagination *usecasex.Pagination) (user.List, *usecasex.PageInfo, error) {
+	if r.err != nil {
+		return nil, nil, r.err
+	}
+
+	users := user.List(r.data.FindAll(func(key user.ID, value *user.User) bool {
+		return ids.Has(key)
+	}))
+
+	if len(users) == 0 {
+		return nil, nil, rerror.ErrNotFound
+	}
+
+	if alias != nil {
+		aliasStr := strings.ToLower(strings.TrimSpace(*alias))
+		filtered := make(user.List, 0)
+		for _, u := range users {
+			if strings.Contains(strings.ToLower(u.Name()), aliasStr) || strings.Contains(strings.ToLower(u.Alias()), aliasStr) {
+				filtered = append(filtered, u)
+			}
+		}
+		users = filtered
+	}
+
+	startCursor, endCursor := usecasex.Cursor(users[0].ID().String()), usecasex.Cursor(users[len(users)-1].ID().String())
+
+	return users, usecasex.NewPageInfo(
+		int64(len(users)),
+		&startCursor,
+		&endCursor,
+		true,
+		true,
+	), nil
 }
 
 func (r *User) FindByID(_ context.Context, v user.ID) (*user.User, error) {

@@ -10,6 +10,7 @@ import (
 	"github.com/reearth/reearth-accounts/server/internal/usecase/gateway"
 	"github.com/reearth/reearth-accounts/server/internal/usecase/interfaces"
 	"github.com/reearth/reearth-accounts/server/internal/usecase/repo"
+	"github.com/reearth/reearth-accounts/server/pkg/pagination"
 	"github.com/reearth/reearth-accounts/server/pkg/user"
 	"github.com/reearth/reearth-accounts/server/pkg/workspace"
 	"github.com/reearth/reearthx/i18n"
@@ -63,6 +64,10 @@ func NewMultiUser(r *repo.Container, g *gateway.Container, signupSecret, authSrc
 
 func (i *User) FetchByID(ctx context.Context, ids user.IDList) (user.List, error) {
 	return i.query.FetchByID(ctx, ids)
+}
+
+func (i *User) FetchByIDsWithPagination(ctx context.Context, ids user.IDList, alias *string, pagination interfaces.FetchByIDsWithPaginationParam) (interfaces.FetchByIDsWithPaginationResult, error) {
+	return i.query.FetchByIDsWithPagination(ctx, ids, alias, pagination)
 }
 
 func (i *User) FetchBySub(ctx context.Context, sub string) (*user.User, error) {
@@ -402,6 +407,18 @@ func (q *UserQuery) FetchByID(ctx context.Context, ids user.IDList) (user.List, 
 	}
 
 	return us, nil
+}
+
+func (q *UserQuery) FetchByIDsWithPagination(ctx context.Context, ids user.IDList, alias *string, paginationParam interfaces.FetchByIDsWithPaginationParam) (interfaces.FetchByIDsWithPaginationResult, error) {
+	users, pageInfo, err := q.repos[0].FindByIDsWithPagination(ctx, ids, alias, pagination.ToPagination(paginationParam.Page, paginationParam.Size))
+	if err != nil {
+		return interfaces.FetchByIDsWithPaginationResult{}, err
+	}
+
+	return interfaces.FetchByIDsWithPaginationResult{
+		Users:      user.List(users),
+		TotalCount: int(pageInfo.TotalCount),
+	}, nil
 }
 
 func (q *UserQuery) FetchBySub(ctx context.Context, sub string) (*user.User, error) {

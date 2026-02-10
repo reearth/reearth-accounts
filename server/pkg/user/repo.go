@@ -5,6 +5,7 @@ import (
 
 	"github.com/reearth/reearthx/i18n"
 	"github.com/reearth/reearthx/rerror"
+	"github.com/reearth/reearthx/usecasex"
 )
 
 var ErrDuplicatedUser = rerror.NewE(i18n.T("duplicated user"))
@@ -22,12 +23,13 @@ type Repo interface {
 
 type Query interface {
 	FindAll(context.Context) (List, error)
+	FindByAlias(context.Context, string) (*User, error)
+	FindByEmail(context.Context, string) (*User, error)
 	FindByID(context.Context, ID) (*User, error)
 	FindByIDs(context.Context, IDList) (List, error)
-	FindBySub(context.Context, string) (*User, error)
-	FindByEmail(context.Context, string) (*User, error)
+	FindByIDsWithPagination(context.Context, IDList, *string, *usecasex.Pagination) (List, *usecasex.PageInfo, error)
 	FindByName(context.Context, string) (*User, error)
-	FindByAlias(context.Context, string) (*User, error)
 	FindByNameOrEmail(context.Context, string) (*User, error)
+	FindBySub(context.Context, string) (*User, error)
 	SearchByKeyword(context.Context, string) (List, error)
 }
