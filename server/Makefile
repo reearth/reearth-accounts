@@ -57,6 +57,9 @@ run-cerbos:
 generate: dev-install
 	go generate ./...
 
+gen-policies:
+	go run ./cmd/policy-generator
+
 gql:
 	go generate ./internal/adapter/gql
 
