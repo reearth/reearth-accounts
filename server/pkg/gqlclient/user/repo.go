@@ -172,9 +172,7 @@ func (r *userRepo) FindUsersByIDsWithPagination(ctx context.Context, id []string
 	}
 
 	users := gqlmodel.ToUsers(ctx, q.FindUsersByIDsWithPagination.Users)
-	return users, 	FindByAlias(ctx context.Context, name string) (*user.User, error)
-	FindByAlias(ctx context.Context, name string) (*user.User, error)
-q.FindUsersByIDsWithPagination.TotalCount, nil
+	return users, q.FindUsersByIDsWithPagination.TotalCount, nil
 }
 
 // TODO: Extend the Account server's UpdateMeInput to support alias, photoURL, website, and description.

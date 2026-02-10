@@ -72,18 +72,18 @@ func (mr *MockRepoMockRecorder) DeleteMe(ctx, userID any) *gomock.Call {
 }
 
 // FindByAlias mocks base method.
-func (m *MockRepo) FindByAlias(ctx context.Context, name string) (*user0.User, error) {
+func (m *MockRepo) FindByAlias(ctx context.Context, alias string) (*user0.User, error) {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "FindByAlias", ctx, name)
+	ret := m.ctrl.Call(m, "FindByAlias", ctx, alias)
 	ret0, _ := ret[0].(*user0.User)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
 
 // FindByAlias indicates an expected call of FindByAlias.
-func (mr *MockRepoMockRecorder) FindByAlias(ctx, name any) *gomock.Call {
+func (mr *MockRepoMockRecorder) FindByAlias(ctx, alias any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "FindByAlias", reflect.TypeOf((*MockRepo)(nil).FindByAlias), ctx, name)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "FindByAlias", reflect.TypeOf((*MockRepo)(nil).FindByAlias), ctx, alias)
 }
 
 // FindByID mocks base method.
@@ -99,6 +99,21 @@ func (m *MockRepo) FindByID(ctx context.Context, id string) (*user0.User, error)
 func (mr *MockRepoMockRecorder) FindByID(ctx, id any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "FindByID", reflect.TypeOf((*MockRepo)(nil).FindByID), ctx, id)
+}
+
+// FindByNameOrEmail mocks base method.
+func (m *MockRepo) FindByNameOrEmail(ctx context.Context, nameOrEmail string) (*user0.User, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "FindByNameOrEmail", ctx, nameOrEmail)
+	ret0, _ := ret[0].(*user0.User)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// FindByNameOrEmail indicates an expected call of FindByNameOrEmail.
+func (mr *MockRepoMockRecorder) FindByNameOrEmail(ctx, nameOrEmail any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "FindByNameOrEmail", reflect.TypeOf((*MockRepo)(nil).FindByNameOrEmail), ctx, nameOrEmail)
 }
 
 // FindMe mocks base method.
