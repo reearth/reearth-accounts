@@ -389,10 +389,6 @@ func (r *userRepo) SignupNoID(ctx context.Context, name, email, password, secret
 	var m signupMutationNoID
 	vars := map[string]interface{}{}
 
-	if workspaceID != "" {
-		vars["workspaceID"] = graphql.ID(workspaceID)
-	}
-
 	vars["name"] = graphql.String(name)
 	vars["email"] = graphql.String(email)
 	vars["password"] = graphql.String(password)
@@ -480,7 +476,7 @@ func (r *userRepo) VerifyUser(ctx context.Context, code string) (*user.User, err
 	}
 
 	in := VerifyUserInput{
-		Code: graphql.String(string(code)),
+		Code: graphql.String(code),
 	}
 
 	var m verifyUserMutation
@@ -526,7 +522,7 @@ func (r *userRepo) StartPasswordReset(ctx context.Context, email string) error {
 	}
 
 	in := StartPasswordResetInput{
-		Email: graphql.String(string(email)),
+		Email: graphql.String(email),
 	}
 
 	var m startPasswordResetMutation
@@ -547,8 +543,8 @@ func (r *userRepo) PasswordReset(ctx context.Context, password string, token str
 	}
 
 	in := PasswordResetInput{
-		Password: graphql.String(string(password)),
-		Token:    graphql.String(string(token)),
+		Password: graphql.String(password),
+		Token:    graphql.String(token),
 	}
 
 	var m passwordResetMutation
