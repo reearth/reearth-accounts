@@ -1448,6 +1448,7 @@ enum NodeType {
 
 # Basic types
 scalar Lang
+scalar Upload
 
 enum Theme {
   DEFAULT
@@ -1780,8 +1781,11 @@ input CreateWorkspaceInput {
 
 input UpdateWorkspaceInput {
     workspaceId: ID!
-    name: String!
+    name: String
     alias: String
+    description: String
+    website: String
+    photoURL: String
 }
 
 input MemberInput {
@@ -9621,7 +9625,7 @@ func (ec *executionContext) unmarshalInputUpdateWorkspaceInput(ctx context.Conte
 		asMap[k] = v
 	}
 
-	fieldsInOrder := [...]string{"workspaceId", "name", "alias"}
+	fieldsInOrder := [...]string{"workspaceId", "name", "alias", "description", "website", "photoURL"}
 	for _, k := range fieldsInOrder {
 		v, ok := asMap[k]
 		if !ok {
@@ -9637,7 +9641,7 @@ func (ec *executionContext) unmarshalInputUpdateWorkspaceInput(ctx context.Conte
 			it.WorkspaceID = data
 		case "name":
 			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("name"))
-			data, err := ec.unmarshalNString2string(ctx, v)
+			data, err := ec.unmarshalOString2ᚖstring(ctx, v)
 			if err != nil {
 				return it, err
 			}
@@ -9649,6 +9653,27 @@ func (ec *executionContext) unmarshalInputUpdateWorkspaceInput(ctx context.Conte
 				return it, err
 			}
 			it.Alias = data
+		case "description":
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("description"))
+			data, err := ec.unmarshalOString2ᚖstring(ctx, v)
+			if err != nil {
+				return it, err
+			}
+			it.Description = data
+		case "website":
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("website"))
+			data, err := ec.unmarshalOString2ᚖstring(ctx, v)
+			if err != nil {
+				return it, err
+			}
+			it.Website = data
+		case "photoURL":
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("photoURL"))
+			data, err := ec.unmarshalOString2ᚖstring(ctx, v)
+			if err != nil {
+				return it, err
+			}
+			it.PhotoURL = data
 		}
 	}
 

@@ -99,12 +99,29 @@ func (w *Workspace) Create(ctx context.Context, alias, name, description string,
 	return ToWorkspace(res.CreateWorkspace.Workspace.FragmentWorkspace)
 }
 
-func (w *Workspace) Update(ctx context.Context, id workspace.ID, name string, alias *string, op *workspace.Operator) (*workspace.Workspace, error) {
-	aliasStr := ""
-	if alias != nil {
-		aliasStr = *alias
+func (w *Workspace) Update(ctx context.Context, param interfaces.UpdateWorkspaceParam, op *workspace.Operator) (*workspace.Workspace, error) {
+	input := UpdateWorkspaceInput{
+		WorkspaceId: param.ID.String(),
 	}
-	res, err := UpdateWorkspace(ctx, w.gql, UpdateWorkspaceInput{WorkspaceId: id.String(), Name: name, Alias: aliasStr})
+	if param.Name != nil {
+		input.Name = *param.Name
+	}
+	if param.Alias != nil {
+		input.Alias = *param.Alias
+	}
+	if param.Description != nil {
+		input.Description = *param.Description
+	}
+	if param.Website != nil {
+		input.Website = *param.Website
+	}
+	if param.PhotoURL != nil {
+		input.PhotoURL = *param.PhotoURL
+	}
+	// Note: File upload (param.FileImage) is not supported via proxy as it requires multipart form data
+	// Use param.PhotoURL to pass the photo path/URL directly for service-to-service communication
+
+	res, err := UpdateWorkspace(ctx, w.gql, input)
 	if err != nil {
 		return nil, err
 	}

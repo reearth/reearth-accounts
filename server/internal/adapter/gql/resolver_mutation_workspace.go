@@ -5,6 +5,7 @@ import (
 
 	"github.com/labstack/gommon/log"
 	"github.com/reearth/reearth-accounts/server/internal/adapter/gql/gqlmodel"
+	"github.com/reearth/reearth-accounts/server/internal/usecase/interfaces"
 	"github.com/reearth/reearth-accounts/server/pkg/id"
 	"github.com/reearth/reearth-accounts/server/pkg/role"
 )
@@ -53,7 +54,16 @@ func (r *mutationResolver) UpdateWorkspace(ctx context.Context, input gqlmodel.U
 		return nil, err
 	}
 
-	w, err := usecases(ctx).Workspace.Update(ctx, tid, input.Name, input.Alias, getOperator(ctx))
+	param := interfaces.UpdateWorkspaceParam{
+		ID:          tid,
+		Name:        input.Name,
+		Alias:       input.Alias,
+		Description: input.Description,
+		Website:     input.Website,
+		PhotoURL:    input.PhotoURL,
+	}
+
+	w, err := usecases(ctx).Workspace.Update(ctx, param, getOperator(ctx))
 	if err != nil {
 		return nil, err
 	}

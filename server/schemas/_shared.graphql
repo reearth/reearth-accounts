@@ -10,6 +10,7 @@ enum NodeType {
 
 # Basic types
 scalar Lang
+scalar Upload
 
 enum Theme {
   DEFAULT

@@ -38,7 +38,7 @@ func TestWorkspace_TransferOwnership(t *testing.T) {
 
 	_ = db.Workspace.Save(ctx, w1)
 
-	workspaceUC := NewWorkspace(db, nil)
+	workspaceUC := NewWorkspace(db, nil, nil)
 	ws, err := workspaceUC.TransferOwnership(ctx, id1, newOwnerID, op)
 	assert.NoError(t, err)
 	assert.Equal(t, role.RoleOwner, ws.Members().UserRole(newOwnerID))

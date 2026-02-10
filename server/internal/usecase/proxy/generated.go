@@ -3071,6 +3071,9 @@ type UpdateWorkspaceInput struct {
 	WorkspaceId string `json:"workspaceId"`
 	Name        string `json:"name"`
 	Alias       string `json:"alias"`
+	Description string `json:"description"`
+	Website     string `json:"website"`
+	PhotoURL    string `json:"photoURL"`
 }
 
 // GetWorkspaceId returns UpdateWorkspaceInput.WorkspaceId, and is useful for accessing the field via an interface.
@@ -3081,6 +3084,15 @@ func (v *UpdateWorkspaceInput) GetName() string { return v.Name }
 
 // GetAlias returns UpdateWorkspaceInput.Alias, and is useful for accessing the field via an interface.
 func (v *UpdateWorkspaceInput) GetAlias() string { return v.Alias }
+
+// GetDescription returns UpdateWorkspaceInput.Description, and is useful for accessing the field via an interface.
+func (v *UpdateWorkspaceInput) GetDescription() string { return v.Description }
+
+// GetWebsite returns UpdateWorkspaceInput.Website, and is useful for accessing the field via an interface.
+func (v *UpdateWorkspaceInput) GetWebsite() string { return v.Website }
+
+// GetPhotoURL returns UpdateWorkspaceInput.PhotoURL, and is useful for accessing the field via an interface.
+func (v *UpdateWorkspaceInput) GetPhotoURL() string { return v.PhotoURL }
 
 // UpdateWorkspaceResponse is returned by UpdateWorkspace on success.
 type UpdateWorkspaceResponse struct {
