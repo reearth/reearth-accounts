@@ -422,7 +422,7 @@ func (r *userRepo) CreateVerification(ctx context.Context, email string) (bool, 
 		"email": graphql.String(email),
 	}
 	if err := r.client.Mutate(ctx, &m, vars); err != nil {
-		return false, err
+		return false, gqlerror.ReturnAccountsError(ctx, err)
 	}
 
 	return *m.CreateVerification, nil
@@ -489,7 +489,7 @@ func (r *userRepo) VerifyUser(ctx context.Context, code string) (*user.User, err
 	}
 
 	if err := r.client.Mutate(ctx, &m, vars); err != nil {
-		return nil, err
+		return nil, gqlerror.ReturnAccountsError(ctx, err)
 	}
 
 	uid, err := user.IDFrom(string(m.VerifyUser.User.ID))
@@ -535,7 +535,7 @@ func (r *userRepo) StartPasswordReset(ctx context.Context, email string) error {
 	}
 
 	if err := r.client.Mutate(ctx, &m, vars); err != nil {
-		return err
+		return gqlerror.ReturnAccountsError(ctx, err)
 	}
 
 	return nil
@@ -557,7 +557,7 @@ func (r *userRepo) PasswordReset(ctx context.Context, password string, token str
 	}
 
 	if err := r.client.Mutate(ctx, &m, vars); err != nil {
-		return err
+		return gqlerror.ReturnAccountsError(ctx, err)
 	}
 
 	return nil
