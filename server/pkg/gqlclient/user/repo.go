@@ -343,10 +343,6 @@ func (r *userRepo) SignupOIDC(ctx context.Context, name string, email string, su
 }
 
 func (r *userRepo) Signup(ctx context.Context, userID, name, email, password, secret, workspaceID string, mockAuth bool) (*user.User, error) {
-	if userID == "" {
-		return r.SignupNoID(ctx, name, email, password, secret, workspaceID, mockAuth)
-	}
-
 	var m signupMutation
 	vars := map[string]interface{}{}
 
@@ -381,7 +377,7 @@ func (r *userRepo) Signup(ctx context.Context, userID, name, email, password, se
 		Build()
 }
 
-func (r *userRepo) SignupNoID(ctx context.Context, name, email, password, secret, workspaceID string, mockAuth bool) (*user.User, error) {
+func (r *userRepo) SignupNoID(ctx context.Context, name, email, password, secret string, mockAuth bool) (*user.User, error) {
 	var m signupMutationNoID
 	vars := map[string]interface{}{}
 
