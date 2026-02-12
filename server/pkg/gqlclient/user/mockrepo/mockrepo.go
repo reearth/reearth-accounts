@@ -190,6 +190,21 @@ func (mr *MockRepoMockRecorder) Signup(ctx, userID, name, email, password, secre
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Signup", reflect.TypeOf((*MockRepo)(nil).Signup), ctx, userID, name, email, password, secret, workspaceID, mockAuth)
 }
 
+// SignupNoID mocks base method.
+func (m *MockUserRepos) SignupNoID(ctx context.Context, name, email, password, secret string, mockAuth bool) (*user0.User, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "SignupNoID", ctx, name, email, password, secret, mockAuth)
+	ret0, _ := ret[0].(*user0.User)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// SignupNoID indicates an expected call of SignupNoID.
+func (mr *MockUserReposMockRecorder) SignupNoID(ctx, name, email, password, secret, mockAuth any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "SignupNoID", reflect.TypeOf((*MockUserRepos)(nil).SignupNoID), ctx, name, email, password, secret, mockAuth)
+}
+
 // SignupOIDC mocks base method.
 func (m *MockRepo) SignupOIDC(ctx context.Context, name, email, sub, secret string) (*user0.User, error) {
 	m.ctrl.T.Helper()
