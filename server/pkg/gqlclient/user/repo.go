@@ -36,6 +36,7 @@ type Repo interface {
 	UpdateMe(ctx context.Context, input UpdateMeInput) (*user.User, error)
 	SignupOIDC(ctx context.Context, name string, email string, sub string, secret string) (*user.User, error)
 	Signup(ctx context.Context, userID, name, email, password, secret, workspaceID string, mockAuth bool) (*user.User, error)
+	SignupNoID(ctx context.Context, name, email, password, secret string, mockAuth bool) (*user.User, error)
 	CreateVerification(ctx context.Context, email string) (bool, error)
 	RemoveMyAuth(ctx context.Context, auth string) (*user.User, error)
 	DeleteMe(ctx context.Context, userID string) error
