@@ -257,16 +257,30 @@ func (r *workspaceRepo) RemoveUserFromWorkspace(ctx context.Context, workspaceID
 	return toWorkspace(ctx, m.RemoveUserFromWorkspace.Workspace.ID, m.RemoveUserFromWorkspace.Workspace.Name, m.RemoveUserFromWorkspace.Workspace.Alias, m.RemoveUserFromWorkspace.Workspace.Personal)
 }
 
-func (r *workspaceRepo) UpdateUserOfWorkspace(ctx context.Context, input UpdateUserOfWorkspaceInput) (*workspace.Workspace, error) {
-	in := gqlmodel.UpdateUserOfWorkspaceInput{
-		WorkspaceID: graphql.ID(input.WorkspaceID),
-		UserID:      graphql.ID(input.UserID),
-		Role:        graphql.String(input.Role),
-	}
+// func (r *workspaceRepo) UpdateUserOfWorkspace(ctx context.Context, input UpdateUserOfWorkspaceInput) (*workspace.Workspace, error) {
+// 	in := gqlmodel.UpdateUserOfWorkspaceInput{
+// 		WorkspaceID: graphql.ID(input.WorkspaceID),
+// 		UserID:      graphql.ID(input.UserID),
+// 		Role:        graphql.String(input.Role),
+// 	}
 
+// 	var m updateUserOfWorkspaceMutation
+// 	vars := map[string]interface{}{
+// 		"input": in,
+// 	}
+// 	if err := r.client.Mutate(ctx, &m, vars); err != nil {
+// 		return nil, gqlerror.ReturnAccountsError(ctx, err)
+// 	}
+
+// 	return toWorkspace(ctx, m.UpdateUserOfWorkspace.Workspace.ID, m.UpdateUserOfWorkspace.Workspace.Name, m.UpdateUserOfWorkspace.Workspace.Alias, m.UpdateUserOfWorkspace.Workspace.Personal)
+// }
+
+func (r *workspaceRepo) UpdateUserOfWorkspace(ctx context.Context, input UpdateUserOfWorkspaceInput) (*workspace.Workspace, error) {
 	var m updateUserOfWorkspaceMutation
 	vars := map[string]interface{}{
-		"input": in,
+		"workspaceId": graphql.ID(input.WorkspaceID),
+		"userId":      graphql.ID(input.UserID),
+		"role":        graphql.String(input.Role),
 	}
 	if err := r.client.Mutate(ctx, &m, vars); err != nil {
 		return nil, gqlerror.ReturnAccountsError(ctx, err)

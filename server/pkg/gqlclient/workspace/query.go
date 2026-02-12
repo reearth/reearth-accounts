@@ -82,6 +82,17 @@ type removeUserFromWorkspaceMutation struct {
 	} `graphql:"removeUserFromWorkspace(input: {workspaceId: $workspaceId, userId: $userId})"`
 }
 
+// type updateUserOfWorkspaceMutation struct {
+// 	UpdateUserOfWorkspace struct {
+// 		Workspace struct {
+// 			ID       graphql.ID     `graphql:"id"`
+// 			Name     graphql.String `graphql:"name"`
+// 			Alias    graphql.String `graphql:"alias"`
+// 			Personal bool           `graphql:"personal"`
+// 		} `graphql:"workspace"`
+// 	} `graphql:"updateUserOfWorkspace(input: $input)"`
+// }
+
 type updateUserOfWorkspaceMutation struct {
 	UpdateUserOfWorkspace struct {
 		Workspace struct {
@@ -90,5 +101,5 @@ type updateUserOfWorkspaceMutation struct {
 			Alias    graphql.String `graphql:"alias"`
 			Personal bool           `graphql:"personal"`
 		} `graphql:"workspace"`
-	} `graphql:"updateUserOfWorkspace(input: $input)"`
+	} `graphql:"updateUserOfWorkspace(input: {workspaceId: $workspaceId, userId: $userId, role: $role})"`
 }
