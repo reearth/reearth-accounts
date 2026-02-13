@@ -754,3 +754,304 @@ func TestUserRepo_FindByNameOrEmail(t *testing.T) {
 		assert.Nil(t, got)
 	})
 }
+
+func TestUserRepo_FindUsersByIDsWithPagination(t *testing.T) {
+	ctx := context.Background()
+
+	t.Run("successfully find users with pagination", func(t *testing.T) {
+		httpmock.Activate()
+		defer httpmock.DeactivateAndReset()
+
+		transport := httpmock.DefaultTransport
+		client := gqlclient.NewClient("https://accounts.example.com", 30, transport)
+
+		httpmock.RegisterResponder("POST", "https://accounts.example.com/api/graphql",
+			func(req *http.Request) (*http.Response, error) {
+				bodyBytes, _ := io.ReadAll(req.Body)
+				body := string(bodyBytes)
+				// Verify the query uses findUsersByIDsWithPagination with correct parameters
+				assert.Contains(t, body, "findUsersByIDsWithPagination")
+				assert.Contains(t, body, "$ids")
+				assert.Contains(t, body, "$alias")
+				assert.Contains(t, body, "$page")
+				assert.Contains(t, body, "$size")
+
+				req.Body = io.NopCloser(bytes.NewBuffer(bodyBytes))
+				return httpmock.NewStringResponse(http.StatusOK, `{
+					"data": {
+						"findUsersByIDsWithPagination": {
+							"users": [
+								{
+									"id": "01j9x0yy00000000000000000a",
+									"name": "User One",
+									"alias": "userone",
+									"email": "user1@example.com",
+									"workspace": "01j9x0yy00000000000000001a",
+									"host": "",
+									"auths": ["auth0|111111"],
+									"metadata": {
+										"photoURL": "https://example.com/photo1.jpg",
+										"description": "User one description",
+										"website": "https://example1.com",
+										"lang": "en",
+										"theme": "light"
+									}
+								},
+								{
+									"id": "01j9x0yy00000000000000000b",
+									"name": "User Two",
+									"alias": "usertwo",
+									"email": "user2@example.com",
+									"workspace": "01j9x0yy00000000000000001b",
+									"host": "",
+									"auths": ["auth0|222222"],
+									"metadata": {
+										"photoURL": "https://example.com/photo2.jpg",
+										"description": "User two description",
+										"website": "https://example2.com",
+										"lang": "ja",
+										"theme": "dark"
+									}
+								}
+							],
+							"totalCount": 10
+						}
+					}
+				}`), nil
+			},
+		)
+
+		users, totalCount, err := client.UserRepo.FindUsersByIDsWithPagination(
+			ctx,
+			[]string{"01j9x0yy00000000000000000a", "01j9x0yy00000000000000000b"},
+			"test-alias",
+			1,
+			10,
+		)
+
+		assert.NoError(t, err)
+		assert.NotNil(t, users)
+		assert.Len(t, users, 2)
+		assert.Equal(t, 10, totalCount)
+		assert.Equal(t, "User One", users[0].Name())
+		assert.Equal(t, "user1@example.com", users[0].Email())
+		assert.Equal(t, "User Two", users[1].Name())
+		assert.Equal(t, "user2@example.com", users[1].Email())
+	})
+
+	t.Run("successfully find users with empty results", func(t *testing.T) {
+		httpmock.Activate()
+		defer httpmock.DeactivateAndReset()
+
+		transport := httpmock.DefaultTransport
+		client := gqlclient.NewClient("https://accounts.example.com", 30, transport)
+
+		httpmock.RegisterResponder("POST", "https://accounts.example.com/api/graphql",
+			func(req *http.Request) (*http.Response, error) {
+				bodyBytes, _ := io.ReadAll(req.Body)
+				fmt.Printf("\n--- FindUsersByIDsWithPagination Empty GraphQL Request ---\n%s\n", string(bodyBytes))
+				req.Body = io.NopCloser(bytes.NewBuffer(bodyBytes))
+				return httpmock.NewStringResponse(http.StatusOK, `{
+					"data": {
+						"findUsersByIDsWithPagination": {
+							"users": [],
+							"totalCount": 0
+						}
+					}
+				}`), nil
+			},
+		)
+
+		users, totalCount, err := client.UserRepo.FindUsersByIDsWithPagination(
+			ctx,
+			[]string{"nonexistent-id"},
+			"test-alias",
+			1,
+			10,
+		)
+
+		assert.NoError(t, err)
+		assert.NotNil(t, users)
+		assert.Len(t, users, 0)
+		assert.Equal(t, 0, totalCount)
+	})
+
+	t.Run("error from server", func(t *testing.T) {
+		httpmock.Activate()
+		defer httpmock.DeactivateAndReset()
+
+		transport := httpmock.DefaultTransport
+		client := gqlclient.NewClient("https://accounts.example.com", 30, transport)
+
+		httpmock.RegisterResponder(
+			"POST",
+			"https://accounts.example.com/api/graphql",
+			httpmock.NewStringResponder(http.StatusOK, `{
+				"errors": [
+					{
+						"message": "Internal server error"
+					}
+				]
+			}`),
+		)
+
+		users, totalCount, err := client.UserRepo.FindUsersByIDsWithPagination(
+			ctx,
+			[]string{"01j9x0yy00000000000000000a"},
+			"test-alias",
+			1,
+			10,
+		)
+
+		assert.Error(t, err)
+		assert.Nil(t, users)
+		assert.Equal(t, 0, totalCount)
+	})
+
+	t.Run("network error", func(t *testing.T) {
+		httpmock.Activate()
+		defer httpmock.DeactivateAndReset()
+
+		transport := httpmock.DefaultTransport
+		client := gqlclient.NewClient("https://accounts.example.com", 30, transport)
+
+		httpmock.RegisterResponder(
+			"POST",
+			"https://accounts.example.com/api/graphql",
+			httpmock.NewStringResponder(http.StatusInternalServerError, "Internal Server Error"),
+		)
+
+		users, totalCount, err := client.UserRepo.FindUsersByIDsWithPagination(
+			ctx,
+			[]string{"01j9x0yy00000000000000000a"},
+			"test-alias",
+			1,
+			10,
+		)
+
+		assert.Error(t, err)
+		assert.Nil(t, users)
+		assert.Equal(t, 0, totalCount)
+	})
+
+	t.Run("invalid user ID in response", func(t *testing.T) {
+		httpmock.Activate()
+		defer httpmock.DeactivateAndReset()
+
+		transport := httpmock.DefaultTransport
+		client := gqlclient.NewClient("https://accounts.example.com", 30, transport)
+
+		httpmock.RegisterResponder(
+			"POST",
+			"https://accounts.example.com/api/graphql",
+			httpmock.NewStringResponder(http.StatusOK, `{
+				"data": {
+					"findUsersByIDsWithPagination": {
+						"users": [
+							{
+								"id": "invalid-id",
+								"name": "User One",
+								"alias": "userone",
+								"email": "user1@example.com",
+								"workspace": "01j9x0yy00000000000000001a",
+								"host": "",
+								"auths": [],
+								"metadata": {
+									"photoURL": "",
+									"description": "",
+									"website": "",
+									"lang": "",
+									"theme": ""
+								}
+							}
+						],
+						"totalCount": 1
+					}
+				}
+			}`),
+		)
+
+		users, totalCount, err := client.UserRepo.FindUsersByIDsWithPagination(
+			ctx,
+			[]string{"01j9x0yy00000000000000000a"},
+			"test-alias",
+			1,
+			10,
+		)
+
+		// gqlmodel.ToUsers handles errors gracefully by logging and skipping invalid users
+		assert.NoError(t, err)
+		assert.NotNil(t, users)
+		assert.Len(t, users, 0) // Invalid user is skipped
+		assert.Equal(t, 1, totalCount)
+	})
+
+	t.Run("partial invalid user IDs in response", func(t *testing.T) {
+		httpmock.Activate()
+		defer httpmock.DeactivateAndReset()
+
+		transport := httpmock.DefaultTransport
+		client := gqlclient.NewClient("https://accounts.example.com", 30, transport)
+
+		httpmock.RegisterResponder(
+			"POST",
+			"https://accounts.example.com/api/graphql",
+			httpmock.NewStringResponder(http.StatusOK, `{
+				"data": {
+					"findUsersByIDsWithPagination": {
+						"users": [
+							{
+								"id": "01j9x0yy00000000000000000a",
+								"name": "Valid User",
+								"alias": "validuser",
+								"email": "valid@example.com",
+								"workspace": "01j9x0yy00000000000000001a",
+								"host": "",
+								"auths": [],
+								"metadata": {
+									"photoURL": "",
+									"description": "",
+									"website": "",
+									"lang": "en",
+									"theme": "light"
+								}
+							},
+							{
+								"id": "invalid-id",
+								"name": "Invalid User",
+								"alias": "invaliduser",
+								"email": "invalid@example.com",
+								"workspace": "01j9x0yy00000000000000001b",
+								"host": "",
+								"auths": [],
+								"metadata": {
+									"photoURL": "",
+									"description": "",
+									"website": "",
+									"lang": "",
+									"theme": ""
+								}
+							}
+						],
+						"totalCount": 2
+					}
+				}
+			}`),
+		)
+
+		users, totalCount, err := client.UserRepo.FindUsersByIDsWithPagination(
+			ctx,
+			[]string{"01j9x0yy00000000000000000a", "invalid-id"},
+			"test-alias",
+			1,
+			10,
+		)
+
+		// gqlmodel.ToUsers handles errors gracefully by logging and skipping invalid users
+		assert.NoError(t, err)
+		assert.NotNil(t, users)
+		assert.Len(t, users, 1) // Only valid user is returned
+		assert.Equal(t, 2, totalCount)
+		assert.Equal(t, "Valid User", users[0].Name())
+	})
+}
