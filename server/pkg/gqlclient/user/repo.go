@@ -1,3 +1,5 @@
+//go:generate go run go.uber.org/mock/mockgen -source=repo.go -destination=mockrepo/mockrepo.go -package=mockrepo -mock_names=Repo=MockRepo
+
 package user
 
 import (
