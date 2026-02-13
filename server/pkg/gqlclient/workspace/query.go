@@ -14,6 +14,10 @@ type findByIDQuery struct {
 	Workspace gqlmodel.Workspace `graphql:"findByID(id: $id)"`
 }
 
+type findByIDsQuery struct {
+	Workspaces []gqlmodel.Workspace `graphql:"findByIDs(ids: $ids)"`
+}
+
 type findByAliasQuery struct {
 	Workspace gqlmodel.Workspace `graphql:"findByAlias(alias: $alias)"`
 }
@@ -86,5 +90,5 @@ type updateUserOfWorkspaceMutation struct {
 			Alias    graphql.String `graphql:"alias"`
 			Personal bool           `graphql:"personal"`
 		} `graphql:"workspace"`
-	} `graphql:"updateUserOfWorkspace(input: {workspaceId: $workspaceId, userId: $userId, role: $role})"`
+	} `graphql:"updateUserOfWorkspace(input: $input)"`
 }

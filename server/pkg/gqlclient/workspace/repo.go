@@ -60,6 +60,7 @@ type workspaceRepo struct {
 type WorkspaceRepo interface {
 	FindByUser(ctx context.Context, userID string) (workspace.List, error)
 	FindByID(ctx context.Context, id string) (*workspace.Workspace, error)
+	FindByIDs(ctx context.Context, ids []string) (workspace.List, error)
 	FindByAlias(ctx context.Context, alias string) (*workspace.Workspace, error)
 	FindByUserWithPagination(ctx context.Context, userID string, page int64, size int64) (workspace.List, int, error)
 	CreateWorkspace(ctx context.Context, input CreateWorkspaceInput) (*workspace.Workspace, error)
@@ -124,6 +125,27 @@ func (r *workspaceRepo) FindByID(ctx context.Context, id string) (*workspace.Wor
 	}
 
 	return gqlmodel.ToWorkspace(ctx, q.Workspace)
+}
+
+func (r *workspaceRepo) FindByIDs(ctx context.Context, ids []string) (workspace.List, error) {
+	if len(ids) == 0 {
+		return nil, nil
+	}
+
+	graphqlIDs := make([]graphql.ID, 0, len(ids))
+	for _, id := range ids {
+		graphqlIDs = append(graphqlIDs, graphql.ID(id))
+	}
+
+	var q findByIDsQuery
+	vars := map[string]interface{}{
+		"ids": graphqlIDs,
+	}
+	if err := r.client.Query(ctx, &q, vars); err != nil {
+		return nil, gqlerror.ReturnAccountsError(ctx, err)
+	}
+
+	return gqlmodel.ToWorkspaces(ctx, q.Workspaces), nil
 }
 
 func (r *workspaceRepo) FindByAlias(ctx context.Context, alias string) (*workspace.Workspace, error) {
@@ -201,13 +223,13 @@ func (r *workspaceRepo) DeleteWorkspace(ctx context.Context, workspaceID string)
 }
 
 func (r *workspaceRepo) AddUsersToWorkspace(ctx context.Context, input AddUsersToWorkspaceInput) (*workspace.Workspace, error) {
-	// Convert WorkspaceMemberInput to gqlmodel.MemberInput for proper GraphQL type inference
-	users := make([]gqlmodel.MemberInput, len(input.Users))
-	for i, u := range input.Users {
-		users[i] = gqlmodel.MemberInput{
+	// Convert MemberInput to GraphQL format
+	users := make([]gqlmodel.MemberInput, 0, len(input.Users))
+	for _, u := range input.Users {
+		users = append(users, gqlmodel.MemberInput{
 			UserID: graphql.ID(u.UserID),
 			Role:   graphql.String(u.Role),
-		}
+		})
 	}
 
 	var m addUsersToWorkspaceMutation
@@ -236,11 +258,15 @@ func (r *workspaceRepo) RemoveUserFromWorkspace(ctx context.Context, workspaceID
 }
 
 func (r *workspaceRepo) UpdateUserOfWorkspace(ctx context.Context, input UpdateUserOfWorkspaceInput) (*workspace.Workspace, error) {
+	in := gqlmodel.UpdateUserOfWorkspaceInput{
+		WorkspaceID: graphql.ID(input.WorkspaceID),
+		UserID:      graphql.ID(input.UserID),
+		Role:        graphql.String(input.Role),
+	}
+
 	var m updateUserOfWorkspaceMutation
 	vars := map[string]interface{}{
-		"workspaceId": graphql.ID(input.WorkspaceID),
-		"userId":      graphql.ID(input.UserID),
-		"role":        graphql.String(input.Role),
+		"input": in,
 	}
 	if err := r.client.Mutate(ctx, &m, vars); err != nil {
 		return nil, gqlerror.ReturnAccountsError(ctx, err)
@@ -261,7 +287,7 @@ func toWorkspace(ctx context.Context, id graphql.ID, name graphql.String, alias 
 		Name(string(name)).
 		Alias(string(alias)).
 		Members(make(map[workspace.UserID]workspace.Member)). // Empty members map for mutations
-		Metadata(workspace.MetadataFrom("", "", "", "", "")).  // Empty metadata for mutations
+		Metadata(workspace.MetadataFrom("", "", "", "", "")). // Empty metadata for mutations
 		Personal(personal).
 		MustBuild(), nil
 }
