@@ -4,6 +4,7 @@ import (
 	"context"
 
 	"github.com/reearth/reearth-accounts/server/internal/adapter/gql/gqlmodel"
+	"github.com/reearth/reearth-accounts/server/internal/usecase/interfaces"
 	"github.com/reearth/reearth-accounts/server/pkg/id"
 )
 
@@ -33,4 +34,24 @@ func (r *queryResolver) FindUsersByIDs(ctx context.Context, userIds []gqlmodel.I
 	}
 
 	return gqlmodel.ToUsers(res), nil
+}
+
+func (r *queryResolver) FindUsersByIDsWithPagination(ctx context.Context, userIds []gqlmodel.ID, alias *string, pagination gqlmodel.Pagination) (*gqlmodel.UsersWithPagination, error) {
+	uids, err := gqlmodel.ToIDs[id.User](userIds)
+	if err != nil {
+		return nil, err
+	}
+
+	res, err := usecases(ctx).User.FetchByIDsWithPagination(ctx, uids, alias, interfaces.FetchByIDsWithPaginationParam{
+		Page: int64(pagination.Page),
+		Size: int64(pagination.Size),
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	return &gqlmodel.UsersWithPagination{
+		Users:      gqlmodel.ToUsers(res.Users),
+		TotalCount: res.TotalCount,
+	}, nil
 }

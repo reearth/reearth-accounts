@@ -317,6 +317,11 @@ type UserWithRoles struct {
 	Roles []*RoleForAuthorization `json:"roles"`
 }
 
+type UsersWithPagination struct {
+	Users      []*User `json:"users"`
+	TotalCount int     `json:"totalCount"`
+}
+
 type Verification struct {
 	Code       string `json:"code"`
 	Expiration string `json:"expiration"`

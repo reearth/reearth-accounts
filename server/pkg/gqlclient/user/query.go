@@ -36,6 +36,13 @@ type findByAliasQuery struct {
 	} `graphql:"findUserByAlias(alias: $alias)"`
 }
 
+type FindUsersByIDsWithPaginationQuery struct {
+	FindUsersByIDsWithPagination struct {
+		Users      []gqlmodel.User `graphql:"users"`
+		TotalCount int             `graphql:"totalCount"`
+	} `graphql:"findUsersByIDsWithPagination(ids: $ids, alias: $alias, pagination: {page: $page, size: $size})"`
+}
+
 type updateMeMutation struct {
 	UpdateMe struct {
 		Me gqlmodel.Me

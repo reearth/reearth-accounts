@@ -131,24 +131,25 @@ type ComplexityRoot struct {
 	}
 
 	Query struct {
-		AuthConfig               func(childComplexity int) int
-		CheckPermission          func(childComplexity int, input gqlmodel.CheckPermissionInput) int
-		FindByAlias              func(childComplexity int, alias string) int
-		FindByID                 func(childComplexity int, id gqlmodel.ID) int
-		FindByIDs                func(childComplexity int, ids []gqlmodel.ID) int
-		FindByName               func(childComplexity int, name string) int
-		FindByUser               func(childComplexity int, userID gqlmodel.ID) int
-		FindByUserWithPagination func(childComplexity int, userID gqlmodel.ID, pagination gqlmodel.Pagination) int
-		FindUserByAlias          func(childComplexity int, alias string) int
-		FindUsersByIDs           func(childComplexity int, ids []gqlmodel.ID) int
-		GetUsersWithRoles        func(childComplexity int) int
-		Me                       func(childComplexity int) int
-		Node                     func(childComplexity int, id gqlmodel.ID, typeArg gqlmodel.NodeType) int
-		Nodes                    func(childComplexity int, id []gqlmodel.ID, typeArg gqlmodel.NodeType) int
-		Roles                    func(childComplexity int) int
-		SearchUser               func(childComplexity int, keyword string) int
-		User                     func(childComplexity int, id gqlmodel.ID) int
-		UserByNameOrEmail        func(childComplexity int, nameOrEmail string) int
+		AuthConfig                   func(childComplexity int) int
+		CheckPermission              func(childComplexity int, input gqlmodel.CheckPermissionInput) int
+		FindByAlias                  func(childComplexity int, alias string) int
+		FindByID                     func(childComplexity int, id gqlmodel.ID) int
+		FindByIDs                    func(childComplexity int, ids []gqlmodel.ID) int
+		FindByName                   func(childComplexity int, name string) int
+		FindByUser                   func(childComplexity int, userID gqlmodel.ID) int
+		FindByUserWithPagination     func(childComplexity int, userID gqlmodel.ID, pagination gqlmodel.Pagination) int
+		FindUserByAlias              func(childComplexity int, alias string) int
+		FindUsersByIDs               func(childComplexity int, ids []gqlmodel.ID) int
+		FindUsersByIDsWithPagination func(childComplexity int, ids []gqlmodel.ID, alias *string, pagination gqlmodel.Pagination) int
+		GetUsersWithRoles            func(childComplexity int) int
+		Me                           func(childComplexity int) int
+		Node                         func(childComplexity int, id gqlmodel.ID, typeArg gqlmodel.NodeType) int
+		Nodes                        func(childComplexity int, id []gqlmodel.ID, typeArg gqlmodel.NodeType) int
+		Roles                        func(childComplexity int) int
+		SearchUser                   func(childComplexity int, keyword string) int
+		User                         func(childComplexity int, id gqlmodel.ID) int
+		UserByNameOrEmail            func(childComplexity int, nameOrEmail string) int
 	}
 
 	RemoveIntegrationsFromWorkspacePayload struct {
@@ -223,6 +224,11 @@ type ComplexityRoot struct {
 	UserWithRoles struct {
 		Roles func(childComplexity int) int
 		User  func(childComplexity int) int
+	}
+
+	UsersWithPagination struct {
+		TotalCount func(childComplexity int) int
+		Users      func(childComplexity int) int
 	}
 
 	Verification struct {
@@ -313,6 +319,7 @@ type QueryResolver interface {
 	SearchUser(ctx context.Context, keyword string) ([]*gqlmodel.User, error)
 	FindUsersByIDs(ctx context.Context, ids []gqlmodel.ID) ([]*gqlmodel.User, error)
 	FindUserByAlias(ctx context.Context, alias string) (*gqlmodel.User, error)
+	FindUsersByIDsWithPagination(ctx context.Context, ids []gqlmodel.ID, alias *string, pagination gqlmodel.Pagination) (*gqlmodel.UsersWithPagination, error)
 	FindByID(ctx context.Context, id gqlmodel.ID) (*gqlmodel.Workspace, error)
 	FindByIDs(ctx context.Context, ids []gqlmodel.ID) ([]*gqlmodel.Workspace, error)
 	FindByName(ctx context.Context, name string) (*gqlmodel.Workspace, error)
@@ -883,6 +890,17 @@ func (e *executableSchema) Complexity(ctx context.Context, typeName, field strin
 		}
 
 		return e.complexity.Query.FindUsersByIDs(childComplexity, args["ids"].([]gqlmodel.ID)), true
+	case "Query.findUsersByIDsWithPagination":
+		if e.complexity.Query.FindUsersByIDsWithPagination == nil {
+			break
+		}
+
+		args, err := ec.field_Query_findUsersByIDsWithPagination_args(ctx, rawArgs)
+		if err != nil {
+			return 0, false
+		}
+
+		return e.complexity.Query.FindUsersByIDsWithPagination(childComplexity, args["ids"].([]gqlmodel.ID), args["alias"].(*string), args["pagination"].(gqlmodel.Pagination)), true
 	case "Query.getUsersWithRoles":
 		if e.complexity.Query.GetUsersWithRoles == nil {
 			break
@@ -1145,6 +1163,19 @@ func (e *executableSchema) Complexity(ctx context.Context, typeName, field strin
 		}
 
 		return e.complexity.UserWithRoles.User(childComplexity), true
+
+	case "UsersWithPagination.totalCount":
+		if e.complexity.UsersWithPagination.TotalCount == nil {
+			break
+		}
+
+		return e.complexity.UsersWithPagination.TotalCount(childComplexity), true
+	case "UsersWithPagination.users":
+		if e.complexity.UsersWithPagination.Users == nil {
+			break
+		}
+
+		return e.complexity.UsersWithPagination.Users(childComplexity), true
 
 	case "Verification.code":
 		if e.complexity.Verification.Code == nil {
@@ -1621,6 +1652,11 @@ type Verification {
   verified: Boolean!
 }
 
+type UsersWithPagination {
+  users: [User!]!
+  totalCount: Int!
+}
+
 input SignupInput {
   id: ID
   workspaceID: ID
@@ -1690,6 +1726,7 @@ extend type Query {
   searchUser(keyword: String!): [User!]!
   findUsersByIDs(ids: [ID!]!): [User!]!
   findUserByAlias(alias: String!): User
+  findUsersByIDsWithPagination(ids: [ID!]!, alias: String, pagination: Pagination!): UsersWithPagination!
 }
 
 type UserPayload {
@@ -2292,6 +2329,27 @@ func (ec *executionContext) field_Query_findUserByAlias_args(ctx context.Context
 		return nil, err
 	}
 	args["alias"] = arg0
+	return args, nil
+}
+
+func (ec *executionContext) field_Query_findUsersByIDsWithPagination_args(ctx context.Context, rawArgs map[string]any) (map[string]any, error) {
+	var err error
+	args := map[string]any{}
+	arg0, err := graphql.ProcessArgField(ctx, rawArgs, "ids", ec.unmarshalNID2ᚕgithubᚗcomᚋreearthᚋreearthᚑaccountsᚋserverᚋinternalᚋadapterᚋgqlᚋgqlmodelᚐIDᚄ)
+	if err != nil {
+		return nil, err
+	}
+	args["ids"] = arg0
+	arg1, err := graphql.ProcessArgField(ctx, rawArgs, "alias", ec.unmarshalOString2ᚖstring)
+	if err != nil {
+		return nil, err
+	}
+	args["alias"] = arg1
+	arg2, err := graphql.ProcessArgField(ctx, rawArgs, "pagination", ec.unmarshalNPagination2githubᚗcomᚋreearthᚋreearthᚑaccountsᚋserverᚋinternalᚋadapterᚋgqlᚋgqlmodelᚐPagination)
+	if err != nil {
+		return nil, err
+	}
+	args["pagination"] = arg2
 	return args, nil
 }
 
@@ -4900,6 +4958,53 @@ func (ec *executionContext) fieldContext_Query_findUserByAlias(ctx context.Conte
 	return fc, nil
 }
 
+func (ec *executionContext) _Query_findUsersByIDsWithPagination(ctx context.Context, field graphql.CollectedField) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		ec.fieldContext_Query_findUsersByIDsWithPagination,
+		func(ctx context.Context) (any, error) {
+			fc := graphql.GetFieldContext(ctx)
+			return ec.resolvers.Query().FindUsersByIDsWithPagination(ctx, fc.Args["ids"].([]gqlmodel.ID), fc.Args["alias"].(*string), fc.Args["pagination"].(gqlmodel.Pagination))
+		},
+		nil,
+		ec.marshalNUsersWithPagination2ᚖgithubᚗcomᚋreearthᚋreearthᚑaccountsᚋserverᚋinternalᚋadapterᚋgqlᚋgqlmodelᚐUsersWithPagination,
+		true,
+		true,
+	)
+}
+
+func (ec *executionContext) fieldContext_Query_findUsersByIDsWithPagination(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "Query",
+		Field:      field,
+		IsMethod:   true,
+		IsResolver: true,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			switch field.Name {
+			case "users":
+				return ec.fieldContext_UsersWithPagination_users(ctx, field)
+			case "totalCount":
+				return ec.fieldContext_UsersWithPagination_totalCount(ctx, field)
+			}
+			return nil, fmt.Errorf("no field named %q was found under type UsersWithPagination", field.Name)
+		},
+	}
+	defer func() {
+		if r := recover(); r != nil {
+			err = ec.Recover(ctx, r)
+			ec.Error(ctx, err)
+		}
+	}()
+	ctx = graphql.WithFieldContext(ctx, fc)
+	if fc.Args, err = ec.field_Query_findUsersByIDsWithPagination_args(ctx, field.ArgumentMap(ec.Variables)); err != nil {
+		ec.Error(ctx, err)
+		return fc, err
+	}
+	return fc, nil
+}
+
 func (ec *executionContext) _Query_findByID(ctx context.Context, field graphql.CollectedField) (ret graphql.Marshaler) {
 	return graphql.ResolveField(
 		ctx,
@@ -6342,6 +6447,84 @@ func (ec *executionContext) fieldContext_UserWithRoles_roles(_ context.Context, 
 				return ec.fieldContext_RoleForAuthorization_name(ctx, field)
 			}
 			return nil, fmt.Errorf("no field named %q was found under type RoleForAuthorization", field.Name)
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _UsersWithPagination_users(ctx context.Context, field graphql.CollectedField, obj *gqlmodel.UsersWithPagination) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		ec.fieldContext_UsersWithPagination_users,
+		func(ctx context.Context) (any, error) {
+			return obj.Users, nil
+		},
+		nil,
+		ec.marshalNUser2ᚕᚖgithubᚗcomᚋreearthᚋreearthᚑaccountsᚋserverᚋinternalᚋadapterᚋgqlᚋgqlmodelᚐUserᚄ,
+		true,
+		true,
+	)
+}
+
+func (ec *executionContext) fieldContext_UsersWithPagination_users(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "UsersWithPagination",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			switch field.Name {
+			case "id":
+				return ec.fieldContext_User_id(ctx, field)
+			case "name":
+				return ec.fieldContext_User_name(ctx, field)
+			case "alias":
+				return ec.fieldContext_User_alias(ctx, field)
+			case "email":
+				return ec.fieldContext_User_email(ctx, field)
+			case "host":
+				return ec.fieldContext_User_host(ctx, field)
+			case "workspace":
+				return ec.fieldContext_User_workspace(ctx, field)
+			case "auths":
+				return ec.fieldContext_User_auths(ctx, field)
+			case "metadata":
+				return ec.fieldContext_User_metadata(ctx, field)
+			case "verification":
+				return ec.fieldContext_User_verification(ctx, field)
+			}
+			return nil, fmt.Errorf("no field named %q was found under type User", field.Name)
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _UsersWithPagination_totalCount(ctx context.Context, field graphql.CollectedField, obj *gqlmodel.UsersWithPagination) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		ec.fieldContext_UsersWithPagination_totalCount,
+		func(ctx context.Context) (any, error) {
+			return obj.TotalCount, nil
+		},
+		nil,
+		ec.marshalNInt2int,
+		true,
+		true,
+	)
+}
+
+func (ec *executionContext) fieldContext_UsersWithPagination_totalCount(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "UsersWithPagination",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type Int does not have child fields")
 		},
 	}
 	return fc, nil
@@ -10609,6 +10792,28 @@ func (ec *executionContext) _Query(ctx context.Context, sel ast.SelectionSet) gr
 			}
 
 			out.Concurrently(i, func(ctx context.Context) graphql.Marshaler { return rrm(innerCtx) })
+		case "findUsersByIDsWithPagination":
+			field := field
+
+			innerFunc := func(ctx context.Context, fs *graphql.FieldSet) (res graphql.Marshaler) {
+				defer func() {
+					if r := recover(); r != nil {
+						ec.Error(ctx, ec.Recover(ctx, r))
+					}
+				}()
+				res = ec._Query_findUsersByIDsWithPagination(ctx, field)
+				if res == graphql.Null {
+					atomic.AddUint32(&fs.Invalids, 1)
+				}
+				return res
+			}
+
+			rrm := func(ctx context.Context) graphql.Marshaler {
+				return ec.OperationContext.RootResolverMiddleware(ctx,
+					func(ctx context.Context) graphql.Marshaler { return innerFunc(ctx, out) })
+			}
+
+			out.Concurrently(i, func(ctx context.Context) graphql.Marshaler { return rrm(innerCtx) })
 		case "findByID":
 			field := field
 
@@ -11386,6 +11591,50 @@ func (ec *executionContext) _UserWithRoles(ctx context.Context, sel ast.Selectio
 			}
 		case "roles":
 			out.Values[i] = ec._UserWithRoles_roles(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		default:
+			panic("unknown field " + strconv.Quote(field.Name))
+		}
+	}
+	out.Dispatch(ctx)
+	if out.Invalids > 0 {
+		return graphql.Null
+	}
+
+	atomic.AddInt32(&ec.deferred, int32(len(deferred)))
+
+	for label, dfs := range deferred {
+		ec.processDeferredGroup(graphql.DeferredGroup{
+			Label:    label,
+			Path:     graphql.GetPath(ctx),
+			FieldSet: dfs,
+			Context:  ctx,
+		})
+	}
+
+	return out
+}
+
+var usersWithPaginationImplementors = []string{"UsersWithPagination"}
+
+func (ec *executionContext) _UsersWithPagination(ctx context.Context, sel ast.SelectionSet, obj *gqlmodel.UsersWithPagination) graphql.Marshaler {
+	fields := graphql.CollectFields(ec.OperationContext, sel, usersWithPaginationImplementors)
+
+	out := graphql.NewFieldSet(fields)
+	deferred := make(map[string]*graphql.FieldSet)
+	for i, field := range fields {
+		switch field.Name {
+		case "__typename":
+			out.Values[i] = graphql.MarshalString("UsersWithPagination")
+		case "users":
+			out.Values[i] = ec._UsersWithPagination_users(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "totalCount":
+			out.Values[i] = ec._UsersWithPagination_totalCount(ctx, field, obj)
 			if out.Values[i] == graphql.Null {
 				out.Invalids++
 			}
@@ -12628,6 +12877,20 @@ func (ec *executionContext) marshalNUserWithRoles2ᚖgithubᚗcomᚋreearthᚋre
 		return graphql.Null
 	}
 	return ec._UserWithRoles(ctx, sel, v)
+}
+
+func (ec *executionContext) marshalNUsersWithPagination2githubᚗcomᚋreearthᚋreearthᚑaccountsᚋserverᚋinternalᚋadapterᚋgqlᚋgqlmodelᚐUsersWithPagination(ctx context.Context, sel ast.SelectionSet, v gqlmodel.UsersWithPagination) graphql.Marshaler {
+	return ec._UsersWithPagination(ctx, sel, &v)
+}
+
+func (ec *executionContext) marshalNUsersWithPagination2ᚖgithubᚗcomᚋreearthᚋreearthᚑaccountsᚋserverᚋinternalᚋadapterᚋgqlᚋgqlmodelᚐUsersWithPagination(ctx context.Context, sel ast.SelectionSet, v *gqlmodel.UsersWithPagination) graphql.Marshaler {
+	if v == nil {
+		if !graphql.HasFieldError(ctx, graphql.GetFieldContext(ctx)) {
+			graphql.AddErrorf(ctx, "the requested element is null which the schema does not allow")
+		}
+		return graphql.Null
+	}
+	return ec._UsersWithPagination(ctx, sel, v)
 }
 
 func (ec *executionContext) unmarshalNVerifyUserInput2githubᚗcomᚋreearthᚋreearthᚑaccountsᚋserverᚋinternalᚋadapterᚋgqlᚋgqlmodelᚐVerifyUserInput(ctx context.Context, v any) (gqlmodel.VerifyUserInput, error) {

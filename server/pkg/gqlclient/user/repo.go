@@ -31,6 +31,7 @@ type Repo interface {
 	FindByID(ctx context.Context, id string) (*user.User, error)
 	FindByAlias(ctx context.Context, alias string) (*user.User, error)
 	FindByNameOrEmail(ctx context.Context, nameOrEmail string) (*user.User, error)
+	FindUsersByIDsWithPagination(ctx context.Context, id []string, alias string, page, size int64) (user.List, int, error)
 	Update(ctx context.Context, name string) error
 	UpdateMe(ctx context.Context, input UpdateMeInput) (*user.User, error)
 	SignupOIDC(ctx context.Context, name string, email string, sub string, secret string) (*user.User, error)
@@ -158,6 +159,22 @@ func (r *userRepo) FindByNameOrEmail(ctx context.Context, nameOrEmail string) (*
 // Deprecated: Use FindByNameOrEmail instead
 func (r *userRepo) FindByNameEmail(ctx context.Context, nameOrEmail string) (*user.User, error) {
 	return r.FindByNameOrEmail(ctx, nameOrEmail)
+}
+
+func (r *userRepo) FindUsersByIDsWithPagination(ctx context.Context, id []string, alias string, page, size int64) (user.List, int, error) {
+	var q FindUsersByIDsWithPaginationQuery
+	vars := map[string]interface{}{
+		"ids":   gqlutil.ToIDSlice(id),
+		"alias": graphql.String(alias),
+		"page":  graphql.Int(page),
+		"size":  graphql.Int(size),
+	}
+	if err := r.client.Query(ctx, &q, vars); err != nil {
+		return nil, 0, gqlerror.ReturnAccountsError(ctx, err)
+	}
+
+	users := gqlmodel.ToUsers(ctx, q.FindUsersByIDsWithPagination.Users)
+	return users, q.FindUsersByIDsWithPagination.TotalCount, nil
 }
 
 // TODO: Extend the Account server's UpdateMeInput to support alias, photoURL, website, and description.
