@@ -15,12 +15,15 @@ var (
 	RoleWriter = RoleType("writer")
 	// RoleReader is a role who can read projects
 	RoleReader = RoleType("reader")
+	// RoleSelf is a special role that represents the user themselves
+	RoleSelf = RoleType("self")
 
 	roleTypes = []RoleType{
 		RoleOwner,
 		RoleMaintainer,
 		RoleWriter,
 		RoleReader,
+		RoleSelf,
 	}
 
 	ErrInvalidRole = errors.New("invalid role")

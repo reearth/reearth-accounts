@@ -1,6 +1,9 @@
 package rbac
 
 import (
+	"slices"
+
+	"github.com/reearth/reearth-accounts/server/pkg/role"
 	"github.com/reearth/reearthx/cerbos/generator"
 	"github.com/samber/lo"
 )
@@ -31,12 +34,12 @@ const (
 	ActionValidate          = "validate"
 )
 
-const (
-	roleReader     = "reader"
-	roleWriter     = "writer"
-	roleMaintainer = "maintainer"
-	roleOwner      = "owner"
-	roleSelf       = "self"
+var (
+	roleReader     = role.RoleReader.String()
+	roleWriter     = role.RoleWriter.String()
+	roleMaintainer = role.RoleMaintainer.String()
+	roleOwner      = role.RoleOwner.String()
+	roleSelf       = role.RoleSelf.String()
 )
 
 type ResourceRule struct {
@@ -78,9 +81,22 @@ var resourceRules = []ResourceRule{
 				},
 			},
 
-			// TODO: need further investigation about search user permission & validate alias permission
-			ActionSearch:   {Roles: []string{roleReader, roleWriter, roleMaintainer, roleOwner}},
-			ActionValidate: {Roles: []string{roleReader, roleWriter, roleMaintainer, roleOwner}},
+			ActionSearch: {
+				Roles: []string{roleSelf, roleReader, roleWriter, roleMaintainer, roleOwner},
+				Condition: &generator.Condition{
+					Match: generator.Match{
+						Expr: lo.ToPtr("has(request.auxData.jwt)"),
+					},
+				},
+			},
+			ActionValidate: {
+				Roles: []string{roleSelf, roleReader, roleWriter, roleMaintainer, roleOwner},
+				Condition: &generator.Condition{
+					Match: generator.Match{
+						Expr: lo.ToPtr("has(request.auxData.jwt)"),
+					},
+				},
+			},
 		},
 	},
 	{
@@ -118,7 +134,15 @@ func DefineResources(builder *generator.ResourceBuilder) []generator.ResourceDef
 
 	for _, r := range resourceRules {
 		var actions []generator.ActionDefinition
-		for action, actionRule := range r.Actions {
+		// Sort action keys to ensure deterministic output
+		actionKeys := make([]string, 0, len(r.Actions))
+		for action := range r.Actions {
+			actionKeys = append(actionKeys, action)
+		}
+		slices.Sort(actionKeys)
+
+		for _, action := range actionKeys {
+			actionRule := r.Actions[action]
 			if actionRule.Condition != nil {
 				actions = append(actions, generator.NewActionDefinitionWithCondition(action, actionRule.Roles, actionRule.Condition))
 			} else {

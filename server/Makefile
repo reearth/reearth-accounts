@@ -14,6 +14,7 @@ help:
 	@echo "  run-migration     Run database migrations"
 	@echo "  gql               Generate GraphQL code include dataloader"
 	@echo "  generate          Run go generate"
+	@echo "  gen-policies      Generate Cerbos policy files"
 
 TARGET_TEST :=./...
 REEARTH_DB := mongodb://localhost
@@ -70,4 +71,4 @@ update-schema-json:
 	go run ./tools/cmd/mongoschemagen -output ./internal/infrastructure/mongo/schema
 	go run ./tools/cmd/ergen -schema ./internal/infrastructure/mongo/schema -mongodoc ./internal/infrastructure/mongo/mongodoc -output ./internal/infrastructure/mongo/schema/ER.md
 
-.PHONY: dev-install dev run down run-app run-cerbos run-migration gql update-schema-json
+.PHONY: dev-install dev run down run-app run-cerbos run-migration gql gen-policies update-schema-json
