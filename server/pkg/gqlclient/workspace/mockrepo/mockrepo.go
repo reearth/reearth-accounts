@@ -162,6 +162,21 @@ func (mr *MockWorkspaceRepoMockRecorder) RemoveUserFromWorkspace(ctx, workspaceI
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "RemoveUserFromWorkspace", reflect.TypeOf((*MockWorkspaceRepo)(nil).RemoveUserFromWorkspace), ctx, workspaceID, userID)
 }
 
+// TransferOwnership mocks base method.
+func (m *MockWorkspaceRepo) TransferOwnership(ctx context.Context, workspaceID, newOwnerID string) (*workspace0.Workspace, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "TransferOwnership", ctx, workspaceID, newOwnerID)
+	ret0, _ := ret[0].(*workspace0.Workspace)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// TransferOwnership indicates an expected call of TransferOwnership.
+func (mr *MockWorkspaceRepoMockRecorder) TransferOwnership(ctx, workspaceID, newOwnerID any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "TransferOwnership", reflect.TypeOf((*MockWorkspaceRepo)(nil).TransferOwnership), ctx, workspaceID, newOwnerID)
+}
+
 // UpdateUserOfWorkspace mocks base method.
 func (m *MockWorkspaceRepo) UpdateUserOfWorkspace(ctx context.Context, input workspace.UpdateUserOfWorkspaceInput) (*workspace0.Workspace, error) {
 	m.ctrl.T.Helper()

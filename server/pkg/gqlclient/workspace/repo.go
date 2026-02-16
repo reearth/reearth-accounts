@@ -68,6 +68,7 @@ type WorkspaceRepo interface {
 	AddUsersToWorkspace(ctx context.Context, input AddUsersToWorkspaceInput) (*workspace.Workspace, error)
 	RemoveUserFromWorkspace(ctx context.Context, workspaceID, userID string) (*workspace.Workspace, error)
 	UpdateUserOfWorkspace(ctx context.Context, input UpdateUserOfWorkspaceInput) (*workspace.Workspace, error)
+	TransferOwnership(ctx context.Context, workspaceID string, newOwnerID string) (*workspace.Workspace, error)
 }
 
 // Input types for mutations
@@ -249,6 +250,25 @@ func (r *workspaceRepo) UpdateUserOfWorkspace(ctx context.Context, input UpdateU
 	return toWorkspace(ctx, m.UpdateUserOfWorkspace.Workspace.ID, m.UpdateUserOfWorkspace.Workspace.Name, m.UpdateUserOfWorkspace.Workspace.Alias, m.UpdateUserOfWorkspace.Workspace.Personal)
 }
 
+func (r *workspaceRepo) TransferOwnership(ctx context.Context, workspaceID string, newOwnerID string) (*workspace.Workspace, error) {
+	var m transferWorkspaceOwnershipMutation
+	vars := map[string]interface{}{
+		"workspaceId": graphql.ID(workspaceID),
+		"newOwnerId":  graphql.ID(newOwnerID),
+	}
+
+	if err := r.client.Mutate(ctx, &m, vars); err != nil {
+		return nil, err
+	}
+
+	ws, err := gqlmodel.ToWorkspace(ctx, m.TransferWorkspaceOwnership.Workspace)
+	if err != nil {
+		return nil, err
+	}
+
+	return ws, nil
+}
+
 // toWorkspace converts GraphQL types to full Workspace domain object
 func toWorkspace(ctx context.Context, id graphql.ID, name graphql.String, alias graphql.String, personal bool) (*workspace.Workspace, error) {
 	wsID, err := workspace.IDFrom(string(id))
@@ -261,7 +281,7 @@ func toWorkspace(ctx context.Context, id graphql.ID, name graphql.String, alias 
 		Name(string(name)).
 		Alias(string(alias)).
 		Members(make(map[workspace.UserID]workspace.Member)). // Empty members map for mutations
-		Metadata(workspace.MetadataFrom("", "", "", "", "")).  // Empty metadata for mutations
+		Metadata(workspace.MetadataFrom("", "", "", "", "")). // Empty metadata for mutations
 		Personal(personal).
 		MustBuild(), nil
 }
