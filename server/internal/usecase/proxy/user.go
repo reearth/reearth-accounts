@@ -36,6 +36,10 @@ func (u *User) FetchByID(ctx context.Context, ids user.IDList) (user.List, error
 	return UserByIDsResponseTo(UserByIDs(ctx, u.gql, ids.Strings()))
 }
 
+func (u *User) FetchByIDsWithPagination(ctx context.Context, ids user.IDList, alias *string, pagination interfaces.FetchByIDsWithPaginationParam) (interfaces.FetchByIDsWithPaginationResult, error) {
+	return interfaces.FetchByIDsWithPaginationResult{}, nil
+}
+
 func (u *User) Signup(ctx context.Context, param interfaces.SignupParam) (*user.User, error) {
 	input := SignupInput{
 		Id:          param.UserID.String(),

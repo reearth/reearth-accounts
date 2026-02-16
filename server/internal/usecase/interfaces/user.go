@@ -72,8 +72,19 @@ type UpdateMeParam struct {
 	PasswordConfirmation *string
 }
 
+type FetchByIDsWithPaginationParam struct {
+	Page int64
+	Size int64
+}
+
+type FetchByIDsWithPaginationResult struct {
+	Users      user.List
+	TotalCount int
+}
+
 type UserQuery interface {
 	FetchByID(context.Context, user.IDList) (user.List, error)
+	FetchByIDsWithPagination(ctx context.Context, ids user.IDList, alias *string, pagination FetchByIDsWithPaginationParam) (FetchByIDsWithPaginationResult, error)
 	FetchBySub(context.Context, string) (*user.User, error)
 	FetchByNameOrEmail(context.Context, string) (*user.Simple, error)
 	FetchByAlias(context.Context, string) (*user.User, error)
