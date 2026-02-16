@@ -29,6 +29,7 @@ type UpdateMeInput struct {
 type Repo interface {
 	FindMe(ctx context.Context) (*user.User, error)
 	FindByID(ctx context.Context, id string) (*user.User, error)
+	FindByIDs(ctx context.Context, ids []string) ([]*user.User, error)
 	FindByAlias(ctx context.Context, alias string) (*user.User, error)
 	FindByNameOrEmail(ctx context.Context, nameOrEmail string) (*user.User, error)
 	FindUsersByIDsWithPagination(ctx context.Context, id []string, alias string, page, size int64) (user.List, int, error)
@@ -36,9 +37,13 @@ type Repo interface {
 	UpdateMe(ctx context.Context, input UpdateMeInput) (*user.User, error)
 	SignupOIDC(ctx context.Context, name string, email string, sub string, secret string) (*user.User, error)
 	Signup(ctx context.Context, userID, name, email, password, secret, workspaceID string, mockAuth bool) (*user.User, error)
+	SignupNoID(ctx context.Context, name, email, password, secret string, mockAuth bool) (*user.User, error)
 	CreateVerification(ctx context.Context, email string) (bool, error)
 	RemoveMyAuth(ctx context.Context, auth string) (*user.User, error)
 	DeleteMe(ctx context.Context, userID string) error
+	VerifyUser(ctx context.Context, code string) (*user.User, error)
+	StartPasswordReset(ctx context.Context, email string) error
+	PasswordReset(ctx context.Context, password string, token string) error
 }
 
 func NewRepo(gql *graphql.Client) Repo {
@@ -109,6 +114,63 @@ func (r *userRepo) FindByID(ctx context.Context, id string) (*user.User, error) 
 		Workspace(wid).
 		Metadata(gqlmodel.ToUserMetadata(q.User.Metadata)).
 		Build()
+}
+
+func (r *userRepo) FindByIDs(ctx context.Context, ids []string) ([]*user.User, error) {
+	if len(ids) == 0 {
+		return nil, nil
+	}
+
+	graphqlIDs := make([]graphql.ID, 0, len(ids))
+	for _, id := range ids {
+		graphqlIDs = append(graphqlIDs, graphql.ID(id))
+	}
+
+	var q findUsersByIDsQuery
+	vars := map[string]interface{}{
+		"ids": graphqlIDs,
+	}
+	if err := r.client.Query(ctx, &q, vars); err != nil {
+		return nil, gqlerror.ReturnAccountsError(ctx, err)
+	}
+
+	users := make([]*user.User, 0, len(q.Users))
+	for _, u := range q.Users {
+		uid, err := user.IDFrom(string(u.ID))
+		if err != nil {
+			log.Errorf("[FindByIDs] failed to convert user id: %s", u.ID)
+			return nil, gqlerror.ReturnAccountsError(ctx, err)
+		}
+
+		wid, err := user.WorkspaceIDFrom(string(u.Workspace))
+		if err != nil {
+			log.Errorf("[FindByIDs] failed to convert workspace id: %s", u.Workspace)
+			return nil, gqlerror.ReturnAccountsError(ctx, err)
+		}
+
+		auths := gqlutil.ToStringSlice(u.Auths)
+		auths2 := make([]user.Auth, len(auths))
+		for i, auth := range auths {
+			auths2[i] = user.AuthFrom(auth)
+		}
+
+		userObj, err := user.New().
+			ID(uid).
+			Name(string(u.Name)).
+			Email(string(u.Email)).
+			Workspace(wid).
+			Auths(auths2).
+			Metadata(gqlmodel.ToUserMetadata(u.Metadata)).
+			Build()
+
+		if err != nil {
+			return nil, gqlerror.ReturnAccountsError(ctx, err)
+		}
+
+		users = append(users, userObj)
+	}
+
+	return users, nil
 }
 
 func (r *userRepo) FindByAlias(ctx context.Context, alias string) (*user.User, error) {
@@ -317,13 +379,40 @@ func (r *userRepo) Signup(ctx context.Context, userID, name, email, password, se
 		Build()
 }
 
+func (r *userRepo) SignupNoID(ctx context.Context, name, email, password, secret string, mockAuth bool) (*user.User, error) {
+	var m signupMutationNoID
+	vars := map[string]interface{}{}
+
+	vars["name"] = graphql.String(name)
+	vars["email"] = graphql.String(email)
+	vars["password"] = graphql.String(password)
+	vars["secret"] = graphql.String(secret)
+	vars["mockAuth"] = graphql.Boolean(mockAuth)
+
+	if err := r.client.Mutate(ctx, &m, vars); err != nil {
+		return nil, gqlerror.ReturnAccountsError(ctx, err)
+	}
+
+	uid, err := user.IDFrom(string(m.Signup.User.ID))
+	if err != nil {
+		log.Errorf("[SignupNoID] failed to convert user id: %s", m.Signup.User.ID)
+		return nil, gqlerror.ReturnAccountsError(ctx, err)
+	}
+
+	return user.New().
+		ID(uid).
+		Name(string(m.Signup.User.Name)).
+		Email(string(m.Signup.User.Email)).
+		Build()
+}
+
 func (r *userRepo) CreateVerification(ctx context.Context, email string) (bool, error) {
 	var m createVerificationMutation
 	vars := map[string]interface{}{
 		"email": graphql.String(email),
 	}
 	if err := r.client.Mutate(ctx, &m, vars); err != nil {
-		return false, err
+		return false, gqlerror.ReturnAccountsError(ctx, err)
 	}
 
 	return *m.CreateVerification, nil
@@ -373,4 +462,93 @@ func (r *userRepo) RemoveMyAuth(ctx context.Context, auth string) (*user.User, e
 		Workspace(wid).
 		Auths(auths2).
 		Build()
+}
+
+func (r *userRepo) VerifyUser(ctx context.Context, code string) (*user.User, error) {
+	if code == "" {
+		return nil, nil
+	}
+
+	in := VerifyUserInput{
+		Code: graphql.String(code),
+	}
+
+	var m verifyUserMutation
+	vars := map[string]interface{}{
+		"input": in,
+	}
+
+	if err := r.client.Mutate(ctx, &m, vars); err != nil {
+		return nil, gqlerror.ReturnAccountsError(ctx, err)
+	}
+
+	uid, err := user.IDFrom(string(m.VerifyUser.User.ID))
+	if err != nil {
+		log.Errorf("[VerifyUser] failed to convert user id: %s", m.VerifyUser.User.ID)
+		return nil, gqlerror.ReturnAccountsError(ctx, err)
+	}
+
+	wid, err := user.WorkspaceIDFrom(string(m.VerifyUser.User.Workspace))
+	if err != nil {
+		log.Errorf("[VerifyUser] failed to convert workspace id: %s", m.VerifyUser.User.Workspace)
+		return nil, gqlerror.ReturnAccountsError(ctx, err)
+	}
+
+	auths := gqlutil.ToStringSlice(m.VerifyUser.User.Auths)
+	auths2 := make([]user.Auth, len(auths))
+	for i, auth := range auths {
+		auths2[i] = user.AuthFrom(auth)
+	}
+
+	return user.New().
+		ID(uid).
+		Name(string(m.VerifyUser.User.Name)).
+		Email(string(m.VerifyUser.User.Email)).
+		Workspace(wid).
+		Auths(auths2).
+		Metadata(gqlmodel.ToUserMetadata(m.VerifyUser.User.Metadata)).
+		Build()
+}
+
+func (r *userRepo) StartPasswordReset(ctx context.Context, email string) error {
+	if email == "" {
+		return nil
+	}
+
+	in := StartPasswordResetInput{
+		Email: graphql.String(email),
+	}
+
+	var m startPasswordResetMutation
+	vars := map[string]interface{}{
+		"input": in,
+	}
+
+	if err := r.client.Mutate(ctx, &m, vars); err != nil {
+		return gqlerror.ReturnAccountsError(ctx, err)
+	}
+
+	return nil
+}
+
+func (r *userRepo) PasswordReset(ctx context.Context, password string, token string) error {
+	if password == "" || token == "" {
+		return nil
+	}
+
+	in := PasswordResetInput{
+		Password: graphql.String(password),
+		Token:    graphql.String(token),
+	}
+
+	var m passwordResetMutation
+	vars := map[string]interface{}{
+		"input": in,
+	}
+
+	if err := r.client.Mutate(ctx, &m, vars); err != nil {
+		return gqlerror.ReturnAccountsError(ctx, err)
+	}
+
+	return nil
 }
