@@ -92,3 +92,9 @@ type updateUserOfWorkspaceMutation struct {
 		} `graphql:"workspace"`
 	} `graphql:"updateUserOfWorkspace(input: $input)"`
 }
+
+type transferWorkspaceOwnershipMutation struct {
+	TransferWorkspaceOwnership struct {
+		Workspace gqlmodel.Workspace
+	} `graphql:"transferWorkspaceOwnership(input: {workspaceId: $workspaceId, newOwnerId: $newOwnerId})"`
+}
