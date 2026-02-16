@@ -75,3 +75,10 @@ type removeMyAuthMutation struct {
 		Me gqlmodel.Me
 	} `graphql:"removeMyAuth(input: {auth: $auth})"`
 }
+
+type findUsersByIDsWithPaginationQuery struct {
+	FindUsersByIDsWithPagination struct {
+		Users      []gqlmodel.User `graphql:"users"`
+		TotalCount int             `graphql:"totalCount"`
+	} `graphql:"findUsersByIDsWithPagination(userIDs: $userIDs, page: $page, size: $size)"`
+}

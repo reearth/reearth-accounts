@@ -27,17 +27,18 @@ type UpdateMeInput struct {
 }
 
 type Repo interface {
-	FindMe(ctx context.Context) (*user.User, error)
-	FindByID(ctx context.Context, id string) (*user.User, error)
+	CreateVerification(ctx context.Context, email string) (bool, error)
+	DeleteMe(ctx context.Context, userID string) error
 	FindByAlias(ctx context.Context, alias string) (*user.User, error)
+	FindByID(ctx context.Context, id string) (*user.User, error)
 	FindByNameOrEmail(ctx context.Context, nameOrEmail string) (*user.User, error)
+	FindMe(ctx context.Context) (*user.User, error)
+	FindUsersByIDsWithPagination(ctx context.Context, userIDs []string, page int64, size int64) ([]*user.User, int, error)
+	RemoveMyAuth(ctx context.Context, auth string) (*user.User, error)
+	Signup(ctx context.Context, userID, name, email, password, secret, workspaceID string, mockAuth bool) (*user.User, error)
+	SignupOIDC(ctx context.Context, name string, email string, sub string, secret string) (*user.User, error)
 	Update(ctx context.Context, name string) error
 	UpdateMe(ctx context.Context, input UpdateMeInput) (*user.User, error)
-	SignupOIDC(ctx context.Context, name string, email string, sub string, secret string) (*user.User, error)
-	Signup(ctx context.Context, userID, name, email, password, secret, workspaceID string, mockAuth bool) (*user.User, error)
-	CreateVerification(ctx context.Context, email string) (bool, error)
-	RemoveMyAuth(ctx context.Context, auth string) (*user.User, error)
-	DeleteMe(ctx context.Context, userID string) error
 }
 
 func NewRepo(gql *graphql.Client) Repo {
@@ -131,6 +132,50 @@ func (r *userRepo) FindByAlias(ctx context.Context, alias string) (*user.User, e
 		Alias(string(q.User.Alias)).
 		Email(string(q.User.Email)).
 		Build()
+}
+
+func (r *userRepo) FindUsersByIDsWithPagination(ctx context.Context, userIDs []string, page int64, size int64) ([]*user.User, int, error) {
+	var q findUsersByIDsWithPaginationQuery
+	ids := make([]graphql.ID, len(userIDs))
+	for i, id := range userIDs {
+		ids[i] = graphql.ID(id)
+	}
+	vars := map[string]interface{}{
+		"userIDs": ids,
+		"page":    graphql.Int(page),
+		"size":    graphql.Int(size),
+	}
+	if err := r.client.Query(ctx, &q, vars); err != nil {
+		return nil, 0, gqlerror.ReturnAccountsError(ctx, err)
+	}
+
+	users := make([]*user.User, len(q.FindUsersByIDsWithPagination.Users))
+	for i, u := range q.FindUsersByIDsWithPagination.Users {
+		uid, err := user.IDFrom(string(u.ID))
+		if err != nil {
+			log.Errorf("[FindUsersByIDsWithPagination] failed to convert user id: %s", u.ID)
+			return nil, 0, gqlerror.ReturnAccountsError(ctx, err)
+		}
+
+		wid, err := user.WorkspaceIDFrom(string(u.Workspace))
+		if err != nil {
+			log.Errorf("[FindUsersByIDsWithPagination] failed to convert workspace id: %s", u.Workspace)
+			return nil, 0, gqlerror.ReturnAccountsError(ctx, err)
+		}
+
+		users[i], err = user.New().
+			ID(uid).
+			Name(string(u.Name)).
+			Email(string(u.Email)).
+			Workspace(wid).
+			Metadata(gqlmodel.ToUserMetadata(u.Metadata)).
+			Build()
+		if err != nil {
+			return nil, 0, gqlerror.ReturnAccountsError(ctx, err)
+		}
+	}
+
+	return users, q.FindUsersByIDsWithPagination.TotalCount, nil
 }
 
 func (r *userRepo) FindByNameOrEmail(ctx context.Context, nameOrEmail string) (*user.User, error) {

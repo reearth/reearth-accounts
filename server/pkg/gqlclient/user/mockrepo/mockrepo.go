@@ -131,6 +131,22 @@ func (mr *MockRepoMockRecorder) FindMe(ctx any) *gomock.Call {
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "FindMe", reflect.TypeOf((*MockRepo)(nil).FindMe), ctx)
 }
 
+// FindUsersByIDsWithPagination mocks base method.
+func (m *MockRepo) FindUsersByIDsWithPagination(ctx context.Context, userIDs []string, page, size int64) ([]*user0.User, int, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "FindUsersByIDsWithPagination", ctx, userIDs, page, size)
+	ret0, _ := ret[0].([]*user0.User)
+	ret1, _ := ret[1].(int)
+	ret2, _ := ret[2].(error)
+	return ret0, ret1, ret2
+}
+
+// FindUsersByIDsWithPagination indicates an expected call of FindUsersByIDsWithPagination.
+func (mr *MockRepoMockRecorder) FindUsersByIDsWithPagination(ctx, userIDs, page, size any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "FindUsersByIDsWithPagination", reflect.TypeOf((*MockRepo)(nil).FindUsersByIDsWithPagination), ctx, userIDs, page, size)
+}
+
 // RemoveMyAuth mocks base method.
 func (m *MockRepo) RemoveMyAuth(ctx context.Context, auth string) (*user0.User, error) {
 	m.ctrl.T.Helper()
