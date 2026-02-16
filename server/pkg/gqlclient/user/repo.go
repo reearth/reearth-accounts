@@ -32,6 +32,7 @@ type Repo interface {
 	FindByIDs(ctx context.Context, ids []string) ([]*user.User, error)
 	FindByAlias(ctx context.Context, alias string) (*user.User, error)
 	FindByNameOrEmail(ctx context.Context, nameOrEmail string) (*user.User, error)
+	FindUsersByIDsWithPagination(ctx context.Context, id []string, alias string, page, size int64) (user.List, int, error)
 	Update(ctx context.Context, name string) error
 	UpdateMe(ctx context.Context, input UpdateMeInput) (*user.User, error)
 	SignupOIDC(ctx context.Context, name string, email string, sub string, secret string) (*user.User, error)
