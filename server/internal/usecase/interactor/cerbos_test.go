@@ -10,6 +10,7 @@ import (
 	responsev1 "github.com/cerbos/cerbos/api/genpb/cerbos/response/v1"
 	infraCerbos "github.com/reearth/reearth-accounts/server/internal/infrastructure/cerbos"
 	"github.com/reearth/reearth-accounts/server/internal/infrastructure/memory"
+	"github.com/reearth/reearth-accounts/server/internal/rbac"
 	"github.com/reearth/reearth-accounts/server/internal/usecase/gateway/mock_gateway"
 	"github.com/reearth/reearth-accounts/server/internal/usecase/interfaces"
 	"github.com/reearth/reearth-accounts/server/pkg/id"
@@ -244,7 +245,7 @@ func TestCheckPermission_WorkspaceResource(t *testing.T) {
 
 	param := interfaces.CheckPermissionParam{
 		Service:        "service",
-		Resource:       interfaces.ResourceWorkspace,
+		Resource:       rbac.ResourceWorkspace,
 		Action:         "read",
 		WorkspaceAlias: wsAlias,
 	}
@@ -366,7 +367,7 @@ func TestCheckPermission_WorkspaceResource(t *testing.T) {
 	t.Run("Workspace alias empty", func(t *testing.T) {
 		emptyAliasParam := interfaces.CheckPermissionParam{
 			Service:        "service",
-			Resource:       interfaces.ResourceWorkspace,
+			Resource:       rbac.ResourceWorkspace,
 			Action:         "read",
 			WorkspaceAlias: "",
 		}
