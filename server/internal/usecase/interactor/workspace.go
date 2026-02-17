@@ -194,6 +194,8 @@ func (i *Workspace) Update(ctx context.Context, param interfaces.UpdateWorkspace
 				aliasVal = "w-" + param.ID.String()
 			}
 			if aliasVal != ws.Alias() {
+				// When Cerbos is configured, check edit_alias permission separately for finer-grained control.
+				// When Cerbos is not configured, alias editing is allowed by the general edit permission (owner-only) check above.
 				if i.cerbos != nil {
 					result, cErr := i.cerbos.CheckPermission(ctx, *operator.User, interfaces.CheckPermissionParam{
 						Service:        "accounts",
@@ -218,10 +220,6 @@ func (i *Workspace) Update(ctx context.Context, param interfaces.UpdateWorkspace
 
 		// Update metadata fields
 		metadata := ws.Metadata()
-		if metadata == nil {
-			m := workspace.NewMetadata()
-			metadata = &m
-		}
 
 		if param.Description != nil {
 			metadata.SetDescription(*param.Description)
