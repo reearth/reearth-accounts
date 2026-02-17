@@ -81,7 +81,11 @@ type CreateWorkspaceInput struct {
 
 type UpdateWorkspaceInput struct {
 	WorkspaceID string
-	Name        string
+	Name        *string
+	Alias       *string
+	Description *string
+	Website     *string
+	PhotoURL    *string
 }
 
 type WorkspaceMemberInput struct {
@@ -202,8 +206,29 @@ func (r *workspaceRepo) UpdateWorkspace(ctx context.Context, input UpdateWorkspa
 	var m updateWorkspaceMutation
 	vars := map[string]interface{}{
 		"workspaceId": graphql.ID(input.WorkspaceID),
-		"name":        graphql.String(input.Name),
+		"name":        (*graphql.String)(nil),
+		"alias":       (*graphql.String)(nil),
+		"description": (*graphql.String)(nil),
+		"website":     (*graphql.String)(nil),
+		"photoURL":    (*graphql.String)(nil),
 	}
+
+	if input.Name != nil {
+		vars["name"] = graphql.String(*input.Name)
+	}
+	if input.Alias != nil {
+		vars["alias"] = graphql.String(*input.Alias)
+	}
+	if input.Description != nil {
+		vars["description"] = graphql.String(*input.Description)
+	}
+	if input.Website != nil {
+		vars["website"] = graphql.String(*input.Website)
+	}
+	if input.PhotoURL != nil {
+		vars["photoURL"] = graphql.String(*input.PhotoURL)
+	}
+
 	if err := r.client.Mutate(ctx, &m, vars); err != nil {
 		return nil, gqlerror.ReturnAccountsError(ctx, err)
 	}

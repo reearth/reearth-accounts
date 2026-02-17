@@ -9,3 +9,5 @@ bindings:
     type: string
   Lang:
     type: string
+  Upload:
+    type: any

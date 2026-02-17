@@ -8,6 +8,7 @@ import (
 	"slices"
 	"strings"
 
+	"github.com/reearth/reearth-accounts/server/internal/rbac"
 	"github.com/reearth/reearth-accounts/server/internal/usecase/interfaces"
 	"github.com/reearth/reearth-accounts/server/internal/usecase/repo"
 	"github.com/reearth/reearth-accounts/server/pkg/applog"
@@ -29,15 +30,19 @@ type Workspace struct {
 	userquery          interfaces.UserQuery
 	permittableRepo    permittable.Repo
 	roleRepo           role.Repo
+	// TODO: we need to generate policy for accounts
+	// after that we need to check permission on each function
+	cerbos interfaces.Cerbos
 }
 
-func NewWorkspace(r *repo.Container, enforceMemberCount WorkspaceMemberCountEnforcer) interfaces.Workspace {
+func NewWorkspace(r *repo.Container, enforceMemberCount WorkspaceMemberCountEnforcer, cerbos interfaces.Cerbos) interfaces.Workspace {
 	return &Workspace{
 		repos:              r,
 		enforceMemberCount: enforceMemberCount,
 		userquery:          NewUserQuery(r.User, r.Users...),
 		permittableRepo:    r.Permittable,
 		roleRepo:           r.Role,
+		cerbos:             cerbos,
 	}
 }
 
@@ -133,36 +138,80 @@ func (i *Workspace) Create(ctx context.Context, alias, name, description string,
 	})
 }
 
-func (i *Workspace) Update(ctx context.Context, id workspace.ID, name string, alias *string, operator *workspace.Operator) (_ *workspace.Workspace, err error) {
+func (i *Workspace) Update(ctx context.Context, param interfaces.UpdateWorkspaceParam, operator *workspace.Operator) (_ *workspace.Workspace, err error) {
 	if operator.User == nil {
 		return nil, interfaces.ErrInvalidOperator
 	}
 
 	return Run1(ctx, operator, i.repos, Usecase().Transaction(), func(ctx context.Context) (*workspace.Workspace, error) {
-		ws, err := i.repos.Workspace.FindByID(ctx, id)
+		ws, err := i.repos.Workspace.FindByID(ctx, param.ID)
 		if err != nil {
-			return nil, err
+			return nil, applog.ErrorWithCallerLogging(ctx, "failed to find workspace", err)
 		}
 
 		if ws.IsPersonal() {
 			return nil, workspace.ErrCannotModifyPersonalWorkspace
 		}
-		if ws.Members().UserRole(*operator.User) != role.RoleOwner {
-			return nil, interfaces.ErrOperationDenied
+
+		// Check permission via Cerbos or fallback to role-based check
+		var cerbosChecked bool
+		if i.cerbos != nil {
+			result, cErr := i.cerbos.CheckPermission(ctx, *operator.User, interfaces.CheckPermissionParam{
+				Service:        rbac.ServiceName,
+				Resource:       rbac.ResourceWorkspace,
+				Action:         rbac.ActionEdit,
+				WorkspaceAlias: ws.Alias(),
+			})
+			if cErr != nil {
+				return nil, applog.ErrorWithCallerLogging(ctx, "failed to check permission", cErr)
+			}
+			if result != nil {
+				cerbosChecked = true
+				if !result.Allowed {
+					return nil, interfaces.ErrPermissionDenied
+				}
+			}
 		}
 
-		if len(strings.TrimSpace(name)) == 0 {
-			return nil, user.ErrInvalidName
+		if !cerbosChecked {
+			if ws.Members().UserRole(*operator.User) != role.RoleOwner {
+				return nil, interfaces.ErrOperationDenied
+			}
 		}
 
-		ws.Rename(name)
+		// Update name if provided
+		if param.Name != nil {
+			name := strings.TrimSpace(*param.Name)
+			if len(name) == 0 {
+				return nil, user.ErrInvalidName
+			}
+			ws.Rename(name)
+		}
 
-		if alias != nil {
-			aliasVal := strings.TrimSpace(*alias)
+		// Update alias if provided
+		if param.Alias != nil {
+			aliasVal := strings.TrimSpace(*param.Alias)
 			if aliasVal == "" {
-				aliasVal = "w-" + id.String()
+				aliasVal = "w-" + param.ID.String()
 			}
 			if aliasVal != ws.Alias() {
+				// When Cerbos is configured, check edit_alias permission separately for finer-grained control.
+				// When Cerbos is not configured, alias editing is allowed by the general edit permission (owner-only) check above.
+				if i.cerbos != nil {
+					result, cErr := i.cerbos.CheckPermission(ctx, *operator.User, interfaces.CheckPermissionParam{
+						Service:        rbac.ServiceName,
+						Resource:       rbac.ResourceWorkspace,
+						Action:         rbac.ActionEditAlias,
+						WorkspaceAlias: ws.Alias(),
+					})
+					if cErr != nil {
+						return nil, applog.ErrorWithCallerLogging(ctx, "failed to check alias edit permission", cErr)
+					}
+					if result != nil && !result.Allowed {
+						return nil, interfaces.ErrPermissionDenied
+					}
+				}
+
 				if existing, ferr := i.repos.Workspace.FindByAlias(ctx, aliasVal); ferr == nil && existing != nil && existing.ID() != ws.ID() {
 					return nil, interfaces.ErrWorkspaceAliasAlreadyExists
 				}
@@ -170,9 +219,27 @@ func (i *Workspace) Update(ctx context.Context, id workspace.ID, name string, al
 			}
 		}
 
+		// Update metadata fields
+		metadata := ws.Metadata()
+
+		if param.Description != nil {
+			metadata.SetDescription(*param.Description)
+		}
+		if param.Website != nil {
+			metadata.SetWebsite(*param.Website)
+		}
+
+		// Handle photo URL
+		// Note: Store the path, not the signed URL. The signed URL is generated on-demand in ToWorkspace converter.
+		if param.PhotoURL != nil {
+			metadata.SetPhotoURL(*param.PhotoURL)
+		}
+
+		ws.SetMetadata(*metadata)
+
 		err = i.repos.Workspace.Save(ctx, ws)
 		if err != nil {
-			return nil, err
+			return nil, applog.ErrorWithCallerLogging(ctx, "failed to save workspace", err)
 		}
 
 		i.applyDefaultPolicy(ws, operator)

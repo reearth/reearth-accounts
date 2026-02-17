@@ -203,8 +203,20 @@ mutation DeleteWorkspace($input: DeleteWorkspaceInput!) {
     }
 }
 
-mutation UpdateWorkspace($input: UpdateWorkspaceInput!) {
-    updateWorkspace(input: $input) {
+mutation UpdateWorkspace(
+    $workspaceId: ID!,
+    # @genqlient(pointer: true)
+    $name: String,
+    # @genqlient(pointer: true)
+    $alias: String,
+    # @genqlient(pointer: true)
+    $description: String,
+    # @genqlient(pointer: true)
+    $website: String,
+    # @genqlient(pointer: true)
+    $photoURL: String,
+) {
+    updateWorkspace(input: { workspaceId: $workspaceId, name: $name, alias: $alias, description: $description, website: $website, photoURL: $photoURL }) {
         workspace{...FragmentWorkspace}
     }
 }

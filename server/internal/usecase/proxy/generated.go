@@ -3067,21 +3067,6 @@ func (v *UpdateUserOfWorkspaceUpdateUserOfWorkspaceUpdateMemberOfWorkspacePayloa
 	return &retval, nil
 }
 
-type UpdateWorkspaceInput struct {
-	WorkspaceId string `json:"workspaceId"`
-	Name        string `json:"name"`
-	Alias       string `json:"alias"`
-}
-
-// GetWorkspaceId returns UpdateWorkspaceInput.WorkspaceId, and is useful for accessing the field via an interface.
-func (v *UpdateWorkspaceInput) GetWorkspaceId() string { return v.WorkspaceId }
-
-// GetName returns UpdateWorkspaceInput.Name, and is useful for accessing the field via an interface.
-func (v *UpdateWorkspaceInput) GetName() string { return v.Name }
-
-// GetAlias returns UpdateWorkspaceInput.Alias, and is useful for accessing the field via an interface.
-func (v *UpdateWorkspaceInput) GetAlias() string { return v.Alias }
-
 // UpdateWorkspaceResponse is returned by UpdateWorkspace on success.
 type UpdateWorkspaceResponse struct {
 	UpdateWorkspace UpdateWorkspaceUpdateWorkspaceUpdateWorkspacePayload `json:"updateWorkspace"`
@@ -4246,11 +4231,31 @@ func (v *__UpdateUserOfWorkspaceInput) GetInput() UpdateUserOfWorkspaceInput { r
 
 // __UpdateWorkspaceInput is used internally by genqlient
 type __UpdateWorkspaceInput struct {
-	Input UpdateWorkspaceInput `json:"input"`
+	WorkspaceId string  `json:"workspaceId"`
+	Name        *string `json:"name"`
+	Alias       *string `json:"alias"`
+	Description *string `json:"description"`
+	Website     *string `json:"website"`
+	PhotoURL    *string `json:"photoURL"`
 }
 
-// GetInput returns __UpdateWorkspaceInput.Input, and is useful for accessing the field via an interface.
-func (v *__UpdateWorkspaceInput) GetInput() UpdateWorkspaceInput { return v.Input }
+// GetWorkspaceId returns __UpdateWorkspaceInput.WorkspaceId, and is useful for accessing the field via an interface.
+func (v *__UpdateWorkspaceInput) GetWorkspaceId() string { return v.WorkspaceId }
+
+// GetName returns __UpdateWorkspaceInput.Name, and is useful for accessing the field via an interface.
+func (v *__UpdateWorkspaceInput) GetName() *string { return v.Name }
+
+// GetAlias returns __UpdateWorkspaceInput.Alias, and is useful for accessing the field via an interface.
+func (v *__UpdateWorkspaceInput) GetAlias() *string { return v.Alias }
+
+// GetDescription returns __UpdateWorkspaceInput.Description, and is useful for accessing the field via an interface.
+func (v *__UpdateWorkspaceInput) GetDescription() *string { return v.Description }
+
+// GetWebsite returns __UpdateWorkspaceInput.Website, and is useful for accessing the field via an interface.
+func (v *__UpdateWorkspaceInput) GetWebsite() *string { return v.Website }
+
+// GetPhotoURL returns __UpdateWorkspaceInput.PhotoURL, and is useful for accessing the field via an interface.
+func (v *__UpdateWorkspaceInput) GetPhotoURL() *string { return v.PhotoURL }
 
 // __UserByAliasInput is used internally by genqlient
 type __UserByAliasInput struct {
@@ -5617,8 +5622,8 @@ func UpdateUserOfWorkspace(
 
 // The mutation executed by UpdateWorkspace.
 const UpdateWorkspace_Operation = `
-mutation UpdateWorkspace ($input: UpdateWorkspaceInput!) {
-	updateWorkspace(input: $input) {
+mutation UpdateWorkspace ($workspaceId: ID!, $name: String, $alias: String, $description: String, $website: String, $photoURL: String) {
+	updateWorkspace(input: {workspaceId:$workspaceId,name:$name,alias:$alias,description:$description,website:$website,photoURL:$photoURL}) {
 		workspace {
 			... FragmentWorkspace
 		}
@@ -5647,13 +5652,23 @@ fragment FragmentWorkspace on Workspace {
 func UpdateWorkspace(
 	ctx_ context.Context,
 	client_ graphql.Client,
-	input UpdateWorkspaceInput,
+	workspaceId string,
+	name *string,
+	alias *string,
+	description *string,
+	website *string,
+	photoURL *string,
 ) (data_ *UpdateWorkspaceResponse, err_ error) {
 	req_ := &graphql.Request{
 		OpName: "UpdateWorkspace",
 		Query:  UpdateWorkspace_Operation,
 		Variables: &__UpdateWorkspaceInput{
-			Input: input,
+			WorkspaceId: workspaceId,
+			Name:        name,
+			Alias:       alias,
+			Description: description,
+			Website:     website,
+			PhotoURL:    photoURL,
 		},
 	}
 

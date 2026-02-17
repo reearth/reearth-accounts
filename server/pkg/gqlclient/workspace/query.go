@@ -51,7 +51,7 @@ type updateWorkspaceMutation struct {
 			Alias    graphql.String `graphql:"alias"`
 			Personal bool           `graphql:"personal"`
 		} `graphql:"workspace"`
-	} `graphql:"updateWorkspace(input: {workspaceId: $workspaceId, name: $name})"`
+	} `graphql:"updateWorkspace(input: {workspaceId: $workspaceId, name: $name, alias: $alias, description: $description, website: $website, photoURL: $photoURL})"`
 }
 
 type deleteWorkspaceMutation struct {
