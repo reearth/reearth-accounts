@@ -8,6 +8,7 @@ import (
 	"slices"
 	"strings"
 
+	"github.com/reearth/reearth-accounts/server/internal/rbac"
 	"github.com/reearth/reearth-accounts/server/internal/usecase/interfaces"
 	"github.com/reearth/reearth-accounts/server/internal/usecase/repo"
 	"github.com/reearth/reearth-accounts/server/pkg/applog"
@@ -156,9 +157,9 @@ func (i *Workspace) Update(ctx context.Context, param interfaces.UpdateWorkspace
 		var cerbosChecked bool
 		if i.cerbos != nil {
 			result, cErr := i.cerbos.CheckPermission(ctx, *operator.User, interfaces.CheckPermissionParam{
-				Service:        "accounts",
-				Resource:       interfaces.ResourceWorkspace,
-				Action:         "edit",
+				Service:        rbac.ServiceName,
+				Resource:       rbac.ResourceWorkspace,
+				Action:         rbac.ActionEdit,
 				WorkspaceAlias: ws.Alias(),
 			})
 			if cErr != nil {
@@ -198,9 +199,9 @@ func (i *Workspace) Update(ctx context.Context, param interfaces.UpdateWorkspace
 				// When Cerbos is not configured, alias editing is allowed by the general edit permission (owner-only) check above.
 				if i.cerbos != nil {
 					result, cErr := i.cerbos.CheckPermission(ctx, *operator.User, interfaces.CheckPermissionParam{
-						Service:        "accounts",
-						Resource:       interfaces.ResourceWorkspace,
-						Action:         "edit_alias",
+						Service:        rbac.ServiceName,
+						Resource:       rbac.ResourceWorkspace,
+						Action:         rbac.ActionEditAlias,
 						WorkspaceAlias: ws.Alias(),
 					})
 					if cErr != nil {
