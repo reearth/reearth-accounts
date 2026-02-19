@@ -24,9 +24,9 @@ jobs:
       - name: Generate Release Tag
         id: generate_tag
         run: |
-          TIMESTAMP=$(date +%d%m%Y.%H%M)
+          TIMESTAMP=$(date +%d%m%Y.%H%M%S)
           TAG="release-${TIMESTAMP}"
-          PREVIOUS_TAG=$(gh release list --limit 1 --json tagName --jq '.[0].tagName' || echo "")
+          PREVIOUS_TAG=$(gh release list --limit 1 --json tagName --jq '.[0].tagName // empty' || echo "")
           echo "tag=${TAG}" >> $GITHUB_OUTPUT
           echo "previous_tag=${PREVIOUS_TAG}" >> $GITHUB_OUTPUT
           echo "Generated release tag: ${TAG}"

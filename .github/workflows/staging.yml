@@ -20,11 +20,19 @@ jobs:
           GH_APP_USER: ${{ vars.GH_APP_USER }}
         run: |
           git config --global user.name ${GH_APP_USER}
-          git config user.email ${GH_APP_ID}+${GH_APP_USER}[bot]@users.noreply.github.com
+          git config --global user.email ${GH_APP_ID}+${GH_APP_USER}[bot]@users.noreply.github.com
           git config --global pull.rebase false
-      - name: Checkout release branch
-        run: git switch release || git switch -c release
+      - name: Prepare release branch
+        run: |
+          git fetch origin main release || true
+          if git rev-parse --verify origin/release >/dev/null 2>&1; then
+            git checkout release || git checkout -b release origin/release
+          else
+            git checkout -B release origin/main
+          fi
       - name: Merge main branch to release branch
-        run: git merge -X theirs origin/main
+        run: |
+          git fetch origin main
+          git merge -X theirs origin/main
       - name: Git push
         run: git push origin release
