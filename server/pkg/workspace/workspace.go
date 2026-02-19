@@ -1,6 +1,7 @@
 package workspace
 
 import (
+	"fmt"
 	"time"
 
 	"github.com/reearth/reearthx/util"
@@ -92,4 +93,8 @@ func (w *Workspace) DeleteIntegrations(iids IntegrationIDList) error {
 
 func (w *Workspace) UpdatedAt() time.Time {
 	return w.updatedAt
+}
+
+func (w *Workspace) StripeCustomerName() string {
+	return fmt.Sprintf("workspace:%s_%s", w.id, w.alias)
 }
