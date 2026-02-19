@@ -51,9 +51,9 @@ jobs:
           TAG="${{ inputs.new_tag_short != 'blank' && inputs.new_tag_short || '' }}"
           NAME="${{ inputs.name }}"
           SHA="${{ inputs.sha_short }}"
+          PLATFORMS="linux/amd64,linux/arm64"
 
           if [[ -n "$TAG" ]]; then
-            PLATFORMS="linux/amd64,linux/arm64"
             VERSION="$TAG"
             TAGS="$IMAGE_NAME:$TAG"
 
@@ -63,7 +63,6 @@ jobs:
               TAGS+=",${IMAGE_NAME}:latest"
             fi
           else
-            PLATFORMS="linux/amd64"
             VERSION="$SHA"
             TAGS="$IMAGE_NAME:$NAME"
           fi
