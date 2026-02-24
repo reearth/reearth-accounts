@@ -30,7 +30,6 @@ jobs:
             .github/workflows/ci.yml
             .github/workflows/ci_server.yml
             .github/workflows/build_server.yml
-            .github/workflows/deploy_server_dev.yml
             .github/workflows/deploy_server_nightly.yml
 
       - name: Check server output
