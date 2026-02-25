@@ -181,7 +181,7 @@ func identityProviderAuthMiddleware(cfg *ServerConfig) func(http.Handler) http.H
 			}
 
 			if usr == nil {
-				if ai.Sub == "" {
+				if ai.Sub == "" && !cfg.Debug {
 					log.Warnfc(ctx, "[authMiddleware] sub is empty and debug is disabled")
 					http.Error(w, http.StatusText(http.StatusUnauthorized), http.StatusUnauthorized)
 					return
