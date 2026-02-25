@@ -66,6 +66,7 @@ func isBypassed(req *http.Request) bool {
 		"findbyalias(",
 		"createverification(",
 		"authconfig",
+		"findusersbyidswithpagination(",
 	}
 
 	for _, q := range list {
@@ -180,7 +181,7 @@ func identityProviderAuthMiddleware(cfg *ServerConfig) func(http.Handler) http.H
 			}
 
 			if usr == nil {
-				if ai.Sub == "" && !cfg.Debug {
+				if ai.Sub == "" {
 					log.Warnfc(ctx, "[authMiddleware] sub is empty and debug is disabled")
 					http.Error(w, http.StatusText(http.StatusUnauthorized), http.StatusUnauthorized)
 					return
