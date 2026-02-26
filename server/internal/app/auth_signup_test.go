@@ -38,6 +38,51 @@ func TestIsBypassed(t *testing.T) {
 			assert.True(t, result)
 		})
 
+		t.Run("findById query", func(t *testing.T) {
+			body := `{"query":"query { findById(id: \"test\") { id } }"}`
+			req, err := http.NewRequest(http.MethodPost, "/api/graphql", io.NopCloser(bytes.NewBufferString(body)))
+			assert.NoError(t, err)
+
+			result := isBypassed(req)
+			assert.True(t, result)
+		})
+
+		t.Run("findByAlias query", func(t *testing.T) {
+			body := `{"query":"query { findByAlias(alias: \"test\") { id } }"}`
+			req, err := http.NewRequest(http.MethodPost, "/api/graphql", io.NopCloser(bytes.NewBufferString(body)))
+			assert.NoError(t, err)
+
+			result := isBypassed(req)
+			assert.True(t, result)
+		})
+
+		t.Run("createVerification mutation", func(t *testing.T) {
+			body := `{"query":"mutation { createVerification(input: {email: \"test@example.com\"}) { success } }"}`
+			req, err := http.NewRequest(http.MethodPost, "/api/graphql", io.NopCloser(bytes.NewBufferString(body)))
+			assert.NoError(t, err)
+
+			result := isBypassed(req)
+			assert.True(t, result)
+		})
+
+		t.Run("authConfig query", func(t *testing.T) {
+			body := `{"query":"query { authConfig { provider } }"}`
+			req, err := http.NewRequest(http.MethodPost, "/api/graphql", io.NopCloser(bytes.NewBufferString(body)))
+			assert.NoError(t, err)
+
+			result := isBypassed(req)
+			assert.True(t, result)
+		})
+
+		t.Run("findUsersByIdsWithPagination query", func(t *testing.T) {
+			body := `{"query":"query { findUsersByIdsWithPagination(ids: [\"id1\"]) { nodes { id } } }"}`
+			req, err := http.NewRequest(http.MethodPost, "/api/graphql", io.NopCloser(bytes.NewBufferString(body)))
+			assert.NoError(t, err)
+
+			result := isBypassed(req)
+			assert.True(t, result)
+		})
+
 		t.Run("signup mutation with whitespace and newlines", func(t *testing.T) {
 			body := `{"query":"mutation {\n  signup(input: $input) {\n    user { id }\n  }\n}"}`
 			req, err := http.NewRequest(http.MethodPost, "/api/graphql", io.NopCloser(bytes.NewBufferString(body)))
