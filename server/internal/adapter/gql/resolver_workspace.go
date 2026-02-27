@@ -95,7 +95,7 @@ func (r *queryResolver) FindByAlias(ctx context.Context, alias string) (*gqlmode
 	w, err := usecases(ctx).Workspace.FetchByAlias(ctx, alias)
 	if err != nil {
 		log.Errorf("[FindByAlias] failed to fetch workspace: %s, alias: %s", err.Error(), alias)
-		return nil, err
+		return nil, gqlerror.ReturnAccountsError(ctx, err)
 	}
 
 	exists, err := buildExistingUserSetFromWorkspace(ctx, w)

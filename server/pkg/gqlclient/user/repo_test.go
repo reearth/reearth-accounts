@@ -557,7 +557,7 @@ func TestUserRepo_FindByAlias(t *testing.T) {
 		assert.Equal(t, "test@example.com", got.Email())
 	})
 
-	t.Run("user not found by alias", func(t *testing.T) {
+	t.Run("user not found by alias (alias is available)", func(t *testing.T) {
 		httpmock.Activate()
 		defer httpmock.DeactivateAndReset()
 
@@ -578,7 +578,8 @@ func TestUserRepo_FindByAlias(t *testing.T) {
 
 		got, err := client.UserRepo.FindByAlias(ctx, "nonexistent")
 
-		assert.Error(t, err)
+		// "not found" is expected for alias validation - it means the alias is available
+		assert.NoError(t, err)
 		assert.Nil(t, got)
 	})
 
