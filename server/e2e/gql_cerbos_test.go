@@ -23,12 +23,12 @@ func baseSeederOneUserWithSelfRoleNoPermittable(ctx context.Context, r *repo.Con
 		return err
 	}
 
-	auth := user.ReearthSub(uID.String())
+	auth := user.ReearthSub(uId.String())
 	metadata := user.NewMetadata()
 	metadata.LangFrom("ja")
 	metadata.SetTheme(user.ThemeDark)
 
-	u := user.New().ID(uID).
+	u := user.New().ID(uId).
 		Name("e2e").
 		Email("e2e@e2e.com").
 		Auths([]user.Auth{*auth}).
@@ -40,13 +40,13 @@ func baseSeederOneUserWithSelfRoleNoPermittable(ctx context.Context, r *repo.Con
 	}
 	roleOwner := workspace.Member{
 		Role:      role.RoleOwner,
-		InvitedBy: uID,
+		InvitedBy: uId,
 	}
 
 	w := workspace.New().ID(wId).
 		Name("e2e").
 		Members(map[idx.ID[id.User]]workspace.Member{
-			uID: roleOwner,
+			uId: roleOwner,
 		}).
 		Integrations(map[idx.ID[id.Integration]]workspace.Member{
 			iId: roleOwner,
@@ -80,7 +80,7 @@ func checkPermission(e *httpexpect.Expect, service string, resource string, acti
 	res := e.POST("/api/graphql").
 		WithHeader("Origin", "https://example.com").
 		WithHeader("authorization", "Bearer test").
-		WithHeader("X-Reearth-Debug-User", uID.String()).
+		WithHeader("X-Reearth-Debug-User", uId.String()).
 		WithHeader("Content-Type", "application/json").
 		WithJSON(checkPermissionRequestBody).
 		Expect().
@@ -116,7 +116,7 @@ func TestCheckPermission(t *testing.T) {
 
 	// Add role and permittable
 	_, _, roleId1 := addRole(e, "role1")
-	_, _, _ = updatePermittable(e, uID.String(), []string{roleId1})
+	_, _, _ = updatePermittable(e, uId.String(), []string{roleId1})
 
 	// check permission with permittable
 	_, res2 := checkPermission(e, "service", "resource", "read")
