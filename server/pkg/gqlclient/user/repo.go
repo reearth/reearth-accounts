@@ -4,8 +4,6 @@ package user
 
 import (
 	"context"
-	"errors"
-	"strings"
 
 	"github.com/hasura/go-graphql-client"
 	"github.com/labstack/gommon/log"
@@ -13,21 +11,6 @@ import (
 	"github.com/reearth/reearth-accounts/server/pkg/gqlclient/gqlmodel"
 	"github.com/reearth/reearth-accounts/server/pkg/gqlclient/gqlutil"
 	"github.com/reearth/reearth-accounts/server/pkg/user"
-)
-
-var (
-	ErrUserNotFound = func(err error) bool {
-		var gqlErrs graphql.Errors
-		if errors.As(err, &gqlErrs) {
-			for _, gqlErr := range gqlErrs {
-				if strings.Contains(gqlErr.Message, "not found") {
-					return true
-				}
-			}
-		}
-
-		return false
-	}
 )
 
 type userRepo struct {
@@ -196,9 +179,6 @@ func (r *userRepo) FindByAlias(ctx context.Context, alias string) (*user.User, e
 		"alias": graphql.String(alias),
 	}
 	if err := r.client.Query(ctx, &q, vars); err != nil {
-		if ErrUserNotFound(err) {
-			return nil, nil
-		}
 		return nil, gqlerror.ReturnAccountsError(ctx, err)
 	}
 

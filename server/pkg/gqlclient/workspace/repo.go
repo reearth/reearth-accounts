@@ -159,9 +159,6 @@ func (r *workspaceRepo) FindByAlias(ctx context.Context, alias string) (*workspa
 		"alias": graphql.String(alias),
 	}
 	if err := r.client.Query(ctx, &q, vars); err != nil {
-		if ErrWorkspaceNotFound(err) {
-			return nil, nil
-		}
 		return nil, gqlerror.ReturnAccountsError(ctx, err)
 	}
 
