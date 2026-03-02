@@ -17,14 +17,9 @@ import (
 	"github.com/reearth/reearth-accounts/server/internal/usecase/gateway"
 	gatewaymock "github.com/reearth/reearth-accounts/server/internal/usecase/gateway/mock"
 	"github.com/reearth/reearth-accounts/server/internal/usecase/repo"
-	"github.com/reearth/reearth-accounts/server/pkg/user"
 	"github.com/reearth/reearthx/mailer"
 	"github.com/reearth/reearthx/mongox/mongotest"
 	"go.uber.org/mock/gomock"
-)
-
-var (
-	uID = user.NewID()
 )
 
 type Seeder func(ctx context.Context, r *repo.Container) error

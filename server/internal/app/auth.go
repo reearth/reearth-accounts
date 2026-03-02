@@ -176,51 +176,56 @@ func identityProviderAuthMiddleware(cfg *ServerConfig) func(http.Handler) http.H
 				if newCtx, dai := injectDebugAuthInfo(ctx, req); dai != nil {
 					ctx = newCtx
 					ai = *dai
+					log.Debugfc(ctx, "[authMiddleware] Debug auth info injected: sub=%s", ai.Sub)
 				}
 				usr = isDebugUserExists(req, cfg, ctx)
+				if usr != nil {
+					log.Debugfc(ctx, "[authMiddleware] Debug user header loaded: %s (%s)", usr.Name(), usr.ID())
+				}
 			}
 
-			if usr == nil {
-				if ai.Sub == "" && !cfg.Debug {
-					log.Warnfc(ctx, "[authMiddleware] sub is empty and debug is disabled")
-					http.Error(w, http.StatusText(http.StatusUnauthorized), http.StatusUnauthorized)
+			// Guard: Handle empty sub (only if user not already loaded via debug header)
+			if usr == nil && ai.Sub == "" {
+				log.Warnfc(ctx, "[authMiddleware] Rejecting request with empty sub")
+				http.Error(w, http.StatusText(http.StatusUnauthorized), http.StatusUnauthorized)
+				return
+			}
+
+			// Load user by sub if not already loaded via debug header
+			if usr == nil && ai.Sub != "" {
+				existingUsr, err := cfg.Repos.User.FindBySub(ctx, ai.Sub)
+
+				if err != nil {
+					if errors.Is(err, rerror.ErrNotFound) {
+						log.Warnfc(ctx, "[authMiddleware] User not found for sub=%s", ai.Sub)
+						http.Error(w, http.StatusText(http.StatusUnauthorized), http.StatusUnauthorized)
+						return
+					}
+
+					// Unexpected database error
+					log.Errorfc(ctx, "[authMiddleware] Database error finding user by sub=%s: %v", ai.Sub, err)
+					http.Error(w, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
 					return
 				}
 
-				if ai.Sub != "" {
-					existingUsr, err := cfg.Repos.User.FindBySub(ctx, ai.Sub)
-					if err != nil {
-						if errors.Is(err, rerror.ErrNotFound) {
-							// In debug mode, allow requests without an existing user (e.g., for signup)
-							if cfg.Debug {
-								log.Debugfc(ctx, "[authMiddleware] user not found by sub in debug mode, allowing request: %s", ai.Sub)
-							} else {
-								log.Warnfc(ctx, "[authMiddleware] failed to find user by sub: %s, error: %s", ai.Sub, err.Error())
-								http.Error(w, http.StatusText(http.StatusUnauthorized), http.StatusUnauthorized)
-								return
-							}
-						} else {
-							log.Errorfc(ctx, "[authMiddleware] failed to find user by sub: %s, error: %s", ai.Sub, err.Error())
-							http.Error(w, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
-							return
-						}
-					} else {
-						usr = existingUsr
-					}
-				} else {
-					log.Errorfc(ctx, "[authMiddleware] sub is empty")
-				}
+				usr = existingUsr
+				log.Debugfc(ctx, "[authMiddleware] User loaded by sub: %s (%s)", usr.Name(), usr.ID())
 			}
 
 			if usr != nil {
 				ctx = adapter.AttachUser(ctx, usr)
+
 				op, err := generateUserOperator(ctx, cfg, usr)
 				if err != nil {
-					log.Errorfc(ctx, "[authMiddleware] failed to generate user operator: %s, error: %s", usr.ID(), err.Error())
+					log.Errorfc(ctx, "[authMiddleware] Failed to generate operator for user %s: %v", usr.ID(), err)
 					http.Error(w, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
 					return
 				}
+
 				ctx = adapter.AttachOperator(ctx, op)
+				log.Debugfc(ctx, "[authMiddleware] User and operator attached to context: %s", usr.ID())
+			} else {
+				log.Debugfc(ctx, "[authMiddleware] Proceeding without user/operator in context (debug mode)")
 			}
 
 			next.ServeHTTP(w, req.WithContext(ctx))

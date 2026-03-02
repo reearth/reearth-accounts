@@ -79,7 +79,7 @@ func getUsersWithRoles(e *httpexpect.Expect) (GraphQLRequest, *httpexpect.Value)
 	res := e.POST("/api/graphql").
 		WithHeader("Origin", "https://example.com").
 		WithHeader("authorization", "Bearer test").
-		WithHeader("X-Reearth-Debug-User", uID.String()).
+		WithHeader("X-Reearth-Debug-User", uId.String()).
 		WithHeader("Content-Type", "application/json").
 		WithJSON(getUsersWithRolesRequestBody).
 		Expect().
@@ -112,7 +112,7 @@ func updatePermittable(e *httpexpect.Expect, userID string, roleIDs []string) (G
 	res := e.POST("/api/graphql").
 		WithHeader("Origin", "https://example.com").
 		WithHeader("authorization", "Bearer test").
-		WithHeader("X-Reearth-Debug-User", uID.String()).
+		WithHeader("X-Reearth-Debug-User", uId.String()).
 		WithHeader("Content-Type", "application/json").
 		WithJSON(updatePermittableRequestBody).
 		Expect().
@@ -124,34 +124,26 @@ func updatePermittable(e *httpexpect.Expect, userID string, roleIDs []string) (G
 }
 
 func TestPermittableCRUD(t *testing.T) {
-	e, _ := StartServer(t, &app.Config{}, true, nil)
+	// Start with seeded user directly
+	e, _ := StartServer(t, &app.Config{}, true, baseSeederOneUserNoPermittable)
 
-	// Get users and roles check if users are empty
+	// Get users and roles check if users are not empty and roles are empty
 	_, res1 := getUsersWithRoles(e)
 	res1.Object().
 		Value("data").Object().
 		Value("getUsersWithRoles").Object().
-		Value("usersWithRoles").Array().IsEmpty()
-
-	e, _ = StartServer(t, &app.Config{}, true, baseSeederOneUserNoPermittable)
-
-	// Get users and roles check if users are not empty and roles are empty
-	_, res2 := getUsersWithRoles(e)
-	res2.Object().
-		Value("data").Object().
-		Value("getUsersWithRoles").Object().
 		Value("usersWithRoles").Array().NotEmpty()
-	res2.Object().
+	res1.Object().
 		Value("data").Object().
 		Value("getUsersWithRoles").Object().
 		Value("usersWithRoles").Array().Length().IsEqual(1)
-	res2.Object().
+	res1.Object().
 		Value("data").Object().
 		Value("getUsersWithRoles").Object().
 		Value("usersWithRoles").Array().Value(0).Object().
 		Value("user").Object().
 		Value("id").String().IsEqual(uId.String())
-	res2.Object().
+	res1.Object().
 		Value("data").Object().
 		Value("getUsersWithRoles").Object().
 		Value("usersWithRoles").Array().Value(0).Object().
@@ -162,19 +154,19 @@ func TestPermittableCRUD(t *testing.T) {
 	_, _, _ = updatePermittable(e, uId.String(), []string{roleId1})
 
 	// Get users and roles check if the role is present
-	_, res3 := getUsersWithRoles(e)
-	res3.Object().
+	_, res2 := getUsersWithRoles(e)
+	res2.Object().
 		Value("data").Object().
 		Value("getUsersWithRoles").Object().
 		Value("usersWithRoles").Array().Value(0).Object().
 		Value("roles").Array().Length().IsEqual(1)
-	res3.Object().
+	res2.Object().
 		Value("data").Object().
 		Value("getUsersWithRoles").Object().
 		Value("usersWithRoles").Array().Value(0).Object().
 		Value("roles").Array().Value(0).Object().
 		Value("id").String().IsEqual(roleId1)
-	res3.Object().
+	res2.Object().
 		Value("data").Object().
 		Value("getUsersWithRoles").Object().
 		Value("usersWithRoles").Array().Value(0).Object().
@@ -187,13 +179,13 @@ func TestPermittableCRUD(t *testing.T) {
 	_, _, _ = updatePermittable(e, uId.String(), []string{roleId2, roleId3})
 
 	// Get users and roles check if the roles are present
-	_, res4 := getUsersWithRoles(e)
-	res4.Object().
+	_, res3 := getUsersWithRoles(e)
+	res3.Object().
 		Value("data").Object().
 		Value("getUsersWithRoles").Object().
 		Value("usersWithRoles").Array().Value(0).Object().
 		Value("roles").Array().Length().IsEqual(2)
-	res4.Object().
+	res3.Object().
 		Value("data").Object().
 		Value("getUsersWithRoles").Object().
 		Value("usersWithRoles").Array().Value(0).Object().

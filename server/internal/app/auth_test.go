@@ -193,67 +193,6 @@ func TestAuthMiddleware(t *testing.T) {
 		assert.NotNil(t, op.User)
 	})
 
-	t.Run("should allow request in debug mode without AuthInfo", func(t *testing.T) {
-		cfg := &ServerConfig{
-			Config: &Config{
-				Mock_Auth: false,
-			},
-			Debug: true,
-			Repos: memory.New(),
-		}
-		middleware := authMiddleware(cfg)
-
-		nextHandler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			w.WriteHeader(http.StatusOK)
-		})
-
-		req := httptest.NewRequest(http.MethodGet, "/", nil)
-		req = req.WithContext(context.Background())
-		rr := httptest.NewRecorder()
-
-		middleware(nextHandler).ServeHTTP(rr, req)
-
-		assert.Equal(t, http.StatusOK, rr.Code)
-	})
-
-	t.Run("should allow request in debug mode when user not found by sub (for signup)", func(t *testing.T) {
-		ai := appx.AuthInfo{
-			Sub: "auth0|new-user-sub",
-		}
-		ctx := context.WithValue(context.Background(), adapter.AuthInfoKey, ai)
-
-		cfg := &ServerConfig{
-			Config: &Config{
-				Mock_Auth: false,
-			},
-			Debug: true,
-			Repos: memory.New(),
-		}
-		middleware := authMiddleware(cfg)
-
-		var capturedCtx context.Context
-		nextHandler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			capturedCtx = r.Context()
-			w.WriteHeader(http.StatusOK)
-		})
-
-		req := httptest.NewRequest(http.MethodGet, "/", nil)
-		req = req.WithContext(ctx)
-		rr := httptest.NewRecorder()
-
-		middleware(nextHandler).ServeHTTP(rr, req)
-
-		assert.Equal(t, http.StatusOK, rr.Code)
-
-		// User should be nil since they don't exist yet
-		usr := adapter.User(capturedCtx)
-		assert.Nil(t, usr)
-
-		// Operator should also be nil
-		op := adapter.Operator(capturedCtx)
-		assert.Nil(t, op)
-	})
-
 	t.Run("should inject debug auth info from headers", func(t *testing.T) {
 		uid := user.NewID()
 		u := user.New().
@@ -547,6 +486,296 @@ func TestAuthMiddleware_DebugUserHeader(t *testing.T) {
 	usr := adapter.User(capturedCtx)
 	assert.NotNil(t, usr)
 	assert.Equal(t, "debug-user", usr.Name())
+}
+
+func TestAuthMiddleware_DebugUserHeaderWithEmptySub(t *testing.T) {
+	t.Run("should load user from debug header even when sub is empty", func(t *testing.T) {
+		uid := user.NewID()
+		u := user.New().
+			ID(uid).
+			Name("debug-user-no-sub").
+			Email("debugnosub@example.com").
+			MustBuild()
+
+		wid := workspace.NewID()
+		w := workspace.New().
+			ID(wid).
+			Name("debug-workspace").
+			Members(map[id.UserID]workspace.Member{
+				uid: {
+					Role:      role.RoleOwner,
+					InvitedBy: uid,
+				},
+			}).
+			MustBuild()
+
+		repos := memory.New()
+		repos.User = memory.NewUserWith(u)
+		repos.Workspace = memory.NewWorkspaceWith(w)
+
+		cfg := &ServerConfig{
+			Config: &Config{
+				Mock_Auth: false,
+			},
+			Debug: true,
+			Repos: repos,
+		}
+
+		middleware := authMiddleware(cfg)
+
+		var capturedCtx context.Context
+		nextHandler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			capturedCtx = r.Context()
+			w.WriteHeader(http.StatusOK)
+		})
+
+		// Set debug user header but no AuthInfo (empty sub)
+		req := httptest.NewRequest(http.MethodGet, "/", nil)
+		req.Header.Set(debugUserHeader, uid.String())
+		req = req.WithContext(context.Background())
+		rr := httptest.NewRecorder()
+
+		middleware(nextHandler).ServeHTTP(rr, req)
+
+		assert.Equal(t, http.StatusOK, rr.Code)
+		usr := adapter.User(capturedCtx)
+		assert.NotNil(t, usr)
+		assert.Equal(t, "debug-user-no-sub", usr.Name())
+
+		op := adapter.Operator(capturedCtx)
+		assert.NotNil(t, op)
+	})
+}
+
+func TestAuthMiddleware_DebugModeWithExistingUser(t *testing.T) {
+	t.Run("should successfully authenticate existing user in debug mode", func(t *testing.T) {
+		uid := user.NewID()
+		u := user.New().
+			ID(uid).
+			Name("debug-existing-user").
+			Email("debugexisting@example.com").
+			Auths([]user.Auth{{Provider: "auth0", Sub: "auth0|debug-existing-sub"}}).
+			MustBuild()
+
+		wid := workspace.NewID()
+		w := workspace.New().
+			ID(wid).
+			Name("debug-workspace").
+			Members(map[id.UserID]workspace.Member{
+				uid: {
+					Role:      role.RoleOwner,
+					InvitedBy: uid,
+				},
+			}).
+			MustBuild()
+
+		repos := memory.New()
+		repos.User = memory.NewUserWith(u)
+		repos.Workspace = memory.NewWorkspaceWith(w)
+
+		ai := appx.AuthInfo{
+			Sub: "auth0|debug-existing-sub",
+		}
+		ctx := context.WithValue(context.Background(), adapter.AuthInfoKey, ai)
+
+		cfg := &ServerConfig{
+			Config: &Config{
+				Mock_Auth: false,
+			},
+			Debug: true,
+			Repos: repos,
+		}
+		middleware := authMiddleware(cfg)
+
+		var capturedCtx context.Context
+		nextHandler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			capturedCtx = r.Context()
+			w.WriteHeader(http.StatusOK)
+		})
+
+		req := httptest.NewRequest(http.MethodGet, "/", nil)
+		req = req.WithContext(ctx)
+		rr := httptest.NewRecorder()
+
+		middleware(nextHandler).ServeHTTP(rr, req)
+
+		assert.Equal(t, http.StatusOK, rr.Code)
+
+		usr := adapter.User(capturedCtx)
+		assert.NotNil(t, usr)
+		assert.Equal(t, "debug-existing-user", usr.Name())
+
+		op := adapter.Operator(capturedCtx)
+		assert.NotNil(t, op)
+	})
+}
+
+func TestAuthMiddleware_DebugUserHeaderByEmail(t *testing.T) {
+	t.Run("should find user by email via debug header", func(t *testing.T) {
+		uid := user.NewID()
+		u := user.New().
+			ID(uid).
+			Name("email-user").
+			Email("emailuser@example.com").
+			MustBuild()
+
+		wid := workspace.NewID()
+		w := workspace.New().
+			ID(wid).
+			Name("email-workspace").
+			Members(map[id.UserID]workspace.Member{
+				uid: {
+					Role:      role.RoleOwner,
+					InvitedBy: uid,
+				},
+			}).
+			MustBuild()
+
+		repos := memory.New()
+		repos.User = memory.NewUserWith(u)
+		repos.Workspace = memory.NewWorkspaceWith(w)
+
+		cfg := &ServerConfig{
+			Config: &Config{
+				Mock_Auth: false,
+			},
+			Debug: true,
+			Repos: repos,
+		}
+
+		middleware := authMiddleware(cfg)
+
+		var capturedCtx context.Context
+		nextHandler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			capturedCtx = r.Context()
+			w.WriteHeader(http.StatusOK)
+		})
+
+		req := httptest.NewRequest(http.MethodGet, "/", nil)
+		req.Header.Set(debugUserHeader, "emailuser@example.com")
+		rr := httptest.NewRecorder()
+
+		middleware(nextHandler).ServeHTTP(rr, req)
+
+		assert.Equal(t, http.StatusOK, rr.Code)
+		usr := adapter.User(capturedCtx)
+		assert.NotNil(t, usr)
+		assert.Equal(t, "email-user", usr.Name())
+		assert.Equal(t, "emailuser@example.com", usr.Email())
+	})
+}
+
+func TestAuthMiddleware_DebugUserHeaderByName(t *testing.T) {
+	t.Run("should find user by name via debug header", func(t *testing.T) {
+		uid := user.NewID()
+		u := user.New().
+			ID(uid).
+			Name("name-user").
+			Email("nameuser@example.com").
+			MustBuild()
+
+		wid := workspace.NewID()
+		w := workspace.New().
+			ID(wid).
+			Name("name-workspace").
+			Members(map[id.UserID]workspace.Member{
+				uid: {
+					Role:      role.RoleOwner,
+					InvitedBy: uid,
+				},
+			}).
+			MustBuild()
+
+		repos := memory.New()
+		repos.User = memory.NewUserWith(u)
+		repos.Workspace = memory.NewWorkspaceWith(w)
+
+		cfg := &ServerConfig{
+			Config: &Config{
+				Mock_Auth: false,
+			},
+			Debug: true,
+			Repos: repos,
+		}
+
+		middleware := authMiddleware(cfg)
+
+		var capturedCtx context.Context
+		nextHandler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			capturedCtx = r.Context()
+			w.WriteHeader(http.StatusOK)
+		})
+
+		req := httptest.NewRequest(http.MethodGet, "/", nil)
+		req.Header.Set(debugUserHeader, "name-user")
+		rr := httptest.NewRecorder()
+
+		middleware(nextHandler).ServeHTTP(rr, req)
+
+		assert.Equal(t, http.StatusOK, rr.Code)
+		usr := adapter.User(capturedCtx)
+		assert.NotNil(t, usr)
+		assert.Equal(t, "name-user", usr.Name())
+	})
+}
+
+func TestCanUseDebugHeaders(t *testing.T) {
+	t.Run("should allow debug headers when Debug is true", func(t *testing.T) {
+		cfg := &ServerConfig{
+			Config: &Config{
+				Dev: false,
+			},
+			Debug: true,
+		}
+		req := httptest.NewRequest(http.MethodGet, "/", nil)
+
+		result := canUseDebugHeaders(req, cfg)
+
+		assert.True(t, result)
+	})
+
+	t.Run("should allow debug headers when Dev is true", func(t *testing.T) {
+		cfg := &ServerConfig{
+			Config: &Config{
+				Dev: true,
+			},
+			Debug: false,
+		}
+		req := httptest.NewRequest(http.MethodGet, "/", nil)
+
+		result := canUseDebugHeaders(req, cfg)
+
+		assert.True(t, result)
+	})
+
+	t.Run("should allow debug headers with visualizer-api service header", func(t *testing.T) {
+		cfg := &ServerConfig{
+			Config: &Config{
+				Dev: false,
+			},
+			Debug: false,
+		}
+		req := httptest.NewRequest(http.MethodGet, "/", nil)
+		req.Header.Set("X-Internal-Service", "visualizer-api")
+
+		result := canUseDebugHeaders(req, cfg)
+
+		assert.True(t, result)
+	})
+
+	t.Run("should not allow debug headers in production mode", func(t *testing.T) {
+		cfg := &ServerConfig{
+			Config: &Config{
+				Dev: false,
+			},
+			Debug: false,
+		}
+		req := httptest.NewRequest(http.MethodGet, "/", nil)
+
+		result := canUseDebugHeaders(req, cfg)
+
+		assert.False(t, result)
+	})
 }
 
 func TestGenerateUserOperator(t *testing.T) {
