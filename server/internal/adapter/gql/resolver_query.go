@@ -13,6 +13,20 @@ func (r *Resolver) Query() QueryResolver {
 
 type queryResolver struct{ *Resolver }
 
+func (r *queryResolver) MatchPassword(ctx context.Context, password string) (bool, error) {
+	u := getUser(ctx)
+	if u == nil {
+		return false, nil
+	}
+
+	match, err := u.MatchPassword(password)
+	if err != nil {
+		return false, err
+	}
+
+	return match, nil
+}
+
 func (r *queryResolver) Me(ctx context.Context) (*gqlmodel.Me, error) {
 	u := getUser(ctx)
 	if u == nil {

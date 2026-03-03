@@ -104,13 +104,14 @@ input DeleteMeInput {
 }
 
 extend type Query {
-  me: Me
-  user(id: ID!): User
-  userByNameOrEmail(nameOrEmail: String!): User
-  searchUser(keyword: String!): [User!]!
-  findUsersByIDs(ids: [ID!]!): [User!]!
   findUserByAlias(alias: String!): User
   findUsersByIDsWithPagination(ids: [ID!]!, alias: String, pagination: Pagination!): UsersWithPagination!
+  findUsersByIDs(ids: [ID!]!): [User!]!
+  matchPassword(password: String!): Boolean!
+  me: Me
+  searchUser(keyword: String!): [User!]!
+  user(id: ID!): User
+  userByNameOrEmail(nameOrEmail: String!): User
 }
 
 type UserPayload {

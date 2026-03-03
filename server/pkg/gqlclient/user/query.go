@@ -5,6 +5,10 @@ import (
 	"github.com/reearth/reearth-accounts/server/pkg/gqlclient/gqlmodel"
 )
 
+type matchPasswordQuery struct {
+	MatchPassword graphql.Boolean `graphql:"matchPassword(password: $password)"`
+}
+
 type findMeQuery struct {
 	Me gqlmodel.Me `graphql:"me"`
 }
