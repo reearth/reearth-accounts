@@ -107,7 +107,7 @@ func initEcho(ctx context.Context, cfg *ServerConfig) *echo.Echo {
 		cacheControl,
 	)
 
-	api.POST("/graphql", GraphqlAPI(cfg.Config, cfg.Config.Dev), middlewares...)
+	api.POST("/graphql", GraphqlAPI(cfg.Config, cfg.Gateways, cfg.Config.Dev), middlewares...)
 
 	return e
 }

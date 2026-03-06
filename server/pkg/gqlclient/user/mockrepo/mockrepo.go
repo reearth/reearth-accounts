@@ -162,21 +162,6 @@ func (mr *MockRepoMockRecorder) FindUsersByIDsWithPagination(ctx, id, alias, pag
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "FindUsersByIDsWithPagination", reflect.TypeOf((*MockRepo)(nil).FindUsersByIDsWithPagination), ctx, id, alias, page, size)
 }
 
-// MatchPassword mocks base method.
-func (m *MockRepo) MatchPassword(ctx context.Context, password string) (bool, error) {
-	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "MatchPassword", ctx, password)
-	ret0, _ := ret[0].(bool)
-	ret1, _ := ret[1].(error)
-	return ret0, ret1
-}
-
-// MatchPassword indicates an expected call of MatchPassword.
-func (mr *MockRepoMockRecorder) MatchPassword(ctx, password any) *gomock.Call {
-	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "MatchPassword", reflect.TypeOf((*MockRepo)(nil).MatchPassword), ctx, password)
-}
-
 // PasswordReset mocks base method.
 func (m *MockRepo) PasswordReset(ctx context.Context, password, token string) error {
 	m.ctrl.T.Helper()
@@ -189,6 +174,21 @@ func (m *MockRepo) PasswordReset(ctx context.Context, password, token string) er
 func (mr *MockRepoMockRecorder) PasswordReset(ctx, password, token any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "PasswordReset", reflect.TypeOf((*MockRepo)(nil).PasswordReset), ctx, password, token)
+}
+
+// PasswordValidation mocks base method.
+func (m *MockRepo) PasswordValidation(ctx context.Context, password string) (bool, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "PasswordValidation", ctx, password)
+	ret0, _ := ret[0].(bool)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// PasswordValidation indicates an expected call of PasswordValidation.
+func (mr *MockRepoMockRecorder) PasswordValidation(ctx, password any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "PasswordValidation", reflect.TypeOf((*MockRepo)(nil).PasswordValidation), ctx, password)
 }
 
 // RemoveMyAuth mocks base method.

@@ -35,7 +35,7 @@ type Repo interface {
 	FindByNameOrEmail(ctx context.Context, nameOrEmail string) (*user.User, error)
 	FindMe(ctx context.Context) (*user.User, error)
 	FindUsersByIDsWithPagination(ctx context.Context, id []string, alias string, page, size int64) (user.List, int, error)
-	MatchPassword(ctx context.Context, password string) (bool, error)
+	PasswordValidation(ctx context.Context, password string) (bool, error)
 	PasswordReset(ctx context.Context, password string, token string) error
 	RemoveMyAuth(ctx context.Context, auth string) (*user.User, error)
 	Signup(ctx context.Context, userID, name, email, password, secret, workspaceID string, mockAuth bool) (*user.User, error)
@@ -87,8 +87,8 @@ func (r *userRepo) FindMe(ctx context.Context) (*user.User, error) {
 		Build()
 }
 
-func (r *userRepo) MatchPassword(ctx context.Context, password string) (bool, error) {
-	var q matchPasswordQuery
+func (r *userRepo) PasswordValidation(ctx context.Context, password string) (bool, error) {
+	var q passwordValidationQuery
 	vars := map[string]interface{}{
 		"password": graphql.String(password),
 	}
@@ -97,7 +97,7 @@ func (r *userRepo) MatchPassword(ctx context.Context, password string) (bool, er
 		return false, gqlerror.ReturnAccountsError(ctx, err)
 	}
 
-	return bool(q.MatchPassword), nil
+	return bool(q.PasswordValidation), nil
 }
 
 func (r *userRepo) FindByID(ctx context.Context, id string) (*user.User, error) {
