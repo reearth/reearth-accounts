@@ -68,6 +68,11 @@ type WorkspaceRepo interface {
 	DeleteWorkspace(ctx context.Context, workspaceID string) error
 	AddUsersToWorkspace(ctx context.Context, input AddUsersToWorkspaceInput) (*workspace.Workspace, error)
 	RemoveUserFromWorkspace(ctx context.Context, workspaceID, userID string) (*workspace.Workspace, error)
+	RemoveMultipleUsersFromWorkspace(ctx context.Context, workspaceID string, userIDs []string) (*workspace.Workspace, error)
+	AddIntegrationToWorkspace(ctx context.Context, workspaceID, integrationID, role string) (*workspace.Workspace, error)
+	RemoveIntegrationFromWorkspace(ctx context.Context, workspaceID, integrationID string) (*workspace.Workspace, error)
+	RemoveIntegrationsFromWorkspace(ctx context.Context, workspaceID string, integrationIDs []string) (*workspace.Workspace, error)
+	UpdateIntegrationOfWorkspace(ctx context.Context, workspaceID, integrationID, role string) (*workspace.Workspace, error)
 	UpdateUserOfWorkspace(ctx context.Context, input UpdateUserOfWorkspaceInput) (*workspace.Workspace, error)
 	TransferOwnership(ctx context.Context, workspaceID string, newOwnerID string) (*workspace.Workspace, error)
 }
@@ -281,6 +286,83 @@ func (r *workspaceRepo) RemoveUserFromWorkspace(ctx context.Context, workspaceID
 	}
 
 	return toWorkspace(ctx, m.RemoveUserFromWorkspace.Workspace.ID, m.RemoveUserFromWorkspace.Workspace.Name, m.RemoveUserFromWorkspace.Workspace.Alias, m.RemoveUserFromWorkspace.Workspace.Personal)
+}
+
+func (r *workspaceRepo) RemoveMultipleUsersFromWorkspace(ctx context.Context, workspaceID string, userIDs []string) (*workspace.Workspace, error) {
+	gqlUserIDs := make([]graphql.ID, 0, len(userIDs))
+	for _, uid := range userIDs {
+		gqlUserIDs = append(gqlUserIDs, graphql.ID(uid))
+	}
+
+	var m removeMultipleUsersFromWorkspaceMutation
+	vars := map[string]interface{}{
+		"workspaceId": graphql.ID(workspaceID),
+		"userIds":     gqlUserIDs,
+	}
+	if err := r.client.Mutate(ctx, &m, vars); err != nil {
+		return nil, gqlerror.ReturnAccountsError(ctx, err)
+	}
+
+	return toWorkspace(ctx, m.RemoveMultipleUsersFromWorkspace.Workspace.ID, m.RemoveMultipleUsersFromWorkspace.Workspace.Name, m.RemoveMultipleUsersFromWorkspace.Workspace.Alias, m.RemoveMultipleUsersFromWorkspace.Workspace.Personal)
+}
+
+func (r *workspaceRepo) AddIntegrationToWorkspace(ctx context.Context, workspaceID, integrationID, role string) (*workspace.Workspace, error) {
+	var m addIntegrationToWorkspaceMutation
+	vars := map[string]interface{}{
+		"workspaceId":   graphql.ID(workspaceID),
+		"integrationId": graphql.ID(integrationID),
+		"role":          graphql.String(role),
+	}
+	if err := r.client.Mutate(ctx, &m, vars); err != nil {
+		return nil, gqlerror.ReturnAccountsError(ctx, err)
+	}
+
+	return toWorkspace(ctx, m.AddIntegrationToWorkspace.Workspace.ID, m.AddIntegrationToWorkspace.Workspace.Name, m.AddIntegrationToWorkspace.Workspace.Alias, m.AddIntegrationToWorkspace.Workspace.Personal)
+}
+
+func (r *workspaceRepo) RemoveIntegrationFromWorkspace(ctx context.Context, workspaceID, integrationID string) (*workspace.Workspace, error) {
+	var m removeIntegrationFromWorkspaceMutation
+	vars := map[string]interface{}{
+		"workspaceId":   graphql.ID(workspaceID),
+		"integrationId": graphql.ID(integrationID),
+	}
+	if err := r.client.Mutate(ctx, &m, vars); err != nil {
+		return nil, gqlerror.ReturnAccountsError(ctx, err)
+	}
+
+	return toWorkspace(ctx, m.RemoveIntegrationFromWorkspace.Workspace.ID, m.RemoveIntegrationFromWorkspace.Workspace.Name, m.RemoveIntegrationFromWorkspace.Workspace.Alias, m.RemoveIntegrationFromWorkspace.Workspace.Personal)
+}
+
+func (r *workspaceRepo) RemoveIntegrationsFromWorkspace(ctx context.Context, workspaceID string, integrationIDs []string) (*workspace.Workspace, error) {
+	gqlIDs := make([]graphql.ID, 0, len(integrationIDs))
+	for _, iid := range integrationIDs {
+		gqlIDs = append(gqlIDs, graphql.ID(iid))
+	}
+
+	var m removeIntegrationsFromWorkspaceMutation
+	vars := map[string]interface{}{
+		"workspaceId":    graphql.ID(workspaceID),
+		"integrationIds": gqlIDs,
+	}
+	if err := r.client.Mutate(ctx, &m, vars); err != nil {
+		return nil, gqlerror.ReturnAccountsError(ctx, err)
+	}
+
+	return toWorkspace(ctx, m.RemoveIntegrationsFromWorkspace.Workspace.ID, m.RemoveIntegrationsFromWorkspace.Workspace.Name, m.RemoveIntegrationsFromWorkspace.Workspace.Alias, m.RemoveIntegrationsFromWorkspace.Workspace.Personal)
+}
+
+func (r *workspaceRepo) UpdateIntegrationOfWorkspace(ctx context.Context, workspaceID, integrationID, role string) (*workspace.Workspace, error) {
+	var m updateIntegrationOfWorkspaceMutation
+	vars := map[string]interface{}{
+		"workspaceId":   graphql.ID(workspaceID),
+		"integrationId": graphql.ID(integrationID),
+		"role":          graphql.String(role),
+	}
+	if err := r.client.Mutate(ctx, &m, vars); err != nil {
+		return nil, gqlerror.ReturnAccountsError(ctx, err)
+	}
+
+	return toWorkspace(ctx, m.UpdateIntegrationOfWorkspace.Workspace.ID, m.UpdateIntegrationOfWorkspace.Workspace.Name, m.UpdateIntegrationOfWorkspace.Workspace.Alias, m.UpdateIntegrationOfWorkspace.Workspace.Personal)
 }
 
 func (r *workspaceRepo) UpdateUserOfWorkspace(ctx context.Context, input UpdateUserOfWorkspaceInput) (*workspace.Workspace, error) {

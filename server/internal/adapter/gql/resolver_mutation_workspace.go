@@ -164,11 +164,34 @@ func (r *mutationResolver) RemoveUserFromWorkspace(ctx context.Context, input gq
 	return &gqlmodel.RemoveMemberFromWorkspacePayload{Workspace: converted}, nil
 }
 
-// Temporary stub implementation to satisfy gqlgen after migrating GraphQL files from reearthx/account.
-// This resolver was added to avoid compile-time errors.
-// Will be implemented if needed, or removed if unused after migration.
 func (r *mutationResolver) RemoveMultipleUsersFromWorkspace(ctx context.Context, input gqlmodel.RemoveMultipleUsersFromWorkspaceInput) (*gqlmodel.RemoveMultipleMembersFromWorkspacePayload, error) {
-	return nil, nil
+	tid, err := gqlmodel.ToID[id.Workspace](input.WorkspaceID)
+	if err != nil {
+		return nil, err
+	}
+
+	uids, err := gqlmodel.ToIDs[id.User](input.UserIds)
+	if err != nil {
+		return nil, err
+	}
+
+	w, err := usecases(ctx).Workspace.RemoveMultipleUserMembers(ctx, tid, uids, getOperator(ctx))
+	if err != nil {
+		return nil, err
+	}
+
+	exists, err := buildExistingUserSetFromWorkspace(ctx, w)
+	if err != nil {
+		return nil, err
+	}
+
+	converted, err := gqlmodel.ToWorkspace(w, exists, r.Storage)
+	if err != nil {
+		log.Errorf("failed to convert workspace: %s", err.Error())
+		return nil, err
+	}
+
+	return &gqlmodel.RemoveMultipleMembersFromWorkspacePayload{Workspace: converted}, nil
 }
 
 func (r *mutationResolver) RemoveIntegrationFromWorkspace(ctx context.Context, input gqlmodel.RemoveIntegrationFromWorkspaceInput) (*gqlmodel.RemoveMemberFromWorkspacePayload, error) {
@@ -196,11 +219,34 @@ func (r *mutationResolver) RemoveIntegrationFromWorkspace(ctx context.Context, i
 	return &gqlmodel.RemoveMemberFromWorkspacePayload{Workspace: converted}, nil
 }
 
-// Temporary stub implementation to satisfy gqlgen after migrating GraphQL files from reearthx/account.
-// This resolver was added to avoid compile-time errors.
-// Will be implemented if needed, or removed if unused after migration.
 func (r *mutationResolver) RemoveIntegrationsFromWorkspace(ctx context.Context, input gqlmodel.RemoveIntegrationsFromWorkspaceInput) (*gqlmodel.RemoveIntegrationsFromWorkspacePayload, error) {
-	return nil, nil
+	wId, err := gqlmodel.ToID[id.Workspace](input.WorkspaceID)
+	if err != nil {
+		return nil, err
+	}
+
+	iIds, err := gqlmodel.ToIDs[id.Integration](input.IntegrationIds)
+	if err != nil {
+		return nil, err
+	}
+
+	w, err := usecases(ctx).Workspace.RemoveIntegrations(ctx, wId, iIds, getOperator(ctx))
+	if err != nil {
+		return nil, err
+	}
+
+	exists, err := buildExistingUserSetFromWorkspace(ctx, w)
+	if err != nil {
+		return nil, err
+	}
+
+	converted, err := gqlmodel.ToWorkspace(w, exists, r.Storage)
+	if err != nil {
+		log.Errorf("failed to convert workspace: %s", err.Error())
+		return nil, err
+	}
+
+	return &gqlmodel.RemoveIntegrationsFromWorkspacePayload{Workspace: converted}, nil
 }
 
 func (r *mutationResolver) UpdateUserOfWorkspace(ctx context.Context, input gqlmodel.UpdateUserOfWorkspaceInput) (*gqlmodel.UpdateMemberOfWorkspacePayload, error) {

@@ -42,6 +42,21 @@ func (m *MockWorkspaceRepo) EXPECT() *MockWorkspaceRepoMockRecorder {
 	return m.recorder
 }
 
+// AddIntegrationToWorkspace mocks base method.
+func (m *MockWorkspaceRepo) AddIntegrationToWorkspace(ctx context.Context, workspaceID, integrationID, role string) (*workspace0.Workspace, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "AddIntegrationToWorkspace", ctx, workspaceID, integrationID, role)
+	ret0, _ := ret[0].(*workspace0.Workspace)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// AddIntegrationToWorkspace indicates an expected call of AddIntegrationToWorkspace.
+func (mr *MockWorkspaceRepoMockRecorder) AddIntegrationToWorkspace(ctx, workspaceID, integrationID, role any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "AddIntegrationToWorkspace", reflect.TypeOf((*MockWorkspaceRepo)(nil).AddIntegrationToWorkspace), ctx, workspaceID, integrationID, role)
+}
+
 // AddUsersToWorkspace mocks base method.
 func (m *MockWorkspaceRepo) AddUsersToWorkspace(ctx context.Context, input workspace.AddUsersToWorkspaceInput) (*workspace0.Workspace, error) {
 	m.ctrl.T.Helper()
@@ -162,6 +177,51 @@ func (mr *MockWorkspaceRepoMockRecorder) FindByUserWithPagination(ctx, userID, p
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "FindByUserWithPagination", reflect.TypeOf((*MockWorkspaceRepo)(nil).FindByUserWithPagination), ctx, userID, page, size)
 }
 
+// RemoveIntegrationFromWorkspace mocks base method.
+func (m *MockWorkspaceRepo) RemoveIntegrationFromWorkspace(ctx context.Context, workspaceID, integrationID string) (*workspace0.Workspace, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "RemoveIntegrationFromWorkspace", ctx, workspaceID, integrationID)
+	ret0, _ := ret[0].(*workspace0.Workspace)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// RemoveIntegrationFromWorkspace indicates an expected call of RemoveIntegrationFromWorkspace.
+func (mr *MockWorkspaceRepoMockRecorder) RemoveIntegrationFromWorkspace(ctx, workspaceID, integrationID any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "RemoveIntegrationFromWorkspace", reflect.TypeOf((*MockWorkspaceRepo)(nil).RemoveIntegrationFromWorkspace), ctx, workspaceID, integrationID)
+}
+
+// RemoveIntegrationsFromWorkspace mocks base method.
+func (m *MockWorkspaceRepo) RemoveIntegrationsFromWorkspace(ctx context.Context, workspaceID string, integrationIDs []string) (*workspace0.Workspace, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "RemoveIntegrationsFromWorkspace", ctx, workspaceID, integrationIDs)
+	ret0, _ := ret[0].(*workspace0.Workspace)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// RemoveIntegrationsFromWorkspace indicates an expected call of RemoveIntegrationsFromWorkspace.
+func (mr *MockWorkspaceRepoMockRecorder) RemoveIntegrationsFromWorkspace(ctx, workspaceID, integrationIDs any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "RemoveIntegrationsFromWorkspace", reflect.TypeOf((*MockWorkspaceRepo)(nil).RemoveIntegrationsFromWorkspace), ctx, workspaceID, integrationIDs)
+}
+
+// RemoveMultipleUsersFromWorkspace mocks base method.
+func (m *MockWorkspaceRepo) RemoveMultipleUsersFromWorkspace(ctx context.Context, workspaceID string, userIDs []string) (*workspace0.Workspace, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "RemoveMultipleUsersFromWorkspace", ctx, workspaceID, userIDs)
+	ret0, _ := ret[0].(*workspace0.Workspace)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// RemoveMultipleUsersFromWorkspace indicates an expected call of RemoveMultipleUsersFromWorkspace.
+func (mr *MockWorkspaceRepoMockRecorder) RemoveMultipleUsersFromWorkspace(ctx, workspaceID, userIDs any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "RemoveMultipleUsersFromWorkspace", reflect.TypeOf((*MockWorkspaceRepo)(nil).RemoveMultipleUsersFromWorkspace), ctx, workspaceID, userIDs)
+}
+
 // RemoveUserFromWorkspace mocks base method.
 func (m *MockWorkspaceRepo) RemoveUserFromWorkspace(ctx context.Context, workspaceID, userID string) (*workspace0.Workspace, error) {
 	m.ctrl.T.Helper()
@@ -190,6 +250,21 @@ func (m *MockWorkspaceRepo) TransferOwnership(ctx context.Context, workspaceID, 
 func (mr *MockWorkspaceRepoMockRecorder) TransferOwnership(ctx, workspaceID, newOwnerID any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "TransferOwnership", reflect.TypeOf((*MockWorkspaceRepo)(nil).TransferOwnership), ctx, workspaceID, newOwnerID)
+}
+
+// UpdateIntegrationOfWorkspace mocks base method.
+func (m *MockWorkspaceRepo) UpdateIntegrationOfWorkspace(ctx context.Context, workspaceID, integrationID, role string) (*workspace0.Workspace, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "UpdateIntegrationOfWorkspace", ctx, workspaceID, integrationID, role)
+	ret0, _ := ret[0].(*workspace0.Workspace)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// UpdateIntegrationOfWorkspace indicates an expected call of UpdateIntegrationOfWorkspace.
+func (mr *MockWorkspaceRepoMockRecorder) UpdateIntegrationOfWorkspace(ctx, workspaceID, integrationID, role any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "UpdateIntegrationOfWorkspace", reflect.TypeOf((*MockWorkspaceRepo)(nil).UpdateIntegrationOfWorkspace), ctx, workspaceID, integrationID, role)
 }
 
 // UpdateUserOfWorkspace mocks base method.

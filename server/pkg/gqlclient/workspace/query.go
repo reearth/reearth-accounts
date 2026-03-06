@@ -93,6 +93,61 @@ type updateUserOfWorkspaceMutation struct {
 	} `graphql:"updateUserOfWorkspace(input: $input)"`
 }
 
+type addIntegrationToWorkspaceMutation struct {
+	AddIntegrationToWorkspace struct {
+		Workspace struct {
+			ID       graphql.ID     `graphql:"id"`
+			Name     graphql.String `graphql:"name"`
+			Alias    graphql.String `graphql:"alias"`
+			Personal bool           `graphql:"personal"`
+		} `graphql:"workspace"`
+	} `graphql:"addIntegrationToWorkspace(input: {workspaceId: $workspaceId, integrationId: $integrationId, role: $role})"`
+}
+
+type removeIntegrationFromWorkspaceMutation struct {
+	RemoveIntegrationFromWorkspace struct {
+		Workspace struct {
+			ID       graphql.ID     `graphql:"id"`
+			Name     graphql.String `graphql:"name"`
+			Alias    graphql.String `graphql:"alias"`
+			Personal bool           `graphql:"personal"`
+		} `graphql:"workspace"`
+	} `graphql:"removeIntegrationFromWorkspace(input: {workspaceId: $workspaceId, integrationId: $integrationId})"`
+}
+
+type removeIntegrationsFromWorkspaceMutation struct {
+	RemoveIntegrationsFromWorkspace struct {
+		Workspace struct {
+			ID       graphql.ID     `graphql:"id"`
+			Name     graphql.String `graphql:"name"`
+			Alias    graphql.String `graphql:"alias"`
+			Personal bool           `graphql:"personal"`
+		} `graphql:"workspace"`
+	} `graphql:"removeIntegrationsFromWorkspace(input: {workspaceId: $workspaceId, integrationIds: $integrationIds})"`
+}
+
+type updateIntegrationOfWorkspaceMutation struct {
+	UpdateIntegrationOfWorkspace struct {
+		Workspace struct {
+			ID       graphql.ID     `graphql:"id"`
+			Name     graphql.String `graphql:"name"`
+			Alias    graphql.String `graphql:"alias"`
+			Personal bool           `graphql:"personal"`
+		} `graphql:"workspace"`
+	} `graphql:"updateIntegrationOfWorkspace(input: {workspaceId: $workspaceId, integrationId: $integrationId, role: $role})"`
+}
+
+type removeMultipleUsersFromWorkspaceMutation struct {
+	RemoveMultipleUsersFromWorkspace struct {
+		Workspace struct {
+			ID       graphql.ID     `graphql:"id"`
+			Name     graphql.String `graphql:"name"`
+			Alias    graphql.String `graphql:"alias"`
+			Personal bool           `graphql:"personal"`
+		} `graphql:"workspace"`
+	} `graphql:"removeMultipleUsersFromWorkspace(input: {workspaceId: $workspaceId, userIds: $userIds})"`
+}
+
 type transferWorkspaceOwnershipMutation struct {
 	TransferWorkspaceOwnership struct {
 		Workspace gqlmodel.Workspace
