@@ -65,76 +65,93 @@ func GraphqlAPI(conf *Config, dev bool) echo.HandlerFunc {
 		Cache: lru.New[string](30),
 	})
 
-	// Mutation field-level transfer size logging
-	srv.AroundFields(func(ctx context.Context, next graphql.Resolver) (res interface{}, err error) {
-		rc := graphql.GetOperationContext(ctx)
-		fc := graphql.GetFieldContext(ctx)
+	// Mutation transfer size logging (configurable)
+	if conf.GraphQL.MutationTransferLogger {
+		srv.AroundResponses(func(ctx context.Context, next graphql.ResponseHandler) *graphql.Response {
+			rc := graphql.GetOperationContext(ctx)
+			resp := next(ctx)
 
-		res, err = next(ctx)
+			// Only log for mutations
+			if rc.Operation != nil && rc.Operation.Operation == ast.Mutation {
+				operationName := rc.OperationName
+				if operationName == "" {
+					operationName = "anonymous"
+				}
 
-		// Only log for mutation fields (top-level mutation fields)
-		if rc.Operation != nil && rc.Operation.Operation == ast.Mutation && fc.Object == "Mutation" {
-			fieldSize := 0
-			if res != nil {
-				if resJSON, jsonErr := json.Marshal(res); jsonErr == nil {
-					fieldSize = len(resJSON)
+				// Calculate request size
+				requestSize := len(rc.RawQuery)
+				if rc.Variables != nil {
+					varsJSON, err := json.Marshal(rc.Variables)
+					if err != nil {
+						log.Warnf("Mutation transfer: failed to marshal variables for %s: %v", operationName, err)
+					} else {
+						requestSize += len(varsJSON)
+					}
+				}
+
+				// Calculate response size as actual JSON payload size
+				responseSize := 0
+				if resp != nil {
+					respJSON, err := json.Marshal(resp)
+					if err != nil {
+						log.Warnf("Mutation transfer: failed to marshal response for %s: %v", operationName, err)
+					} else {
+						responseSize = len(respJSON)
+					}
+				}
+
+				// Log per-field sizes from response data
+				if resp != nil && resp.Data != nil {
+					var fields map[string]json.RawMessage
+					if err := json.Unmarshal(resp.Data, &fields); err != nil {
+						log.Warnf("Mutation transfer: failed to unmarshal response data for %s: %v", operationName, err)
+					} else {
+						for fieldName, fieldData := range fields {
+							log.Infof("Mutation field: %s response_size=%d bytes", fieldName, len(fieldData))
+						}
+					}
+				}
+
+				log.Infof("Mutation transfer total: operation=%s request_size=%d bytes response_size=%d bytes total=%d bytes",
+					operationName, requestSize, responseSize, requestSize+responseSize)
+			}
+
+			// Dev mode error logging
+			if dev && resp != nil && len(resp.Errors) > 0 {
+				fmt.Printf("\n⚠️ GraphQL Errors:\n")
+				for _, e := range resp.Errors {
+					fmt.Printf("Message: %s\nPath: %v\nExtensions: %+v\n\n", e.Message, e.Path, e.Extensions)
 				}
 			}
 
-			log.Infof("Mutation field: %s response_size=%d bytes", fc.Field.Name, fieldSize)
-		}
+			return resp
+		})
+	} else if dev {
+		// Dev mode error logging only (when mutation transfer logger is disabled)
+		srv.AroundResponses(func(ctx context.Context, next graphql.ResponseHandler) *graphql.Response {
+			resp := next(ctx)
+			if resp != nil && len(resp.Errors) > 0 {
+				fmt.Printf("\n⚠️ GraphQL Errors:\n")
+				for _, e := range resp.Errors {
+					fmt.Printf("Message: %s\nPath: %v\nExtensions: %+v\n\n", e.Message, e.Path, e.Extensions)
+				}
+			}
+			return resp
+		})
+	}
 
-		// Dev mode field logging
-		if dev {
+	// Dev mode field logging
+	if dev {
+		srv.AroundFields(func(ctx context.Context, next graphql.Resolver) (res interface{}, err error) {
+			fc := graphql.GetFieldContext(ctx)
 			fmt.Printf("Resolving %s.%s\n", fc.Object, fc.Field.Name)
+			res, err = next(ctx)
 			if err != nil {
 				fmt.Printf("Error in %s.%s: %v\n", fc.Object, fc.Field.Name, err)
 			}
-		}
-
-		return res, err
-	})
-
-	// Mutation total transfer size logging (always enabled)
-	srv.AroundResponses(func(ctx context.Context, next graphql.ResponseHandler) *graphql.Response {
-		rc := graphql.GetOperationContext(ctx)
-		resp := next(ctx)
-
-		// Only log for mutations
-		if rc.Operation != nil && rc.Operation.Operation == ast.Mutation {
-			operationName := rc.OperationName
-			if operationName == "" {
-				operationName = "anonymous"
-			}
-
-			// Calculate request size
-			requestSize := len(rc.RawQuery)
-			if rc.Variables != nil {
-				if varsJSON, err := json.Marshal(rc.Variables); err == nil {
-					requestSize += len(varsJSON)
-				}
-			}
-
-			// Calculate response size
-			responseSize := 0
-			if resp != nil && resp.Data != nil {
-				responseSize = len(resp.Data)
-			}
-
-			log.Infof("Mutation transfer total: operation=%s request_size=%d bytes response_size=%d bytes total=%d bytes",
-				operationName, requestSize, responseSize, requestSize+responseSize)
-		}
-
-		// Dev mode error logging
-		if dev && resp != nil && len(resp.Errors) > 0 {
-			fmt.Printf("\n⚠️ GraphQL Errors:\n")
-			for _, e := range resp.Errors {
-				fmt.Printf("Message: %s\nPath: %v\nExtensions: %+v\n\n", e.Message, e.Path, e.Extensions)
-			}
-		}
-
-		return resp
-	})
+			return res, err
+		})
+	}
 
 	if dev {
 		srv.Use(extension.Introspection{})
