@@ -87,6 +87,14 @@ type DeleteMePayload struct {
 	UserID ID `json:"userId"`
 }
 
+type DeletePersonalWorkspaceInput struct {
+	WorkspaceID ID `json:"workspaceId"`
+}
+
+type DeletePersonalWorkspacePayload struct {
+	WorkspaceID ID `json:"workspaceId"`
+}
+
 type DeleteWorkspaceInput struct {
 	WorkspaceID ID `json:"workspaceId"`
 }

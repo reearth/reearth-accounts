@@ -60,6 +60,12 @@ type deleteWorkspaceMutation struct {
 	} `graphql:"deleteWorkspace(input: {workspaceId: $workspaceId})"`
 }
 
+type deletePersonalWorkspaceMutation struct {
+	DeletePersonalWorkspace struct {
+		WorkspaceID graphql.ID `graphql:"workspaceId"`
+	} `graphql:"deletePersonalWorkspace(input: {workspaceId: $workspaceId})"`
+}
+
 type addUsersToWorkspaceMutation struct {
 	AddUsersToWorkspace struct {
 		Workspace struct {

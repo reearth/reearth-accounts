@@ -72,6 +72,20 @@ func (mr *MockWorkspaceRepoMockRecorder) CreateWorkspace(ctx, input any) *gomock
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "CreateWorkspace", reflect.TypeOf((*MockWorkspaceRepo)(nil).CreateWorkspace), ctx, input)
 }
 
+// DeletePersonalWorkspace mocks base method.
+func (m *MockWorkspaceRepo) DeletePersonalWorkspace(ctx context.Context, workspaceID string) error {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "DeletePersonalWorkspace", ctx, workspaceID)
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
+// DeletePersonalWorkspace indicates an expected call of DeletePersonalWorkspace.
+func (mr *MockWorkspaceRepoMockRecorder) DeletePersonalWorkspace(ctx, workspaceID any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "DeletePersonalWorkspace", reflect.TypeOf((*MockWorkspaceRepo)(nil).DeletePersonalWorkspace), ctx, workspaceID)
+}
+
 // DeleteWorkspace mocks base method.
 func (m *MockWorkspaceRepo) DeleteWorkspace(ctx context.Context, workspaceID string) error {
 	m.ctrl.T.Helper()
