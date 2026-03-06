@@ -2,6 +2,7 @@ package app
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"time"
 
@@ -64,11 +65,72 @@ func GraphqlAPI(conf *Config, dev bool) echo.HandlerFunc {
 		Cache: lru.New[string](30),
 	})
 
-	if dev {
-		srv.Use(extension.Introspection{})
+	// Mutation transfer size logging (configurable)
+	if conf.GraphQL.MutationTransferLogger {
+		srv.AroundResponses(func(ctx context.Context, next graphql.ResponseHandler) *graphql.Response {
+			rc := graphql.GetOperationContext(ctx)
+			resp := next(ctx)
+
+			// Only log for mutations
+			if rc.Operation != nil && rc.Operation.Operation == ast.Mutation {
+				operationName := rc.OperationName
+				if operationName == "" {
+					operationName = "anonymous"
+				}
+
+				// Calculate request size
+				requestSize := len(rc.RawQuery)
+				if rc.Variables != nil {
+					varsJSON, err := json.Marshal(rc.Variables)
+					if err != nil {
+						log.Warnf("Mutation transfer: failed to marshal variables for %s: %v", operationName, err)
+					} else {
+						requestSize += len(varsJSON)
+					}
+				}
+
+				// Calculate response size as actual JSON payload size
+				responseSize := 0
+				if resp != nil {
+					respJSON, err := json.Marshal(resp)
+					if err != nil {
+						log.Warnf("Mutation transfer: failed to marshal response for %s: %v", operationName, err)
+					} else {
+						responseSize = len(respJSON)
+					}
+				}
+
+				// Log per-field sizes from response data
+				if resp != nil && resp.Data != nil {
+					var fields map[string]json.RawMessage
+					if err := json.Unmarshal(resp.Data, &fields); err != nil {
+						log.Warnf("Mutation transfer: failed to unmarshal response data for %s: %v", operationName, err)
+					} else {
+						for fieldName, fieldData := range fields {
+							log.Infof("Mutation field: %s response_size=%d bytes", fieldName, len(fieldData))
+						}
+					}
+				}
+
+				log.Infof("Mutation transfer total: operation=%s request_size=%d bytes response_size=%d bytes total=%d bytes",
+					operationName, requestSize, responseSize, requestSize+responseSize)
+			}
+
+			// Dev mode error logging
+			if dev && resp != nil && len(resp.Errors) > 0 {
+				fmt.Printf("\n⚠️ GraphQL Errors:\n")
+				for _, e := range resp.Errors {
+					fmt.Printf("Message: %s\nPath: %v\nExtensions: %+v\n\n", e.Message, e.Path, e.Extensions)
+				}
+			}
+
+			return resp
+		})
+	} else if dev {
+		// Dev mode error logging only (when mutation transfer logger is disabled)
 		srv.AroundResponses(func(ctx context.Context, next graphql.ResponseHandler) *graphql.Response {
 			resp := next(ctx)
-			if len(resp.Errors) > 0 {
+			if resp != nil && len(resp.Errors) > 0 {
 				fmt.Printf("\n⚠️ GraphQL Errors:\n")
 				for _, e := range resp.Errors {
 					fmt.Printf("Message: %s\nPath: %v\nExtensions: %+v\n\n", e.Message, e.Path, e.Extensions)
@@ -76,19 +138,27 @@ func GraphqlAPI(conf *Config, dev bool) echo.HandlerFunc {
 			}
 			return resp
 		})
+	}
+
+	// Dev mode field logging
+	if dev {
+		srv.AroundFields(func(ctx context.Context, next graphql.Resolver) (res interface{}, err error) {
+			fc := graphql.GetFieldContext(ctx)
+			fmt.Printf("Resolving %s.%s\n", fc.Object, fc.Field.Name)
+			res, err = next(ctx)
+			if err != nil {
+				fmt.Printf("Error in %s.%s: %v\n", fc.Object, fc.Field.Name, err)
+			}
+			return res, err
+		})
+	}
+
+	if dev {
+		srv.Use(extension.Introspection{})
 		srv.AroundOperations(func(ctx context.Context, next graphql.OperationHandler) graphql.ResponseHandler {
 			rc := graphql.GetOperationContext(ctx)
 			log.Printf("GraphQL Request:\nQuery:\n%s\nVariables: %+v\n", rc.RawQuery, rc.Variables)
 			return next(ctx)
-		})
-		srv.AroundFields(func(ctx context.Context, next graphql.Resolver) (res interface{}, err error) {
-			rc := graphql.GetFieldContext(ctx)
-			fmt.Printf("🧩 Resolving %s.%s\n", rc.Object, rc.Field.Name)
-			res, err = next(ctx)
-			if err != nil {
-				fmt.Printf("❌ Error in %s.%s: %v\n", rc.Object, rc.Field.Name, err)
-			}
-			return res, err
 		})
 	}
 

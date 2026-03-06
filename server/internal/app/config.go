@@ -176,7 +176,8 @@ func ReadConfig(debug bool) (*Config, error) {
 }
 
 type GraphQLConfig struct {
-	ComplexityLimit int `default:"6000"`
+	ComplexityLimit        int  `default:"6000"`
+	MutationTransferLogger bool `envconfig:"REEARTH_ACCOUNTS_GRAPHQL_MUTATION_TRANSFER_LOGGER"`
 }
 
 func (c Config) Print() string {
