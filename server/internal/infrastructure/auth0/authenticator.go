@@ -136,6 +136,33 @@ func (a *Auth0) ResendVerificationEmail(ctx context.Context, userID string) erro
 	return nil
 }
 
+func (a *Auth0) ValidatePassword(ctx context.Context, email, password string) (bool, error) {
+	if a == nil || a.domain == "" {
+		return false, rerror.NewE(i18n.T("auth0 is not set up"))
+	}
+
+	if a.clientID == "" || a.clientSecret == "" {
+		return false, rerror.NewE(i18n.T("auth0 is not set up"))
+	}
+
+	payload := map[string]string{
+		"grant_type":    "password",
+		"username":      email,
+		"password":      password,
+		"client_id":     a.clientID,
+		"client_secret": a.clientSecret,
+		"audience":      urlFromDomain(a.domain) + "api/v2/",
+		"scope":         "openid profile email",
+	}
+
+	r, err := a.exec(http.MethodPost, "oauth/token", a.token, payload)
+	if err != nil {
+		return false, nil
+	}
+
+	return r.Token != "", nil
+}
+
 func (a *Auth0) needsFetchToken() bool {
 	if a == nil {
 		return false

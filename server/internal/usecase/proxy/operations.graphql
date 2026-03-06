@@ -203,6 +203,12 @@ mutation DeleteWorkspace($input: DeleteWorkspaceInput!) {
     }
 }
 
+mutation DeletePersonalWorkspace($input: DeletePersonalWorkspaceInput!) {
+    deletePersonalWorkspace(input: $input) {
+        workspaceId
+    }
+}
+
 mutation UpdateWorkspace(
     $workspaceId: ID!,
     # @genqlient(pointer: true)
