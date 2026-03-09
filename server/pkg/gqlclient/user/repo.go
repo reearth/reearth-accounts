@@ -31,6 +31,7 @@ type Repo interface {
 	FindByID(ctx context.Context, id string) (*user.User, error)
 	FindByIDs(ctx context.Context, ids []string) ([]*user.User, error)
 	FindByAlias(ctx context.Context, alias string) (*user.User, error)
+	FindByNameOrAlias(ctx context.Context, nameOrAlias string) ([]*user.User, error)
 	FindByNameOrEmail(ctx context.Context, nameOrEmail string) (*user.User, error)
 	FindUsersByIDsWithPagination(ctx context.Context, id []string, alias string, page, size int64) (user.List, int, error)
 	Update(ctx context.Context, name string) error
@@ -194,6 +195,55 @@ func (r *userRepo) FindByAlias(ctx context.Context, alias string) (*user.User, e
 		Alias(string(q.User.Alias)).
 		Email(string(q.User.Email)).
 		Build()
+}
+
+func (r *userRepo) FindByNameOrAlias(ctx context.Context, nameOrAlias string) ([]*user.User, error) {
+	var q findByNameOrAliasQuery
+	vars := map[string]interface{}{
+		"nameOrAlias": graphql.String(nameOrAlias),
+	}
+	if err := r.client.Query(ctx, &q, vars); err != nil {
+		return nil, gqlerror.ReturnAccountsError(ctx, err)
+	}
+
+	users := make([]*user.User, 0, len(q.Users))
+	for _, u := range q.Users {
+		uid, err := user.IDFrom(string(u.ID))
+		if err != nil {
+			log.Errorf("[FindByNameOrAlias] failed to convert user id: %s", u.ID)
+			return nil, gqlerror.ReturnAccountsError(ctx, err)
+		}
+
+		wid, err := user.WorkspaceIDFrom(string(u.Workspace))
+		if err != nil {
+			log.Errorf("[FindByNameOrAlias] failed to convert workspace id: %s", u.Workspace)
+			return nil, gqlerror.ReturnAccountsError(ctx, err)
+		}
+
+		auths := gqlutil.ToStringSlice(u.Auths)
+		auths2 := make([]user.Auth, len(auths))
+		for i, auth := range auths {
+			auths2[i] = user.AuthFrom(auth)
+		}
+
+		userObj, err := user.New().
+			ID(uid).
+			Name(string(u.Name)).
+			Alias(string(u.Alias)).
+			Email(string(u.Email)).
+			Workspace(wid).
+			Auths(auths2).
+			Metadata(gqlmodel.ToUserMetadata(u.Metadata)).
+			Build()
+
+		if err != nil {
+			return nil, gqlerror.ReturnAccountsError(ctx, err)
+		}
+
+		users = append(users, userObj)
+	}
+
+	return users, nil
 }
 
 func (r *userRepo) FindByNameOrEmail(ctx context.Context, nameOrEmail string) (*user.User, error) {

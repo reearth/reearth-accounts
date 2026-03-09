@@ -94,6 +94,19 @@ func (c *UserLoader) FetchByAlias(ctx context.Context, alias string) (*gqlmodel.
 	return gqlmodel.ToUser(res), nil
 }
 
+func (c *UserLoader) FetchByNameOrAlias(ctx context.Context, nameOrAlias string) ([]*gqlmodel.User, error) {
+	res, err := c.usecase.FetchByNameOrAlias(ctx, nameOrAlias)
+	if err != nil {
+		return nil, err
+	}
+
+	if len(res) == 0 {
+		return nil, nil
+	}
+
+	return gqlmodel.ToUsers(res), nil
+}
+
 // data loader
 
 type UserDataLoader interface {

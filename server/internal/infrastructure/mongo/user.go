@@ -109,6 +109,16 @@ func (r *User) FindByName(ctx context.Context, name string) (*user.User, error) 
 	return r.findOne(ctx, bson.M{"name": name})
 }
 
+func (r *User) FindByNameOrAlias(ctx context.Context, nameOrAlias string) (user.List, error) {
+	regex := bson.M{"$regex": primitive.Regex{Pattern: regexp.QuoteMeta(nameOrAlias), Options: "i"}}
+	return r.find(ctx, bson.M{
+		"$or": []bson.M{
+			{"name": regex},
+			{"alias": regex},
+		},
+	})
+}
+
 func (r *User) FindByNameOrEmail(ctx context.Context, nameOrEmail string) (*user.User, error) {
 	return r.findOne(ctx, bson.M{
 		"$or": []bson.M{

@@ -107,6 +107,7 @@ extend type Query {
   me: Me
   user(id: ID!): User
   userByNameOrEmail(nameOrEmail: String!): User
+  userByNameOrAlias(nameOrAlias: String!): [User!]!
   searchUser(keyword: String!): [User!]!
   findUsersByIDs(ids: [ID!]!): [User!]!
   findUserByAlias(alias: String!): User

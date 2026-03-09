@@ -86,6 +86,7 @@ type UserQuery interface {
 	FetchByID(context.Context, user.IDList) (user.List, error)
 	FetchByIDsWithPagination(ctx context.Context, ids user.IDList, alias *string, pagination FetchByIDsWithPaginationParam) (FetchByIDsWithPaginationResult, error)
 	FetchBySub(context.Context, string) (*user.User, error)
+	FetchByNameOrAlias(context.Context, string) (user.List, error)
 	FetchByNameOrEmail(context.Context, string) (*user.Simple, error)
 	FetchByAlias(context.Context, string) (*user.User, error)
 	SearchUser(ctx context.Context, keyword string) (user.List, error)
