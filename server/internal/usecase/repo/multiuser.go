@@ -87,6 +87,20 @@ func (u MultiUser) FindByAlias(ctx context.Context, alias string) (*user.User, e
 	})
 }
 
+func (u MultiUser) FindByNameOrAlias(ctx context.Context, nameOrAlias string) (user.List, error) {
+	res := user.List{}
+	for _, r := range u {
+		if r, err := r.FindByNameOrAlias(ctx, nameOrAlias); err != nil {
+			if !errors.Is(err, rerror.ErrNotFound) {
+				return nil, err
+			}
+		} else {
+			res = append(res, r...)
+		}
+	}
+	return res, nil
+}
+
 func (u MultiUser) FindByNameOrEmail(ctx context.Context, nameOrEmail string) (*user.User, error) {
 	return u.findOne(func(r user.Repo) (*user.User, error) {
 		return r.FindByNameOrEmail(ctx, nameOrEmail)

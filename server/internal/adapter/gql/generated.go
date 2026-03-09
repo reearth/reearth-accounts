@@ -317,7 +317,7 @@ type QueryResolver interface {
 	Me(ctx context.Context) (*gqlmodel.Me, error)
 	User(ctx context.Context, id gqlmodel.ID) (*gqlmodel.User, error)
 	UserByNameOrEmail(ctx context.Context, nameOrEmail string) (*gqlmodel.User, error)
-	UserByNameOrAlias(ctx context.Context, nameOrAlias string) (*gqlmodel.User, error)
+	UserByNameOrAlias(ctx context.Context, nameOrAlias string) ([]*gqlmodel.User, error)
 	SearchUser(ctx context.Context, keyword string) ([]*gqlmodel.User, error)
 	FindUsersByIDs(ctx context.Context, ids []gqlmodel.ID) ([]*gqlmodel.User, error)
 	FindUserByAlias(ctx context.Context, alias string) (*gqlmodel.User, error)
@@ -1737,7 +1737,7 @@ extend type Query {
   me: Me
   user(id: ID!): User
   userByNameOrEmail(nameOrEmail: String!): User
-  userByNameOrAlias(nameOrAlias: String!): User
+  userByNameOrAlias(nameOrAlias: String!): [User!]!
   searchUser(keyword: String!): [User!]!
   findUsersByIDs(ids: [ID!]!): [User!]!
   findUserByAlias(alias: String!): User
@@ -4815,9 +4815,9 @@ func (ec *executionContext) _Query_userByNameOrAlias(ctx context.Context, field 
 			return ec.resolvers.Query().UserByNameOrAlias(ctx, fc.Args["nameOrAlias"].(string))
 		},
 		nil,
-		ec.marshalOUser2ᚖgithubᚗcomᚋreearthᚋreearthᚑaccountsᚋserverᚋinternalᚋadapterᚋgqlᚋgqlmodelᚐUser,
+		ec.marshalNUser2ᚕᚖgithubᚗcomᚋreearthᚋreearthᚑaccountsᚋserverᚋinternalᚋadapterᚋgqlᚋgqlmodelᚐUserᚄ,
 		true,
-		false,
+		true,
 	)
 }
 
@@ -10843,13 +10843,16 @@ func (ec *executionContext) _Query(ctx context.Context, sel ast.SelectionSet) gr
 		case "userByNameOrAlias":
 			field := field
 
-			innerFunc := func(ctx context.Context, _ *graphql.FieldSet) (res graphql.Marshaler) {
+			innerFunc := func(ctx context.Context, fs *graphql.FieldSet) (res graphql.Marshaler) {
 				defer func() {
 					if r := recover(); r != nil {
 						ec.Error(ctx, ec.Recover(ctx, r))
 					}
 				}()
 				res = ec._Query_userByNameOrAlias(ctx, field)
+				if res == graphql.Null {
+					atomic.AddUint32(&fs.Invalids, 1)
+				}
 				return res
 			}
 
