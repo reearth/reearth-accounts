@@ -330,10 +330,6 @@ type QueryResolver interface {
 	User(ctx context.Context, id gqlmodel.ID) (*gqlmodel.User, error)
 	UserByNameOrEmail(ctx context.Context, nameOrEmail string) (*gqlmodel.User, error)
 	UserByNameOrAlias(ctx context.Context, nameOrAlias string) ([]*gqlmodel.User, error)
-	SearchUser(ctx context.Context, keyword string) ([]*gqlmodel.User, error)
-	FindUsersByIDs(ctx context.Context, ids []gqlmodel.ID) ([]*gqlmodel.User, error)
-	FindUserByAlias(ctx context.Context, alias string) (*gqlmodel.User, error)
-	FindUsersByIDsWithPagination(ctx context.Context, ids []gqlmodel.ID, alias *string, pagination gqlmodel.Pagination) (*gqlmodel.UsersWithPagination, error)
 	FindByID(ctx context.Context, id gqlmodel.ID) (*gqlmodel.Workspace, error)
 	FindByIDs(ctx context.Context, ids []gqlmodel.ID) ([]*gqlmodel.Workspace, error)
 	FindByName(ctx context.Context, name string) (*gqlmodel.Workspace, error)
@@ -1785,10 +1781,6 @@ extend type Query {
   user(id: ID!): User
   userByNameOrEmail(nameOrEmail: String!): User
   userByNameOrAlias(nameOrAlias: String!): [User!]!
-  searchUser(keyword: String!): [User!]!
-  findUsersByIDs(ids: [ID!]!): [User!]!
-  findUserByAlias(alias: String!): User
-  findUsersByIDsWithPagination(ids: [ID!]!, alias: String, pagination: Pagination!): UsersWithPagination!
 }
 
 type UserPayload {
@@ -5044,67 +5036,6 @@ func (ec *executionContext) fieldContext_Query_passwordValidation(ctx context.Co
 	return fc, nil
 }
 
-func (ec *executionContext) _Query_userByNameOrAlias(ctx context.Context, field graphql.CollectedField) (ret graphql.Marshaler) {
-	return graphql.ResolveField(
-		ctx,
-		ec.OperationContext,
-		field,
-		ec.fieldContext_Query_userByNameOrAlias,
-		func(ctx context.Context) (any, error) {
-			fc := graphql.GetFieldContext(ctx)
-			return ec.resolvers.Query().UserByNameOrAlias(ctx, fc.Args["nameOrAlias"].(string))
-		},
-		nil,
-		ec.marshalNUser2ᚕᚖgithubᚗcomᚋreearthᚋreearthᚑaccountsᚋserverᚋinternalᚋadapterᚋgqlᚋgqlmodelᚐUserᚄ,
-		true,
-		true,
-	)
-}
-
-func (ec *executionContext) fieldContext_Query_userByNameOrAlias(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
-	fc = &graphql.FieldContext{
-		Object:     "Query",
-		Field:      field,
-		IsMethod:   true,
-		IsResolver: true,
-		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
-			switch field.Name {
-			case "id":
-				return ec.fieldContext_User_id(ctx, field)
-			case "name":
-				return ec.fieldContext_User_name(ctx, field)
-			case "alias":
-				return ec.fieldContext_User_alias(ctx, field)
-			case "email":
-				return ec.fieldContext_User_email(ctx, field)
-			case "host":
-				return ec.fieldContext_User_host(ctx, field)
-			case "workspace":
-				return ec.fieldContext_User_workspace(ctx, field)
-			case "auths":
-				return ec.fieldContext_User_auths(ctx, field)
-			case "metadata":
-				return ec.fieldContext_User_metadata(ctx, field)
-			case "verification":
-				return ec.fieldContext_User_verification(ctx, field)
-			}
-			return nil, fmt.Errorf("no field named %q was found under type User", field.Name)
-		},
-	}
-	defer func() {
-		if r := recover(); r != nil {
-			err = ec.Recover(ctx, r)
-			ec.Error(ctx, err)
-		}
-	}()
-	ctx = graphql.WithFieldContext(ctx, fc)
-	if fc.Args, err = ec.field_Query_userByNameOrAlias_args(ctx, field.ArgumentMap(ec.Variables)); err != nil {
-		ec.Error(ctx, err)
-		return fc, err
-	}
-	return fc, nil
-}
-
 func (ec *executionContext) _Query_searchUser(ctx context.Context, field graphql.CollectedField) (ret graphql.Marshaler) {
 	return graphql.ResolveField(
 		ctx,
@@ -5282,6 +5213,67 @@ func (ec *executionContext) fieldContext_Query_userByNameOrEmail(ctx context.Con
 	}()
 	ctx = graphql.WithFieldContext(ctx, fc)
 	if fc.Args, err = ec.field_Query_userByNameOrEmail_args(ctx, field.ArgumentMap(ec.Variables)); err != nil {
+		ec.Error(ctx, err)
+		return fc, err
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _Query_userByNameOrAlias(ctx context.Context, field graphql.CollectedField) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		ec.fieldContext_Query_userByNameOrAlias,
+		func(ctx context.Context) (any, error) {
+			fc := graphql.GetFieldContext(ctx)
+			return ec.resolvers.Query().UserByNameOrAlias(ctx, fc.Args["nameOrAlias"].(string))
+		},
+		nil,
+		ec.marshalNUser2ᚕᚖgithubᚗcomᚋreearthᚋreearthᚑaccountsᚋserverᚋinternalᚋadapterᚋgqlᚋgqlmodelᚐUserᚄ,
+		true,
+		true,
+	)
+}
+
+func (ec *executionContext) fieldContext_Query_userByNameOrAlias(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "Query",
+		Field:      field,
+		IsMethod:   true,
+		IsResolver: true,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			switch field.Name {
+			case "id":
+				return ec.fieldContext_User_id(ctx, field)
+			case "name":
+				return ec.fieldContext_User_name(ctx, field)
+			case "alias":
+				return ec.fieldContext_User_alias(ctx, field)
+			case "email":
+				return ec.fieldContext_User_email(ctx, field)
+			case "host":
+				return ec.fieldContext_User_host(ctx, field)
+			case "workspace":
+				return ec.fieldContext_User_workspace(ctx, field)
+			case "auths":
+				return ec.fieldContext_User_auths(ctx, field)
+			case "metadata":
+				return ec.fieldContext_User_metadata(ctx, field)
+			case "verification":
+				return ec.fieldContext_User_verification(ctx, field)
+			}
+			return nil, fmt.Errorf("no field named %q was found under type User", field.Name)
+		},
+	}
+	defer func() {
+		if r := recover(); r != nil {
+			err = ec.Recover(ctx, r)
+			ec.Error(ctx, err)
+		}
+	}()
+	ctx = graphql.WithFieldContext(ctx, fc)
+	if fc.Args, err = ec.field_Query_userByNameOrAlias_args(ctx, field.ArgumentMap(ec.Variables)); err != nil {
 		ec.Error(ctx, err)
 		return fc, err
 	}
@@ -11128,28 +11120,6 @@ func (ec *executionContext) _Query(ctx context.Context, sel ast.SelectionSet) gr
 			}
 
 			out.Concurrently(i, func(ctx context.Context) graphql.Marshaler { return rrm(innerCtx) })
-		case "userByNameOrAlias":
-			field := field
-
-			innerFunc := func(ctx context.Context, fs *graphql.FieldSet) (res graphql.Marshaler) {
-				defer func() {
-					if r := recover(); r != nil {
-						ec.Error(ctx, ec.Recover(ctx, r))
-					}
-				}()
-				res = ec._Query_userByNameOrAlias(ctx, field)
-				if res == graphql.Null {
-					atomic.AddUint32(&fs.Invalids, 1)
-				}
-				return res
-			}
-
-			rrm := func(ctx context.Context) graphql.Marshaler {
-				return ec.OperationContext.RootResolverMiddleware(ctx,
-					func(ctx context.Context) graphql.Marshaler { return innerFunc(ctx, out) })
-			}
-
-			out.Concurrently(i, func(ctx context.Context) graphql.Marshaler { return rrm(innerCtx) })
 		case "passwordValidation":
 			field := field
 
@@ -11223,6 +11193,28 @@ func (ec *executionContext) _Query(ctx context.Context, sel ast.SelectionSet) gr
 					}
 				}()
 				res = ec._Query_userByNameOrEmail(ctx, field)
+				return res
+			}
+
+			rrm := func(ctx context.Context) graphql.Marshaler {
+				return ec.OperationContext.RootResolverMiddleware(ctx,
+					func(ctx context.Context) graphql.Marshaler { return innerFunc(ctx, out) })
+			}
+
+			out.Concurrently(i, func(ctx context.Context) graphql.Marshaler { return rrm(innerCtx) })
+		case "userByNameOrAlias":
+			field := field
+
+			innerFunc := func(ctx context.Context, fs *graphql.FieldSet) (res graphql.Marshaler) {
+				defer func() {
+					if r := recover(); r != nil {
+						ec.Error(ctx, ec.Recover(ctx, r))
+					}
+				}()
+				res = ec._Query_userByNameOrAlias(ctx, field)
+				if res == graphql.Null {
+					atomic.AddUint32(&fs.Invalids, 1)
+				}
 				return res
 			}
 
