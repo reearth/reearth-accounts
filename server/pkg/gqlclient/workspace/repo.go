@@ -66,6 +66,7 @@ type WorkspaceRepo interface {
 	CreateWorkspace(ctx context.Context, input CreateWorkspaceInput) (*workspace.Workspace, error)
 	UpdateWorkspace(ctx context.Context, input UpdateWorkspaceInput) (*workspace.Workspace, error)
 	DeleteWorkspace(ctx context.Context, workspaceID string) error
+	DeletePersonalWorkspace(ctx context.Context, workspaceID string) error
 	AddUsersToWorkspace(ctx context.Context, input AddUsersToWorkspaceInput) (*workspace.Workspace, error)
 	RemoveUserFromWorkspace(ctx context.Context, workspaceID, userID string) (*workspace.Workspace, error)
 	UpdateUserOfWorkspace(ctx context.Context, input UpdateUserOfWorkspaceInput) (*workspace.Workspace, error)
@@ -238,6 +239,18 @@ func (r *workspaceRepo) UpdateWorkspace(ctx context.Context, input UpdateWorkspa
 
 func (r *workspaceRepo) DeleteWorkspace(ctx context.Context, workspaceID string) error {
 	var m deleteWorkspaceMutation
+	vars := map[string]interface{}{
+		"workspaceId": graphql.ID(workspaceID),
+	}
+	if err := r.client.Mutate(ctx, &m, vars); err != nil {
+		return gqlerror.ReturnAccountsError(ctx, err)
+	}
+
+	return nil
+}
+
+func (r *workspaceRepo) DeletePersonalWorkspace(ctx context.Context, workspaceID string) error {
+	var m deletePersonalWorkspaceMutation
 	vars := map[string]interface{}{
 		"workspaceId": graphql.ID(workspaceID),
 	}

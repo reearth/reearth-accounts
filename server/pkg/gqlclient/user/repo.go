@@ -27,24 +27,25 @@ type UpdateMeInput struct {
 }
 
 type Repo interface {
-	FindMe(ctx context.Context) (*user.User, error)
+	CreateVerification(ctx context.Context, email string) (bool, error)
+	DeleteMe(ctx context.Context, userID string) error
+	FindByAlias(ctx context.Context, alias string) (*user.User, error)
 	FindByID(ctx context.Context, id string) (*user.User, error)
 	FindByIDs(ctx context.Context, ids []string) ([]*user.User, error)
-	FindByAlias(ctx context.Context, alias string) (*user.User, error)
 	FindByNameOrAlias(ctx context.Context, nameOrAlias string) ([]*user.User, error)
 	FindByNameOrEmail(ctx context.Context, nameOrEmail string) (*user.User, error)
+	FindMe(ctx context.Context) (*user.User, error)
 	FindUsersByIDsWithPagination(ctx context.Context, id []string, alias string, page, size int64) (user.List, int, error)
-	Update(ctx context.Context, name string) error
-	UpdateMe(ctx context.Context, input UpdateMeInput) (*user.User, error)
-	SignupOIDC(ctx context.Context, name string, email string, sub string, secret string) (*user.User, error)
+	PasswordValidation(ctx context.Context, password string) (bool, error)
+	PasswordReset(ctx context.Context, password string, token string) error
+	RemoveMyAuth(ctx context.Context, auth string) (*user.User, error)
 	Signup(ctx context.Context, userID, name, email, password, secret, workspaceID string, mockAuth bool) (*user.User, error)
 	SignupNoID(ctx context.Context, name, email, password, secret string, mockAuth bool) (*user.User, error)
-	CreateVerification(ctx context.Context, email string) (bool, error)
-	RemoveMyAuth(ctx context.Context, auth string) (*user.User, error)
-	DeleteMe(ctx context.Context, userID string) error
-	VerifyUser(ctx context.Context, code string) (*user.User, error)
+	SignupOIDC(ctx context.Context, name string, email string, sub string, secret string) (*user.User, error)
 	StartPasswordReset(ctx context.Context, email string) error
-	PasswordReset(ctx context.Context, password string, token string) error
+	Update(ctx context.Context, name string) error
+	UpdateMe(ctx context.Context, input UpdateMeInput) (*user.User, error)
+	VerifyUser(ctx context.Context, code string) (*user.User, error)
 }
 
 func NewRepo(gql *graphql.Client) Repo {
@@ -85,6 +86,19 @@ func (r *userRepo) FindMe(ctx context.Context) (*user.User, error) {
 		Workspace(wid).
 		Auths(auths2).
 		Build()
+}
+
+func (r *userRepo) PasswordValidation(ctx context.Context, password string) (bool, error) {
+	var q passwordValidationQuery
+	vars := map[string]interface{}{
+		"password": graphql.String(password),
+	}
+
+	if err := r.client.Query(ctx, &q, vars); err != nil {
+		return false, gqlerror.ReturnAccountsError(ctx, err)
+	}
+
+	return bool(q.PasswordValidation), nil
 }
 
 func (r *userRepo) FindByID(ctx context.Context, id string) (*user.User, error) {

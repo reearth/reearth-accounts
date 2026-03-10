@@ -13,6 +13,15 @@ func (r *Resolver) Query() QueryResolver {
 
 type queryResolver struct{ *Resolver }
 
+func (r *queryResolver) PasswordValidation(ctx context.Context, password string) (bool, error) {
+	u := getUser(ctx)
+	if u == nil {
+		return false, nil
+	}
+
+	return r.Authenticator.ValidatePassword(ctx, u.Email(), password)
+}
+
 func (r *queryResolver) Me(ctx context.Context) (*gqlmodel.Me, error) {
 	u := getUser(ctx)
 	if u == nil {
