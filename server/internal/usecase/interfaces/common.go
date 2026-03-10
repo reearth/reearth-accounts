@@ -8,7 +8,7 @@ import (
 var (
 	ErrOperationDenied error = rerror.NewE(i18n.T("operation denied"))
 	ErrInvalidOperator error = rerror.NewE(i18n.T("invalid operator"))
-	ErrInvalidPhotoURL error = rerror.NewE(i18n.T("invalid photo URL: full URLs are not allowed, use path only"))
+	ErrInvalidPhotoURL error = rerror.NewE(i18n.T("invalid photo URL"))
 )
 
 type Container struct {

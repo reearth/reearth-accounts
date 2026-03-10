@@ -400,6 +400,82 @@ func TestWorkspace_Update(t *testing.T) {
 			assert.ErrorIs(t, err, rerror.ErrNotFound)
 			assert.Nil(t, result)
 		})
+
+		t.Run("reject full URL in photoURL", func(t *testing.T) {
+			db := memory.New()
+			seedRoles(db)
+
+			ownerID := id.NewUserID()
+			wsID := id.NewWorkspaceID()
+			ws := workspace.New().
+				ID(wsID).
+				Name("Test").
+				Alias("test-alias").
+				Members(map[user.ID]workspace.Member{
+					ownerID: {Role: role.RoleOwner},
+				}).
+				Personal(false).
+				MustBuild()
+			assert.NoError(t, db.Workspace.Save(ctx, ws))
+
+			workspaceUC := NewWorkspace(db, nil, nil)
+
+			// Test https URL
+			result, err := workspaceUC.Update(ctx, interfaces.UpdateWorkspaceParam{
+				ID:       wsID,
+				PhotoURL: lo.ToPtr("https://example.com/photo.webp"),
+			}, &workspace.Operator{
+				User:             lo.ToPtr(ownerID),
+				OwningWorkspaces: []workspace.ID{wsID},
+			})
+			assert.ErrorIs(t, err, interfaces.ErrInvalidPhotoURL)
+			assert.Nil(t, result)
+
+			// Test http URL
+			result, err = workspaceUC.Update(ctx, interfaces.UpdateWorkspaceParam{
+				ID:       wsID,
+				PhotoURL: lo.ToPtr("http://example.com/photo.webp"),
+			}, &workspace.Operator{
+				User:             lo.ToPtr(ownerID),
+				OwningWorkspaces: []workspace.ID{wsID},
+			})
+			assert.ErrorIs(t, err, interfaces.ErrInvalidPhotoURL)
+			assert.Nil(t, result)
+
+			// Test case-insensitive (HTTPS)
+			result, err = workspaceUC.Update(ctx, interfaces.UpdateWorkspaceParam{
+				ID:       wsID,
+				PhotoURL: lo.ToPtr("HTTPS://example.com/photo.webp"),
+			}, &workspace.Operator{
+				User:             lo.ToPtr(ownerID),
+				OwningWorkspaces: []workspace.ID{wsID},
+			})
+			assert.ErrorIs(t, err, interfaces.ErrInvalidPhotoURL)
+			assert.Nil(t, result)
+
+			// Test with leading whitespace
+			result, err = workspaceUC.Update(ctx, interfaces.UpdateWorkspaceParam{
+				ID:       wsID,
+				PhotoURL: lo.ToPtr("  https://example.com/photo.webp"),
+			}, &workspace.Operator{
+				User:             lo.ToPtr(ownerID),
+				OwningWorkspaces: []workspace.ID{wsID},
+			})
+			assert.ErrorIs(t, err, interfaces.ErrInvalidPhotoURL)
+			assert.Nil(t, result)
+
+			// Valid path should succeed
+			result, err = workspaceUC.Update(ctx, interfaces.UpdateWorkspaceParam{
+				ID:       wsID,
+				PhotoURL: lo.ToPtr("workspaces/test/photo.webp"),
+			}, &workspace.Operator{
+				User:             lo.ToPtr(ownerID),
+				OwningWorkspaces: []workspace.ID{wsID},
+			})
+			assert.NoError(t, err)
+			assert.NotNil(t, result)
+			assert.Equal(t, "workspaces/test/photo.webp", result.Metadata().PhotoURL())
+		})
 	})
 }
 
