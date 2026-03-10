@@ -116,6 +116,21 @@ func (mr *MockRepoMockRecorder) FindByIDs(ctx, ids any) *gomock.Call {
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "FindByIDs", reflect.TypeOf((*MockRepo)(nil).FindByIDs), ctx, ids)
 }
 
+// FindByNameOrAlias mocks base method.
+func (m *MockRepo) FindByNameOrAlias(ctx context.Context, nameOrAlias string) ([]*user0.User, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "FindByNameOrAlias", ctx, nameOrAlias)
+	ret0, _ := ret[0].([]*user0.User)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// FindByNameOrAlias indicates an expected call of FindByNameOrAlias.
+func (mr *MockRepoMockRecorder) FindByNameOrAlias(ctx, nameOrAlias any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "FindByNameOrAlias", reflect.TypeOf((*MockRepo)(nil).FindByNameOrAlias), ctx, nameOrAlias)
+}
+
 // FindByNameOrEmail mocks base method.
 func (m *MockRepo) FindByNameOrEmail(ctx context.Context, nameOrEmail string) (*user0.User, error) {
 	m.ctrl.T.Helper()

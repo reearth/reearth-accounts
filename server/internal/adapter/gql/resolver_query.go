@@ -101,6 +101,14 @@ func (r *queryResolver) UserByNameOrEmail(ctx context.Context, nameOrEmail strin
 	return res, nil
 }
 
+func (r *queryResolver) UserByNameOrAlias(ctx context.Context, nameOrAlias string) ([]*gqlmodel.User, error) {
+	res, err := loaders(ctx).User.FetchByNameOrAlias(ctx, nameOrAlias)
+	if err != nil {
+		return nil, err
+	}
+	return res, nil
+}
+
 // Temporary stub implementation to satisfy gqlgen after migrating GraphQL files from reearthx/account.
 // This resolver was added to avoid compile-time errors.
 // Will be implemented if needed, or removed if unused after migration.

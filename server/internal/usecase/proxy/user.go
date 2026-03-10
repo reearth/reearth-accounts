@@ -146,6 +146,10 @@ func (u *User) FetchByAlias(ctx context.Context, alias string) (*user.User, erro
 	return FragmentToUser(res.FindUserByAlias.FragmentUser)
 }
 
+func (u *User) FetchByNameOrAlias(ctx context.Context, nameOrAlias string) (user.List, error) {
+	panic("unsupported")
+}
+
 func (u *User) DeleteMe(ctx context.Context, id user.ID, op *workspace.Operator) error {
 	_, err := DeleteMe(ctx, u.gql, DeleteMeInput{UserId: id.String()})
 	if err != nil {

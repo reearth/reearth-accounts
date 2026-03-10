@@ -112,6 +112,7 @@ extend type Query {
   searchUser(keyword: String!): [User!]!
   user(id: ID!): User
   userByNameOrEmail(nameOrEmail: String!): User
+  userByNameOrAlias(nameOrAlias: String!): [User!]!
 }
 
 type UserPayload {

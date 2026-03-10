@@ -44,6 +44,10 @@ type findByAliasQuery struct {
 	} `graphql:"findUserByAlias(alias: $alias)"`
 }
 
+type findByNameOrAliasQuery struct {
+	Users []gqlmodel.User `graphql:"userByNameOrAlias(nameOrAlias: $nameOrAlias)"`
+}
+
 type FindUsersByIDsWithPaginationQuery struct {
 	FindUsersByIDsWithPagination struct {
 		Users      []gqlmodel.User `graphql:"users"`

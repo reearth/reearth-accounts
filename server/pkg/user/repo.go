@@ -29,6 +29,7 @@ type Query interface {
 	FindByIDs(context.Context, IDList) (List, error)
 	FindByIDsWithPagination(context.Context, IDList, *string, *usecasex.Pagination) (List, *usecasex.PageInfo, error)
 	FindByName(context.Context, string) (*User, error)
+	FindByNameOrAlias(context.Context, string) (List, error)
 	FindByNameOrEmail(context.Context, string) (*User, error)
 	FindBySub(context.Context, string) (*User, error)
 	SearchByKeyword(context.Context, string) (List, error)
