@@ -434,33 +434,6 @@ type DeleteMeResponse struct {
 // GetDeleteMe returns DeleteMeResponse.DeleteMe, and is useful for accessing the field via an interface.
 func (v *DeleteMeResponse) GetDeleteMe() DeleteMeDeleteMeDeleteMePayload { return v.DeleteMe }
 
-// DeletePersonalWorkspaceDeletePersonalWorkspaceDeletePersonalWorkspacePayload includes the requested fields of the GraphQL type DeletePersonalWorkspacePayload.
-type DeletePersonalWorkspaceDeletePersonalWorkspaceDeletePersonalWorkspacePayload struct {
-	WorkspaceId string `json:"workspaceId"`
-}
-
-// GetWorkspaceId returns DeletePersonalWorkspaceDeletePersonalWorkspaceDeletePersonalWorkspacePayload.WorkspaceId, and is useful for accessing the field via an interface.
-func (v *DeletePersonalWorkspaceDeletePersonalWorkspaceDeletePersonalWorkspacePayload) GetWorkspaceId() string {
-	return v.WorkspaceId
-}
-
-type DeletePersonalWorkspaceInput struct {
-	WorkspaceId string `json:"workspaceId"`
-}
-
-// GetWorkspaceId returns DeletePersonalWorkspaceInput.WorkspaceId, and is useful for accessing the field via an interface.
-func (v *DeletePersonalWorkspaceInput) GetWorkspaceId() string { return v.WorkspaceId }
-
-// DeletePersonalWorkspaceResponse is returned by DeletePersonalWorkspace on success.
-type DeletePersonalWorkspaceResponse struct {
-	DeletePersonalWorkspace DeletePersonalWorkspaceDeletePersonalWorkspaceDeletePersonalWorkspacePayload `json:"deletePersonalWorkspace"`
-}
-
-// GetDeletePersonalWorkspace returns DeletePersonalWorkspaceResponse.DeletePersonalWorkspace, and is useful for accessing the field via an interface.
-func (v *DeletePersonalWorkspaceResponse) GetDeletePersonalWorkspace() DeletePersonalWorkspaceDeletePersonalWorkspaceDeletePersonalWorkspacePayload {
-	return v.DeletePersonalWorkspace
-}
-
 // DeleteWorkspaceDeleteWorkspaceDeleteWorkspacePayload includes the requested fields of the GraphQL type DeleteWorkspacePayload.
 type DeleteWorkspaceDeleteWorkspaceDeleteWorkspacePayload struct {
 	WorkspaceId string `json:"workspaceId"`
@@ -4070,14 +4043,6 @@ type __DeleteMeInput struct {
 // GetInput returns __DeleteMeInput.Input, and is useful for accessing the field via an interface.
 func (v *__DeleteMeInput) GetInput() DeleteMeInput { return v.Input }
 
-// __DeletePersonalWorkspaceInput is used internally by genqlient
-type __DeletePersonalWorkspaceInput struct {
-	Input DeletePersonalWorkspaceInput `json:"input"`
-}
-
-// GetInput returns __DeletePersonalWorkspaceInput.Input, and is useful for accessing the field via an interface.
-func (v *__DeletePersonalWorkspaceInput) GetInput() DeletePersonalWorkspaceInput { return v.Input }
-
 // __DeleteWorkspaceInput is used internally by genqlient
 type __DeleteWorkspaceInput struct {
 	Input DeleteWorkspaceInput `json:"input"`
@@ -4549,40 +4514,6 @@ func DeleteMe(
 	}
 
 	data_ = &DeleteMeResponse{}
-	resp_ := &graphql.Response{Data: data_}
-
-	err_ = client_.MakeRequest(
-		ctx_,
-		req_,
-		resp_,
-	)
-
-	return data_, err_
-}
-
-// The mutation executed by DeletePersonalWorkspace.
-const DeletePersonalWorkspace_Operation = `
-mutation DeletePersonalWorkspace ($input: DeletePersonalWorkspaceInput!) {
-	deletePersonalWorkspace(input: $input) {
-		workspaceId
-	}
-}
-`
-
-func DeletePersonalWorkspace(
-	ctx_ context.Context,
-	client_ graphql.Client,
-	input DeletePersonalWorkspaceInput,
-) (data_ *DeletePersonalWorkspaceResponse, err_ error) {
-	req_ := &graphql.Request{
-		OpName: "DeletePersonalWorkspace",
-		Query:  DeletePersonalWorkspace_Operation,
-		Variables: &__DeletePersonalWorkspaceInput{
-			Input: input,
-		},
-	}
-
-	data_ = &DeletePersonalWorkspaceResponse{}
 	resp_ := &graphql.Response{Data: data_}
 
 	err_ = client_.MakeRequest(

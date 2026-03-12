@@ -528,36 +528,6 @@ func (i *Workspace) Remove(ctx context.Context, id workspace.ID, operator *works
 	})
 }
 
-func (i *Workspace) RemovePersonal(ctx context.Context, id workspace.ID, operator *workspace.Operator) error {
-	if operator.User == nil {
-		return interfaces.ErrInvalidOperator
-	}
-
-	return Run0(ctx, operator, i.repos, Usecase().Transaction().WithOwnableWorkspaces(id), func(ctx context.Context) error {
-		ws, err := i.repos.Workspace.FindByID(ctx, id)
-		if err != nil {
-			return err
-		}
-
-		if !ws.IsPersonal() {
-			return workspace.ErrCannotDeleteTeamWorkspace
-		}
-
-		for uId := range ws.Members().Users() {
-			if err := i.removePermittable(ctx, uId, id); err != nil {
-				return err
-			}
-		}
-
-		err = i.repos.Workspace.Remove(ctx, id)
-		if err != nil {
-			return err
-		}
-
-		return nil
-	})
-}
-
 func (i *Workspace) TransferOwnership(ctx context.Context, workspaceID workspace.ID, newOwnerID workspace.UserID, operator *workspace.Operator) (*workspace.Workspace, error) {
 	if operator.User == nil {
 		return nil, interfaces.ErrInvalidOperator

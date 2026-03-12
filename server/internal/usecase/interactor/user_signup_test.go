@@ -392,28 +392,16 @@ type mockAuthenticator struct {
 	resendVerificationEmailCalled bool
 	resendVerificationEmailUserID string
 	resendVerificationEmailError  error
-	validatePasswordCalled        bool
-	validatePasswordEmail         string
-	validatePasswordPassword      string
-	validatePasswordResult        bool
-	validatePasswordError         error
-}
-
-func (m *mockAuthenticator) ResendVerificationEmail(ctx context.Context, userID string) error {
-	m.resendVerificationEmailCalled = true
-	m.resendVerificationEmailUserID = userID
-	return m.resendVerificationEmailError
 }
 
 func (m *mockAuthenticator) UpdateUser(ctx context.Context, p gateway.AuthenticatorUpdateUserParam) (gateway.AuthenticatorUser, error) {
 	return gateway.AuthenticatorUser{}, nil
 }
 
-func (m *mockAuthenticator) ValidatePassword(ctx context.Context, email, password string) (bool, error) {
-	m.validatePasswordCalled = true
-	m.validatePasswordEmail = email
-	m.validatePasswordPassword = password
-	return m.validatePasswordResult, m.validatePasswordError
+func (m *mockAuthenticator) ResendVerificationEmail(ctx context.Context, userID string) error {
+	m.resendVerificationEmailCalled = true
+	m.resendVerificationEmailUserID = userID
+	return m.resendVerificationEmailError
 }
 
 func TestUser_CreateVerification(t *testing.T) {

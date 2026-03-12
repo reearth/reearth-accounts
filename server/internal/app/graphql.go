@@ -10,13 +10,13 @@ import (
 	"github.com/99designs/gqlgen/graphql/handler/extension"
 	"github.com/99designs/gqlgen/graphql/handler/lru"
 	"github.com/99designs/gqlgen/graphql/handler/transport"
-	"github.com/labstack/echo/v4"
-	"github.com/ravilushqa/otelgqlgen"
 	"github.com/reearth/reearth-accounts/server/internal/adapter"
 	"github.com/reearth/reearth-accounts/server/internal/adapter/gql"
 	"github.com/reearth/reearth-accounts/server/internal/infrastructure/storage"
-	"github.com/reearth/reearth-accounts/server/internal/usecase/gateway"
 	"github.com/reearth/reearthx/log"
+
+	"github.com/labstack/echo/v4"
+	"github.com/ravilushqa/otelgqlgen"
 	"github.com/vektah/gqlparser/v2/ast"
 	"github.com/vektah/gqlparser/v2/gqlerror"
 )
@@ -27,7 +27,7 @@ const (
 	maxMemorySize     = 100 * 1024 * 1024       // 100MB
 )
 
-func GraphqlAPI(conf *Config, gateways *gateway.Container, dev bool) echo.HandlerFunc {
+func GraphqlAPI(conf *Config, dev bool) echo.HandlerFunc {
 	str, err := storage.NewGCPStorage(&storage.Config{
 		IsLocal:          conf.StorageIsLocal,
 		BucketName:       conf.StorageBucketName,
@@ -39,7 +39,7 @@ func GraphqlAPI(conf *Config, gateways *gateway.Container, dev bool) echo.Handle
 	}
 
 	schema := gql.NewExecutableSchema(gql.Config{
-		Resolvers: gql.NewResolver(str, gateways.Authenticator),
+		Resolvers: gql.NewResolver(str),
 	})
 
 	srv := handler.New(schema)

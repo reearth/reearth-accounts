@@ -17,7 +17,6 @@ type AuthenticatorUser struct {
 }
 
 type Authenticator interface {
-	ResendVerificationEmail(ctx context.Context, userID string) error
 	UpdateUser(context.Context, AuthenticatorUpdateUserParam) (AuthenticatorUser, error)
-	ValidatePassword(ctx context.Context, email, password string) (bool, error)
+	ResendVerificationEmail(ctx context.Context, userID string) error
 }

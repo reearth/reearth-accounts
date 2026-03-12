@@ -5,10 +5,6 @@ import (
 	"github.com/reearth/reearth-accounts/server/pkg/gqlclient/gqlmodel"
 )
 
-type passwordValidationQuery struct {
-	PasswordValidation graphql.Boolean `graphql:"passwordValidation(password: $password)"`
-}
-
 type findMeQuery struct {
 	Me gqlmodel.Me `graphql:"me"`
 }

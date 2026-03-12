@@ -75,10 +75,6 @@ type ComplexityRoot struct {
 		UserID func(childComplexity int) int
 	}
 
-	DeletePersonalWorkspacePayload struct {
-		WorkspaceID func(childComplexity int) int
-	}
-
 	DeleteWorkspacePayload struct {
 		WorkspaceID func(childComplexity int) int
 	}
@@ -106,7 +102,6 @@ type ComplexityRoot struct {
 		CreateVerification               func(childComplexity int, input gqlmodel.CreateVerificationInput) int
 		CreateWorkspace                  func(childComplexity int, input gqlmodel.CreateWorkspaceInput) int
 		DeleteMe                         func(childComplexity int, input gqlmodel.DeleteMeInput) int
-		DeletePersonalWorkspace          func(childComplexity int, input gqlmodel.DeletePersonalWorkspaceInput) int
 		DeleteWorkspace                  func(childComplexity int, input gqlmodel.DeleteWorkspaceInput) int
 		FindOrCreate                     func(childComplexity int, input gqlmodel.FindOrCreateInput) int
 		PasswordReset                    func(childComplexity int, input gqlmodel.PasswordResetInput) int
@@ -151,7 +146,6 @@ type ComplexityRoot struct {
 		Me                           func(childComplexity int) int
 		Node                         func(childComplexity int, id gqlmodel.ID, typeArg gqlmodel.NodeType) int
 		Nodes                        func(childComplexity int, id []gqlmodel.ID, typeArg gqlmodel.NodeType) int
-		PasswordValidation           func(childComplexity int, password string) int
 		Roles                        func(childComplexity int) int
 		SearchUser                   func(childComplexity int, keyword string) int
 		User                         func(childComplexity int, id gqlmodel.ID) int
@@ -302,7 +296,6 @@ type MutationResolver interface {
 	PasswordReset(ctx context.Context, input gqlmodel.PasswordResetInput) (*bool, error)
 	CreateWorkspace(ctx context.Context, input gqlmodel.CreateWorkspaceInput) (*gqlmodel.CreateWorkspacePayload, error)
 	DeleteWorkspace(ctx context.Context, input gqlmodel.DeleteWorkspaceInput) (*gqlmodel.DeleteWorkspacePayload, error)
-	DeletePersonalWorkspace(ctx context.Context, input gqlmodel.DeletePersonalWorkspaceInput) (*gqlmodel.DeletePersonalWorkspacePayload, error)
 	UpdateWorkspace(ctx context.Context, input gqlmodel.UpdateWorkspaceInput) (*gqlmodel.UpdateWorkspacePayload, error)
 	AddUsersToWorkspace(ctx context.Context, input gqlmodel.AddUsersToWorkspaceInput) (*gqlmodel.AddUsersToWorkspacePayload, error)
 	AddIntegrationToWorkspace(ctx context.Context, input gqlmodel.AddIntegrationToWorkspaceInput) (*gqlmodel.AddUsersToWorkspacePayload, error)
@@ -325,7 +318,6 @@ type QueryResolver interface {
 	FindUsersByIDsWithPagination(ctx context.Context, ids []gqlmodel.ID, alias *string, pagination gqlmodel.Pagination) (*gqlmodel.UsersWithPagination, error)
 	FindUsersByIDs(ctx context.Context, ids []gqlmodel.ID) ([]*gqlmodel.User, error)
 	Me(ctx context.Context) (*gqlmodel.Me, error)
-	PasswordValidation(ctx context.Context, password string) (bool, error)
 	SearchUser(ctx context.Context, keyword string) ([]*gqlmodel.User, error)
 	User(ctx context.Context, id gqlmodel.ID) (*gqlmodel.User, error)
 	UserByNameOrEmail(ctx context.Context, nameOrEmail string) (*gqlmodel.User, error)
@@ -419,13 +411,6 @@ func (e *executableSchema) Complexity(ctx context.Context, typeName, field strin
 		}
 
 		return e.complexity.DeleteMePayload.UserID(childComplexity), true
-
-	case "DeletePersonalWorkspacePayload.workspaceId":
-		if e.complexity.DeletePersonalWorkspacePayload.WorkspaceID == nil {
-			break
-		}
-
-		return e.complexity.DeletePersonalWorkspacePayload.WorkspaceID(childComplexity), true
 
 	case "DeleteWorkspacePayload.workspaceId":
 		if e.complexity.DeleteWorkspacePayload.WorkspaceID == nil {
@@ -562,17 +547,6 @@ func (e *executableSchema) Complexity(ctx context.Context, typeName, field strin
 		}
 
 		return e.complexity.Mutation.DeleteMe(childComplexity, args["input"].(gqlmodel.DeleteMeInput)), true
-	case "Mutation.deletePersonalWorkspace":
-		if e.complexity.Mutation.DeletePersonalWorkspace == nil {
-			break
-		}
-
-		args, err := ec.field_Mutation_deletePersonalWorkspace_args(ctx, rawArgs)
-		if err != nil {
-			return 0, false
-		}
-
-		return e.complexity.Mutation.DeletePersonalWorkspace(childComplexity, args["input"].(gqlmodel.DeletePersonalWorkspaceInput)), true
 	case "Mutation.deleteWorkspace":
 		if e.complexity.Mutation.DeleteWorkspace == nil {
 			break
@@ -963,17 +937,6 @@ func (e *executableSchema) Complexity(ctx context.Context, typeName, field strin
 		}
 
 		return e.complexity.Query.Nodes(childComplexity, args["id"].([]gqlmodel.ID), args["type"].(gqlmodel.NodeType)), true
-	case "Query.passwordValidation":
-		if e.complexity.Query.PasswordValidation == nil {
-			break
-		}
-
-		args, err := ec.field_Query_passwordValidation_args(ctx, rawArgs)
-		if err != nil {
-			return 0, false
-		}
-
-		return e.complexity.Query.PasswordValidation(childComplexity, args["password"].(string)), true
 	case "Query.roles":
 		if e.complexity.Query.Roles == nil {
 			break
@@ -1398,7 +1361,6 @@ func (e *executableSchema) Exec(ctx context.Context) graphql.ResponseHandler {
 		ec.unmarshalInputCreateVerificationInput,
 		ec.unmarshalInputCreateWorkspaceInput,
 		ec.unmarshalInputDeleteMeInput,
-		ec.unmarshalInputDeletePersonalWorkspaceInput,
 		ec.unmarshalInputDeleteWorkspaceInput,
 		ec.unmarshalInputFindOrCreateInput,
 		ec.unmarshalInputMemberInput,
@@ -1776,7 +1738,6 @@ extend type Query {
   findUsersByIDsWithPagination(ids: [ID!]!, alias: String, pagination: Pagination!): UsersWithPagination!
   findUsersByIDs(ids: [ID!]!): [User!]!
   me: Me
-  passwordValidation(password: String!): Boolean!
   searchUser(keyword: String!): [User!]!
   user(id: ID!): User
   userByNameOrEmail(nameOrEmail: String!): User
@@ -1930,10 +1891,6 @@ input DeleteWorkspaceInput {
     workspaceId: ID!
 }
 
-input DeletePersonalWorkspaceInput {
-    workspaceId: ID!
-}
-
 input TransferWorkspaceOwnershipInput {
     workspaceId: ID!
     newOwnerId: ID!
@@ -1973,10 +1930,6 @@ type DeleteWorkspacePayload {
     workspaceId: ID!
 }
 
-type DeletePersonalWorkspacePayload {
-    workspaceId: ID!
-}
-
 extend type Query {
     findByID(id: ID!): Workspace!
     findByIDs(ids: [ID!]!): [Workspace!]!
@@ -1989,7 +1942,6 @@ extend type Query {
 extend type Mutation {
     createWorkspace(input: CreateWorkspaceInput!): CreateWorkspacePayload
     deleteWorkspace(input: DeleteWorkspaceInput!): DeleteWorkspacePayload
-    deletePersonalWorkspace(input: DeletePersonalWorkspaceInput!): DeletePersonalWorkspacePayload
     updateWorkspace(input: UpdateWorkspaceInput!): UpdateWorkspacePayload
     addUsersToWorkspace(input: AddUsersToWorkspaceInput!): AddUsersToWorkspacePayload
     addIntegrationToWorkspace(input: AddIntegrationToWorkspaceInput!): AddUsersToWorkspacePayload
@@ -2067,17 +2019,6 @@ func (ec *executionContext) field_Mutation_deleteMe_args(ctx context.Context, ra
 	var err error
 	args := map[string]any{}
 	arg0, err := graphql.ProcessArgField(ctx, rawArgs, "input", ec.unmarshalNDeleteMeInput2githubᚗcomᚋreearthᚋreearthᚑaccountsᚋserverᚋinternalᚋadapterᚋgqlᚋgqlmodelᚐDeleteMeInput)
-	if err != nil {
-		return nil, err
-	}
-	args["input"] = arg0
-	return args, nil
-}
-
-func (ec *executionContext) field_Mutation_deletePersonalWorkspace_args(ctx context.Context, rawArgs map[string]any) (map[string]any, error) {
-	var err error
-	args := map[string]any{}
-	arg0, err := graphql.ProcessArgField(ctx, rawArgs, "input", ec.unmarshalNDeletePersonalWorkspaceInput2githubᚗcomᚋreearthᚋreearthᚑaccountsᚋserverᚋinternalᚋadapterᚋgqlᚋgqlmodelᚐDeletePersonalWorkspaceInput)
 	if err != nil {
 		return nil, err
 	}
@@ -2473,17 +2414,6 @@ func (ec *executionContext) field_Query_nodes_args(ctx context.Context, rawArgs 
 	return args, nil
 }
 
-func (ec *executionContext) field_Query_passwordValidation_args(ctx context.Context, rawArgs map[string]any) (map[string]any, error) {
-	var err error
-	args := map[string]any{}
-	arg0, err := graphql.ProcessArgField(ctx, rawArgs, "password", ec.unmarshalNString2string)
-	if err != nil {
-		return nil, err
-	}
-	args["password"] = arg0
-	return args, nil
-}
-
 func (ec *executionContext) field_Query_searchUser_args(ctx context.Context, rawArgs map[string]any) (map[string]any, error) {
 	var err error
 	args := map[string]any{}
@@ -2865,35 +2795,6 @@ func (ec *executionContext) _DeleteMePayload_userId(ctx context.Context, field g
 func (ec *executionContext) fieldContext_DeleteMePayload_userId(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
 	fc = &graphql.FieldContext{
 		Object:     "DeleteMePayload",
-		Field:      field,
-		IsMethod:   false,
-		IsResolver: false,
-		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
-			return nil, errors.New("field of type ID does not have child fields")
-		},
-	}
-	return fc, nil
-}
-
-func (ec *executionContext) _DeletePersonalWorkspacePayload_workspaceId(ctx context.Context, field graphql.CollectedField, obj *gqlmodel.DeletePersonalWorkspacePayload) (ret graphql.Marshaler) {
-	return graphql.ResolveField(
-		ctx,
-		ec.OperationContext,
-		field,
-		ec.fieldContext_DeletePersonalWorkspacePayload_workspaceId,
-		func(ctx context.Context) (any, error) {
-			return obj.WorkspaceID, nil
-		},
-		nil,
-		ec.marshalNID2githubᚗcomᚋreearthᚋreearthᚑaccountsᚋserverᚋinternalᚋadapterᚋgqlᚋgqlmodelᚐID,
-		true,
-		true,
-	)
-}
-
-func (ec *executionContext) fieldContext_DeletePersonalWorkspacePayload_workspaceId(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
-	fc = &graphql.FieldContext{
-		Object:     "DeletePersonalWorkspacePayload",
 		Field:      field,
 		IsMethod:   false,
 		IsResolver: false,
@@ -3963,51 +3864,6 @@ func (ec *executionContext) fieldContext_Mutation_deleteWorkspace(ctx context.Co
 	return fc, nil
 }
 
-func (ec *executionContext) _Mutation_deletePersonalWorkspace(ctx context.Context, field graphql.CollectedField) (ret graphql.Marshaler) {
-	return graphql.ResolveField(
-		ctx,
-		ec.OperationContext,
-		field,
-		ec.fieldContext_Mutation_deletePersonalWorkspace,
-		func(ctx context.Context) (any, error) {
-			fc := graphql.GetFieldContext(ctx)
-			return ec.resolvers.Mutation().DeletePersonalWorkspace(ctx, fc.Args["input"].(gqlmodel.DeletePersonalWorkspaceInput))
-		},
-		nil,
-		ec.marshalODeletePersonalWorkspacePayload2ᚖgithubᚗcomᚋreearthᚋreearthᚑaccountsᚋserverᚋinternalᚋadapterᚋgqlᚋgqlmodelᚐDeletePersonalWorkspacePayload,
-		true,
-		false,
-	)
-}
-
-func (ec *executionContext) fieldContext_Mutation_deletePersonalWorkspace(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
-	fc = &graphql.FieldContext{
-		Object:     "Mutation",
-		Field:      field,
-		IsMethod:   true,
-		IsResolver: true,
-		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
-			switch field.Name {
-			case "workspaceId":
-				return ec.fieldContext_DeletePersonalWorkspacePayload_workspaceId(ctx, field)
-			}
-			return nil, fmt.Errorf("no field named %q was found under type DeletePersonalWorkspacePayload", field.Name)
-		},
-	}
-	defer func() {
-		if r := recover(); r != nil {
-			err = ec.Recover(ctx, r)
-			ec.Error(ctx, err)
-		}
-	}()
-	ctx = graphql.WithFieldContext(ctx, fc)
-	if fc.Args, err = ec.field_Mutation_deletePersonalWorkspace_args(ctx, field.ArgumentMap(ec.Variables)); err != nil {
-		ec.Error(ctx, err)
-		return fc, err
-	}
-	return fc, nil
-}
-
 func (ec *executionContext) _Mutation_updateWorkspace(ctx context.Context, field graphql.CollectedField) (ret graphql.Marshaler) {
 	return graphql.ResolveField(
 		ctx,
@@ -4991,47 +4847,6 @@ func (ec *executionContext) fieldContext_Query_me(_ context.Context, field graph
 			}
 			return nil, fmt.Errorf("no field named %q was found under type Me", field.Name)
 		},
-	}
-	return fc, nil
-}
-
-func (ec *executionContext) _Query_passwordValidation(ctx context.Context, field graphql.CollectedField) (ret graphql.Marshaler) {
-	return graphql.ResolveField(
-		ctx,
-		ec.OperationContext,
-		field,
-		ec.fieldContext_Query_passwordValidation,
-		func(ctx context.Context) (any, error) {
-			fc := graphql.GetFieldContext(ctx)
-			return ec.resolvers.Query().PasswordValidation(ctx, fc.Args["password"].(string))
-		},
-		nil,
-		ec.marshalNBoolean2bool,
-		true,
-		true,
-	)
-}
-
-func (ec *executionContext) fieldContext_Query_passwordValidation(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
-	fc = &graphql.FieldContext{
-		Object:     "Query",
-		Field:      field,
-		IsMethod:   true,
-		IsResolver: true,
-		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
-			return nil, errors.New("field of type Boolean does not have child fields")
-		},
-	}
-	defer func() {
-		if r := recover(); r != nil {
-			err = ec.Recover(ctx, r)
-			ec.Error(ctx, err)
-		}
-	}()
-	ctx = graphql.WithFieldContext(ctx, fc)
-	if fc.Args, err = ec.field_Query_passwordValidation_args(ctx, field.ArgumentMap(ec.Variables)); err != nil {
-		ec.Error(ctx, err)
-		return fc, err
 	}
 	return fc, nil
 }
@@ -9287,33 +9102,6 @@ func (ec *executionContext) unmarshalInputDeleteMeInput(ctx context.Context, obj
 	return it, nil
 }
 
-func (ec *executionContext) unmarshalInputDeletePersonalWorkspaceInput(ctx context.Context, obj any) (gqlmodel.DeletePersonalWorkspaceInput, error) {
-	var it gqlmodel.DeletePersonalWorkspaceInput
-	asMap := map[string]any{}
-	for k, v := range obj.(map[string]any) {
-		asMap[k] = v
-	}
-
-	fieldsInOrder := [...]string{"workspaceId"}
-	for _, k := range fieldsInOrder {
-		v, ok := asMap[k]
-		if !ok {
-			continue
-		}
-		switch k {
-		case "workspaceId":
-			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("workspaceId"))
-			data, err := ec.unmarshalNID2githubᚗcomᚋreearthᚋreearthᚑaccountsᚋserverᚋinternalᚋadapterᚋgqlᚋgqlmodelᚐID(ctx, v)
-			if err != nil {
-				return it, err
-			}
-			it.WorkspaceID = data
-		}
-	}
-
-	return it, nil
-}
-
 func (ec *executionContext) unmarshalInputDeleteWorkspaceInput(ctx context.Context, obj any) (gqlmodel.DeleteWorkspaceInput, error) {
 	var it gqlmodel.DeleteWorkspaceInput
 	asMap := map[string]any{}
@@ -10479,45 +10267,6 @@ func (ec *executionContext) _DeleteMePayload(ctx context.Context, sel ast.Select
 	return out
 }
 
-var deletePersonalWorkspacePayloadImplementors = []string{"DeletePersonalWorkspacePayload"}
-
-func (ec *executionContext) _DeletePersonalWorkspacePayload(ctx context.Context, sel ast.SelectionSet, obj *gqlmodel.DeletePersonalWorkspacePayload) graphql.Marshaler {
-	fields := graphql.CollectFields(ec.OperationContext, sel, deletePersonalWorkspacePayloadImplementors)
-
-	out := graphql.NewFieldSet(fields)
-	deferred := make(map[string]*graphql.FieldSet)
-	for i, field := range fields {
-		switch field.Name {
-		case "__typename":
-			out.Values[i] = graphql.MarshalString("DeletePersonalWorkspacePayload")
-		case "workspaceId":
-			out.Values[i] = ec._DeletePersonalWorkspacePayload_workspaceId(ctx, field, obj)
-			if out.Values[i] == graphql.Null {
-				out.Invalids++
-			}
-		default:
-			panic("unknown field " + strconv.Quote(field.Name))
-		}
-	}
-	out.Dispatch(ctx)
-	if out.Invalids > 0 {
-		return graphql.Null
-	}
-
-	atomic.AddInt32(&ec.deferred, int32(len(deferred)))
-
-	for label, dfs := range deferred {
-		ec.processDeferredGroup(graphql.DeferredGroup{
-			Label:    label,
-			Path:     graphql.GetPath(ctx),
-			FieldSet: dfs,
-			Context:  ctx,
-		})
-	}
-
-	return out
-}
-
 var deleteWorkspacePayloadImplementors = []string{"DeleteWorkspacePayload"}
 
 func (ec *executionContext) _DeleteWorkspacePayload(ctx context.Context, sel ast.SelectionSet, obj *gqlmodel.DeleteWorkspacePayload) graphql.Marshaler {
@@ -10785,10 +10534,6 @@ func (ec *executionContext) _Mutation(ctx context.Context, sel ast.SelectionSet)
 		case "deleteWorkspace":
 			out.Values[i] = ec.OperationContext.RootResolverMiddleware(innerCtx, func(ctx context.Context) (res graphql.Marshaler) {
 				return ec._Mutation_deleteWorkspace(ctx, field)
-			})
-		case "deletePersonalWorkspace":
-			out.Values[i] = ec.OperationContext.RootResolverMiddleware(innerCtx, func(ctx context.Context) (res graphql.Marshaler) {
-				return ec._Mutation_deletePersonalWorkspace(ctx, field)
 			})
 		case "updateWorkspace":
 			out.Values[i] = ec.OperationContext.RootResolverMiddleware(innerCtx, func(ctx context.Context) (res graphql.Marshaler) {
@@ -11111,28 +10856,6 @@ func (ec *executionContext) _Query(ctx context.Context, sel ast.SelectionSet) gr
 					}
 				}()
 				res = ec._Query_me(ctx, field)
-				return res
-			}
-
-			rrm := func(ctx context.Context) graphql.Marshaler {
-				return ec.OperationContext.RootResolverMiddleware(ctx,
-					func(ctx context.Context) graphql.Marshaler { return innerFunc(ctx, out) })
-			}
-
-			out.Concurrently(i, func(ctx context.Context) graphql.Marshaler { return rrm(innerCtx) })
-		case "passwordValidation":
-			field := field
-
-			innerFunc := func(ctx context.Context, fs *graphql.FieldSet) (res graphql.Marshaler) {
-				defer func() {
-					if r := recover(); r != nil {
-						ec.Error(ctx, ec.Recover(ctx, r))
-					}
-				}()
-				res = ec._Query_passwordValidation(ctx, field)
-				if res == graphql.Null {
-					atomic.AddUint32(&fs.Invalids, 1)
-				}
 				return res
 			}
 
@@ -12808,11 +12531,6 @@ func (ec *executionContext) unmarshalNDeleteMeInput2githubᚗcomᚋreearthᚋree
 	return res, graphql.ErrorOnPath(ctx, err)
 }
 
-func (ec *executionContext) unmarshalNDeletePersonalWorkspaceInput2githubᚗcomᚋreearthᚋreearthᚑaccountsᚋserverᚋinternalᚋadapterᚋgqlᚋgqlmodelᚐDeletePersonalWorkspaceInput(ctx context.Context, v any) (gqlmodel.DeletePersonalWorkspaceInput, error) {
-	res, err := ec.unmarshalInputDeletePersonalWorkspaceInput(ctx, v)
-	return res, graphql.ErrorOnPath(ctx, err)
-}
-
 func (ec *executionContext) unmarshalNDeleteWorkspaceInput2githubᚗcomᚋreearthᚋreearthᚑaccountsᚋserverᚋinternalᚋadapterᚋgqlᚋgqlmodelᚐDeleteWorkspaceInput(ctx context.Context, v any) (gqlmodel.DeleteWorkspaceInput, error) {
 	res, err := ec.unmarshalInputDeleteWorkspaceInput(ctx, v)
 	return res, graphql.ErrorOnPath(ctx, err)
@@ -13772,13 +13490,6 @@ func (ec *executionContext) marshalODeleteMePayload2ᚖgithubᚗcomᚋreearthᚋ
 		return graphql.Null
 	}
 	return ec._DeleteMePayload(ctx, sel, v)
-}
-
-func (ec *executionContext) marshalODeletePersonalWorkspacePayload2ᚖgithubᚗcomᚋreearthᚋreearthᚑaccountsᚋserverᚋinternalᚋadapterᚋgqlᚋgqlmodelᚐDeletePersonalWorkspacePayload(ctx context.Context, sel ast.SelectionSet, v *gqlmodel.DeletePersonalWorkspacePayload) graphql.Marshaler {
-	if v == nil {
-		return graphql.Null
-	}
-	return ec._DeletePersonalWorkspacePayload(ctx, sel, v)
 }
 
 func (ec *executionContext) marshalODeleteWorkspacePayload2ᚖgithubᚗcomᚋreearthᚋreearthᚑaccountsᚋserverᚋinternalᚋadapterᚋgqlᚋgqlmodelᚐDeleteWorkspacePayload(ctx context.Context, sel ast.SelectionSet, v *gqlmodel.DeleteWorkspacePayload) graphql.Marshaler {

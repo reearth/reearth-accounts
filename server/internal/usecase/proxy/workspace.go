@@ -185,14 +185,6 @@ func (w *Workspace) Remove(ctx context.Context, id workspace.ID, op *workspace.O
 	return nil
 }
 
-func (w *Workspace) RemovePersonal(ctx context.Context, id workspace.ID, op *workspace.Operator) error {
-	_, err := DeletePersonalWorkspace(ctx, w.gql, DeletePersonalWorkspaceInput{WorkspaceId: id.String()})
-	if err != nil {
-		return err
-	}
-	return nil
-}
-
 func (w *Workspace) TransferOwnership(ctx context.Context, id workspace.ID, newOwnerID accountid.UserID, op *workspace.Operator) (*workspace.Workspace, error) {
 	res, err := TransferWorkspaceOwnership(ctx, w.gql, TransferWorkspaceOwnershipInput{WorkspaceId: id.String(), NewOwnerId: newOwnerID.String()})
 	if err != nil {
