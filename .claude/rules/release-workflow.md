@@ -8,7 +8,7 @@ Releases are automated via GitHub Actions using `Stage` and `Release` workflows.
 
 1. Open the Actions tab on GitHub
 2. Run the "Stage" workflow (merges `main` branch into `release` branch)
-3. Run the "Release" workflow (creates tag, GitHub Release, and Docker build)
+3. Run the "Release" workflow **from the `release` branch** (select `release` in the branch dropdown, then click "Run workflow")
 
 ## Automatic Versioning
 

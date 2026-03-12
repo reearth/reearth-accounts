@@ -16,14 +16,16 @@ Choose the type based on **what the commit actually does**, not what the overall
 | ---------- | ---------------------------------------------------------------------------------------- | ------ |
 | `feat`     | Adds a **new feature** for the user (new API endpoint, new UI component, new capability) | MINOR  |
 | `fix`      | Fixes a **bug**                                                                          | PATCH  |
-| `docs`     | Documentation only (README, comments, JSDoc, OpenAPI specs)                              | -      |
-| `refactor` | Code change that neither fixes a bug nor adds a feature (restructuring, renaming)        | -      |
-| `test`     | Adding or updating tests only                                                            | -      |
-| `chore`    | Build process, CI config, dependencies, tooling (Makefile, CI workflows, package.json)   | -      |
-| `style`    | Formatting, whitespace, linting (no logic change)                                        | -      |
+| `docs`     | Documentation only (README, comments, JSDoc, OpenAPI specs)                              | PATCH  |
+| `refactor` | Code change that neither fixes a bug nor adds a feature (restructuring, renaming)        | PATCH  |
+| `test`     | Adding or updating tests only                                                            | PATCH  |
+| `chore`    | Build process, CI config, dependencies, tooling (Makefile, CI workflows, package.json)   | PATCH  |
+| `style`    | Formatting, whitespace, linting (no logic change)                                        | PATCH  |
 | `perf`     | Performance improvement                                                                  | PATCH  |
-| `ci`       | CI/CD configuration changes (.github/workflows/, Makefile CI targets)                    | -      |
-| `build`    | Build system or external dependency changes                                              | -      |
+| `ci`       | CI/CD configuration changes (.github/workflows/, Makefile CI targets)                    | PATCH  |
+| `build`    | Build system or external dependency changes                                              | PATCH  |
+
+> **Note:** In this repository, our release automation is configured with `default_bump: patch`, so all commit types will result in at least a PATCH version bump.
 
 ## Decision Guide
 
