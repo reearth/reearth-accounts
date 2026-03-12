@@ -173,12 +173,6 @@ func (i *User) UpdateMe(ctx context.Context, p interfaces.UpdateMeParam, operato
 			}
 		}
 
-		if p.Password != nil && u.HasAuthProvider("reearth") {
-			if err := u.SetPassword(*p.Password); err != nil {
-				return nil, err
-			}
-		}
-
 		// Update Auth0 users
 		if p.Name != nil || p.Email != nil || p.Password != nil {
 			for _, a := range u.Auths() {

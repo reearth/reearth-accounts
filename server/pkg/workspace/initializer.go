@@ -10,7 +10,6 @@ type InitParams struct {
 	Email       string
 	Name        string
 	Sub         *user.Auth
-	Password    *string
 	Lang        *language.Tag
 	Theme       *user.Theme
 	UserID      *user.ID
@@ -47,9 +46,7 @@ func Init(p InitParams) (*user.User, *Workspace, error) {
 		Email(p.Email).
 		Metadata(metadata).
 		Auths([]user.Auth{*p.Sub})
-	if p.Password != nil {
-		b = b.PasswordPlainText(*p.Password)
-	}
+
 	u, err := b.Build()
 	if err != nil {
 		return nil, nil, err
