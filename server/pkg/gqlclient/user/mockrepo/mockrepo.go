@@ -191,21 +191,6 @@ func (mr *MockRepoMockRecorder) PasswordReset(ctx, password, token any) *gomock.
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "PasswordReset", reflect.TypeOf((*MockRepo)(nil).PasswordReset), ctx, password, token)
 }
 
-// PasswordValidation mocks base method.
-func (m *MockRepo) PasswordValidation(ctx context.Context, password string) (bool, error) {
-	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "PasswordValidation", ctx, password)
-	ret0, _ := ret[0].(bool)
-	ret1, _ := ret[1].(error)
-	return ret0, ret1
-}
-
-// PasswordValidation indicates an expected call of PasswordValidation.
-func (mr *MockRepoMockRecorder) PasswordValidation(ctx, password any) *gomock.Call {
-	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "PasswordValidation", reflect.TypeOf((*MockRepo)(nil).PasswordValidation), ctx, password)
-}
-
 // RemoveMyAuth mocks base method.
 func (m *MockRepo) RemoveMyAuth(ctx context.Context, auth string) (*user0.User, error) {
 	m.ctrl.T.Helper()

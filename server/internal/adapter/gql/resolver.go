@@ -14,13 +14,11 @@ var ErrNotImplemented = errors.New("not impleneted yet")
 var ErrUnauthorized = errors.New("unauthorized")
 
 type Resolver struct {
-	Authenticator gateway.Authenticator
-	Storage       gateway.Storage
+	Storage gateway.Storage
 }
 
-func NewResolver(storage gateway.Storage, authenticator gateway.Authenticator) ResolverRoot {
+func NewResolver(storage gateway.Storage) ResolverRoot {
 	return &Resolver{
-		Authenticator: authenticator,
-		Storage:       storage,
+		Storage: storage,
 	}
 }

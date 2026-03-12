@@ -120,10 +120,6 @@ input DeleteWorkspaceInput {
     workspaceId: ID!
 }
 
-input DeletePersonalWorkspaceInput {
-    workspaceId: ID!
-}
-
 input TransferWorkspaceOwnershipInput {
     workspaceId: ID!
     newOwnerId: ID!
@@ -163,10 +159,6 @@ type DeleteWorkspacePayload {
     workspaceId: ID!
 }
 
-type DeletePersonalWorkspacePayload {
-    workspaceId: ID!
-}
-
 extend type Query {
     findByID(id: ID!): Workspace!
     findByIDs(ids: [ID!]!): [Workspace!]!
@@ -179,7 +171,6 @@ extend type Query {
 extend type Mutation {
     createWorkspace(input: CreateWorkspaceInput!): CreateWorkspacePayload
     deleteWorkspace(input: DeleteWorkspaceInput!): DeleteWorkspacePayload
-    deletePersonalWorkspace(input: DeletePersonalWorkspaceInput!): DeletePersonalWorkspacePayload
     updateWorkspace(input: UpdateWorkspaceInput!): UpdateWorkspacePayload
     addUsersToWorkspace(input: AddUsersToWorkspaceInput!): AddUsersToWorkspacePayload
     addIntegrationToWorkspace(input: AddIntegrationToWorkspaceInput!): AddUsersToWorkspacePayload
