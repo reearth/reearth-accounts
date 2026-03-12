@@ -69,8 +69,8 @@ func init() {
 	}
 }
 
-func (i *User) Signup(ctx context.Context, param interfaces.SignupParam) (u *user.User, err error) {
-	if err = i.verifySignupSecret(param.Secret); err != nil {
+func (i *User) Signup(ctx context.Context, param interfaces.SignupParam) (*user.User, error) {
+	if err := i.verifySignupSecret(param.Secret); err != nil {
 		return nil, err
 	}
 
@@ -87,10 +87,9 @@ func (i *User) Signup(ctx context.Context, param interfaces.SignupParam) (u *use
 			return nil, interfaces.ErrUserAlreadyExists
 		}
 
-		u, ws, err := workspace.Init(workspace.InitParams{
+		usr, ws, err := workspace.Init(workspace.InitParams{
 			Email:       param.Email,
 			Name:        param.Name,
-			Password:    lo.ToPtr(param.Password),
 			Lang:        param.Lang,
 			Theme:       param.Theme,
 			UserID:      param.UserID,
@@ -101,9 +100,9 @@ func (i *User) Signup(ctx context.Context, param interfaces.SignupParam) (u *use
 		}
 
 		vr := user.NewVerification()
-		u.SetVerification(vr)
+		usr.SetVerification(vr)
 
-		if err = i.repos.User.Create(ctx, u); err != nil {
+		if err = i.repos.User.Create(ctx, usr); err != nil {
 			if errors.Is(err, user.ErrDuplicatedUser) {
 				return nil, interfaces.ErrUserAlreadyExists
 			}
@@ -131,18 +130,18 @@ func (i *User) Signup(ctx context.Context, param interfaces.SignupParam) (u *use
 		}
 
 		wsRole := permittable.NewWorkspaceRole(ws.ID(), roleOwner.ID())
-		perm := permittable.New().NewID().RoleIDs([]id.RoleID{roleSelf.ID()}).UserID(u.ID()).WorkspaceRoles([]permittable.WorkspaceRole{wsRole}).MustBuild()
+		perm := permittable.New().NewID().RoleIDs([]id.RoleID{roleSelf.ID()}).UserID(usr.ID()).WorkspaceRoles([]permittable.WorkspaceRole{wsRole}).MustBuild()
 		if err = i.repos.Permittable.Save(ctx, lo.FromPtr(perm)); err != nil {
 			return nil, err
 		}
 
 		if !param.MockAuth {
-			if err = i.sendVerificationMail(ctx, u, vr); err != nil {
+			if err = i.sendVerificationMail(ctx, usr, vr); err != nil {
 				return nil, err
 			}
 		}
 
-		return u, nil
+		return usr, nil
 	})
 }
 

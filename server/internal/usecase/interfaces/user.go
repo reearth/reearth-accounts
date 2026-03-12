@@ -43,7 +43,6 @@ type SignupUserParam struct {
 type SignupParam struct {
 	Email       string
 	Name        string
-	Password    string
 	Secret      *string
 	Lang        *language.Tag
 	Theme       *user.Theme
