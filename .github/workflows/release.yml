@@ -2,66 +2,56 @@ name: Release
 
 on:
   workflow_dispatch:
-    inputs:
-      version:
-        description: 'Release version (SemVer, e.g. 1.0.0)'
-        required: true
-        type: string
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref_name }}
   cancel-in-progress: false
 
+permissions:
+  contents: write
+
 jobs:
   create-release:
-    name: Create Release and Tag
+    name: Create Version Tag and Release
     runs-on: ubuntu-latest
-    permissions:
-      contents: write
+    if: github.ref_name == 'release'
     outputs:
-      release_tag: ${{ steps.generate_tag.outputs.tag }}
+      release_tag: ${{ steps.tag.outputs.new_tag }}
     steps:
       - name: Checkout Repository
         uses: actions/checkout@v6
         with:
           ref: release
           fetch-depth: 0
-      - name: Validate and Generate Release Tag
-        id: generate_tag
-        run: |
-          VERSION="${{ inputs.version }}"
-          if [[ ! "$VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
-            echo "::error::Invalid version format: $VERSION. Must be SemVer (e.g. 1.0.0)"
-            exit 1
-          fi
-          TAG="v${VERSION}"
-          if git rev-parse "$TAG" >/dev/null 2>&1; then
-            echo "::error::Tag $TAG already exists"
-            exit 1
-          fi
-          PREVIOUS_TAG=$(gh release list --limit 1 --json tagName --jq '.[0].tagName // empty' || echo "")
-          echo "tag=${TAG}" >> $GITHUB_OUTPUT
-          echo "previous_tag=${PREVIOUS_TAG}" >> $GITHUB_OUTPUT
-          echo "Release tag: ${TAG}"
-          echo "Previous release tag: ${PREVIOUS_TAG}"
+
+      - name: Bump version and push tag
+        id: tag
+        uses: mathieudutour/github-tag-action@v6.2
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          default_bump: patch
+          release_branches: release
+          fetch_all_tags: true
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ steps.tag.outputs.new_tag }}
+          generate_release_notes: true
+          draft: false
+          prerelease: ${{ contains(steps.tag.outputs.new_tag, '-') }}
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-      - name: Create GitHub Release and Tag
+
+      - name: Summary
         run: |
-          if [ -n "${{ steps.generate_tag.outputs.previous_tag }}" ]; then
-            gh release create ${{ steps.generate_tag.outputs.tag }} \
-              --target release \
-              --title "${{ steps.generate_tag.outputs.tag }}" \
-              --generate-notes \
-              --notes-start-tag ${{ steps.generate_tag.outputs.previous_tag }}
-          else
-            gh release create ${{ steps.generate_tag.outputs.tag }} \
-              --target release \
-              --title "${{ steps.generate_tag.outputs.tag }}" \
-              --generate-notes
-          fi
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          echo "### New Release Created" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "- **Previous tag:** ${{ steps.tag.outputs.previous_tag }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **New tag:** ${{ steps.tag.outputs.new_tag }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **Bump type:** ${{ steps.tag.outputs.release_type }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **Changelog:**" >> $GITHUB_STEP_SUMMARY
+          echo "${{ steps.tag.outputs.changelog }}" >> $GITHUB_STEP_SUMMARY
 
   build-and-push:
     name: Build and Push Docker Image
