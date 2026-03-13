@@ -13,6 +13,7 @@ import (
 var (
 	DefaultPasswordEncoder PasswordEncoder = &BcryptPasswordEncoder{}
 	ErrEncodingPassword                    = rerror.NewE(i18n.T("encoding password"))
+	ErrInvalidPassword                     = rerror.NewE(i18n.T("invalid password"))
 	ErrPasswordLength                      = rerror.NewE(i18n.T("password at least 8 characters"))
 	ErrPasswordUpper                       = rerror.NewE(i18n.T("password should have upper case letters"))
 	ErrPasswordLower                       = rerror.NewE(i18n.T("password should have lower case letters"))

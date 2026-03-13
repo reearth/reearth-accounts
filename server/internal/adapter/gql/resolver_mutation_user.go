@@ -61,6 +61,7 @@ func (r *mutationResolver) Signup(ctx context.Context, input gqlmodel.SignupInpu
 	u, err := usecases(ctx).User.Signup(ctx, interfaces.SignupParam{
 		Email:       input.Email,
 		Name:        input.Name,
+		Password:    input.Password,
 		Secret:      input.Secret,
 		Lang:        &lang,
 		Theme:       gqlmodel.ToTheme(input.Theme),
