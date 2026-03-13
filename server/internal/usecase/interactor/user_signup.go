@@ -91,6 +91,7 @@ func (i *User) Signup(ctx context.Context, param interfaces.SignupParam) (*user.
 			Email:       param.Email,
 			Name:        param.Name,
 			Lang:        param.Lang,
+			Password:    lo.ToPtr(param.Password),
 			Theme:       param.Theme,
 			UserID:      param.UserID,
 			WorkspaceID: param.WorkspaceID,
