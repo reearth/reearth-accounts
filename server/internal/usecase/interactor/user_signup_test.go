@@ -58,6 +58,7 @@ func TestUser_Signup(t *testing.T) {
 			args: interfaces.SignupParam{
 				Email:       "other@bbb.com",
 				Name:        "NAME",
+				Password:    "PAss00!!",
 				UserID:      &uid,
 				WorkspaceID: &tid,
 			},
@@ -73,6 +74,7 @@ func TestUser_Signup(t *testing.T) {
 			args: interfaces.SignupParam{
 				Email:       "unique@bbb.com",
 				Name:        "NAME",
+				Password:    "PAss00!!",
 				UserID:      &uid,
 				WorkspaceID: &tid,
 			},
@@ -85,6 +87,7 @@ func TestUser_Signup(t *testing.T) {
 					Auths(u.Auths()).
 					Metadata(*u.Metadata()).
 					Email("unique@bbb.com").
+					PasswordPlainText("PAss00!!").
 					Verification(user.VerificationFrom(mockcode, mocktime.Add(24*time.Hour), false)).
 					MustBuild()
 			},
@@ -107,6 +110,7 @@ func TestUser_Signup(t *testing.T) {
 			args: interfaces.SignupParam{
 				Email:       "aaa@bbb.com",
 				Name:        "NAME",
+				Password:    "PAss00!!",
 				UserID:      &uid,
 				WorkspaceID: &tid,
 			},
@@ -148,6 +152,7 @@ func TestUser_Signup(t *testing.T) {
 			args: interfaces.SignupParam{
 				Email:       "aaa@bbb.com",
 				Name:        "NAME",
+				Password:    "PAss00!!",
 				UserID:      &uid,
 				WorkspaceID: &tid,
 			},
@@ -169,6 +174,7 @@ func TestUser_Signup(t *testing.T) {
 			args: interfaces.SignupParam{
 				Email:       "aaa@bbb.com",
 				Name:        "NAME",
+				Password:    "PAss00!!",
 				UserID:      &uid,
 				WorkspaceID: &tid,
 			},
@@ -183,6 +189,7 @@ func TestUser_Signup(t *testing.T) {
 			args: interfaces.SignupParam{
 				Email:       "aaa@bbb.com",
 				Name:        "NAME",
+				Password:    "PAss00!!",
 				Secret:      lo.ToPtr("hogehoge"),
 				UserID:      &uid,
 				WorkspaceID: &tid,
@@ -219,6 +226,7 @@ func TestUser_Signup(t *testing.T) {
 			args: interfaces.SignupParam{
 				Email:       "aaa@bbb.com",
 				Name:        "NAME",
+				Password:    "PAss00!!",
 				Secret:      lo.ToPtr("SECRET"),
 				UserID:      &uid,
 				WorkspaceID: &tid,
@@ -259,8 +267,10 @@ func TestUser_Signup(t *testing.T) {
 			signupSecret:    "SECRET",
 			authSrvUIDomain: "",
 			args: interfaces.SignupParam{
-				Email: "aaa@bbb.com",
-				Name:  "NAME", Secret: lo.ToPtr("SECRET!"),
+				Email:    "aaa@bbb.com",
+				Name:     "NAME",
+				Password: "PAss00!!",
+				Secret:   lo.ToPtr("SECRET!"),
 			},
 			wantError: interfaces.ErrSignupInvalidSecret,
 		},
@@ -269,16 +279,18 @@ func TestUser_Signup(t *testing.T) {
 			signupSecret:    "SECRET",
 			authSrvUIDomain: "",
 			args: interfaces.SignupParam{
-				Email: "aaa@bbb.com",
-				Name:  "NAME",
+				Email:    "aaa@bbb.com",
+				Name:     "NAME",
+				Password: "PAss00!!",
 			},
 			wantError: interfaces.ErrSignupInvalidSecret,
 		},
 		{
 			name: "invalid email",
 			args: interfaces.SignupParam{
-				Email: "aaa",
-				Name:  "NAME",
+				Email:    "aaa",
+				Name:     "NAME",
+				Password: "PAss00!!",
 			},
 			wantError: user.ErrInvalidEmail,
 		},
