@@ -173,7 +173,7 @@ func (i *User) UpdateMe(ctx context.Context, p interfaces.UpdateMeParam, operato
 			}
 		}
 
-		if p.Password != nil {
+		if p.Password != nil && u.HasAuthProvider("reearth") {
 			if err = u.SetPassword(*p.Password); err != nil {
 				return nil, err
 			}
