@@ -104,6 +104,22 @@ func (u *User) UpdateMe(ctx context.Context, param interfaces.UpdateMeParam, op 
 	return MeToUser(res.UpdateMe.Me.FragmentMe)
 }
 
+func (u *User) UpdateMeOIDC(ctx context.Context, param interfaces.UpdateMeOIDCParam, op *workspace.Operator) (*user.User, error) {
+	input := UpdateMeOIDCInput{
+		Name:                 *param.Name,
+		Email:                *param.Email,
+		Lang:                 param.Lang.String(),
+		Theme:                string(*param.Theme),
+		Password:             *param.Password,
+		PasswordConfirmation: *param.PasswordConfirmation,
+	}
+	res, err := UpdateMeOIDC(ctx, u.gql, input)
+	if err != nil {
+		return nil, err
+	}
+	return MeToUser(res.UpdateMeOIDC.Me.FragmentMe)
+}
+
 func (u *User) RemoveMyAuth(ctx context.Context, auth string, op *workspace.Operator) (*user.User, error) {
 	res, err := RemoveMyAuth(ctx, u.gql, RemoveMyAuthInput{Auth: auth})
 	if err != nil {
