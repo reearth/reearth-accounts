@@ -294,6 +294,15 @@ func TestUser_Signup(t *testing.T) {
 			},
 			wantError: user.ErrInvalidEmail,
 		},
+		{
+			name: "invalid password",
+			args: interfaces.SignupParam{
+				Email:    "aaa@bbb.com",
+				Name:     "NAME",
+				Password: "PAss00",
+			},
+			wantError: user.ErrPasswordLength,
+		},
 	}
 
 	for _, tt := range tests {
