@@ -2,12 +2,12 @@
 
 ## Document Signature
 
-|           |        |
-|-----------|--------|
-| Creator   | [name] |
-| Leader    | [name] |
-| Task Link | [url]  |
-| Developer | [name] |
+|           |                                                                        |
+|-----------|------------------------------------------------------------------------|
+| Creator   | @zombozo12                                                             |
+| Leader    | @soneda-yuya                                                           |
+| Task Link | https://www.notion.so/eukarya/Sprint3-2fe16e0fb1658084a390d07efe652ee9 |
+| Developer | @zombozo12                                                             |
 
 ## Background / Problem Statement
 
