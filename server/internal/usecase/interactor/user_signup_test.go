@@ -601,283 +601,284 @@ func TestUser_CreateVerification(t *testing.T) {
 func TestUser_UpdateMeOIDC(t *testing.T) {
 	user.DefaultPasswordEncoder = &user.NoopPasswordEncoder{}
 
-	tests := []struct {
-		name                        string
-		createUserBefore            func() (*user.User, *workspace.Workspace)
-		param                       interfaces.UpdateMeOIDCParam
-		authenticatorError          error
-		wantError                   error
-		wantAuthenticatorCalled     bool
-		wantAuthenticatorParam      *gateway.AuthenticatorUpdateUserParam
-		wantUserName                string
-		wantUserEmail               string
-		wantWorkspaceName           string
-		wantPasswordNotStored       bool
-	}{
-		{
-			name: "update name only",
-			createUserBefore: func() (*user.User, *workspace.Workspace) {
-				uid := id.NewUserID()
-				wid := id.NewWorkspaceID()
-				u := user.New().
-					ID(uid).
-					Workspace(wid).
-					Name("OldName").
-					Email("test@example.com").
-					Auths([]user.Auth{{Provider: "auth0", Sub: "auth0|123"}}).
-					MustBuild()
-				ws := workspace.New().ID(wid).Name("OldName").Personal(true).MustBuild()
-				return u, ws
-			},
-			param: interfaces.UpdateMeOIDCParam{
-				Name: lo.ToPtr("NewName"),
-			},
-			wantError:               nil,
-			wantAuthenticatorCalled: true,
-			wantAuthenticatorParam: &gateway.AuthenticatorUpdateUserParam{
-				ID:   "auth0|123",
-				Name: lo.ToPtr("NewName"),
-			},
-			wantUserName:      "NewName",
-			wantUserEmail:     "test@example.com",
-			wantWorkspaceName: "NewName",
-		},
-		{
-			name: "update email only",
-			createUserBefore: func() (*user.User, *workspace.Workspace) {
-				uid := id.NewUserID()
-				wid := id.NewWorkspaceID()
-				u := user.New().
-					ID(uid).
-					Workspace(wid).
-					Name("TestUser").
-					Email("old@example.com").
-					Auths([]user.Auth{{Provider: "auth0", Sub: "auth0|456"}}).
-					MustBuild()
-				ws := workspace.New().ID(wid).Name("TestUser").Personal(true).MustBuild()
-				return u, ws
-			},
-			param: interfaces.UpdateMeOIDCParam{
-				Email: lo.ToPtr("new@example.com"),
-			},
-			wantError:               nil,
-			wantAuthenticatorCalled: true,
-			wantAuthenticatorParam: &gateway.AuthenticatorUpdateUserParam{
-				ID:    "auth0|456",
-				Email: lo.ToPtr("new@example.com"),
-			},
-			wantUserName:      "TestUser",
-			wantUserEmail:     "new@example.com",
-			wantWorkspaceName: "TestUser",
-		},
-		{
-			name: "update password",
-			createUserBefore: func() (*user.User, *workspace.Workspace) {
-				uid := id.NewUserID()
-				wid := id.NewWorkspaceID()
-				u := user.New().
-					ID(uid).
-					Workspace(wid).
-					Name("TestUser").
-					Email("test@example.com").
-					Auths([]user.Auth{{Provider: "auth0", Sub: "auth0|789"}}).
-					MustBuild()
-				ws := workspace.New().ID(wid).Name("TestUser").Personal(true).MustBuild()
-				return u, ws
-			},
-			param: interfaces.UpdateMeOIDCParam{
-				Password:             lo.ToPtr("NewPass00!!"),
-				PasswordConfirmation: lo.ToPtr("NewPass00!!"),
-			},
-			wantError:               nil,
-			wantAuthenticatorCalled: true,
-			wantAuthenticatorParam: &gateway.AuthenticatorUpdateUserParam{
-				ID:       "auth0|789",
-				Password: lo.ToPtr("NewPass00!!"),
-			},
-			wantUserName:          "TestUser",
-			wantUserEmail:         "test@example.com",
-			wantWorkspaceName:     "TestUser",
-			wantPasswordNotStored: true,
-		},
-		{
-			name: "update lang and theme (no auth0 call)",
-			createUserBefore: func() (*user.User, *workspace.Workspace) {
-				uid := id.NewUserID()
-				wid := id.NewWorkspaceID()
-				u := user.New().
-					ID(uid).
-					Workspace(wid).
-					Name("TestUser").
-					Email("test@example.com").
-					Auths([]user.Auth{{Provider: "auth0", Sub: "auth0|abc"}}).
-					MustBuild()
-				ws := workspace.New().ID(wid).Name("TestUser").Personal(true).MustBuild()
-				return u, ws
-			},
-			param: interfaces.UpdateMeOIDCParam{
-				Lang:  lo.ToPtr(language.Japanese),
-				Theme: user.ThemeDark.Ref(),
-			},
-			wantError:               nil,
-			wantAuthenticatorCalled: false,
-			wantUserName:            "TestUser",
-			wantUserEmail:           "test@example.com",
-			wantWorkspaceName:       "TestUser",
-		},
-		{
-			name: "password mismatch",
-			createUserBefore: func() (*user.User, *workspace.Workspace) {
-				uid := id.NewUserID()
-				wid := id.NewWorkspaceID()
-				u := user.New().
-					ID(uid).
-					Workspace(wid).
-					Name("TestUser").
-					Email("test@example.com").
-					Auths([]user.Auth{{Provider: "auth0", Sub: "auth0|def"}}).
-					MustBuild()
-				ws := workspace.New().ID(wid).Name("TestUser").Personal(true).MustBuild()
-				return u, ws
-			},
-			param: interfaces.UpdateMeOIDCParam{
-				Password:             lo.ToPtr("NewPass00!!"),
-				PasswordConfirmation: lo.ToPtr("DifferentPass00!!"),
-			},
-			wantError:               interfaces.ErrUserInvalidPasswordConfirmation,
-			wantAuthenticatorCalled: false,
-		},
-		{
-			name: "no auth0 provider - no authenticator call",
-			createUserBefore: func() (*user.User, *workspace.Workspace) {
-				uid := id.NewUserID()
-				wid := id.NewWorkspaceID()
-				u := user.New().
-					ID(uid).
-					Workspace(wid).
-					Name("TestUser").
-					Email("test@example.com").
-					Auths([]user.Auth{{Provider: "reearth", Sub: "reearth|123"}}).
-					MustBuild()
-				ws := workspace.New().ID(wid).Name("TestUser").Personal(true).MustBuild()
-				return u, ws
-			},
-			param: interfaces.UpdateMeOIDCParam{
-				Name: lo.ToPtr("NewName"),
-			},
-			wantError:               nil,
-			wantAuthenticatorCalled: false,
-			wantUserName:            "NewName",
-			wantUserEmail:           "test@example.com",
-			wantWorkspaceName:       "NewName",
-		},
-		{
-			name: "authenticator error",
-			createUserBefore: func() (*user.User, *workspace.Workspace) {
-				uid := id.NewUserID()
-				wid := id.NewWorkspaceID()
-				u := user.New().
-					ID(uid).
-					Workspace(wid).
-					Name("TestUser").
-					Email("test@example.com").
-					Auths([]user.Auth{{Provider: "auth0", Sub: "auth0|error"}}).
-					MustBuild()
-				ws := workspace.New().ID(wid).Name("TestUser").Personal(true).MustBuild()
-				return u, ws
-			},
-			param: interfaces.UpdateMeOIDCParam{
-				Name: lo.ToPtr("NewName"),
-			},
-			authenticatorError:      rerror.NewE(i18n.T("auth0 error")),
-			wantError:               rerror.NewE(i18n.T("auth0 error")),
-			wantAuthenticatorCalled: true,
-		},
-		{
-			name: "invalid operator",
-			createUserBefore: func() (*user.User, *workspace.Workspace) {
-				return nil, nil
-			},
-			param: interfaces.UpdateMeOIDCParam{
-				Name: lo.ToPtr("NewName"),
-			},
-			wantError:               interfaces.ErrInvalidOperator,
-			wantAuthenticatorCalled: false,
-		},
-	}
+	t.Run("update name only", func(t *testing.T) {
+		ctx := context.Background()
+		r := accountmemory.New()
 
-	for _, tt := range tests {
-		tt := tt
-		t.Run(tt.name, func(t *testing.T) {
-			t.Parallel()
-			ctx := context.Background()
-			r := accountmemory.New()
+		uid := id.NewUserID()
+		wid := id.NewWorkspaceID()
+		u := user.New().
+			ID(uid).
+			Workspace(wid).
+			Name("OldName").
+			Email("test@example.com").
+			Auths([]user.Auth{{Provider: "auth0", Sub: "auth0|123"}}).
+			MustBuild()
+		ws := workspace.New().ID(wid).Name("OldName").Personal(true).MustBuild()
 
-			var createdUser *user.User
-			var createdWorkspace *workspace.Workspace
-			var operator *workspace.Operator
+		assert.NoError(t, r.User.Save(ctx, u))
+		assert.NoError(t, r.Workspace.Save(ctx, ws))
 
-			if tt.createUserBefore != nil {
-				createdUser, createdWorkspace = tt.createUserBefore()
-				if createdUser != nil {
-					assert.NoError(t, r.User.Save(ctx, createdUser))
-					operator = &workspace.Operator{User: lo.ToPtr(createdUser.ID())}
-				}
-				if createdWorkspace != nil {
-					assert.NoError(t, r.Workspace.Save(ctx, createdWorkspace))
-				}
-			}
+		auth := &mockAuthenticator{}
+		g := &gateway.Container{Authenticator: auth}
+		uc := NewUser(r, g, "", "")
+		operator := &workspace.Operator{User: lo.ToPtr(u.ID())}
 
-			if operator == nil {
-				operator = &workspace.Operator{}
-			}
+		result, err := uc.UpdateMeOIDC(ctx, interfaces.UpdateMeOIDCParam{
+			Name: lo.ToPtr("NewName"),
+		}, operator)
 
-			auth := &mockAuthenticator{
-				updateUserError: tt.authenticatorError,
-			}
-			g := &gateway.Container{
-				Authenticator: auth,
-			}
-			uc := NewUser(r, g, "", "")
+		assert.NoError(t, err)
+		assert.NotNil(t, result)
+		assert.Equal(t, "NewName", result.Name())
+		assert.Equal(t, "test@example.com", result.Email())
 
-			result, err := uc.UpdateMeOIDC(ctx, tt.param, operator)
+		// Verify workspace was renamed
+		updatedWs, _ := r.Workspace.FindByID(ctx, wid)
+		assert.Equal(t, "NewName", updatedWs.Name())
 
-			if tt.wantError != nil {
-				assert.Error(t, err)
-				assert.Equal(t, tt.wantError.Error(), err.Error())
-			} else {
-				assert.NoError(t, err)
-				assert.NotNil(t, result)
-				assert.Equal(t, tt.wantUserName, result.Name())
-				assert.Equal(t, tt.wantUserEmail, result.Email())
+		// Verify Auth0 was called
+		assert.True(t, auth.updateUserCalled)
+		assert.Equal(t, "auth0|123", auth.updateUserParam.ID)
+		assert.Equal(t, "NewName", *auth.updateUserParam.Name)
+	})
 
-				// Verify workspace was updated if name changed
-				if createdWorkspace != nil {
-					ws, _ := r.Workspace.FindByID(ctx, createdWorkspace.ID())
-					assert.Equal(t, tt.wantWorkspaceName, ws.Name())
-				}
-			}
+	t.Run("update email only", func(t *testing.T) {
+		ctx := context.Background()
+		r := accountmemory.New()
 
-			assert.Equal(t, tt.wantAuthenticatorCalled, auth.updateUserCalled, "authenticator call mismatch")
-			if tt.wantAuthenticatorParam != nil {
-				assert.Equal(t, tt.wantAuthenticatorParam.ID, auth.updateUserParam.ID)
-				if tt.wantAuthenticatorParam.Name != nil {
-					assert.Equal(t, *tt.wantAuthenticatorParam.Name, *auth.updateUserParam.Name)
-				}
-				if tt.wantAuthenticatorParam.Email != nil {
-					assert.Equal(t, *tt.wantAuthenticatorParam.Email, *auth.updateUserParam.Email)
-				}
-				if tt.wantAuthenticatorParam.Password != nil {
-					assert.Equal(t, *tt.wantAuthenticatorParam.Password, *auth.updateUserParam.Password)
-				}
-			}
+		uid := id.NewUserID()
+		wid := id.NewWorkspaceID()
+		u := user.New().
+			ID(uid).
+			Workspace(wid).
+			Name("TestUser").
+			Email("old@example.com").
+			Auths([]user.Auth{{Provider: "auth0", Sub: "auth0|456"}}).
+			MustBuild()
+		ws := workspace.New().ID(wid).Name("TestUser").Personal(true).MustBuild()
 
-			// Verify password is NOT stored locally for OIDC users
-			if tt.wantPasswordNotStored && result != nil {
-				// Password should not match the provided password since it's not stored locally
-				matched, _ := result.MatchPassword(*tt.param.Password)
-				assert.False(t, matched, "password should NOT be stored locally for OIDC users")
-			}
-		})
-	}
+		assert.NoError(t, r.User.Save(ctx, u))
+		assert.NoError(t, r.Workspace.Save(ctx, ws))
+
+		auth := &mockAuthenticator{}
+		g := &gateway.Container{Authenticator: auth}
+		uc := NewUser(r, g, "", "")
+		operator := &workspace.Operator{User: lo.ToPtr(u.ID())}
+
+		result, err := uc.UpdateMeOIDC(ctx, interfaces.UpdateMeOIDCParam{
+			Email: lo.ToPtr("new@example.com"),
+		}, operator)
+
+		assert.NoError(t, err)
+		assert.NotNil(t, result)
+		assert.Equal(t, "TestUser", result.Name())
+		assert.Equal(t, "new@example.com", result.Email())
+
+		// Verify Auth0 was called
+		assert.True(t, auth.updateUserCalled)
+		assert.Equal(t, "auth0|456", auth.updateUserParam.ID)
+		assert.Equal(t, "new@example.com", *auth.updateUserParam.Email)
+	})
+
+	t.Run("update password sends to Auth0 only and not stored locally", func(t *testing.T) {
+		ctx := context.Background()
+		r := accountmemory.New()
+
+		uid := id.NewUserID()
+		wid := id.NewWorkspaceID()
+		u := user.New().
+			ID(uid).
+			Workspace(wid).
+			Name("TestUser").
+			Email("test@example.com").
+			Auths([]user.Auth{{Provider: "auth0", Sub: "auth0|789"}}).
+			MustBuild()
+		ws := workspace.New().ID(wid).Name("TestUser").Personal(true).MustBuild()
+
+		assert.NoError(t, r.User.Save(ctx, u))
+		assert.NoError(t, r.Workspace.Save(ctx, ws))
+
+		auth := &mockAuthenticator{}
+		g := &gateway.Container{Authenticator: auth}
+		uc := NewUser(r, g, "", "")
+		operator := &workspace.Operator{User: lo.ToPtr(u.ID())}
+
+		result, err := uc.UpdateMeOIDC(ctx, interfaces.UpdateMeOIDCParam{
+			Password:             lo.ToPtr("NewPass00!!"),
+			PasswordConfirmation: lo.ToPtr("NewPass00!!"),
+		}, operator)
+
+		assert.NoError(t, err)
+		assert.NotNil(t, result)
+
+		// Verify Auth0 was called with password
+		assert.True(t, auth.updateUserCalled)
+		assert.Equal(t, "auth0|789", auth.updateUserParam.ID)
+		assert.Equal(t, "NewPass00!!", *auth.updateUserParam.Password)
+
+		// Verify password is NOT stored locally
+		matched, _ := result.MatchPassword("NewPass00!!")
+		assert.False(t, matched, "password should NOT be stored locally for OIDC users")
+	})
+
+	t.Run("update lang and theme does not call Auth0", func(t *testing.T) {
+		ctx := context.Background()
+		r := accountmemory.New()
+
+		uid := id.NewUserID()
+		wid := id.NewWorkspaceID()
+		u := user.New().
+			ID(uid).
+			Workspace(wid).
+			Name("TestUser").
+			Email("test@example.com").
+			Auths([]user.Auth{{Provider: "auth0", Sub: "auth0|abc"}}).
+			MustBuild()
+		ws := workspace.New().ID(wid).Name("TestUser").Personal(true).MustBuild()
+
+		assert.NoError(t, r.User.Save(ctx, u))
+		assert.NoError(t, r.Workspace.Save(ctx, ws))
+
+		auth := &mockAuthenticator{}
+		g := &gateway.Container{Authenticator: auth}
+		uc := NewUser(r, g, "", "")
+		operator := &workspace.Operator{User: lo.ToPtr(u.ID())}
+
+		result, err := uc.UpdateMeOIDC(ctx, interfaces.UpdateMeOIDCParam{
+			Lang:  lo.ToPtr(language.Japanese),
+			Theme: user.ThemeDark.Ref(),
+		}, operator)
+
+		assert.NoError(t, err)
+		assert.NotNil(t, result)
+		assert.Equal(t, "TestUser", result.Name())
+		assert.Equal(t, "test@example.com", result.Email())
+
+		// Verify Auth0 was NOT called (lang/theme are local only)
+		assert.False(t, auth.updateUserCalled)
+	})
+
+	t.Run("password mismatch returns error", func(t *testing.T) {
+		ctx := context.Background()
+		r := accountmemory.New()
+
+		uid := id.NewUserID()
+		wid := id.NewWorkspaceID()
+		u := user.New().
+			ID(uid).
+			Workspace(wid).
+			Name("TestUser").
+			Email("test@example.com").
+			Auths([]user.Auth{{Provider: "auth0", Sub: "auth0|def"}}).
+			MustBuild()
+		ws := workspace.New().ID(wid).Name("TestUser").Personal(true).MustBuild()
+
+		assert.NoError(t, r.User.Save(ctx, u))
+		assert.NoError(t, r.Workspace.Save(ctx, ws))
+
+		auth := &mockAuthenticator{}
+		g := &gateway.Container{Authenticator: auth}
+		uc := NewUser(r, g, "", "")
+		operator := &workspace.Operator{User: lo.ToPtr(u.ID())}
+
+		_, err := uc.UpdateMeOIDC(ctx, interfaces.UpdateMeOIDCParam{
+			Password:             lo.ToPtr("NewPass00!!"),
+			PasswordConfirmation: lo.ToPtr("DifferentPass00!!"),
+		}, operator)
+
+		assert.Error(t, err)
+		assert.Equal(t, interfaces.ErrUserInvalidPasswordConfirmation.Error(), err.Error())
+		assert.False(t, auth.updateUserCalled)
+	})
+
+	t.Run("no auth0 provider does not call authenticator", func(t *testing.T) {
+		ctx := context.Background()
+		r := accountmemory.New()
+
+		uid := id.NewUserID()
+		wid := id.NewWorkspaceID()
+		u := user.New().
+			ID(uid).
+			Workspace(wid).
+			Name("TestUser").
+			Email("test@example.com").
+			Auths([]user.Auth{{Provider: "reearth", Sub: "reearth|123"}}).
+			MustBuild()
+		ws := workspace.New().ID(wid).Name("TestUser").Personal(true).MustBuild()
+
+		assert.NoError(t, r.User.Save(ctx, u))
+		assert.NoError(t, r.Workspace.Save(ctx, ws))
+
+		auth := &mockAuthenticator{}
+		g := &gateway.Container{Authenticator: auth}
+		uc := NewUser(r, g, "", "")
+		operator := &workspace.Operator{User: lo.ToPtr(u.ID())}
+
+		result, err := uc.UpdateMeOIDC(ctx, interfaces.UpdateMeOIDCParam{
+			Name: lo.ToPtr("NewName"),
+		}, operator)
+
+		assert.NoError(t, err)
+		assert.NotNil(t, result)
+		assert.Equal(t, "NewName", result.Name())
+
+		// Verify Auth0 was NOT called (no auth0 provider)
+		assert.False(t, auth.updateUserCalled)
+
+		// Verify workspace was still renamed
+		updatedWs, _ := r.Workspace.FindByID(ctx, wid)
+		assert.Equal(t, "NewName", updatedWs.Name())
+	})
+
+	t.Run("authenticator error is propagated", func(t *testing.T) {
+		ctx := context.Background()
+		r := accountmemory.New()
+
+		uid := id.NewUserID()
+		wid := id.NewWorkspaceID()
+		u := user.New().
+			ID(uid).
+			Workspace(wid).
+			Name("TestUser").
+			Email("test@example.com").
+			Auths([]user.Auth{{Provider: "auth0", Sub: "auth0|error"}}).
+			MustBuild()
+		ws := workspace.New().ID(wid).Name("TestUser").Personal(true).MustBuild()
+
+		assert.NoError(t, r.User.Save(ctx, u))
+		assert.NoError(t, r.Workspace.Save(ctx, ws))
+
+		expectedErr := rerror.NewE(i18n.T("auth0 error"))
+		auth := &mockAuthenticator{updateUserError: expectedErr}
+		g := &gateway.Container{Authenticator: auth}
+		uc := NewUser(r, g, "", "")
+		operator := &workspace.Operator{User: lo.ToPtr(u.ID())}
+
+		_, err := uc.UpdateMeOIDC(ctx, interfaces.UpdateMeOIDCParam{
+			Name: lo.ToPtr("NewName"),
+		}, operator)
+
+		assert.Error(t, err)
+		assert.Equal(t, expectedErr.Error(), err.Error())
+		assert.True(t, auth.updateUserCalled)
+	})
+
+	t.Run("invalid operator returns error", func(t *testing.T) {
+		ctx := context.Background()
+		r := accountmemory.New()
+
+		auth := &mockAuthenticator{}
+		g := &gateway.Container{Authenticator: auth}
+		uc := NewUser(r, g, "", "")
+		operator := &workspace.Operator{} // No user set
+
+		_, err := uc.UpdateMeOIDC(ctx, interfaces.UpdateMeOIDCParam{
+			Name: lo.ToPtr("NewName"),
+		}, operator)
+
+		assert.Error(t, err)
+		assert.Equal(t, interfaces.ErrInvalidOperator.Error(), err.Error())
+		assert.False(t, auth.updateUserCalled)
+	})
 }
