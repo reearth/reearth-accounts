@@ -87,12 +87,16 @@ input PasswordResetInput {
 }
 
 input UpdateMeInput {
-  name: String
+  alias: String
+  description: String
   email: String
   lang: Lang
-  theme: Theme
+  name: String
   password: String
   passwordConfirmation: String
+  photoURL: String
+  theme: Theme
+  website: String
 }
 
 input RemoveMyAuthInput {

@@ -60,7 +60,7 @@ type updateMeMutation struct {
 type updateMeFullMutation struct {
 	UpdateMe struct {
 		Me gqlmodel.Me
-	} `graphql:"updateMe(input: {name: $name, email: $email, lang: $lang, theme: $theme, password: $password, passwordConfirmation: $passwordConfirmation})"`
+	} `graphql:"updateMe(input: {alias: $alias, description: $description, email: $email, lang: $lang, name: $name, password: $password, passwordConfirmation: $passwordConfirmation, photoURL: $photoURL, theme: $theme, website: $website})"`
 }
 
 type signupOIDCMutation struct {

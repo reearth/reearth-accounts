@@ -2811,6 +2811,9 @@ func (v *UpdateIntegrationOfWorkspaceUpdateIntegrationOfWorkspaceUpdateMemberOfW
 type UpdateMeInput struct {
 	Name                 string `json:"name"`
 	Email                string `json:"email"`
+	Description          string `json:"description"`
+	PhotoURL             string `json:"photoURL"`
+	Website              string `json:"website"`
 	Lang                 string `json:"lang"`
 	Theme                string `json:"theme"`
 	Password             string `json:"password"`
@@ -2822,6 +2825,15 @@ func (v *UpdateMeInput) GetName() string { return v.Name }
 
 // GetEmail returns UpdateMeInput.Email, and is useful for accessing the field via an interface.
 func (v *UpdateMeInput) GetEmail() string { return v.Email }
+
+// GetDescription returns UpdateMeInput.Description, and is useful for accessing the field via an interface.
+func (v *UpdateMeInput) GetDescription() string { return v.Description }
+
+// GetPhotoURL returns UpdateMeInput.PhotoURL, and is useful for accessing the field via an interface.
+func (v *UpdateMeInput) GetPhotoURL() string { return v.PhotoURL }
+
+// GetWebsite returns UpdateMeInput.Website, and is useful for accessing the field via an interface.
+func (v *UpdateMeInput) GetWebsite() string { return v.Website }
 
 // GetLang returns UpdateMeInput.Lang, and is useful for accessing the field via an interface.
 func (v *UpdateMeInput) GetLang() string { return v.Lang }

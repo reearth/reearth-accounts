@@ -64,12 +64,16 @@ type GetUserByCredentials struct {
 }
 
 type UpdateMeParam struct {
-	Name                 *string
+	Alias                *string
+	Description          *string
 	Email                *string
 	Lang                 *language.Tag
-	Theme                *user.Theme
+	Name                 *string
 	Password             *string
 	PasswordConfirmation *string
+	PhotoURL             *string
+	Theme                *user.Theme
+	Website              *string
 }
 
 type FetchByIDsWithPaginationParam struct {
