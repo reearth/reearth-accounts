@@ -73,54 +73,36 @@ These fields are already supported in the domain model (`user.User` and `user.Me
 
 ## Design
 
-```
-Client Request
-      |
-      v
-+------------------+
-| GraphQL Mutation |
-| updateMe         |
-+------------------+
-      |
-      v
-+------------------+
-| UpdateMe         |
-| Interactor       |
-+------------------+
-      |
-      +-- Validate alias uniqueness (if provided)
-      |        |
-      |        v
-      |   +------------------+
-      |   | User Repository  |
-      |   | FindByAlias      |
-      |   +------------------+
-      |
-      +-- Update User fields
-      |        |
-      |        v
-      |   +------------------+
-      |   | User Entity      |
-      |   | UpdateAlias,     |
-      |   | Metadata updates |
-      |   +------------------+
-      |
-      +-- Sync Personal Workspace (if metadata changed)
-      |        |
-      |        v
-      |   +------------------+
-      |   | Workspace Repo   |
-      |   | FindByID, Save   |
-      |   +------------------+
-      |
-      v
-+------------------+
-| Save User        |
-| User Repository  |
-+------------------+
-      |
-      v
-Response
+```mermaid
+sequenceDiagram
+    participant Client
+    participant GraphQL as GraphQL Mutation<br>(updateMe)
+    participant Interactor as UpdateMe Interactor
+    participant UserRepo as User Repository
+    participant User as User Entity
+    participant WorkspaceRepo as Workspace Repository
+
+    Client->>GraphQL: UpdateMe Request
+    GraphQL->>Interactor: Execute mutation
+
+    opt Alias provided
+        Interactor->>UserRepo: FindByAlias(alias)
+        UserRepo-->>Interactor: Check uniqueness
+    end
+
+    Interactor->>User: UpdateAlias, UpdateMetadata
+    User-->>Interactor: Updated entity
+
+    opt Metadata changed (description, website, photoURL)
+        Interactor->>WorkspaceRepo: FindByID(personalWorkspaceID)
+        WorkspaceRepo-->>Interactor: Personal workspace
+        Interactor->>WorkspaceRepo: Save(updated workspace)
+    end
+
+    Interactor->>UserRepo: Save(user)
+    UserRepo-->>Interactor: Success
+    Interactor-->>GraphQL: Updated user
+    GraphQL-->>Client: Response
 ```
 
 ## Potential Impact
