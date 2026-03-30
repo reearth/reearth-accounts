@@ -26,7 +26,7 @@
       },
       "latestlogoutat": {
         "bsonType": "date",
-        "description": "UTC Unix timestamp of user's latest logout. Default: zero"
+        "description": "Timestamp (datetime) of user's latest logout in UTC. Default: zero value"
       },
       "metadata": {
         "bsonType": "object",

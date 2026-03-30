@@ -19,7 +19,7 @@ type UserDocument struct {
 	Name          string                 `json:"name" bson:"name" jsonschema:"required,description=User display name"`
 	Alias         string                 `json:"alias" bson:"alias" jsonschema:"required,description=Unique user handle/alias. Default: \"\""`
 	Email          string                 `json:"email" bson:"email" jsonschema:"required,description=User email address"`
-	LatestLogoutAt time.Time              `json:"latestlogoutat" bson:"latestlogoutat" jsonschema:"description=UTC Unix timestamp of user's latest logout. Default: zero"`
+	LatestLogoutAt time.Time              `json:"latestlogoutat" bson:"latestlogoutat" jsonschema:"description=Timestamp (datetime) of user's latest logout in UTC. Default: zero value"`
 	Subs           []string               `json:"subs" bson:"subs" jsonschema:"required,description=OAuth subject identifiers for authentication providers. Default: []"`
 	Workspace     string                 `json:"workspace" bson:"workspace" jsonschema:"required,foreignkey=workspace,description=Personal workspace ID (ULID format)"`
 	Team          string                 `json:"team" bson:",omitempty" jsonschema:"description=Legacy team field (deprecated, use workspace)"`
