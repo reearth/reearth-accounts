@@ -35,6 +35,26 @@ func (r *mutationResolver) UpdateMe(ctx context.Context, input gqlmodel.UpdateMe
 	return &gqlmodel.UpdateMePayload{Me: gqlmodel.ToMe(res)}, nil
 }
 
+func (r *mutationResolver) UpdateMeOidc(ctx context.Context, input gqlmodel.UpdateMeOIDCInput) (*gqlmodel.UpdateMePayload, error) {
+	var lang language.Tag
+	if input.Lang != nil {
+		lang = language.Make(*input.Lang)
+	}
+	res, err := usecases(ctx).User.UpdateMeOIDC(ctx, interfaces.UpdateMeOIDCParam{
+		Name:                 input.Name,
+		Email:                input.Email,
+		Lang:                 &lang,
+		Theme:                gqlmodel.ToTheme(input.Theme),
+		Password:             input.Password,
+		PasswordConfirmation: input.PasswordConfirmation,
+	}, getOperator(ctx))
+	if err != nil {
+		return nil, err
+	}
+
+	return &gqlmodel.UpdateMePayload{Me: gqlmodel.ToMe(res)}, nil
+}
+
 func (r *mutationResolver) RemoveMyAuth(ctx context.Context, input gqlmodel.RemoveMyAuthInput) (*gqlmodel.UpdateMePayload, error) {
 	res, err := usecases(ctx).User.RemoveMyAuth(ctx, input.Auth, getOperator(ctx))
 	if err != nil {

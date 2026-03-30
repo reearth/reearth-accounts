@@ -99,6 +99,15 @@ input UpdateMeInput {
   website: String
 }
 
+input UpdateMeOIDCInput {
+  name: String
+  email: String
+  lang: Lang
+  theme: Theme
+  password: String
+  passwordConfirmation: String
+}
+
 input RemoveMyAuthInput {
   auth: String!
 }
@@ -132,6 +141,7 @@ type DeleteMePayload {
 
 extend type Mutation {
   updateMe(input: UpdateMeInput!): UpdateMePayload
+  updateMeOIDC(input: UpdateMeOIDCInput!): UpdateMePayload
   removeMyAuth(input: RemoveMyAuthInput!): UpdateMePayload
   deleteMe(input: DeleteMeInput!): DeleteMePayload
   signup(input: SignupInput!): UserPayload
