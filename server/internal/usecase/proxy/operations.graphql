@@ -134,6 +134,12 @@ mutation UpdateMe($input: UpdateMeInput!) {
     }
 }
 
+mutation UpdateMeOIDC($input: UpdateMeOIDCInput!) {
+    updateMeOIDC(input: $input) {
+        me {...FragmentMe}
+    }
+}
+
 mutation DeleteMe($input: DeleteMeInput!) {
     deleteMe(input: $input) {
         userId
