@@ -141,6 +141,16 @@ func (i *User) UpdateMe(ctx context.Context, p interfaces.UpdateMeParam, operato
 			return nil, err
 		}
 
+		if p.Alias != nil && *p.Alias != u.Alias() {
+			existingUser, err := i.repos.User.FindByAlias(ctx, *p.Alias)
+			if err != nil && !errors.Is(err, rerror.ErrNotFound) {
+				return nil, err
+			}
+			if existingUser != nil && existingUser.ID() != u.ID() {
+				return nil, interfaces.ErrUserAliasAlreadyExists
+			}
+			u.UpdateAlias(*p.Alias)
+		}
 		if p.Name != nil && *p.Name != u.Name() {
 			oldName := u.Name()
 			u.UpdateName(*p.Name)
@@ -158,7 +168,7 @@ func (i *User) UpdateMe(ctx context.Context, p interfaces.UpdateMeParam, operato
 			}
 		}
 		if p.Email != nil {
-			if err := u.UpdateEmail(*p.Email); err != nil {
+			if err = u.UpdateEmail(*p.Email); err != nil {
 				return nil, err
 			}
 		}
@@ -171,11 +181,63 @@ func (i *User) UpdateMe(ctx context.Context, p interfaces.UpdateMeParam, operato
 			if p.Theme != nil {
 				u.Metadata().SetTheme(*p.Theme)
 			}
+
+			if p.Description != nil {
+				u.Metadata().SetDescription(*p.Description)
+			}
+
+			if p.Website != nil {
+				u.Metadata().SetWebsite(*p.Website)
+			}
+
+			if p.PhotoURL != nil {
+				u.Metadata().SetPhotoURL(*p.PhotoURL)
+			}
 		}
 
 		if p.Password != nil && u.HasAuthProvider("reearth") {
-			if err = u.SetPassword(*p.Password); err != nil {
+			if err := u.SetPassword(*p.Password); err != nil {
 				return nil, err
+			}
+		}
+
+		// Update Auth0 users
+		if p.Name != nil || p.Email != nil || p.Password != nil {
+			for _, a := range u.Auths() {
+				if a.Provider != "auth0" {
+					continue
+				}
+				if _, err = i.gateways.Authenticator.UpdateUser(ctx, gateway.AuthenticatorUpdateUserParam{
+					ID:       a.Sub,
+					Name:     p.Name,
+					Email:    p.Email,
+					Password: p.Password,
+				}); err != nil {
+					return nil, err
+				}
+			}
+		}
+
+		// Update personal workspace metadata fields (description, website, photoURL)
+		if p.Description != nil || p.Website != nil || p.PhotoURL != nil {
+			if ws == nil {
+				ws, err = i.repos.Workspace.FindByID(ctx, u.Workspace())
+				if err != nil && !errors.Is(err, rerror.ErrNotFound) {
+					return nil, err
+				}
+			}
+			if ws != nil && ws.IsPersonal() {
+				metadata := ws.Metadata()
+				if p.Description != nil {
+					metadata.SetDescription(*p.Description)
+				}
+				if p.Website != nil {
+					metadata.SetWebsite(*p.Website)
+				}
+				if p.PhotoURL != nil {
+					metadata.SetPhotoURL(*p.PhotoURL)
+				}
+				ws.SetMetadata(*metadata)
 			}
 		}
 

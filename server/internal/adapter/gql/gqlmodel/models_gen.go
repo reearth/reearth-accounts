@@ -235,12 +235,16 @@ type UpdateIntegrationOfWorkspaceInput struct {
 }
 
 type UpdateMeInput struct {
-	Name                 *string `json:"name,omitempty"`
+	Alias                *string `json:"alias,omitempty"`
+	Description          *string `json:"description,omitempty"`
 	Email                *string `json:"email,omitempty"`
 	Lang                 *string `json:"lang,omitempty"`
-	Theme                *Theme  `json:"theme,omitempty"`
+	Name                 *string `json:"name,omitempty"`
 	Password             *string `json:"password,omitempty"`
 	PasswordConfirmation *string `json:"passwordConfirmation,omitempty"`
+	PhotoURL             *string `json:"photoURL,omitempty"`
+	Theme                *Theme  `json:"theme,omitempty"`
+	Website              *string `json:"website,omitempty"`
 }
 
 type UpdateMeOIDCInput struct {
