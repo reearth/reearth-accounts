@@ -24,6 +24,10 @@
         "bsonType": "string",
         "description": "User language preference. Default: \"\" (deprecated, move to metadata)"
       },
+      "latestlogoutat": {
+        "bsonType": "date",
+        "description": "UTC Unix timestamp of user's latest logout. Default: zero"
+      },
       "metadata": {
         "bsonType": "object",
         "description": "Extended user metadata. Default: {}",

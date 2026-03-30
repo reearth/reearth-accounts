@@ -88,6 +88,10 @@ func (u *User) FindOrCreate(ctx context.Context, param interfaces.UserFindOrCrea
 	return FragmentToUser(res.FindOrCreate.User.FragmentUser)
 }
 
+func (u *User) UpdateLatestLogoutAt(ctx context.Context, op *workspace.Operator) (*user.User, error) {
+	panic("unsupported")
+}
+
 func (u *User) UpdateMe(ctx context.Context, param interfaces.UpdateMeParam, op *workspace.Operator) (*user.User, error) {
 	input := UpdateMeInput{
 		Name:                 *param.Name,

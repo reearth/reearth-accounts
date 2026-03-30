@@ -14,18 +14,19 @@ var (
 )
 
 type User struct {
-	id            ID
-	name          string
-	alias         string
-	email         string
-	metadata      Metadata
-	password      EncodedPassword
-	workspace     WorkspaceID
-	auths         []Auth
-	verification  *Verification
-	passwordReset *PasswordReset
-	host          string
-	updatedAt     time.Time
+	id              ID
+	name            string
+	alias           string
+	email           string
+	latestLogoutAt  time.Time
+	metadata        Metadata
+	password        EncodedPassword
+	workspace       WorkspaceID
+	auths           []Auth
+	verification    *Verification
+	passwordReset   *PasswordReset
+	host            string
+	updatedAt       time.Time
 }
 
 func (u *User) ID() ID {
@@ -172,6 +173,11 @@ func (u *User) ClearAuths() {
 	u.updatedAt = time.Now()
 }
 
+func (u *User) SetLatestLogoutAt(t time.Time) {
+	u.latestLogoutAt = t
+	u.updatedAt = time.Now()
+}
+
 func (u *User) SetPassword(pass string) error {
 	p, err := NewEncodedPassword(pass)
 	if err != nil {
@@ -212,23 +218,28 @@ func (u *User) Host() string {
 	return u.host
 }
 
+func (u *User) LatestLogoutAt() time.Time {
+	return u.latestLogoutAt
+}
+
 func (u *User) UpdatedAt() time.Time {
 	return u.updatedAt
 }
 
 func (u *User) Clone() *User {
 	return &User{
-		id:            u.id,
-		name:          u.name,
-		alias:         u.alias,
-		email:         u.email,
-		password:      u.password,
-		workspace:     u.workspace,
-		auths:         slices.Clone(u.auths),
-		metadata:      u.metadata,
-		verification:  util.CloneRef(u.verification),
-		passwordReset: util.CloneRef(u.passwordReset),
-		updatedAt:     time.Now(),
+		id:             u.id,
+		name:           u.name,
+		alias:          u.alias,
+		email:          u.email,
+		latestLogoutAt: u.latestLogoutAt,
+		password:       u.password,
+		workspace:      u.workspace,
+		auths:          slices.Clone(u.auths),
+		metadata:       u.metadata,
+		verification:   util.CloneRef(u.verification),
+		passwordReset:  util.CloneRef(u.passwordReset),
+		updatedAt:      time.Now(),
 	}
 }
 

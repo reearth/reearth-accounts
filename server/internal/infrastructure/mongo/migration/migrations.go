@@ -39,4 +39,5 @@ var migrations = migration.Migrations[DBClient]{
 	260126150002: ApplyWorkspaceUpdatedAtSchema,
 	260128010001: ApplyRoleUpdatedAtSchema,
 	260128010002: ApplyPermittableUpdatedAtSchema,
+	260330120000: ApplyUserLatestLogoutAtSchema,
 }

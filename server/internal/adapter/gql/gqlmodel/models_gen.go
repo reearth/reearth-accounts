@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"io"
 	"strconv"
+	"time"
 )
 
 type Node interface {
@@ -106,15 +107,16 @@ type GetUsersWithRolesPayload struct {
 }
 
 type Me struct {
-	ID            ID            `json:"id"`
-	Name          string        `json:"name"`
-	Alias         string        `json:"alias"`
-	Email         string        `json:"email"`
-	Metadata      *UserMetadata `json:"metadata"`
-	Host          *string       `json:"host,omitempty"`
-	MyWorkspaceID ID            `json:"myWorkspaceId"`
-	Auths         []string      `json:"auths"`
-	MyWorkspace   *Workspace    `json:"myWorkspace"`
+	ID             ID            `json:"id"`
+	Name           string        `json:"name"`
+	Alias          string        `json:"alias"`
+	Email          string        `json:"email"`
+	Metadata       *UserMetadata `json:"metadata"`
+	Host           *string       `json:"host,omitempty"`
+	LatestLogoutAt *time.Time    `json:"latestLogoutAt,omitempty"`
+	MyWorkspaceID  ID            `json:"myWorkspaceId"`
+	Auths          []string      `json:"auths"`
+	MyWorkspace    *Workspace    `json:"myWorkspace"`
 }
 
 type MemberInput struct {

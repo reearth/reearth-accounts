@@ -100,9 +100,10 @@ type User interface {
 	SignupOIDC(context.Context, SignupOIDCParam) (*user.User, error)
 
 	// editing me
-	UpdateMe(context.Context, UpdateMeParam, *workspace.Operator) (*user.User, error)
-	RemoveMyAuth(context.Context, string, *workspace.Operator) (*user.User, error)
 	DeleteMe(context.Context, user.ID, *workspace.Operator) error
+	RemoveMyAuth(context.Context, string, *workspace.Operator) (*user.User, error)
+	UpdateMe(context.Context, UpdateMeParam, *workspace.Operator) (*user.User, error)
+	UpdateLatestLogoutAt(context.Context, *workspace.Operator) (*user.User, error)
 
 	// built-in auth server
 	CreateVerification(context.Context, string) error
