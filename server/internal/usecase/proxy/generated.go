@@ -2809,43 +2809,47 @@ func (v *UpdateIntegrationOfWorkspaceUpdateIntegrationOfWorkspaceUpdateMemberOfW
 }
 
 type UpdateMeInput struct {
-	Name                 string `json:"name"`
-	Email                string `json:"email"`
+	Alias                string `json:"alias"`
 	Description          string `json:"description"`
-	PhotoURL             string `json:"photoURL"`
-	Website              string `json:"website"`
+	Email                string `json:"email"`
 	Lang                 string `json:"lang"`
-	Theme                string `json:"theme"`
+	Name                 string `json:"name"`
 	Password             string `json:"password"`
 	PasswordConfirmation string `json:"passwordConfirmation"`
+	PhotoURL             string `json:"photoURL"`
+	Theme                string `json:"theme"`
+	Website              string `json:"website"`
 }
 
-// GetName returns UpdateMeInput.Name, and is useful for accessing the field via an interface.
-func (v *UpdateMeInput) GetName() string { return v.Name }
-
-// GetEmail returns UpdateMeInput.Email, and is useful for accessing the field via an interface.
-func (v *UpdateMeInput) GetEmail() string { return v.Email }
+// GetAlias returns UpdateMeInput.Alias, and is useful for accessing the field via an interface.
+func (v *UpdateMeInput) GetAlias() string { return v.Alias }
 
 // GetDescription returns UpdateMeInput.Description, and is useful for accessing the field via an interface.
 func (v *UpdateMeInput) GetDescription() string { return v.Description }
 
-// GetPhotoURL returns UpdateMeInput.PhotoURL, and is useful for accessing the field via an interface.
-func (v *UpdateMeInput) GetPhotoURL() string { return v.PhotoURL }
-
-// GetWebsite returns UpdateMeInput.Website, and is useful for accessing the field via an interface.
-func (v *UpdateMeInput) GetWebsite() string { return v.Website }
+// GetEmail returns UpdateMeInput.Email, and is useful for accessing the field via an interface.
+func (v *UpdateMeInput) GetEmail() string { return v.Email }
 
 // GetLang returns UpdateMeInput.Lang, and is useful for accessing the field via an interface.
 func (v *UpdateMeInput) GetLang() string { return v.Lang }
 
-// GetTheme returns UpdateMeInput.Theme, and is useful for accessing the field via an interface.
-func (v *UpdateMeInput) GetTheme() string { return v.Theme }
+// GetName returns UpdateMeInput.Name, and is useful for accessing the field via an interface.
+func (v *UpdateMeInput) GetName() string { return v.Name }
 
 // GetPassword returns UpdateMeInput.Password, and is useful for accessing the field via an interface.
 func (v *UpdateMeInput) GetPassword() string { return v.Password }
 
 // GetPasswordConfirmation returns UpdateMeInput.PasswordConfirmation, and is useful for accessing the field via an interface.
 func (v *UpdateMeInput) GetPasswordConfirmation() string { return v.PasswordConfirmation }
+
+// GetPhotoURL returns UpdateMeInput.PhotoURL, and is useful for accessing the field via an interface.
+func (v *UpdateMeInput) GetPhotoURL() string { return v.PhotoURL }
+
+// GetTheme returns UpdateMeInput.Theme, and is useful for accessing the field via an interface.
+func (v *UpdateMeInput) GetTheme() string { return v.Theme }
+
+// GetWebsite returns UpdateMeInput.Website, and is useful for accessing the field via an interface.
+func (v *UpdateMeInput) GetWebsite() string { return v.Website }
 
 // UpdateMeResponse is returned by UpdateMe on success.
 type UpdateMeResponse struct {
