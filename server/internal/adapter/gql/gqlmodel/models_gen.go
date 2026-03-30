@@ -245,6 +245,15 @@ type UpdateMeInput struct {
 	PasswordConfirmation *string `json:"passwordConfirmation,omitempty"`
 }
 
+type UpdateMeOIDCInput struct {
+	Name                 *string `json:"name,omitempty"`
+	Email                *string `json:"email,omitempty"`
+	Lang                 *string `json:"lang,omitempty"`
+	Theme                *Theme  `json:"theme,omitempty"`
+	Password             *string `json:"password,omitempty"`
+	PasswordConfirmation *string `json:"passwordConfirmation,omitempty"`
+}
+
 type UpdateMePayload struct {
 	Me *Me `json:"me"`
 }

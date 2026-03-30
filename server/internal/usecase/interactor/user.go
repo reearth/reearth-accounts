@@ -156,7 +156,7 @@ func (i *User) UpdateMe(ctx context.Context, p interfaces.UpdateMeParam, operato
 			}
 		}
 
-		var workspace *workspace.Workspace
+		var ws *workspace.Workspace
 
 		u, err = i.repos.User.FindByID(ctx, *operator.User)
 		if err != nil {
@@ -167,16 +167,16 @@ func (i *User) UpdateMe(ctx context.Context, p interfaces.UpdateMeParam, operato
 			oldName := u.Name()
 			u.UpdateName(*p.Name)
 
-			workspace, err = i.repos.Workspace.FindByID(ctx, u.Workspace())
+			ws, err = i.repos.Workspace.FindByID(ctx, u.Workspace())
 			if err != nil && !errors.Is(err, rerror.ErrNotFound) {
 				return nil, err
 			}
 
-			tn := workspace.Name()
+			tn := ws.Name()
 			if tn == "" || tn == oldName {
-				workspace.Rename(*p.Name)
+				ws.Rename(*p.Name)
 			} else {
-				workspace = nil
+				ws = nil
 			}
 		}
 		if p.Email != nil {
@@ -196,18 +196,85 @@ func (i *User) UpdateMe(ctx context.Context, p interfaces.UpdateMeParam, operato
 		}
 
 		if p.Password != nil && u.HasAuthProvider("reearth") {
-			if err := u.SetPassword(*p.Password); err != nil {
+			if err = u.SetPassword(*p.Password); err != nil {
 				return nil, err
 			}
 		}
 
-		// Update Auth0 users
+		if ws != nil {
+			err = i.repos.Workspace.Save(ctx, ws)
+			if err != nil {
+				return nil, err
+			}
+		}
+
+		err = i.repos.User.Save(ctx, u)
+		if err != nil {
+			return nil, err
+		}
+
+		return u, nil
+	})
+}
+
+func (i *User) UpdateMeOIDC(ctx context.Context, p interfaces.UpdateMeOIDCParam, operator *workspace.Operator) (u *user.User, err error) {
+	if operator.User == nil {
+		return nil, interfaces.ErrInvalidOperator
+	}
+
+	return Run1(ctx, operator, i.repos, Usecase().Transaction(), func(ctx context.Context) (*user.User, error) {
+		var ws *workspace.Workspace
+
+		if p.Password != nil {
+			if p.PasswordConfirmation == nil || *p.Password != *p.PasswordConfirmation {
+				return nil, interfaces.ErrUserInvalidPasswordConfirmation
+			}
+		}
+
+		u, err = i.repos.User.FindByID(ctx, *operator.User)
+		if err != nil {
+			return nil, err
+		}
+
+		if p.Name != nil && *p.Name != u.Name() {
+			oldName := u.Name()
+			u.UpdateName(*p.Name)
+
+			ws, err = i.repos.Workspace.FindByID(ctx, u.Workspace())
+			if err != nil && !errors.Is(err, rerror.ErrNotFound) {
+				return nil, err
+			}
+
+			tn := ws.Name()
+			if tn == "" || tn == oldName {
+				ws.Rename(*p.Name)
+			} else {
+				ws = nil
+			}
+		}
+		if p.Email != nil {
+			if err := u.UpdateEmail(*p.Email); err != nil {
+				return nil, err
+			}
+		}
+
+		if u.Metadata() != nil {
+			if p.Lang != nil {
+				u.Metadata().LangFrom(p.Lang.String())
+			}
+
+			if p.Theme != nil {
+				u.Metadata().SetTheme(*p.Theme)
+			}
+		}
+
+		// Update Auth0 users (password is only sent to Auth0, not stored locally for OIDC users)
 		if p.Name != nil || p.Email != nil || p.Password != nil {
 			for _, a := range u.Auths() {
 				if a.Provider != "auth0" {
 					continue
 				}
-				if _, err := i.gateways.Authenticator.UpdateUser(ctx, gateway.AuthenticatorUpdateUserParam{
+				if _, err = i.gateways.Authenticator.UpdateUser(ctx, gateway.AuthenticatorUpdateUserParam{
 					ID:       a.Sub,
 					Name:     p.Name,
 					Email:    p.Email,
@@ -218,8 +285,8 @@ func (i *User) UpdateMe(ctx context.Context, p interfaces.UpdateMeParam, operato
 			}
 		}
 
-		if workspace != nil {
-			err = i.repos.Workspace.Save(ctx, workspace)
+		if ws != nil {
+			err = i.repos.Workspace.Save(ctx, ws)
 			if err != nil {
 				return nil, err
 			}

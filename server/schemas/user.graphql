@@ -96,6 +96,15 @@ input UpdateMeInput {
   passwordConfirmation: String
 }
 
+input UpdateMeOIDCInput {
+  name: String
+  email: String
+  lang: Lang
+  theme: Theme
+  password: String
+  passwordConfirmation: String
+}
+
 input RemoveMyAuthInput {
   auth: String!
 }
@@ -137,6 +146,7 @@ extend type Mutation {
   signupOIDC(input: SignupOIDCInput!): UserPayload
   startPasswordReset(input: StartPasswordResetInput!): Boolean
   updateMe(input: UpdateMeInput!): UpdateMePayload
+  updateMeOIDC(input: UpdateMeOIDCInput!): UpdateMePayload
   updateMyLatestLogoutAt: Me
   verifyUser(input: VerifyUserInput!): UserPayload
 }

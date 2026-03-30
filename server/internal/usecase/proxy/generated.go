@@ -2835,6 +2835,139 @@ func (v *UpdateMeInput) GetPassword() string { return v.Password }
 // GetPasswordConfirmation returns UpdateMeInput.PasswordConfirmation, and is useful for accessing the field via an interface.
 func (v *UpdateMeInput) GetPasswordConfirmation() string { return v.PasswordConfirmation }
 
+type UpdateMeOIDCInput struct {
+	Name                 string `json:"name"`
+	Email                string `json:"email"`
+	Lang                 string `json:"lang"`
+	Theme                string `json:"theme"`
+	Password             string `json:"password"`
+	PasswordConfirmation string `json:"passwordConfirmation"`
+}
+
+// GetName returns UpdateMeOIDCInput.Name, and is useful for accessing the field via an interface.
+func (v *UpdateMeOIDCInput) GetName() string { return v.Name }
+
+// GetEmail returns UpdateMeOIDCInput.Email, and is useful for accessing the field via an interface.
+func (v *UpdateMeOIDCInput) GetEmail() string { return v.Email }
+
+// GetLang returns UpdateMeOIDCInput.Lang, and is useful for accessing the field via an interface.
+func (v *UpdateMeOIDCInput) GetLang() string { return v.Lang }
+
+// GetTheme returns UpdateMeOIDCInput.Theme, and is useful for accessing the field via an interface.
+func (v *UpdateMeOIDCInput) GetTheme() string { return v.Theme }
+
+// GetPassword returns UpdateMeOIDCInput.Password, and is useful for accessing the field via an interface.
+func (v *UpdateMeOIDCInput) GetPassword() string { return v.Password }
+
+// GetPasswordConfirmation returns UpdateMeOIDCInput.PasswordConfirmation, and is useful for accessing the field via an interface.
+func (v *UpdateMeOIDCInput) GetPasswordConfirmation() string { return v.PasswordConfirmation }
+
+// UpdateMeOIDCResponse is returned by UpdateMeOIDC on success.
+type UpdateMeOIDCResponse struct {
+	UpdateMeOIDC UpdateMeOIDCUpdateMeOIDCUpdateMePayload `json:"updateMeOIDC"`
+}
+
+// GetUpdateMeOIDC returns UpdateMeOIDCResponse.UpdateMeOIDC, and is useful for accessing the field via an interface.
+func (v *UpdateMeOIDCResponse) GetUpdateMeOIDC() UpdateMeOIDCUpdateMeOIDCUpdateMePayload {
+	return v.UpdateMeOIDC
+}
+
+// UpdateMeOIDCUpdateMeOIDCUpdateMePayload includes the requested fields of the GraphQL type UpdateMePayload.
+type UpdateMeOIDCUpdateMeOIDCUpdateMePayload struct {
+	Me UpdateMeOIDCUpdateMeOIDCUpdateMePayloadMe `json:"me"`
+}
+
+// GetMe returns UpdateMeOIDCUpdateMeOIDCUpdateMePayload.Me, and is useful for accessing the field via an interface.
+func (v *UpdateMeOIDCUpdateMeOIDCUpdateMePayload) GetMe() UpdateMeOIDCUpdateMeOIDCUpdateMePayloadMe {
+	return v.Me
+}
+
+// UpdateMeOIDCUpdateMeOIDCUpdateMePayloadMe includes the requested fields of the GraphQL type Me.
+type UpdateMeOIDCUpdateMeOIDCUpdateMePayloadMe struct {
+	FragmentMe `json:"-"`
+}
+
+// GetId returns UpdateMeOIDCUpdateMeOIDCUpdateMePayloadMe.Id, and is useful for accessing the field via an interface.
+func (v *UpdateMeOIDCUpdateMeOIDCUpdateMePayloadMe) GetId() string { return v.FragmentMe.Id }
+
+// GetName returns UpdateMeOIDCUpdateMeOIDCUpdateMePayloadMe.Name, and is useful for accessing the field via an interface.
+func (v *UpdateMeOIDCUpdateMeOIDCUpdateMePayloadMe) GetName() string { return v.FragmentMe.Name }
+
+// GetEmail returns UpdateMeOIDCUpdateMeOIDCUpdateMePayloadMe.Email, and is useful for accessing the field via an interface.
+func (v *UpdateMeOIDCUpdateMeOIDCUpdateMePayloadMe) GetEmail() string { return v.FragmentMe.Email }
+
+// GetMetadata returns UpdateMeOIDCUpdateMeOIDCUpdateMePayloadMe.Metadata, and is useful for accessing the field via an interface.
+func (v *UpdateMeOIDCUpdateMeOIDCUpdateMePayloadMe) GetMetadata() FragmentMeMetadataUserMetadata {
+	return v.FragmentMe.Metadata
+}
+
+// GetMyWorkspaceId returns UpdateMeOIDCUpdateMeOIDCUpdateMePayloadMe.MyWorkspaceId, and is useful for accessing the field via an interface.
+func (v *UpdateMeOIDCUpdateMeOIDCUpdateMePayloadMe) GetMyWorkspaceId() string {
+	return v.FragmentMe.MyWorkspaceId
+}
+
+// GetAuths returns UpdateMeOIDCUpdateMeOIDCUpdateMePayloadMe.Auths, and is useful for accessing the field via an interface.
+func (v *UpdateMeOIDCUpdateMeOIDCUpdateMePayloadMe) GetAuths() []string { return v.FragmentMe.Auths }
+
+func (v *UpdateMeOIDCUpdateMeOIDCUpdateMePayloadMe) UnmarshalJSON(b []byte) error {
+
+	if string(b) == "null" {
+		return nil
+	}
+
+	var firstPass struct {
+		*UpdateMeOIDCUpdateMeOIDCUpdateMePayloadMe
+		graphql.NoUnmarshalJSON
+	}
+	firstPass.UpdateMeOIDCUpdateMeOIDCUpdateMePayloadMe = v
+
+	err := json.Unmarshal(b, &firstPass)
+	if err != nil {
+		return err
+	}
+
+	err = json.Unmarshal(
+		b, &v.FragmentMe)
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
+type __premarshalUpdateMeOIDCUpdateMeOIDCUpdateMePayloadMe struct {
+	Id string `json:"id"`
+
+	Name string `json:"name"`
+
+	Email string `json:"email"`
+
+	Metadata FragmentMeMetadataUserMetadata `json:"metadata"`
+
+	MyWorkspaceId string `json:"myWorkspaceId"`
+
+	Auths []string `json:"auths"`
+}
+
+func (v *UpdateMeOIDCUpdateMeOIDCUpdateMePayloadMe) MarshalJSON() ([]byte, error) {
+	premarshaled, err := v.__premarshalJSON()
+	if err != nil {
+		return nil, err
+	}
+	return json.Marshal(premarshaled)
+}
+
+func (v *UpdateMeOIDCUpdateMeOIDCUpdateMePayloadMe) __premarshalJSON() (*__premarshalUpdateMeOIDCUpdateMeOIDCUpdateMePayloadMe, error) {
+	var retval __premarshalUpdateMeOIDCUpdateMeOIDCUpdateMePayloadMe
+
+	retval.Id = v.FragmentMe.Id
+	retval.Name = v.FragmentMe.Name
+	retval.Email = v.FragmentMe.Email
+	retval.Metadata = v.FragmentMe.Metadata
+	retval.MyWorkspaceId = v.FragmentMe.MyWorkspaceId
+	retval.Auths = v.FragmentMe.Auths
+	return &retval, nil
+}
+
 // UpdateMeResponse is returned by UpdateMe on success.
 type UpdateMeResponse struct {
 	UpdateMe UpdateMeUpdateMeUpdateMePayload `json:"updateMe"`
@@ -4221,6 +4354,14 @@ type __UpdateMeInput struct {
 // GetInput returns __UpdateMeInput.Input, and is useful for accessing the field via an interface.
 func (v *__UpdateMeInput) GetInput() UpdateMeInput { return v.Input }
 
+// __UpdateMeOIDCInput is used internally by genqlient
+type __UpdateMeOIDCInput struct {
+	Input UpdateMeOIDCInput `json:"input"`
+}
+
+// GetInput returns __UpdateMeOIDCInput.Input, and is useful for accessing the field via an interface.
+func (v *__UpdateMeOIDCInput) GetInput() UpdateMeOIDCInput { return v.Input }
+
 // __UpdateUserOfWorkspaceInput is used internally by genqlient
 type __UpdateUserOfWorkspaceInput struct {
 	Input UpdateUserOfWorkspaceInput `json:"input"`
@@ -5555,6 +5696,56 @@ func UpdateMe(
 	}
 
 	data_ = &UpdateMeResponse{}
+	resp_ := &graphql.Response{Data: data_}
+
+	err_ = client_.MakeRequest(
+		ctx_,
+		req_,
+		resp_,
+	)
+
+	return data_, err_
+}
+
+// The mutation executed by UpdateMeOIDC.
+const UpdateMeOIDC_Operation = `
+mutation UpdateMeOIDC ($input: UpdateMeOIDCInput!) {
+	updateMeOIDC(input: $input) {
+		me {
+			... FragmentMe
+		}
+	}
+}
+fragment FragmentMe on Me {
+	id
+	name
+	email
+	metadata {
+		description
+		lang
+		photoURL
+		theme
+		website
+	}
+	myWorkspaceId
+	auths
+}
+`
+
+func UpdateMeOIDC(
+	ctx_ context.Context,
+	client_ graphql.Client,
+	input UpdateMeOIDCInput,
+) (data_ *UpdateMeOIDCResponse, err_ error) {
+	req_ := &graphql.Request{
+		OpName: "UpdateMeOIDC",
+		Query:  UpdateMeOIDC_Operation,
+		Variables: &__UpdateMeOIDCInput{
+			Input: input,
+		},
+	}
+
+	data_ = &UpdateMeOIDCResponse{}
 	resp_ := &graphql.Response{Data: data_}
 
 	err_ = client_.MakeRequest(

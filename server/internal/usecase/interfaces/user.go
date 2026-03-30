@@ -72,6 +72,15 @@ type UpdateMeParam struct {
 	PasswordConfirmation *string
 }
 
+type UpdateMeOIDCParam struct {
+	Name                 *string
+	Email                *string
+	Lang                 *language.Tag
+	Theme                *user.Theme
+	Password             *string
+	PasswordConfirmation *string
+}
+
 type FetchByIDsWithPaginationParam struct {
 	Page int64
 	Size int64
@@ -102,8 +111,9 @@ type User interface {
 	// editing me
 	DeleteMe(context.Context, user.ID, *workspace.Operator) error
 	RemoveMyAuth(context.Context, string, *workspace.Operator) (*user.User, error)
-	UpdateMe(context.Context, UpdateMeParam, *workspace.Operator) (*user.User, error)
 	UpdateLatestLogoutAt(context.Context, *workspace.Operator) (*user.User, error)
+	UpdateMe(context.Context, UpdateMeParam, *workspace.Operator) (*user.User, error)
+	UpdateMeOIDC(context.Context, UpdateMeOIDCParam, *workspace.Operator) (*user.User, error)
 
 	// built-in auth server
 	CreateVerification(context.Context, string) error
