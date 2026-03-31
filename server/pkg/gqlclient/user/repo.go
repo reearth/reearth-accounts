@@ -18,12 +18,16 @@ type userRepo struct {
 }
 
 type UpdateMeInput struct {
-	Name                 *string
+	Alias                *string
+	Description          *string
 	Email                *string
 	Lang                 *string
-	Theme                *string
+	Name                 *string
 	Password             *string
 	PasswordConfirmation *string
+	PhotoURL             *string
+	Theme                *string
+	Website              *string
 }
 
 type Repo interface {
@@ -303,17 +307,37 @@ func (r *userRepo) UpdateMe(ctx context.Context, input UpdateMeInput) (*user.Use
 	var m updateMeFullMutation
 
 	vars := map[string]interface{}{
-		"name":                 (*graphql.String)(nil),
+		"alias":                (*graphql.String)(nil),
+		"description":          (*graphql.String)(nil),
 		"email":                (*graphql.String)(nil),
 		"lang":                 (*gqlmodel.Lang)(nil),
-		"theme":                (*gqlmodel.Theme)(nil),
+		"name":                 (*graphql.String)(nil),
 		"password":             (*graphql.String)(nil),
 		"passwordConfirmation": (*graphql.String)(nil),
+		"photoURL":             (*graphql.String)(nil),
+		"theme":                (*gqlmodel.Theme)(nil),
+		"website":              (*graphql.String)(nil),
 	}
 
+	if input.Alias != nil {
+		alias := graphql.String(*input.Alias)
+		vars["alias"] = &alias
+	}
 	if input.Name != nil {
 		name := graphql.String(*input.Name)
 		vars["name"] = &name
+	}
+	if input.Description != nil {
+		description := graphql.String(*input.Description)
+		vars["description"] = &description
+	}
+	if input.Website != nil {
+		website := graphql.String(*input.Website)
+		vars["website"] = &website
+	}
+	if input.PhotoURL != nil {
+		photoURL := graphql.String(*input.PhotoURL)
+		vars["photoURL"] = &photoURL
 	}
 	if input.Email != nil {
 		email := graphql.String(*input.Email)

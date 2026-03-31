@@ -17,12 +17,16 @@ func (r *mutationResolver) UpdateMe(ctx context.Context, input gqlmodel.UpdateMe
 		lang = language.Make(*input.Lang)
 	}
 	res, err := usecases(ctx).User.UpdateMe(ctx, interfaces.UpdateMeParam{
-		Name:                 input.Name,
+		Alias:                input.Alias,
+		Description:          input.Description,
 		Email:                input.Email,
 		Lang:                 &lang,
-		Theme:                gqlmodel.ToTheme(input.Theme),
+		Name:                 input.Name,
 		Password:             input.Password,
 		PasswordConfirmation: input.PasswordConfirmation,
+		PhotoURL:             input.PhotoURL,
+		Theme:                gqlmodel.ToTheme(input.Theme),
+		Website:              input.Website,
 	}, getOperator(ctx))
 	if err != nil {
 		return nil, err

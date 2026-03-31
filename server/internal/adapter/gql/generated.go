@@ -1749,12 +1749,16 @@ input PasswordResetInput {
 }
 
 input UpdateMeInput {
-  name: String
+  alias: String
+  description: String
   email: String
   lang: Lang
-  theme: Theme
+  name: String
   password: String
   passwordConfirmation: String
+  photoURL: String
+  theme: Theme
+  website: String
 }
 
 input UpdateMeOIDCInput {
@@ -9906,20 +9910,27 @@ func (ec *executionContext) unmarshalInputUpdateMeInput(ctx context.Context, obj
 		asMap[k] = v
 	}
 
-	fieldsInOrder := [...]string{"name", "email", "lang", "theme", "password", "passwordConfirmation"}
+	fieldsInOrder := [...]string{"alias", "description", "email", "lang", "name", "password", "passwordConfirmation", "photoURL", "theme", "website"}
 	for _, k := range fieldsInOrder {
 		v, ok := asMap[k]
 		if !ok {
 			continue
 		}
 		switch k {
-		case "name":
-			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("name"))
+		case "alias":
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("alias"))
 			data, err := ec.unmarshalOString2ᚖstring(ctx, v)
 			if err != nil {
 				return it, err
 			}
-			it.Name = data
+			it.Alias = data
+		case "description":
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("description"))
+			data, err := ec.unmarshalOString2ᚖstring(ctx, v)
+			if err != nil {
+				return it, err
+			}
+			it.Description = data
 		case "email":
 			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("email"))
 			data, err := ec.unmarshalOString2ᚖstring(ctx, v)
@@ -9934,13 +9945,13 @@ func (ec *executionContext) unmarshalInputUpdateMeInput(ctx context.Context, obj
 				return it, err
 			}
 			it.Lang = data
-		case "theme":
-			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("theme"))
-			data, err := ec.unmarshalOTheme2ᚖgithubᚗcomᚋreearthᚋreearthᚑaccountsᚋserverᚋinternalᚋadapterᚋgqlᚋgqlmodelᚐTheme(ctx, v)
+		case "name":
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("name"))
+			data, err := ec.unmarshalOString2ᚖstring(ctx, v)
 			if err != nil {
 				return it, err
 			}
-			it.Theme = data
+			it.Name = data
 		case "password":
 			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("password"))
 			data, err := ec.unmarshalOString2ᚖstring(ctx, v)
@@ -9955,6 +9966,27 @@ func (ec *executionContext) unmarshalInputUpdateMeInput(ctx context.Context, obj
 				return it, err
 			}
 			it.PasswordConfirmation = data
+		case "photoURL":
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("photoURL"))
+			data, err := ec.unmarshalOString2ᚖstring(ctx, v)
+			if err != nil {
+				return it, err
+			}
+			it.PhotoURL = data
+		case "theme":
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("theme"))
+			data, err := ec.unmarshalOTheme2ᚖgithubᚗcomᚋreearthᚋreearthᚑaccountsᚋserverᚋinternalᚋadapterᚋgqlᚋgqlmodelᚐTheme(ctx, v)
+			if err != nil {
+				return it, err
+			}
+			it.Theme = data
+		case "website":
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("website"))
+			data, err := ec.unmarshalOString2ᚖstring(ctx, v)
+			if err != nil {
+				return it, err
+			}
+			it.Website = data
 		}
 	}
 

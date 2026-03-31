@@ -90,6 +90,7 @@ func baseSeederOneUser(ctx context.Context, r *repo.Container) error {
 
 	w := workspace.New().ID(wId).
 		Name("e2e").
+		Personal(true).
 		Members(map[idx.ID[id.User]]workspace.Member{
 			uId: roleOwner,
 		}).
@@ -251,6 +252,214 @@ func TestUpdateMe(t *testing.T) {
 	o.Value("email").String().IsEqual("hoge@test.com")
 	o.Value("metadata").Object().Value("lang").String().IsEqual("ja")
 	o.Value("metadata").Object().Value("theme").String().IsEqual("default")
+}
+
+func TestUpdateMe_Alias(t *testing.T) {
+	e, r := StartServer(t, &app.Config{}, true, baseSeederOneUser)
+
+	query := `mutation { updateMe(input: {alias: "mynewalias"}){ me{ id alias } }}`
+	request := GraphQLRequest{
+		Query: query,
+	}
+	jsonData, err := json.Marshal(request)
+	assert.NoError(t, err)
+
+	o := e.POST("/api/graphql").
+		WithHeader("authorization", "Bearer test").
+		WithHeader("Content-Type", "application/json").
+		WithHeader("X-Reearth-Debug-User", uId.String()).
+		WithBytes(jsonData).Expect().Status(http.StatusOK).JSON().Object().Value("data").Object().Value("updateMe").Object().Value("me").Object()
+	o.Value("alias").String().IsEqual("mynewalias")
+
+	// Verify in database
+	u, err := r.User.FindByID(context.Background(), uId)
+	assert.NoError(t, err)
+	assert.Equal(t, "mynewalias", u.Alias())
+}
+
+func TestUpdateMe_AliasAlreadyExists(t *testing.T) {
+	e, _ := StartServer(t, &app.Config{}, true, baseSeederUser)
+
+	// First, update user2's alias
+	query1 := `mutation { updateMe(input: {alias: "existingalias"}){ me{ id alias } }}`
+	request1 := GraphQLRequest{
+		Query: query1,
+	}
+	jsonData1, err := json.Marshal(request1)
+	assert.NoError(t, err)
+
+	e.POST("/api/graphql").
+		WithHeader("authorization", "Bearer test").
+		WithHeader("Content-Type", "application/json").
+		WithHeader("X-Reearth-Debug-User", uId2.String()).
+		WithBytes(jsonData1).Expect().Status(http.StatusOK)
+
+	// Now try to update user1 with the same alias - should fail
+	query2 := `mutation { updateMe(input: {alias: "existingalias"}){ me{ id alias } }}`
+	request2 := GraphQLRequest{
+		Query: query2,
+	}
+	jsonData2, err := json.Marshal(request2)
+	assert.NoError(t, err)
+
+	resp := e.POST("/api/graphql").
+		WithHeader("authorization", "Bearer test").
+		WithHeader("Content-Type", "application/json").
+		WithHeader("X-Reearth-Debug-User", uId.String()).
+		WithBytes(jsonData2).Expect().Status(http.StatusOK).JSON().Object()
+
+	// Should have errors
+	resp.Value("errors").Array().NotEmpty()
+}
+
+func TestUpdateMe_Description(t *testing.T) {
+	e, r := StartServer(t, &app.Config{}, true, baseSeederOneUser)
+
+	query := `mutation { updateMe(input: {description: "My new description"}){ me{ id metadata { description } } }}`
+	request := GraphQLRequest{
+		Query: query,
+	}
+	jsonData, err := json.Marshal(request)
+	assert.NoError(t, err)
+
+	o := e.POST("/api/graphql").
+		WithHeader("authorization", "Bearer test").
+		WithHeader("Content-Type", "application/json").
+		WithHeader("X-Reearth-Debug-User", uId.String()).
+		WithBytes(jsonData).Expect().Status(http.StatusOK).JSON().Object().Value("data").Object().Value("updateMe").Object().Value("me").Object()
+	o.Value("metadata").Object().Value("description").String().IsEqual("My new description")
+
+	// Verify user metadata in database
+	u, err := r.User.FindByID(context.Background(), uId)
+	assert.NoError(t, err)
+	assert.Equal(t, "My new description", u.Metadata().Description())
+
+	// Verify workspace metadata is also updated (personal workspace)
+	ws, err := r.Workspace.FindByID(context.Background(), wId)
+	assert.NoError(t, err)
+	assert.Equal(t, "My new description", ws.Metadata().Description())
+}
+
+func TestUpdateMe_Website(t *testing.T) {
+	e, r := StartServer(t, &app.Config{}, true, baseSeederOneUser)
+
+	query := `mutation { updateMe(input: {website: "https://mywebsite.com"}){ me{ id metadata { website } } }}`
+	request := GraphQLRequest{
+		Query: query,
+	}
+	jsonData, err := json.Marshal(request)
+	assert.NoError(t, err)
+
+	o := e.POST("/api/graphql").
+		WithHeader("authorization", "Bearer test").
+		WithHeader("Content-Type", "application/json").
+		WithHeader("X-Reearth-Debug-User", uId.String()).
+		WithBytes(jsonData).Expect().Status(http.StatusOK).JSON().Object().Value("data").Object().Value("updateMe").Object().Value("me").Object()
+	o.Value("metadata").Object().Value("website").String().IsEqual("https://mywebsite.com")
+
+	// Verify workspace metadata is also updated (personal workspace)
+	ws, err := r.Workspace.FindByID(context.Background(), wId)
+	assert.NoError(t, err)
+	assert.Equal(t, "https://mywebsite.com", ws.Metadata().Website())
+}
+
+func TestUpdateMe_PhotoURL(t *testing.T) {
+	e, r := StartServer(t, &app.Config{}, true, baseSeederOneUser)
+
+	query := `mutation { updateMe(input: {photoURL: "https://example.com/photo.jpg"}){ me{ id metadata { photoURL } } }}`
+	request := GraphQLRequest{
+		Query: query,
+	}
+	jsonData, err := json.Marshal(request)
+	assert.NoError(t, err)
+
+	o := e.POST("/api/graphql").
+		WithHeader("authorization", "Bearer test").
+		WithHeader("Content-Type", "application/json").
+		WithHeader("X-Reearth-Debug-User", uId.String()).
+		WithBytes(jsonData).Expect().Status(http.StatusOK).JSON().Object().Value("data").Object().Value("updateMe").Object().Value("me").Object()
+	o.Value("metadata").Object().Value("photoURL").String().IsEqual("https://example.com/photo.jpg")
+
+	// Verify workspace metadata is also updated (personal workspace)
+	ws, err := r.Workspace.FindByID(context.Background(), wId)
+	assert.NoError(t, err)
+	assert.Equal(t, "https://example.com/photo.jpg", ws.Metadata().PhotoURL())
+}
+
+func TestUpdateMe_AllMetadataFields(t *testing.T) {
+	e, r := StartServer(t, &app.Config{}, true, baseSeederOneUser)
+
+	query := `mutation {
+		updateMe(input: {
+			alias: "fullalias",
+			description: "Full description",
+			website: "https://fullsite.com",
+			photoURL: "https://fullsite.com/avatar.png"
+		}){
+			me{
+				id
+				alias
+				metadata { description website photoURL }
+			}
+		}
+	}`
+	request := GraphQLRequest{
+		Query: query,
+	}
+	jsonData, err := json.Marshal(request)
+	assert.NoError(t, err)
+
+	o := e.POST("/api/graphql").
+		WithHeader("authorization", "Bearer test").
+		WithHeader("Content-Type", "application/json").
+		WithHeader("X-Reearth-Debug-User", uId.String()).
+		WithBytes(jsonData).Expect().Status(http.StatusOK).JSON().Object().Value("data").Object().Value("updateMe").Object().Value("me").Object()
+
+	o.Value("alias").String().IsEqual("fullalias")
+	o.Value("metadata").Object().Value("description").String().IsEqual("Full description")
+	o.Value("metadata").Object().Value("website").String().IsEqual("https://fullsite.com")
+	o.Value("metadata").Object().Value("photoURL").String().IsEqual("https://fullsite.com/avatar.png")
+
+	// Verify user in database
+	u, err := r.User.FindByID(context.Background(), uId)
+	assert.NoError(t, err)
+	assert.Equal(t, "fullalias", u.Alias())
+	assert.Equal(t, "Full description", u.Metadata().Description())
+
+	// Verify workspace metadata is also updated
+	ws, err := r.Workspace.FindByID(context.Background(), wId)
+	assert.NoError(t, err)
+	assert.Equal(t, "Full description", ws.Metadata().Description())
+	assert.Equal(t, "https://fullsite.com", ws.Metadata().Website())
+	assert.Equal(t, "https://fullsite.com/avatar.png", ws.Metadata().PhotoURL())
+}
+
+func TestUpdateMe_NameUpdatesWorkspace(t *testing.T) {
+	e, r := StartServer(t, &app.Config{}, true, baseSeederOneUser)
+
+	// Verify initial workspace name matches user name
+	ws, err := r.Workspace.FindByID(context.Background(), wId)
+	assert.NoError(t, err)
+	assert.Equal(t, "e2e", ws.Name())
+
+	query := `mutation { updateMe(input: {name: "newname"}){ me{ id name } }}`
+	request := GraphQLRequest{
+		Query: query,
+	}
+	jsonData, err := json.Marshal(request)
+	assert.NoError(t, err)
+
+	o := e.POST("/api/graphql").
+		WithHeader("authorization", "Bearer test").
+		WithHeader("Content-Type", "application/json").
+		WithHeader("X-Reearth-Debug-User", uId.String()).
+		WithBytes(jsonData).Expect().Status(http.StatusOK).JSON().Object().Value("data").Object().Value("updateMe").Object().Value("me").Object()
+	o.Value("name").String().IsEqual("newname")
+
+	// Verify workspace name is also updated
+	ws, err = r.Workspace.FindByID(context.Background(), wId)
+	assert.NoError(t, err)
+	assert.Equal(t, "newname", ws.Name())
 }
 
 func TestRemoveMyAuth(t *testing.T) {
