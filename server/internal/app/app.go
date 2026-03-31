@@ -3,7 +3,6 @@ package app
 import (
 	"context"
 	"errors"
-	"fmt"
 	"net/http"
 	"net/http/pprof"
 
@@ -35,8 +34,7 @@ func initEcho(ctx context.Context, cfg *ServerConfig) *echo.Echo {
 	if len(origins) > 0 {
 		e.Use(
 			middleware.CORSWithConfig(middleware.CORSConfig{
-				AllowOrigins:  origins,
-				ExposeHeaders: []string{"X-Latest-Logout-At"},
+				AllowOrigins: origins,
 			}),
 		)
 	}
@@ -90,10 +88,7 @@ func initEcho(ctx context.Context, cfg *ServerConfig) *echo.Echo {
 	// Prepare middlewares based on Mock_Auth setting
 	var middlewares []echo.MiddlewareFunc
 	middlewares = append(middlewares,
-		middleware.CORSWithConfig(middleware.CORSConfig{
-			AllowOrigins:  origins,
-			ExposeHeaders: []string{"X-Latest-Logout-At"},
-		}),
+		middleware.CORSWithConfig(middleware.CORSConfig{AllowOrigins: origins}),
 		usecaseMiddleware,
 	)
 
@@ -109,7 +104,6 @@ func initEcho(ctx context.Context, cfg *ServerConfig) *echo.Echo {
 	// Always apply the app's auth middleware (handles both mock and real auth)
 	middlewares = append(middlewares,
 		echo.WrapMiddleware(authMiddleware(cfg)),
-		latestLogoutAtHeader,
 		cacheControl,
 	)
 
@@ -165,13 +159,3 @@ func cacheControl(next echo.HandlerFunc) echo.HandlerFunc {
 	}
 }
 
-func latestLogoutAtHeader(next echo.HandlerFunc) echo.HandlerFunc {
-	return func(c echo.Context) error {
-		if u := adapter.User(c.Request().Context()); u != nil {
-			if t := u.LatestLogoutAt(); !t.IsZero() {
-				c.Response().Header().Set("X-Latest-Logout-At", fmt.Sprintf("%d", t.Unix()))
-			}
-		}
-		return next(c)
-	}
-}
