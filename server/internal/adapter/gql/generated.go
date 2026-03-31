@@ -106,6 +106,7 @@ type ComplexityRoot struct {
 		DeleteMe                         func(childComplexity int, input gqlmodel.DeleteMeInput) int
 		DeleteWorkspace                  func(childComplexity int, input gqlmodel.DeleteWorkspaceInput) int
 		FindOrCreate                     func(childComplexity int, input gqlmodel.FindOrCreateInput) int
+		Logout                           func(childComplexity int) int
 		PasswordReset                    func(childComplexity int, input gqlmodel.PasswordResetInput) int
 		RemoveIntegrationFromWorkspace   func(childComplexity int, input gqlmodel.RemoveIntegrationFromWorkspaceInput) int
 		RemoveIntegrationsFromWorkspace  func(childComplexity int, input gqlmodel.RemoveIntegrationsFromWorkspaceInput) int
@@ -120,7 +121,6 @@ type ComplexityRoot struct {
 		UpdateIntegrationOfWorkspace     func(childComplexity int, input gqlmodel.UpdateIntegrationOfWorkspaceInput) int
 		UpdateMe                         func(childComplexity int, input gqlmodel.UpdateMeInput) int
 		UpdateMeOidc                     func(childComplexity int, input gqlmodel.UpdateMeOIDCInput) int
-		UpdateMyLatestLogoutAt           func(childComplexity int) int
 		UpdatePermittable                func(childComplexity int, input gqlmodel.UpdatePermittableInput) int
 		UpdateRole                       func(childComplexity int, input gqlmodel.UpdateRoleInput) int
 		UpdateUserOfWorkspace            func(childComplexity int, input gqlmodel.UpdateUserOfWorkspaceInput) int
@@ -298,7 +298,7 @@ type MutationResolver interface {
 	StartPasswordReset(ctx context.Context, input gqlmodel.StartPasswordResetInput) (*bool, error)
 	UpdateMe(ctx context.Context, input gqlmodel.UpdateMeInput) (*gqlmodel.UpdateMePayload, error)
 	UpdateMeOidc(ctx context.Context, input gqlmodel.UpdateMeOIDCInput) (*gqlmodel.UpdateMePayload, error)
-	UpdateMyLatestLogoutAt(ctx context.Context) (*gqlmodel.Me, error)
+	Logout(ctx context.Context) (*gqlmodel.Me, error)
 	VerifyUser(ctx context.Context, input gqlmodel.VerifyUserInput) (*gqlmodel.UserPayload, error)
 	CreateWorkspace(ctx context.Context, input gqlmodel.CreateWorkspaceInput) (*gqlmodel.CreateWorkspacePayload, error)
 	DeleteWorkspace(ctx context.Context, input gqlmodel.DeleteWorkspaceInput) (*gqlmodel.DeleteWorkspacePayload, error)
@@ -581,6 +581,12 @@ func (e *executableSchema) Complexity(ctx context.Context, typeName, field strin
 		}
 
 		return e.complexity.Mutation.FindOrCreate(childComplexity, args["input"].(gqlmodel.FindOrCreateInput)), true
+	case "Mutation.logout":
+		if e.complexity.Mutation.Logout == nil {
+			break
+		}
+
+		return e.complexity.Mutation.Logout(childComplexity), true
 	case "Mutation.passwordReset":
 		if e.complexity.Mutation.PasswordReset == nil {
 			break
@@ -735,12 +741,6 @@ func (e *executableSchema) Complexity(ctx context.Context, typeName, field strin
 		}
 
 		return e.complexity.Mutation.UpdateMeOidc(childComplexity, args["input"].(gqlmodel.UpdateMeOIDCInput)), true
-	case "Mutation.updateMyLatestLogoutAt":
-		if e.complexity.Mutation.UpdateMyLatestLogoutAt == nil {
-			break
-		}
-
-		return e.complexity.Mutation.UpdateMyLatestLogoutAt(childComplexity), true
 	case "Mutation.updatePermittable":
 		if e.complexity.Mutation.UpdatePermittable == nil {
 			break
@@ -1812,7 +1812,7 @@ extend type Mutation {
   startPasswordReset(input: StartPasswordResetInput!): Boolean
   updateMe(input: UpdateMeInput!): UpdateMePayload
   updateMeOIDC(input: UpdateMeOIDCInput!): UpdateMePayload
-  updateMyLatestLogoutAt: Me
+  logout: Me
   verifyUser(input: VerifyUserInput!): UserPayload
 }
 `, BuiltIn: false},
@@ -3861,14 +3861,14 @@ func (ec *executionContext) fieldContext_Mutation_updateMeOIDC(ctx context.Conte
 	return fc, nil
 }
 
-func (ec *executionContext) _Mutation_updateMyLatestLogoutAt(ctx context.Context, field graphql.CollectedField) (ret graphql.Marshaler) {
+func (ec *executionContext) _Mutation_logout(ctx context.Context, field graphql.CollectedField) (ret graphql.Marshaler) {
 	return graphql.ResolveField(
 		ctx,
 		ec.OperationContext,
 		field,
-		ec.fieldContext_Mutation_updateMyLatestLogoutAt,
+		ec.fieldContext_Mutation_logout,
 		func(ctx context.Context) (any, error) {
-			return ec.resolvers.Mutation().UpdateMyLatestLogoutAt(ctx)
+			return ec.resolvers.Mutation().Logout(ctx)
 		},
 		nil,
 		ec.marshalOMe2ᚖgithubᚗcomᚋreearthᚋreearthᚑaccountsᚋserverᚋinternalᚋadapterᚋgqlᚋgqlmodelᚐMe,
@@ -3877,7 +3877,7 @@ func (ec *executionContext) _Mutation_updateMyLatestLogoutAt(ctx context.Context
 	)
 }
 
-func (ec *executionContext) fieldContext_Mutation_updateMyLatestLogoutAt(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+func (ec *executionContext) fieldContext_Mutation_logout(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
 	fc = &graphql.FieldContext{
 		Object:     "Mutation",
 		Field:      field,
@@ -10806,9 +10806,9 @@ func (ec *executionContext) _Mutation(ctx context.Context, sel ast.SelectionSet)
 			out.Values[i] = ec.OperationContext.RootResolverMiddleware(innerCtx, func(ctx context.Context) (res graphql.Marshaler) {
 				return ec._Mutation_updateMeOIDC(ctx, field)
 			})
-		case "updateMyLatestLogoutAt":
+		case "logout":
 			out.Values[i] = ec.OperationContext.RootResolverMiddleware(innerCtx, func(ctx context.Context) (res graphql.Marshaler) {
-				return ec._Mutation_updateMyLatestLogoutAt(ctx, field)
+				return ec._Mutation_logout(ctx, field)
 			})
 		case "verifyUser":
 			out.Values[i] = ec.OperationContext.RootResolverMiddleware(innerCtx, func(ctx context.Context) (res graphql.Marshaler) {

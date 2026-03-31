@@ -148,8 +148,8 @@ func (r *mutationResolver) SignupOidc(ctx context.Context, input gqlmodel.Signup
 	return &gqlmodel.UserPayload{User: gqlmodel.ToUser(u)}, nil
 }
 
-func (r *mutationResolver) UpdateMyLatestLogoutAt(ctx context.Context) (*gqlmodel.Me, error) {
-	res, err := usecases(ctx).User.UpdateLatestLogoutAt(ctx, getOperator(ctx))
+func (r *mutationResolver) Logout(ctx context.Context) (*gqlmodel.Me, error) {
+	res, err := usecases(ctx).User.Logout(ctx, getOperator(ctx))
 	if err != nil {
 		return nil, err
 	}

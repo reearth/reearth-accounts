@@ -112,10 +112,12 @@ type User interface {
 	Signup(context.Context, SignupParam) (*user.User, error)
 	SignupOIDC(context.Context, SignupOIDCParam) (*user.User, error)
 
+	// session management
+	Logout(context.Context, *workspace.Operator) (*user.User, error)
+
 	// editing me
 	DeleteMe(context.Context, user.ID, *workspace.Operator) error
 	RemoveMyAuth(context.Context, string, *workspace.Operator) (*user.User, error)
-	UpdateLatestLogoutAt(context.Context, *workspace.Operator) (*user.User, error)
 	UpdateMe(context.Context, UpdateMeParam, *workspace.Operator) (*user.User, error)
 	UpdateMeOIDC(context.Context, UpdateMeOIDCParam, *workspace.Operator) (*user.User, error)
 

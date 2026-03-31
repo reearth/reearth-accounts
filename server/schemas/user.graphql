@@ -151,6 +151,6 @@ extend type Mutation {
   startPasswordReset(input: StartPasswordResetInput!): Boolean
   updateMe(input: UpdateMeInput!): UpdateMePayload
   updateMeOIDC(input: UpdateMeOIDCInput!): UpdateMePayload
-  updateMyLatestLogoutAt: Me
+  logout: Me
   verifyUser(input: VerifyUserInput!): UserPayload
 }

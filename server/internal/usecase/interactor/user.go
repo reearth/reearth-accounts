@@ -123,7 +123,7 @@ func (i *User) GetUserBySubject(ctx context.Context, sub string) (u *user.User, 
 	})
 }
 
-func (i *User) UpdateLatestLogoutAt(ctx context.Context, operator *workspace.Operator) (*user.User, error) {
+func (i *User) Logout(ctx context.Context, operator *workspace.Operator) (*user.User, error) {
 	if operator.User == nil {
 		return nil, interfaces.ErrInvalidOperator
 	}

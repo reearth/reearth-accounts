@@ -89,8 +89,8 @@ func (u *User) FindOrCreate(ctx context.Context, param interfaces.UserFindOrCrea
 	return FragmentToUser(res.FindOrCreate.User.FragmentUser)
 }
 
-func (u *User) UpdateLatestLogoutAt(_ context.Context, _ *workspace.Operator) (*user.User, error) {
-	return nil, errors.New("UpdateLatestLogoutAt is not supported in proxy mode")
+func (u *User) Logout(_ context.Context, _ *workspace.Operator) (*user.User, error) {
+	return nil, errors.New("Logout is not supported in proxy mode")
 }
 
 func (u *User) UpdateMe(ctx context.Context, param interfaces.UpdateMeParam, op *workspace.Operator) (*user.User, error) {

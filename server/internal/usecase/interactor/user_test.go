@@ -298,7 +298,7 @@ func TestUser_PasswordReset(t *testing.T) {
 	}
 }
 
-func TestUser_UpdateLatestLogoutAt(t *testing.T) {
+func TestUser_Logout(t *testing.T) {
 	user.DefaultPasswordEncoder = &user.NoopPasswordEncoder{}
 
 	t.Run("ok", func(t *testing.T) {
@@ -319,7 +319,7 @@ func TestUser_UpdateLatestLogoutAt(t *testing.T) {
 
 		before := time.Now()
 		op := &workspace.Operator{User: lo.ToPtr(uid)}
-		result, err := uc.UpdateLatestLogoutAt(ctx, op)
+		result, err := uc.Logout(ctx, op)
 
 		assert.NoError(t, err)
 		assert.NotNil(t, result)
@@ -339,7 +339,7 @@ func TestUser_UpdateLatestLogoutAt(t *testing.T) {
 		uc := NewUser(r, nil, "", "")
 
 		op := &workspace.Operator{}
-		result, err := uc.UpdateLatestLogoutAt(ctx, op)
+		result, err := uc.Logout(ctx, op)
 
 		assert.Nil(t, result)
 		assert.Equal(t, interfaces.ErrInvalidOperator, err)
