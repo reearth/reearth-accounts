@@ -81,15 +81,20 @@ func (r *userRepo) FindMe(ctx context.Context) (*user.User, error) {
 		auths2[i] = user.AuthFrom(auth)
 	}
 
-	return user.New().
+	b := user.New().
 		ID(id).
 		Name(string(q.Me.Name)).
 		Alias(string(q.Me.Alias)).
 		Email(string(q.Me.Email)).
 		Metadata(gqlmodel.ToUserMetadata(q.Me.Metadata)).
 		Workspace(wid).
-		Auths(auths2).
-		Build()
+		Auths(auths2)
+
+	if q.Me.LatestLogoutAt != nil {
+		b = b.LatestLogoutAt(*q.Me.LatestLogoutAt)
+	}
+
+	return b.Build()
 }
 
 func (r *userRepo) FindByID(ctx context.Context, id string) (*user.User, error) {
