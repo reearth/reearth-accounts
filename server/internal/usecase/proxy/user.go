@@ -4,6 +4,7 @@ package proxy
 
 import (
 	"context"
+	"errors"
 
 	"github.com/reearth/reearth-accounts/server/pkg/user"
 	"github.com/reearth/reearth-accounts/server/pkg/workspace"
@@ -86,6 +87,10 @@ func (u *User) FindOrCreate(ctx context.Context, param interfaces.UserFindOrCrea
 		return nil, err
 	}
 	return FragmentToUser(res.FindOrCreate.User.FragmentUser)
+}
+
+func (u *User) Logout(_ context.Context, _ *workspace.Operator) (*user.User, error) {
+	return nil, errors.New("Logout is not supported in proxy mode")
 }
 
 func (u *User) UpdateMe(ctx context.Context, param interfaces.UpdateMeParam, op *workspace.Operator) (*user.User, error) {

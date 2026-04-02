@@ -177,6 +177,21 @@ func (mr *MockRepoMockRecorder) FindUsersByIDsWithPagination(ctx, id, alias, pag
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "FindUsersByIDsWithPagination", reflect.TypeOf((*MockRepo)(nil).FindUsersByIDsWithPagination), ctx, id, alias, page, size)
 }
 
+// Logout mocks base method.
+func (m *MockRepo) Logout(ctx context.Context) (*user0.User, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "Logout", ctx)
+	ret0, _ := ret[0].(*user0.User)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// Logout indicates an expected call of Logout.
+func (mr *MockRepoMockRecorder) Logout(ctx any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Logout", reflect.TypeOf((*MockRepo)(nil).Logout), ctx)
+}
+
 // PasswordReset mocks base method.
 func (m *MockRepo) PasswordReset(ctx context.Context, password, token string) error {
 	m.ctrl.T.Helper()

@@ -15,6 +15,7 @@ import (
 	"github.com/reearth/reearth-accounts/server/pkg/workspace"
 	"github.com/reearth/reearthx/mailer"
 	"github.com/reearth/reearthx/rerror"
+	"github.com/samber/lo"
 	"golang.org/x/text/language"
 
 	"github.com/stretchr/testify/assert"
@@ -295,6 +296,54 @@ func TestUser_PasswordReset(t *testing.T) {
 			assert.Equal(t, tt.wantError, err)
 		})
 	}
+}
+
+func TestUser_Logout(t *testing.T) {
+	user.DefaultPasswordEncoder = &user.NoopPasswordEncoder{}
+
+	t.Run("ok", func(t *testing.T) {
+		t.Parallel()
+		ctx := context.Background()
+		r := memory.New()
+		uc := NewUser(r, nil, "", "")
+
+		uid := id.NewUserID()
+		tid := id.NewWorkspaceID()
+		u := user.New().
+			ID(uid).
+			Workspace(tid).
+			Name("NAME").
+			Email("aaa@bbb.com").
+			MustBuild()
+		assert.NoError(t, r.User.Save(ctx, u))
+
+		before := time.Now()
+		op := &workspace.Operator{User: lo.ToPtr(uid)}
+		result, err := uc.Logout(ctx, op)
+
+		assert.NoError(t, err)
+		assert.NotNil(t, result)
+		assert.False(t, result.LatestLogoutAt().IsZero())
+		assert.True(t, !result.LatestLogoutAt().Before(before))
+
+		// Verify persisted
+		saved, err := r.User.FindByID(ctx, uid)
+		assert.NoError(t, err)
+		assert.Equal(t, result.LatestLogoutAt().Unix(), saved.LatestLogoutAt().Unix())
+	})
+
+	t.Run("nil operator user", func(t *testing.T) {
+		t.Parallel()
+		ctx := context.Background()
+		r := memory.New()
+		uc := NewUser(r, nil, "", "")
+
+		op := &workspace.Operator{}
+		result, err := uc.Logout(ctx, op)
+
+		assert.Nil(t, result)
+		assert.Equal(t, interfaces.ErrInvalidOperator, err)
+	})
 }
 
 func TestUser_UpdateMe(t *testing.T) {

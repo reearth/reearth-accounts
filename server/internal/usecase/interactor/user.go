@@ -6,6 +6,7 @@ import (
 	_ "embed"
 	"errors"
 	htmlTmpl "html/template"
+	"time"
 
 	"github.com/reearth/reearth-accounts/server/internal/usecase/gateway"
 	"github.com/reearth/reearth-accounts/server/internal/usecase/interfaces"
@@ -118,6 +119,27 @@ func (i *User) GetUserBySubject(ctx context.Context, sub string) (u *user.User, 
 		if err != nil {
 			return nil, err
 		}
+		return u, nil
+	})
+}
+
+func (i *User) Logout(ctx context.Context, operator *workspace.Operator) (*user.User, error) {
+	if operator.User == nil {
+		return nil, interfaces.ErrInvalidOperator
+	}
+
+	return Run1(ctx, operator, i.repos, Usecase().Transaction(), func(ctx context.Context) (*user.User, error) {
+		u, err := i.repos.User.FindByID(ctx, *operator.User)
+		if err != nil {
+			return nil, err
+		}
+
+		u.SetLatestLogoutAt(time.Now())
+
+		if err := i.repos.User.Save(ctx, u); err != nil {
+			return nil, err
+		}
+
 		return u, nil
 	})
 }

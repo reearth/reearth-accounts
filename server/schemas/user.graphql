@@ -17,6 +17,7 @@ type Me {
   email: String!
   metadata: UserMetadata!
   host: String
+  latestLogoutAt: DateTime
   myWorkspaceId: ID!
   auths: [String!]!
   myWorkspace: Workspace!
@@ -140,15 +141,16 @@ type DeleteMePayload {
 }
 
 extend type Mutation {
-  updateMe(input: UpdateMeInput!): UpdateMePayload
-  updateMeOIDC(input: UpdateMeOIDCInput!): UpdateMePayload
-  removeMyAuth(input: RemoveMyAuthInput!): UpdateMePayload
+  createVerification(input: CreateVerificationInput!): Boolean
   deleteMe(input: DeleteMeInput!): DeleteMePayload
+  findOrCreate(input: FindOrCreateInput!): UserPayload
+  passwordReset(input: PasswordResetInput!): Boolean
+  removeMyAuth(input: RemoveMyAuthInput!): UpdateMePayload
   signup(input: SignupInput!): UserPayload
   signupOIDC(input: SignupOIDCInput!): UserPayload
-  verifyUser(input: VerifyUserInput!): UserPayload
-  findOrCreate(input: FindOrCreateInput!): UserPayload
-  createVerification(input: CreateVerificationInput!): Boolean
   startPasswordReset(input: StartPasswordResetInput!): Boolean
-  passwordReset(input: PasswordResetInput!): Boolean
+  updateMe(input: UpdateMeInput!): UpdateMePayload
+  updateMeOIDC(input: UpdateMeOIDCInput!): UpdateMePayload
+  logout: Me
+  verifyUser(input: VerifyUserInput!): UserPayload
 }

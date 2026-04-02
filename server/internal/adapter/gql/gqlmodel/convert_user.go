@@ -1,6 +1,8 @@
 package gqlmodel
 
 import (
+	"time"
+
 	"github.com/reearth/reearth-accounts/server/pkg/role"
 	"github.com/reearth/reearth-accounts/server/pkg/user"
 	"github.com/samber/lo"
@@ -94,13 +96,20 @@ func ToMe(u *user.User) *Me {
 		Website:     u.Metadata().Website(),
 	}
 
+	var latestLogoutAt *time.Time
+	if !u.LatestLogoutAt().IsZero() {
+		t := u.LatestLogoutAt()
+		latestLogoutAt = &t
+	}
+
 	return &Me{
-		ID:            IDFrom(u.ID()),
-		Name:          u.Name(),
-		Alias:         u.Alias(),
-		Email:         u.Email(),
-		Metadata:      &metadata,
-		MyWorkspaceID: IDFrom(u.Workspace()),
+		ID:             IDFrom(u.ID()),
+		Name:           u.Name(),
+		Alias:          u.Alias(),
+		Email:          u.Email(),
+		LatestLogoutAt: latestLogoutAt,
+		Metadata:       &metadata,
+		MyWorkspaceID:  IDFrom(u.Workspace()),
 		Auths: util.Map(u.Auths(), func(a user.Auth) string {
 			return a.Provider
 		}),

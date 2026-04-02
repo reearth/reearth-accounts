@@ -158,3 +158,4 @@ func cacheControl(next echo.HandlerFunc) echo.HandlerFunc {
 		return next(c)
 	}
 }
+

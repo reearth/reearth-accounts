@@ -85,6 +85,10 @@ type createVerificationMutation struct {
 	CreateVerification *bool `graphql:"createVerification(input: {email: $email})"`
 }
 
+type logoutMutation struct {
+	Logout gqlmodel.Me `graphql:"logout"`
+}
+
 type deleteMeMutation struct {
 	DeleteMe struct {
 		UserID graphql.ID `json:"userId"`

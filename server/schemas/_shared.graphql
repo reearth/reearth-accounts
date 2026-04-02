@@ -9,6 +9,7 @@ enum NodeType {
 }
 
 # Basic types
+scalar DateTime
 scalar Lang
 scalar Upload
 

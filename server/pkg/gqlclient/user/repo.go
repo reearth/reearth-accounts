@@ -40,6 +40,7 @@ type Repo interface {
 	FindByNameOrEmail(ctx context.Context, nameOrEmail string) (*user.User, error)
 	FindMe(ctx context.Context) (*user.User, error)
 	FindUsersByIDsWithPagination(ctx context.Context, id []string, alias string, page, size int64) (user.List, int, error)
+	Logout(ctx context.Context) (*user.User, error)
 	PasswordReset(ctx context.Context, password string, token string) error
 	RemoveMyAuth(ctx context.Context, auth string) (*user.User, error)
 	Signup(ctx context.Context, userID, name, email, password, secret, workspaceID string, mockAuth bool) (*user.User, error)
@@ -80,15 +81,20 @@ func (r *userRepo) FindMe(ctx context.Context) (*user.User, error) {
 		auths2[i] = user.AuthFrom(auth)
 	}
 
-	return user.New().
+	b := user.New().
 		ID(id).
 		Name(string(q.Me.Name)).
 		Alias(string(q.Me.Alias)).
 		Email(string(q.Me.Email)).
 		Metadata(gqlmodel.ToUserMetadata(q.Me.Metadata)).
 		Workspace(wid).
-		Auths(auths2).
-		Build()
+		Auths(auths2)
+
+	if q.Me.LatestLogoutAt != nil {
+		b = b.LatestLogoutAt(*q.Me.LatestLogoutAt)
+	}
+
+	return b.Build()
 }
 
 func (r *userRepo) FindByID(ctx context.Context, id string) (*user.User, error) {
@@ -291,6 +297,46 @@ func (r *userRepo) FindUsersByIDsWithPagination(ctx context.Context, id []string
 
 	users := gqlmodel.ToUsers(ctx, q.FindUsersByIDsWithPagination.Users)
 	return users, q.FindUsersByIDsWithPagination.TotalCount, nil
+}
+
+func (r *userRepo) Logout(ctx context.Context) (*user.User, error) {
+	var m logoutMutation
+	if err := r.client.Mutate(ctx, &m, nil); err != nil {
+		return nil, gqlerror.ReturnAccountsError(ctx, err)
+	}
+
+	id, err := user.IDFrom(string(m.Logout.ID))
+	if err != nil {
+		log.Errorf("[Logout] failed to convert user id: %s", m.Logout.ID)
+		return nil, gqlerror.ReturnAccountsError(ctx, err)
+	}
+
+	wid, err := user.WorkspaceIDFrom(string(m.Logout.MyWorkspaceID))
+	if err != nil {
+		log.Errorf("[Logout] failed to convert workspace id: %s", m.Logout.MyWorkspaceID)
+		return nil, gqlerror.ReturnAccountsError(ctx, err)
+	}
+
+	auths := gqlutil.ToStringSlice(m.Logout.Auths)
+	auths2 := make([]user.Auth, len(auths))
+	for i, auth := range auths {
+		auths2[i] = user.AuthFrom(auth)
+	}
+
+	b := user.New().
+		ID(id).
+		Name(string(m.Logout.Name)).
+		Alias(string(m.Logout.Alias)).
+		Email(string(m.Logout.Email)).
+		Metadata(gqlmodel.ToUserMetadata(m.Logout.Metadata)).
+		Workspace(wid).
+		Auths(auths2)
+
+	if m.Logout.LatestLogoutAt != nil {
+		b = b.LatestLogoutAt(*m.Logout.LatestLogoutAt)
+	}
+
+	return b.Build()
 }
 
 // TODO: Extend the Account server's UpdateMeInput to support alias, photoURL, website, and description.

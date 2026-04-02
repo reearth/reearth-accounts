@@ -127,6 +127,11 @@ func (b *Builder) Verification(v *Verification) *Builder {
 	return b
 }
 
+func (b *Builder) LatestLogoutAt(t time.Time) *Builder {
+	b.u.latestLogoutAt = t
+	return b
+}
+
 func (b *Builder) Metadata(m Metadata) *Builder {
 	b.u.metadata = m
 	return b

@@ -33,6 +33,7 @@ erDiagram
         string alias
         string email
         string lang "optional"
+        date latestlogoutat "optional"
         object metadata
         string name
         binData password "optional"

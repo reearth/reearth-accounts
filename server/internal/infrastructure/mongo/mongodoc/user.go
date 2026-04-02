@@ -18,8 +18,9 @@ type UserDocument struct {
 	ID            string                 `json:"id" bson:"id" jsonschema:"required,description=User ID (ULID format)"`
 	Name          string                 `json:"name" bson:"name" jsonschema:"required,description=User display name"`
 	Alias         string                 `json:"alias" bson:"alias" jsonschema:"required,description=Unique user handle/alias. Default: \"\""`
-	Email         string                 `json:"email" bson:"email" jsonschema:"required,description=User email address"`
-	Subs          []string               `json:"subs" bson:"subs" jsonschema:"required,description=OAuth subject identifiers for authentication providers. Default: []"`
+	Email          string                 `json:"email" bson:"email" jsonschema:"required,description=User email address"`
+	LatestLogoutAt time.Time              `json:"latestlogoutat" bson:"latestlogoutat" jsonschema:"description=Timestamp (datetime) of user's latest logout in UTC. Default: zero value"`
+	Subs           []string               `json:"subs" bson:"subs" jsonschema:"required,description=OAuth subject identifiers for authentication providers. Default: []"`
 	Workspace     string                 `json:"workspace" bson:"workspace" jsonschema:"required,foreignkey=workspace,description=Personal workspace ID (ULID format)"`
 	Team          string                 `json:"team" bson:",omitempty" jsonschema:"description=Legacy team field (deprecated, use workspace)"`
 	Lang          string                 `json:"lang" bson:"lang" jsonschema:"description=User language preference. Default: \"\" (deprecated, move to metadata)"`
@@ -84,17 +85,18 @@ func NewUser(user *user.User) (*UserDocument, string) {
 	}
 
 	return &UserDocument{
-		ID:            id,
-		Name:          user.Name(),
-		Alias:         user.Alias(),
-		Email:         user.Email(),
-		Subs:          authsdoc,
-		Workspace:     user.Workspace().String(),
-		Verification:  v,
-		Password:      user.Password(),
-		PasswordReset: pwdResetDoc,
-		Metadata:      metadataDoc,
-		UpdatedAt:     updatedAt,
+		ID:             id,
+		Name:           user.Name(),
+		Alias:          user.Alias(),
+		Email:          user.Email(),
+		LatestLogoutAt: user.LatestLogoutAt(),
+		Subs:           authsdoc,
+		Workspace:      user.Workspace().String(),
+		Verification:   v,
+		Password:       user.Password(),
+		PasswordReset:  pwdResetDoc,
+		Metadata:       metadataDoc,
+		UpdatedAt:      updatedAt,
 	}, id
 }
 
@@ -140,6 +142,7 @@ func (d *UserDocument) Model() (*user.User, error) {
 		ID(uid).
 		Name(d.Name).
 		Email(d.Email).
+		LatestLogoutAt(d.LatestLogoutAt).
 		Metadata(metadata).
 		Alias(d.Alias).
 		Auths(auths).
