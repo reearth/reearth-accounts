@@ -5,6 +5,10 @@ jobs:
   stage:
     runs-on: ubuntu-latest
     steps:
+      - name: Harden Runner
+        uses: step-security/harden-runner@fe104658747b27e96e4f7e80cd0a94068e53901d # v2.16.1
+        with:
+          egress-policy: audit
       - uses: actions/create-github-app-token@29824e69f54612133e76f7eaac726eef6c875baf
         id: app-token
         with:
