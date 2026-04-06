@@ -18,6 +18,10 @@ jobs:
     outputs:
       release_tag: ${{ steps.tag.outputs.new_tag }}
     steps:
+      - name: Harden Runner
+        uses: step-security/harden-runner@fe104658747b27e96e4f7e80cd0a94068e53901d # v2.16.1
+        with:
+          egress-policy: audit
       - name: Checkout Repository
         uses: actions/checkout@v6
         with:
@@ -68,6 +72,10 @@ jobs:
       IMAGE_NAME: reearth/reearth-accounts-api
       RELEASE_TAG: ${{ needs.create-release.outputs.release_tag }}
     steps:
+      - name: Harden Runner
+        uses: step-security/harden-runner@fe104658747b27e96e4f7e80cd0a94068e53901d # v2.16.1
+        with:
+          egress-policy: audit
       - name: Checkout Repository
         uses: actions/checkout@v6
         with:
@@ -115,6 +123,10 @@ jobs:
       IMAGE_NAME: reearth/reearth-accounts-api
       RELEASE_TAG: ${{ needs.create-release.outputs.release_tag }}
     steps:
+      - name: Harden Runner
+        uses: step-security/harden-runner@fe104658747b27e96e4f7e80cd0a94068e53901d # v2.16.1
+        with:
+          egress-policy: audit
       - name: Download digests
         uses: actions/download-artifact@v4
         with:
