@@ -14,6 +14,7 @@ import (
 	"github.com/reearth/reearthx/appx"
 	"github.com/reearth/reearthx/log"
 	"github.com/reearth/reearthx/rerror"
+	"go.opentelemetry.io/contrib/instrumentation/github.com/labstack/echo/otelecho"
 )
 
 func initEcho(ctx context.Context, cfg *ServerConfig) *echo.Echo {
@@ -28,7 +29,11 @@ func initEcho(ctx context.Context, cfg *ServerConfig) *echo.Echo {
 
 	logger := log.NewEcho()
 	e.Logger = logger
-	e.Use(AccessLogger(logger))
+	e.Use(
+		otelecho.Middleware("reearth-accounts-api"),
+		AccessLogger(logger),
+		echo.WrapMiddleware(appx.RequestIDMiddleware()),
+	)
 
 	origins := allowedOrigins(cfg)
 	if len(origins) > 0 {
