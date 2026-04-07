@@ -63,6 +63,7 @@ func isBypassed(req *http.Request) bool {
 		"signup(",
 		"signupoidc(",
 		"findbyid(",
+		"findbyids(",
 		"findbyalias(",
 		"createverification(",
 		"authconfig",
