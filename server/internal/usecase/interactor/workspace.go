@@ -47,8 +47,7 @@ func NewWorkspace(r *repo.Container, enforceMemberCount WorkspaceMemberCountEnfo
 }
 
 func (i *Workspace) Fetch(ctx context.Context, ids workspace.IDList, operator *workspace.Operator) (workspace.List, error) {
-	res, err := i.repos.Workspace.FindByIDs(ctx, ids)
-	return filterWorkspaces(res, operator, err, false, true)
+	return i.repos.Workspace.FindByIDs(ctx, ids)
 }
 
 func (i *Workspace) FetchByID(ctx context.Context, id workspace.ID) (*workspace.Workspace, error) {
