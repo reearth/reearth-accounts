@@ -55,7 +55,7 @@ Currently we print a lot of logs that make it hard to debug manually when an err
 
 1. **HTTP middleware for incoming requests**
    - Register `otelecho.Middleware()` to extract trace context from inbound requests
-   - Extract `X-Cloud-Trace-Context` header (Cloud Run) or W3C `traceparent`
+   - Extracts W3C `traceparent` header (Cloud Run sends this automatically alongside `X-Cloud-Trace-Context`)
    - Propagate through request context
 
 2. **Wrap outbound HTTP clients**

@@ -31,8 +31,8 @@ func initEcho(ctx context.Context, cfg *ServerConfig) *echo.Echo {
 	e.Logger = logger
 	e.Use(
 		otelecho.Middleware("reearth-accounts-api"),
-		AccessLogger(logger),
 		echo.WrapMiddleware(appx.RequestIDMiddleware()),
+		AccessLogger(logger),
 	)
 
 	origins := allowedOrigins(cfg)
@@ -163,4 +163,3 @@ func cacheControl(next echo.HandlerFunc) echo.HandlerFunc {
 		return next(c)
 	}
 }
-
