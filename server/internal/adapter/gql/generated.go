@@ -1977,6 +1977,7 @@ type DeleteWorkspacePayload {
     workspaceId: ID!
 }
 
+# TODO: rename it to findWorkspace** as a prefix to avoid conflict with other entities
 extend type Query {
     findByID(id: ID!): Workspace!
     findByIDs(ids: [ID!]!): [Workspace!]!
