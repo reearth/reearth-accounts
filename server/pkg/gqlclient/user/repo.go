@@ -28,6 +28,18 @@ var (
 
 		return false
 	}
+
+	ErrUserInvalidPasswordConfirmation = func(err error) bool {
+		var gqlErrs graphql.Errors
+		if errors.As(err, &gqlErrs) {
+			for _, gqlErr := range gqlErrs {
+				if strings.Contains(gqlErr.Message, "invalid password confirmation") {
+				}
+			}
+		}
+
+		return false
+	}
 )
 
 type userRepo struct {
