@@ -120,7 +120,6 @@ type ComplexityRoot struct {
 		TransferWorkspaceOwnership       func(childComplexity int, input gqlmodel.TransferWorkspaceOwnershipInput) int
 		UpdateIntegrationOfWorkspace     func(childComplexity int, input gqlmodel.UpdateIntegrationOfWorkspaceInput) int
 		UpdateMe                         func(childComplexity int, input gqlmodel.UpdateMeInput) int
-		UpdateMeOidc                     func(childComplexity int, input gqlmodel.UpdateMeOIDCInput) int
 		UpdatePermittable                func(childComplexity int, input gqlmodel.UpdatePermittableInput) int
 		UpdateRole                       func(childComplexity int, input gqlmodel.UpdateRoleInput) int
 		UpdateUserOfWorkspace            func(childComplexity int, input gqlmodel.UpdateUserOfWorkspaceInput) int
@@ -297,7 +296,6 @@ type MutationResolver interface {
 	SignupOidc(ctx context.Context, input gqlmodel.SignupOIDCInput) (*gqlmodel.UserPayload, error)
 	StartPasswordReset(ctx context.Context, input gqlmodel.StartPasswordResetInput) (*bool, error)
 	UpdateMe(ctx context.Context, input gqlmodel.UpdateMeInput) (*gqlmodel.UpdateMePayload, error)
-	UpdateMeOidc(ctx context.Context, input gqlmodel.UpdateMeOIDCInput) (*gqlmodel.UpdateMePayload, error)
 	Logout(ctx context.Context) (*gqlmodel.Me, error)
 	VerifyUser(ctx context.Context, input gqlmodel.VerifyUserInput) (*gqlmodel.UserPayload, error)
 	CreateWorkspace(ctx context.Context, input gqlmodel.CreateWorkspaceInput) (*gqlmodel.CreateWorkspacePayload, error)
@@ -730,17 +728,6 @@ func (e *executableSchema) Complexity(ctx context.Context, typeName, field strin
 		}
 
 		return e.complexity.Mutation.UpdateMe(childComplexity, args["input"].(gqlmodel.UpdateMeInput)), true
-	case "Mutation.updateMeOIDC":
-		if e.complexity.Mutation.UpdateMeOidc == nil {
-			break
-		}
-
-		args, err := ec.field_Mutation_updateMeOIDC_args(ctx, rawArgs)
-		if err != nil {
-			return 0, false
-		}
-
-		return e.complexity.Mutation.UpdateMeOidc(childComplexity, args["input"].(gqlmodel.UpdateMeOIDCInput)), true
 	case "Mutation.updatePermittable":
 		if e.complexity.Mutation.UpdatePermittable == nil {
 			break
@@ -1407,7 +1394,6 @@ func (e *executableSchema) Exec(ctx context.Context) graphql.ResponseHandler {
 		ec.unmarshalInputTransferWorkspaceOwnershipInput,
 		ec.unmarshalInputUpdateIntegrationOfWorkspaceInput,
 		ec.unmarshalInputUpdateMeInput,
-		ec.unmarshalInputUpdateMeOIDCInput,
 		ec.unmarshalInputUpdatePermittableInput,
 		ec.unmarshalInputUpdateRoleInput,
 		ec.unmarshalInputUpdateUserOfWorkspaceInput,
@@ -1761,15 +1747,6 @@ input UpdateMeInput {
   website: String
 }
 
-input UpdateMeOIDCInput {
-  name: String
-  email: String
-  lang: Lang
-  theme: Theme
-  password: String
-  passwordConfirmation: String
-}
-
 input RemoveMyAuthInput {
   auth: String!
 }
@@ -1811,7 +1788,6 @@ extend type Mutation {
   signupOIDC(input: SignupOIDCInput!): UserPayload
   startPasswordReset(input: StartPasswordResetInput!): Boolean
   updateMe(input: UpdateMeInput!): UpdateMePayload
-  updateMeOIDC(input: UpdateMeOIDCInput!): UpdateMePayload
   logout: Me
   verifyUser(input: VerifyUserInput!): UserPayload
 }
@@ -2221,17 +2197,6 @@ func (ec *executionContext) field_Mutation_updateIntegrationOfWorkspace_args(ctx
 	var err error
 	args := map[string]any{}
 	arg0, err := graphql.ProcessArgField(ctx, rawArgs, "input", ec.unmarshalNUpdateIntegrationOfWorkspaceInput2githubᚗcomᚋreearthᚋreearthᚑaccountsᚋserverᚋinternalᚋadapterᚋgqlᚋgqlmodelᚐUpdateIntegrationOfWorkspaceInput)
-	if err != nil {
-		return nil, err
-	}
-	args["input"] = arg0
-	return args, nil
-}
-
-func (ec *executionContext) field_Mutation_updateMeOIDC_args(ctx context.Context, rawArgs map[string]any) (map[string]any, error) {
-	var err error
-	args := map[string]any{}
-	arg0, err := graphql.ProcessArgField(ctx, rawArgs, "input", ec.unmarshalNUpdateMeOIDCInput2githubᚗcomᚋreearthᚋreearthᚑaccountsᚋserverᚋinternalᚋadapterᚋgqlᚋgqlmodelᚐUpdateMeOIDCInput)
 	if err != nil {
 		return nil, err
 	}
@@ -3811,51 +3776,6 @@ func (ec *executionContext) fieldContext_Mutation_updateMe(ctx context.Context, 
 	}()
 	ctx = graphql.WithFieldContext(ctx, fc)
 	if fc.Args, err = ec.field_Mutation_updateMe_args(ctx, field.ArgumentMap(ec.Variables)); err != nil {
-		ec.Error(ctx, err)
-		return fc, err
-	}
-	return fc, nil
-}
-
-func (ec *executionContext) _Mutation_updateMeOIDC(ctx context.Context, field graphql.CollectedField) (ret graphql.Marshaler) {
-	return graphql.ResolveField(
-		ctx,
-		ec.OperationContext,
-		field,
-		ec.fieldContext_Mutation_updateMeOIDC,
-		func(ctx context.Context) (any, error) {
-			fc := graphql.GetFieldContext(ctx)
-			return ec.resolvers.Mutation().UpdateMeOidc(ctx, fc.Args["input"].(gqlmodel.UpdateMeOIDCInput))
-		},
-		nil,
-		ec.marshalOUpdateMePayload2ᚖgithubᚗcomᚋreearthᚋreearthᚑaccountsᚋserverᚋinternalᚋadapterᚋgqlᚋgqlmodelᚐUpdateMePayload,
-		true,
-		false,
-	)
-}
-
-func (ec *executionContext) fieldContext_Mutation_updateMeOIDC(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
-	fc = &graphql.FieldContext{
-		Object:     "Mutation",
-		Field:      field,
-		IsMethod:   true,
-		IsResolver: true,
-		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
-			switch field.Name {
-			case "me":
-				return ec.fieldContext_UpdateMePayload_me(ctx, field)
-			}
-			return nil, fmt.Errorf("no field named %q was found under type UpdateMePayload", field.Name)
-		},
-	}
-	defer func() {
-		if r := recover(); r != nil {
-			err = ec.Recover(ctx, r)
-			ec.Error(ctx, err)
-		}
-	}()
-	ctx = graphql.WithFieldContext(ctx, fc)
-	if fc.Args, err = ec.field_Mutation_updateMeOIDC_args(ctx, field.ArgumentMap(ec.Variables)); err != nil {
 		ec.Error(ctx, err)
 		return fc, err
 	}
@@ -9994,68 +9914,6 @@ func (ec *executionContext) unmarshalInputUpdateMeInput(ctx context.Context, obj
 	return it, nil
 }
 
-func (ec *executionContext) unmarshalInputUpdateMeOIDCInput(ctx context.Context, obj any) (gqlmodel.UpdateMeOIDCInput, error) {
-	var it gqlmodel.UpdateMeOIDCInput
-	asMap := map[string]any{}
-	for k, v := range obj.(map[string]any) {
-		asMap[k] = v
-	}
-
-	fieldsInOrder := [...]string{"name", "email", "lang", "theme", "password", "passwordConfirmation"}
-	for _, k := range fieldsInOrder {
-		v, ok := asMap[k]
-		if !ok {
-			continue
-		}
-		switch k {
-		case "name":
-			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("name"))
-			data, err := ec.unmarshalOString2ᚖstring(ctx, v)
-			if err != nil {
-				return it, err
-			}
-			it.Name = data
-		case "email":
-			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("email"))
-			data, err := ec.unmarshalOString2ᚖstring(ctx, v)
-			if err != nil {
-				return it, err
-			}
-			it.Email = data
-		case "lang":
-			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("lang"))
-			data, err := ec.unmarshalOLang2ᚖstring(ctx, v)
-			if err != nil {
-				return it, err
-			}
-			it.Lang = data
-		case "theme":
-			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("theme"))
-			data, err := ec.unmarshalOTheme2ᚖgithubᚗcomᚋreearthᚋreearthᚑaccountsᚋserverᚋinternalᚋadapterᚋgqlᚋgqlmodelᚐTheme(ctx, v)
-			if err != nil {
-				return it, err
-			}
-			it.Theme = data
-		case "password":
-			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("password"))
-			data, err := ec.unmarshalOString2ᚖstring(ctx, v)
-			if err != nil {
-				return it, err
-			}
-			it.Password = data
-		case "passwordConfirmation":
-			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("passwordConfirmation"))
-			data, err := ec.unmarshalOString2ᚖstring(ctx, v)
-			if err != nil {
-				return it, err
-			}
-			it.PasswordConfirmation = data
-		}
-	}
-
-	return it, nil
-}
-
 func (ec *executionContext) unmarshalInputUpdatePermittableInput(ctx context.Context, obj any) (gqlmodel.UpdatePermittableInput, error) {
 	var it gqlmodel.UpdatePermittableInput
 	asMap := map[string]any{}
@@ -10802,10 +10660,6 @@ func (ec *executionContext) _Mutation(ctx context.Context, sel ast.SelectionSet)
 		case "updateMe":
 			out.Values[i] = ec.OperationContext.RootResolverMiddleware(innerCtx, func(ctx context.Context) (res graphql.Marshaler) {
 				return ec._Mutation_updateMe(ctx, field)
-			})
-		case "updateMeOIDC":
-			out.Values[i] = ec.OperationContext.RootResolverMiddleware(innerCtx, func(ctx context.Context) (res graphql.Marshaler) {
-				return ec._Mutation_updateMeOIDC(ctx, field)
 			})
 		case "logout":
 			out.Values[i] = ec.OperationContext.RootResolverMiddleware(innerCtx, func(ctx context.Context) (res graphql.Marshaler) {
@@ -13159,11 +13013,6 @@ func (ec *executionContext) unmarshalNUpdateIntegrationOfWorkspaceInput2github�
 
 func (ec *executionContext) unmarshalNUpdateMeInput2githubᚗcomᚋreearthᚋreearthᚑaccountsᚋserverᚋinternalᚋadapterᚋgqlᚋgqlmodelᚐUpdateMeInput(ctx context.Context, v any) (gqlmodel.UpdateMeInput, error) {
 	res, err := ec.unmarshalInputUpdateMeInput(ctx, v)
-	return res, graphql.ErrorOnPath(ctx, err)
-}
-
-func (ec *executionContext) unmarshalNUpdateMeOIDCInput2githubᚗcomᚋreearthᚋreearthᚑaccountsᚋserverᚋinternalᚋadapterᚋgqlᚋgqlmodelᚐUpdateMeOIDCInput(ctx context.Context, v any) (gqlmodel.UpdateMeOIDCInput, error) {
-	res, err := ec.unmarshalInputUpdateMeOIDCInput(ctx, v)
 	return res, graphql.ErrorOnPath(ctx, err)
 }
 
