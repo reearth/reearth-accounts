@@ -34,6 +34,7 @@ var (
 		if errors.As(err, &gqlErrs) {
 			for _, gqlErr := range gqlErrs {
 				if strings.Contains(gqlErr.Message, "invalid password confirmation") {
+					return true
 				}
 			}
 		}
