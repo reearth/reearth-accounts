@@ -1521,11 +1521,13 @@ func TestWorkspace_UpdateMember(t *testing.T) {
 	w4 := workspace.New().ID(id4).Name("W4").Members(map[user.ID]workspace.Member{userID: {Role: role.RoleOwner}, u.ID(): {Role: role.RoleReader}}).Personal(false).MustBuild()
 	id5 := id.NewWorkspaceID()
 	w5 := workspace.New().ID(id5).Name("W5").Members(map[user.ID]workspace.Member{userID: {Role: role.RoleOwner}, u.ID(): {Role: role.RoleReader}}).Personal(false).MustBuild()
+	id6 := id.NewWorkspaceID()
+	w6 := workspace.New().ID(id6).Name("W6").Members(map[user.ID]workspace.Member{userID: {Role: role.RoleOwner}, u.ID(): {Role: role.RoleReader}}).Personal(false).MustBuild()
 
 	op := &workspace.Operator{
 		User:               &userID,
 		ReadableWorkspaces: []workspace.ID{id1, id2},
-		OwningWorkspaces:   []workspace.ID{id1, id2, id3, id4, id5},
+		OwningWorkspaces:   []workspace.ID{id1, id2, id3, id4, id5, id6},
 	}
 
 	tests := []struct {
@@ -1634,7 +1636,7 @@ func TestWorkspace_UpdateMember(t *testing.T) {
 		},
 		{
 			name:       "Non-owner can change own role",
-			seeds:      workspace.List{w2},
+			seeds:      workspace.List{w6},
 			usersSeeds: []*user.User{u},
 			args: struct {
 				wId      workspace.ID
@@ -1642,13 +1644,13 @@ func TestWorkspace_UpdateMember(t *testing.T) {
 				role     role.RoleType
 				operator *workspace.Operator
 			}{
-				wId:  id2,
+				wId:  id6,
 				uId:  u.ID(),
 				role: role.RoleWriter,
 				operator: &workspace.Operator{
 					User:               lo.ToPtr(u.ID()),
-					ReadableWorkspaces: []workspace.ID{id2},
-					WritableWorkspaces: []workspace.ID{id2},
+					ReadableWorkspaces: []workspace.ID{id6},
+					WritableWorkspaces: []workspace.ID{id6},
 				},
 			},
 			wantErr: nil,
