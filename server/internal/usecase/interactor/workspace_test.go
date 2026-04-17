@@ -1517,11 +1517,15 @@ func TestWorkspace_UpdateMember(t *testing.T) {
 	w2 := workspace.New().ID(id2).Name("W2").Members(map[user.ID]workspace.Member{userID: {Role: role.RoleOwner}, u.ID(): {Role: role.RoleReader}}).Personal(false).MustBuild()
 	id3 := id.NewWorkspaceID()
 	w3 := workspace.New().ID(id3).Name("W3").Members(map[user.ID]workspace.Member{userID: {Role: role.RoleOwner}}).Personal(true).MustBuild()
+	id4 := id.NewWorkspaceID()
+	w4 := workspace.New().ID(id4).Name("W4").Members(map[user.ID]workspace.Member{userID: {Role: role.RoleOwner}, u.ID(): {Role: role.RoleReader}}).Personal(false).MustBuild()
+	id5 := id.NewWorkspaceID()
+	w5 := workspace.New().ID(id5).Name("W5").Members(map[user.ID]workspace.Member{userID: {Role: role.RoleOwner}, u.ID(): {Role: role.RoleReader}}).Personal(false).MustBuild()
 
 	op := &workspace.Operator{
 		User:               &userID,
 		ReadableWorkspaces: []workspace.ID{id1, id2},
-		OwningWorkspaces:   []workspace.ID{id1, id2, id3},
+		OwningWorkspaces:   []workspace.ID{id1, id2, id3, id4, id5},
 	}
 
 	tests := []struct {
@@ -1591,6 +1595,64 @@ func TestWorkspace_UpdateMember(t *testing.T) {
 			},
 			wantErr: workspace.ErrCannotModifyPersonalWorkspace,
 			want:    workspace.NewMembersWith(map[user.ID]workspace.Member{userID: {Role: role.RoleOwner}}, map[id.IntegrationID]workspace.Member{}, true),
+		},
+		{
+			name:       "Owner cannot change own role",
+			seeds:      workspace.List{w4},
+			usersSeeds: []*user.User{u},
+			args: struct {
+				wId      workspace.ID
+				uId      user.ID
+				role     role.RoleType
+				operator *workspace.Operator
+			}{
+				wId:      id4,
+				uId:      userID,
+				role:     role.RoleReader,
+				operator: op,
+			},
+			wantErr: interfaces.ErrCannotChangeOwnerRole,
+			want:    workspace.NewMembersWith(map[user.ID]workspace.Member{userID: {Role: role.RoleOwner}, u.ID(): {Role: role.RoleReader}}, nil, false),
+		},
+		{
+			name:       "Owner can set own role to owner",
+			seeds:      workspace.List{w5},
+			usersSeeds: []*user.User{u},
+			args: struct {
+				wId      workspace.ID
+				uId      user.ID
+				role     role.RoleType
+				operator *workspace.Operator
+			}{
+				wId:      id5,
+				uId:      userID,
+				role:     role.RoleOwner,
+				operator: op,
+			},
+			wantErr: nil,
+			want:    workspace.NewMembersWith(map[user.ID]workspace.Member{userID: {Role: role.RoleOwner}, u.ID(): {Role: role.RoleReader}}, nil, false),
+		},
+		{
+			name:       "Non-owner can change own role",
+			seeds:      workspace.List{w2},
+			usersSeeds: []*user.User{u},
+			args: struct {
+				wId      workspace.ID
+				uId      user.ID
+				role     role.RoleType
+				operator *workspace.Operator
+			}{
+				wId:  id2,
+				uId:  u.ID(),
+				role: role.RoleWriter,
+				operator: &workspace.Operator{
+					User:               lo.ToPtr(u.ID()),
+					ReadableWorkspaces: []workspace.ID{id2},
+					WritableWorkspaces: []workspace.ID{id2},
+				},
+			},
+			wantErr: nil,
+			want:    workspace.NewMembersWith(map[user.ID]workspace.Member{userID: {Role: role.RoleOwner}, u.ID(): {Role: role.RoleWriter}}, nil, false),
 		},
 		{
 			name: "mock error",

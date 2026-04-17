@@ -433,7 +433,7 @@ func (i *Workspace) RemoveIntegrations(ctx context.Context, wId workspace.ID, iI
 	})
 }
 
-func (i *Workspace) UpdateUserMember(ctx context.Context, id workspace.ID, u workspace.UserID, r role.RoleType, operator *workspace.Operator) (_ *workspace.Workspace, err error) {
+func (i *Workspace) UpdateUserMember(ctx context.Context, id workspace.ID, u workspace.UserID, newRole role.RoleType, operator *workspace.Operator) (_ *workspace.Workspace, err error) {
 	if operator.User == nil {
 		return nil, interfaces.ErrInvalidOperator
 	}
@@ -448,16 +448,16 @@ func (i *Workspace) UpdateUserMember(ctx context.Context, id workspace.ID, u wor
 			return nil, workspace.ErrCannotModifyPersonalWorkspace
 		}
 
-		if u == *operator.User && ws.Members().UserRole(u) == role.RoleOwner {
+		if u == *operator.User && ws.Members().UserRole(u) == role.RoleOwner && newRole != role.RoleOwner {
 			return nil, interfaces.ErrCannotChangeOwnerRole
 		}
 
-		err = ws.Members().UpdateUserRole(u, r)
+		err = ws.Members().UpdateUserRole(u, newRole)
 		if err != nil {
 			return nil, err
 		}
 
-		if err := i.updatePermittable(ctx, u, ws.ID(), r); err != nil {
+		if err := i.updatePermittable(ctx, u, ws.ID(), newRole); err != nil {
 			return nil, err
 		}
 
