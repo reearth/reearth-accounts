@@ -66,7 +66,7 @@ func TestIsBypassed(t *testing.T) {
 		})
 
 		t.Run("authConfig query", func(t *testing.T) {
-			body := `{"query":"query { authConfig { provider } }"}`
+			body := `{"query":"query { authConfig { auth0ClientId authProvider } }"}`
 			req, err := http.NewRequest(http.MethodPost, "/api/graphql", io.NopCloser(bytes.NewBufferString(body)))
 			assert.NoError(t, err)
 
@@ -130,7 +130,7 @@ func TestIsBypassed(t *testing.T) {
 	})
 
 	t.Run("should allow multiple bypassed fields", func(t *testing.T) {
-		body := `{"query":"query { authConfig { clientId } findByID(id: \"abc\") { id } }"}`
+		body := `{"query":"query { authConfig { auth0ClientId } findByID(id: \"abc\") { id } }"}`
 		req, err := http.NewRequest(http.MethodPost, "/api/graphql", io.NopCloser(bytes.NewBufferString(body)))
 		assert.NoError(t, err)
 

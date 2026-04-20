@@ -42,15 +42,14 @@ type graphqlRequest struct {
 // bypassedFields is the set of top-level GraphQL field names that are
 // allowed without authentication. Field names must be lowercase.
 var bypassedFields = map[string]struct{}{
-	"signup":                        {},
-	"signupoidc":                    {},
-	"createverification":            {},
-	"findbyid":                      {},
-	"findbyids":                     {},
-	"findbyalias":                   {},
-	"finduserbyalias":               {},
-	"findusersbyidswithpagination":  {},
-	"authconfig":                    {},
+	"authconfig":                   {},
+	"createverification":           {},
+	"findbyalias":                  {},
+	"findbyid":                     {},
+	"findbyids":                    {},
+	"findusersbyidswithpagination": {},
+	"signup":                       {},
+	"signupoidc":                   {},
 }
 
 func isBypassed(req *http.Request) bool {
@@ -70,6 +69,21 @@ func isBypassed(req *http.Request) bool {
 	}
 
 	if gqlReq.Query == "" {
+		return false
+	}
+
+	// Cheap prefilter: skip AST parsing if the raw query doesn't contain
+	// any of the bypassed field names. This avoids parsing overhead for
+	// the majority of authenticated requests.
+	queryLower := strings.ToLower(gqlReq.Query)
+	hasCandidate := false
+	for field := range bypassedFields {
+		if strings.Contains(queryLower, field) {
+			hasCandidate = true
+			break
+		}
+	}
+	if !hasCandidate {
 		return false
 	}
 
