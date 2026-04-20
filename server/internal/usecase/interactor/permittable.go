@@ -10,14 +10,12 @@ import (
 	"github.com/reearth/reearth-accounts/server/pkg/role"
 	"github.com/reearth/reearth-accounts/server/pkg/user"
 	"github.com/reearth/reearthx/rerror"
-	"github.com/reearth/reearthx/usecasex"
 )
 
 type Permittable struct {
 	permittableRepo permittable.Repo
 	roleRepo        role.Repo
 	userRepo        user.Repo
-	transaction     usecasex.Transaction
 }
 
 func NewPermittable(r *repo.Container) interfaces.Permittable {
@@ -25,7 +23,6 @@ func NewPermittable(r *repo.Container) interfaces.Permittable {
 		permittableRepo: r.Permittable,
 		roleRepo:        r.Role,
 		userRepo:        r.User,
-		transaction:     r.Transaction,
 	}
 }
 
@@ -87,45 +84,4 @@ func (i *Permittable) GetUsersWithRoles(ctx context.Context) (user.List, map[use
 	}
 
 	return users, userRoleMap, nil
-}
-
-func (i *Permittable) UpdatePermittable(ctx context.Context, param interfaces.UpdatePermittableParam) (*permittable.Permittable, error) {
-	tx, err := i.transaction.Begin(ctx)
-	if err != nil {
-		return nil, err
-	}
-
-	ctx = tx.Context()
-	defer func() {
-		if err2 := tx.End(ctx); err == nil && err2 != nil {
-			err = err2
-		}
-	}()
-
-	targetPermittable, err := i.permittableRepo.FindByUserID(ctx, param.UserID)
-	if err != nil && err != rerror.ErrNotFound {
-		return nil, err
-	}
-
-	var u *permittable.Permittable
-	if targetPermittable != nil {
-		targetPermittable.EditRoleIDs(param.RoleIDs)
-		u = targetPermittable
-	} else {
-		u, err = permittable.New().
-			NewID().
-			UserID(param.UserID).
-			RoleIDs(param.RoleIDs).
-			Build()
-		if err != nil {
-			return nil, err
-		}
-	}
-
-	if err := i.permittableRepo.Save(ctx, *u); err != nil {
-		return nil, err
-	}
-
-	tx.Commit()
-	return u, nil
 }

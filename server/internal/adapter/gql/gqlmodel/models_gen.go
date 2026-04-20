@@ -257,15 +257,6 @@ type UpdateMemberOfWorkspacePayload struct {
 	Workspace *Workspace `json:"workspace"`
 }
 
-type UpdatePermittableInput struct {
-	UserID  ID   `json:"userId"`
-	RoleIds []ID `json:"roleIds"`
-}
-
-type UpdatePermittablePayload struct {
-	Permittable *Permittable `json:"permittable"`
-}
-
 type UpdateRoleInput struct {
 	ID   ID     `json:"id"`
 	Name string `json:"name"`
