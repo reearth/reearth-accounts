@@ -46,6 +46,10 @@ func NewWorkspace(r *repo.Container, enforceMemberCount WorkspaceMemberCountEnfo
 	}
 }
 
+// Fetch returns workspaces by IDs without operator-based filtering.
+// This is intentional: other microservices (e.g. dashboard) call FindByIDs via
+// GraphQL without authentication to look up workspace metadata, so filtering
+// by operator would break service-to-service communication.
 func (i *Workspace) Fetch(ctx context.Context, ids workspace.IDList, operator *workspace.Operator) (workspace.List, error) {
 	return i.repos.Workspace.FindByIDs(ctx, ids)
 }
