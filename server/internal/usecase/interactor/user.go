@@ -168,6 +168,10 @@ func (i *User) UpdateMe(ctx context.Context, p interfaces.UpdateMeParam, operato
 			return nil, err
 		}
 
+		if ws == nil {
+			return nil, rerror.ErrNotFound
+		}
+
 		if p.Alias != nil && *p.Alias != u.Alias() {
 			existingUser, err := i.repos.User.FindByAlias(ctx, *p.Alias)
 			if err != nil && !errors.Is(err, rerror.ErrNotFound) {
@@ -177,19 +181,15 @@ func (i *User) UpdateMe(ctx context.Context, p interfaces.UpdateMeParam, operato
 				return nil, interfaces.ErrUserAliasAlreadyExists
 			}
 			u.UpdateAlias(*p.Alias)
-			if ws != nil {
-				ws.UpdateAlias(*p.Alias)
-			}
+			ws.UpdateAlias(*p.Alias)
 		}
 		if p.Name != nil && *p.Name != u.Name() {
 			oldName := u.Name()
 			u.UpdateName(*p.Name)
 
-			if ws != nil {
-				tn := ws.Name()
-				if tn == "" || tn == oldName {
-					ws.Rename(*p.Name)
-				}
+			tn := ws.Name()
+			if tn == "" || tn == oldName {
+				ws.Rename(*p.Name)
 			}
 		}
 		if p.Email != nil {
