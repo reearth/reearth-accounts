@@ -39,6 +39,13 @@ const (
 	maxBypassBodySize = 100 * 1024 // 100 KB
 )
 
+// readCloser combines an io.Reader and an io.Closer so that
+// Close() is delegated to the original request body.
+type readCloser struct {
+	io.Reader
+	io.Closer
+}
+
 type graphqlRequest struct {
 	Query         string         `json:"query"`
 	OperationName string         `json:"operationName"`
@@ -65,14 +72,18 @@ func isBypassed(req *http.Request) bool {
 
 	// Read up to maxBypassBodySize+1 bytes to detect oversized bodies
 	// without allocating unbounded memory.
-	lr := io.LimitReader(req.Body, maxBypassBodySize+1)
+	origBody := req.Body
+	lr := io.LimitReader(origBody, maxBypassBodySize+1)
 	body, err := io.ReadAll(lr)
 	if err != nil {
 		return false
 	}
 	// Restore full body for downstream handlers: concatenate what we read
-	// with any remaining unread portion of the original body.
-	req.Body = io.NopCloser(io.MultiReader(bytes.NewReader(body), req.Body))
+	// with any remaining unread portion, preserving the original Close().
+	req.Body = readCloser{
+		Reader: io.MultiReader(bytes.NewReader(body), origBody),
+		Closer: origBody,
+	}
 
 	if len(body) > maxBypassBodySize {
 		return false
