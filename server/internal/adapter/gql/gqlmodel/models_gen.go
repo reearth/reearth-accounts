@@ -25,14 +25,6 @@ type AddIntegrationToWorkspaceInput struct {
 	Role          Role `json:"role"`
 }
 
-type AddRoleInput struct {
-	Name string `json:"name"`
-}
-
-type AddRolePayload struct {
-	Role *RoleForAuthorization `json:"role"`
-}
-
 type AddUsersToWorkspaceInput struct {
 	WorkspaceID ID             `json:"workspaceId"`
 	Users       []*MemberInput `json:"users"`
@@ -167,26 +159,9 @@ type RemoveMyAuthInput struct {
 	Auth string `json:"auth"`
 }
 
-type RemoveRoleInput struct {
-	ID ID `json:"id"`
-}
-
-type RemoveRolePayload struct {
-	ID ID `json:"id"`
-}
-
 type RemoveUserFromWorkspaceInput struct {
 	WorkspaceID ID `json:"workspaceId"`
 	UserID      ID `json:"userId"`
-}
-
-type RoleForAuthorization struct {
-	ID   ID     `json:"id"`
-	Name string `json:"name"`
-}
-
-type RolesPayload struct {
-	Roles []*RoleForAuthorization `json:"roles"`
 }
 
 type SignupInput struct {
@@ -245,15 +220,6 @@ type UpdateMePayload struct {
 
 type UpdateMemberOfWorkspacePayload struct {
 	Workspace *Workspace `json:"workspace"`
-}
-
-type UpdateRoleInput struct {
-	ID   ID     `json:"id"`
-	Name string `json:"name"`
-}
-
-type UpdateRolePayload struct {
-	Role *RoleForAuthorization `json:"role"`
 }
 
 type UpdateUserOfWorkspaceInput struct {
