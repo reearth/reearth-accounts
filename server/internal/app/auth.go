@@ -78,6 +78,11 @@ func isBypassed(req *http.Request) bool {
 		return false
 	}
 
+	// A GraphQL document can contain multiple named operations (e.g. query A {...} mutation B {...}).
+	// Only one is executed per request, selected by the operationName field. We iterate all
+	// operations and require every top-level field across all of them to be in the bypass list.
+	// This is intentionally conservative: even though only one operation runs, we reject the
+	// request if any operation contains a non-bypassed field.
 	fieldCount := 0
 	for _, op := range doc.Operations {
 		for _, sel := range op.SelectionSet {
