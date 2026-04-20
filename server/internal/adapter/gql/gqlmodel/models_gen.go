@@ -25,14 +25,6 @@ type AddIntegrationToWorkspaceInput struct {
 	Role          Role `json:"role"`
 }
 
-type AddRoleInput struct {
-	Name string `json:"name"`
-}
-
-type AddRolePayload struct {
-	Role *RoleForAuthorization `json:"role"`
-}
-
 type AddUsersToWorkspaceInput struct {
 	WorkspaceID ID             `json:"workspaceId"`
 	Users       []*MemberInput `json:"users"`
@@ -102,10 +94,6 @@ type FindOrCreateInput struct {
 	Token string `json:"token"`
 }
 
-type GetUsersWithRolesPayload struct {
-	UsersWithRoles []*UserWithRoles `json:"usersWithRoles"`
-}
-
 type Me struct {
 	ID             ID            `json:"id"`
 	Name           string        `json:"name"`
@@ -135,12 +123,6 @@ type Pagination struct {
 type PasswordResetInput struct {
 	Password string `json:"password"`
 	Token    string `json:"token"`
-}
-
-type Permittable struct {
-	ID      ID   `json:"id"`
-	UserID  ID   `json:"userId"`
-	RoleIds []ID `json:"roleIds"`
 }
 
 type Query struct {
@@ -177,26 +159,9 @@ type RemoveMyAuthInput struct {
 	Auth string `json:"auth"`
 }
 
-type RemoveRoleInput struct {
-	ID ID `json:"id"`
-}
-
-type RemoveRolePayload struct {
-	ID ID `json:"id"`
-}
-
 type RemoveUserFromWorkspaceInput struct {
 	WorkspaceID ID `json:"workspaceId"`
 	UserID      ID `json:"userId"`
-}
-
-type RoleForAuthorization struct {
-	ID   ID     `json:"id"`
-	Name string `json:"name"`
-}
-
-type RolesPayload struct {
-	Roles []*RoleForAuthorization `json:"roles"`
 }
 
 type SignupInput struct {
@@ -257,24 +222,6 @@ type UpdateMemberOfWorkspacePayload struct {
 	Workspace *Workspace `json:"workspace"`
 }
 
-type UpdatePermittableInput struct {
-	UserID  ID   `json:"userId"`
-	RoleIds []ID `json:"roleIds"`
-}
-
-type UpdatePermittablePayload struct {
-	Permittable *Permittable `json:"permittable"`
-}
-
-type UpdateRoleInput struct {
-	ID   ID     `json:"id"`
-	Name string `json:"name"`
-}
-
-type UpdateRolePayload struct {
-	Role *RoleForAuthorization `json:"role"`
-}
-
 type UpdateUserOfWorkspaceInput struct {
 	WorkspaceID ID   `json:"workspaceId"`
 	UserID      ID   `json:"userId"`
@@ -319,11 +266,6 @@ type UserMetadata struct {
 
 type UserPayload struct {
 	User *User `json:"user"`
-}
-
-type UserWithRoles struct {
-	User  *User                   `json:"user"`
-	Roles []*RoleForAuthorization `json:"roles"`
 }
 
 type UsersWithPagination struct {

@@ -9,6 +9,7 @@ import (
 	"github.com/reearth/reearth-accounts/server/internal/app"
 	"github.com/reearth/reearth-accounts/server/internal/usecase/repo"
 	"github.com/reearth/reearth-accounts/server/pkg/id"
+	"github.com/reearth/reearth-accounts/server/pkg/permittable"
 	"github.com/reearth/reearth-accounts/server/pkg/role"
 	"github.com/reearth/reearth-accounts/server/pkg/user"
 	"github.com/reearth/reearth-accounts/server/pkg/workspace"
@@ -18,7 +19,6 @@ import (
 // baseSeederOneUserWithSelfRoleNoPermittable creates user, workspace, and "self" role WITHOUT creating permittable
 // This is used for testing permission checks when permittable doesn't exist yet
 func baseSeederOneUserWithSelfRoleNoPermittable(ctx context.Context, r *repo.Container) error {
-	// First seed the self role (required for CheckPermission to work)
 	if err := seedRoles(ctx, r); err != nil {
 		return err
 	}
@@ -56,8 +56,34 @@ func baseSeederOneUserWithSelfRoleNoPermittable(ctx context.Context, r *repo.Con
 		return err
 	}
 
-	// NOTE: Intentionally NOT creating permittable - this test wants to test permission denied scenario
 	return nil
+}
+
+// baseSeederOneUserWithPermittable creates user, workspace, roles, and a permittable with "role1"
+func baseSeederOneUserWithPermittable(ctx context.Context, r *repo.Container) error {
+	if err := baseSeederOneUserWithSelfRoleNoPermittable(ctx, r); err != nil {
+		return err
+	}
+
+	selfRole, err := r.Role.FindByName(ctx, role.RoleSelf.String())
+	if err != nil {
+		return err
+	}
+
+	cerbosRole := role.New().NewID().Name("role1").MustBuild()
+	if err := r.Role.Save(ctx, *cerbosRole); err != nil {
+		return err
+	}
+
+	p, err := permittable.New().
+		NewID().
+		UserID(uId).
+		RoleIDs([]id.RoleID{selfRole.ID(), cerbosRole.ID()}).
+		Build()
+	if err != nil {
+		return err
+	}
+	return r.Permittable.Save(ctx, *p)
 }
 
 func checkPermission(e *httpexpect.Expect, service string, resource string, action string) (GraphQLRequest, *httpexpect.Value) {
@@ -91,7 +117,6 @@ func checkPermission(e *httpexpect.Expect, service string, resource string, acti
 }
 
 func TestCheckPermission(t *testing.T) {
-	// Start Cerbos container
 	container, err := newCerbosContainer()
 	if err != nil {
 		t.Fatalf("failed to start cerbos container: %v", err)
@@ -102,33 +127,39 @@ func TestCheckPermission(t *testing.T) {
 		}
 	}()
 
-	// Start server with user and roles but no permittable
-	e, _ := StartServer(t, &app.Config{
-		CerbosHost: container.getAddress(),
-	}, true, baseSeederOneUserWithSelfRoleNoPermittable)
+	t.Run("should deny when no permittable exists", func(t *testing.T) {
+		e, _ := StartServer(t, &app.Config{
+			CerbosHost: container.getAddress(),
+		}, true, baseSeederOneUserWithSelfRoleNoPermittable)
 
-	// check permission with no permittable - should be denied (user has no roles in permittable)
-	_, res1 := checkPermission(e, "service", "resource", "read")
-	res1.Object().
-		Value("data").Object().
-		Value("checkPermission").Object().
-		Value("allowed").Boolean().IsFalse()
+		_, res := checkPermission(e, "service", "resource", "read")
+		res.Object().
+			Value("data").Object().
+			Value("checkPermission").Object().
+			Value("allowed").Boolean().IsFalse()
+	})
 
-	// Add role and permittable
-	_, _, roleId1 := addRole(e, "role1")
-	_, _, _ = updatePermittable(e, uId.String(), []string{roleId1})
+	t.Run("should allow when permittable with role exists", func(t *testing.T) {
+		e, _ := StartServer(t, &app.Config{
+			CerbosHost: container.getAddress(),
+		}, true, baseSeederOneUserWithPermittable)
 
-	// check permission with permittable
-	_, res2 := checkPermission(e, "service", "resource", "read")
-	res2.Object().
-		Value("data").Object().
-		Value("checkPermission").Object().
-		Value("allowed").Boolean().IsTrue()
+		_, res := checkPermission(e, "service", "resource", "read")
+		res.Object().
+			Value("data").Object().
+			Value("checkPermission").Object().
+			Value("allowed").Boolean().IsTrue()
+	})
 
-	// check permission with permittable but allowed is false
-	_, res3 := checkPermission(e, "service", "resource", "edit")
-	res3.Object().
-		Value("data").Object().
-		Value("checkPermission").Object().
-		Value("allowed").Boolean().IsFalse()
+	t.Run("should deny for unauthorized action", func(t *testing.T) {
+		e, _ := StartServer(t, &app.Config{
+			CerbosHost: container.getAddress(),
+		}, true, baseSeederOneUserWithPermittable)
+
+		_, res := checkPermission(e, "service", "resource", "edit")
+		res.Object().
+			Value("data").Object().
+			Value("checkPermission").Object().
+			Value("allowed").Boolean().IsFalse()
+	})
 }
