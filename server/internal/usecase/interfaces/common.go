@@ -12,9 +12,8 @@ var (
 )
 
 type Container struct {
-	User        User
-	Workspace   Workspace
-	Cerbos      Cerbos
-	Role        Role
-	Permittable Permittable
+	Cerbos    Cerbos
+	Role      Role
+	User      User
+	Workspace Workspace
 }

@@ -80,10 +80,6 @@ type ComplexityRoot struct {
 		WorkspaceID func(childComplexity int) int
 	}
 
-	GetUsersWithRolesPayload struct {
-		UsersWithRoles func(childComplexity int) int
-	}
-
 	Me struct {
 		Alias          func(childComplexity int) int
 		Auths          func(childComplexity int) int
@@ -126,12 +122,6 @@ type ComplexityRoot struct {
 		VerifyUser                       func(childComplexity int, input gqlmodel.VerifyUserInput) int
 	}
 
-	Permittable struct {
-		ID      func(childComplexity int) int
-		RoleIds func(childComplexity int) int
-		UserID  func(childComplexity int) int
-	}
-
 	Query struct {
 		AuthConfig                   func(childComplexity int) int
 		CheckPermission              func(childComplexity int, input gqlmodel.CheckPermissionInput) int
@@ -144,7 +134,6 @@ type ComplexityRoot struct {
 		FindUserByAlias              func(childComplexity int, alias string) int
 		FindUsersByIDs               func(childComplexity int, ids []gqlmodel.ID) int
 		FindUsersByIDsWithPagination func(childComplexity int, ids []gqlmodel.ID, alias *string, pagination gqlmodel.Pagination) int
-		GetUsersWithRoles            func(childComplexity int) int
 		Me                           func(childComplexity int) int
 		Node                         func(childComplexity int, id gqlmodel.ID, typeArg gqlmodel.NodeType) int
 		Nodes                        func(childComplexity int, id []gqlmodel.ID, typeArg gqlmodel.NodeType) int
@@ -218,11 +207,6 @@ type ComplexityRoot struct {
 
 	UserPayload struct {
 		User func(childComplexity int) int
-	}
-
-	UserWithRoles struct {
-		Roles func(childComplexity int) int
-		User  func(childComplexity int) int
 	}
 
 	UsersWithPagination struct {
@@ -311,7 +295,6 @@ type QueryResolver interface {
 	AuthConfig(ctx context.Context) (*gqlmodel.AuthConfig, error)
 	CheckPermission(ctx context.Context, input gqlmodel.CheckPermissionInput) (*gqlmodel.CheckPermissionPayload, error)
 	Roles(ctx context.Context) (*gqlmodel.RolesPayload, error)
-	GetUsersWithRoles(ctx context.Context) (*gqlmodel.GetUsersWithRolesPayload, error)
 	FindUserByAlias(ctx context.Context, alias string) (*gqlmodel.User, error)
 	FindUsersByIDsWithPagination(ctx context.Context, ids []gqlmodel.ID, alias *string, pagination gqlmodel.Pagination) (*gqlmodel.UsersWithPagination, error)
 	FindUsersByIDs(ctx context.Context, ids []gqlmodel.ID) ([]*gqlmodel.User, error)
@@ -416,13 +399,6 @@ func (e *executableSchema) Complexity(ctx context.Context, typeName, field strin
 		}
 
 		return e.complexity.DeleteWorkspacePayload.WorkspaceID(childComplexity), true
-
-	case "GetUsersWithRolesPayload.usersWithRoles":
-		if e.complexity.GetUsersWithRolesPayload.UsersWithRoles == nil {
-			break
-		}
-
-		return e.complexity.GetUsersWithRolesPayload.UsersWithRoles(childComplexity), true
 
 	case "Me.alias":
 		if e.complexity.Me.Alias == nil {
@@ -767,25 +743,6 @@ func (e *executableSchema) Complexity(ctx context.Context, typeName, field strin
 
 		return e.complexity.Mutation.VerifyUser(childComplexity, args["input"].(gqlmodel.VerifyUserInput)), true
 
-	case "Permittable.id":
-		if e.complexity.Permittable.ID == nil {
-			break
-		}
-
-		return e.complexity.Permittable.ID(childComplexity), true
-	case "Permittable.roleIds":
-		if e.complexity.Permittable.RoleIds == nil {
-			break
-		}
-
-		return e.complexity.Permittable.RoleIds(childComplexity), true
-	case "Permittable.userId":
-		if e.complexity.Permittable.UserID == nil {
-			break
-		}
-
-		return e.complexity.Permittable.UserID(childComplexity), true
-
 	case "Query.authConfig":
 		if e.complexity.Query.AuthConfig == nil {
 			break
@@ -902,12 +859,6 @@ func (e *executableSchema) Complexity(ctx context.Context, typeName, field strin
 		}
 
 		return e.complexity.Query.FindUsersByIDsWithPagination(childComplexity, args["ids"].([]gqlmodel.ID), args["alias"].(*string), args["pagination"].(gqlmodel.Pagination)), true
-	case "Query.getUsersWithRoles":
-		if e.complexity.Query.GetUsersWithRoles == nil {
-			break
-		}
-
-		return e.complexity.Query.GetUsersWithRoles(childComplexity), true
 	case "Query.me":
 		if e.complexity.Query.Me == nil {
 			break
@@ -1155,19 +1106,6 @@ func (e *executableSchema) Complexity(ctx context.Context, typeName, field strin
 		}
 
 		return e.complexity.UserPayload.User(childComplexity), true
-
-	case "UserWithRoles.roles":
-		if e.complexity.UserWithRoles.Roles == nil {
-			break
-		}
-
-		return e.complexity.UserWithRoles.Roles(childComplexity), true
-	case "UserWithRoles.user":
-		if e.complexity.UserWithRoles.User == nil {
-			break
-		}
-
-		return e.complexity.UserWithRoles.User(childComplexity), true
 
 	case "UsersWithPagination.totalCount":
 		if e.complexity.UsersWithPagination.TotalCount == nil {
@@ -1588,24 +1526,8 @@ extend type Mutation {
   removeRole(input: RemoveRoleInput!): RemoveRolePayload
 }
 `, BuiltIn: false},
-	{Name: "../../../schemas/permittable.graphql", Input: `type UserWithRoles {
-  user: User!
-  roles: [RoleForAuthorization!]!
-}
-
-type Permittable {
-  id: ID!
-  userId: ID!
-  roleIds: [ID!]!
-}
-
-type GetUsersWithRolesPayload {
-  usersWithRoles: [UserWithRoles!]!
-}
-
-extend type Query {
-  getUsersWithRoles: GetUsersWithRolesPayload
-}
+	{Name: "../../../schemas/permittable.graphql", Input: `# Permittable types are managed internally and not exposed via GraphQL mutations.
+# The Permittable domain model is used for RBAC but has no public API surface.
 `, BuiltIn: false},
 	{Name: "../../../schemas/user.graphql", Input: `type User implements Node {
   id: ID!
@@ -2804,41 +2726,6 @@ func (ec *executionContext) fieldContext_DeleteWorkspacePayload_workspaceId(_ co
 		IsResolver: false,
 		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
 			return nil, errors.New("field of type ID does not have child fields")
-		},
-	}
-	return fc, nil
-}
-
-func (ec *executionContext) _GetUsersWithRolesPayload_usersWithRoles(ctx context.Context, field graphql.CollectedField, obj *gqlmodel.GetUsersWithRolesPayload) (ret graphql.Marshaler) {
-	return graphql.ResolveField(
-		ctx,
-		ec.OperationContext,
-		field,
-		ec.fieldContext_GetUsersWithRolesPayload_usersWithRoles,
-		func(ctx context.Context) (any, error) {
-			return obj.UsersWithRoles, nil
-		},
-		nil,
-		ec.marshalNUserWithRoles2ᚕᚖgithubᚗcomᚋreearthᚋreearthᚑaccountsᚋserverᚋinternalᚋadapterᚋgqlᚋgqlmodelᚐUserWithRolesᚄ,
-		true,
-		true,
-	)
-}
-
-func (ec *executionContext) fieldContext_GetUsersWithRolesPayload_usersWithRoles(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
-	fc = &graphql.FieldContext{
-		Object:     "GetUsersWithRolesPayload",
-		Field:      field,
-		IsMethod:   false,
-		IsResolver: false,
-		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
-			switch field.Name {
-			case "user":
-				return ec.fieldContext_UserWithRoles_user(ctx, field)
-			case "roles":
-				return ec.fieldContext_UserWithRoles_roles(ctx, field)
-			}
-			return nil, fmt.Errorf("no field named %q was found under type UserWithRoles", field.Name)
 		},
 	}
 	return fc, nil
@@ -4324,93 +4211,6 @@ func (ec *executionContext) fieldContext_Mutation_transferWorkspaceOwnership(ctx
 	return fc, nil
 }
 
-func (ec *executionContext) _Permittable_id(ctx context.Context, field graphql.CollectedField, obj *gqlmodel.Permittable) (ret graphql.Marshaler) {
-	return graphql.ResolveField(
-		ctx,
-		ec.OperationContext,
-		field,
-		ec.fieldContext_Permittable_id,
-		func(ctx context.Context) (any, error) {
-			return obj.ID, nil
-		},
-		nil,
-		ec.marshalNID2githubᚗcomᚋreearthᚋreearthᚑaccountsᚋserverᚋinternalᚋadapterᚋgqlᚋgqlmodelᚐID,
-		true,
-		true,
-	)
-}
-
-func (ec *executionContext) fieldContext_Permittable_id(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
-	fc = &graphql.FieldContext{
-		Object:     "Permittable",
-		Field:      field,
-		IsMethod:   false,
-		IsResolver: false,
-		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
-			return nil, errors.New("field of type ID does not have child fields")
-		},
-	}
-	return fc, nil
-}
-
-func (ec *executionContext) _Permittable_userId(ctx context.Context, field graphql.CollectedField, obj *gqlmodel.Permittable) (ret graphql.Marshaler) {
-	return graphql.ResolveField(
-		ctx,
-		ec.OperationContext,
-		field,
-		ec.fieldContext_Permittable_userId,
-		func(ctx context.Context) (any, error) {
-			return obj.UserID, nil
-		},
-		nil,
-		ec.marshalNID2githubᚗcomᚋreearthᚋreearthᚑaccountsᚋserverᚋinternalᚋadapterᚋgqlᚋgqlmodelᚐID,
-		true,
-		true,
-	)
-}
-
-func (ec *executionContext) fieldContext_Permittable_userId(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
-	fc = &graphql.FieldContext{
-		Object:     "Permittable",
-		Field:      field,
-		IsMethod:   false,
-		IsResolver: false,
-		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
-			return nil, errors.New("field of type ID does not have child fields")
-		},
-	}
-	return fc, nil
-}
-
-func (ec *executionContext) _Permittable_roleIds(ctx context.Context, field graphql.CollectedField, obj *gqlmodel.Permittable) (ret graphql.Marshaler) {
-	return graphql.ResolveField(
-		ctx,
-		ec.OperationContext,
-		field,
-		ec.fieldContext_Permittable_roleIds,
-		func(ctx context.Context) (any, error) {
-			return obj.RoleIds, nil
-		},
-		nil,
-		ec.marshalNID2ᚕgithubᚗcomᚋreearthᚋreearthᚑaccountsᚋserverᚋinternalᚋadapterᚋgqlᚋgqlmodelᚐIDᚄ,
-		true,
-		true,
-	)
-}
-
-func (ec *executionContext) fieldContext_Permittable_roleIds(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
-	fc = &graphql.FieldContext{
-		Object:     "Permittable",
-		Field:      field,
-		IsMethod:   false,
-		IsResolver: false,
-		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
-			return nil, errors.New("field of type ID does not have child fields")
-		},
-	}
-	return fc, nil
-}
-
 func (ec *executionContext) _Query_node(ctx context.Context, field graphql.CollectedField) (ret graphql.Marshaler) {
 	return graphql.ResolveField(
 		ctx,
@@ -4605,39 +4405,6 @@ func (ec *executionContext) fieldContext_Query_roles(_ context.Context, field gr
 				return ec.fieldContext_RolesPayload_roles(ctx, field)
 			}
 			return nil, fmt.Errorf("no field named %q was found under type RolesPayload", field.Name)
-		},
-	}
-	return fc, nil
-}
-
-func (ec *executionContext) _Query_getUsersWithRoles(ctx context.Context, field graphql.CollectedField) (ret graphql.Marshaler) {
-	return graphql.ResolveField(
-		ctx,
-		ec.OperationContext,
-		field,
-		ec.fieldContext_Query_getUsersWithRoles,
-		func(ctx context.Context) (any, error) {
-			return ec.resolvers.Query().GetUsersWithRoles(ctx)
-		},
-		nil,
-		ec.marshalOGetUsersWithRolesPayload2ᚖgithubᚗcomᚋreearthᚋreearthᚑaccountsᚋserverᚋinternalᚋadapterᚋgqlᚋgqlmodelᚐGetUsersWithRolesPayload,
-		true,
-		false,
-	)
-}
-
-func (ec *executionContext) fieldContext_Query_getUsersWithRoles(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
-	fc = &graphql.FieldContext{
-		Object:     "Query",
-		Field:      field,
-		IsMethod:   true,
-		IsResolver: true,
-		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
-			switch field.Name {
-			case "usersWithRoles":
-				return ec.fieldContext_GetUsersWithRolesPayload_usersWithRoles(ctx, field)
-			}
-			return nil, fmt.Errorf("no field named %q was found under type GetUsersWithRolesPayload", field.Name)
 		},
 	}
 	return fc, nil
@@ -6430,90 +6197,6 @@ func (ec *executionContext) fieldContext_UserPayload_user(_ context.Context, fie
 				return ec.fieldContext_User_verification(ctx, field)
 			}
 			return nil, fmt.Errorf("no field named %q was found under type User", field.Name)
-		},
-	}
-	return fc, nil
-}
-
-func (ec *executionContext) _UserWithRoles_user(ctx context.Context, field graphql.CollectedField, obj *gqlmodel.UserWithRoles) (ret graphql.Marshaler) {
-	return graphql.ResolveField(
-		ctx,
-		ec.OperationContext,
-		field,
-		ec.fieldContext_UserWithRoles_user,
-		func(ctx context.Context) (any, error) {
-			return obj.User, nil
-		},
-		nil,
-		ec.marshalNUser2ᚖgithubᚗcomᚋreearthᚋreearthᚑaccountsᚋserverᚋinternalᚋadapterᚋgqlᚋgqlmodelᚐUser,
-		true,
-		true,
-	)
-}
-
-func (ec *executionContext) fieldContext_UserWithRoles_user(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
-	fc = &graphql.FieldContext{
-		Object:     "UserWithRoles",
-		Field:      field,
-		IsMethod:   false,
-		IsResolver: false,
-		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
-			switch field.Name {
-			case "id":
-				return ec.fieldContext_User_id(ctx, field)
-			case "name":
-				return ec.fieldContext_User_name(ctx, field)
-			case "alias":
-				return ec.fieldContext_User_alias(ctx, field)
-			case "email":
-				return ec.fieldContext_User_email(ctx, field)
-			case "host":
-				return ec.fieldContext_User_host(ctx, field)
-			case "workspace":
-				return ec.fieldContext_User_workspace(ctx, field)
-			case "auths":
-				return ec.fieldContext_User_auths(ctx, field)
-			case "metadata":
-				return ec.fieldContext_User_metadata(ctx, field)
-			case "verification":
-				return ec.fieldContext_User_verification(ctx, field)
-			}
-			return nil, fmt.Errorf("no field named %q was found under type User", field.Name)
-		},
-	}
-	return fc, nil
-}
-
-func (ec *executionContext) _UserWithRoles_roles(ctx context.Context, field graphql.CollectedField, obj *gqlmodel.UserWithRoles) (ret graphql.Marshaler) {
-	return graphql.ResolveField(
-		ctx,
-		ec.OperationContext,
-		field,
-		ec.fieldContext_UserWithRoles_roles,
-		func(ctx context.Context) (any, error) {
-			return obj.Roles, nil
-		},
-		nil,
-		ec.marshalNRoleForAuthorization2ᚕᚖgithubᚗcomᚋreearthᚋreearthᚑaccountsᚋserverᚋinternalᚋadapterᚋgqlᚋgqlmodelᚐRoleForAuthorizationᚄ,
-		true,
-		true,
-	)
-}
-
-func (ec *executionContext) fieldContext_UserWithRoles_roles(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
-	fc = &graphql.FieldContext{
-		Object:     "UserWithRoles",
-		Field:      field,
-		IsMethod:   false,
-		IsResolver: false,
-		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
-			switch field.Name {
-			case "id":
-				return ec.fieldContext_RoleForAuthorization_id(ctx, field)
-			case "name":
-				return ec.fieldContext_RoleForAuthorization_name(ctx, field)
-			}
-			return nil, fmt.Errorf("no field named %q was found under type RoleForAuthorization", field.Name)
 		},
 	}
 	return fc, nil
@@ -10277,45 +9960,6 @@ func (ec *executionContext) _DeleteWorkspacePayload(ctx context.Context, sel ast
 	return out
 }
 
-var getUsersWithRolesPayloadImplementors = []string{"GetUsersWithRolesPayload"}
-
-func (ec *executionContext) _GetUsersWithRolesPayload(ctx context.Context, sel ast.SelectionSet, obj *gqlmodel.GetUsersWithRolesPayload) graphql.Marshaler {
-	fields := graphql.CollectFields(ec.OperationContext, sel, getUsersWithRolesPayloadImplementors)
-
-	out := graphql.NewFieldSet(fields)
-	deferred := make(map[string]*graphql.FieldSet)
-	for i, field := range fields {
-		switch field.Name {
-		case "__typename":
-			out.Values[i] = graphql.MarshalString("GetUsersWithRolesPayload")
-		case "usersWithRoles":
-			out.Values[i] = ec._GetUsersWithRolesPayload_usersWithRoles(ctx, field, obj)
-			if out.Values[i] == graphql.Null {
-				out.Invalids++
-			}
-		default:
-			panic("unknown field " + strconv.Quote(field.Name))
-		}
-	}
-	out.Dispatch(ctx)
-	if out.Invalids > 0 {
-		return graphql.Null
-	}
-
-	atomic.AddInt32(&ec.deferred, int32(len(deferred)))
-
-	for label, dfs := range deferred {
-		ec.processDeferredGroup(graphql.DeferredGroup{
-			Label:    label,
-			Path:     graphql.GetPath(ctx),
-			FieldSet: dfs,
-			Context:  ctx,
-		})
-	}
-
-	return out
-}
-
 var meImplementors = []string{"Me"}
 
 func (ec *executionContext) _Me(ctx context.Context, sel ast.SelectionSet, obj *gqlmodel.Me) graphql.Marshaler {
@@ -10571,55 +10215,6 @@ func (ec *executionContext) _Mutation(ctx context.Context, sel ast.SelectionSet)
 	return out
 }
 
-var permittableImplementors = []string{"Permittable"}
-
-func (ec *executionContext) _Permittable(ctx context.Context, sel ast.SelectionSet, obj *gqlmodel.Permittable) graphql.Marshaler {
-	fields := graphql.CollectFields(ec.OperationContext, sel, permittableImplementors)
-
-	out := graphql.NewFieldSet(fields)
-	deferred := make(map[string]*graphql.FieldSet)
-	for i, field := range fields {
-		switch field.Name {
-		case "__typename":
-			out.Values[i] = graphql.MarshalString("Permittable")
-		case "id":
-			out.Values[i] = ec._Permittable_id(ctx, field, obj)
-			if out.Values[i] == graphql.Null {
-				out.Invalids++
-			}
-		case "userId":
-			out.Values[i] = ec._Permittable_userId(ctx, field, obj)
-			if out.Values[i] == graphql.Null {
-				out.Invalids++
-			}
-		case "roleIds":
-			out.Values[i] = ec._Permittable_roleIds(ctx, field, obj)
-			if out.Values[i] == graphql.Null {
-				out.Invalids++
-			}
-		default:
-			panic("unknown field " + strconv.Quote(field.Name))
-		}
-	}
-	out.Dispatch(ctx)
-	if out.Invalids > 0 {
-		return graphql.Null
-	}
-
-	atomic.AddInt32(&ec.deferred, int32(len(deferred)))
-
-	for label, dfs := range deferred {
-		ec.processDeferredGroup(graphql.DeferredGroup{
-			Label:    label,
-			Path:     graphql.GetPath(ctx),
-			FieldSet: dfs,
-			Context:  ctx,
-		})
-	}
-
-	return out
-}
-
 var queryImplementors = []string{"Query"}
 
 func (ec *executionContext) _Query(ctx context.Context, sel ast.SelectionSet) graphql.Marshaler {
@@ -10728,25 +10323,6 @@ func (ec *executionContext) _Query(ctx context.Context, sel ast.SelectionSet) gr
 				if res == graphql.Null {
 					atomic.AddUint32(&fs.Invalids, 1)
 				}
-				return res
-			}
-
-			rrm := func(ctx context.Context) graphql.Marshaler {
-				return ec.OperationContext.RootResolverMiddleware(ctx,
-					func(ctx context.Context) graphql.Marshaler { return innerFunc(ctx, out) })
-			}
-
-			out.Concurrently(i, func(ctx context.Context) graphql.Marshaler { return rrm(innerCtx) })
-		case "getUsersWithRoles":
-			field := field
-
-			innerFunc := func(ctx context.Context, _ *graphql.FieldSet) (res graphql.Marshaler) {
-				defer func() {
-					if r := recover(); r != nil {
-						ec.Error(ctx, ec.Recover(ctx, r))
-					}
-				}()
-				res = ec._Query_getUsersWithRoles(ctx, field)
 				return res
 			}
 
@@ -11614,50 +11190,6 @@ func (ec *executionContext) _UserPayload(ctx context.Context, sel ast.SelectionS
 			out.Values[i] = graphql.MarshalString("UserPayload")
 		case "user":
 			out.Values[i] = ec._UserPayload_user(ctx, field, obj)
-			if out.Values[i] == graphql.Null {
-				out.Invalids++
-			}
-		default:
-			panic("unknown field " + strconv.Quote(field.Name))
-		}
-	}
-	out.Dispatch(ctx)
-	if out.Invalids > 0 {
-		return graphql.Null
-	}
-
-	atomic.AddInt32(&ec.deferred, int32(len(deferred)))
-
-	for label, dfs := range deferred {
-		ec.processDeferredGroup(graphql.DeferredGroup{
-			Label:    label,
-			Path:     graphql.GetPath(ctx),
-			FieldSet: dfs,
-			Context:  ctx,
-		})
-	}
-
-	return out
-}
-
-var userWithRolesImplementors = []string{"UserWithRoles"}
-
-func (ec *executionContext) _UserWithRoles(ctx context.Context, sel ast.SelectionSet, obj *gqlmodel.UserWithRoles) graphql.Marshaler {
-	fields := graphql.CollectFields(ec.OperationContext, sel, userWithRolesImplementors)
-
-	out := graphql.NewFieldSet(fields)
-	deferred := make(map[string]*graphql.FieldSet)
-	for i, field := range fields {
-		switch field.Name {
-		case "__typename":
-			out.Values[i] = graphql.MarshalString("UserWithRoles")
-		case "user":
-			out.Values[i] = ec._UserWithRoles_user(ctx, field, obj)
-			if out.Values[i] == graphql.Null {
-				out.Invalids++
-			}
-		case "roles":
-			out.Values[i] = ec._UserWithRoles_roles(ctx, field, obj)
 			if out.Values[i] == graphql.Null {
 				out.Invalids++
 			}
@@ -12877,60 +12409,6 @@ func (ec *executionContext) marshalNUserMetadata2ᚖgithubᚗcomᚋreearthᚋree
 	return ec._UserMetadata(ctx, sel, v)
 }
 
-func (ec *executionContext) marshalNUserWithRoles2ᚕᚖgithubᚗcomᚋreearthᚋreearthᚑaccountsᚋserverᚋinternalᚋadapterᚋgqlᚋgqlmodelᚐUserWithRolesᚄ(ctx context.Context, sel ast.SelectionSet, v []*gqlmodel.UserWithRoles) graphql.Marshaler {
-	ret := make(graphql.Array, len(v))
-	var wg sync.WaitGroup
-	isLen1 := len(v) == 1
-	if !isLen1 {
-		wg.Add(len(v))
-	}
-	for i := range v {
-		i := i
-		fc := &graphql.FieldContext{
-			Index:  &i,
-			Result: &v[i],
-		}
-		ctx := graphql.WithFieldContext(ctx, fc)
-		f := func(i int) {
-			defer func() {
-				if r := recover(); r != nil {
-					ec.Error(ctx, ec.Recover(ctx, r))
-					ret = nil
-				}
-			}()
-			if !isLen1 {
-				defer wg.Done()
-			}
-			ret[i] = ec.marshalNUserWithRoles2ᚖgithubᚗcomᚋreearthᚋreearthᚑaccountsᚋserverᚋinternalᚋadapterᚋgqlᚋgqlmodelᚐUserWithRoles(ctx, sel, v[i])
-		}
-		if isLen1 {
-			f(i)
-		} else {
-			go f(i)
-		}
-
-	}
-	wg.Wait()
-
-	for _, e := range ret {
-		if e == graphql.Null {
-			return graphql.Null
-		}
-	}
-
-	return ret
-}
-
-func (ec *executionContext) marshalNUserWithRoles2ᚖgithubᚗcomᚋreearthᚋreearthᚑaccountsᚋserverᚋinternalᚋadapterᚋgqlᚋgqlmodelᚐUserWithRoles(ctx context.Context, sel ast.SelectionSet, v *gqlmodel.UserWithRoles) graphql.Marshaler {
-	if v == nil {
-		if !graphql.HasFieldError(ctx, graphql.GetFieldContext(ctx)) {
-			graphql.AddErrorf(ctx, "the requested element is null which the schema does not allow")
-		}
-		return graphql.Null
-	}
-	return ec._UserWithRoles(ctx, sel, v)
-}
-
 func (ec *executionContext) marshalNUsersWithPagination2githubᚗcomᚋreearthᚋreearthᚑaccountsᚋserverᚋinternalᚋadapterᚋgqlᚋgqlmodelᚐUsersWithPagination(ctx context.Context, sel ast.SelectionSet, v gqlmodel.UsersWithPagination) graphql.Marshaler {
 	return ec._UsersWithPagination(ctx, sel, &v)
 }
@@ -13434,13 +12912,6 @@ func (ec *executionContext) marshalODeleteWorkspacePayload2ᚖgithubᚗcomᚋree
 		return graphql.Null
 	}
 	return ec._DeleteWorkspacePayload(ctx, sel, v)
-}
-
-func (ec *executionContext) marshalOGetUsersWithRolesPayload2ᚖgithubᚗcomᚋreearthᚋreearthᚑaccountsᚋserverᚋinternalᚋadapterᚋgqlᚋgqlmodelᚐGetUsersWithRolesPayload(ctx context.Context, sel ast.SelectionSet, v *gqlmodel.GetUsersWithRolesPayload) graphql.Marshaler {
-	if v == nil {
-		return graphql.Null
-	}
-	return ec._GetUsersWithRolesPayload(ctx, sel, v)
 }
 
 func (ec *executionContext) unmarshalOID2ᚖgithubᚗcomᚋreearthᚋreearthᚑaccountsᚋserverᚋinternalᚋadapterᚋgqlᚋgqlmodelᚐID(ctx context.Context, v any) (*gqlmodel.ID, error) {

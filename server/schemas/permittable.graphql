@@ -1,18 +1,2 @@
-type UserWithRoles {
-  user: User!
-  roles: [RoleForAuthorization!]!
-}
-
-type Permittable {
-  id: ID!
-  userId: ID!
-  roleIds: [ID!]!
-}
-
-type GetUsersWithRolesPayload {
-  usersWithRoles: [UserWithRoles!]!
-}
-
-extend type Query {
-  getUsersWithRoles: GetUsersWithRolesPayload
-}
+# Permittable types are managed internally and not exposed via GraphQL mutations.
+# The Permittable domain model is used for RBAC but has no public API surface.

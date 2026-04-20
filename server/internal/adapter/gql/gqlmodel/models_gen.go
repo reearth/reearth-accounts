@@ -102,10 +102,6 @@ type FindOrCreateInput struct {
 	Token string `json:"token"`
 }
 
-type GetUsersWithRolesPayload struct {
-	UsersWithRoles []*UserWithRoles `json:"usersWithRoles"`
-}
-
 type Me struct {
 	ID             ID            `json:"id"`
 	Name           string        `json:"name"`
@@ -135,12 +131,6 @@ type Pagination struct {
 type PasswordResetInput struct {
 	Password string `json:"password"`
 	Token    string `json:"token"`
-}
-
-type Permittable struct {
-	ID      ID   `json:"id"`
-	UserID  ID   `json:"userId"`
-	RoleIds []ID `json:"roleIds"`
 }
 
 type Query struct {
@@ -310,11 +300,6 @@ type UserMetadata struct {
 
 type UserPayload struct {
 	User *User `json:"user"`
-}
-
-type UserWithRoles struct {
-	User  *User                   `json:"user"`
-	Roles []*RoleForAuthorization `json:"roles"`
 }
 
 type UsersWithPagination struct {
