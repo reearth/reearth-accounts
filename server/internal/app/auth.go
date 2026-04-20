@@ -18,6 +18,8 @@ import (
 	"github.com/reearth/reearthx/appx"
 	"github.com/reearth/reearthx/log"
 	"github.com/reearth/reearthx/rerror"
+	"github.com/vektah/gqlparser/v2/ast"
+	"github.com/vektah/gqlparser/v2/parser"
 )
 
 const (
@@ -37,6 +39,20 @@ type graphqlRequest struct {
 	Variables     map[string]any `json:"variables"`
 }
 
+// bypassedFields is the set of top-level GraphQL field names that are
+// allowed without authentication. Field names must be lowercase.
+var bypassedFields = map[string]struct{}{
+	"signup":                        {},
+	"signupoidc":                    {},
+	"createverification":            {},
+	"findbyid":                      {},
+	"findbyids":                     {},
+	"findbyalias":                   {},
+	"finduserbyalias":               {},
+	"findusersbyidswithpagination":  {},
+	"authconfig":                    {},
+}
+
 func isBypassed(req *http.Request) bool {
 	if req.Method != http.MethodPost {
 		return false
@@ -53,30 +69,30 @@ func isBypassed(req *http.Request) bool {
 		return false
 	}
 
-	query := strings.ToLower(gqlReq.Query)
-	query = strings.ReplaceAll(query, " ", "")
-	query = strings.ReplaceAll(query, "\n", "")
-	query = strings.ReplaceAll(query, "\t", "")
-	query = strings.ReplaceAll(query, "\r", "")
-
-	list := []string{
-		"signup(",
-		"signupoidc(",
-		"findbyid(",
-		"findbyids(",
-		"findbyalias(",
-		"createverification(",
-		"authconfig",
-		"findusersbyidswithpagination(",
+	if gqlReq.Query == "" {
+		return false
 	}
 
-	for _, q := range list {
-		if strings.Contains(query, q) {
-			return true
+	doc, gqlErr := parser.ParseQuery(&ast.Source{Input: gqlReq.Query})
+	if gqlErr != nil {
+		return false
+	}
+
+	fieldCount := 0
+	for _, op := range doc.Operations {
+		for _, sel := range op.SelectionSet {
+			field, ok := sel.(*ast.Field)
+			if !ok {
+				return false
+			}
+			if _, allowed := bypassedFields[strings.ToLower(field.Name)]; !allowed {
+				return false
+			}
+			fieldCount++
 		}
 	}
 
-	return false
+	return fieldCount > 0
 }
 
 func canUseDebugHeaders(req *http.Request, cfg *ServerConfig) bool {

@@ -93,6 +93,51 @@ func TestIsBypassed(t *testing.T) {
 		})
 	})
 
+	t.Run("should reject bypass keyword injection via comment", func(t *testing.T) {
+		body := `{"query":"# signup(\nmutation { updatePermittable(input: {}) { permittable { id } } }"}`
+		req, err := http.NewRequest(http.MethodPost, "/api/graphql", io.NopCloser(bytes.NewBufferString(body)))
+		assert.NoError(t, err)
+
+		result := isBypassed(req)
+		assert.False(t, result)
+	})
+
+	t.Run("should reject bypass keyword in operation name", func(t *testing.T) {
+		body := `{"query":"mutation signup { updatePermittable(input: {}) { permittable { id } } }"}`
+		req, err := http.NewRequest(http.MethodPost, "/api/graphql", io.NopCloser(bytes.NewBufferString(body)))
+		assert.NoError(t, err)
+
+		result := isBypassed(req)
+		assert.False(t, result)
+	})
+
+	t.Run("should reject bypass keyword as field alias", func(t *testing.T) {
+		body := `{"query":"mutation { signup: updatePermittable(input: {}) { permittable { id } } }"}`
+		req, err := http.NewRequest(http.MethodPost, "/api/graphql", io.NopCloser(bytes.NewBufferString(body)))
+		assert.NoError(t, err)
+
+		result := isBypassed(req)
+		assert.False(t, result)
+	})
+
+	t.Run("should reject mixed bypassed and protected fields", func(t *testing.T) {
+		body := `{"query":"mutation { signup(input: {}) { user { id } } updatePermittable(input: {}) { permittable { id } } }"}`
+		req, err := http.NewRequest(http.MethodPost, "/api/graphql", io.NopCloser(bytes.NewBufferString(body)))
+		assert.NoError(t, err)
+
+		result := isBypassed(req)
+		assert.False(t, result)
+	})
+
+	t.Run("should allow multiple bypassed fields", func(t *testing.T) {
+		body := `{"query":"query { authConfig { clientId } findByID(id: \"abc\") { id } }"}`
+		req, err := http.NewRequest(http.MethodPost, "/api/graphql", io.NopCloser(bytes.NewBufferString(body)))
+		assert.NoError(t, err)
+
+		result := isBypassed(req)
+		assert.True(t, result)
+	})
+
 	t.Run("should not detect non-signup operations", func(t *testing.T) {
 		t.Run("other mutation", func(t *testing.T) {
 			body := `{"query":"mutation { updateMe(input: $input) { me { id } } }"}`
