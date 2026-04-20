@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"io"
 	"net/http"
+	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -182,5 +183,16 @@ func TestIsBypassed(t *testing.T) {
 			result := isBypassed(req)
 			assert.False(t, result)
 		})
+	})
+
+	t.Run("should reject oversized request body", func(t *testing.T) {
+		// Build a body that exceeds maxBypassBodySize (100 KB)
+		padding := strings.Repeat("x", maxBypassBodySize+1)
+		body := `{"query":"mutation { signup(input: {}) { user { id } } }", "extra":"` + padding + `"}`
+		req, err := http.NewRequest(http.MethodPost, "/api/graphql", io.NopCloser(bytes.NewBufferString(body)))
+		assert.NoError(t, err)
+
+		result := isBypassed(req)
+		assert.False(t, result)
 	})
 }

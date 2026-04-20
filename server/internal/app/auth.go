@@ -31,6 +31,12 @@ const (
 	debugAuthEmailHeader = "X-Reearth-Debug-Auth-Email"
 	FIXED_MOCK_USERNAME  = "Demo User"
 	FIXED_MOCK_USERMAILE = "demo@example.com"
+
+	// maxBypassBodySize is the maximum request body size (in bytes) that
+	// isBypassed will read. Bypass-eligible operations (signup, findByID, etc.)
+	// are small by nature; rejecting oversized bodies before parsing prevents
+	// unauthenticated callers from forcing large allocations.
+	maxBypassBodySize = 100 * 1024 // 100 KB
 )
 
 type graphqlRequest struct {
@@ -57,11 +63,20 @@ func isBypassed(req *http.Request) bool {
 		return false
 	}
 
-	body, err := io.ReadAll(req.Body)
+	// Read up to maxBypassBodySize+1 bytes to detect oversized bodies
+	// without allocating unbounded memory.
+	lr := io.LimitReader(req.Body, maxBypassBodySize+1)
+	body, err := io.ReadAll(lr)
 	if err != nil {
 		return false
 	}
-	req.Body = io.NopCloser(bytes.NewReader(body))
+	// Restore full body for downstream handlers: concatenate what we read
+	// with any remaining unread portion of the original body.
+	req.Body = io.NopCloser(io.MultiReader(bytes.NewReader(body), req.Body))
+
+	if len(body) > maxBypassBodySize {
+		return false
+	}
 
 	var gqlReq graphqlRequest
 	if err := json.Unmarshal(body, &gqlReq); err != nil {
