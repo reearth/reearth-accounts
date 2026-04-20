@@ -1370,12 +1370,6 @@ extend type Query {
   checkPermission(input: CheckPermissionInput!): CheckPermissionPayload
 }
 `, BuiltIn: false},
-	{Name: "../../../schemas/role.graphql", Input: `# Role types are managed internally and not exposed via GraphQL API.
-# Roles are created during signup and workspace operations.
-`, BuiltIn: false},
-	{Name: "../../../schemas/permittable.graphql", Input: `# Permittable types are managed internally and not exposed via GraphQL mutations.
-# The Permittable domain model is used for RBAC but has no public API surface.
-`, BuiltIn: false},
 	{Name: "../../../schemas/user.graphql", Input: `type User implements Node {
   id: ID!
   name: String!

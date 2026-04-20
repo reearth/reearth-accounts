@@ -1,2 +1,0 @@
-# Permittable types are managed internally and not exposed via GraphQL mutations.
-# The Permittable domain model is used for RBAC but has no public API surface.

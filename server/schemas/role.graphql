@@ -1,2 +1,0 @@
-# Role types are managed internally and not exposed via GraphQL API.
-# Roles are created during signup and workspace operations.
