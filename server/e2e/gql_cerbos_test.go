@@ -65,6 +65,11 @@ func baseSeederOneUserWithPermittable(ctx context.Context, r *repo.Container) er
 		return err
 	}
 
+	selfRole, err := r.Role.FindByName(ctx, role.RoleSelf.String())
+	if err != nil {
+		return err
+	}
+
 	cerbosRole := role.New().NewID().Name("role1").MustBuild()
 	if err := r.Role.Save(ctx, *cerbosRole); err != nil {
 		return err
@@ -73,7 +78,7 @@ func baseSeederOneUserWithPermittable(ctx context.Context, r *repo.Container) er
 	p, err := permittable.New().
 		NewID().
 		UserID(uId).
-		RoleIDs([]id.RoleID{cerbosRole.ID()}).
+		RoleIDs([]id.RoleID{selfRole.ID(), cerbosRole.ID()}).
 		Build()
 	if err != nil {
 		return err
