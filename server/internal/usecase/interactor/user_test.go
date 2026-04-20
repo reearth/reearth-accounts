@@ -372,6 +372,7 @@ func TestUser_UpdateMe(t *testing.T) {
 				w := workspace.New().
 					ID(wid).
 					Name("Test User").
+					Alias("oldAlias").
 					Personal(true).
 					MustBuild()
 				return u, w
@@ -382,6 +383,10 @@ func TestUser_UpdateMe(t *testing.T) {
 			wantErr: nil,
 			verify: func(t *testing.T, r *repo.Container, u *user.User) {
 				assert.Equal(t, "newAlias", u.Alias())
+				// Verify workspace alias is also updated
+				ws, err := r.Workspace.FindByID(context.Background(), u.Workspace())
+				assert.NoError(t, err)
+				assert.Equal(t, "newAlias", ws.Alias())
 			},
 		},
 		{
@@ -435,6 +440,7 @@ func TestUser_UpdateMe(t *testing.T) {
 				w := workspace.New().
 					ID(wid).
 					Name("Test User").
+					Alias("sameAlias").
 					Personal(true).
 					MustBuild()
 				return u, w
@@ -445,6 +451,10 @@ func TestUser_UpdateMe(t *testing.T) {
 			wantErr: nil,
 			verify: func(t *testing.T, r *repo.Container, u *user.User) {
 				assert.Equal(t, "sameAlias", u.Alias())
+				// Verify workspace alias remains unchanged
+				ws, err := r.Workspace.FindByID(context.Background(), u.Workspace())
+				assert.NoError(t, err)
+				assert.Equal(t, "sameAlias", ws.Alias())
 			},
 		},
 		{
@@ -607,6 +617,42 @@ func TestUser_UpdateMe(t *testing.T) {
 				assert.NoError(t, err)
 				assert.Equal(t, "New Name", ws.Name())
 				assert.Equal(t, "New description", ws.Metadata().Description())
+			},
+		},
+		{
+			name: "update alias and name together updates workspace alias",
+			setupUser: func() (*user.User, *workspace.Workspace) {
+				uid := id.NewUserID()
+				wid := id.NewWorkspaceID()
+				u := user.New().
+					ID(uid).
+					Workspace(wid).
+					Name("Old Name").
+					Alias("oldAlias").
+					Email("test@example.com").
+					MustBuild()
+				w := workspace.New().
+					ID(wid).
+					Name("Different Workspace Name").
+					Alias("oldAlias").
+					Personal(true).
+					MustBuild()
+				return u, w
+			},
+			param: interfaces.UpdateMeParam{
+				Alias: strPtr("newAlias"),
+				Name:  strPtr("New Name"),
+			},
+			wantErr: nil,
+			verify: func(t *testing.T, r *repo.Container, u *user.User) {
+				assert.Equal(t, "newAlias", u.Alias())
+				assert.Equal(t, "New Name", u.Name())
+				// Verify workspace alias is updated even when workspace name differs from old user name
+				ws, err := r.Workspace.FindByID(context.Background(), u.Workspace())
+				assert.NoError(t, err)
+				assert.Equal(t, "newAlias", ws.Alias())
+				// Workspace name should NOT be updated since it differs from old user name
+				assert.Equal(t, "Different Workspace Name", ws.Name())
 			},
 		},
 		{
