@@ -118,26 +118,43 @@ func isBypassed(req *http.Request) bool {
 		return false
 	}
 
-	// A GraphQL document can contain multiple named operations (e.g. query A {...} mutation B {...}).
-	// Only one is executed per request, selected by the operationName field. We iterate all
-	// operations and require every top-level field across all of them to be in the bypass list.
-	// This is intentionally conservative: even though only one operation runs, we reject the
-	// request if any operation contains a non-bypassed field.
-	fieldCount := 0
-	for _, op := range doc.Operations {
-		for _, sel := range op.SelectionSet {
-			field, ok := sel.(*ast.Field)
-			if !ok {
-				return false
+	// Select the operation to inspect. In GraphQL, when multiple operations
+	// are present, only the one matching operationName is executed.
+	var targetOp *ast.OperationDefinition
+	if gqlReq.OperationName != "" {
+		for _, op := range doc.Operations {
+			if op.Name == gqlReq.OperationName {
+				targetOp = op
+				break
 			}
-			if _, allowed := bypassedFields[strings.ToLower(field.Name)]; !allowed {
-				return false
-			}
-			fieldCount++
+		}
+		if targetOp == nil {
+			return false
+		}
+	} else {
+		// When operationName is not set, GraphQL only allows a single operation.
+		if len(doc.Operations) != 1 {
+			return false
+		}
+		targetOp = doc.Operations[0]
+	}
+
+	// Require every top-level field in the selected operation to be in the
+	// bypass allowlist.
+	if len(targetOp.SelectionSet) == 0 {
+		return false
+	}
+	for _, sel := range targetOp.SelectionSet {
+		field, ok := sel.(*ast.Field)
+		if !ok {
+			return false
+		}
+		if _, allowed := bypassedFields[strings.ToLower(field.Name)]; !allowed {
+			return false
 		}
 	}
 
-	return fieldCount > 0
+	return true
 }
 
 func canUseDebugHeaders(req *http.Request, cfg *ServerConfig) bool {
