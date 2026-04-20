@@ -315,7 +315,7 @@ func TestMockAuthMiddleware(t *testing.T) {
 			w.WriteHeader(http.StatusOK)
 		})
 
-		body := `{"query":"mutation { signup(input: {}) { id } }","operationName":"signup"}`
+		body := `{"query":"mutation { signup(input: {}) { id } }"}`
 		req := httptest.NewRequest(http.MethodPost, "/graphql", strings.NewReader(body))
 		req.Header.Set("Content-Type", "application/json")
 		rr := httptest.NewRecorder()

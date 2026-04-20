@@ -18,6 +18,8 @@ import (
 	"github.com/reearth/reearthx/appx"
 	"github.com/reearth/reearthx/log"
 	"github.com/reearth/reearthx/rerror"
+	"github.com/vektah/gqlparser/v2/ast"
+	"github.com/vektah/gqlparser/v2/parser"
 )
 
 const (
@@ -29,7 +31,20 @@ const (
 	debugAuthEmailHeader = "X-Reearth-Debug-Auth-Email"
 	FIXED_MOCK_USERNAME  = "Demo User"
 	FIXED_MOCK_USERMAILE = "demo@example.com"
+
+	// maxBypassBodySize is the maximum request body size (in bytes) that
+	// isBypassed will read. Bypass-eligible operations (signup, findByID, etc.)
+	// are small by nature; rejecting oversized bodies before parsing prevents
+	// unauthenticated callers from forcing large allocations.
+	maxBypassBodySize = 100 * 1024 // 100 KB
 )
+
+// readCloser combines an io.Reader and an io.Closer so that
+// Close() is delegated to the original request body.
+type readCloser struct {
+	io.Reader
+	io.Closer
+}
 
 type graphqlRequest struct {
 	Query         string         `json:"query"`
@@ -37,46 +52,109 @@ type graphqlRequest struct {
 	Variables     map[string]any `json:"variables"`
 }
 
+// bypassedFields is the set of top-level GraphQL field names that are
+// allowed without authentication. Field names must be lowercase.
+var bypassedFields = map[string]struct{}{
+	"authconfig":                   {},
+	"createverification":           {},
+	"findbyalias":                  {},
+	"findbyid":                     {},
+	"findbyids":                    {},
+	"findusersbyidswithpagination": {},
+	"signup":                       {},
+	"signupoidc":                   {},
+}
+
 func isBypassed(req *http.Request) bool {
 	if req.Method != http.MethodPost {
 		return false
 	}
 
-	body, err := io.ReadAll(req.Body)
+	// Read up to maxBypassBodySize+1 bytes to detect oversized bodies
+	// without allocating unbounded memory.
+	origBody := req.Body
+	lr := io.LimitReader(origBody, maxBypassBodySize+1)
+	body, err := io.ReadAll(lr)
 	if err != nil {
 		return false
 	}
-	req.Body = io.NopCloser(bytes.NewReader(body))
+	// Restore full body for downstream handlers: concatenate what we read
+	// with any remaining unread portion, preserving the original Close().
+	req.Body = readCloser{
+		Reader: io.MultiReader(bytes.NewReader(body), origBody),
+		Closer: origBody,
+	}
+
+	if len(body) > maxBypassBodySize {
+		return false
+	}
 
 	var gqlReq graphqlRequest
 	if err := json.Unmarshal(body, &gqlReq); err != nil {
 		return false
 	}
 
-	query := strings.ToLower(gqlReq.Query)
-	query = strings.ReplaceAll(query, " ", "")
-	query = strings.ReplaceAll(query, "\n", "")
-	query = strings.ReplaceAll(query, "\t", "")
-	query = strings.ReplaceAll(query, "\r", "")
-
-	list := []string{
-		"signup(",
-		"signupoidc(",
-		"findbyid(",
-		"findbyids(",
-		"findbyalias(",
-		"createverification(",
-		"authconfig",
-		"findusersbyidswithpagination(",
+	if gqlReq.Query == "" {
+		return false
 	}
 
-	for _, q := range list {
-		if strings.Contains(query, q) {
-			return true
+	// Cheap prefilter: skip AST parsing if the raw query doesn't contain
+	// any of the bypassed field names. This avoids parsing overhead for
+	// the majority of authenticated requests.
+	queryLower := strings.ToLower(gqlReq.Query)
+	hasCandidate := false
+	for field := range bypassedFields {
+		if strings.Contains(queryLower, field) {
+			hasCandidate = true
+			break
+		}
+	}
+	if !hasCandidate {
+		return false
+	}
+
+	doc, gqlErr := parser.ParseQuery(&ast.Source{Input: gqlReq.Query})
+	if gqlErr != nil {
+		return false
+	}
+
+	// Select the operation to inspect. In GraphQL, when multiple operations
+	// are present, only the one matching operationName is executed.
+	var targetOp *ast.OperationDefinition
+	if gqlReq.OperationName != "" {
+		for _, op := range doc.Operations {
+			if op.Name == gqlReq.OperationName {
+				targetOp = op
+				break
+			}
+		}
+		if targetOp == nil {
+			return false
+		}
+	} else {
+		// When operationName is not set, GraphQL only allows a single operation.
+		if len(doc.Operations) != 1 {
+			return false
+		}
+		targetOp = doc.Operations[0]
+	}
+
+	// Require every top-level field in the selected operation to be in the
+	// bypass allowlist.
+	if len(targetOp.SelectionSet) == 0 {
+		return false
+	}
+	for _, sel := range targetOp.SelectionSet {
+		field, ok := sel.(*ast.Field)
+		if !ok {
+			return false
+		}
+		if _, allowed := bypassedFields[strings.ToLower(field.Name)]; !allowed {
+			return false
 		}
 	}
 
-	return false
+	return true
 }
 
 func canUseDebugHeaders(req *http.Request, cfg *ServerConfig) bool {

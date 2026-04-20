@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"io"
 	"net/http"
+	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -66,7 +67,7 @@ func TestIsBypassed(t *testing.T) {
 		})
 
 		t.Run("authConfig query", func(t *testing.T) {
-			body := `{"query":"query { authConfig { provider } }"}`
+			body := `{"query":"query { authConfig { auth0ClientId authProvider } }"}`
 			req, err := http.NewRequest(http.MethodPost, "/api/graphql", io.NopCloser(bytes.NewBufferString(body)))
 			assert.NoError(t, err)
 
@@ -91,6 +92,51 @@ func TestIsBypassed(t *testing.T) {
 			result := isBypassed(req)
 			assert.True(t, result)
 		})
+	})
+
+	t.Run("should reject bypass keyword injection via comment", func(t *testing.T) {
+		body := `{"query":"# signup(\nmutation { updatePermittable(input: {}) { permittable { id } } }"}`
+		req, err := http.NewRequest(http.MethodPost, "/api/graphql", io.NopCloser(bytes.NewBufferString(body)))
+		assert.NoError(t, err)
+
+		result := isBypassed(req)
+		assert.False(t, result)
+	})
+
+	t.Run("should reject bypass keyword in operation name", func(t *testing.T) {
+		body := `{"query":"mutation signup { updatePermittable(input: {}) { permittable { id } } }"}`
+		req, err := http.NewRequest(http.MethodPost, "/api/graphql", io.NopCloser(bytes.NewBufferString(body)))
+		assert.NoError(t, err)
+
+		result := isBypassed(req)
+		assert.False(t, result)
+	})
+
+	t.Run("should reject bypass keyword as field alias", func(t *testing.T) {
+		body := `{"query":"mutation { signup: updatePermittable(input: {}) { permittable { id } } }"}`
+		req, err := http.NewRequest(http.MethodPost, "/api/graphql", io.NopCloser(bytes.NewBufferString(body)))
+		assert.NoError(t, err)
+
+		result := isBypassed(req)
+		assert.False(t, result)
+	})
+
+	t.Run("should reject mixed bypassed and protected fields", func(t *testing.T) {
+		body := `{"query":"mutation { signup(input: {}) { user { id } } updatePermittable(input: {}) { permittable { id } } }"}`
+		req, err := http.NewRequest(http.MethodPost, "/api/graphql", io.NopCloser(bytes.NewBufferString(body)))
+		assert.NoError(t, err)
+
+		result := isBypassed(req)
+		assert.False(t, result)
+	})
+
+	t.Run("should allow multiple bypassed fields", func(t *testing.T) {
+		body := `{"query":"query { authConfig { auth0ClientId } findByID(id: \"abc\") { id } }"}`
+		req, err := http.NewRequest(http.MethodPost, "/api/graphql", io.NopCloser(bytes.NewBufferString(body)))
+		assert.NoError(t, err)
+
+		result := isBypassed(req)
+		assert.True(t, result)
 	})
 
 	t.Run("should not detect non-signup operations", func(t *testing.T) {
@@ -137,5 +183,54 @@ func TestIsBypassed(t *testing.T) {
 			result := isBypassed(req)
 			assert.False(t, result)
 		})
+	})
+
+	t.Run("should bypass only the selected operation via operationName", func(t *testing.T) {
+		t.Run("operationName selects bypassed operation", func(t *testing.T) {
+			body := `{"query":"query Allowed { signup(input: {}) { user { id } } } query Protected { me { id } }", "operationName":"Allowed"}`
+			req, err := http.NewRequest(http.MethodPost, "/api/graphql", io.NopCloser(bytes.NewBufferString(body)))
+			assert.NoError(t, err)
+
+			result := isBypassed(req)
+			assert.True(t, result)
+		})
+
+		t.Run("operationName selects protected operation", func(t *testing.T) {
+			body := `{"query":"query Allowed { signup(input: {}) { user { id } } } query Protected { me { id } }", "operationName":"Protected"}`
+			req, err := http.NewRequest(http.MethodPost, "/api/graphql", io.NopCloser(bytes.NewBufferString(body)))
+			assert.NoError(t, err)
+
+			result := isBypassed(req)
+			assert.False(t, result)
+		})
+
+		t.Run("operationName not found in document", func(t *testing.T) {
+			body := `{"query":"query A { signup(input: {}) { user { id } } }", "operationName":"NonExistent"}`
+			req, err := http.NewRequest(http.MethodPost, "/api/graphql", io.NopCloser(bytes.NewBufferString(body)))
+			assert.NoError(t, err)
+
+			result := isBypassed(req)
+			assert.False(t, result)
+		})
+
+		t.Run("multiple operations without operationName is rejected", func(t *testing.T) {
+			body := `{"query":"query A { signup(input: {}) { user { id } } } query B { findByID(id: \"x\") { id } }"}`
+			req, err := http.NewRequest(http.MethodPost, "/api/graphql", io.NopCloser(bytes.NewBufferString(body)))
+			assert.NoError(t, err)
+
+			result := isBypassed(req)
+			assert.False(t, result)
+		})
+	})
+
+	t.Run("should reject oversized request body", func(t *testing.T) {
+		// Build a body that exceeds maxBypassBodySize (100 KB)
+		padding := strings.Repeat("x", maxBypassBodySize+1)
+		body := `{"query":"mutation { signup(input: {}) { user { id } } }", "extra":"` + padding + `"}`
+		req, err := http.NewRequest(http.MethodPost, "/api/graphql", io.NopCloser(bytes.NewBufferString(body)))
+		assert.NoError(t, err)
+
+		result := isBypassed(req)
+		assert.False(t, result)
 	})
 }
