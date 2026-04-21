@@ -126,38 +126,23 @@ Drawbacks:
 
 ### Before (Multi-Repo Pattern)
 
-```
-┌─────────────────────────────────────────────────────────┐
-│                     UserQuery                           │
-│  repos: []user.Repo{primaryRepo, fallback1, fallback2}  │
-└─────────────────────────────────────────────────────────┘
-                           │
-           ┌───────────────┼───────────────┐
-           ▼               ▼               ▼
-      ┌─────────┐    ┌─────────┐    ┌─────────┐
-      │ Primary │    │Fallback1│    │Fallback2│
-      │  Repo   │    │  Repo   │    │  Repo   │
-      └─────────┘    └─────────┘    └─────────┘
-           │               │               │
-           └───────────────┴───────────────┘
-                           │
-              (iterate until found or error)
+```mermaid
+flowchart TD
+    UQ["UserQuery<br/>repos: [ ]user.Repo"]
+    UQ --> P[Primary Repo]
+    UQ --> F1[Fallback1 Repo]
+    UQ --> F2[Fallback2 Repo]
+    P --> I{Iterate until<br/>found or error}
+    F1 --> I
+    F2 --> I
 ```
 
 ### After (Single Repo Pattern)
 
-```
-┌────────────────────────┐
-│      UserQuery         │
-│  repo: user.Repo       │
-└────────────────────────┘
-           │
-           ▼
-    ┌─────────────┐
-    │   User      │
-    │ Repository  │
-    │ (MongoDB)   │
-    └─────────────┘
+```mermaid
+flowchart TD
+    UQ[UserQuery<br/>repo: user.Repo]
+    UQ --> UR[User Repository<br/>MongoDB]
 ```
 
 ## Potential Impact
