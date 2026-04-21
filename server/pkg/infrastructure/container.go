@@ -12,13 +12,12 @@ import (
 )
 
 type Container struct {
+	Config      config.Repo
+	Permittable permittable.Repo
+	Role        role.Repo
+	Transaction usecasex.Transaction
 	User        user.Repo
 	Workspace   workspace.Repo
-	Role        role.Repo
-	Permittable permittable.Repo
-	Transaction usecasex.Transaction
-	Users       []user.Repo
-	Config      config.Repo
 }
 
 var (
@@ -30,11 +29,11 @@ func (c *Container) Filtered(workspace workspace.WorkspaceFilter) *Container {
 		return c
 	}
 	return &Container{
-		Workspace:   c.Workspace.Filtered(workspace),
-		User:        c.User,
-		Users:       c.Users,
-		Role:        c.Role,
+		Config:      c.Config,
 		Permittable: c.Permittable,
+		Role:        c.Role,
 		Transaction: c.Transaction,
+		User:        c.User,
+		Workspace:   c.Workspace.Filtered(workspace),
 	}
 }
