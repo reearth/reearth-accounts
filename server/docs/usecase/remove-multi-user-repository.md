@@ -2,12 +2,12 @@
 
 ## Document Signature
 
-|           |        |
-|-----------|--------|
-| Creator   | Claude |
-| Leader    | - |
-| Task Link | - |
-| Developer | - |
+|           |                                                              |
+|-----------|--------------------------------------------------------------|
+| Creator   | @zombozo12                                                   |
+| Leader    | @soneda-yuya                                                 |
+| Task Link | https://github.com/eukarya-inc/reearth-dashboard/issues/1125 |
+| Developer | @zombozo12                                                   |
 
 ## Background / Problem Statement
 
