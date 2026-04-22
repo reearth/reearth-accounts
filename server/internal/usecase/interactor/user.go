@@ -36,30 +36,16 @@ var (
 )
 
 func NewUser(r *repo.Container, g *gateway.Container, signupSecret, authSrcUIDomain string) interfaces.User {
-	var repos []user.Repo
+	var userRepo user.Repo
 	if r != nil {
-		repos = []user.Repo{r.User}
+		userRepo = r.User
 	}
 	return &User{
 		repos:           r,
 		gateways:        g,
 		signupSecret:    signupSecret,
 		authSrvUIDomain: authSrcUIDomain,
-		query: &UserQuery{
-			repos: repos,
-		},
-	}
-}
-
-func NewMultiUser(r *repo.Container, g *gateway.Container, signupSecret, authSrcUIDomain string, users []user.Repo) interfaces.User {
-	return &User{
-		repos:           r,
-		gateways:        g,
-		signupSecret:    signupSecret,
-		authSrvUIDomain: authSrcUIDomain,
-		query: &UserQuery{
-			repos: append([]user.Repo{r.User}, users...),
-		},
+		query:           NewUserQuery(userRepo),
 	}
 }
 
@@ -450,35 +436,25 @@ func (i *User) PasswordReset(ctx context.Context, password string, token string)
 }
 
 type UserQuery struct {
-	repos []user.Repo
+	repo user.Repo
 }
 
-func NewUserQuery(primary user.Repo, repos ...user.Repo) *UserQuery {
+func NewUserQuery(repo user.Repo) *UserQuery {
 	return &UserQuery{
-		repos: append([]user.Repo{primary}, repos...),
+		repo: repo,
 	}
+}
+
+func (q *UserQuery) FetchByAlias(ctx context.Context, alias string) (*user.User, error) {
+	return q.repo.FindByAlias(ctx, alias)
 }
 
 func (q *UserQuery) FetchByID(ctx context.Context, ids user.IDList) (user.List, error) {
-	us := make(user.List, len(ids))
-	for _, r := range q.repos {
-		u, err := r.FindByIDs(ctx, ids)
-		if err != nil {
-			return nil, err
-		}
-
-		for i, uu := range u {
-			if uu != nil && us[i] == nil {
-				us[i] = uu
-			}
-		}
-	}
-
-	return us, nil
+	return q.repo.FindByIDs(ctx, ids)
 }
 
 func (q *UserQuery) FetchByIDsWithPagination(ctx context.Context, ids user.IDList, alias *string, paginationParam interfaces.FetchByIDsWithPaginationParam) (interfaces.FetchByIDsWithPaginationResult, error) {
-	users, pageInfo, err := q.repos[0].FindByIDsWithPagination(ctx, ids, alias, pagination.ToPagination(paginationParam.Page, paginationParam.Size))
+	users, pageInfo, err := q.repo.FindByIDsWithPagination(ctx, ids, alias, pagination.ToPagination(paginationParam.Page, paginationParam.Size))
 	if err != nil {
 		return interfaces.FetchByIDsWithPaginationResult{}, err
 	}
@@ -489,75 +465,22 @@ func (q *UserQuery) FetchByIDsWithPagination(ctx context.Context, ids user.IDLis
 	}, nil
 }
 
-func (q *UserQuery) FetchBySub(ctx context.Context, sub string) (*user.User, error) {
-	for _, r := range q.repos {
-		u, err := r.FindBySub(ctx, sub)
-		if errors.Is(err, rerror.ErrNotFound) {
-			continue
-		}
-		if err != nil {
-			return nil, err
-		}
-		return u, nil
-	}
-	return nil, rerror.ErrNotFound
+func (q *UserQuery) FetchByNameOrAlias(ctx context.Context, nameOrAlias string) (user.List, error) {
+	return q.repo.FindByNameOrAlias(ctx, nameOrAlias)
 }
 
 func (q *UserQuery) FetchByNameOrEmail(ctx context.Context, nameOrEmail string) (*user.Simple, error) {
-	for _, r := range q.repos {
-		u, err := r.FindByNameOrEmail(ctx, nameOrEmail)
-		if errors.Is(err, rerror.ErrNotFound) {
-			continue
-		}
-		if err != nil {
-			return nil, err
-		}
-		return user.SimpleFrom(u), nil
+	u, err := q.repo.FindByNameOrEmail(ctx, nameOrEmail)
+	if err != nil {
+		return nil, err
 	}
-	return nil, rerror.ErrNotFound
+	return user.SimpleFrom(u), nil
+}
+
+func (q *UserQuery) FetchBySub(ctx context.Context, sub string) (*user.User, error) {
+	return q.repo.FindBySub(ctx, sub)
 }
 
 func (q *UserQuery) SearchUser(ctx context.Context, keyword string) (user.List, error) {
-	for _, r := range q.repos {
-		u, err := r.SearchByKeyword(ctx, keyword)
-		if errors.Is(err, rerror.ErrNotFound) {
-			continue
-		}
-		if err != nil {
-			return nil, err
-		}
-
-		return u, nil
-	}
-	return nil, rerror.ErrNotFound
-}
-
-func (q *UserQuery) FetchByAlias(ctx context.Context, alias string) (*user.User, error) {
-	for _, r := range q.repos {
-		u, err := r.FindByAlias(ctx, alias)
-		if errors.Is(err, rerror.ErrNotFound) {
-			continue
-		}
-		if err != nil {
-			return nil, err
-		}
-		return u, nil
-	}
-
-	return nil, rerror.ErrNotFound
-}
-
-func (q *UserQuery) FetchByNameOrAlias(ctx context.Context, nameOrAlias string) (user.List, error) {
-	for _, r := range q.repos {
-		u, err := r.FindByNameOrAlias(ctx, nameOrAlias)
-		if errors.Is(err, rerror.ErrNotFound) {
-			continue
-		}
-		if err != nil {
-			return nil, err
-		}
-		return u, nil
-	}
-
-	return nil, rerror.ErrNotFound
+	return q.repo.SearchByKeyword(ctx, keyword)
 }

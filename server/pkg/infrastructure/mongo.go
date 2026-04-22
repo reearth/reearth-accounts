@@ -15,34 +15,31 @@ func NewMongoUser(client *mongox.Client) user.Repo {
 	return mongo.NewUser(client)
 }
 
-// NewMongoWorkspace creates a new MongoDB-backed Workspace repository
-func NewMongoWorkspace(client *mongox.Client) workspace.Repo {
-	return mongo.NewWorkspace(client)
-}
-
 // NewMongoUserWithHost creates a new MongoDB-backed User repository with host
 func NewMongoUserWithHost(client *mongox.Client, host string) user.Repo {
 	return mongo.NewUserWithHost(client, host)
 }
 
+// NewMongoWorkspace creates a new MongoDB-backed Workspace repository
+func NewMongoWorkspace(client *mongox.Client) workspace.Repo {
+	return mongo.NewWorkspace(client)
+}
+
 // New creates a new MongoDB-backed repository container
-// This matches the signature used by reearthx accountmongo
-func New(ctx context.Context, client *mongodriver.Client, databaseName string, useTransaction, needCompat bool, users []user.Repo) (*Container, error) {
-	// Get database from client
+func New(ctx context.Context, client *mongodriver.Client, databaseName string, useTransaction, needCompat bool) (*Container, error) {
 	db := client.Database(databaseName)
 
-	// Call internal New
-	internalContainer, err := mongo.New(ctx, db, useTransaction, needCompat, users)
+	internalContainer, err := mongo.New(ctx, db, useTransaction, needCompat)
 	if err != nil {
 		return nil, err
 	}
 
 	return &Container{
+		Config:      internalContainer.Config,
+		Permittable: internalContainer.Permittable,
+		Role:        internalContainer.Role,
+		Transaction: internalContainer.Transaction,
 		User:        internalContainer.User,
 		Workspace:   internalContainer.Workspace,
-		Role:        internalContainer.Role,
-		Permittable: internalContainer.Permittable,
-		Transaction: internalContainer.Transaction,
-		Users:       internalContainer.Users,
 	}, nil
 }
