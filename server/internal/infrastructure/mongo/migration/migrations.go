@@ -20,7 +20,6 @@ var migrations = migration.Migrations[DBClient]{
 	250919170404: ConvertInvalidUserAlias,
 	250919170408: ConvertInvalidUserWorkspaceAlias,
 	251106072200: ReplaceEmailFormattedNames,
-	251107102200: SyncPersonalWorkspaceAlias,
 	251114101525: SyncUserNameToWorkspace,
 	251119144500: AddWorkspaceMembersHash,
 	251120200000: GenerateMissingWorkspaceAliases,
@@ -40,4 +39,5 @@ var migrations = migration.Migrations[DBClient]{
 	260128010001: ApplyRoleUpdatedAtSchema,
 	260128010002: ApplyPermittableUpdatedAtSchema,
 	260330120000: ApplyUserLatestLogoutAtSchema,
+	260422140204: SyncPersonalWorkspaceAlias,
 }
