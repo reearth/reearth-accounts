@@ -10,6 +10,11 @@ on:
         type: boolean
         default: false
 
+permissions:
+  contents: read
+  id-token: write
+  packages: write
+
 jobs:
   prepare:
     runs-on: ubuntu-latest
@@ -110,6 +115,10 @@ jobs:
       - ci
       - ci-server
       - ci-collect-info
+    permissions:
+      contents: read
+      id-token: write
+      packages: write
     if: |
       !failure() &&
       needs.ci-server.result == 'success' &&
@@ -128,5 +137,9 @@ jobs:
 
   deploy-server-oss:
     needs: build-server
+    permissions:
+      contents: read
+      id-token: write
+      packages: write
     uses: ./.github/workflows/deploy_server_nightly.yml
     secrets: inherit
