@@ -157,14 +157,8 @@ func isBypassed(req *http.Request) bool {
 	return true
 }
 
-func canUseDebugHeaders(req *http.Request, cfg *ServerConfig) bool {
-	if cfg.Debug || cfg.Config.Dev || os.Getenv("REEARTH_ACCOUNTS_DEV") == "true" {
-		return true
-	}
-	if req.Header.Get("X-Internal-Service") == "visualizer-api" {
-		return true
-	}
-	return false
+func canUseDebugHeaders(cfg *ServerConfig) bool {
+	return cfg.Debug || cfg.Config.Dev || os.Getenv("REEARTH_ACCOUNTS_DEV") == "true"
 }
 
 func authMiddleware(cfg *ServerConfig) func(http.Handler) http.Handler {
@@ -251,7 +245,7 @@ func identityProviderAuthMiddleware(cfg *ServerConfig) func(http.Handler) http.H
 				ai = a
 			}
 
-			if canUseDebugHeaders(req, cfg) {
+			if canUseDebugHeaders(cfg) {
 				if newCtx, dai := injectDebugAuthInfo(ctx, req); dai != nil {
 					ctx = newCtx
 					ai = *dai

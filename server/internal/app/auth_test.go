@@ -727,9 +727,8 @@ func TestCanUseDebugHeaders(t *testing.T) {
 			},
 			Debug: true,
 		}
-		req := httptest.NewRequest(http.MethodGet, "/", nil)
 
-		result := canUseDebugHeaders(req, cfg)
+		result := canUseDebugHeaders(cfg)
 
 		assert.True(t, result)
 	})
@@ -741,26 +740,23 @@ func TestCanUseDebugHeaders(t *testing.T) {
 			},
 			Debug: false,
 		}
-		req := httptest.NewRequest(http.MethodGet, "/", nil)
 
-		result := canUseDebugHeaders(req, cfg)
+		result := canUseDebugHeaders(cfg)
 
 		assert.True(t, result)
 	})
 
-	t.Run("should allow debug headers with visualizer-api service header", func(t *testing.T) {
+	t.Run("X-Internal-Service header must not enable debug headers in production", func(t *testing.T) {
 		cfg := &ServerConfig{
 			Config: &Config{
 				Dev: false,
 			},
 			Debug: false,
 		}
-		req := httptest.NewRequest(http.MethodGet, "/", nil)
-		req.Header.Set("X-Internal-Service", "visualizer-api")
 
-		result := canUseDebugHeaders(req, cfg)
+		result := canUseDebugHeaders(cfg)
 
-		assert.True(t, result)
+		assert.False(t, result)
 	})
 
 	t.Run("should not allow debug headers in production mode", func(t *testing.T) {
@@ -770,9 +766,8 @@ func TestCanUseDebugHeaders(t *testing.T) {
 			},
 			Debug: false,
 		}
-		req := httptest.NewRequest(http.MethodGet, "/", nil)
 
-		result := canUseDebugHeaders(req, cfg)
+		result := canUseDebugHeaders(cfg)
 
 		assert.False(t, result)
 	})
