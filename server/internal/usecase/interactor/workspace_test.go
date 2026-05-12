@@ -1523,6 +1523,8 @@ func TestWorkspace_UpdateMember(t *testing.T) {
 	w5 := workspace.New().ID(id5).Name("W5").Members(map[user.ID]workspace.Member{userID: {Role: role.RoleOwner}, u.ID(): {Role: role.RoleReader}}).Personal(false).MustBuild()
 	id6 := id.NewWorkspaceID()
 	w6 := workspace.New().ID(id6).Name("W6").Members(map[user.ID]workspace.Member{userID: {Role: role.RoleOwner}, u.ID(): {Role: role.RoleReader}}).Personal(false).MustBuild()
+	id7 := id.NewWorkspaceID()
+	w7 := workspace.New().ID(id7).Name("W7").Members(map[user.ID]workspace.Member{userID: {Role: role.RoleOwner}, u.ID(): {Role: role.RoleMaintainer}}).Personal(false).MustBuild()
 
 	op := &workspace.Operator{
 		User:               &userID,
@@ -1635,7 +1637,7 @@ func TestWorkspace_UpdateMember(t *testing.T) {
 			want:    workspace.NewMembersWith(map[user.ID]workspace.Member{userID: {Role: role.RoleOwner}, u.ID(): {Role: role.RoleReader}}, nil, false),
 		},
 		{
-			name:       "Non-owner can change own role",
+			name:       "Non-owner cannot self-promote to higher role",
 			seeds:      workspace.List{w6},
 			usersSeeds: []*user.User{u},
 			args: struct {
@@ -1651,6 +1653,27 @@ func TestWorkspace_UpdateMember(t *testing.T) {
 					User:               lo.ToPtr(u.ID()),
 					ReadableWorkspaces: []workspace.ID{id6},
 					WritableWorkspaces: []workspace.ID{id6},
+				},
+			},
+			wantErr: interfaces.ErrCannotSelfPromote,
+		},
+		{
+			name:       "Non-owner can self-demote to lower role",
+			seeds:      workspace.List{w7},
+			usersSeeds: []*user.User{u},
+			args: struct {
+				wId      workspace.ID
+				uId      user.ID
+				role     role.RoleType
+				operator *workspace.Operator
+			}{
+				wId:  id7,
+				uId:  u.ID(),
+				role: role.RoleWriter,
+				operator: &workspace.Operator{
+					User:               lo.ToPtr(u.ID()),
+					ReadableWorkspaces: []workspace.ID{id7},
+					WritableWorkspaces: []workspace.ID{id7},
 				},
 			},
 			wantErr: nil,
