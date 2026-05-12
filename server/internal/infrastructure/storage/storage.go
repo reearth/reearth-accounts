@@ -9,12 +9,12 @@ import (
 	"errors"
 	"io"
 	"os"
+	"sync"
 	"time"
 
 	"cloud.google.com/go/storage"
 	"github.com/reearth/reearth-accounts/server/internal/usecase/gateway"
 	"github.com/reearth/reearthx/asset/domain/file"
-	"github.com/reearth/reearthx/log"
 	"google.golang.org/api/option"
 )
 
@@ -26,7 +26,10 @@ type Config struct {
 }
 
 type Storage struct {
-	cfg *Config
+	cfg       *Config
+	once      sync.Once
+	gcsClient *storage.Client
+	initErr   error
 }
 
 func NewGCPStorage(cfg *Config) (gateway.Storage, error) {
@@ -36,7 +39,7 @@ func NewGCPStorage(cfg *Config) (gateway.Storage, error) {
 }
 
 func (s *Storage) GetSignedURL(ctx context.Context, name string) (string, error) {
-	c, err := s.client(ctx)
+	c, err := s.bucket()
 	if err != nil {
 		return "", err
 	}
@@ -79,40 +82,25 @@ func (s *Storage) GetSignedURL(ctx context.Context, name string) (string, error)
 	return url, nil
 }
 
-func (s *Storage) client(ctx context.Context) (*storage.BucketHandle, error) {
-	var (
-		opts   []option.ClientOption
-		client *storage.Client
-		err    error
-	)
-
-	// For local development & testing purposes.
-	if s.cfg.EmulatorEnabled {
-		_ = os.Setenv("STORAGE_EMULATOR_HOST", s.cfg.EmulatorEndpoint)
-	}
-
-	if s.cfg.IsLocal {
-		opts = append(opts, option.WithoutAuthentication())
-	}
-
-	client, err = storage.NewClient(ctx, opts...)
-	if err != nil {
-		return nil, err
-	}
-
-	// Close client when context is done - use context-aware cleanup
-	go func() {
-		<-ctx.Done()
-		if cErr := client.Close(); cErr != nil {
-			log.Errorf("failed to close GCS client: %v", cErr)
+func (s *Storage) bucket() (*storage.BucketHandle, error) {
+	s.once.Do(func() {
+		var opts []option.ClientOption
+		if s.cfg.EmulatorEnabled {
+			_ = os.Setenv("STORAGE_EMULATOR_HOST", s.cfg.EmulatorEndpoint)
 		}
-	}()
-
-	return client.Bucket(s.cfg.BucketName), nil
+		if s.cfg.IsLocal {
+			opts = append(opts, option.WithoutAuthentication())
+		}
+		s.gcsClient, s.initErr = storage.NewClient(context.Background(), opts...)
+	})
+	if s.initErr != nil {
+		return nil, s.initErr
+	}
+	return s.gcsClient.Bucket(s.cfg.BucketName), nil
 }
 
 func (s *Storage) Delete(ctx context.Context, name string) error {
-	c, err := s.client(ctx)
+	c, err := s.bucket()
 	if err != nil {
 		return err
 	}
@@ -126,7 +114,7 @@ func (s *Storage) Delete(ctx context.Context, name string) error {
 }
 
 func (s *Storage) Upload(ctx context.Context, name string, data *file.File) error {
-	c, err := s.client(ctx)
+	c, err := s.bucket()
 	if err != nil {
 		return err
 	}
