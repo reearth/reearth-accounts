@@ -49,6 +49,21 @@ func (r *Permittable) Save(ctx context.Context, permittable permittable.Permitta
 	return r.client.SaveOne(ctx, gId, doc)
 }
 
+func (r *Permittable) SaveMany(ctx context.Context, ps permittable.List) error {
+	if len(ps) == 0 {
+		return nil
+	}
+
+	ids := make([]string, 0, len(ps))
+	docs := make([]any, 0, len(ps))
+	for _, p := range ps {
+		doc, id := mongodoc.NewPermittable(*p)
+		ids = append(ids, id)
+		docs = append(docs, doc)
+	}
+	return r.client.SaveAll(ctx, ids, docs)
+}
+
 func (r *Permittable) find(ctx context.Context, filter any) (permittable.List, error) {
 	c := mongodoc.NewPermittableConsumer()
 	if err := r.client.Find(ctx, filter, c); err != nil {
