@@ -24,6 +24,7 @@ type User struct {
 	gateways        *gateway.Container
 	signupSecret    string
 	authSrvUIDomain string
+	allowedISS      []string
 	query           interfaces.UserQuery
 }
 
@@ -35,7 +36,7 @@ var (
 	}
 )
 
-func NewUser(r *repo.Container, g *gateway.Container, signupSecret, authSrcUIDomain string) interfaces.User {
+func NewUser(r *repo.Container, g *gateway.Container, signupSecret, authSrcUIDomain string, allowedISS ...string) interfaces.User {
 	var repos []user.Repo
 	if r != nil {
 		repos = []user.Repo{r.User}
@@ -45,18 +46,20 @@ func NewUser(r *repo.Container, g *gateway.Container, signupSecret, authSrcUIDom
 		gateways:        g,
 		signupSecret:    signupSecret,
 		authSrvUIDomain: authSrcUIDomain,
+		allowedISS:      allowedISS,
 		query: &UserQuery{
 			repos: repos,
 		},
 	}
 }
 
-func NewMultiUser(r *repo.Container, g *gateway.Container, signupSecret, authSrcUIDomain string, users []user.Repo) interfaces.User {
+func NewMultiUser(r *repo.Container, g *gateway.Container, signupSecret, authSrcUIDomain string, users []user.Repo, allowedISS ...string) interfaces.User {
 	return &User{
 		repos:           r,
 		gateways:        g,
 		signupSecret:    signupSecret,
 		authSrvUIDomain: authSrcUIDomain,
+		allowedISS:      allowedISS,
 		query: &UserQuery{
 			repos: append([]user.Repo{r.User}, users...),
 		},

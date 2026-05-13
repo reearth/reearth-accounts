@@ -13,6 +13,7 @@ import (
 	"path"
 	"strings"
 	textTmpl "text/template"
+	"time"
 
 	"github.com/reearth/reearth-accounts/server/internal/usecase/interfaces"
 	"github.com/reearth/reearth-accounts/server/pkg/id"
@@ -55,6 +56,8 @@ var (
 
 	authTextTMPL *textTmpl.Template
 	authHTMLTMPL *htmlTmpl.Template
+
+	oidcHTTPClient = &http.Client{Timeout: 10 * time.Second}
 )
 
 func init() {
@@ -155,7 +158,7 @@ func (i *User) SignupOIDC(ctx context.Context, param interfaces.SignupOIDCParam)
 	name := param.Name
 	email := param.Email
 	if sub == "" || email == "" {
-		ui, err := getUserInfoFromISS(ctx, param.Issuer, param.AccessToken)
+		ui, err := i.getUserInfoFromISS(ctx, param.Issuer, param.AccessToken)
 		if err != nil {
 			return nil, err
 		}
@@ -164,7 +167,7 @@ func (i *User) SignupOIDC(ctx context.Context, param interfaces.SignupOIDCParam)
 	}
 
 	return Run1(ctx, nil, i.repos, Usecase().Transaction(), func(ctx context.Context) (*user.User, error) {
-		eu, err := i.repos.User.FindByEmail(ctx, param.Email)
+		eu, err := i.repos.User.FindByEmail(ctx, email)
 		if err != nil && !errors.Is(err, rerror.ErrNotFound) {
 			return nil, err
 		}
@@ -172,7 +175,7 @@ func (i *User) SignupOIDC(ctx context.Context, param interfaces.SignupOIDCParam)
 			return nil, user.ErrDuplicatedUser
 		}
 
-		eu, err = i.repos.User.FindBySub(ctx, param.Sub)
+		eu, err = i.repos.User.FindBySub(ctx, sub)
 		if err != nil && !errors.Is(err, rerror.ErrNotFound) {
 			return nil, err
 		}
@@ -238,7 +241,7 @@ func (i *User) FindOrCreate(ctx context.Context, param interfaces.UserFindOrCrea
 			return existedUser, nil
 		}
 
-		ui, err := getUserInfoFromISS(ctx, param.ISS, param.Token)
+		ui, err := i.getUserInfoFromISS(ctx, param.ISS, param.Token)
 		if err != nil {
 			return nil, err
 		}
@@ -300,12 +303,25 @@ func (i *User) sendVerificationMail(ctx context.Context, u *user.User, vr *user.
 	return nil
 }
 
-func getUserInfoFromISS(ctx context.Context, iss, accessToken string) (UserInfo, error) {
+func (i *User) getUserInfoFromISS(ctx context.Context, iss, accessToken string) (UserInfo, error) {
 	if accessToken == "" {
 		return UserInfo{}, rerror.NewE(i18n.T("invalid access token"))
 	}
 	if iss == "" {
 		return UserInfo{}, rerror.NewE(i18n.T("invalid issuer"))
+	}
+
+	if len(i.allowedISS) > 0 {
+		allowed := false
+		for _, a := range i.allowedISS {
+			if a == iss {
+				allowed = true
+				break
+			}
+		}
+		if !allowed {
+			return UserInfo{}, rerror.NewE(i18n.T("invalid issuer"))
+		}
 	}
 
 	var u string
@@ -339,7 +355,7 @@ func getOpenIDConfiguration(ctx context.Context, iss string) (c OpenIDConfigurat
 		return
 	}
 
-	res, err2 := http.DefaultClient.Do(req)
+	res, err2 := oidcHTTPClient.Do(req)
 	if err2 != nil {
 		err = err2
 		return
@@ -370,7 +386,7 @@ func getUserInfo(ctx context.Context, url, accessToken string) (ui UserInfo, err
 	}
 
 	req.Header.Set("Authorization", "Bearer "+accessToken)
-	res, err2 := http.DefaultClient.Do(req)
+	res, err2 := oidcHTTPClient.Do(req)
 	if err2 != nil {
 		err = err2
 		return

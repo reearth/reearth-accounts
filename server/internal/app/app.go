@@ -72,14 +72,22 @@ func initEcho(ctx context.Context, cfg *ServerConfig) *echo.Echo {
 		log.Printf("gql: GraphQL Playground is available")
 	}
 
+	allowedISS := make([]string, 0)
+	for _, a := range cfg.Config.Auths() {
+		if a.ISS != "" {
+			allowedISS = append(allowedISS, a.ISS)
+		}
+	}
+
 	usecaseMiddleware := UsecaseMiddleware(
 		cfg.Repos,
 		cfg.Gateways,
 		nil,
 		cfg.CerbosAdapter,
 		interactor.ContainerConfig{
-			SignupSecret:    cfg.Config.SignupSecret,
+			AllowedISS:      allowedISS,
 			AuthSrvUIDomain: cfg.Config.HostWeb,
+			SignupSecret:    cfg.Config.SignupSecret,
 		})
 
 	// API
