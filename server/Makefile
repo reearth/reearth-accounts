@@ -41,10 +41,10 @@ else
 endif
 
 dev: dev-install
-	air
+	op run --env-file ./app.env -- air
 
 run-app:
-	go run ./cmd/reearth-accounts
+	op run --env-file ./app.env -- go run ./cmd/reearth-accounts
 
 run:
 	${DOCKER_COMPOSE_DEV} up reearth-accounts-dev
