@@ -8,6 +8,7 @@ import (
 	"github.com/reearth/reearth-accounts/server/internal/usecase/gateway"
 	"github.com/reearth/reearth-accounts/server/pkg/user"
 	"github.com/reearth/reearth-accounts/server/pkg/workspace"
+	"github.com/sourcegraph/conc/pool"
 )
 
 func ToWorkspace(
@@ -73,14 +74,30 @@ func ToWorkspaces(
 		return nil
 	}
 
-	workspaces := make([]*Workspace, 0, len(ws))
-	for _, w := range ws {
-		converted, err := ToWorkspace(ctx, w, exists, storage)
-		if err != nil {
-			log.Errorf("failed to convert workspace: %s", err.Error())
-			continue
+	const maxConcurrency = 10
+	results := make([]*Workspace, len(ws))
+
+	p := pool.New().WithMaxGoroutines(maxConcurrency)
+
+	for i, w := range ws {
+		i, w := i, w
+		p.Go(func() {
+			converted, err := ToWorkspace(ctx, w, exists, storage)
+			if err != nil {
+				log.Errorf("failed to convert workspace: %s", err.Error())
+				return
+			}
+			results[i] = converted
+		})
+	}
+
+	p.Wait()
+
+	workspaces := make([]*Workspace, 0, len(results))
+	for _, w := range results {
+		if w != nil {
+			workspaces = append(workspaces, w)
 		}
-		workspaces = append(workspaces, converted)
 	}
 	return workspaces
 }
