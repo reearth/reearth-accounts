@@ -11,9 +11,10 @@ import (
 )
 
 var (
-	ErrOwnerCannotLeaveTheWorkspace = rerror.NewE(i18n.T("owner user cannot leave from the workspace"))
 	ErrCannotChangeOwnerRole        = rerror.NewE(i18n.T("cannot change the role of the workspace owner"))
 	ErrCannotDeleteWorkspace        = rerror.NewE(i18n.T("cannot delete workspace because at least one project is left"))
+	ErrCannotSelfPromote            = rerror.NewE(i18n.T("cannot promote own role to a higher level"))
+	ErrOwnerCannotLeaveTheWorkspace = rerror.NewE(i18n.T("owner user cannot leave from the workspace"))
 	ErrWorkspaceWithProjects        = rerror.NewE(i18n.T("target workspace still has some project"))
 	ErrPermissionDenied             = rerror.NewE(i18n.T("permission denied"))
 )

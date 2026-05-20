@@ -455,8 +455,14 @@ func (i *Workspace) UpdateUserMember(ctx context.Context, id workspace.ID, u wor
 			return nil, workspace.ErrCannotModifyPersonalWorkspace
 		}
 
-		if u == *operator.User && ws.Members().UserRole(u) == role.RoleOwner && newRole != role.RoleOwner {
-			return nil, interfaces.ErrCannotChangeOwnerRole
+		if u == *operator.User {
+			currentRole := ws.Members().UserRole(u)
+			if !currentRole.Includes(newRole) {
+				return nil, interfaces.ErrCannotSelfPromote
+			}
+			if currentRole == role.RoleOwner && newRole != role.RoleOwner {
+				return nil, interfaces.ErrCannotChangeOwnerRole
+			}
 		}
 
 		err = ws.Members().UpdateUserRole(u, newRole)
