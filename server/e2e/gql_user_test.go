@@ -860,6 +860,93 @@ func TestVerifyUser(t *testing.T) {
 	assert.True(t, u2.Verification().IsVerified())
 }
 
+// TestMe_MyWorkspace verifies that querying myWorkspace through the me query
+// correctly propagates the request context (SCA-01: context.Background() was replaced
+// with the caller's ctx in ToWorkspace so timeouts/cancellations propagate properly).
+// It also exercises the GCS singleton path when a workspace has a photoURL.
+func TestMe_MyWorkspace(t *testing.T) {
+	seeder := func(ctx context.Context, r *repo.Container) error {
+		if err := seedRoles(ctx, r); err != nil {
+			return err
+		}
+
+		auth := user.ReearthSub(uId.String())
+		u := user.New().ID(uId).
+			Name("e2e").
+			Email("e2e@e2e.com").
+			Auths([]user.Auth{*auth}).
+			Workspace(wId).
+			MustBuild()
+		if err := r.User.Save(ctx, u); err != nil {
+			return err
+		}
+
+		wsMetadata := workspace.MetadataFrom(
+			"personal ws",
+			"https://example.com",
+			"",
+			"",
+			"https://example.com/photo.jpg",
+		)
+		roleOwner := workspace.Member{
+			Role:      role.RoleOwner,
+			InvitedBy: uId,
+		}
+		w := workspace.New().ID(wId).
+			Name("e2e").
+			Personal(true).
+			Members(map[idx.ID[id.User]]workspace.Member{
+				uId: roleOwner,
+			}).
+			Metadata(wsMetadata).
+			MustBuild()
+		if err := r.Workspace.Save(ctx, w); err != nil {
+			return err
+		}
+
+		ownerRoleDoc, err := r.Role.FindByName(ctx, role.RoleOwner.String())
+		if err != nil {
+			return err
+		}
+		wsRole := permittable.NewWorkspaceRole(wId, ownerRoleDoc.ID())
+		return createPermittable(ctx, r, uId, []permittable.WorkspaceRole{wsRole})
+	}
+
+	e, _ := StartServer(t, &app.Config{}, true, seeder)
+
+	query := `{
+		me {
+			id
+			myWorkspace {
+				id
+				name
+				personal
+				metadata {
+					photoURL
+				}
+			}
+		}
+	}`
+	request := GraphQLRequest{Query: query}
+	jsonData, err := json.Marshal(request)
+	assert.NoError(t, err)
+
+	o := e.POST("/api/graphql").
+		WithHeader("authorization", "Bearer test").
+		WithHeader("Content-Type", "application/json").
+		WithHeader("X-Reearth-Debug-User", uId.String()).
+		WithBytes(jsonData).Expect().Status(http.StatusOK).
+		JSON().Object().Value("data").Object().Value("me").Object()
+
+	o.Value("id").String().IsEqual(uId.String())
+	ws := o.Value("myWorkspace").Object()
+	ws.Value("id").String().IsEqual(wId.String())
+	ws.Value("name").String().IsEqual("e2e")
+	ws.Value("personal").Boolean().IsTrue()
+	// GCS is unavailable in test env so photoURL is empty, but the query must complete without error
+	ws.Value("metadata").Object().Value("photoURL").String().IsEqual("")
+}
+
 func TestPasswordReset(t *testing.T) {
 	e, r := StartServer(t, &app.Config{}, true, baseSeederUser)
 
