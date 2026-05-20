@@ -287,6 +287,7 @@ func (i *Workspace) AddUserMember(ctx context.Context, workspaceID workspace.ID,
 			}
 		}
 
+		joined := make(map[user.ID]role.RoleType, len(ul))
 		for _, m := range ul {
 			if m == nil {
 				continue
@@ -297,9 +298,11 @@ func (i *Workspace) AddUserMember(ctx context.Context, workspaceID workspace.ID,
 				return nil, applog.ErrorWithCallerLogging(ctx, "failed to join user to workspace", err)
 			}
 
-			if err := i.updatePermittable(ctx, m.ID(), ws.ID(), users[m.ID()]); err != nil {
-				return nil, applog.ErrorWithCallerLogging(ctx, "failed to update permittable", err)
-			}
+			joined[m.ID()] = users[m.ID()]
+		}
+
+		if err := i.bulkUpdatePermittable(ctx, ws.ID(), joined); err != nil {
+			return nil, applog.ErrorWithCallerLogging(ctx, "failed to update permittable", err)
 		}
 
 		err = i.repos.Workspace.Save(ctx, ws)
@@ -674,6 +677,65 @@ func (i *Workspace) updatePermittable(ctx context.Context, userID user.ID, works
 	p.UpdateWorkspaceRole(workspaceID, r.ID())
 
 	return i.permittableRepo.Save(ctx, *p)
+}
+
+func (i *Workspace) bulkUpdatePermittable(ctx context.Context, workspaceID workspace.ID, userRoles map[user.ID]role.RoleType) error {
+	if len(userRoles) == 0 {
+		return nil
+	}
+
+	// Deduplicate role lookups: fetch each unique role name once.
+	roleIDByName := make(map[role.RoleType]role.ID, len(userRoles))
+	for _, roleName := range userRoles {
+		if _, seen := roleIDByName[roleName]; seen {
+			continue
+		}
+		r, err := i.roleRepo.FindByName(ctx, string(roleName))
+		if err != nil {
+			if errors.Is(err, rerror.ErrNotFound) && os.Getenv("REEARTH_MOCK_AUTH") == "true" {
+				log.Infof("[MockAuth] Auto-creating role for workspace: %s", roleName)
+				newRole := role.New().NewID().Name(string(roleName)).MustBuild()
+				if saveErr := i.roleRepo.Save(ctx, *newRole); saveErr != nil {
+					return applog.ErrorWithCallerLogging(ctx, "failed to auto-create role", saveErr)
+				}
+				r = newRole
+			} else {
+				return err
+			}
+		}
+		roleIDByName[roleName] = r.ID()
+	}
+
+	// Batch fetch existing permittables for all users in one round-trip.
+	userIDs := make(user.IDList, 0, len(userRoles))
+	for uid := range userRoles {
+		userIDs = append(userIDs, uid)
+	}
+	existing, err := i.permittableRepo.FindByUserIDs(ctx, userIDs)
+	if err != nil && !errors.Is(err, rerror.ErrNotFound) {
+		return applog.ErrorWithCallerLogging(ctx, "failed to fetch permittables", err)
+	}
+
+	permByUserID := make(map[user.ID]*permittable.Permittable, len(existing))
+	for _, p := range existing {
+		permByUserID[p.UserID()] = p
+	}
+
+	// Build updated/new permittables and save them in one round-trip.
+	toSave := make(permittable.List, 0, len(userRoles))
+	for uid, roleName := range userRoles {
+		p, ok := permByUserID[uid]
+		if !ok {
+			p, err = permittable.New().NewID().UserID(uid).Build()
+			if err != nil {
+				return err
+			}
+		}
+		p.UpdateWorkspaceRole(workspaceID, roleIDByName[roleName])
+		toSave = append(toSave, p)
+	}
+
+	return i.permittableRepo.SaveMany(ctx, toSave)
 }
 
 func (i *Workspace) removePermittable(ctx context.Context, userID user.ID, workspaceID workspace.ID) error {

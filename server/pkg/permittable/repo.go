@@ -13,4 +13,5 @@ type Repo interface {
 	FindByUserIDs(context.Context, user.IDList) (List, error)
 	FindByRoleID(context.Context, id.RoleID) (List, error)
 	Save(context.Context, Permittable) error
+	SaveMany(context.Context, List) error
 }
