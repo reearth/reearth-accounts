@@ -115,6 +115,82 @@ func baseSeederOneUser(ctx context.Context, r *repo.Container) error {
 	return nil
 }
 
+func baseSeederSelfRoleChange(ctx context.Context, r *repo.Container) error {
+	for _, roleName := range []string{"maintainer", "owner", "reader", "self", "writer"} {
+		_ = r.Role.Save(ctx, *role.New().NewID().Name(roleName).MustBuild())
+	}
+
+	u := user.New().ID(uId).Name("e2e").Email("e2e@e2e.com").Workspace(wId).MustBuild()
+	if err := r.User.Save(ctx, u); err != nil {
+		return err
+	}
+	u3 := user.New().ID(uId3).Name("e2e3").Email("e2e3@e2e.com").Workspace(wId2).MustBuild()
+	if err := r.User.Save(ctx, u3); err != nil {
+		return err
+	}
+
+	ownerMember := workspace.Member{Role: role.RoleOwner, InvitedBy: uId}
+	writerMember := workspace.Member{Role: role.RoleWriter, InvitedBy: uId}
+	maintainerMember := workspace.Member{Role: role.RoleMaintainer, InvitedBy: uId}
+
+	// wId: uId=owner, uId3=writer (used for self-promotion test)
+	w := workspace.New().ID(wId).Name("e2e").
+		Members(map[idx.ID[id.User]]workspace.Member{
+			uId:  ownerMember,
+			uId3: writerMember,
+		}).
+		MustBuild()
+	if err := r.Workspace.Save(ctx, w); err != nil {
+		return err
+	}
+
+	// wId2: uId=owner, uId3=maintainer (used for self-demotion test)
+	w2 := workspace.New().ID(wId2).Name("e2e2").
+		Members(map[idx.ID[id.User]]workspace.Member{
+			uId:  ownerMember,
+			uId3: maintainerMember,
+		}).
+		MustBuild()
+	if err := r.Workspace.Save(ctx, w2); err != nil {
+		return err
+	}
+
+	ownerRole, err := r.Role.FindByName(ctx, "owner")
+	if err != nil {
+		return err
+	}
+	writerRole, err := r.Role.FindByName(ctx, "writer")
+	if err != nil {
+		return err
+	}
+	maintainerRole, err := r.Role.FindByName(ctx, "maintainer")
+	if err != nil {
+		return err
+	}
+
+	p1, err := permittable.New().NewID().UserID(uId).Build()
+	if err != nil {
+		return err
+	}
+	p1.UpdateWorkspaceRole(wId, ownerRole.ID())
+	p1.UpdateWorkspaceRole(wId2, ownerRole.ID())
+	if err := r.Permittable.Save(ctx, *p1); err != nil {
+		return err
+	}
+
+	p3, err := permittable.New().NewID().UserID(uId3).Build()
+	if err != nil {
+		return err
+	}
+	p3.UpdateWorkspaceRole(wId, writerRole.ID())
+	p3.UpdateWorkspaceRole(wId2, maintainerRole.ID())
+	if err := r.Permittable.Save(ctx, *p3); err != nil {
+		return err
+	}
+
+	return nil
+}
+
 func baseSeederUser(ctx context.Context, r *repo.Container) error {
 	// Seed roles first
 	if err := seedRoles(ctx, r); err != nil {
@@ -661,6 +737,59 @@ func TestSignupOIDC(t *testing.T) {
 	o.Value("id").String().NotEmpty()
 	o.Value("name").String().IsEqual("new user")
 	o.Value("email").String().IsEqual(email)
+}
+
+func TestUpdateUserOfWorkspace_MaintainerCanSelfDemoteToWriter(t *testing.T) {
+	e, r := StartServer(t, &app.Config{}, true, baseSeederSelfRoleChange)
+
+	w, err := r.Workspace.FindByID(context.Background(), wId2)
+	assert.NoError(t, err)
+	assert.Equal(t, role.RoleMaintainer, w.Members().User(uId3).Role)
+
+	query := fmt.Sprintf(`mutation { updateUserOfWorkspace(input: {workspaceId: "%s", userId: "%s", role: writer}){ workspace{ id } }}`, wId2, uId3)
+	request := GraphQLRequest{Query: query}
+	jsonData, err := json.Marshal(request)
+	assert.NoError(t, err)
+
+	e.POST("/api/graphql").
+		WithHeader("authorization", "Bearer test").
+		WithHeader("Content-Type", "application/json").
+		WithHeader("X-Reearth-Debug-User", uId3.String()).
+		WithBytes(jsonData).Expect().Status(http.StatusOK).
+		JSON().Object().
+		Value("data").Object().
+		Value("updateUserOfWorkspace").Object().
+		Value("workspace").Object().
+		Value("id").String().IsEqual(wId2.String())
+
+	w, err = r.Workspace.FindByID(context.Background(), wId2)
+	assert.NoError(t, err)
+	assert.Equal(t, role.RoleWriter, w.Members().User(uId3).Role)
+}
+
+func TestUpdateUserOfWorkspace_WriterCannotSelfPromoteToOwner(t *testing.T) {
+	e, r := StartServer(t, &app.Config{}, true, baseSeederSelfRoleChange)
+
+	w, err := r.Workspace.FindByID(context.Background(), wId)
+	assert.NoError(t, err)
+	assert.Equal(t, role.RoleWriter, w.Members().User(uId3).Role)
+
+	query := fmt.Sprintf(`mutation { updateUserOfWorkspace(input: {workspaceId: "%s", userId: "%s", role: owner}){ workspace{ id } }}`, wId, uId3)
+	request := GraphQLRequest{Query: query}
+	jsonData, err := json.Marshal(request)
+	assert.NoError(t, err)
+
+	resp := e.POST("/api/graphql").
+		WithHeader("authorization", "Bearer test").
+		WithHeader("Content-Type", "application/json").
+		WithHeader("X-Reearth-Debug-User", uId3.String()).
+		WithBytes(jsonData).Expect().Status(http.StatusOK).JSON().Object()
+
+	resp.Value("errors").Array().NotEmpty()
+
+	w, err = r.Workspace.FindByID(context.Background(), wId)
+	assert.NoError(t, err)
+	assert.Equal(t, role.RoleWriter, w.Members().User(uId3).Role)
 }
 
 func TestVerifyUser(t *testing.T) {
