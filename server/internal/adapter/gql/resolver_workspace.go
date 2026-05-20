@@ -39,7 +39,7 @@ func (r *queryResolver) FindByID(ctx context.Context, workpaceId gqlmodel.ID) (*
 		return nil, gqlerror.ReturnAccountsError(ctx, err)
 	}
 
-	converted, err := gqlmodel.ToWorkspace(w, exists, r.Storage)
+	converted, err := gqlmodel.ToWorkspace(ctx, w, exists, r.Storage)
 	if err != nil {
 		log.Errorf("[FindByID] failed to convert workspace: %s, workspace id: %v", err.Error(), wid)
 		return nil, gqlerror.ReturnAccountsError(ctx, err)
@@ -67,7 +67,7 @@ func (r *queryResolver) FindByIDs(ctx context.Context, workpaceIds []gqlmodel.ID
 		return nil, gqlerror.ReturnAccountsError(ctx, err)
 	}
 
-	return gqlmodel.ToWorkspaces(ws, exists, r.Storage), nil
+	return gqlmodel.ToWorkspaces(ctx, ws, exists, r.Storage), nil
 }
 
 func (r *queryResolver) FindByName(ctx context.Context, name string) (*gqlmodel.Workspace, error) {
@@ -82,7 +82,7 @@ func (r *queryResolver) FindByName(ctx context.Context, name string) (*gqlmodel.
 		return nil, gqlerror.ReturnAccountsError(ctx, err)
 	}
 
-	converted, err := gqlmodel.ToWorkspace(w, exists, r.Storage)
+	converted, err := gqlmodel.ToWorkspace(ctx, w, exists, r.Storage)
 	if err != nil {
 		log.Errorf("[FindByName] failed to convert workspace: %s, name: %s", err.Error(), name)
 		return nil, gqlerror.ReturnAccountsError(ctx, err)
@@ -104,7 +104,7 @@ func (r *queryResolver) FindByAlias(ctx context.Context, alias string) (*gqlmode
 		return nil, err
 	}
 
-	converted, err := gqlmodel.ToWorkspace(w, exists, r.Storage)
+	converted, err := gqlmodel.ToWorkspace(ctx, w, exists, r.Storage)
 	if err != nil {
 		log.Errorf("[FindByID] failed to convert workspace: %s, workspace id: %v", err.Error(), w.ID().String())
 		return nil, gqlerror.ReturnAccountsError(ctx, err)
@@ -132,7 +132,7 @@ func (r *queryResolver) FindByUser(ctx context.Context, userID gqlmodel.ID) ([]*
 		return nil, gqlerror.ReturnAccountsError(ctx, err)
 	}
 
-	return gqlmodel.ToWorkspaces(ws, exists, r.Storage), nil
+	return gqlmodel.ToWorkspaces(ctx, ws, exists, r.Storage), nil
 }
 
 func (r *queryResolver) FindByUserWithPagination(ctx context.Context, userID gqlmodel.ID, pagination gqlmodel.Pagination) (*gqlmodel.WorkspacesWithPagination, error) {
@@ -158,7 +158,7 @@ func (r *queryResolver) FindByUserWithPagination(ctx context.Context, userID gql
 	}
 
 	return &gqlmodel.WorkspacesWithPagination{
-		Workspaces: gqlmodel.ToWorkspaces(res.Workspaces, exists, r.Storage),
+		Workspaces: gqlmodel.ToWorkspaces(ctx, res.Workspaces, exists, r.Storage),
 		TotalCount: res.TotalCount,
 	}, nil
 }

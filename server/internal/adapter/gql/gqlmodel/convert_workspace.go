@@ -12,6 +12,7 @@ import (
 )
 
 func ToWorkspace(
+	ctx context.Context,
 	t *workspace.Workspace,
 	exists map[user.ID]struct{},
 	storage gateway.Storage,
@@ -45,7 +46,7 @@ func ToWorkspace(
 
 	log.Infof("[ToWorkspace] convert workspace photo url: %s", t.Metadata().PhotoURL())
 	if t.Metadata() != nil && t.Metadata().PhotoURL() != "" {
-		signedURL, sErr := storage.GetSignedURL(context.Background(), t.Metadata().PhotoURL())
+		signedURL, sErr := storage.GetSignedURL(ctx, t.Metadata().PhotoURL())
 		log.Infof("[ToWorkspace] get signed url: %s", signedURL)
 		if sErr != nil {
 			log.Errorf("[ToWorkspace] failed to get signed url: %s, workspace id: %s", sErr.Error(), t.ID())
@@ -64,6 +65,7 @@ func ToWorkspace(
 }
 
 func ToWorkspaces(
+	ctx context.Context,
 	ws workspace.List,
 	exists map[user.ID]struct{},
 	storage gateway.Storage,
@@ -80,7 +82,7 @@ func ToWorkspaces(
 	for i, w := range ws {
 		i, w := i, w
 		p.Go(func() {
-			converted, err := ToWorkspace(w, exists, storage)
+			converted, err := ToWorkspace(ctx, w, exists, storage)
 			if err != nil {
 				log.Errorf("failed to convert workspace: %s", err.Error())
 				return
