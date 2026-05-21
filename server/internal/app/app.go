@@ -10,7 +10,6 @@ import (
 	"github.com/labstack/echo/v4"
 	"github.com/labstack/echo/v4/middleware"
 	"github.com/reearth/reearth-accounts/server/internal/adapter"
-	appmiddleware "github.com/reearth/reearth-accounts/server/internal/adapter/middleware"
 	otelapp "github.com/reearth/reearth-accounts/server/internal/app/otel"
 	"github.com/reearth/reearth-accounts/server/internal/usecase/interactor"
 	"github.com/reearth/reearthx/appx"
@@ -33,7 +32,6 @@ func initEcho(ctx context.Context, cfg *ServerConfig) *echo.Echo {
 	if cfg.Config.OtelEnabled {
 		log.Infof("OpenTelemetry tracing enabled for %s", string(otelapp.OtelAccountsServiceName))
 		e.Use(otelapp.Middleware(string(otelapp.OtelAccountsServiceName)))
-		e.Use(appmiddleware.RestAPITracingMiddleware())
 	} else {
 		log.Infof("OpenTelemetry tracing disabled for %s", string(otelapp.OtelAccountsServiceName))
 	}
