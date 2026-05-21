@@ -39,7 +39,7 @@ func RestAPITracingMiddleware() echo.MiddlewareFunc {
 					attribute.String("http.method", req.Method),
 					attribute.String("http.url", req.URL.Path),
 					attribute.String("http.host", req.Host),
-					attribute.String("http.scheme", req.URL.Scheme),
+					attribute.String("http.scheme", c.Scheme()),
 				),
 			)
 			defer span.End()

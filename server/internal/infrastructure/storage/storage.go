@@ -99,7 +99,7 @@ func (s *Storage) GetSignedURL(ctx context.Context, name string) (string, error)
 
 func (s *Storage) bucket(ctx context.Context) (*storage.BucketHandle, error) {
 	s.once.Do(func() {
-		ctx, span := otel.Tracer("reearth-accounts").Start(ctx, "storage.initGCSClient")
+		_, span := otel.Tracer("reearth-accounts").Start(ctx, "storage.initGCSClient")
 		defer span.End()
 
 		var opts []option.ClientOption
@@ -109,7 +109,8 @@ func (s *Storage) bucket(ctx context.Context) (*storage.BucketHandle, error) {
 		if s.cfg.IsLocal {
 			opts = append(opts, option.WithoutAuthentication())
 		}
-		s.gcsClient, s.initErr = storage.NewClient(ctx, opts...)
+		// Use a non-cancelable context so a canceled caller doesn't permanently latch initErr.
+		s.gcsClient, s.initErr = storage.NewClient(context.WithoutCancel(ctx), opts...)
 		if s.initErr != nil {
 			span.RecordError(s.initErr)
 			span.SetStatus(codes.Error, s.initErr.Error())

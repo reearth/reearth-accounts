@@ -2,6 +2,7 @@ package app
 
 import (
 	"context"
+	"strconv"
 
 	"github.com/99designs/gqlgen/graphql"
 	"github.com/reearth/reearthx/log"
@@ -38,12 +39,7 @@ func detailedOperationTracer() graphql.OperationMiddleware {
 		)
 		defer span.End()
 
-		query := opCtx.RawQuery
-		if len(query) > 1000 {
-			query = query[:1000] + "..."
-		}
-		span.SetAttributes(attribute.String("graphql.operation.query", query))
-
+		// Raw query is intentionally not recorded: inline literals may contain PII.
 		if len(opCtx.Variables) > 0 {
 			for key := range opCtx.Variables {
 				span.SetAttributes(attribute.String("graphql.variable."+key, "present"))
@@ -61,7 +57,7 @@ func detailedOperationTracer() graphql.OperationMiddleware {
 
 				for i, err := range response.Errors {
 					if i < 3 {
-						span.SetAttributes(attribute.String("graphql.error."+string(rune(i)), err.Message))
+						span.SetAttributes(attribute.String("graphql.error."+strconv.Itoa(i)+".message", err.Message))
 					}
 				}
 				log.Warnfc(ctx, "graphql: operation '%s' completed with %d errors", spanName, len(response.Errors))

@@ -33,11 +33,11 @@ func initEcho(ctx context.Context, cfg *ServerConfig) *echo.Echo {
 	if cfg.Config.OtelEnabled {
 		log.Infof("OpenTelemetry tracing enabled for %s", string(otelapp.OtelAccountsServiceName))
 		e.Use(otelapp.Middleware(string(otelapp.OtelAccountsServiceName)))
+		e.Use(appmiddleware.RestAPITracingMiddleware())
 	} else {
 		log.Infof("OpenTelemetry tracing disabled for %s", string(otelapp.OtelAccountsServiceName))
 	}
 	e.Use(AccessLogger(logger))
-	e.Use(appmiddleware.RestAPITracingMiddleware())
 
 	origins := allowedOrigins(cfg)
 	if len(origins) > 0 {
