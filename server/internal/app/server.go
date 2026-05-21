@@ -15,11 +15,14 @@ import (
 	"github.com/reearth/reearth-accounts/server/internal/infrastructure/mongo/migration"
 	"github.com/reearth/reearth-accounts/server/internal/usecase/gateway"
 	"github.com/reearth/reearth-accounts/server/internal/usecase/repo"
+
+	otelapp "github.com/reearth/reearth-accounts/server/internal/app/otel"
 	"github.com/reearth/reearthx/log"
 	"github.com/reearth/reearthx/mongox"
 	"go.mongodb.org/mongo-driver/event"
 	"go.mongodb.org/mongo-driver/mongo"
 	"go.mongodb.org/mongo-driver/mongo/options"
+	"go.opentelemetry.io/contrib/instrumentation/go.mongodb.org/mongo-driver/mongo/otelmongo"
 	"golang.org/x/net/http2"
 )
 
@@ -34,10 +37,35 @@ func Start(debug bool) {
 	}
 	log.Infof("config: %s", conf.Print())
 
+	// Init OpenTelemetry tracer
+	if conf.OtelEnabled {
+		tp, terr := otelapp.InitTracer(ctx, &otelapp.Config{
+			Enabled:            conf.OtelEnabled,
+			Endpoint:           conf.OtelEndpoint,
+			ExporterType:       otelapp.ExporterType(conf.OtelExporterType),
+			BatchTimeout:       conf.OtelBatchTimeout,
+			MaxExportBatchSize: conf.OtelMaxExportBatchSize,
+			MaxQueueSize:       conf.OtelMaxQueueSize,
+			SamplingRatio:      conf.OtelSamplingRatio,
+			ServiceName:        otelapp.OtelAccountsServiceName,
+		})
+		if terr != nil {
+			log.Warnfc(ctx, "failed to init tracer: %v", terr)
+		} else {
+			defer func() {
+				shutdownCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+				defer cancel()
+				if serr := tp.Shutdown(shutdownCtx); serr != nil {
+					log.Errorfc(ctx, "failed to shutdown tracer: %s", serr.Error())
+				}
+			}()
+		}
+	}
+
 	// Init MongoDB client with optional command monitoring
-	var monitor *event.CommandMonitor
+	var debugMonitor *event.CommandMonitor
 	if debug || os.Getenv("REEARTH_ACCOUNTS_DEV") == "true" {
-		monitor = &event.CommandMonitor{
+		debugMonitor = &event.CommandMonitor{
 			Failed: func(ctx context.Context, evt *event.CommandFailedEvent) {
 				log.Errorf("MongoDB Command Failed: %s - Duration: %v - Error: %s",
 					evt.CommandName, evt.Duration, evt.Failure)
@@ -55,12 +83,17 @@ func Start(debug bool) {
 		}
 	}
 
+	var otelMonitor *event.CommandMonitor
+	if conf.OtelEnabled {
+		otelMonitor = otelmongo.NewMonitor()
+	}
+
 	client, err := mongo.Connect(
 		ctx,
 		options.Client().
 			ApplyURI(conf.DB).
 			SetConnectTimeout(time.Second*10).
-			SetMonitor(monitor))
+			SetMonitor(chainMongoMonitors(debugMonitor, otelMonitor)))
 	if err != nil {
 		log.Fatalc(ctx, fmt.Sprintf("repo initialization error: %+v", err))
 	}
@@ -175,4 +208,44 @@ func (w *WebServer) Serve(l net.Listener) error {
 
 func (w *WebServer) Shutdown(ctx context.Context) error {
 	return w.appServer.Shutdown(ctx)
+}
+
+// chainMongoMonitors composes multiple mongo CommandMonitors into one.
+// nil monitors are ignored. Returns nil if all inputs are nil.
+func chainMongoMonitors(monitors ...*event.CommandMonitor) *event.CommandMonitor {
+	active := monitors[:0]
+	for _, m := range monitors {
+		if m != nil {
+			active = append(active, m)
+		}
+	}
+	if len(active) == 0 {
+		return nil
+	}
+	if len(active) == 1 {
+		return active[0]
+	}
+	return &event.CommandMonitor{
+		Started: func(ctx context.Context, evt *event.CommandStartedEvent) {
+			for _, m := range active {
+				if m.Started != nil {
+					m.Started(ctx, evt)
+				}
+			}
+		},
+		Succeeded: func(ctx context.Context, evt *event.CommandSucceededEvent) {
+			for _, m := range active {
+				if m.Succeeded != nil {
+					m.Succeeded(ctx, evt)
+				}
+			}
+		},
+		Failed: func(ctx context.Context, evt *event.CommandFailedEvent) {
+			for _, m := range active {
+				if m.Failed != nil {
+					m.Failed(ctx, evt)
+				}
+			}
+		},
+	}
 }

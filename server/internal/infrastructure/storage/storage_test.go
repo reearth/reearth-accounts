@@ -396,7 +396,7 @@ func TestStorage_bucket(t *testing.T) {
 
 		s := &Storage{cfg: cfg}
 
-		bucket, err := s.bucket()
+		bucket, err := s.bucket(context.Background())
 
 		assert.NoError(t, err)
 		assert.NotNil(t, bucket)
@@ -412,7 +412,7 @@ func TestStorage_bucket(t *testing.T) {
 
 		s := &Storage{cfg: cfg}
 
-		bucket, err := s.bucket()
+		bucket, err := s.bucket(context.Background())
 
 		// The client creation doesn't fail immediately, but the bucket handle is still returned
 		assert.NoError(t, err)
@@ -432,7 +432,7 @@ func TestStorage_bucket(t *testing.T) {
 		s := &Storage{cfg: cfg}
 
 		// This will set the environment variable
-		_, _ = s.bucket()
+		_, _ = s.bucket(context.Background())
 
 		// Verify the environment variable was set
 		assert.Equal(t, "localhost:9999", os.Getenv("STORAGE_EMULATOR_HOST"))
@@ -448,8 +448,8 @@ func TestStorage_bucket(t *testing.T) {
 
 		s := &Storage{cfg: cfg}
 
-		bucket1, err1 := s.bucket()
-		bucket2, err2 := s.bucket()
+		bucket1, err1 := s.bucket(context.Background())
+		bucket2, err2 := s.bucket(context.Background())
 
 		assert.NoError(t, err1)
 		assert.NoError(t, err2)

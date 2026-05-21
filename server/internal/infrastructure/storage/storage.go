@@ -15,6 +15,10 @@ import (
 	"cloud.google.com/go/storage"
 	"github.com/reearth/reearth-accounts/server/internal/usecase/gateway"
 	"github.com/reearth/reearthx/asset/domain/file"
+	"go.opentelemetry.io/otel"
+	"go.opentelemetry.io/otel/attribute"
+	"go.opentelemetry.io/otel/codes"
+	"go.opentelemetry.io/otel/trace"
 	"google.golang.org/api/option"
 )
 
@@ -39,8 +43,19 @@ func NewGCPStorage(cfg *Config) (gateway.Storage, error) {
 }
 
 func (s *Storage) GetSignedURL(ctx context.Context, name string) (string, error) {
-	c, err := s.bucket()
+	ctx, span := otel.Tracer("reearth-accounts").Start(ctx, "storage.GetSignedURL",
+		trace.WithAttributes(
+			attribute.String("storage.object", name),
+			attribute.String("storage.bucket", s.cfg.BucketName),
+			attribute.Bool("storage.is_local", s.cfg.IsLocal),
+		),
+	)
+	defer span.End()
+
+	c, err := s.bucket(ctx)
 	if err != nil {
+		span.RecordError(err)
+		span.SetStatus(codes.Error, err.Error())
 		return "", err
 	}
 
@@ -82,8 +97,11 @@ func (s *Storage) GetSignedURL(ctx context.Context, name string) (string, error)
 	return url, nil
 }
 
-func (s *Storage) bucket() (*storage.BucketHandle, error) {
+func (s *Storage) bucket(ctx context.Context) (*storage.BucketHandle, error) {
 	s.once.Do(func() {
+		ctx, span := otel.Tracer("reearth-accounts").Start(ctx, "storage.initGCSClient")
+		defer span.End()
+
 		var opts []option.ClientOption
 		if s.cfg.EmulatorEnabled {
 			_ = os.Setenv("STORAGE_EMULATOR_HOST", s.cfg.EmulatorEndpoint)
@@ -91,7 +109,11 @@ func (s *Storage) bucket() (*storage.BucketHandle, error) {
 		if s.cfg.IsLocal {
 			opts = append(opts, option.WithoutAuthentication())
 		}
-		s.gcsClient, s.initErr = storage.NewClient(context.Background(), opts...)
+		s.gcsClient, s.initErr = storage.NewClient(ctx, opts...)
+		if s.initErr != nil {
+			span.RecordError(s.initErr)
+			span.SetStatus(codes.Error, s.initErr.Error())
+		}
 	})
 	if s.initErr != nil {
 		return nil, s.initErr
@@ -100,7 +122,7 @@ func (s *Storage) bucket() (*storage.BucketHandle, error) {
 }
 
 func (s *Storage) Delete(ctx context.Context, name string) error {
-	c, err := s.bucket()
+	c, err := s.bucket(ctx)
 	if err != nil {
 		return err
 	}
@@ -114,7 +136,7 @@ func (s *Storage) Delete(ctx context.Context, name string) error {
 }
 
 func (s *Storage) Upload(ctx context.Context, name string, data *file.File) error {
-	c, err := s.bucket()
+	c, err := s.bucket(ctx)
 	if err != nil {
 		return err
 	}
