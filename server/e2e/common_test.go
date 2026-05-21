@@ -77,6 +77,40 @@ func StartServerWithRepos(
 	cfg *app.Config,
 	repos *repo.Container,
 ) *httpexpect.Expect {
+	return startServerWithReposAndDebug(t, cfg, repos, true)
+}
+
+func StartServerNoDebug(t *testing.T, cfg *app.Config, useMongo bool, seeder Seeder) (*httpexpect.Expect, *repo.Container) {
+	t.Helper()
+	ctx := context.Background()
+	var repos *repo.Container
+
+	if useMongo {
+		db := mongorepo.Connect(t)(t)
+		var err error
+		repos, err = mongorepo.New(ctx, db, false, false, nil)
+		if err != nil {
+			log.Fatalf("Failed to init mongo: %+v\n", err)
+		}
+	} else {
+		repos = memory.New()
+	}
+
+	if seeder != nil {
+		if err := seeder(ctx, repos); err != nil {
+			t.Fatalf("failed to seed the db: %s", err)
+		}
+	}
+
+	return startServerWithReposAndDebug(t, cfg, repos, false), repos
+}
+
+func startServerWithReposAndDebug(
+	t *testing.T,
+	cfg *app.Config,
+	repos *repo.Container,
+	debug bool,
+) *httpexpect.Expect {
 	t.Helper()
 
 	if testing.Short() {
@@ -105,7 +139,7 @@ func StartServerWithRepos(
 		Gateways: &gateway.Container{
 			Mailer: mailer.New(ctx, &mailer.Config{}),
 		},
-		Debug:         true,
+		Debug:         debug,
 		CerbosAdapter: cerbosAdapter,
 	})
 

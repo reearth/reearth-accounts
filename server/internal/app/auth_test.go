@@ -747,16 +747,45 @@ func TestCanUseDebugHeaders(t *testing.T) {
 	})
 
 	t.Run("X-Internal-Service header must not enable debug headers in production", func(t *testing.T) {
+		uid := user.NewID()
+		u := user.New().
+			ID(uid).
+			Name("target-user").
+			Email("target@example.com").
+			MustBuild()
+
+		wid := workspace.NewID()
+		w := workspace.New().
+			ID(wid).
+			Name("target-workspace").
+			Members(map[id.UserID]workspace.Member{
+				uid: {Role: role.RoleOwner, InvitedBy: uid},
+			}).
+			MustBuild()
+
+		repos := memory.New()
+		repos.User = memory.NewUserWith(u)
+		repos.Workspace = memory.NewWorkspaceWith(w)
+
 		cfg := &ServerConfig{
-			Config: &Config{
-				Dev: false,
-			},
-			Debug: false,
+			Config: &Config{Dev: false, Mock_Auth: false},
+			Debug:  false,
+			Repos:  repos,
 		}
+		middleware := identityProviderAuthMiddleware(cfg)
 
-		result := canUseDebugHeaders(cfg)
+		nextHandler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			w.WriteHeader(http.StatusOK)
+		})
 
-		assert.False(t, result)
+		req := httptest.NewRequest(http.MethodPost, "/api/graphql", nil)
+		req.Header.Set("X-Internal-Service", "visualizer-api")
+		req.Header.Set(debugUserHeader, uid.String())
+		rr := httptest.NewRecorder()
+
+		middleware(nextHandler).ServeHTTP(rr, req)
+
+		assert.Equal(t, http.StatusUnauthorized, rr.Code)
 	})
 
 	t.Run("should not allow debug headers in production mode", func(t *testing.T) {
