@@ -50,6 +50,25 @@ func (c *Client) queries(ctx context.Context) *gen.Queries {
 	return gen.New(c.resolve(ctx))
 }
 
+// inTx runs fn inside a transaction. If a transaction is already active in ctx
+// it reuses it (so callers compose with usecasex transactions); otherwise it
+// begins, commits on success, and rolls back on error. This keeps multi-statement
+// writes (parent row + child rows) atomic.
+func (c *Client) inTx(ctx context.Context, fn func(ctx context.Context) error) error {
+	if _, ok := txFromContext(ctx); ok {
+		return fn(ctx)
+	}
+	tx, err := c.pool.Begin(ctx)
+	if err != nil {
+		return err
+	}
+	if err := fn(withTx(ctx, tx)); err != nil {
+		_ = tx.Rollback(ctx)
+		return err
+	}
+	return tx.Commit(ctx)
+}
+
 // lower lowercases a string (used for case-insensitive alias matching).
 func lower(s string) string { return strings.ToLower(s) }
 
