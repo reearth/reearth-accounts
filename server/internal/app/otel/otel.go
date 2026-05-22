@@ -172,19 +172,18 @@ func createResource(ctx context.Context, cfg *Config) (*resource.Resource, error
 }
 
 func createSampler(cfg *Config) sdktrace.Sampler {
-	if cfg.SamplingRatio < 0 {
-		return sdktrace.AlwaysSample()
+	// Honor an upstream service's sampling decision when there is a remote
+	// parent span; apply the ratio only to new root spans.
+	var root sdktrace.Sampler
+	switch {
+	case cfg.SamplingRatio < 0, cfg.SamplingRatio >= 1:
+		root = sdktrace.AlwaysSample()
+	case cfg.SamplingRatio == 0:
+		root = sdktrace.NeverSample()
+	default:
+		root = sdktrace.TraceIDRatioBased(cfg.SamplingRatio)
 	}
-
-	if cfg.SamplingRatio == 0 {
-		return sdktrace.NeverSample()
-	}
-
-	if cfg.SamplingRatio >= 1 {
-		return sdktrace.AlwaysSample()
-	}
-
-	return sdktrace.TraceIDRatioBased(cfg.SamplingRatio)
+	return sdktrace.ParentBased(root)
 }
 
 func createOTLPExporter(ctx context.Context, cfg *Config, useGCPAuth bool) (sdktrace.SpanExporter, error) {
