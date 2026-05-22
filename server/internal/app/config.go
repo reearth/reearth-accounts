@@ -17,13 +17,13 @@ import (
 const configPrefix = "reearth"
 
 type Config struct {
-	Port    string `default:"8090" envconfig:"PORT"`
-	Dev     bool
+	Port     string `default:"8090" envconfig:"PORT"`
+	Dev      bool
 	DB       string   `default:"mongodb://localhost" envconfig:"REEARTH_ACCOUNTS_DB"`
 	DBName   string   `default:"reearth-account" envconfig:"REEARTH_ACCOUNTS_DB_NAME"`
 	DBDriver string   `envconfig:"REEARTH_ACCOUNTS_DB_DRIVER"`
-	Origins []string `envconfig:"REEARTH_ACCOUNTS_ORIGINS"`
-	Host    string   `default:"0.0.0.0" envconfig:"HOST"`
+	Origins  []string `envconfig:"REEARTH_ACCOUNTS_ORIGINS"`
+	Host     string   `default:"0.0.0.0" envconfig:"HOST"`
 
 	GCPProject string `envconfig:"GOOGLE_CLOUD_PROJECT"`
 	Cert       CertConfig

@@ -235,7 +235,7 @@ func testWorkspaceFiltered(t *testing.T, nc Factory) {
 	require.Len(t, got, 1)
 	assert.Equal(t, visible.ID(), got[0].ID())
 
-	assert.Error(t, f.Save(ctx, hidden))  // not writable
+	assert.Error(t, f.Save(ctx, hidden))    // not writable
 	assert.NoError(t, f.Save(ctx, visible)) // writable
 }
 
