@@ -69,6 +69,8 @@ func GraphqlAPI(conf *Config, dev bool) echo.HandlerFunc {
 		Cache: lru.New[string](30),
 	})
 
+	srv.SetErrorPresenter(gqlErrorPresenter(dev))
+
 	if dev {
 		srv.Use(extension.Introspection{})
 		srv.AroundResponses(func(ctx context.Context, next graphql.ResponseHandler) *graphql.Response {
@@ -113,8 +115,6 @@ func GraphqlAPI(conf *Config, dev bool) echo.HandlerFunc {
 			),
 		)
 		defer span.End()
-
-		srv.SetErrorPresenter(gqlErrorPresenter(dev))
 
 		usecases := adapter.Usecases(ctx)
 		ctx = gql.AttachUsecases(ctx, usecases, str, enableDataLoaders)

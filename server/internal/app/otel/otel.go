@@ -76,7 +76,7 @@ func InitTracer(ctx context.Context, cfg *Config) (TracerProvider, error) {
 	}
 
 	if (cfg.ExporterType == ExporterTypeOTLP || cfg.ExporterType == ExporterTypeJaeger) && cfg.Endpoint == "" {
-		return nil, fmt.Errorf("OTLP endpoint is required for exporter type %s", cfg.ExporterType)
+		return nil, fmt.Errorf("endpoint is required for exporter type %s", cfg.ExporterType)
 	}
 	var exporter sdktrace.SpanExporter
 	var err error

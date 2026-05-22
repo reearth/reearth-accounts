@@ -2,6 +2,7 @@ package app
 
 import (
 	"context"
+	"sort"
 
 	"github.com/99designs/gqlgen/graphql"
 	"github.com/reearth/reearthx/log"
@@ -10,6 +11,10 @@ import (
 	"go.opentelemetry.io/otel/codes"
 	"go.opentelemetry.io/otel/trace"
 )
+
+// maxVariableNamesRecorded caps the number of GraphQL variable names recorded
+// per span so a malicious or noisy query cannot blow up trace payload size.
+const maxVariableNamesRecorded = 16
 
 // detailedOperationTracer creates a middleware that traces GraphQL operations with detailed attributes
 func detailedOperationTracer() graphql.OperationMiddleware {
@@ -39,10 +44,20 @@ func detailedOperationTracer() graphql.OperationMiddleware {
 		)
 
 		// Raw query is intentionally not recorded: inline literals may contain PII.
-		if len(opCtx.Variables) > 0 {
+		// Variable values are also not recorded. Variable names are recorded as a
+		// single bounded list to avoid unbounded high-cardinality attribute keys
+		// (GraphQL variable names are user-controlled).
+		if n := len(opCtx.Variables); n > 0 {
+			span.SetAttributes(attribute.Int("graphql.variables.count", n))
+			names := make([]string, 0, n)
 			for key := range opCtx.Variables {
-				span.SetAttributes(attribute.String("graphql.variable."+key, "present"))
+				names = append(names, key)
 			}
+			sort.Strings(names)
+			if len(names) > maxVariableNamesRecorded {
+				names = names[:maxVariableNamesRecorded]
+			}
+			span.SetAttributes(attribute.StringSlice("graphql.variables.names", names))
 		}
 
 		res := next(ctx)
