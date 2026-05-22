@@ -10,7 +10,10 @@ import (
 	"github.com/labstack/echo/v4"
 	"github.com/labstack/echo/v4/middleware"
 	"github.com/reearth/reearth-accounts/server/internal/adapter"
+	adapterhttp "github.com/reearth/reearth-accounts/server/internal/adapter/http"
 	"github.com/reearth/reearth-accounts/server/internal/usecase/interactor"
+	"github.com/reearth/reearth-accounts/server/pkg/user"
+	"github.com/reearth/reearth-accounts/server/pkg/workspace"
 	"github.com/reearth/reearthx/appx"
 	"github.com/reearth/reearthx/log"
 	"github.com/reearth/reearthx/rerror"
@@ -109,7 +112,61 @@ func initEcho(ctx context.Context, cfg *ServerConfig) *echo.Echo {
 
 	api.POST("/graphql", GraphqlAPI(cfg.Config, cfg.Config.Dev), middlewares...)
 
+	// REST API (additive; GraphQL above is unchanged). Reuses the usecase middleware
+	// and, in non-mock mode, an optional JWT middleware that parses a bearer token into
+	// adapter.AuthInfoKey without rejecting token-less requests (so public and
+	// optional-auth routes work). RequiredAuth/OptionalAuth enforce presence per-route.
+	var restJWT echo.MiddlewareFunc
+	if !cfg.Config.Mock_Auth {
+		jwt, err := appx.AuthMiddleware(cfg.Config.Auths(), adapter.AuthInfoKey, true)
+		if err != nil {
+			log.Panicc(ctx, err)
+		}
+		restJWT = echo.WrapMiddleware(jwt)
+	}
+	adapterhttp.RegisterRESTRouter(e, adapterhttp.RouterConfig{
+		AuthResolver:       restAuthResolver(cfg),
+		UsecaseMiddleware:  usecaseMiddleware,
+		JWTMiddleware:      restJWT,
+		AuthConfigProvider: cfg.Config,
+		APIKey:             cfg.Config.RestAPIKey,
+		SwaggerUser:        cfg.Config.SwaggerBasicUser,
+		SwaggerPass:        cfg.Config.SwaggerBasicPass,
+	})
+
 	return e
+}
+
+// restAuthResolver reuses the existing auth pipeline (FindByName for mock auth,
+// FindBySub for real auth) plus generateUserOperator to turn an AuthInfo into a
+// domain user + operator for the REST middleware. It returns (nil, nil, nil) for an
+// unauthenticated request (no token, or the resolved subject has no user) so that
+// RequiredAuth can answer 401 and OptionalAuth can proceed anonymously.
+func restAuthResolver(cfg *ServerConfig) adapterhttp.AuthResolver {
+	return func(c echo.Context, ai *appx.AuthInfo) (*user.User, *workspace.Operator, error) {
+		ctx := c.Request().Context()
+		var u *user.User
+		var err error
+		if cfg.Config.Mock_Auth {
+			u, err = cfg.Repos.User.FindByName(ctx, FIXED_MOCK_USERNAME)
+		} else {
+			if ai == nil || ai.Sub == "" {
+				return nil, nil, nil
+			}
+			u, err = cfg.Repos.User.FindBySub(ctx, ai.Sub)
+		}
+		if err != nil {
+			if errors.Is(err, rerror.ErrNotFound) {
+				return nil, nil, nil
+			}
+			return nil, nil, err
+		}
+		op, err := generateUserOperator(ctx, cfg, u)
+		if err != nil {
+			return nil, nil, err
+		}
+		return u, op, nil
+	}
 }
 
 func allowedOrigins(cfg *ServerConfig) []string {

@@ -13,18 +13,22 @@ import (
 // and stored under adapter.AuthInfoKey) into a domain user + operator. It is provided
 // by the app layer (reusing app/auth.go's FindBySub + generateUserOperator pipeline)
 // so this package does not import app.
+//
+// The resolver MUST handle every authentication mode itself: it receives the parsed
+// AuthInfo (nil when no token is present) and returns (nil, nil, nil) for an
+// unauthenticated request (no token / mock user not seeded / user not found), a
+// non-nil user for a resolved request, or a non-nil error for an unexpected failure.
+// This lets mock-auth mode (which has no AuthInfo) still resolve the fixed mock user.
 type AuthResolver func(c echo.Context, ai *appx.AuthInfo) (*user.User, *workspace.Operator, error)
 
-// RequiredAuth attaches User+Operator to context; returns 401 when no/invalid token.
+// RequiredAuth attaches User+Operator to context; returns 401 when the request cannot
+// be resolved to a user. The resolver is always invoked (even with nil AuthInfo) so
+// mock-auth mode resolves the fixed mock user.
 func RequiredAuth(resolve AuthResolver) echo.MiddlewareFunc {
 	return func(next echo.HandlerFunc) echo.HandlerFunc {
 		return func(c echo.Context) error {
 			ctx := c.Request().Context()
-			ai := adapter.GetAuthInfo(ctx)
-			if ai == nil || ai.Sub == "" {
-				return httpinternal.ErrUnauthorized
-			}
-			u, op, err := resolve(c, ai)
+			u, op, err := resolve(c, adapter.GetAuthInfo(ctx))
 			if err != nil {
 				return err
 			}
@@ -39,18 +43,17 @@ func RequiredAuth(resolve AuthResolver) echo.MiddlewareFunc {
 	}
 }
 
-// OptionalAuth attaches User+Operator when a valid token is present, else proceeds anonymously.
+// OptionalAuth attaches User+Operator when the request resolves to a user, else
+// proceeds anonymously. The resolver is always invoked so mock-auth mode resolves
+// the fixed mock user.
 func OptionalAuth(resolve AuthResolver) echo.MiddlewareFunc {
 	return func(next echo.HandlerFunc) echo.HandlerFunc {
 		return func(c echo.Context) error {
 			ctx := c.Request().Context()
-			ai := adapter.GetAuthInfo(ctx)
-			if ai != nil && ai.Sub != "" {
-				if u, op, err := resolve(c, ai); err == nil && u != nil {
-					ctx = adapter.AttachUser(ctx, u)
-					ctx = adapter.AttachOperator(ctx, op)
-					c.SetRequest(c.Request().WithContext(ctx))
-				}
+			if u, op, err := resolve(c, adapter.GetAuthInfo(ctx)); err == nil && u != nil {
+				ctx = adapter.AttachUser(ctx, u)
+				ctx = adapter.AttachOperator(ctx, op)
+				c.SetRequest(c.Request().WithContext(ctx))
 			}
 			return next(c)
 		}
