@@ -57,6 +57,11 @@ type Config struct {
 	StorageBucketName       string `envconfig:"REEARTH_ACCOUNTS_STORAGE_BUCKET_NAME" default:"reearth"`
 	StorageEmulatorEnabled  bool   `envconfig:"REEARTH_ACCOUNTS_STORAGE_EMULATOR_ENABLED"`
 	StorageEmulatorEndpoint string `envconfig:"REEARTH_ACCOUNTS_STORAGE_EMULATOR_ENDPOINT"`
+
+	// REST
+	RestAPIKey       string `envconfig:"REEARTH_ACCOUNTS_REST_API_KEY"`
+	SwaggerBasicUser string `envconfig:"REEARTH_ACCOUNTS_SWAGGER_BASIC_USER"`
+	SwaggerBasicPass string `envconfig:"REEARTH_ACCOUNTS_SWAGGER_BASIC_PASS"`
 }
 
 type AuthConfig struct {
