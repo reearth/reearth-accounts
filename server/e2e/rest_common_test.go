@@ -24,6 +24,15 @@ var (
 // workspace so mock-auth REST requests resolve, plus a second user usable as a
 // workspace-membership target.
 func seedDemoUser(ctx context.Context, r *repo.Container) error {
+	// Seed the named roles that updatePermittable looks up by name (it only
+	// auto-creates them when REEARTH_MOCK_AUTH=true is set in the process env).
+	for _, rt := range []role.RoleType{role.RoleOwner, role.RoleMaintainer, role.RoleWriter, role.RoleReader, role.RoleSelf} {
+		rl := role.New().NewID().Name(string(rt)).MustBuild()
+		if err := r.Role.Save(ctx, *rl); err != nil {
+			return err
+		}
+	}
+
 	md := user.NewMetadata()
 	md.LangFrom("en")
 	md.SetTheme(user.ThemeLight)
