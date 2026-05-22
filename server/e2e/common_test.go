@@ -41,7 +41,7 @@ func StartServerAndRepos(t *testing.T, cfg *app.Config, useMongo bool, seeder Se
 		db := mongorepo.Connect(t)(t)
 
 		var err error
-		repos, err = mongorepo.New(ctx, db, false, false, nil)
+		repos, err = mongorepo.New(ctx, db, false, false)
 		if err != nil {
 			log.Fatalf("Failed to init mongo: %+v\n", err)
 		}

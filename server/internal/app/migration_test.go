@@ -79,10 +79,8 @@ func TestRunMigration(t *testing.T) {
 		{
 			name: "should create maintainer role and assign it to workspace users and integrations",
 			setup: func(ctx context.Context, repos *repo.Container) {
-				userRepo := repo.NewMultiUser(memory.NewUserWith(u1, u2, u3))
-				workspaceRepo := memory.NewWorkspaceWith(w1, w2)
-				repos.User = userRepo
-				repos.Workspace = workspaceRepo
+				repos.User = memory.NewUserWith(u1, u2, u3)
+				repos.Workspace = memory.NewWorkspaceWith(w1, w2)
 			},
 			assert: func(t *testing.T, ctx context.Context, repos *repo.Container) {
 				assertPermittablesAndRoles(t, ctx, repos, user.IDList{uId1, uId2, uId3, iUserId1, iUserId2, iUserId3})
@@ -97,10 +95,8 @@ func TestRunMigration(t *testing.T) {
 					t.Fatal(err)
 				}
 
-				userRepo := repo.NewMultiUser(memory.NewUserWith(u1, u2, u3))
-				workspaceRepo := memory.NewWorkspaceWith(w1, w2)
-				repos.User = userRepo
-				repos.Workspace = workspaceRepo
+				repos.User = memory.NewUserWith(u1, u2, u3)
+				repos.Workspace = memory.NewWorkspaceWith(w1, w2)
 			},
 			assert: func(t *testing.T, ctx context.Context, repos *repo.Container) {
 				assertPermittablesAndRoles(t, ctx, repos, user.IDList{uId1, uId2, uId3, iUserId1, iUserId2, iUserId3})
@@ -125,10 +121,8 @@ func TestRunMigration(t *testing.T) {
 					t.Fatal(err)
 				}
 
-				userRepo := repo.NewMultiUser(memory.NewUserWith(u1, u2, u3))
-				workspaceRepo := memory.NewWorkspaceWith(w1, w2)
-				repos.User = userRepo
-				repos.Workspace = workspaceRepo
+				repos.User = memory.NewUserWith(u1, u2, u3)
+				repos.Workspace = memory.NewWorkspaceWith(w1, w2)
 			},
 			assert: func(t *testing.T, ctx context.Context, repos *repo.Container) {
 				permittable, err := repos.Permittable.FindByUserID(ctx, uId1)
@@ -157,10 +151,8 @@ func TestRunMigration(t *testing.T) {
 					t.Fatal(err)
 				}
 
-				userRepo := repo.NewMultiUser(memory.NewUserWith(u1, u2, u3))
-				workspaceRepo := memory.NewWorkspaceWith(w1, w2)
-				repos.User = userRepo
-				repos.Workspace = workspaceRepo
+				repos.User = memory.NewUserWith(u1, u2, u3)
+				repos.Workspace = memory.NewWorkspaceWith(w1, w2)
 			},
 			assert: func(t *testing.T, ctx context.Context, repos *repo.Container) {
 				roles, err := repos.Role.FindAll(ctx)

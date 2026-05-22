@@ -37,12 +37,12 @@ type Workspace struct {
 
 func NewWorkspace(r *repo.Container, enforceMemberCount WorkspaceMemberCountEnforcer, cerbos interfaces.Cerbos) interfaces.Workspace {
 	return &Workspace{
-		repos:              r,
-		enforceMemberCount: enforceMemberCount,
-		userquery:          NewUserQuery(r.User, r.Users...),
-		permittableRepo:    r.Permittable,
-		roleRepo:           r.Role,
 		cerbos:             cerbos,
+		enforceMemberCount: enforceMemberCount,
+		permittableRepo:    r.Permittable,
+		repos:              r,
+		roleRepo:           r.Role,
+		userquery:          NewUserQuery(r.User),
 	}
 }
 
