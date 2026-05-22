@@ -4,6 +4,7 @@ import (
 	"context"
 
 	"github.com/reearth/reearth-accounts/server/internal/infrastructure/auth0"
+	"github.com/reearth/reearth-accounts/server/internal/infrastructure/cip"
 	mongorepo "github.com/reearth/reearth-accounts/server/internal/infrastructure/mongo"
 	"github.com/reearth/reearth-accounts/server/internal/infrastructure/storage"
 	"github.com/reearth/reearth-accounts/server/internal/usecase/gateway"
@@ -33,9 +34,23 @@ func initReposAndGateways(ctx context.Context, client *mongo.Client, conf *Confi
 		log.Fatalf("Failed to init storage: %+v\n", err)
 	}
 
+	var authenticator gateway.Authenticator
+	switch conf.GetAuthProvider() {
+	case "cip":
+		authenticator, err = cip.New(ctx, cip.Params{
+			ProjectID: conf.CIP.ProjectID,
+			TenantID:  conf.CIP.TenantID,
+		})
+		if err != nil {
+			log.Fatalf("Failed to init CIP authenticator: %+v\n", err)
+		}
+	default:
+		authenticator = auth0.New(conf.Auth0.Domain, conf.Auth0.ClientID, conf.Auth0.ClientSecret)
+	}
+
 	acGateways := &gateway.Container{
 		Mailer:        mailer.New(ctx, &mailer.Config{}),
-		Authenticator: auth0.New(conf.Auth0.Domain, conf.Auth0.ClientID, conf.Auth0.ClientSecret),
+		Authenticator: authenticator,
 		Storage:       str,
 	}
 
