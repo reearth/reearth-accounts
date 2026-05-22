@@ -9,6 +9,7 @@ import (
 	permh "github.com/reearth/reearth-accounts/server/internal/adapter/http/permission"
 	userh "github.com/reearth/reearth-accounts/server/internal/adapter/http/user"
 	wsh "github.com/reearth/reearth-accounts/server/internal/adapter/http/workspace"
+	_ "github.com/reearth/reearth-accounts/server/docs" // generated OpenAPI spec (make swag)
 	echoSwagger "github.com/swaggo/echo-swagger"
 )
 
@@ -79,7 +80,7 @@ func RegisterRESTRouter(e *echo.Echo, cfg RouterConfig) {
 	api.POST("/users/verify", uh.VerifyUser)
 	api.POST("/users/password-reset/start", uh.StartPasswordReset)
 	api.POST("/users/password-reset", uh.PasswordReset)
-	api.POST("/users/find-or-create", uh.FindOrCreate, apikeyOrAuth)
+	api.POST("/users/find-or-create", uh.FindOrCreate, optional, apikeyOrAuth)
 
 	// --- Workspaces ---
 	wh := wsh.NewHandler()
@@ -100,7 +101,9 @@ func RegisterRESTRouter(e *echo.Echo, cfg RouterConfig) {
 
 	// --- Permission ---
 	ph := permh.NewHandler()
-	api.POST("/permissions/check", ph.Check, apikeyOrAuth)
+	// OptionalAuth resolves a JWT/mock user (attaching it for APIKeyOrAuth and the
+	// handler's RequireUser); APIKeyOrAuth then admits either that user or a valid M2M key.
+	api.POST("/permissions/check", ph.Check, optional, apikeyOrAuth)
 
 	// --- Swagger ---
 	if cfg.SwaggerUser != "" {

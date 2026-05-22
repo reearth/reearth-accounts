@@ -1,0 +1,1240 @@
+basePath: /
+definitions:
+  httpmodel.AddIntegrationRequest:
+    properties:
+      integration_id:
+        type: string
+      role:
+        enum:
+        - reader
+        - writer
+        - maintainer
+        - owner
+        type: string
+    required:
+    - integration_id
+    - role
+    type: object
+  httpmodel.AddMembersRequest:
+    properties:
+      users:
+        items:
+          $ref: '#/definitions/httpmodel.MemberInputRequest'
+        minItems: 1
+        type: array
+    required:
+    - users
+    type: object
+  httpmodel.AuthConfigResponse:
+    properties:
+      auth_provider:
+        type: string
+      auth0_audience:
+        type: string
+      auth0_client_id:
+        type: string
+      auth0_domain:
+        type: string
+    type: object
+  httpmodel.CheckPermissionRequest:
+    properties:
+      action:
+        type: string
+      resource:
+        type: string
+      service:
+        type: string
+      workspace_alias:
+        type: string
+    required:
+    - action
+    - resource
+    - service
+    type: object
+  httpmodel.CheckPermissionResponse:
+    properties:
+      allowed:
+        type: boolean
+    type: object
+  httpmodel.CreateVerificationRequest:
+    properties:
+      email:
+        type: string
+    required:
+    - email
+    type: object
+  httpmodel.CreateWorkspaceRequest:
+    properties:
+      alias:
+        type: string
+      description:
+        type: string
+      name:
+        type: string
+    required:
+    - alias
+    - name
+    type: object
+  httpmodel.FindOrCreateRequest:
+    properties:
+      iss:
+        type: string
+      sub:
+        type: string
+      token:
+        type: string
+    required:
+    - iss
+    - sub
+    - token
+    type: object
+  httpmodel.MeResponse:
+    properties:
+      alias:
+        type: string
+      auths:
+        items:
+          type: string
+        type: array
+      email:
+        type: string
+      host:
+        type: string
+      id:
+        type: string
+      latest_logout_at:
+        type: string
+      metadata:
+        $ref: '#/definitions/httpmodel.UserMetadataResponse'
+      my_workspace_id:
+        type: string
+      name:
+        type: string
+    type: object
+  httpmodel.MemberInputRequest:
+    properties:
+      role:
+        enum:
+        - reader
+        - writer
+        - maintainer
+        - owner
+        type: string
+      user_id:
+        type: string
+    required:
+    - role
+    - user_id
+    type: object
+  httpmodel.MessageResponse:
+    properties:
+      success:
+        type: boolean
+    type: object
+  httpmodel.PasswordResetRequest:
+    properties:
+      password:
+        type: string
+      token:
+        type: string
+    required:
+    - password
+    - token
+    type: object
+  httpmodel.RemoveIntegrationsRequest:
+    properties:
+      integration_ids:
+        items:
+          type: string
+        minItems: 1
+        type: array
+    required:
+    - integration_ids
+    type: object
+  httpmodel.RemoveMembersRequest:
+    properties:
+      user_ids:
+        items:
+          type: string
+        minItems: 1
+        type: array
+    required:
+    - user_ids
+    type: object
+  httpmodel.SignupOIDCRequest:
+    properties:
+      email:
+        type: string
+      id:
+        type: string
+      lang:
+        type: string
+      name:
+        type: string
+      secret:
+        type: string
+      sub:
+        type: string
+      workspace_id:
+        type: string
+    type: object
+  httpmodel.SignupRequest:
+    properties:
+      email:
+        type: string
+      id:
+        type: string
+      lang:
+        type: string
+      mock_auth:
+        type: boolean
+      name:
+        type: string
+      password:
+        type: string
+      secret:
+        type: string
+      theme:
+        enum:
+        - default
+        - dark
+        - light
+        type: string
+      workspace_id:
+        type: string
+    required:
+    - email
+    - name
+    - password
+    type: object
+  httpmodel.SimpleUserResponse:
+    properties:
+      email:
+        type: string
+      id:
+        type: string
+      name:
+        type: string
+    type: object
+  httpmodel.StartPasswordResetRequest:
+    properties:
+      email:
+        type: string
+    required:
+    - email
+    type: object
+  httpmodel.TransferOwnershipRequest:
+    properties:
+      new_owner_id:
+        type: string
+    required:
+    - new_owner_id
+    type: object
+  httpmodel.UpdateIntegrationRequest:
+    properties:
+      role:
+        enum:
+        - reader
+        - writer
+        - maintainer
+        - owner
+        type: string
+    required:
+    - role
+    type: object
+  httpmodel.UpdateMeRequest:
+    properties:
+      alias:
+        type: string
+      description:
+        type: string
+      email:
+        type: string
+      lang:
+        type: string
+      name:
+        type: string
+      password:
+        type: string
+      password_confirmation:
+        type: string
+      photo_url:
+        type: string
+      theme:
+        enum:
+        - default
+        - dark
+        - light
+        type: string
+      website:
+        type: string
+    type: object
+  httpmodel.UpdateMemberRequest:
+    properties:
+      role:
+        enum:
+        - reader
+        - writer
+        - maintainer
+        - owner
+        type: string
+    required:
+    - role
+    type: object
+  httpmodel.UpdateWorkspaceRequest:
+    properties:
+      alias:
+        type: string
+      description:
+        type: string
+      name:
+        type: string
+      photo_url:
+        type: string
+      website:
+        type: string
+    type: object
+  httpmodel.UserMetadataResponse:
+    properties:
+      description:
+        type: string
+      lang:
+        type: string
+      photo_url:
+        type: string
+      theme:
+        type: string
+      website:
+        type: string
+    type: object
+  httpmodel.UserResponse:
+    properties:
+      alias:
+        type: string
+      auths:
+        items:
+          type: string
+        type: array
+      email:
+        type: string
+      host:
+        type: string
+      id:
+        type: string
+      metadata:
+        $ref: '#/definitions/httpmodel.UserMetadataResponse'
+      name:
+        type: string
+      verification:
+        $ref: '#/definitions/httpmodel.VerificationResponse'
+      workspace:
+        type: string
+    type: object
+  httpmodel.VerificationResponse:
+    properties:
+      code:
+        type: string
+      expiration:
+        type: string
+      verified:
+        type: boolean
+    type: object
+  httpmodel.VerifyUserRequest:
+    properties:
+      code:
+        type: string
+    required:
+    - code
+    type: object
+  httpmodel.WorkspaceMemberResponse:
+    properties:
+      integration_id:
+        type: string
+      role:
+        type: string
+      user_id:
+        type: string
+    type: object
+  httpmodel.WorkspaceMetadataResponse:
+    properties:
+      billing_email:
+        type: string
+      description:
+        type: string
+      location:
+        type: string
+      photo_url:
+        type: string
+      website:
+        type: string
+    type: object
+  httpmodel.WorkspaceResponse:
+    properties:
+      alias:
+        type: string
+      id:
+        type: string
+      members:
+        items:
+          $ref: '#/definitions/httpmodel.WorkspaceMemberResponse'
+        type: array
+      metadata:
+        $ref: '#/definitions/httpmodel.WorkspaceMetadataResponse'
+      name:
+        type: string
+      personal:
+        type: boolean
+    type: object
+  internal.ErrorResponse:
+    properties:
+      description:
+        type: string
+      field_errors:
+        items:
+          $ref: '#/definitions/internal.FieldErrorResponse'
+        type: array
+      message:
+        type: string
+      status:
+        type: integer
+    type: object
+  internal.FieldErrorResponse:
+    properties:
+      field:
+        type: string
+      message:
+        type: string
+    type: object
+info:
+  contact: {}
+  description: REST mirror of the reearth-accounts GraphQL surface.
+  title: reearth-accounts REST API
+  version: "1.0"
+paths:
+  /api/auth/config:
+    get:
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/httpmodel.AuthConfigResponse'
+      summary: Get public auth configuration
+      tags:
+      - Auth
+  /api/auth/logout:
+    post:
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/httpmodel.MeResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/internal.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Log out the current user
+      tags:
+      - Auth
+  /api/permissions/check:
+    post:
+      consumes:
+      - application/json
+      parameters:
+      - description: service/resource/action
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/httpmodel.CheckPermissionRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/httpmodel.CheckPermissionResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/internal.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Check a permission for the current user
+      tags:
+      - Permission
+  /api/users:
+    get:
+      parameters:
+      - description: comma-separated user IDs
+        in: query
+        name: ids
+        type: string
+      - description: alias filter (requires pagination)
+        in: query
+        name: alias
+        type: string
+      - description: page (default 1)
+        in: query
+        name: page
+        type: integer
+      - description: page size (default 50, max 100)
+        in: query
+        name: page_size
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/httpmodel.UserResponse'
+      security:
+      - BearerAuth: []
+      summary: List users by IDs (optionally paginated with alias filter)
+      tags:
+      - User
+  /api/users/{id}:
+    get:
+      parameters:
+      - description: user ID
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/httpmodel.UserResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/internal.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Get a user by ID
+      tags:
+      - User
+  /api/users/by-alias:
+    get:
+      parameters:
+      - description: alias
+        in: query
+        name: alias
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/httpmodel.UserResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/internal.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Find a user by alias
+      tags:
+      - User
+  /api/users/by-name-or-alias:
+    get:
+      parameters:
+      - description: name or alias
+        in: query
+        name: q
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            items:
+              $ref: '#/definitions/httpmodel.UserResponse'
+            type: array
+      security:
+      - BearerAuth: []
+      summary: Find users by name or alias
+      tags:
+      - User
+  /api/users/by-name-or-email:
+    get:
+      parameters:
+      - description: name or email
+        in: query
+        name: q
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/httpmodel.SimpleUserResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/internal.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Find a user by name or email
+      tags:
+      - User
+  /api/users/find-or-create:
+    post:
+      consumes:
+      - application/json
+      parameters:
+      - description: sub, iss, token
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/httpmodel.FindOrCreateRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/httpmodel.UserResponse'
+      summary: Find or create a user (M2M or JWT)
+      tags:
+      - User
+  /api/users/me:
+    delete:
+      produces:
+      - application/json
+      responses:
+        "204":
+          description: No Content
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/internal.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Delete current user
+      tags:
+      - User
+    get:
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/httpmodel.MeResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/internal.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Get current user
+      tags:
+      - User
+    patch:
+      consumes:
+      - application/json
+      parameters:
+      - description: fields to update
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/httpmodel.UpdateMeRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/httpmodel.MeResponse'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/internal.ErrorResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/internal.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Update current user
+      tags:
+      - User
+  /api/users/me/auths/{sub}:
+    delete:
+      parameters:
+      - description: auth provider/sub
+        in: path
+        name: sub
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/httpmodel.MeResponse'
+      security:
+      - BearerAuth: []
+      summary: Remove an auth provider from the current user
+      tags:
+      - User
+  /api/users/password-reset:
+    post:
+      consumes:
+      - application/json
+      parameters:
+      - description: password and token
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/httpmodel.PasswordResetRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/httpmodel.MessageResponse'
+      summary: Complete a password reset
+      tags:
+      - User
+  /api/users/password-reset/start:
+    post:
+      consumes:
+      - application/json
+      parameters:
+      - description: email
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/httpmodel.StartPasswordResetRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/httpmodel.MessageResponse'
+      summary: Start a password reset
+      tags:
+      - User
+  /api/users/search:
+    get:
+      parameters:
+      - description: search keyword
+        in: query
+        name: keyword
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            items:
+              $ref: '#/definitions/httpmodel.UserResponse'
+            type: array
+      security:
+      - BearerAuth: []
+      summary: Search users by keyword
+      tags:
+      - User
+  /api/users/signup:
+    post:
+      consumes:
+      - application/json
+      parameters:
+      - description: signup fields
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/httpmodel.SignupRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/httpmodel.UserResponse'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/internal.ErrorResponse'
+        "409":
+          description: Conflict
+          schema:
+            $ref: '#/definitions/internal.ErrorResponse'
+      summary: Sign up a new user
+      tags:
+      - User
+  /api/users/signup-oidc:
+    post:
+      consumes:
+      - application/json
+      parameters:
+      - description: OIDC signup fields
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/httpmodel.SignupOIDCRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/httpmodel.UserResponse'
+      summary: Sign up via OIDC
+      tags:
+      - User
+  /api/users/verifications:
+    post:
+      consumes:
+      - application/json
+      parameters:
+      - description: email
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/httpmodel.CreateVerificationRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/httpmodel.MessageResponse'
+      summary: Create an email verification
+      tags:
+      - User
+  /api/users/verify:
+    post:
+      consumes:
+      - application/json
+      parameters:
+      - description: code
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/httpmodel.VerifyUserRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/httpmodel.UserResponse'
+      summary: Verify a user with a code
+      tags:
+      - User
+  /api/workspaces:
+    get:
+      parameters:
+      - description: comma-separated workspace IDs
+        in: query
+        name: ids
+        type: string
+      - description: workspace name
+        in: query
+        name: name
+        type: string
+      - description: workspace alias
+        in: query
+        name: alias
+        type: string
+      - description: user ID (optionally paginated)
+        in: query
+        name: user_id
+        type: string
+      - description: page (default 1)
+        in: query
+        name: page
+        type: integer
+      - description: page size (default 50, max 100)
+        in: query
+        name: page_size
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/httpmodel.WorkspaceResponse'
+      security:
+      - BearerAuth: []
+      summary: List workspaces by a single selector (ids|name|alias|user_id)
+      tags:
+      - Workspace
+    post:
+      consumes:
+      - application/json
+      parameters:
+      - description: workspace fields
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/httpmodel.CreateWorkspaceRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/httpmodel.WorkspaceResponse'
+      security:
+      - BearerAuth: []
+      summary: Create a workspace
+      tags:
+      - Workspace
+  /api/workspaces/{id}:
+    delete:
+      parameters:
+      - description: workspace ID
+        in: path
+        name: id
+        required: true
+        type: string
+      responses:
+        "204":
+          description: No Content
+      security:
+      - BearerAuth: []
+      summary: Delete a workspace
+      tags:
+      - Workspace
+    get:
+      parameters:
+      - description: workspace ID
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/httpmodel.WorkspaceResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/internal.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Get a workspace by ID
+      tags:
+      - Workspace
+    patch:
+      consumes:
+      - application/json
+      parameters:
+      - description: workspace ID
+        in: path
+        name: id
+        required: true
+        type: string
+      - description: fields to update
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/httpmodel.UpdateWorkspaceRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/httpmodel.WorkspaceResponse'
+      security:
+      - BearerAuth: []
+      summary: Update a workspace
+      tags:
+      - Workspace
+  /api/workspaces/{id}/integrations:
+    delete:
+      consumes:
+      - application/json
+      parameters:
+      - description: workspace ID
+        in: path
+        name: id
+        required: true
+        type: string
+      - description: integration IDs
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/httpmodel.RemoveIntegrationsRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/httpmodel.WorkspaceResponse'
+      security:
+      - BearerAuth: []
+      summary: Remove multiple integration members
+      tags:
+      - Workspace
+    post:
+      consumes:
+      - application/json
+      parameters:
+      - description: workspace ID
+        in: path
+        name: id
+        required: true
+        type: string
+      - description: integration and role
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/httpmodel.AddIntegrationRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/httpmodel.WorkspaceResponse'
+      security:
+      - BearerAuth: []
+      summary: Add an integration member
+      tags:
+      - Workspace
+  /api/workspaces/{id}/integrations/{integration_id}:
+    delete:
+      parameters:
+      - description: workspace ID
+        in: path
+        name: id
+        required: true
+        type: string
+      - description: integration ID
+        in: path
+        name: integration_id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/httpmodel.WorkspaceResponse'
+      security:
+      - BearerAuth: []
+      summary: Remove an integration member
+      tags:
+      - Workspace
+    patch:
+      consumes:
+      - application/json
+      parameters:
+      - description: workspace ID
+        in: path
+        name: id
+        required: true
+        type: string
+      - description: integration ID
+        in: path
+        name: integration_id
+        required: true
+        type: string
+      - description: new role
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/httpmodel.UpdateIntegrationRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/httpmodel.WorkspaceResponse'
+      security:
+      - BearerAuth: []
+      summary: Update an integration member's role
+      tags:
+      - Workspace
+  /api/workspaces/{id}/members:
+    delete:
+      consumes:
+      - application/json
+      parameters:
+      - description: workspace ID
+        in: path
+        name: id
+        required: true
+        type: string
+      - description: user IDs
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/httpmodel.RemoveMembersRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/httpmodel.WorkspaceResponse'
+      security:
+      - BearerAuth: []
+      summary: Remove multiple user members
+      tags:
+      - Workspace
+    post:
+      consumes:
+      - application/json
+      parameters:
+      - description: workspace ID
+        in: path
+        name: id
+        required: true
+        type: string
+      - description: users to add
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/httpmodel.AddMembersRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/httpmodel.WorkspaceResponse'
+      security:
+      - BearerAuth: []
+      summary: Add user members to a workspace
+      tags:
+      - Workspace
+  /api/workspaces/{id}/members/{user_id}:
+    delete:
+      parameters:
+      - description: workspace ID
+        in: path
+        name: id
+        required: true
+        type: string
+      - description: user ID
+        in: path
+        name: user_id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/httpmodel.WorkspaceResponse'
+      security:
+      - BearerAuth: []
+      summary: Remove a user member
+      tags:
+      - Workspace
+    patch:
+      consumes:
+      - application/json
+      parameters:
+      - description: workspace ID
+        in: path
+        name: id
+        required: true
+        type: string
+      - description: user ID
+        in: path
+        name: user_id
+        required: true
+        type: string
+      - description: new role
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/httpmodel.UpdateMemberRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/httpmodel.WorkspaceResponse'
+      security:
+      - BearerAuth: []
+      summary: Update a user member's role
+      tags:
+      - Workspace
+  /api/workspaces/{id}/transfer-ownership:
+    post:
+      consumes:
+      - application/json
+      parameters:
+      - description: workspace ID
+        in: path
+        name: id
+        required: true
+        type: string
+      - description: new owner ID
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/httpmodel.TransferOwnershipRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/httpmodel.WorkspaceResponse'
+      security:
+      - BearerAuth: []
+      summary: Transfer workspace ownership
+      tags:
+      - Workspace
+securityDefinitions:
+  BearerAuth:
+    in: header
+    name: Authorization
+    type: apiKey
+swagger: "2.0"
