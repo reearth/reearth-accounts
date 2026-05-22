@@ -39,6 +39,9 @@ type Config struct {
 	Auth_TTL *int        `pp:",omitempty"`
 	Auth0    Auth0Config `pp:",omitempty"`
 
+	CIP          CIPConfig `pp:",omitempty"`
+	AuthProvider string    `default:"auth0" envconfig:"REEARTH_ACCOUNTS_AUTH_PROVIDER" pp:",omitempty"`
+
 	GraphQL GraphQLConfig
 
 	SignupSecret   string `envconfig:"REEARTH_ACCOUNTS_SIGNUP_SECRET"`
@@ -75,6 +78,33 @@ type Auth0Config struct {
 	WebClientID  string
 }
 
+type CIPConfig struct {
+	// ProjectID is the CIP / Firebase project id. When set, a CIP JWT provider
+	// (ISS=https://securetoken.google.com/<ProjectID>, AUD=[<ProjectID>]) is
+	// appended to Config.Auths(), and the Firebase Admin SDK targets this project.
+	ProjectID string `envconfig:"REEARTH_ACCOUNTS_CIP_PROJECT_ID"`
+	// TenantID is an optional GCIP multi-tenant id. Issuer/audience are unchanged;
+	// it only scopes Admin SDK management calls to the tenant.
+	TenantID string `envconfig:"REEARTH_ACCOUNTS_CIP_TENANT_ID"`
+	// APIKey is the public client API key advertised via authConfig (not a secret).
+	APIKey string `envconfig:"REEARTH_ACCOUNTS_CIP_API_KEY"`
+	// AuthDomain is the public client auth domain advertised via authConfig.
+	AuthDomain string `envconfig:"REEARTH_ACCOUNTS_CIP_AUTH_DOMAIN"`
+}
+
+// AuthConfig builds the JWT validation parameters for CIP-issued ID tokens.
+// Returns nil when CIP is unconfigured, so Config.Auths() stays unchanged.
+func (c CIPConfig) AuthConfig() *AuthConfig {
+	if c.ProjectID == "" {
+		return nil
+	}
+	return &AuthConfig{
+		ISS: "https://securetoken.google.com/" + c.ProjectID,
+		AUD: []string{c.ProjectID},
+		// ALG omitted: appx defaults to RS256, which is what CIP uses.
+	}
+}
+
 type CertConfig struct {
 	IP                net.IP
 	PubSubTopicIssue  string
@@ -103,6 +133,14 @@ func (c Config) Auths() (res []appx.JWTProvider) {
 			TTL: c.Auth_TTL,
 		}
 		res = append(res, a)
+	}
+	if ac := c.CIP.AuthConfig(); ac != nil {
+		res = append(res, appx.JWTProvider{
+			ISS: ac.ISS,
+			AUD: ac.AUD,
+			ALG: ac.ALG,
+			TTL: ac.TTL,
+		})
 	}
 	return append(res, c.Auth...)
 }
