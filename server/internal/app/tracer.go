@@ -2,7 +2,6 @@ package app
 
 import (
 	"context"
-	"strconv"
 
 	"github.com/99designs/gqlgen/graphql"
 	"github.com/reearth/reearthx/log"
@@ -29,8 +28,9 @@ func detailedOperationTracer() graphql.OperationMiddleware {
 
 		spanName := "GraphQL " + string(opCtx.Operation.Operation) + " " + operationName
 
+		// SpanKindInternal: the HTTP server span is already created by otelecho.
 		ctx, span := tracer.Start(ctx, spanName,
-			trace.WithSpanKind(trace.SpanKindServer),
+			trace.WithSpanKind(trace.SpanKindInternal),
 			trace.WithAttributes(
 				attribute.String("graphql.operation.name", operationName),
 				attribute.String("graphql.operation.type", string(opCtx.Operation.Operation)),
@@ -53,17 +53,12 @@ func detailedOperationTracer() graphql.OperationMiddleware {
 
 			if response != nil && len(response.Errors) > 0 {
 				span.SetStatus(codes.Error, "GraphQL operation returned errors")
+				// Only record error count; raw error messages may contain PII and are high-cardinality.
 				span.SetAttributes(attribute.Int("graphql.errors.count", len(response.Errors)))
-
-				for i, err := range response.Errors {
-					if i < 3 {
-						span.SetAttributes(attribute.String("graphql.error."+strconv.Itoa(i)+".message", err.Message))
-					}
-				}
 				log.Warnfc(ctx, "graphql: operation '%s' completed with %d errors", spanName, len(response.Errors))
 			} else {
 				span.SetStatus(codes.Ok, "GraphQL operation completed successfully")
-				log.Infofc(ctx, "graphql: operation '%s' completed successfully", spanName)
+				log.Debugfc(ctx, "graphql: operation '%s' completed successfully", spanName)
 			}
 
 			return response

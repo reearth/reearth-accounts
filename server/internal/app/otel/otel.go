@@ -46,6 +46,7 @@ type Config struct {
 	Enabled            bool
 	Endpoint           string
 	ExporterType       ExporterType
+	Insecure           bool // skip TLS for otlp/jaeger; ignored for gcp (always TLS)
 	MaxExportBatchSize int
 	BatchTimeout       time.Duration
 	MaxQueueSize       int
@@ -80,18 +81,21 @@ func InitTracer(ctx context.Context, cfg *Config) (TracerProvider, error) {
 	var exporter sdktrace.SpanExporter
 	var err error
 
+	// resolvedEndpoint is the actual endpoint used by the exporter (may differ from cfg.Endpoint for GCP).
+	resolvedEndpoint := cfg.Endpoint
 	switch cfg.ExporterType {
 	case ExporterTypeGCP:
-		log.Infoc(ctx, "Initializing GCP Cloud Trace exporter via OTLP")
+		resolvedEndpoint = gcpCloudTraceEndpoint
+		log.Infoc(ctx, "Initializing GCP Cloud Trace exporter via OTLP", "endpoint", resolvedEndpoint)
 		exporter, err = createGCPExporter(ctx, cfg)
 	case ExporterTypeJaeger:
-		log.Infoc(ctx, "Initializing Jaeger exporter via OTLP", "endpoint", cfg.Endpoint)
+		log.Infoc(ctx, "Initializing Jaeger exporter via OTLP", "endpoint", cfg.Endpoint, "insecure", cfg.Insecure)
 		exporter, err = createOTLPExporter(ctx, cfg, false)
 	case ExporterTypeOTLP:
-		log.Infoc(ctx, "Initializing OTLP exporter", "endpoint", cfg.Endpoint)
+		log.Infoc(ctx, "Initializing OTLP exporter", "endpoint", cfg.Endpoint, "insecure", cfg.Insecure)
 		exporter, err = createOTLPExporter(ctx, cfg, false)
 	default:
-		log.Warnc(ctx, "Unknown exporter type, defaulting to OTLP", "type", cfg.ExporterType)
+		log.Warnc(ctx, "Unknown exporter type, defaulting to OTLP", "type", cfg.ExporterType, "insecure", cfg.Insecure)
 		exporter, err = createOTLPExporter(ctx, cfg, false)
 	}
 
@@ -127,7 +131,7 @@ func InitTracer(ctx context.Context, cfg *Config) (TracerProvider, error) {
 	))
 
 	log.Infoc(ctx, "OpenTelemetry tracing initialized successfully",
-		"endpoint", cfg.Endpoint,
+		"endpoint", resolvedEndpoint,
 		"exporter", cfg.ExporterType,
 		"service", string(cfg.ServiceName),
 		"max_export_batch_size", cfg.MaxExportBatchSize,
@@ -188,7 +192,8 @@ func createOTLPExporter(ctx context.Context, cfg *Config, useGCPAuth bool) (sdkt
 		otlptracegrpc.WithEndpoint(cfg.Endpoint),
 	}
 
-	if useGCPAuth {
+	switch {
+	case useGCPAuth:
 		creds, err := google.FindDefaultCredentials(ctx, "https://www.googleapis.com/auth/trace.append")
 		if err != nil {
 			return nil, fmt.Errorf("failed to get GCP credentials: %w", err)
@@ -200,8 +205,11 @@ func createOTLPExporter(ctx context.Context, cfg *Config, useGCPAuth bool) (sdkt
 			otlptracegrpc.WithTLSCredentials(credentials.NewClientTLSFromCert(nil, "")),
 			otlptracegrpc.WithDialOption(grpc.WithPerRPCCredentials(perRPCCreds)),
 		)
-	} else {
+	case cfg.Insecure:
 		opts = append(opts, otlptracegrpc.WithInsecure())
+	default:
+		// TLS using the system trust store.
+		opts = append(opts, otlptracegrpc.WithTLSCredentials(credentials.NewClientTLSFromCert(nil, "")))
 	}
 
 	return otlptracegrpc.New(ctx, opts...)

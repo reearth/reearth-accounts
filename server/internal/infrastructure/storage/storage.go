@@ -45,7 +45,6 @@ func NewGCPStorage(cfg *Config) (gateway.Storage, error) {
 func (s *Storage) GetSignedURL(ctx context.Context, name string) (string, error) {
 	ctx, span := otel.Tracer("reearth-accounts").Start(ctx, "storage.GetSignedURL",
 		trace.WithAttributes(
-			attribute.String("storage.object", name),
 			attribute.String("storage.bucket", s.cfg.BucketName),
 			attribute.Bool("storage.is_local", s.cfg.IsLocal),
 		),
@@ -63,6 +62,8 @@ func (s *Storage) GetSignedURL(ctx context.Context, name string) (string, error)
 	if s.cfg.IsLocal {
 		key, kErr := rsa.GenerateKey(rand.Reader, 2048)
 		if kErr != nil {
+			span.RecordError(kErr)
+			span.SetStatus(codes.Error, kErr.Error())
 			return "", kErr
 		}
 
@@ -80,6 +81,8 @@ func (s *Storage) GetSignedURL(ctx context.Context, name string) (string, error)
 			PrivateKey:     pri,
 		})
 		if sErr != nil {
+			span.RecordError(sErr)
+			span.SetStatus(codes.Error, sErr.Error())
 			return "", sErr
 		}
 
@@ -91,6 +94,8 @@ func (s *Storage) GetSignedURL(ctx context.Context, name string) (string, error)
 		Expires: time.Now().Add(24 * time.Hour),
 	})
 	if sErr != nil {
+		span.RecordError(sErr)
+		span.SetStatus(codes.Error, sErr.Error())
 		return "", sErr
 	}
 

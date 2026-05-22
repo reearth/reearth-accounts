@@ -43,6 +43,7 @@ func Start(debug bool) {
 			Enabled:            conf.OtelEnabled,
 			Endpoint:           conf.OtelEndpoint,
 			ExporterType:       otelapp.ExporterType(conf.OtelExporterType),
+			Insecure:           conf.OtelInsecure,
 			BatchTimeout:       conf.OtelBatchTimeout,
 			MaxExportBatchSize: conf.OtelMaxExportBatchSize,
 			MaxQueueSize:       conf.OtelMaxQueueSize,

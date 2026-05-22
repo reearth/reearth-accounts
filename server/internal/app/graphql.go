@@ -102,8 +102,9 @@ func GraphqlAPI(conf *Config, dev bool) echo.HandlerFunc {
 		ctx := req.Context()
 
 		tracer := otel.Tracer("reearth-accounts")
+		// SpanKindInternal: the HTTP server span is already created by otelecho.
 		ctx, span := tracer.Start(ctx, "GraphQL Handler",
-			trace.WithSpanKind(trace.SpanKindServer),
+			trace.WithSpanKind(trace.SpanKindInternal),
 			trace.WithAttributes(
 				attribute.String("component", "graphql"),
 				attribute.String("http.method", req.Method),
