@@ -19,8 +19,9 @@ const configPrefix = "reearth"
 type Config struct {
 	Port    string `default:"8090" envconfig:"PORT"`
 	Dev     bool
-	DB      string   `default:"mongodb://localhost" envconfig:"REEARTH_ACCOUNTS_DB"`
-	DBName  string   `default:"reearth-account" envconfig:"REEARTH_ACCOUNTS_DB_NAME"`
+	DB       string   `default:"mongodb://localhost" envconfig:"REEARTH_ACCOUNTS_DB"`
+	DBName   string   `default:"reearth-account" envconfig:"REEARTH_ACCOUNTS_DB_NAME"`
+	DBDriver string   `envconfig:"REEARTH_ACCOUNTS_DB_DRIVER"`
 	Origins []string `envconfig:"REEARTH_ACCOUNTS_ORIGINS"`
 	Host    string   `default:"0.0.0.0" envconfig:"HOST"`
 
@@ -57,6 +58,18 @@ type Config struct {
 	StorageBucketName       string `envconfig:"REEARTH_ACCOUNTS_STORAGE_BUCKET_NAME" default:"reearth"`
 	StorageEmulatorEnabled  bool   `envconfig:"REEARTH_ACCOUNTS_STORAGE_EMULATOR_ENABLED"`
 	StorageEmulatorEndpoint string `envconfig:"REEARTH_ACCOUNTS_STORAGE_EMULATOR_ENDPOINT"`
+}
+
+// ResolveDBDriver returns "postgres" or "mongo", honoring an explicit
+// REEARTH_ACCOUNTS_DB_DRIVER override and otherwise inferring from the DB scheme.
+func (c *Config) ResolveDBDriver() string {
+	if c.DBDriver != "" {
+		return strings.ToLower(c.DBDriver)
+	}
+	if strings.HasPrefix(c.DB, "postgres://") || strings.HasPrefix(c.DB, "postgresql://") {
+		return "postgres"
+	}
+	return "mongo"
 }
 
 type AuthConfig struct {

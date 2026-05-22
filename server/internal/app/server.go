@@ -9,10 +9,12 @@ import (
 	"time"
 
 	"github.com/cerbos/cerbos-sdk-go/cerbos"
+	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/labstack/echo/v4"
 	infraCerbos "github.com/reearth/reearth-accounts/server/internal/infrastructure/cerbos"
 	mongorepo "github.com/reearth/reearth-accounts/server/internal/infrastructure/mongo"
 	"github.com/reearth/reearth-accounts/server/internal/infrastructure/mongo/migration"
+	pgmigration "github.com/reearth/reearth-accounts/server/internal/infrastructure/postgres/migration"
 	"github.com/reearth/reearth-accounts/server/internal/usecase/gateway"
 	"github.com/reearth/reearth-accounts/server/internal/usecase/repo"
 	"github.com/reearth/reearthx/log"
@@ -34,59 +36,75 @@ func Start(debug bool) {
 	}
 	log.Infof("config: %s", conf.Print())
 
-	// Init MongoDB client with optional command monitoring
-	var monitor *event.CommandMonitor
-	if debug || os.Getenv("REEARTH_ACCOUNTS_DEV") == "true" {
-		monitor = &event.CommandMonitor{
-			Failed: func(ctx context.Context, evt *event.CommandFailedEvent) {
-				log.Errorf("MongoDB Command Failed: %s - Duration: %v - Error: %s",
-					evt.CommandName, evt.Duration, evt.Failure)
-			},
-			Succeeded: func(ctx context.Context, evt *event.CommandSucceededEvent) {
-				// Only log slow queries or critical operations
-				if evt.Duration > time.Millisecond*100 ||
-					evt.CommandName == "createIndexes" ||
-					evt.CommandName == "dropIndexes" ||
-					evt.CommandName == "drop" {
-					log.Debugf("MongoDB Command: %s - Duration: %v - Reply: %v",
-						evt.CommandName, evt.Duration, evt.Reply)
-				}
-			},
+	// Select persistence backend by DB URI scheme (mongo by default, postgres
+	// when REEARTH_ACCOUNTS_DB is a postgres:// DSN or DB_DRIVER=postgres).
+	var repos *repo.Container
+	var gateways *gateway.Container
+
+	if conf.ResolveDBDriver() == "postgres" {
+		pool, perr := pgxpool.New(ctx, conf.DB)
+		if perr != nil {
+			log.Fatalc(ctx, fmt.Sprintf("postgres pool init error: %+v", perr))
 		}
-	}
-
-	client, err := mongo.Connect(
-		ctx,
-		options.Client().
-			ApplyURI(conf.DB).
-			SetConnectTimeout(time.Second*10).
-			SetMonitor(monitor))
-	if err != nil {
-		log.Fatalc(ctx, fmt.Sprintf("repo initialization error: %+v", err))
-	}
-
-	// Init repositories
-	repos, gateways := initReposAndGateways(ctx, client, conf)
-
-	// Check if migration mode
-	// Once the permission check migration is complete, it will be deleted.
-	if os.Getenv("RUN_MIGRATION") == "true" {
-		clientx := mongox.NewClient(conf.DBName, client)
-		db := clientx.Database()
-
-		lock, lockErr := mongorepo.NewLock(db.Collection("locks"))
-		if lockErr != nil {
-			log.Fatalf("failed to create lock: %v", lockErr)
+		if merr := pgmigration.Migrate(ctx, pool); merr != nil {
+			log.Fatalc(ctx, fmt.Sprintf("postgres migration error: %+v", merr))
+		}
+		repos, gateways = initPostgresReposAndGateways(ctx, pool, conf)
+	} else {
+		// Init MongoDB client with optional command monitoring
+		var monitor *event.CommandMonitor
+		if debug || os.Getenv("REEARTH_ACCOUNTS_DEV") == "true" {
+			monitor = &event.CommandMonitor{
+				Failed: func(ctx context.Context, evt *event.CommandFailedEvent) {
+					log.Errorf("MongoDB Command Failed: %s - Duration: %v - Error: %s",
+						evt.CommandName, evt.Duration, evt.Failure)
+				},
+				Succeeded: func(ctx context.Context, evt *event.CommandSucceededEvent) {
+					// Only log slow queries or critical operations
+					if evt.Duration > time.Millisecond*100 ||
+						evt.CommandName == "createIndexes" ||
+						evt.CommandName == "dropIndexes" ||
+						evt.CommandName == "drop" {
+						log.Debugf("MongoDB Command: %s - Duration: %v - Reply: %v",
+							evt.CommandName, evt.Duration, evt.Reply)
+					}
+				},
+			}
 		}
 
-		if migrationErr := runMigration(ctx, repos); migrationErr != nil {
-			log.Fatal(migrationErr)
+		client, err := mongo.Connect(
+			ctx,
+			options.Client().
+				ApplyURI(conf.DB).
+				SetConnectTimeout(time.Second*10).
+				SetMonitor(monitor))
+		if err != nil {
+			log.Fatalc(ctx, fmt.Sprintf("repo initialization error: %+v", err))
 		}
 
-		if migrationErr := migration.Do(ctx, clientx, mongorepo.NewConfig(db.Collection("config"), lock)); migrationErr != nil {
-			log.Fatalf("failed to run migration: %v", migrationErr)
+		// Init repositories
+		repos, gateways = initReposAndGateways(ctx, client, conf)
+
+		// Check if migration mode (mongo-only data migrations).
+		// Once the permission check migration is complete, it will be deleted.
+		if os.Getenv("RUN_MIGRATION") == "true" {
+			clientx := mongox.NewClient(conf.DBName, client)
+			db := clientx.Database()
+
+			lock, lockErr := mongorepo.NewLock(db.Collection("locks"))
+			if lockErr != nil {
+				log.Fatalf("failed to create lock: %v", lockErr)
+			}
+
+			if migrationErr := runMigration(ctx, repos); migrationErr != nil {
+				log.Fatal(migrationErr)
+			}
+
+			if migrationErr := migration.Do(ctx, clientx, mongorepo.NewConfig(db.Collection("config"), lock)); migrationErr != nil {
+				log.Fatalf("failed to run migration: %v", migrationErr)
+			}
+			return
 		}
-		return
 	}
 
 	// Cerbos
