@@ -240,3 +240,17 @@ func (c Config) GetAuth0Audience() string {
 func (c Config) GetAuth0WebClientID() string {
 	return c.Auth0.WebClientID
 }
+
+// GetAuthProvider returns the configured primary provider for management/advertisement
+// ("auth0" | "cip"). Defaults to "auth0" when unset.
+func (c Config) GetAuthProvider() string {
+	if c.AuthProvider == "" {
+		return "auth0"
+	}
+	return c.AuthProvider
+}
+
+func (c Config) GetCIPProjectID() string  { return c.CIP.ProjectID }
+func (c Config) GetCIPTenantID() string   { return c.CIP.TenantID }
+func (c Config) GetCIPAPIKey() string     { return c.CIP.APIKey }
+func (c Config) GetCIPAuthDomain() string { return c.CIP.AuthDomain }

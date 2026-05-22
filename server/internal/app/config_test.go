@@ -43,3 +43,23 @@ func TestConfig_Auths_MultiIssuer_Auth0AndCIP(t *testing.T) {
 	})
 	assert.Len(t, got, 2)
 }
+
+func TestConfig_AuthProviderAndCIPAccessors(t *testing.T) {
+	c := Config{
+		AuthProvider: "cip",
+		CIP: CIPConfig{
+			ProjectID:  "my-proj",
+			TenantID:   "tenant-1",
+			APIKey:     "api-key",
+			AuthDomain: "my-proj.firebaseapp.com",
+		},
+	}
+	assert.Equal(t, "cip", c.GetAuthProvider())
+	assert.Equal(t, "my-proj", c.GetCIPProjectID())
+	assert.Equal(t, "tenant-1", c.GetCIPTenantID())
+	assert.Equal(t, "api-key", c.GetCIPAPIKey())
+	assert.Equal(t, "my-proj.firebaseapp.com", c.GetCIPAuthDomain())
+
+	// default falls back to auth0 when unset
+	assert.Equal(t, "auth0", Config{}.GetAuthProvider())
+}
