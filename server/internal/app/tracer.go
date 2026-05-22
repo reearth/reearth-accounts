@@ -37,7 +37,6 @@ func detailedOperationTracer() graphql.OperationMiddleware {
 				attribute.String("component", "graphql"),
 			),
 		)
-		defer span.End()
 
 		// Raw query is intentionally not recorded: inline literals may contain PII.
 		if len(opCtx.Variables) > 0 {
@@ -48,7 +47,10 @@ func detailedOperationTracer() graphql.OperationMiddleware {
 
 		res := next(ctx)
 
+		// span.End is deferred to the ResponseHandler so it covers the full
+		// operation execution (res is invoked later by gqlgen).
 		return func(ctx context.Context) *graphql.Response {
+			defer span.End()
 			response := res(ctx)
 
 			if response != nil && len(response.Errors) > 0 {
