@@ -52,3 +52,35 @@ func TestREST_Swagger(t *testing.T) {
 	exp, _ := StartServer(t, cfg, false, seedDemoUser)
 	exp.GET("/swagger/index.html").Expect().Status(http.StatusOK)
 }
+
+// TestREST_FullFlow_Mongo runs the same flow against real MongoDB repositories
+// (useMongo=true). It auto-skips when REEARTH_DB is not set (mongotest.Connect),
+// so it is a no-op in environments without a database and exercises the full
+// HTTP -> middleware -> handler -> interactor -> MongoDB path when one is present.
+func TestREST_FullFlow_Mongo(t *testing.T) {
+	cfg := &app.Config{Mock_Auth: true}
+	exp, _ := StartServer(t, cfg, true, seedDemoUser)
+
+	exp.POST("/api/users/signup").
+		WithJSON(map[string]any{"name": "Mongo Flow User", "email": "mongo-flow@example.com", "password": "Passw0rd!", "mock_auth": true}).
+		Expect().Status(http.StatusOK).JSON().Object().HasValue("email", "mongo-flow@example.com")
+
+	exp.GET("/api/users/me").Expect().Status(http.StatusOK).
+		JSON().Object().HasValue("name", app.FIXED_MOCK_USERNAME)
+
+	wid := exp.POST("/api/workspaces").
+		WithJSON(map[string]any{"alias": "mongo-team", "name": "Mongo Team"}).
+		Expect().Status(http.StatusOK).JSON().Object().Value("id").String().Raw()
+
+	exp.POST("/api/workspaces/"+wid+"/members").
+		WithJSON(map[string]any{"users": []map[string]any{
+			{"user_id": restOtherUID.String(), "role": "writer"},
+		}}).
+		Expect().Status(http.StatusOK).JSON().Object().
+		Value("members").Array().Length().IsEqual(2)
+
+	exp.GET("/api/workspaces/" + wid).Expect().Status(http.StatusOK).
+		JSON().Object().HasValue("id", wid)
+
+	exp.DELETE("/api/workspaces/" + wid).Expect().Status(http.StatusNoContent)
+}
