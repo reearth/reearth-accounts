@@ -8,6 +8,7 @@ import (
 	"errors"
 	"fmt"
 	htmlTmpl "html/template"
+	"io"
 	"net/http"
 	"net/url"
 	"path"
@@ -360,6 +361,10 @@ func getOpenIDConfiguration(ctx context.Context, iss string) (c OpenIDConfigurat
 		err = err2
 		return
 	}
+	defer func() {
+		_, _ = io.Copy(io.Discard, res.Body)
+		_ = res.Body.Close()
+	}()
 
 	if res.StatusCode != http.StatusOK {
 		err = rerror.NewE(i18n.T("could not get user info"))
@@ -391,6 +396,10 @@ func getUserInfo(ctx context.Context, url, accessToken string) (ui UserInfo, err
 		err = err2
 		return
 	}
+	defer func() {
+		_, _ = io.Copy(io.Discard, res.Body)
+		_ = res.Body.Close()
+	}()
 
 	if res.StatusCode != http.StatusOK {
 		err = rerror.NewE(i18n.T("could not get user info"))

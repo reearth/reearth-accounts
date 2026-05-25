@@ -380,6 +380,164 @@ func TestUser_Signup(t *testing.T) {
 	}
 }
 
+func TestGetOpenIDConfiguration(t *testing.T) {
+	tests := []struct {
+		name       string
+		handler    http.HandlerFunc
+		iss        string
+		wantErr    bool
+		wantResult OpenIDConfiguration
+	}{
+		{
+			name: "success",
+			handler: func(w http.ResponseWriter, r *http.Request) {
+				w.Header().Set("Content-Type", "application/json")
+				_, _ = w.Write([]byte(`{"userinfo_endpoint":"https://example.com/userinfo"}`))
+			},
+			wantResult: OpenIDConfiguration{UserinfoEndpoint: "https://example.com/userinfo"},
+		},
+		{
+			name: "non-200 response",
+			handler: func(w http.ResponseWriter, r *http.Request) {
+				w.WriteHeader(http.StatusInternalServerError)
+				_, _ = w.Write([]byte("internal server error"))
+			},
+			wantErr: true,
+		},
+		{
+			name: "invalid JSON",
+			handler: func(w http.ResponseWriter, r *http.Request) {
+				w.WriteHeader(http.StatusOK)
+				_, _ = w.Write([]byte("not valid json"))
+			},
+			wantErr: true,
+		},
+		{
+			name:    "empty issuer",
+			iss:     "",
+			wantErr: true,
+		},
+	}
+
+	for _, tt := range tests {
+		tt := tt
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			iss := tt.iss
+			if tt.handler != nil {
+				srv := httptest.NewServer(tt.handler)
+				defer srv.Close()
+				iss = srv.URL
+			}
+
+			result, err := getOpenIDConfiguration(context.Background(), iss)
+
+			if tt.wantErr {
+				assert.Error(t, err)
+			} else {
+				assert.NoError(t, err)
+				assert.Equal(t, tt.wantResult, result)
+			}
+		})
+	}
+}
+
+func TestGetUserInfo(t *testing.T) {
+	tests := []struct {
+		name        string
+		handler     http.HandlerFunc
+		accessToken string
+		wantErr     bool
+		wantResult  UserInfo
+	}{
+		{
+			name: "success",
+			handler: func(w http.ResponseWriter, r *http.Request) {
+				w.Header().Set("Content-Type", "application/json")
+				_, _ = w.Write([]byte(`{"sub":"sub123","email":"user@example.com","name":"Test User"}`))
+			},
+			accessToken: "token123",
+			wantResult:  UserInfo{Sub: "sub123", Email: "user@example.com", Name: "Test User"},
+		},
+		{
+			name: "authorization header forwarded",
+			handler: func(w http.ResponseWriter, r *http.Request) {
+				if r.Header.Get("Authorization") != "Bearer mytoken" {
+					http.Error(w, "unauthorized", http.StatusUnauthorized)
+					return
+				}
+				w.Header().Set("Content-Type", "application/json")
+				_, _ = w.Write([]byte(`{"sub":"sub456","email":"other@example.com"}`))
+			},
+			accessToken: "mytoken",
+			wantResult:  UserInfo{Sub: "sub456", Email: "other@example.com"},
+		},
+		{
+			name: "non-200 response",
+			handler: func(w http.ResponseWriter, r *http.Request) {
+				w.WriteHeader(http.StatusForbidden)
+				_, _ = w.Write([]byte("forbidden"))
+			},
+			accessToken: "token123",
+			wantErr:     true,
+		},
+		{
+			name: "invalid JSON",
+			handler: func(w http.ResponseWriter, r *http.Request) {
+				w.WriteHeader(http.StatusOK)
+				_, _ = w.Write([]byte("not valid json"))
+			},
+			accessToken: "token123",
+			wantErr:     true,
+		},
+		{
+			name: "error field in response",
+			handler: func(w http.ResponseWriter, r *http.Request) {
+				w.Header().Set("Content-Type", "application/json")
+				_, _ = w.Write([]byte(`{"error":"access_denied"}`))
+			},
+			accessToken: "token123",
+			wantErr:     true,
+		},
+		{
+			name: "missing sub",
+			handler: func(w http.ResponseWriter, r *http.Request) {
+				w.Header().Set("Content-Type", "application/json")
+				_, _ = w.Write([]byte(`{"email":"user@example.com"}`))
+			},
+			accessToken: "token123",
+			wantErr:     true,
+		},
+		{
+			name: "missing email",
+			handler: func(w http.ResponseWriter, r *http.Request) {
+				w.Header().Set("Content-Type", "application/json")
+				_, _ = w.Write([]byte(`{"sub":"sub123"}`))
+			},
+			accessToken: "token123",
+			wantErr:     true,
+		},
+	}
+
+	for _, tt := range tests {
+		tt := tt
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			srv := httptest.NewServer(tt.handler)
+			defer srv.Close()
+
+			result, err := getUserInfo(context.Background(), srv.URL, tt.accessToken)
+
+			if tt.wantErr {
+				assert.Error(t, err)
+			} else {
+				assert.NoError(t, err)
+				assert.Equal(t, tt.wantResult, result)
+			}
+		})
+	}
+}
+
 func TestIssToURL(t *testing.T) {
 	assert.Nil(t, issToURL("", ""))
 	assert.Equal(t, &url.URL{Scheme: "https", Host: "iss.com"}, issToURL("iss.com", ""))
