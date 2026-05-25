@@ -77,6 +77,50 @@ func StartServerWithRepos(
 	cfg *app.Config,
 	repos *repo.Container,
 ) *httpexpect.Expect {
+	return StartServerWithGateways(t, cfg, repos, nil)
+}
+
+func StartServerWithAuthenticator(
+	t *testing.T,
+	cfg *app.Config,
+	useMongo bool,
+	seeder Seeder,
+	authenticator gateway.Authenticator,
+) (*httpexpect.Expect, *repo.Container) {
+	t.Helper()
+
+	ctx := context.Background()
+	var repos *repo.Container
+
+	if useMongo {
+		db := mongorepo.Connect(t)(t)
+		var err error
+		repos, err = mongorepo.New(ctx, db, false, false, nil)
+		if err != nil {
+			log.Fatalf("Failed to init mongo: %+v\n", err)
+		}
+	} else {
+		repos = memory.New()
+	}
+
+	if seeder != nil {
+		if err := seeder(ctx, repos); err != nil {
+			t.Fatalf("failed to seed the db: %s", err)
+		}
+	}
+
+	return StartServerWithGateways(t, cfg, repos, &gateway.Container{
+		Authenticator: authenticator,
+		Mailer:        mailer.New(ctx, &mailer.Config{}),
+	}), repos
+}
+
+func StartServerWithGateways(
+	t *testing.T,
+	cfg *app.Config,
+	repos *repo.Container,
+	gateways *gateway.Container,
+) *httpexpect.Expect {
 	t.Helper()
 
 	if testing.Short() {
@@ -99,12 +143,16 @@ func StartServerWithRepos(
 		cerbosAdapter = infraCerbos.NewCerbosAdapter(cerbosClient)
 	}
 
-	srv := app.NewServer(ctx, &app.ServerConfig{
-		Config: cfg,
-		Repos:  repos,
-		Gateways: &gateway.Container{
+	if gateways == nil {
+		gateways = &gateway.Container{
 			Mailer: mailer.New(ctx, &mailer.Config{}),
-		},
+		}
+	}
+
+	srv := app.NewServer(ctx, &app.ServerConfig{
+		Config:        cfg,
+		Repos:         repos,
+		Gateways:      gateways,
 		Debug:         true,
 		CerbosAdapter: cerbosAdapter,
 	})
