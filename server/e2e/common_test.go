@@ -78,6 +78,19 @@ func StartServerWithRepos(
 	repos *repo.Container,
 ) *httpexpect.Expect {
 	t.Helper()
+	ctx := context.Background()
+	return StartServerWithGateway(t, cfg, repos, &gateway.Container{
+		Mailer: mailer.New(ctx, &mailer.Config{}),
+	})
+}
+
+func StartServerWithGateway(
+	t *testing.T,
+	cfg *app.Config,
+	repos *repo.Container,
+	gw *gateway.Container,
+) *httpexpect.Expect {
+	t.Helper()
 
 	if testing.Short() {
 		t.SkipNow()
@@ -100,11 +113,9 @@ func StartServerWithRepos(
 	}
 
 	srv := app.NewServer(ctx, &app.ServerConfig{
-		Config: cfg,
-		Repos:  repos,
-		Gateways: &gateway.Container{
-			Mailer: mailer.New(ctx, &mailer.Config{}),
-		},
+		Config:        cfg,
+		Repos:         repos,
+		Gateways:      gw,
 		Debug:         true,
 		CerbosAdapter: cerbosAdapter,
 	})

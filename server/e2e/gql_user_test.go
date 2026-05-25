@@ -3,11 +3,14 @@ package e2e
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"net/http"
 	"testing"
 
 	"github.com/reearth/reearth-accounts/server/internal/app"
+	"github.com/reearth/reearth-accounts/server/internal/infrastructure/memory"
+	"github.com/reearth/reearth-accounts/server/internal/usecase/gateway"
 	"github.com/reearth/reearth-accounts/server/internal/usecase/interfaces"
 	"github.com/reearth/reearth-accounts/server/internal/usecase/repo"
 	"github.com/reearth/reearth-accounts/server/pkg/id"
@@ -16,6 +19,7 @@ import (
 	"github.com/reearth/reearth-accounts/server/pkg/user"
 	"github.com/reearth/reearth-accounts/server/pkg/workspace"
 	"github.com/reearth/reearthx/idx"
+	"github.com/reearth/reearthx/mailer"
 	"github.com/reearth/reearthx/rerror"
 	"github.com/samber/lo"
 	"github.com/stretchr/testify/assert"
@@ -749,9 +753,7 @@ func TestPasswordReset(t *testing.T) {
 	startBody, err := json.Marshal(startReq)
 	assert.NoError(t, err)
 	e.POST("/api/graphql").
-		WithHeader("authorization", "Bearer test").
 		WithHeader("Content-Type", "application/json").
-		WithHeader("X-Reearth-Debug-User", uId.String()).
 		WithBytes(startBody).
 		Expect().Status(http.StatusOK).
 		JSON().Object().
@@ -801,4 +803,47 @@ func TestPasswordReset(t *testing.T) {
 	ok, err := u2.MatchPassword(newPass)
 	assert.NoError(t, err)
 	assert.True(t, ok, "password should be updated")
+}
+
+type errMailer struct{ err error }
+
+func (m *errMailer) SendMail(_ context.Context, _ []mailer.Contact, _, _, _ string) error {
+	return m.err
+}
+
+// TestStartPasswordReset_TokenPersistedOnMailerFailure verifies that the
+// password-reset token is committed to the DB before SendMail is called,
+// so a mailer failure does not leave the user with an emailed token that
+// the DB no longer recognises (REL-04).
+func TestStartPasswordReset_TokenPersistedOnMailerFailure(t *testing.T) {
+	ctx := context.Background()
+	repos := memory.New()
+	if err := baseSeederUser(ctx, repos); err != nil {
+		t.Fatalf("seed: %v", err)
+	}
+
+	smtpErr := errors.New("smtp unavailable")
+	e := StartServerWithGateway(t, &app.Config{}, repos, &gateway.Container{
+		Mailer: &errMailer{err: smtpErr},
+	})
+
+	body, err := json.Marshal(GraphQLRequest{
+		Query: `mutation($input: StartPasswordResetInput!) { startPasswordReset(input: $input) }`,
+		Variables: map[string]any{
+			"input": map[string]any{"email": "e2e@e2e.com"},
+		},
+	})
+	assert.NoError(t, err)
+
+	resp := e.POST("/api/graphql").
+		WithHeader("Content-Type", "application/json").
+		WithBytes(body).
+		Expect().Status(http.StatusOK).JSON().Object()
+
+	resp.Value("errors").Array().NotEmpty()
+
+	// Token must be committed even though the mailer failed.
+	saved, dbErr := repos.User.FindByID(ctx, uId)
+	assert.NoError(t, dbErr)
+	assert.NotNil(t, saved.PasswordReset(), "token must be persisted even when mailer fails")
 }
