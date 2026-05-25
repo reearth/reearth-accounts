@@ -67,20 +67,37 @@ func (r *Permittable) FindByUserID(ctx context.Context, uid user.ID) (*permittab
 	return list[0], nil
 }
 
+// FindByUserIDs returns ErrNotFound when nothing matches, mirroring the Mongo
+// backend (its find wrapper errors on an empty result set).
 func (r *Permittable) FindByUserIDs(ctx context.Context, ids user.IDList) (permittable.List, error) {
 	rows, err := r.c.queries(ctx).PermittableFindByUserIDs(ctx, ids.Strings())
 	if err != nil {
 		return nil, err
 	}
-	return r.hydrate(ctx, rows)
+	list, err := r.hydrate(ctx, rows)
+	if err != nil {
+		return nil, err
+	}
+	if len(list) == 0 {
+		return nil, rerror.ErrNotFound
+	}
+	return list, nil
 }
 
+// FindByRoleID returns ErrNotFound when nothing matches, mirroring the Mongo backend.
 func (r *Permittable) FindByRoleID(ctx context.Context, rid id.RoleID) (permittable.List, error) {
 	rows, err := r.c.queries(ctx).PermittableFindByRoleID(ctx, rid.String())
 	if err != nil {
 		return nil, err
 	}
-	return r.hydrate(ctx, rows)
+	list, err := r.hydrate(ctx, rows)
+	if err != nil {
+		return nil, err
+	}
+	if len(list) == 0 {
+		return nil, rerror.ErrNotFound
+	}
+	return list, nil
 }
 
 func (r *Permittable) Save(ctx context.Context, p permittable.Permittable) error {

@@ -3,7 +3,6 @@ package postgres
 import (
 	"context"
 	"strconv"
-	"strings"
 
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
@@ -68,9 +67,6 @@ func (c *Client) inTx(ctx context.Context, fn func(ctx context.Context) error) e
 	}
 	return tx.Commit(ctx)
 }
-
-// lower lowercases a string (used for case-insensitive alias matching).
-func lower(s string) string { return strings.ToLower(s) }
 
 // itoa wraps strconv.Itoa for terse placeholder construction.
 func itoa(n int) string { return strconv.Itoa(n) }

@@ -140,15 +140,12 @@ func (r *Workspace) FindByAlias(ctx context.Context, alias string) (*workspace.W
 	return r.one(ctx, w, err)
 }
 
+// FindByAliases uses exact (case-sensitive) matching, mirroring the Mongo backend.
 func (r *Workspace) FindByAliases(ctx context.Context, aliases []string) (workspace.List, error) {
 	if len(aliases) == 0 {
 		return nil, nil
 	}
-	lowered := make([]string, len(aliases))
-	for i, a := range aliases {
-		lowered[i] = lower(a)
-	}
-	rows, err := r.c.queries(ctx).WorkspaceFindByAliases(ctx, lowered)
+	rows, err := r.c.queries(ctx).WorkspaceFindByAliases(ctx, aliases)
 	if err != nil {
 		return nil, err
 	}

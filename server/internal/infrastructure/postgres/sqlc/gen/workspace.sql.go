@@ -41,9 +41,10 @@ func (q *Queries) WorkspaceFindByAlias(ctx context.Context, lower string) (Works
 }
 
 const workspaceFindByAliases = `-- name: WorkspaceFindByAliases :many
-SELECT id, name, alias, email, personal, policy, members_hash, metadata, updated_at FROM workspaces WHERE lower(alias) = ANY($1::text[]) ORDER BY id
+SELECT id, name, alias, email, personal, policy, members_hash, metadata, updated_at FROM workspaces WHERE alias = ANY($1::text[]) ORDER BY id
 `
 
+// Exact (case-sensitive) match, mirroring the Mongo backend ($in on alias).
 func (q *Queries) WorkspaceFindByAliases(ctx context.Context, dollar_1 []string) ([]Workspace, error) {
 	rows, err := q.db.Query(ctx, workspaceFindByAliases, dollar_1)
 	if err != nil {

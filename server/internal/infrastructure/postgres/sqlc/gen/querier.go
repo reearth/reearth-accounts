@@ -27,11 +27,14 @@ type Querier interface {
 	RoleUpsert(ctx context.Context, arg RoleUpsertParams) error
 	UserDelete(ctx context.Context, id string) error
 	UserFindAll(ctx context.Context) ([]User, error)
-	UserFindByAlias(ctx context.Context, lower string) (User, error)
-	UserFindByEmail(ctx context.Context, lower string) (User, error)
+	// Exact (case-sensitive) match, mirroring the Mongo backend.
+	UserFindByAlias(ctx context.Context, alias string) (User, error)
+	// Exact (case-sensitive) match, mirroring the Mongo backend.
+	UserFindByEmail(ctx context.Context, email string) (User, error)
 	UserFindByID(ctx context.Context, id string) (User, error)
 	UserFindByIDs(ctx context.Context, dollar_1 []string) ([]User, error)
 	UserFindByName(ctx context.Context, name string) (User, error)
+	// Exact (case-sensitive) match on name OR email, mirroring the Mongo backend.
 	UserFindByNameOrEmail(ctx context.Context, name string) (User, error)
 	UserFindByPasswordResetRequest(ctx context.Context, dollar_1 string) (User, error)
 	UserFindBySub(ctx context.Context, dollar_1 string) (User, error)
@@ -40,6 +43,7 @@ type Querier interface {
 	UserUpsert(ctx context.Context, arg UserUpsertParams) error
 	WorkspaceDelete(ctx context.Context, id string) error
 	WorkspaceFindByAlias(ctx context.Context, lower string) (Workspace, error)
+	// Exact (case-sensitive) match, mirroring the Mongo backend ($in on alias).
 	WorkspaceFindByAliases(ctx context.Context, dollar_1 []string) ([]Workspace, error)
 	WorkspaceFindByID(ctx context.Context, id string) (Workspace, error)
 	WorkspaceFindByIDs(ctx context.Context, dollar_1 []string) ([]Workspace, error)

@@ -18,7 +18,8 @@ SELECT * FROM workspaces WHERE name = $1;
 SELECT * FROM workspaces WHERE lower(alias) = lower($1) AND alias <> '';
 
 -- name: WorkspaceFindByAliases :many
-SELECT * FROM workspaces WHERE lower(alias) = ANY($1::text[]) ORDER BY id;
+-- Exact (case-sensitive) match, mirroring the Mongo backend ($in on alias).
+SELECT * FROM workspaces WHERE alias = ANY($1::text[]) ORDER BY id;
 
 -- name: WorkspaceDelete :exec
 DELETE FROM workspaces WHERE id = $1;

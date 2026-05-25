@@ -164,10 +164,13 @@ func (r *User) FindByPasswordResetRequest(ctx context.Context, token string) (*u
 	return one(r.c.queries(ctx).UserFindByPasswordResetRequest(ctx, token))
 }
 
-// FindByNameOrAlias: case-insensitive exact match on name OR alias (mongo parity).
+// FindByNameOrAlias: case-insensitive substring match on name OR alias, mirroring
+// the Mongo backend (case-insensitive regex on name/alias). Returns an empty list
+// when nothing matches.
 func (r *User) FindByNameOrAlias(ctx context.Context, nameOrAlias string) (user.List, error) {
+	kw := likeContains(nameOrAlias)
 	rows, err := r.c.resolve(ctx).Query(ctx,
-		`SELECT * FROM users WHERE name = $1 OR (lower(alias) = lower($1) AND alias <> '') ORDER BY id`, nameOrAlias)
+		`SELECT * FROM users WHERE name ILIKE $1 OR alias ILIKE $1 ORDER BY id`, kw)
 	if err != nil {
 		return nil, err
 	}

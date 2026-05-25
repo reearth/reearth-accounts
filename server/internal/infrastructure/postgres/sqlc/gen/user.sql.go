@@ -60,11 +60,12 @@ func (q *Queries) UserFindAll(ctx context.Context) ([]User, error) {
 }
 
 const userFindByAlias = `-- name: UserFindByAlias :one
-SELECT id, name, alias, email, workspace, password, subs, latest_logout_at, metadata, verification, password_reset, team, lang, theme, updated_at FROM users WHERE lower(alias) = lower($1) AND alias <> ''
+SELECT id, name, alias, email, workspace, password, subs, latest_logout_at, metadata, verification, password_reset, team, lang, theme, updated_at FROM users WHERE alias = $1
 `
 
-func (q *Queries) UserFindByAlias(ctx context.Context, lower string) (User, error) {
-	row := q.db.QueryRow(ctx, userFindByAlias, lower)
+// Exact (case-sensitive) match, mirroring the Mongo backend.
+func (q *Queries) UserFindByAlias(ctx context.Context, alias string) (User, error) {
+	row := q.db.QueryRow(ctx, userFindByAlias, alias)
 	var i User
 	err := row.Scan(
 		&i.ID,
@@ -87,11 +88,12 @@ func (q *Queries) UserFindByAlias(ctx context.Context, lower string) (User, erro
 }
 
 const userFindByEmail = `-- name: UserFindByEmail :one
-SELECT id, name, alias, email, workspace, password, subs, latest_logout_at, metadata, verification, password_reset, team, lang, theme, updated_at FROM users WHERE lower(email) = lower($1)
+SELECT id, name, alias, email, workspace, password, subs, latest_logout_at, metadata, verification, password_reset, team, lang, theme, updated_at FROM users WHERE email = $1
 `
 
-func (q *Queries) UserFindByEmail(ctx context.Context, lower string) (User, error) {
-	row := q.db.QueryRow(ctx, userFindByEmail, lower)
+// Exact (case-sensitive) match, mirroring the Mongo backend.
+func (q *Queries) UserFindByEmail(ctx context.Context, email string) (User, error) {
+	row := q.db.QueryRow(ctx, userFindByEmail, email)
 	var i User
 	err := row.Scan(
 		&i.ID,
@@ -208,9 +210,10 @@ func (q *Queries) UserFindByName(ctx context.Context, name string) (User, error)
 }
 
 const userFindByNameOrEmail = `-- name: UserFindByNameOrEmail :one
-SELECT id, name, alias, email, workspace, password, subs, latest_logout_at, metadata, verification, password_reset, team, lang, theme, updated_at FROM users WHERE name = $1 OR lower(email) = lower($1) LIMIT 1
+SELECT id, name, alias, email, workspace, password, subs, latest_logout_at, metadata, verification, password_reset, team, lang, theme, updated_at FROM users WHERE name = $1 OR email = $1 LIMIT 1
 `
 
+// Exact (case-sensitive) match on name OR email, mirroring the Mongo backend.
 func (q *Queries) UserFindByNameOrEmail(ctx context.Context, name string) (User, error) {
 	row := q.db.QueryRow(ctx, userFindByNameOrEmail, name)
 	var i User
