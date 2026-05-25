@@ -49,14 +49,21 @@ func detailedOperationTracer() graphql.OperationMiddleware {
 		// (GraphQL variable names are user-controlled).
 		if n := len(opCtx.Variables); n > 0 {
 			span.SetAttributes(attribute.Int("graphql.variables.count", n))
-			names := make([]string, 0, n)
+			// Cap collection up front: variable names are user-controlled, so
+			// allocating a slice of size n and sorting all of it would let a
+			// caller amplify CPU/allocations by sending many variables.
+			capLen := n
+			if capLen > maxVariableNamesRecorded {
+				capLen = maxVariableNamesRecorded
+			}
+			names := make([]string, 0, capLen)
 			for key := range opCtx.Variables {
+				if len(names) >= maxVariableNamesRecorded {
+					break
+				}
 				names = append(names, key)
 			}
 			sort.Strings(names)
-			if len(names) > maxVariableNamesRecorded {
-				names = names[:maxVariableNamesRecorded]
-			}
 			span.SetAttributes(attribute.StringSlice("graphql.variables.names", names))
 		}
 

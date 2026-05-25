@@ -110,7 +110,7 @@ func InitTracer(ctx context.Context, cfg *Config) (TracerProvider, error) {
 
 	log.Infoc(ctx, fmt.Sprintf("resource attributes: %+v", res.Attributes()))
 
-	sampler := createSampler(cfg)
+	sampler := createSampler(ctx, cfg)
 
 	tp := sdktrace.NewTracerProvider(
 		sdktrace.WithBatcher(
@@ -171,17 +171,24 @@ func createResource(ctx context.Context, cfg *Config) (*resource.Resource, error
 	return resource.New(ctx, baseAttributes...)
 }
 
-func createSampler(cfg *Config) sdktrace.Sampler {
+func createSampler(ctx context.Context, cfg *Config) sdktrace.Sampler {
 	// Honor an upstream service's sampling decision when there is a remote
 	// parent span; apply the ratio only to new root spans.
+	ratio := cfg.SamplingRatio
 	var root sdktrace.Sampler
 	switch {
-	case cfg.SamplingRatio < 0, cfg.SamplingRatio >= 1:
-		root = sdktrace.AlwaysSample()
-	case cfg.SamplingRatio == 0:
+	case ratio < 0:
+		log.Warnfc(ctx, "OTEL sampling ratio %f is below 0; clamping to 0 (NeverSample)", ratio)
 		root = sdktrace.NeverSample()
+	case ratio == 0:
+		root = sdktrace.NeverSample()
+	case ratio > 1:
+		log.Warnfc(ctx, "OTEL sampling ratio %f exceeds 1; clamping to 1 (AlwaysSample)", ratio)
+		root = sdktrace.AlwaysSample()
+	case ratio == 1:
+		root = sdktrace.AlwaysSample()
 	default:
-		root = sdktrace.TraceIDRatioBased(cfg.SamplingRatio)
+		root = sdktrace.TraceIDRatioBased(ratio)
 	}
 	return sdktrace.ParentBased(root)
 }
