@@ -132,6 +132,7 @@ func initEcho(ctx context.Context, cfg *ServerConfig) *echo.Echo {
 		APIKey:             cfg.Config.RestAPIKey,
 		SwaggerUser:        cfg.Config.SwaggerBasicUser,
 		SwaggerPass:        cfg.Config.SwaggerBasicPass,
+		Debug:              cfg.Debug || cfg.Config.Dev,
 	})
 
 	return e

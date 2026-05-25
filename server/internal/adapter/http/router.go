@@ -29,6 +29,9 @@ type RouterConfig struct {
 	APIKey string
 	// Swagger basic-auth (optional).
 	SwaggerUser, SwaggerPass string
+	// Debug enables serving /swagger without credentials (debug/dev only); in
+	// production Swagger is served only when basic-auth credentials are configured.
+	Debug bool
 }
 
 // RegisterRESTRouter mounts all /api/* REST routes additively. It MUST be called after
@@ -108,14 +111,18 @@ func RegisterRESTRouter(e *echo.Echo, cfg RouterConfig) {
 	api.POST("/permissions/check", ph.Check, optional, apikeyOrAuth)
 
 	// --- Swagger ---
-	if cfg.SwaggerUser != "" {
+	// Basic-auth protected when credentials are configured (served in any environment);
+	// otherwise served only in debug/dev, mirroring how the GraphQL playground is gated,
+	// so API docs aren't unintentionally exposed in production.
+	switch {
+	case cfg.SwaggerUser != "":
 		e.GET("/swagger/*", echoSwagger.WrapHandler, middleware.BasicAuth(func(u, p string, _ echo.Context) (bool, error) {
 			// constant-time comparison to avoid leaking credential length/match via timing
 			userOK := subtle.ConstantTimeCompare([]byte(u), []byte(cfg.SwaggerUser)) == 1
 			passOK := subtle.ConstantTimeCompare([]byte(p), []byte(cfg.SwaggerPass)) == 1
 			return userOK && passOK, nil
 		}))
-	} else {
+	case cfg.Debug:
 		e.GET("/swagger/*", echoSwagger.WrapHandler)
 	}
 }

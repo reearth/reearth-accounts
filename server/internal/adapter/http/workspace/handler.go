@@ -479,6 +479,10 @@ func (h *Handler) TransferOwnership(c echo.Context) error {
 func parseWorkspaceIDs(ss []string) (id.WorkspaceIDList, error) {
 	out := make(id.WorkspaceIDList, 0, len(ss))
 	for _, s := range ss {
+		s = strings.TrimSpace(s)
+		if s == "" {
+			continue
+		}
 		wid, err := id.WorkspaceIDFrom(s)
 		if err != nil {
 			return nil, badRequest("invalid workspace id")
@@ -491,6 +495,10 @@ func parseWorkspaceIDs(ss []string) (id.WorkspaceIDList, error) {
 func parseUserIDs(ss []string) (id.UserIDList, error) {
 	out := make(id.UserIDList, 0, len(ss))
 	for _, s := range ss {
+		s = strings.TrimSpace(s)
+		if s == "" {
+			continue
+		}
 		uid, err := id.UserIDFrom(s)
 		if err != nil {
 			return nil, badRequest("invalid user id")
