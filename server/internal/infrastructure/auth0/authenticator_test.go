@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"io"
 	"net/http"
+	"net/http/httptest"
 	"strings"
 	"testing"
 	"time"
@@ -43,7 +44,7 @@ func TestAuth0(t *testing.T) {
 	a.disableLogging = true
 
 	assert.True(t, a.needsFetchToken())
-	assert.NoError(t, a.updateToken())
+	assert.NoError(t, a.updateToken(context.Background()))
 	assert.Equal(t, token, a.token)
 	assert.Equal(t, current.Add(time.Second*expiresIn), a.expireAt)
 	assert.False(t, a.needsFetchToken())
@@ -165,6 +166,29 @@ func client(t *testing.T) *http.Client {
 			}
 		}),
 	}
+}
+
+func TestAuth0_ExecRespectsContextTimeout(t *testing.T) {
+	slow := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		select {
+		case <-r.Context().Done():
+		case <-time.After(5 * time.Second):
+		}
+		w.WriteHeader(http.StatusOK)
+	}))
+	defer slow.Close()
+
+	a := &Auth0{
+		domain:         slow.URL,
+		client:         &http.Client{Timeout: 30 * time.Second},
+		disableLogging: true,
+	}
+
+	ctx, cancel := context.WithTimeout(context.Background(), 50*time.Millisecond)
+	defer cancel()
+
+	_, err := a.exec(ctx, http.MethodGet, "/test", "", nil)
+	assert.ErrorIs(t, err, context.DeadlineExceeded)
 }
 
 type RoundTripFunc func(req *http.Request) *http.Response

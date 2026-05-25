@@ -10,6 +10,7 @@ import (
 	"github.com/reearth/reearth-accounts/server/internal/usecase/interfaces"
 	"github.com/reearth/reearth-accounts/server/internal/usecase/repo"
 	"github.com/reearth/reearth-accounts/server/pkg/id"
+	"github.com/reearth/reearth-accounts/server/pkg/permittable"
 	"github.com/reearth/reearth-accounts/server/pkg/role"
 	"github.com/reearth/reearth-accounts/server/pkg/user"
 	"github.com/reearth/reearth-accounts/server/pkg/workspace"
@@ -1523,6 +1524,8 @@ func TestWorkspace_UpdateMember(t *testing.T) {
 	w5 := workspace.New().ID(id5).Name("W5").Members(map[user.ID]workspace.Member{userID: {Role: role.RoleOwner}, u.ID(): {Role: role.RoleReader}}).Personal(false).MustBuild()
 	id6 := id.NewWorkspaceID()
 	w6 := workspace.New().ID(id6).Name("W6").Members(map[user.ID]workspace.Member{userID: {Role: role.RoleOwner}, u.ID(): {Role: role.RoleReader}}).Personal(false).MustBuild()
+	id7 := id.NewWorkspaceID()
+	w7 := workspace.New().ID(id7).Name("W7").Members(map[user.ID]workspace.Member{userID: {Role: role.RoleOwner}, u.ID(): {Role: role.RoleMaintainer}}).Personal(false).MustBuild()
 
 	op := &workspace.Operator{
 		User:               &userID,
@@ -1635,7 +1638,7 @@ func TestWorkspace_UpdateMember(t *testing.T) {
 			want:    workspace.NewMembersWith(map[user.ID]workspace.Member{userID: {Role: role.RoleOwner}, u.ID(): {Role: role.RoleReader}}, nil, false),
 		},
 		{
-			name:       "Non-owner can change own role",
+			name:       "Non-owner cannot self-promote to higher role",
 			seeds:      workspace.List{w6},
 			usersSeeds: []*user.User{u},
 			args: struct {
@@ -1651,6 +1654,27 @@ func TestWorkspace_UpdateMember(t *testing.T) {
 					User:               lo.ToPtr(u.ID()),
 					ReadableWorkspaces: []workspace.ID{id6},
 					WritableWorkspaces: []workspace.ID{id6},
+				},
+			},
+			wantErr: interfaces.ErrCannotSelfPromote,
+		},
+		{
+			name:       "Non-owner can self-demote to lower role",
+			seeds:      workspace.List{w7},
+			usersSeeds: []*user.User{u},
+			args: struct {
+				wId      workspace.ID
+				uId      user.ID
+				role     role.RoleType
+				operator *workspace.Operator
+			}{
+				wId:  id7,
+				uId:  u.ID(),
+				role: role.RoleWriter,
+				operator: &workspace.Operator{
+					User:               lo.ToPtr(u.ID()),
+					ReadableWorkspaces: []workspace.ID{id7},
+					WritableWorkspaces: []workspace.ID{id7},
 				},
 			},
 			wantErr: nil,
@@ -1854,4 +1878,275 @@ func TestWorkspace_RemoveIntegrations(t *testing.T) {
 			assert.NotZero(t, got.UpdatedAt(), "updatedAt should be set")
 		})
 	}
+}
+
+func TestWorkspace_AddUserMember_PermittableSync(t *testing.T) {
+	t.Parallel()
+	ctx := context.Background()
+
+	seedDB := func() *repo.Container {
+		db := memory.New()
+		for _, r := range []string{"owner", "maintainer", "writer", "reader"} {
+			_ = db.Role.Save(ctx, *role.New().NewID().Name(r).MustBuild())
+		}
+		return db
+	}
+
+	findRole := func(db *repo.Container, name role.RoleType) *role.Role {
+		r, err := db.Role.FindByName(ctx, string(name))
+		if err != nil {
+			panic(err)
+		}
+		return r
+	}
+
+	t.Run("creates permittables for added users", func(t *testing.T) {
+		t.Parallel()
+		db := seedDB()
+
+		ownerID := id.NewUserID()
+		wsID := id.NewWorkspaceID()
+		ws := workspace.New().ID(wsID).Name("ws").
+			Members(map[user.ID]workspace.Member{ownerID: {Role: role.RoleOwner}}).
+			Personal(false).MustBuild()
+		_ = db.Workspace.Save(ctx, ws)
+
+		u1 := user.New().NewID().Name("u1").Email("u1@test.com").MustBuild()
+		u2 := user.New().NewID().Name("u2").Email("u2@test.com").MustBuild()
+		_ = db.User.Save(ctx, u1)
+		_ = db.User.Save(ctx, u2)
+
+		op := &workspace.Operator{
+			User:             &ownerID,
+			OwningWorkspaces: workspace.IDList{wsID},
+		}
+
+		_, err := NewWorkspace(db, nil, nil).AddUserMember(ctx, wsID, map[user.ID]role.RoleType{
+			u1.ID(): role.RoleWriter,
+			u2.ID(): role.RoleReader,
+		}, op)
+		assert.NoError(t, err)
+
+		readerRoleID := findRole(db, role.RoleReader).ID()
+		writerRoleID := findRole(db, role.RoleWriter).ID()
+
+		p1, err := db.Permittable.FindByUserID(ctx, u1.ID())
+		assert.NoError(t, err)
+		assert.NotNil(t, p1)
+		assert.Equal(t, u1.ID(), p1.UserID())
+		wrs1 := p1.WorkspaceRoles()
+		assert.Len(t, wrs1, 1)
+		assert.Equal(t, wsID, wrs1[0].ID())
+		assert.Equal(t, writerRoleID, wrs1[0].RoleID())
+
+		p2, err := db.Permittable.FindByUserID(ctx, u2.ID())
+		assert.NoError(t, err)
+		assert.NotNil(t, p2)
+		assert.Equal(t, u2.ID(), p2.UserID())
+		wrs2 := p2.WorkspaceRoles()
+		assert.Len(t, wrs2, 1)
+		assert.Equal(t, wsID, wrs2[0].ID())
+		assert.Equal(t, readerRoleID, wrs2[0].RoleID())
+	})
+
+	t.Run("updates existing permittable without losing other workspace roles", func(t *testing.T) {
+		t.Parallel()
+		db := seedDB()
+
+		ownerID := id.NewUserID()
+		ws1ID := id.NewWorkspaceID()
+		ws2ID := id.NewWorkspaceID()
+		ws1 := workspace.New().ID(ws1ID).Name("ws1").
+			Members(map[user.ID]workspace.Member{ownerID: {Role: role.RoleOwner}}).
+			Personal(false).MustBuild()
+		_ = db.Workspace.Save(ctx, ws1)
+
+		otherRoleID := findRole(db, role.RoleMaintainer).ID()
+		u := user.New().NewID().Name("u").Email("u@test.com").MustBuild()
+		_ = db.User.Save(ctx, u)
+
+		// Pre-existing permittable with a role on a different workspace.
+		existing, _ := permittable.New().NewID().UserID(u.ID()).
+			WorkspaceRoles([]permittable.WorkspaceRole{
+				permittable.NewWorkspaceRole(ws2ID, otherRoleID),
+			}).Build()
+		_ = db.Permittable.Save(ctx, *existing)
+
+		op := &workspace.Operator{
+			User:             &ownerID,
+			OwningWorkspaces: workspace.IDList{ws1ID},
+		}
+
+		_, err := NewWorkspace(db, nil, nil).AddUserMember(ctx, ws1ID, map[user.ID]role.RoleType{
+			u.ID(): role.RoleWriter,
+		}, op)
+		assert.NoError(t, err)
+
+		writerRoleID := findRole(db, role.RoleWriter).ID()
+		p, err := db.Permittable.FindByUserID(ctx, u.ID())
+		assert.NoError(t, err)
+		assert.NotNil(t, p)
+
+		wrs := p.WorkspaceRoles()
+		assert.Len(t, wrs, 2)
+
+		roleByWS := make(map[workspace.ID]id.RoleID, len(wrs))
+		for _, wr := range wrs {
+			roleByWS[wr.ID()] = wr.RoleID()
+		}
+		assert.Equal(t, otherRoleID, roleByWS[ws2ID], "existing workspace role should be preserved")
+		assert.Equal(t, writerRoleID, roleByWS[ws1ID], "new workspace role should be set")
+	})
+}
+
+func TestWorkspace_BulkUpdatePermittable(t *testing.T) {
+	t.Parallel()
+	ctx := context.Background()
+
+	seedDB := func() *repo.Container {
+		db := memory.New()
+		for _, r := range []string{"owner", "maintainer", "writer", "reader"} {
+			_ = db.Role.Save(ctx, *role.New().NewID().Name(r).MustBuild())
+		}
+		return db
+	}
+
+	findRole := func(db *repo.Container, name role.RoleType) *role.Role {
+		r, err := db.Role.FindByName(ctx, string(name))
+		if err != nil {
+			panic(err)
+		}
+		return r
+	}
+
+	makeInteractor := func(db *repo.Container) *Workspace {
+		return &Workspace{
+			repos:           db,
+			permittableRepo: db.Permittable,
+			roleRepo:        db.Role,
+		}
+	}
+
+	t.Run("empty map is a no-op", func(t *testing.T) {
+		t.Parallel()
+		db := seedDB()
+		i := makeInteractor(db)
+		wsID := id.NewWorkspaceID()
+		err := i.bulkUpdatePermittable(ctx, wsID, map[user.ID]role.RoleType{})
+		assert.NoError(t, err)
+	})
+
+	t.Run("creates new permittable for unknown user", func(t *testing.T) {
+		t.Parallel()
+		db := seedDB()
+		i := makeInteractor(db)
+		wsID := id.NewWorkspaceID()
+		uID := id.NewUserID()
+
+		err := i.bulkUpdatePermittable(ctx, wsID, map[user.ID]role.RoleType{
+			uID: role.RoleReader,
+		})
+		assert.NoError(t, err)
+
+		p, err := db.Permittable.FindByUserID(ctx, uID)
+		assert.NoError(t, err)
+		assert.Equal(t, uID, p.UserID())
+		wrs := p.WorkspaceRoles()
+		assert.Len(t, wrs, 1)
+		assert.Equal(t, wsID, wrs[0].ID())
+		assert.Equal(t, findRole(db, role.RoleReader).ID(), wrs[0].RoleID())
+	})
+
+	t.Run("updates existing permittable workspace role", func(t *testing.T) {
+		t.Parallel()
+		db := seedDB()
+		i := makeInteractor(db)
+		wsID := id.NewWorkspaceID()
+		uID := id.NewUserID()
+
+		oldRoleID := findRole(db, role.RoleReader).ID()
+		existing, _ := permittable.New().NewID().UserID(uID).
+			WorkspaceRoles([]permittable.WorkspaceRole{
+				permittable.NewWorkspaceRole(wsID, oldRoleID),
+			}).Build()
+		_ = db.Permittable.Save(ctx, *existing)
+
+		err := i.bulkUpdatePermittable(ctx, wsID, map[user.ID]role.RoleType{
+			uID: role.RoleOwner,
+		})
+		assert.NoError(t, err)
+
+		p, err := db.Permittable.FindByUserID(ctx, uID)
+		assert.NoError(t, err)
+		wrs := p.WorkspaceRoles()
+		assert.Len(t, wrs, 1)
+		assert.Equal(t, findRole(db, role.RoleOwner).ID(), wrs[0].RoleID())
+	})
+
+	t.Run("handles mix of new and existing users in one batch", func(t *testing.T) {
+		t.Parallel()
+		db := seedDB()
+		i := makeInteractor(db)
+		wsID := id.NewWorkspaceID()
+
+		existingUID := id.NewUserID()
+		newUID := id.NewUserID()
+
+		ep, _ := permittable.New().NewID().UserID(existingUID).Build()
+		_ = db.Permittable.Save(ctx, *ep)
+
+		err := i.bulkUpdatePermittable(ctx, wsID, map[user.ID]role.RoleType{
+			existingUID: role.RoleWriter,
+			newUID:      role.RoleReader,
+		})
+		assert.NoError(t, err)
+
+		writerRoleID := findRole(db, role.RoleWriter).ID()
+		readerRoleID := findRole(db, role.RoleReader).ID()
+
+		pe, err := db.Permittable.FindByUserID(ctx, existingUID)
+		assert.NoError(t, err)
+		assert.Equal(t, writerRoleID, pe.WorkspaceRoles()[0].RoleID())
+
+		pn, err := db.Permittable.FindByUserID(ctx, newUID)
+		assert.NoError(t, err)
+		assert.Equal(t, readerRoleID, pn.WorkspaceRoles()[0].RoleID())
+	})
+
+	t.Run("deduplicates role lookups for users sharing the same role", func(t *testing.T) {
+		t.Parallel()
+		db := seedDB()
+		i := makeInteractor(db)
+		wsID := id.NewWorkspaceID()
+
+		ids := make([]user.ID, 5)
+		userRoles := make(map[user.ID]role.RoleType, 5)
+		for j := range ids {
+			ids[j] = id.NewUserID()
+			userRoles[ids[j]] = role.RoleReader
+		}
+
+		err := i.bulkUpdatePermittable(ctx, wsID, userRoles)
+		assert.NoError(t, err)
+
+		readerRoleID := findRole(db, role.RoleReader).ID()
+		for _, uID := range ids {
+			p, err := db.Permittable.FindByUserID(ctx, uID)
+			assert.NoError(t, err)
+			assert.Equal(t, readerRoleID, p.WorkspaceRoles()[0].RoleID())
+		}
+	})
+
+	t.Run("returns error when role does not exist", func(t *testing.T) {
+		t.Parallel()
+		db := seedDB()
+		i := makeInteractor(db)
+		wsID := id.NewWorkspaceID()
+		uID := id.NewUserID()
+
+		err := i.bulkUpdatePermittable(ctx, wsID, map[user.ID]role.RoleType{
+			uID: role.RoleType("nonexistent-role"),
+		})
+		assert.Error(t, err)
+	})
 }

@@ -100,3 +100,17 @@ func (mr *MockRepoMockRecorder) Save(arg0, arg1 any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Save", reflect.TypeOf((*MockRepo)(nil).Save), arg0, arg1)
 }
+
+// SaveMany mocks base method.
+func (m *MockRepo) SaveMany(arg0 context.Context, arg1 List) error {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "SaveMany", arg0, arg1)
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
+// SaveMany indicates an expected call of SaveMany.
+func (mr *MockRepoMockRecorder) SaveMany(arg0, arg1 any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "SaveMany", reflect.TypeOf((*MockRepo)(nil).SaveMany), arg0, arg1)
+}
