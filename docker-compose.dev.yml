@@ -12,7 +12,7 @@ services:
   # Optional PostgreSQL backend (opt-in). Point the app at it with
   # REEARTH_ACCOUNTS_DB=postgres://reearth:reearth@postgres:5432/reearth-account?sslmode=disable
   postgres:
-    image: postgres:16-alpine
+    image: postgres:17-alpine
     environment:
       POSTGRES_USER: reearth
       POSTGRES_PASSWORD: reearth

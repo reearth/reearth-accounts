@@ -24,7 +24,7 @@ import (
 func TestPostgresE2E_GetAndUpdateMe(t *testing.T) {
 	ctx := context.Background()
 
-	c, err := tcpostgres.Run(ctx, "postgres:16-alpine",
+	c, err := tcpostgres.Run(ctx, "postgres:17-alpine",
 		tcpostgres.WithDatabase("test"), tcpostgres.WithUsername("test"), tcpostgres.WithPassword("test"),
 		testcontainers.WithWaitStrategy(wait.ForListeningPort("5432/tcp")))
 	require.NoError(t, err)

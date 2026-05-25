@@ -18,7 +18,7 @@ import (
 func startPG(t *testing.T) (*pgxpool.Pool, func()) {
 	t.Helper()
 	ctx := context.Background()
-	c, err := tcpostgres.Run(ctx, "postgres:16-alpine",
+	c, err := tcpostgres.Run(ctx, "postgres:17-alpine",
 		tcpostgres.WithDatabase("test"),
 		tcpostgres.WithUsername("test"),
 		tcpostgres.WithPassword("test"),
