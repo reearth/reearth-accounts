@@ -592,6 +592,30 @@ func TestNodes(t *testing.T) {
 	o.Array().ConsistsOf(map[string]string{"id": uId.String()})
 }
 
+func TestNodes_MultipleUsersOrderPreserved(t *testing.T) {
+	e, _ := StartServer(t, &app.Config{}, true, baseSeederUser)
+	// Request IDs in reverse insertion order to verify filterUsers preserves the requested order.
+	query := fmt.Sprintf(
+		`{ nodes(id: ["%s", "%s", "%s"], type: USER){ id } }`,
+		uId3.String(), uId2.String(), uId.String(),
+	)
+	request := GraphQLRequest{Query: query}
+	jsonData, err := json.Marshal(request)
+	assert.NoError(t, err)
+
+	arr := e.POST("/api/graphql").
+		WithHeader("authorization", "Bearer test").
+		WithHeader("Content-Type", "application/json").
+		WithHeader("X-Reearth-Debug-User", uId.String()).
+		WithBytes(jsonData).Expect().Status(http.StatusOK).
+		JSON().Object().Value("data").Object().Value("nodes").Array()
+
+	arr.Length().IsEqual(3)
+	arr.Value(0).Object().Value("id").String().IsEqual(uId3.String())
+	arr.Value(1).Object().Value("id").String().IsEqual(uId2.String())
+	arr.Value(2).Object().Value("id").String().IsEqual(uId.String())
+}
+
 func TestSignup(t *testing.T) {
 	e, _ := StartServer(t, &app.Config{}, true, seedRoles)
 	email := "newuser@example.com"
