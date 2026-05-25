@@ -30,12 +30,13 @@ import (
 // mongo and postgres set all of these true; memory (an in-process map) sets them
 // false because it does not enforce them.
 type Caps struct {
-	RealTransactions bool // Begin/Commit/Rollback actually isolate writes
-	EnforcesFilter   bool // Filtered() enforces read/write permissions
-	OrderedFindByIDs bool // user FindByIDs preserves request order with nil holes
-	RealPagination   bool // cursor/offset pagination is honored
-	UniqueEmail      bool // duplicate emails are rejected on Create
-	SubstringSearch  bool // FindByNameOrAlias matches case-insensitive substrings
+	RealTransactions     bool // Begin/Commit/Rollback actually isolate writes
+	EnforcesFilter       bool // Filtered() enforces read/write permissions
+	OrderedFindByIDs     bool // user FindByIDs preserves request order with nil holes
+	RealPagination       bool // cursor/offset pagination is honored
+	UniqueEmail          bool // duplicate emails are rejected on Create
+	SubstringSearch      bool // FindByNameOrAlias matches case-insensitive substrings
+	CaseInsensitiveEmail bool // FindByEmail/FindByAlias match case-insensitively
 }
 
 // Factory returns a fresh, empty repo.Container, its capabilities, and cleanup.
@@ -50,6 +51,7 @@ func Run(t *testing.T, nc Factory) {
 	t.Run("User_FindByName_Alias_NameOrEmail", func(t *testing.T) { testUserFindByNameAliasEmail(t, nc) })
 	t.Run("User_FindByNameOrAlias", func(t *testing.T) { testUserFindByNameOrAlias(t, nc) })
 	t.Run("User_FindByNameOrAlias_Substring", func(t *testing.T) { testUserFindByNameOrAliasSubstring(t, nc) })
+	t.Run("User_CaseInsensitiveEmailAlias", func(t *testing.T) { testUserCaseInsensitiveEmailAlias(t, nc) })
 	t.Run("User_FindBySub", func(t *testing.T) { testUserFindBySub(t, nc) })
 	t.Run("User_FindBySubOrCreate", func(t *testing.T) { testUserFindBySubOrCreate(t, nc) })
 	t.Run("User_FindByVerification_PasswordReset", func(t *testing.T) { testUserFindByVerification(t, nc) })
@@ -220,6 +222,27 @@ func testUserFindByNameOrAliasSubstring(t *testing.T, nc Factory) {
 	require.NoError(t, err)
 	require.Len(t, res, 1)
 	assert.Equal(t, u.ID(), res[0].ID())
+}
+
+func testUserCaseInsensitiveEmailAlias(t *testing.T, nc Factory) {
+	c, caps, done := nc(t)
+	defer done()
+	if !caps.CaseInsensitiveEmail {
+		t.Skip("backend does not match email/alias case-insensitively")
+	}
+	ctx := context.Background()
+	u, err := user.New().NewID().Name("ci").Email("Mixed@Example.com").Alias("MixedAlias").
+		Workspace(id.NewWorkspaceID()).Build()
+	require.NoError(t, err)
+	require.NoError(t, c.User.Create(ctx, u))
+
+	byEmail, err := c.User.FindByEmail(ctx, "mixed@example.COM")
+	require.NoError(t, err)
+	assert.Equal(t, u.ID(), byEmail.ID())
+
+	byAlias, err := c.User.FindByAlias(ctx, "mixedalias")
+	require.NoError(t, err)
+	assert.Equal(t, u.ID(), byAlias.ID())
 }
 
 func testUserFindBySub(t *testing.T, nc Factory) {

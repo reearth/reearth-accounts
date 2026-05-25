@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"sort"
+	"strings"
 
 	"github.com/jackc/pgx/v5"
 	"github.com/reearth/reearth-accounts/server/internal/infrastructure/postgres/pgdoc"
@@ -140,14 +141,19 @@ func (r *Workspace) FindByAlias(ctx context.Context, alias string) (*workspace.W
 	return r.one(ctx, w, err)
 }
 
-// FindByAliases uses exact (case-sensitive) matching, mirroring the Mongo backend.
+// FindByAliases uses case-insensitive matching (the alias unique index is
+// case-insensitive); the query compares lower(alias), so lowercase the inputs.
 func (r *Workspace) FindByAliases(ctx context.Context, aliases []string) (workspace.List, error) {
 	if len(aliases) == 0 {
 		return nil, nil
 	}
-	rows, err := r.c.queries(ctx).WorkspaceFindByAliases(ctx, aliases)
+	lowered := make([]string, len(aliases))
+	for i, a := range aliases {
+		lowered[i] = strings.ToLower(a)
+	}
+	rows, err := r.c.queries(ctx).WorkspaceFindByAliases(ctx, lowered)
 	if err != nil {
-		return nil, err
+		return nil, rerror.ErrInternalByWithContext(ctx, err)
 	}
 	return r.hydrate(ctx, rows)
 }

@@ -23,7 +23,7 @@ func TestPostgresConformance(t *testing.T) {
 	ctx := context.Background()
 
 	// One container for the whole suite; reset state between subtests with TRUNCATE.
-	c, err := tcpostgres.Run(ctx, "postgres:16-alpine",
+	c, err := tcpostgres.Run(ctx, "postgres:17-alpine",
 		tcpostgres.WithDatabase("test"), tcpostgres.WithUsername("test"), tcpostgres.WithPassword("test"),
 		testcontainers.WithWaitStrategy(wait.ForListeningPort("5432/tcp")))
 	require.NoError(t, err)
@@ -42,12 +42,13 @@ func TestPostgresConformance(t *testing.T) {
 		repos, err := postgres.New(ctx, pool, nil)
 		require.NoError(t, err)
 		return repos, Caps{
-			RealTransactions: true,
-			EnforcesFilter:   true,
-			OrderedFindByIDs: true,
-			RealPagination:   true,
-			UniqueEmail:      true,
-			SubstringSearch:  true,
+			RealTransactions:     true,
+			EnforcesFilter:       true,
+			OrderedFindByIDs:     true,
+			RealPagination:       true,
+			UniqueEmail:          true,
+			SubstringSearch:      true,
+			CaseInsensitiveEmail: true,
 		}, func() {}
 	})
 }

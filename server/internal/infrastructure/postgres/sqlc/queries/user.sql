@@ -21,22 +21,22 @@ SELECT * FROM users WHERE id = ANY($1::text[]);
 SELECT * FROM users ORDER BY id;
 
 -- name: UserFindByEmail :one
--- Exact (case-sensitive) match, mirroring the Mongo backend.
-SELECT * FROM users WHERE email = $1;
+-- Case-insensitive, matching the case-insensitive unique index on lower(email).
+SELECT * FROM users WHERE lower(email) = lower($1);
 
 -- name: UserFindByName :one
 SELECT * FROM users WHERE name = $1;
 
 -- name: UserFindByAlias :one
--- Exact (case-sensitive) match, mirroring the Mongo backend.
-SELECT * FROM users WHERE alias = $1;
+-- Case-insensitive, matching the partial unique index on lower(alias).
+SELECT * FROM users WHERE lower(alias) = lower($1) AND alias <> '';
 
 -- name: UserFindBySub :one
 SELECT * FROM users WHERE subs @> ARRAY[$1::text] LIMIT 1;
 
 -- name: UserFindByNameOrEmail :one
--- Exact (case-sensitive) match on name OR email, mirroring the Mongo backend.
-SELECT * FROM users WHERE name = $1 OR email = $1 LIMIT 1;
+-- Exact name OR case-insensitive email (email is case-insensitively unique).
+SELECT * FROM users WHERE name = $1 OR lower(email) = lower($1) LIMIT 1;
 
 -- name: UserFindByVerification :one
 SELECT * FROM users WHERE verification ->> 'code' = $1::text LIMIT 1;
