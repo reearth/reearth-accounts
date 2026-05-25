@@ -24,9 +24,15 @@ test:
 	REEARTH_DB=${REEARTH_DB} go test ./... -run ${TARGET_TEST}
 
 # Integration tests that spin real databases (postgres + mongo) via
-# testcontainers. Requires a running Docker daemon.
+# testcontainers. Requires a running Docker daemon. -p 1 serializes packages so
+# their testcontainers reapers don't collide; the -run filter skips e2e tests
+# that need a separate mongo service.
 test-integration:
-	go test -tags integration ./internal/infrastructure/postgres/... ./internal/infrastructure/conformance/... -timeout 900s
+	go test -p 1 -tags integration -timeout 900s \
+		./internal/infrastructure/postgres/... \
+		./internal/infrastructure/conformance/... \
+		./e2e/... \
+		-run 'Conformance|TestMigrate|TestTransaction|TestResolveDBTX|TestPostgresE2E_GetAndUpdateMe'
 
 # Regenerate the sqlc query package for the PostgreSQL backend after editing
 # any *.sql under internal/infrastructure/postgres/sqlc. Requires sqlc v1.27+.

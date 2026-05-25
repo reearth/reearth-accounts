@@ -79,4 +79,13 @@ jobs:
           cache-dependency-path: server/go.sum
       - name: integration test
         working-directory: server
-        run: go test -tags integration ./internal/infrastructure/postgres/... ./internal/infrastructure/conformance/... -timeout 900s
+        # -p 1 serializes package execution so each package's testcontainers
+        # reaper is created sequentially (parallel binaries collide on its name).
+        # The -run filter selects the postgres-backed tests and the postgres e2e
+        # while skipping the e2e tests that require a separate mongo service.
+        run: >-
+          go test -p 1 -tags integration -timeout 900s
+          ./internal/infrastructure/postgres/...
+          ./internal/infrastructure/conformance/...
+          ./e2e/...
+          -run 'Conformance|TestMigrate|TestTransaction|TestResolveDBTX|TestPostgresE2E_GetAndUpdateMe'
