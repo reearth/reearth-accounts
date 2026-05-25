@@ -663,6 +663,119 @@ func TestSignupOIDC(t *testing.T) {
 	o.Value("email").String().IsEqual(email)
 }
 
+func TestSignupOIDC_DuplicateEmail(t *testing.T) {
+	seeder := func(ctx context.Context, r *repo.Container) error {
+		if err := seedRoles(ctx, r); err != nil {
+			return err
+		}
+		existingWID := id.NewWorkspaceID()
+		u := user.New().NewID().
+			Name("existing").
+			Email("dup-oidc@example.com").
+			Workspace(existingWID).
+			MustBuild()
+		return r.User.Save(ctx, u)
+	}
+
+	e, _ := StartServer(t, &app.Config{}, true, seeder)
+	query := `mutation($input: SignupOIDCInput!) {
+		signupOIDC(input: $input) {
+			user { id }
+		}
+	}`
+	vars := map[string]interface{}{
+		"input": map[string]interface{}{
+			"email": "dup-oidc@example.com",
+			"name":  "new user",
+			"sub":   "oidc|unique-sub-for-dup-email-test",
+		},
+	}
+	request := GraphQLRequest{Query: query, Variables: vars}
+	jsonData, err := json.Marshal(request)
+	assert.NoError(t, err)
+
+	resp := e.POST("/api/graphql").
+		WithHeader("authorization", "Bearer test").
+		WithHeader("Content-Type", "application/json").
+		WithBytes(jsonData).Expect().Status(http.StatusOK).JSON().Object()
+	resp.Value("errors").Array().NotEmpty()
+}
+
+func TestSignupOIDC_DuplicateSub(t *testing.T) {
+	seeder := func(ctx context.Context, r *repo.Container) error {
+		if err := seedRoles(ctx, r); err != nil {
+			return err
+		}
+		existingWID := id.NewWorkspaceID()
+		auth := user.AuthFrom("oidc|dup-sub-9999")
+		u := user.New().NewID().
+			Name("existing").
+			Email("existing-for-dup-sub@example.com").
+			Auths([]user.Auth{auth}).
+			Workspace(existingWID).
+			MustBuild()
+		return r.User.Save(ctx, u)
+	}
+
+	e, _ := StartServer(t, &app.Config{}, true, seeder)
+	query := `mutation($input: SignupOIDCInput!) {
+		signupOIDC(input: $input) {
+			user { id }
+		}
+	}`
+	vars := map[string]interface{}{
+		"input": map[string]interface{}{
+			"email": "different-email-for-dup-sub@example.com",
+			"name":  "new user",
+			"sub":   "oidc|dup-sub-9999",
+		},
+	}
+	request := GraphQLRequest{Query: query, Variables: vars}
+	jsonData, err := json.Marshal(request)
+	assert.NoError(t, err)
+
+	resp := e.POST("/api/graphql").
+		WithHeader("authorization", "Bearer test").
+		WithHeader("Content-Type", "application/json").
+		WithBytes(jsonData).Expect().Status(http.StatusOK).JSON().Object()
+	resp.Value("errors").Array().NotEmpty()
+}
+
+func TestSignupOIDC_WithAllowedISSConfig(t *testing.T) {
+	// When Auth_ISS is configured, signupOIDC with sub+email in input should still succeed.
+	// Validates that populating AllowedISS from config does not break the path where
+	// sub and email are supplied directly (no ISS lookup is triggered).
+	// Mock_Auth skips the JWT middleware (which requires Auth_AUD alongside Auth_ISS),
+	// while allowedISS is still populated from Auth_ISS in initEcho before that check.
+	cfg := &app.Config{Auth_ISS: "https://trusted-idp.example.com", Mock_Auth: true}
+	e, _ := StartServer(t, cfg, true, seedRoles)
+
+	email := "oidc-with-iss-config@example.com"
+	query := `mutation($input: SignupOIDCInput!) {
+		signupOIDC(input: $input) {
+			user { id name email }
+		}
+	}`
+	vars := map[string]interface{}{
+		"input": map[string]interface{}{
+			"email": email,
+			"name":  "OIDC ISS Config User",
+			"sub":   "oidc|iss-config-test-sub-001",
+		},
+	}
+	request := GraphQLRequest{Query: query, Variables: vars}
+	jsonData, err := json.Marshal(request)
+	assert.NoError(t, err)
+
+	o := e.POST("/api/graphql").
+		WithHeader("authorization", "Bearer test").
+		WithHeader("Content-Type", "application/json").
+		WithBytes(jsonData).Expect().Status(http.StatusOK).JSON().Object().Value("data").Object().Value("signupOIDC").Object().Value("user").Object()
+	o.Value("id").String().NotEmpty()
+	o.Value("name").String().IsEqual("OIDC ISS Config User")
+	o.Value("email").String().IsEqual(email)
+}
+
 func TestVerifyUser(t *testing.T) {
 	e, r := StartServer(t, &app.Config{}, true, baseSeederUser)
 
