@@ -39,7 +39,7 @@ func (c *WorkspaceLoader) Fetch(ctx context.Context, ids []gqlmodel.ID) ([]*gqlm
 
 	workspaces := make([]*gqlmodel.Workspace, 0, len(ws))
 	for _, w := range ws {
-		converted, err := gqlmodel.ToWorkspace(w, exists, c.storage)
+		converted, err := gqlmodel.ToWorkspace(ctx, w, exists, c.storage)
 		if err != nil {
 			log.Errorf("failed to convert workspace: %s", err.Error())
 			continue
@@ -67,7 +67,7 @@ func (c *WorkspaceLoader) FindByUser(ctx context.Context, uid gqlmodel.ID) ([]*g
 
 	workspaces := make([]*gqlmodel.Workspace, 0, len(ws))
 	for _, w := range ws {
-		converted, err := gqlmodel.ToWorkspace(w, exists, c.storage)
+		converted, err := gqlmodel.ToWorkspace(ctx, w, exists, c.storage)
 		if err != nil {
 			log.Errorf("failed to convert workspace: %s", err.Error())
 			continue

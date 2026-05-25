@@ -412,6 +412,93 @@ func TestUpdateIntegrationOfWorkspace(t *testing.T) {
 	assert.Equal(t, w.Members().Integration(iId3).Role, role.RoleMaintainer)
 }
 
+func TestFindByUser_ParallelPhotoURLSigning(t *testing.T) {
+	const workspaceCount = 15 // exceeds pool maxConcurrency of 10
+
+	testUID := id.NewUserID()
+	wsIDs := make([]id.WorkspaceID, workspaceCount)
+	for i := 0; i < workspaceCount; i++ {
+		wsIDs[i] = id.NewWorkspaceID()
+	}
+
+	seeder := func(ctx context.Context, r *repo.Container) error {
+		for _, roleName := range []string{"owner", "maintainer", "writer", "reader", "self"} {
+			_ = r.Role.Save(ctx, *role.New().NewID().Name(roleName).MustBuild())
+		}
+
+		u := user.New().ID(testUID).
+			Name("parallel-test").
+			Email("parallel@test.com").
+			Workspace(wsIDs[0]).
+			MustBuild()
+		if err := r.User.Save(ctx, u); err != nil {
+			return err
+		}
+
+		ownerMember := workspace.Member{
+			Role:      role.RoleOwner,
+			InvitedBy: testUID,
+		}
+
+		for i, wsID := range wsIDs {
+			meta := workspace.MetadataFrom(
+				fmt.Sprintf("description-%d", i),
+				fmt.Sprintf("https://example%d.com", i),
+				"Tokyo",
+				fmt.Sprintf("billing%d@example.com", i),
+				fmt.Sprintf("https://example%d.com/photo.jpg", i),
+			)
+			w := workspace.New().ID(wsID).
+				Name(fmt.Sprintf("workspace-%d", i)).
+				Members(map[idx.ID[id.User]]workspace.Member{
+					testUID: ownerMember,
+				}).
+				Metadata(meta).
+				MustBuild()
+			if err := r.Workspace.Save(ctx, w); err != nil {
+				return err
+			}
+		}
+
+		ownerRole, err := r.Role.FindByName(ctx, "owner")
+		if err != nil {
+			return err
+		}
+		p, err := permittable.New().NewID().UserID(testUID).Build()
+		if err != nil {
+			return err
+		}
+		for _, wsID := range wsIDs {
+			p.UpdateWorkspaceRole(wsID, ownerRole.ID())
+		}
+		return r.Permittable.Save(ctx, *p)
+	}
+
+	e, _ := StartServer(t, &app.Config{StorageIsLocal: true}, true, seeder)
+
+	query := fmt.Sprintf(`query { findByUser(userId: "%s"){ id metadata { photoURL } } }`, testUID)
+	request := GraphQLRequest{Query: query}
+	jsonData, err := json.Marshal(request)
+	assert.NoError(t, err)
+
+	arr := e.POST("/api/graphql").
+		WithHeader("authorization", "Bearer test").
+		WithHeader("Content-Type", "application/json").
+		WithHeader("X-Reearth-Debug-User", testUID.String()).
+		WithBytes(jsonData).
+		Expect().Status(http.StatusOK).
+		JSON().Object().
+		Value("data").Object().
+		Value("findByUser").Array()
+
+	arr.Length().IsEqual(workspaceCount)
+	for i := 0; i < workspaceCount; i++ {
+		arr.Value(i).Object().
+			Value("metadata").Object().
+			Value("photoURL").String().NotEmpty()
+	}
+}
+
 func TestFindByUser(t *testing.T) {
 	e, _ := StartServer(t, &app.Config{StorageIsLocal: true}, true, baseSeederWorkspace)
 
