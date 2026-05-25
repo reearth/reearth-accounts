@@ -7,8 +7,27 @@ import (
 
 	fbauth "firebase.google.com/go/v4/auth"
 	"github.com/reearth/reearth-accounts/server/internal/usecase/gateway"
+	"github.com/reearth/reearthx/mailer"
 	"github.com/stretchr/testify/assert"
 )
+
+// fakeMailer implements mailer.Mailer for tests and records the last sent message.
+type fakeMailer struct {
+	sent    bool
+	to      []mailer.Contact
+	subject string
+	text    string
+	html    string
+}
+
+func (f *fakeMailer) SendMail(_ context.Context, to []mailer.Contact, subject, text, html string) error {
+	f.sent = true
+	f.to = to
+	f.subject = subject
+	f.text = text
+	f.html = html
+	return nil
+}
 
 // fakeAuthClient implements firebaseAuthClient for tests (no SDK / network).
 type fakeAuthClient struct {
@@ -47,13 +66,13 @@ func (f *fakeAuthClient) EmailVerificationLink(ctx context.Context, email string
 }
 
 func newTestAuthenticator(c firebaseAuthClient) *Authenticator {
-	return &Authenticator{client: c}
+	return &Authenticator{client: c, mailer: &fakeMailer{}}
 }
 
 func strptr(s string) *string { return &s }
 
 func TestCIP_New_RequiresProjectID(t *testing.T) {
-	_, err := New(context.Background(), Params{})
+	_, err := New(context.Background(), Params{}, &fakeMailer{})
 	assert.Error(t, err)
 }
 
@@ -111,11 +130,16 @@ func TestCIP_ResendVerificationEmail(t *testing.T) {
 			return &fbauth.UserRecord{UserInfo: &fbauth.UserInfo{UID: uid, Email: "u@example.com"}}, nil
 		},
 	}
-	a := newTestAuthenticator(fake)
+	fm := &fakeMailer{}
+	a := &Authenticator{client: fake, mailer: fm}
 
 	err := a.ResendVerificationEmail(context.Background(), "uid-1")
 	assert.NoError(t, err)
 	assert.Equal(t, "u@example.com", fake.verifyLinkEmail)
+	// The generated link must actually be emailed (Admin SDK only generates it).
+	assert.True(t, fm.sent)
+	assert.Equal(t, "u@example.com", fm.to[0].Email)
+	assert.Contains(t, fm.text, "https://verify.example/u@example.com")
 }
 
 func TestCIP_ResendVerificationEmail_NoEmail(t *testing.T) {

@@ -1200,7 +1200,7 @@ func TestUser_UpdateMe_AuthenticatorUpdateUserError(t *testing.T) {
 
 	authError := errors.New("auth0 api error")
 	mockAuth := &mockAuthenticatorWithError{updateUserErr: authError}
-	g := &gateway.Container{Authenticator: mockAuth}
+	g := &gateway.Container{Authenticators: map[string]gateway.Authenticator{"auth0": mockAuth}}
 	uc := NewUser(r, g, "", "")
 
 	uid := id.NewUserID()

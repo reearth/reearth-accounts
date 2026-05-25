@@ -34,24 +34,34 @@ func initReposAndGateways(ctx context.Context, client *mongo.Client, conf *Confi
 		log.Fatalf("Failed to init storage: %+v\n", err)
 	}
 
-	var authenticator gateway.Authenticator
-	switch conf.GetAuthProvider() {
-	case "cip":
-		authenticator, err = cip.New(ctx, cip.Params{
+	mailerInstance := mailer.New(ctx, &mailer.Config{})
+
+	// Build per-provider authenticators so management calls (UpdateUser,
+	// ResendVerificationEmail) are routed by each user's auth record provider
+	// rather than swapping a single authenticator globally. This keeps Auth0
+	// subs going to Auth0 and CIP subs going to Firebase when both coexist.
+	authenticators := map[string]gateway.Authenticator{}
+	if conf.Auth0.Domain != "" {
+		authenticators["auth0"] = auth0.New(conf.Auth0.Domain, conf.Auth0.ClientID, conf.Auth0.ClientSecret)
+	}
+	if conf.GetAuthProvider() == "cip" {
+		if conf.CIP.ProjectID == "" {
+			log.Fatalf("REEARTH_ACCOUNTS_AUTH_PROVIDER=cip requires REEARTH_ACCOUNTS_CIP_PROJECT_ID")
+		}
+		cipAuth, cipErr := cip.New(ctx, cip.Params{
 			ProjectID: conf.CIP.ProjectID,
 			TenantID:  conf.CIP.TenantID,
-		})
-		if err != nil {
-			log.Fatalf("Failed to init CIP authenticator: %+v\n", err)
+		}, mailerInstance)
+		if cipErr != nil {
+			log.Fatalf("Failed to init CIP authenticator: %+v\n", cipErr)
 		}
-	default:
-		authenticator = auth0.New(conf.Auth0.Domain, conf.Auth0.ClientID, conf.Auth0.ClientSecret)
+		authenticators["cip"] = cipAuth
 	}
 
 	acGateways := &gateway.Container{
-		Mailer:        mailer.New(ctx, &mailer.Config{}),
-		Authenticator: authenticator,
-		Storage:       str,
+		Mailer:         mailerInstance,
+		Authenticators: authenticators,
+		Storage:        str,
 	}
 
 	return repos, acGateways

@@ -2,12 +2,14 @@ package cip
 
 import (
 	"context"
+	"fmt"
 
 	firebase "firebase.google.com/go/v4"
 	fbauth "firebase.google.com/go/v4/auth"
 	"github.com/reearth/reearth-accounts/server/internal/usecase/gateway"
 	"github.com/reearth/reearthx/i18n"
 	"github.com/reearth/reearthx/log"
+	"github.com/reearth/reearthx/mailer"
 	"github.com/reearth/reearthx/rerror"
 )
 
@@ -31,13 +33,14 @@ type Params struct {
 // (the Cloud Run service account).
 type Authenticator struct {
 	client firebaseAuthClient
+	mailer mailer.Mailer
 }
 
 var _ gateway.Authenticator = (*Authenticator)(nil)
 
 // New constructs a CIP Authenticator using Application Default Credentials.
 // When p.TenantID is set, management calls are scoped to that GCIP tenant.
-func New(ctx context.Context, p Params) (*Authenticator, error) {
+func New(ctx context.Context, p Params, m mailer.Mailer) (*Authenticator, error) {
 	// Fail fast on an inconsistent configuration: selecting CIP without a project
 	// id means Config.Auths() never registers the CIP JWT provider (so CIP tokens
 	// would not validate) while management calls would still be routed to Firebase.
@@ -66,7 +69,7 @@ func New(ctx context.Context, p Params) (*Authenticator, error) {
 		client = tc
 	}
 
-	return &Authenticator{client: client}, nil
+	return &Authenticator{client: client, mailer: m}, nil
 }
 
 func (a *Authenticator) UpdateUser(ctx context.Context, p gateway.AuthenticatorUpdateUserParam) (gateway.AuthenticatorUser, error) {
@@ -109,8 +112,22 @@ func (a *Authenticator) ResendVerificationEmail(ctx context.Context, userID stri
 	// Generate the out-of-band verification link. Delivery is handled out-of-band
 	// (Firebase email templates or the configured mailer); generating the link
 	// validates the user and triggers Firebase-managed email when templates are on.
-	if _, err := a.client.EmailVerificationLink(ctx, rec.Email); err != nil {
+	// The Firebase Admin SDK only generates the verification link; it does not
+	// send any email. Deliver it via the configured mailer.
+	link, err := a.client.EmailVerificationLink(ctx, rec.Email)
+	if err != nil {
 		log.Errorf("cip: email verification link: %+v", err)
+		return rerror.NewE(i18n.T("failed to resend verification email"))
+	}
+	if a.mailer == nil {
+		log.Errorf("cip: mailer is not configured; cannot send verification email")
+		return rerror.NewE(i18n.T("failed to resend verification email"))
+	}
+
+	text := "Please verify your email address by opening the following link:\n" + link
+	html := fmt.Sprintf(`<p>Please verify your email address by clicking <a href="%s">this link</a>.</p>`, link)
+	if err := a.mailer.SendMail(ctx, []mailer.Contact{{Email: rec.Email, Name: rec.DisplayName}}, "email verification", text, html); err != nil {
+		log.Errorf("cip: send verification email: %+v", err)
 		return rerror.NewE(i18n.T("failed to resend verification email"))
 	}
 	return nil

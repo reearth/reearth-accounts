@@ -474,11 +474,16 @@ func (i *User) CreateVerification(ctx context.Context, email string) error {
 			return err
 		}
 
-		auth0Auth := u.Auths().GetByProvider("auth0")
-		if auth0Auth != nil {
-			if err = i.gateways.Authenticator.ResendVerificationEmail(ctx, auth0Auth.Sub); err != nil {
+		// Resend through the user's external IdP, routed by auth record provider.
+		for _, a := range u.Auths() {
+			authenticator := i.gateways.AuthenticatorFor(a.Provider)
+			if authenticator == nil {
+				continue
+			}
+			if err = authenticator.ResendVerificationEmail(ctx, a.Sub); err != nil {
 				return err
 			}
+			break
 		}
 
 		return nil
