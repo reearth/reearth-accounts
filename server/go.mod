@@ -23,6 +23,7 @@ require (
 	github.com/ravilushqa/otelgqlgen v0.19.0
 	github.com/reearth/reearthx v0.0.0-20251202081949-5abca579aec6
 	github.com/samber/lo v1.52.0
+	github.com/sourcegraph/conc v0.3.0
 	github.com/square/mongo-lock v0.0.0-20230808145049-cfcf499f6bf0
 	github.com/stretchr/testify v1.11.1
 	github.com/testcontainers/testcontainers-go v0.40.0
@@ -182,7 +183,6 @@ require (
 	github.com/shirou/gopsutil/v4 v4.25.10 // indirect
 	github.com/sirupsen/logrus v1.9.3 // indirect
 	github.com/sosodev/duration v1.3.1 // indirect
-	github.com/sourcegraph/conc v0.3.0 // indirect
 	github.com/spiffe/go-spiffe/v2 v2.6.0 // indirect
 	github.com/stoewer/go-strcase v1.3.1 // indirect
 	github.com/tklauser/go-sysconf v0.3.16 // indirect

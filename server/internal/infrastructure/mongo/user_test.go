@@ -614,6 +614,22 @@ func TestUserRepo_FindBySub(t *testing.T) {
 	}
 }
 
+func BenchmarkFilterUsers(b *testing.B) {
+	wsid := user.NewWorkspaceID()
+	const n = 10000
+	rows := make([]*user.User, n)
+	ids := make([]user.ID, n)
+	for i := range rows {
+		u := user.New().NewID().Email("u@example.com").Workspace(wsid).Name("u").MustBuild()
+		rows[i] = u
+		ids[i] = u.ID()
+	}
+	b.ResetTimer()
+	for range b.N {
+		filterUsers(ids, rows)
+	}
+}
+
 func TestUserRepo_Remove(t *testing.T) {
 	wsid := user.NewWorkspaceID()
 	user1 := user.New().

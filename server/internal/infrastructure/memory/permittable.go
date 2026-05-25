@@ -89,3 +89,14 @@ func (r *Permittable) Save(ctx context.Context, p permittable.Permittable) error
 	r.data[p.ID()] = &p
 	return nil
 }
+
+func (r *Permittable) SaveMany(ctx context.Context, ps permittable.List) error {
+	r.lock.Lock()
+	defer r.lock.Unlock()
+
+	for _, p := range ps {
+		copied := *p
+		r.data[p.ID()] = &copied
+	}
+	return nil
+}

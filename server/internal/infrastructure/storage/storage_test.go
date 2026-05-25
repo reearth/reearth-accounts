@@ -7,7 +7,6 @@ import (
 	"os"
 	"strings"
 	"testing"
-	"time"
 
 	"github.com/reearth/reearthx/asset/domain/file"
 	"github.com/stretchr/testify/assert"
@@ -381,7 +380,7 @@ func TestStorage_Upload(t *testing.T) {
 	})
 }
 
-func TestStorage_client(t *testing.T) {
+func TestStorage_bucket(t *testing.T) {
 	t.Run("should create client with emulator", func(t *testing.T) {
 		// Skip if no emulator is available
 		if os.Getenv("STORAGE_EMULATOR_HOST") == "" {
@@ -395,15 +394,12 @@ func TestStorage_client(t *testing.T) {
 			EmulatorEndpoint: "localhost:8080",
 		}
 
-		storage := &Storage{cfg: cfg}
+		s := &Storage{cfg: cfg}
 
-		ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
-		defer cancel()
-
-		client, err := storage.client(ctx)
+		bucket, err := s.bucket()
 
 		assert.NoError(t, err)
-		assert.NotNil(t, client)
+		assert.NotNil(t, bucket)
 	})
 
 	t.Run("should handle invalid bucket name", func(t *testing.T) {
@@ -414,18 +410,15 @@ func TestStorage_client(t *testing.T) {
 			EmulatorEndpoint: "",
 		}
 
-		storage := &Storage{cfg: cfg}
+		s := &Storage{cfg: cfg}
 
-		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-		defer cancel()
-
-		client, err := storage.client(ctx)
+		bucket, err := s.bucket()
 
 		// The client creation doesn't fail immediately, but the bucket handle is still returned
 		assert.NoError(t, err)
-		assert.NotNil(t, client)
+		assert.NotNil(t, bucket)
 		// The bucket name will be empty in the handle
-		assert.Equal(t, "", client.BucketName())
+		assert.Equal(t, "", bucket.BucketName())
 	})
 
 	t.Run("should set emulator environment variable", func(t *testing.T) {
@@ -436,16 +429,34 @@ func TestStorage_client(t *testing.T) {
 			EmulatorEndpoint: "localhost:9999",
 		}
 
-		storage := &Storage{cfg: cfg}
-
-		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-		defer cancel()
+		s := &Storage{cfg: cfg}
 
 		// This will set the environment variable
-		_, _ = storage.client(ctx)
+		_, _ = s.bucket()
 
 		// Verify the environment variable was set
 		assert.Equal(t, "localhost:9999", os.Getenv("STORAGE_EMULATOR_HOST"))
+	})
+
+	t.Run("should reuse the same client across multiple calls", func(t *testing.T) {
+		cfg := &Config{
+			IsLocal:          false,
+			BucketName:       "test-bucket",
+			EmulatorEnabled:  false,
+			EmulatorEndpoint: "",
+		}
+
+		s := &Storage{cfg: cfg}
+
+		bucket1, err1 := s.bucket()
+		bucket2, err2 := s.bucket()
+
+		assert.NoError(t, err1)
+		assert.NoError(t, err2)
+		assert.NotNil(t, bucket1)
+		assert.NotNil(t, bucket2)
+		// Both should reference the same underlying client
+		assert.Equal(t, s.gcsClient, s.gcsClient)
 	})
 }
 

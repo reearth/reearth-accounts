@@ -10,8 +10,9 @@ import (
 )
 
 type ContainerConfig struct {
-	SignupSecret    string
+	AllowedISS      []string
 	AuthSrvUIDomain string
+	SignupSecret    string
 }
 
 func NewContainer(
@@ -24,7 +25,7 @@ func NewContainer(
 	cerbos := NewCerbos(r, cerbosAdapter)
 	return interfaces.Container{
 		Cerbos:    cerbos,
-		User:      NewUser(r, acg, config.SignupSecret, config.AuthSrvUIDomain),
+		User:      NewUser(r, acg, config.SignupSecret, config.AuthSrvUIDomain, config.AllowedISS...),
 		Workspace: NewWorkspace(r, enforcer, cerbos),
 	}
 }
