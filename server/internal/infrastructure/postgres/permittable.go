@@ -58,7 +58,7 @@ func (r *Permittable) FindByUserID(ctx context.Context, uid user.ID) (*permittab
 		return nil, rerror.ErrNotFound
 	}
 	if err != nil {
-		return nil, err
+		return nil, rerror.ErrInternalByWithContext(ctx, err)
 	}
 	list, err := r.hydrate(ctx, []gen.Permittable{row})
 	if err != nil {
@@ -72,7 +72,7 @@ func (r *Permittable) FindByUserID(ctx context.Context, uid user.ID) (*permittab
 func (r *Permittable) FindByUserIDs(ctx context.Context, ids user.IDList) (permittable.List, error) {
 	rows, err := r.c.queries(ctx).PermittableFindByUserIDs(ctx, ids.Strings())
 	if err != nil {
-		return nil, err
+		return nil, rerror.ErrInternalByWithContext(ctx, err)
 	}
 	list, err := r.hydrate(ctx, rows)
 	if err != nil {
@@ -88,7 +88,7 @@ func (r *Permittable) FindByUserIDs(ctx context.Context, ids user.IDList) (permi
 func (r *Permittable) FindByRoleID(ctx context.Context, rid id.RoleID) (permittable.List, error) {
 	rows, err := r.c.queries(ctx).PermittableFindByRoleID(ctx, rid.String())
 	if err != nil {
-		return nil, err
+		return nil, rerror.ErrInternalByWithContext(ctx, err)
 	}
 	list, err := r.hydrate(ctx, rows)
 	if err != nil {

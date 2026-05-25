@@ -93,24 +93,28 @@ func (r *User) Remove(ctx context.Context, uid id.UserID) error {
 	return nil
 }
 
-func one(r gen.User, err error) (*user.User, error) {
+func one(ctx context.Context, r gen.User, err error) (*user.User, error) {
 	if errors.Is(err, pgx.ErrNoRows) {
 		return nil, rerror.ErrNotFound
 	}
 	if err != nil {
-		return nil, err
+		return nil, rerror.ErrInternalByWithContext(ctx, err)
 	}
 	return userModel(r)
 }
 
 func (r *User) FindByID(ctx context.Context, uid id.UserID) (*user.User, error) {
-	return one(r.c.queries(ctx).UserFindByID(ctx, uid.String()))
+	row, err := r.c.queries(ctx).UserFindByID(ctx, uid.String())
+	return one(ctx, row, err)
 }
 
 func (r *User) FindByIDs(ctx context.Context, ids user.IDList) (user.List, error) {
+	if len(ids) == 0 {
+		return nil, nil
+	}
 	rows, err := r.c.queries(ctx).UserFindByIDs(ctx, ids.Strings())
 	if err != nil {
-		return nil, err
+		return nil, rerror.ErrInternalByWithContext(ctx, err)
 	}
 	list, err := userModels(rows)
 	if err != nil {
@@ -131,37 +135,44 @@ func (r *User) FindByIDs(ctx context.Context, ids user.IDList) (user.List, error
 func (r *User) FindAll(ctx context.Context) (user.List, error) {
 	rows, err := r.c.queries(ctx).UserFindAll(ctx)
 	if err != nil {
-		return nil, err
+		return nil, rerror.ErrInternalByWithContext(ctx, err)
 	}
 	return userModels(rows)
 }
 
 func (r *User) FindByEmail(ctx context.Context, email string) (*user.User, error) {
-	return one(r.c.queries(ctx).UserFindByEmail(ctx, email))
+	row, err := r.c.queries(ctx).UserFindByEmail(ctx, email)
+	return one(ctx, row, err)
 }
 
 func (r *User) FindByName(ctx context.Context, name string) (*user.User, error) {
-	return one(r.c.queries(ctx).UserFindByName(ctx, name))
+	row, err := r.c.queries(ctx).UserFindByName(ctx, name)
+	return one(ctx, row, err)
 }
 
 func (r *User) FindByAlias(ctx context.Context, alias string) (*user.User, error) {
-	return one(r.c.queries(ctx).UserFindByAlias(ctx, alias))
+	row, err := r.c.queries(ctx).UserFindByAlias(ctx, alias)
+	return one(ctx, row, err)
 }
 
 func (r *User) FindBySub(ctx context.Context, sub string) (*user.User, error) {
-	return one(r.c.queries(ctx).UserFindBySub(ctx, sub))
+	row, err := r.c.queries(ctx).UserFindBySub(ctx, sub)
+	return one(ctx, row, err)
 }
 
 func (r *User) FindByNameOrEmail(ctx context.Context, nameOrEmail string) (*user.User, error) {
-	return one(r.c.queries(ctx).UserFindByNameOrEmail(ctx, nameOrEmail))
+	row, err := r.c.queries(ctx).UserFindByNameOrEmail(ctx, nameOrEmail)
+	return one(ctx, row, err)
 }
 
 func (r *User) FindByVerification(ctx context.Context, code string) (*user.User, error) {
-	return one(r.c.queries(ctx).UserFindByVerification(ctx, code))
+	row, err := r.c.queries(ctx).UserFindByVerification(ctx, code)
+	return one(ctx, row, err)
 }
 
 func (r *User) FindByPasswordResetRequest(ctx context.Context, token string) (*user.User, error) {
-	return one(r.c.queries(ctx).UserFindByPasswordResetRequest(ctx, token))
+	row, err := r.c.queries(ctx).UserFindByPasswordResetRequest(ctx, token)
+	return one(ctx, row, err)
 }
 
 // FindByNameOrAlias: case-insensitive substring match on name OR alias, mirroring
@@ -170,7 +181,7 @@ func (r *User) FindByPasswordResetRequest(ctx context.Context, token string) (*u
 func (r *User) FindByNameOrAlias(ctx context.Context, nameOrAlias string) (user.List, error) {
 	kw := likeContains(nameOrAlias)
 	rows, err := r.c.resolve(ctx).Query(ctx,
-		`SELECT * FROM users WHERE name ILIKE $1 OR alias ILIKE $1 ORDER BY id`, kw)
+		`SELECT `+userColumns+` FROM users WHERE name ILIKE $1 OR alias ILIKE $1 ORDER BY id`, kw)
 	if err != nil {
 		return nil, err
 	}
@@ -185,7 +196,7 @@ func (r *User) SearchByKeyword(ctx context.Context, keyword string) (user.List, 
 	}
 	kw := likeContains(keyword)
 	rows, err := r.c.resolve(ctx).Query(ctx,
-		`SELECT * FROM users WHERE name ILIKE $1 OR email ILIKE $1 ORDER BY name LIMIT 10`, kw)
+		`SELECT `+userColumns+` FROM users WHERE name ILIKE $1 OR email ILIKE $1 ORDER BY name LIMIT 10`, kw)
 	if err != nil {
 		return nil, err
 	}
@@ -217,6 +228,12 @@ func likeContains(s string) string {
 	s = strings.ReplaceAll(s, "_", `\_`)
 	return "%" + s + "%"
 }
+
+// userColumns is the explicit column list for hand-built queries, in the exact
+// order scanUsers (and gen.User) expects. Using it instead of `SELECT *` keeps
+// row scanning stable if the table's column order ever changes.
+const userColumns = "id, name, alias, email, workspace, password, subs, " +
+	"latest_logout_at, metadata, verification, password_reset, team, lang, theme, updated_at"
 
 func scanUsers(rows pgx.Rows) (user.List, error) {
 	defer rows.Close()
@@ -273,7 +290,7 @@ func paginateUsers(ctx context.Context, c *Client, ids []string, alias *string, 
 		return cursorPageUsers(ctx, c, base, args, total, p.Cursor)
 	}
 	if p != nil && p.Offset != nil {
-		q := "SELECT * " + base + " ORDER BY id LIMIT $" + itoa(len(args)+1) + " OFFSET $" + itoa(len(args)+2)
+		q := "SELECT " + userColumns + " " + base + " ORDER BY id LIMIT $" + itoa(len(args)+1) + " OFFSET $" + itoa(len(args)+2)
 		args = append(args, p.Offset.Limit, p.Offset.Offset)
 		rows, err := c.resolve(ctx).Query(ctx, q, args...)
 		if err != nil {
@@ -286,7 +303,7 @@ func paginateUsers(ctx context.Context, c *Client, ids []string, alias *string, 
 		return list, usecasex.NewPageInfo(total, cur(list, true), cur(list, false), false, false), nil
 	}
 
-	rows, err := c.resolve(ctx).Query(ctx, "SELECT * "+base+" ORDER BY id", args...)
+	rows, err := c.resolve(ctx).Query(ctx, "SELECT "+userColumns+" "+base+" ORDER BY id", args...)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -321,7 +338,7 @@ func cursorPageUsers(ctx context.Context, c *Client, base string, args []any, to
 		conds += " ORDER BY id DESC LIMIT $" + itoa(len(args)+1)
 	}
 	args = append(args, limit+1) // fetch one extra to detect more
-	rows, err := c.resolve(ctx).Query(ctx, "SELECT * "+conds, args...)
+	rows, err := c.resolve(ctx).Query(ctx, "SELECT "+userColumns+" "+conds, args...)
 	if err != nil {
 		return nil, nil, err
 	}

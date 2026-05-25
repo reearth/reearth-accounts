@@ -46,15 +46,25 @@ func (r *Config) LockAndLoad(ctx context.Context) (*config.Config, error) {
 		return &config.Config{}, nil
 	}
 	if err != nil {
+		// Release the advisory lock and connection so a failed load doesn't leak
+		// a pool connection or hold the lock forever. Safe to clear r.conn here:
+		// we still hold r.mu (released by the deferred Unlock above).
+		_, _ = conn.Exec(ctx, `SELECT pg_advisory_unlock($1)`, configAdvisoryLockKey)
+		conn.Release()
+		r.conn = nil
 		return nil, rerror.ErrInternalByWithContext(ctx, err)
 	}
 	return row.Model(), nil
 }
 
-// exec runs on the locked connection if held, else on the pool.
+// exec runs on the locked connection if held, else on the pool. The held
+// connection is read under r.mu to avoid racing with LockAndLoad/Unlock.
 func (r *Config) exec(ctx context.Context, sql string, args ...any) error {
-	if r.conn != nil {
-		_, err := r.conn.Exec(ctx, sql, args...)
+	r.mu.Lock()
+	conn := r.conn
+	r.mu.Unlock()
+	if conn != nil {
+		_, err := conn.Exec(ctx, sql, args...)
 		return err
 	}
 	_, err := r.pool.Exec(ctx, sql, args...)

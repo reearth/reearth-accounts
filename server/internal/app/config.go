@@ -66,7 +66,9 @@ func (c *Config) ResolveDBDriver() string {
 	if c.DBDriver != "" {
 		return strings.ToLower(c.DBDriver)
 	}
-	if strings.HasPrefix(c.DB, "postgres://") || strings.HasPrefix(c.DB, "postgresql://") {
+	// URI schemes are case-insensitive, so normalize before matching.
+	db := strings.ToLower(c.DB)
+	if strings.HasPrefix(db, "postgres://") || strings.HasPrefix(db, "postgresql://") {
 		return "postgres"
 	}
 	return "mongo"

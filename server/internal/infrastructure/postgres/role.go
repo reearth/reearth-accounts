@@ -39,7 +39,7 @@ func roleModels(rs []gen.Role) (role.List, error) {
 func (r *Role) FindAll(ctx context.Context) (role.List, error) {
 	rows, err := r.c.queries(ctx).RoleFindAll(ctx)
 	if err != nil {
-		return nil, err
+		return nil, rerror.ErrInternalByWithContext(ctx, err)
 	}
 	return roleModels(rows)
 }
@@ -50,7 +50,7 @@ func (r *Role) FindByID(ctx context.Context, rid id.RoleID) (*role.Role, error) 
 		return nil, rerror.ErrNotFound
 	}
 	if err != nil {
-		return nil, err
+		return nil, rerror.ErrInternalByWithContext(ctx, err)
 	}
 	return roleModel(row)
 }
@@ -58,9 +58,12 @@ func (r *Role) FindByID(ctx context.Context, rid id.RoleID) (*role.Role, error) 
 // FindByIDs returns only the roles that exist (no nil placeholders), mirroring
 // the Mongo backend which returns found rows without preserving request order.
 func (r *Role) FindByIDs(ctx context.Context, ids id.RoleIDList) (role.List, error) {
+	if len(ids) == 0 {
+		return nil, nil
+	}
 	rows, err := r.c.queries(ctx).RoleFindByIDs(ctx, ids.Strings())
 	if err != nil {
-		return nil, err
+		return nil, rerror.ErrInternalByWithContext(ctx, err)
 	}
 	return roleModels(rows)
 }
@@ -71,7 +74,7 @@ func (r *Role) FindByName(ctx context.Context, name string) (*role.Role, error) 
 		return nil, rerror.ErrNotFound
 	}
 	if err != nil {
-		return nil, err
+		return nil, rerror.ErrInternalByWithContext(ctx, err)
 	}
 	return roleModel(row)
 }

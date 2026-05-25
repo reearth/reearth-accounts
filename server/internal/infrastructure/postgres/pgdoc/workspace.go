@@ -126,7 +126,13 @@ func WorkspaceModel(r *WorkspaceRow, members []WorkspaceMemberRow, integrations 
 		if err != nil {
 			return nil, err
 		}
-		integs[iid] = workspace.Member{Role: role.RoleType(m.Role), Disabled: m.Disabled, InvitedBy: id.MustUserID(m.InvitedBy)}
+		// invited_by may be empty/invalid (text column, default ''); parse safely
+		// and fall back to the zero UserID rather than panicking (MustUserID).
+		inviter, err := id.UserIDFrom(m.InvitedBy)
+		if err != nil {
+			inviter = id.UserID{}
+		}
+		integs[iid] = workspace.Member{Role: role.RoleType(m.Role), Disabled: m.Disabled, InvitedBy: inviter}
 	}
 
 	var policy *workspace.PolicyID
