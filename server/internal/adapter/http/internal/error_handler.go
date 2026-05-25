@@ -96,11 +96,13 @@ func mapError(err error) *ErrorResponse {
 		return &ErrorResponse{Status: http.StatusConflict, Message: "conflict", Description: err.Error(), Err: err}
 	case errors.Is(err, ErrForbidden),
 		errors.Is(err, interfaces.ErrPermissionDenied),
+		errors.Is(err, interfaces.ErrOperationDenied),
 		errors.Is(err, interfaces.ErrCannotChangeOwnerRole),
 		errors.Is(err, interfaces.ErrCannotSelfPromote),
 		errors.Is(err, interfaces.ErrOwnerCannotLeaveTheWorkspace):
 		return &ErrorResponse{Status: http.StatusForbidden, Message: "forbidden", Description: err.Error(), Err: err}
-	case errors.Is(err, ErrUnauthorized):
+	case errors.Is(err, ErrUnauthorized),
+		errors.Is(err, interfaces.ErrInvalidOperator):
 		return &ErrorResponse{Status: http.StatusUnauthorized, Message: "unauthorized", Description: "authentication is required"}
 	case errors.Is(err, interfaces.ErrInvalidUserEmail),
 		errors.Is(err, interfaces.ErrInvalidEmailOrPassword),
@@ -108,6 +110,7 @@ func mapError(err error) *ErrorResponse {
 		errors.Is(err, interfaces.ErrUserInvalidPasswordReset),
 		errors.Is(err, interfaces.ErrUserInvalidLang),
 		errors.Is(err, interfaces.ErrSignupInvalidSecret),
+		errors.Is(err, interfaces.ErrInvalidPhotoURL),
 		errors.Is(err, interfaces.ErrNotVerifiedUser):
 		return &ErrorResponse{Status: http.StatusBadRequest, Message: "bad request", Description: err.Error(), Err: err}
 	default:

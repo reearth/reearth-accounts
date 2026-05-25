@@ -29,12 +29,14 @@ func ParseUserIDs(ss []string) (user.IDList, error) {
 	return out, nil
 }
 
-// ParseLang converts an optional BCP-47 string to a language tag pointer.
+// ParseLang converts an optional BCP-47 string to a language tag pointer. It returns
+// nil when the field is omitted/empty so update requests don't overwrite an existing
+// language with "und"; a tag is only built when a value is actually provided.
 func ParseLang(s *string) *language.Tag {
-	t := language.Tag{}
-	if s != nil {
-		t = language.Make(*s)
+	if s == nil || *s == "" {
+		return nil
 	}
+	t := language.Make(*s)
 	return &t
 }
 

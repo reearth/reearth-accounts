@@ -1,6 +1,8 @@
 package http
 
 import (
+	"crypto/subtle"
+
 	"github.com/labstack/echo/v4"
 	"github.com/labstack/echo/v4/middleware"
 	"github.com/reearth/reearth-accounts/server/internal/adapter"
@@ -108,7 +110,10 @@ func RegisterRESTRouter(e *echo.Echo, cfg RouterConfig) {
 	// --- Swagger ---
 	if cfg.SwaggerUser != "" {
 		e.GET("/swagger/*", echoSwagger.WrapHandler, middleware.BasicAuth(func(u, p string, _ echo.Context) (bool, error) {
-			return u == cfg.SwaggerUser && p == cfg.SwaggerPass, nil
+			// constant-time comparison to avoid leaking credential length/match via timing
+			userOK := subtle.ConstantTimeCompare([]byte(u), []byte(cfg.SwaggerUser)) == 1
+			passOK := subtle.ConstantTimeCompare([]byte(p), []byte(cfg.SwaggerPass)) == 1
+			return userOK && passOK, nil
 		}))
 	} else {
 		e.GET("/swagger/*", echoSwagger.WrapHandler)

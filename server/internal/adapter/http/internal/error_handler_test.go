@@ -26,6 +26,9 @@ func TestCustomHTTPErrorHandler(t *testing.T) {
 	assert.Equal(t, http.StatusConflict, handleStatus(t, interfaces.ErrUserAlreadyExists))
 	assert.Equal(t, http.StatusConflict, handleStatus(t, interfaces.ErrUserAliasAlreadyExists))
 	assert.Equal(t, http.StatusForbidden, handleStatus(t, interfaces.ErrPermissionDenied))
+	assert.Equal(t, http.StatusForbidden, handleStatus(t, interfaces.ErrOperationDenied))
 	assert.Equal(t, http.StatusUnauthorized, handleStatus(t, httpinternal.ErrUnauthorized))
+	assert.Equal(t, http.StatusUnauthorized, handleStatus(t, interfaces.ErrInvalidOperator))
+	assert.Equal(t, http.StatusBadRequest, handleStatus(t, interfaces.ErrInvalidPhotoURL))
 	assert.Equal(t, http.StatusInternalServerError, handleStatus(t, assert.AnError))
 }

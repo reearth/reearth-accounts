@@ -43,14 +43,20 @@ func RequiredAuth(resolve AuthResolver) echo.MiddlewareFunc {
 	}
 }
 
-// OptionalAuth attaches User+Operator when the request resolves to a user, else
-// proceeds anonymously. The resolver is always invoked so mock-auth mode resolves
-// the fixed mock user.
+// OptionalAuth attaches User+Operator when the request resolves to a user, and
+// proceeds anonymously when the resolver succeeds but finds no user. Genuine resolver
+// errors (e.g. a datastore outage) are propagated so they surface as 5xx rather than
+// being silently downgraded to anonymous access. The resolver is always invoked so
+// mock-auth mode resolves the fixed mock user.
 func OptionalAuth(resolve AuthResolver) echo.MiddlewareFunc {
 	return func(next echo.HandlerFunc) echo.HandlerFunc {
 		return func(c echo.Context) error {
 			ctx := c.Request().Context()
-			if u, op, err := resolve(c, adapter.GetAuthInfo(ctx)); err == nil && u != nil {
+			u, op, err := resolve(c, adapter.GetAuthInfo(ctx))
+			if err != nil {
+				return err
+			}
+			if u != nil {
 				ctx = adapter.AttachUser(ctx, u)
 				ctx = adapter.AttachOperator(ctx, op)
 				c.SetRequest(c.Request().WithContext(ctx))

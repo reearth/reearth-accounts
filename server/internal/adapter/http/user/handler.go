@@ -110,7 +110,7 @@ func (h *Handler) Get(c echo.Context) error {
 	ctx := c.Request().Context()
 	uid, err := id.UserIDFrom(c.Param("id"))
 	if err != nil {
-		return rerror.ErrNotFound
+		return httpinternal.NewError(http.StatusBadRequest, "invalid user id", nil)
 	}
 	res, err := httpinternal.Usecases(c).User.FetchByID(ctx, id.UserIDList{uid})
 	if err != nil {
@@ -125,13 +125,14 @@ func (h *Handler) Get(c echo.Context) error {
 // List godoc
 // @Tags User
 // @Summary List users by IDs (optionally paginated with alias filter)
+// @Description Default form returns an array of users. When page, page_size, or alias is supplied, a paginated object is returned instead: {"items": [user...], "pagination": {"page", "page_size", "total"}}.
 // @Security BearerAuth
 // @Param ids query string false "comma-separated user IDs"
 // @Param alias query string false "alias filter (requires pagination)"
 // @Param page query int false "page (default 1)"
 // @Param page_size query int false "page size (default 50, max 100)"
 // @Produce json
-// @Success 200 {object} httpmodel.UserResponse
+// @Success 200 {array} httpmodel.UserResponse "array form; the paginated form returns an object wrapper (see description)"
 // @Router /api/users [get]
 func (h *Handler) List(c echo.Context) error {
 	ctx := c.Request().Context()
@@ -403,7 +404,8 @@ func (h *Handler) PasswordReset(c echo.Context) error {
 // @Accept json
 // @Produce json
 // @Param body body httpmodel.FindOrCreateRequest true "sub, iss, token"
-// @Success 200 {object} httpmodel.UserResponse
+// @Success 204 "No Content (stub mirroring the GraphQL findOrCreate resolver)"
+// @Failure 400 {object} internal.ErrorResponse
 // @Router /api/users/find-or-create [post]
 func (h *Handler) FindOrCreate(c echo.Context) error {
 	// The GraphQL findOrCreate resolver is currently a stub (returns nil), and the

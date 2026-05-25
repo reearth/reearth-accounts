@@ -115,6 +115,7 @@ const docTemplate = `{
                         "BearerAuth": []
                     }
                 ],
+                "description": "Default form returns an array of users. When page, page_size, or alias is supplied, a paginated object is returned instead: {\"items\": [user...], \"pagination\": {\"page\", \"page_size\", \"total\"}}.",
                 "produces": [
                     "application/json"
                 ],
@@ -150,9 +151,12 @@ const docTemplate = `{
                 ],
                 "responses": {
                     "200": {
-                        "description": "OK",
+                        "description": "array form; the paginated form returns an object wrapper (see description)",
                         "schema": {
-                            "$ref": "#/definitions/httpmodel.UserResponse"
+                            "type": "array",
+                            "items": {
+                                "$ref": "#/definitions/httpmodel.UserResponse"
+                            }
                         }
                     }
                 }
@@ -296,10 +300,13 @@ const docTemplate = `{
                     }
                 ],
                 "responses": {
-                    "200": {
-                        "description": "OK",
+                    "204": {
+                        "description": "No Content (stub mirroring the GraphQL findOrCreate resolver)"
+                    },
+                    "400": {
+                        "description": "Bad Request",
                         "schema": {
-                            "$ref": "#/definitions/httpmodel.UserResponse"
+                            "$ref": "#/definitions/internal.ErrorResponse"
                         }
                     }
                 }
@@ -733,6 +740,7 @@ const docTemplate = `{
                         "BearerAuth": []
                     }
                 ],
+                "description": "Response shape depends on the selector: ids and user_id return an array of workspaces; name and alias return a single workspace object; user_id with page/page_size returns a paginated object {\"items\": [...], \"pagination\": {...}}.",
                 "produces": [
                     "application/json"
                 ],
@@ -780,9 +788,12 @@ const docTemplate = `{
                 ],
                 "responses": {
                     "200": {
-                        "description": "OK",
+                        "description": "array for ids/user_id; a single object for name/alias; a paginated object when paginating by user_id (see description)",
                         "schema": {
-                            "$ref": "#/definitions/httpmodel.WorkspaceResponse"
+                            "type": "array",
+                            "items": {
+                                "$ref": "#/definitions/httpmodel.WorkspaceResponse"
+                            }
                         }
                     }
                 }

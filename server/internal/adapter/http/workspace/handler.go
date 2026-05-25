@@ -74,6 +74,7 @@ func (h *Handler) Get(c echo.Context) error {
 // List godoc
 // @Tags Workspace
 // @Summary List workspaces by a single selector (ids|name|alias|user_id)
+// @Description Response shape depends on the selector: ids and user_id return an array of workspaces; name and alias return a single workspace object; user_id with page/page_size returns a paginated object {"items": [...], "pagination": {...}}.
 // @Security BearerAuth
 // @Param ids query string false "comma-separated workspace IDs"
 // @Param name query string false "workspace name"
@@ -82,7 +83,7 @@ func (h *Handler) Get(c echo.Context) error {
 // @Param page query int false "page (default 1)"
 // @Param page_size query int false "page size (default 50, max 100)"
 // @Produce json
-// @Success 200 {object} httpmodel.WorkspaceResponse
+// @Success 200 {array} httpmodel.WorkspaceResponse "array for ids/user_id; a single object for name/alias; a paginated object when paginating by user_id (see description)"
 // @Router /api/workspaces [get]
 func (h *Handler) List(c echo.Context) error {
 	ctx := c.Request().Context()
