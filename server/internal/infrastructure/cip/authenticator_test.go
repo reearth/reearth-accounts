@@ -52,6 +52,11 @@ func newTestAuthenticator(c firebaseAuthClient) *Authenticator {
 
 func strptr(s string) *string { return &s }
 
+func TestCIP_New_RequiresProjectID(t *testing.T) {
+	_, err := New(context.Background(), Params{})
+	assert.Error(t, err)
+}
+
 func TestCIP_UpdateUser(t *testing.T) {
 	fake := &fakeAuthClient{
 		getUser: func(_ context.Context, uid string) (*fbauth.UserRecord, error) {

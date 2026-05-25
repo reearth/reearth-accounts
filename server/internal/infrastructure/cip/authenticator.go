@@ -38,6 +38,13 @@ var _ gateway.Authenticator = (*Authenticator)(nil)
 // New constructs a CIP Authenticator using Application Default Credentials.
 // When p.TenantID is set, management calls are scoped to that GCIP tenant.
 func New(ctx context.Context, p Params) (*Authenticator, error) {
+	// Fail fast on an inconsistent configuration: selecting CIP without a project
+	// id means Config.Auths() never registers the CIP JWT provider (so CIP tokens
+	// would not validate) while management calls would still be routed to Firebase.
+	if p.ProjectID == "" {
+		return nil, rerror.NewE(i18n.T("cip project id is required"))
+	}
+
 	app, err := firebase.NewApp(ctx, &firebase.Config{ProjectID: p.ProjectID})
 	if err != nil {
 		log.Errorf("cip: init firebase app: %+v", err)
