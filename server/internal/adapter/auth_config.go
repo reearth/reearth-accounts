@@ -71,18 +71,14 @@ func ExtractAuthConfigData(provider AuthConfigProvider) *AuthConfigData {
 		ac.CIPTenantID = lo.ToPtr(v)
 	}
 
-	// AuthProvider: honor explicit config; otherwise infer from what is set.
+	// AuthProvider: explicit config, defaulting to auth0.
+	// GetAuthProvider always returns a non-empty value ("auth0" by default), so
+	// "cip" must be opted into explicitly via REEARTH_ACCOUNTS_AUTH_PROVIDER.
 	switch provider.GetAuthProvider() {
 	case "cip":
 		ac.AuthProvider = lo.ToPtr("cip")
-	case "auth0":
+	default: // "auth0"
 		ac.AuthProvider = lo.ToPtr("auth0")
-	default:
-		if ac.CIPProjectID != nil {
-			ac.AuthProvider = lo.ToPtr("cip")
-		} else if ac.Auth0Domain != nil {
-			ac.AuthProvider = lo.ToPtr("auth0")
-		}
 	}
 
 	return ac

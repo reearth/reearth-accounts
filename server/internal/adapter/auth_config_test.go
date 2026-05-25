@@ -50,6 +50,18 @@ func TestExtractAuthConfigData_CIP(t *testing.T) {
 	assert.Equal(t, "my-proj.firebaseapp.com", *ac.CIPAuthDomain)
 }
 
+func TestExtractAuthConfigData_DefaultsToAuth0(t *testing.T) {
+	// An empty authProvider must resolve to "auth0" (the default), even when CIP
+	// advertisement fields are present: "cip" is opt-in only.
+	ac := ExtractAuthConfigData(fakeProvider{
+		authProvider: "",
+		cipProjectID: "my-proj",
+		cipAPIKey:    "api-key",
+	})
+	assert.Equal(t, "auth0", *ac.AuthProvider)
+	assert.Equal(t, "my-proj", *ac.CIPProjectID)
+}
+
 func TestExtractAuthConfigData_Nil(t *testing.T) {
 	assert.NotNil(t, ExtractAuthConfigData(nil))
 }
