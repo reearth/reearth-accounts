@@ -28,7 +28,7 @@ func (t *Transaction) Begin(ctx context.Context) (usecasex.Tx, error) {
 	if err != nil {
 		return nil, err
 	}
-	return &Tx{ctx: withTx(ctx, pgtx), tx: pgtx}, nil
+	return &Tx{ctx: txToContext(ctx, pgtx), tx: pgtx}, nil
 }
 
 // Tx implements usecasex.Tx; it commits on End only when Commit was called.

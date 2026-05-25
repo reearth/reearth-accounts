@@ -217,7 +217,7 @@ func (r *Workspace) Save(ctx context.Context, ws *workspace.Workspace) error {
 
 func (r *Workspace) save(ctx context.Context, ws *workspace.Workspace) error {
 	row, members, integrations := pgdoc.NewWorkspaceRows(ws)
-	return r.c.inTx(ctx, func(ctx context.Context) error {
+	return r.c.WithinTransaction(ctx, func(ctx context.Context) error {
 		q := r.c.queries(ctx)
 		if err := q.WorkspaceUpsert(ctx, gen.WorkspaceUpsertParams{
 			ID: row.ID, Name: row.Name, Alias: row.Alias, Email: row.Email, Personal: row.Personal,
@@ -261,7 +261,7 @@ func (r *Workspace) SaveAll(ctx context.Context, list workspace.List) error {
 			return repo.ErrOperationDenied
 		}
 	}
-	return r.c.inTx(ctx, func(ctx context.Context) error {
+	return r.c.WithinTransaction(ctx, func(ctx context.Context) error {
 		for _, ws := range list {
 			if ws == nil {
 				continue
@@ -293,7 +293,7 @@ func (r *Workspace) RemoveAll(ctx context.Context, ids id.WorkspaceIDList) error
 			return repo.ErrOperationDenied
 		}
 	}
-	return r.c.inTx(ctx, func(ctx context.Context) error {
+	return r.c.WithinTransaction(ctx, func(ctx context.Context) error {
 		for _, wid := range ids {
 			if err := r.c.queries(ctx).WorkspaceDelete(ctx, wid.String()); err != nil {
 				return rerror.ErrInternalByWithContext(ctx, err)

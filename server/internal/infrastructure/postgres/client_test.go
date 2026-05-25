@@ -17,12 +17,12 @@ func TestResolveDBTX(t *testing.T) {
 	ctx := context.Background()
 
 	// no tx in ctx -> falls back to the pool (here a typed-nil *pgxpool.Pool).
-	assert.Equal(t, DBTX(c.pool), c.resolve(ctx))
+	assert.Equal(t, DBTX(c.pool), c.db(ctx))
 
 	// tx in ctx -> returns that tx.
 	tx := fakeTx{}
-	ctx2 := withTx(ctx, tx)
-	assert.Equal(t, DBTX(tx), c.resolve(ctx2))
+	ctx2 := txToContext(ctx, tx)
+	assert.Equal(t, DBTX(tx), c.db(ctx2))
 
 	// txFromContext round-trips.
 	got, ok := txFromContext(ctx2)

@@ -180,7 +180,7 @@ func (r *User) FindByPasswordResetRequest(ctx context.Context, token string) (*u
 // when nothing matches.
 func (r *User) FindByNameOrAlias(ctx context.Context, nameOrAlias string) (user.List, error) {
 	kw := likeContains(nameOrAlias)
-	rows, err := r.c.resolve(ctx).Query(ctx,
+	rows, err := r.c.db(ctx).Query(ctx,
 		`SELECT `+userColumns+` FROM users WHERE name ILIKE $1 OR alias ILIKE $1 ORDER BY id`, kw)
 	if err != nil {
 		return nil, err
@@ -195,7 +195,7 @@ func (r *User) SearchByKeyword(ctx context.Context, keyword string) (user.List, 
 		return nil, nil
 	}
 	kw := likeContains(keyword)
-	rows, err := r.c.resolve(ctx).Query(ctx,
+	rows, err := r.c.db(ctx).Query(ctx,
 		`SELECT `+userColumns+` FROM users WHERE name ILIKE $1 OR email ILIKE $1 ORDER BY name LIMIT 10`, kw)
 	if err != nil {
 		return nil, err
@@ -282,7 +282,7 @@ func paginateUsers(ctx context.Context, c *Client, ids []string, alias *string, 
 	base := "FROM users WHERE " + strings.Join(where, " AND ")
 
 	var total int64
-	if err := c.resolve(ctx).QueryRow(ctx, "SELECT count(*) "+base, args...).Scan(&total); err != nil {
+	if err := c.db(ctx).QueryRow(ctx, "SELECT count(*) "+base, args...).Scan(&total); err != nil {
 		return nil, nil, err
 	}
 
@@ -292,7 +292,7 @@ func paginateUsers(ctx context.Context, c *Client, ids []string, alias *string, 
 	if p != nil && p.Offset != nil {
 		q := "SELECT " + userColumns + " " + base + " ORDER BY id LIMIT $" + itoa(len(args)+1) + " OFFSET $" + itoa(len(args)+2)
 		args = append(args, p.Offset.Limit, p.Offset.Offset)
-		rows, err := c.resolve(ctx).Query(ctx, q, args...)
+		rows, err := c.db(ctx).Query(ctx, q, args...)
 		if err != nil {
 			return nil, nil, err
 		}
@@ -303,7 +303,7 @@ func paginateUsers(ctx context.Context, c *Client, ids []string, alias *string, 
 		return list, usecasex.NewPageInfo(total, cur(list, true), cur(list, false), false, false), nil
 	}
 
-	rows, err := c.resolve(ctx).Query(ctx, "SELECT "+userColumns+" "+base+" ORDER BY id", args...)
+	rows, err := c.db(ctx).Query(ctx, "SELECT "+userColumns+" "+base+" ORDER BY id", args...)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -338,7 +338,7 @@ func cursorPageUsers(ctx context.Context, c *Client, base string, args []any, to
 		conds += " ORDER BY id DESC LIMIT $" + itoa(len(args)+1)
 	}
 	args = append(args, limit+1) // fetch one extra to detect more
-	rows, err := c.resolve(ctx).Query(ctx, "SELECT "+userColumns+" "+conds, args...)
+	rows, err := c.db(ctx).Query(ctx, "SELECT "+userColumns+" "+conds, args...)
 	if err != nil {
 		return nil, nil, err
 	}

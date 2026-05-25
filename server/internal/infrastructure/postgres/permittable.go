@@ -102,7 +102,7 @@ func (r *Permittable) FindByRoleID(ctx context.Context, rid id.RoleID) (permitta
 
 func (r *Permittable) Save(ctx context.Context, p permittable.Permittable) error {
 	row, wrs := pgdoc.NewPermittableRow(p)
-	return r.c.inTx(ctx, func(ctx context.Context) error {
+	return r.c.WithinTransaction(ctx, func(ctx context.Context) error {
 		q := r.c.queries(ctx)
 		// ON CONFLICT (user_id) keeps the existing row's id; use the returned
 		// canonical id for the workspace_roles child rows.
@@ -130,7 +130,7 @@ func (r *Permittable) SaveMany(ctx context.Context, list permittable.List) error
 	if len(list) == 0 {
 		return nil
 	}
-	return r.c.inTx(ctx, func(ctx context.Context) error {
+	return r.c.WithinTransaction(ctx, func(ctx context.Context) error {
 		for _, p := range list {
 			if p == nil {
 				continue
