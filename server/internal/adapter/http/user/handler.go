@@ -143,7 +143,7 @@ func (h *Handler) List(c echo.Context) error {
 	if idsParam != "" {
 		parsed, err := httpmodel.ParseUserIDs(strings.Split(idsParam, ","))
 		if err != nil {
-			return err
+			return httpinternal.NewError(http.StatusBadRequest, "invalid user id in ids", nil)
 		}
 		ids = parsed
 	}
@@ -260,6 +260,14 @@ func (h *Handler) Signup(c echo.Context) error {
 	if err := httpinternal.BindValidate(c, req); err != nil {
 		return err
 	}
+	uid, err := parseUserIDRef(req.ID)
+	if err != nil {
+		return httpinternal.NewError(http.StatusBadRequest, "invalid id", nil)
+	}
+	wid, err := parseWorkspaceIDRef(req.WorkspaceID)
+	if err != nil {
+		return httpinternal.NewError(http.StatusBadRequest, "invalid workspace_id", nil)
+	}
 	param := interfaces.SignupParam{
 		Email:       req.Email,
 		Name:        req.Name,
@@ -267,8 +275,8 @@ func (h *Handler) Signup(c echo.Context) error {
 		Secret:      req.Secret,
 		Lang:        httpmodel.ParseLang(req.Lang),
 		Theme:       httpmodel.ParseTheme(req.Theme),
-		UserID:      parseUserIDRef(req.ID),
-		WorkspaceID: parseWorkspaceIDRef(req.WorkspaceID),
+		UserID:      uid,
+		WorkspaceID: wid,
 		MockAuth:    lo.FromPtr(req.MockAuth),
 	}
 	u, err := httpinternal.Usecases(c).User.Signup(ctx, param)
@@ -297,6 +305,14 @@ func (h *Handler) SignupOIDC(c echo.Context) error {
 	if ai != nil {
 		accessToken, iss = ai.Token, ai.Iss
 	}
+	uid, err := parseUserIDRef(req.ID)
+	if err != nil {
+		return httpinternal.NewError(http.StatusBadRequest, "invalid id", nil)
+	}
+	wid, err := parseWorkspaceIDRef(req.WorkspaceID)
+	if err != nil {
+		return httpinternal.NewError(http.StatusBadRequest, "invalid workspace_id", nil)
+	}
 	param := interfaces.SignupOIDCParam{
 		Sub:         lo.FromPtr(req.Sub),
 		AccessToken: accessToken,
@@ -306,8 +322,8 @@ func (h *Handler) SignupOIDC(c echo.Context) error {
 		Secret:      req.Secret,
 		User: interfaces.SignupUserParam{
 			Lang:        httpmodel.ParseLang(req.Lang),
-			UserID:      parseUserIDRef(req.ID),
-			WorkspaceID: parseWorkspaceIDRef(req.WorkspaceID),
+			UserID:      uid,
+			WorkspaceID: wid,
 		},
 	}
 	u, err := httpinternal.Usecases(c).User.SignupOIDC(ctx, param)
@@ -421,26 +437,30 @@ func (h *Handler) FindOrCreate(c echo.Context) error {
 	return c.NoContent(http.StatusNoContent)
 }
 
-func parseUserIDRef(s *string) *id.UserID {
+// parseUserIDRef parses an optional user ID reference: (nil, nil) when omitted/empty,
+// (id, nil) when valid, and (nil, err) when a value is provided but malformed so the
+// caller can return 400 rather than silently ignoring bad input.
+func parseUserIDRef(s *string) (*id.UserID, error) {
 	if s == nil || *s == "" {
-		return nil
+		return nil, nil
 	}
 	uid, err := id.UserIDFrom(*s)
 	if err != nil {
-		return nil
+		return nil, err
 	}
-	return &uid
+	return &uid, nil
 }
 
-func parseWorkspaceIDRef(s *string) *id.WorkspaceID {
+// parseWorkspaceIDRef parses an optional workspace ID reference; see parseUserIDRef.
+func parseWorkspaceIDRef(s *string) (*id.WorkspaceID, error) {
 	if s == nil || *s == "" {
-		return nil
+		return nil, nil
 	}
 	wid, err := id.WorkspaceIDFrom(*s)
 	if err != nil {
-		return nil
+		return nil, err
 	}
-	return &wid
+	return &wid, nil
 }
 
 func adapterAuthInfo(c echo.Context) *appx.AuthInfo {

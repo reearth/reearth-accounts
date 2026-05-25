@@ -118,12 +118,18 @@ func NewMeResponse(u *user.User) *MeResponse {
 		t := u.LatestLogoutAt()
 		ll = &t
 	}
+	host := u.Host()
+	var hp *string
+	if host != "" {
+		hp = &host
+	}
 	return &MeResponse{
 		ID:             u.ID().String(),
 		Name:           u.Name(),
 		Alias:          u.Alias(),
 		Email:          u.Email(),
 		Metadata:       metadataResponse(u),
+		Host:           hp,
 		LatestLogoutAt: ll,
 		MyWorkspaceID:  u.Workspace().String(),
 		Auths:          util.Map(u.Auths(), func(a user.Auth) string { return a.Provider }),
