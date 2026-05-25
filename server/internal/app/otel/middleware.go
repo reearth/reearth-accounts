@@ -8,7 +8,7 @@ import (
 	"go.opentelemetry.io/contrib/instrumentation/github.com/labstack/echo/otelecho"
 )
 
-var skipPaths = []string{"/", "/api/ping"}
+var skipPaths = []string{"/"}
 
 func openTelemetrySkipper(c echo.Context) bool {
 	if slices.Contains(skipPaths, c.Path()) {
