@@ -59,7 +59,6 @@ func GraphqlAPI(conf *Config, dev bool) echo.HandlerFunc {
 
 	// tracing with detailed operation tracking
 	srv.AroundOperations(detailedOperationTracer())
-	srv.AroundResponses(responseTracer())
 
 	if conf.GraphQL.ComplexityLimit > 0 {
 		srv.Use(extension.FixedComplexityLimit(conf.GraphQL.ComplexityLimit))

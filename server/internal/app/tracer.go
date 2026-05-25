@@ -92,21 +92,3 @@ func detailedOperationTracer() graphql.OperationMiddleware {
 	}
 }
 
-// responseTracer creates a middleware that traces response handling
-func responseTracer() graphql.ResponseMiddleware {
-	return func(ctx context.Context, next graphql.ResponseHandler) *graphql.Response {
-		span := trace.SpanFromContext(ctx)
-
-		response := next(ctx)
-
-		if response != nil {
-			if response.Extensions != nil {
-				if complexity, ok := response.Extensions["complexity"].(int); ok {
-					span.SetAttributes(attribute.Int("graphql.response.complexity", complexity))
-				}
-			}
-		}
-
-		return response
-	}
-}
