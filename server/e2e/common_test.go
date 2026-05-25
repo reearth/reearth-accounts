@@ -155,6 +155,12 @@ func StartServerWithGateways(
 	}
 
 	ctx := context.Background()
+	if gateways == nil {
+		gateways = &gateway.Container{
+			Mailer: mailer.New(ctx, &mailer.Config{}),
+		}
+	}
+
 	l, err := net.Listen("tcp", ":0")
 	if err != nil {
 		t.Fatalf("server failed to listen: %v", err)
@@ -168,12 +174,6 @@ func StartServerWithGateways(
 			log.Fatalf("Failed to create cerbos client: %v", err)
 		}
 		cerbosAdapter = infraCerbos.NewCerbosAdapter(cerbosClient)
-	}
-
-	if gateways == nil {
-		gateways = &gateway.Container{
-			Mailer: mailer.New(ctx, &mailer.Config{}),
-		}
 	}
 
 	srv := app.NewServer(ctx, &app.ServerConfig{
@@ -201,4 +201,13 @@ func StartServerWithGateways(
 		}
 	})
 	return httpexpect.Default(t, "http://"+l.Addr().String())
+}
+
+func StartServerWithGateway(
+	t *testing.T,
+	cfg *app.Config,
+	repos *repo.Container,
+	gw *gateway.Container,
+) *httpexpect.Expect {
+	return StartServerWithGateways(t, cfg, repos, gw, true)
 }

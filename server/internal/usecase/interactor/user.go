@@ -376,7 +376,10 @@ func (i *User) VerifyUser(ctx context.Context, code string) (*user.User, error) 
 	})
 }
 func (i *User) StartPasswordReset(ctx context.Context, email string) error {
-	return Run0(ctx, nil, i.repos, Usecase().Transaction(), func(ctx context.Context) error {
+	var contact mailer.Contact
+	var mailText, mailHTML string
+
+	if err := Run0(ctx, nil, i.repos, Usecase().Transaction(), func(ctx context.Context) error {
 		u, err := i.repos.User.FindByEmail(ctx, email)
 		if err != nil {
 			return err
@@ -390,34 +393,37 @@ func (i *User) StartPasswordReset(ctx context.Context, email string) error {
 		pr := user.NewPasswordReset()
 		u.SetPasswordReset(pr)
 
-		if err := i.repos.User.Save(ctx, u); err != nil {
+		if err = i.repos.User.Save(ctx, u); err != nil {
 			return err
 		}
 
 		var TextOut, HTMLOut bytes.Buffer
 		link := i.authSrvUIDomain + "/?pwd-reset-token=" + pr.Token
-		passwordResetMailContent.UserName = u.Name()
-		passwordResetMailContent.ActionURL = htmlTmpl.URL(link)
-
-		if err := authTextTMPL.Execute(&TextOut, passwordResetMailContent); err != nil {
-			return err
-		}
-		if err := authHTMLTMPL.Execute(&HTMLOut, passwordResetMailContent); err != nil {
-			return err
+		content := mailContent{
+			UserName:    u.Name(),
+			ActionURL:   htmlTmpl.URL(link),
+			Message:     passwordResetMailContent.Message,
+			Suffix:      passwordResetMailContent.Suffix,
+			ActionLabel: passwordResetMailContent.ActionLabel,
 		}
 
-		err = i.gateways.Mailer.SendMail(ctx, []mailer.Contact{
-			{
-				Email: u.Email(),
-				Name:  u.Name(),
-			},
-		}, "Password reset", TextOut.String(), HTMLOut.String())
-		if err != nil {
+		if err = authTextTMPL.Execute(&TextOut, content); err != nil {
 			return err
 		}
+		if err = authHTMLTMPL.Execute(&HTMLOut, content); err != nil {
+			return err
+		}
+
+		contact = mailer.Contact{Email: u.Email(), Name: u.Name()}
+		mailText = TextOut.String()
+		mailHTML = HTMLOut.String()
 
 		return nil
-	})
+	}); err != nil {
+		return err
+	}
+
+	return i.gateways.Mailer.SendMail(ctx, []mailer.Contact{contact}, "Password reset", mailText, mailHTML)
 }
 
 func (i *User) PasswordReset(ctx context.Context, password string, token string) error {
