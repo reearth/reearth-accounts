@@ -3,10 +3,13 @@ package gqlerror
 import (
 	"context"
 	"errors"
+	"fmt"
 	"runtime"
 	"strings"
 
+	"github.com/hasura/go-graphql-client"
 	"github.com/reearth/reearthx/log"
+	"github.com/reearth/reearthx/rerror"
 )
 
 type AccountsError error
@@ -23,6 +26,21 @@ func ReturnAccountsError(ctx context.Context, err error) AccountsError {
 		log.Warnfc(ctx, "[Warn] unauthorized at %s:%d %+v", file, line, err)
 		return ErrUnauthorized
 	}
-	log.Errorfc(ctx, "[Error] error with caller logging at %s:%d %+v", file, line, err)
+	if isNotFoundError(err) {
+		log.Warnfc(ctx, "[Warn] not found at %s:%d %+v", file, line, err)
+		return fmt.Errorf("%w: %v", rerror.ErrNotFound, err)
+	}
 	return err
+}
+
+func isNotFoundError(err error) bool {
+	var gqlErrs graphql.Errors
+	if errors.As(err, &gqlErrs) {
+		for _, gqlErr := range gqlErrs {
+			if strings.Contains(gqlErr.Message, "not found") {
+				return true
+			}
+		}
+	}
+	return false
 }
