@@ -11,7 +11,9 @@ import (
 var skipPaths = []string{"/"}
 
 func openTelemetrySkipper(c echo.Context) bool {
-	if slices.Contains(skipPaths, c.Path()) {
+	// Match against the actual request URL because c.Path() returns the matched
+	// route pattern — unregistered paths (e.g. health checks to "/") return empty.
+	if slices.Contains(skipPaths, c.Request().URL.Path) {
 		return true
 	}
 

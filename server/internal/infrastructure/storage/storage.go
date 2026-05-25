@@ -54,7 +54,7 @@ func (s *Storage) GetSignedURL(ctx context.Context, name string) (string, error)
 	c, err := s.bucket(ctx)
 	if err != nil {
 		span.RecordError(err)
-		span.SetStatus(codes.Error, err.Error())
+		span.SetStatus(codes.Error, "bucket initialization failed")
 		return "", err
 	}
 
@@ -63,7 +63,7 @@ func (s *Storage) GetSignedURL(ctx context.Context, name string) (string, error)
 		key, kErr := rsa.GenerateKey(rand.Reader, 2048)
 		if kErr != nil {
 			span.RecordError(kErr)
-			span.SetStatus(codes.Error, kErr.Error())
+			span.SetStatus(codes.Error, "rsa key generation failed")
 			return "", kErr
 		}
 
@@ -82,7 +82,7 @@ func (s *Storage) GetSignedURL(ctx context.Context, name string) (string, error)
 		})
 		if sErr != nil {
 			span.RecordError(sErr)
-			span.SetStatus(codes.Error, sErr.Error())
+			span.SetStatus(codes.Error, "signed URL generation failed")
 			return "", sErr
 		}
 
@@ -95,7 +95,7 @@ func (s *Storage) GetSignedURL(ctx context.Context, name string) (string, error)
 	})
 	if sErr != nil {
 		span.RecordError(sErr)
-		span.SetStatus(codes.Error, sErr.Error())
+		span.SetStatus(codes.Error, "signed URL generation failed")
 		return "", sErr
 	}
 
@@ -118,7 +118,7 @@ func (s *Storage) bucket(ctx context.Context) (*storage.BucketHandle, error) {
 		s.gcsClient, s.initErr = storage.NewClient(context.WithoutCancel(ctx), opts...)
 		if s.initErr != nil {
 			span.RecordError(s.initErr)
-			span.SetStatus(codes.Error, s.initErr.Error())
+			span.SetStatus(codes.Error, "GCS client initialization failed")
 		}
 	})
 	if s.initErr != nil {

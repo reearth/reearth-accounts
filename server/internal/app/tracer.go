@@ -79,7 +79,9 @@ func detailedOperationTracer() graphql.OperationMiddleware {
 				span.SetStatus(codes.Error, "GraphQL operation returned errors")
 				// Only record error count; raw error messages may contain PII and are high-cardinality.
 				span.SetAttributes(attribute.Int("graphql.errors.count", len(response.Errors)))
-				log.Warnfc(ctx, "graphql: operation '%s' completed with %d errors", spanName, len(response.Errors))
+				// GraphQL errors include expected client-side failures (validation, auth, not found).
+				// Log at Debug to avoid noisy WARN for non-actionable errors.
+				log.Debugfc(ctx, "graphql: operation '%s' completed with %d errors", spanName, len(response.Errors))
 			} else {
 				span.SetStatus(codes.Ok, "GraphQL operation completed successfully")
 				log.Debugfc(ctx, "graphql: operation '%s' completed successfully", spanName)
