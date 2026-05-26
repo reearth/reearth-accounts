@@ -180,6 +180,40 @@ func TestUser_StartPasswordReset(t *testing.T) {
 			email:     "ccc@bbb.com",
 			wantError: rerror.ErrNotFound,
 		},
+		{
+			name: "no reearth auth",
+			createUserBefore: user.New().
+				ID(id.NewUserID()).
+				Workspace(id.NewWorkspaceID()).
+				Email("noauth@bbb.com").
+				Name("NOAUTH").
+				Auths([]user.Auth{
+					{
+						Provider: "auth0",
+						Sub:      "auth0|someuser",
+					},
+				}).
+				MustBuild(),
+			email:     "noauth@bbb.com",
+			wantError: interfaces.ErrUserInvalidPasswordReset,
+		},
+		{
+			name: "empty sub",
+			createUserBefore: user.New().
+				ID(id.NewUserID()).
+				Workspace(id.NewWorkspaceID()).
+				Email("emptysub@bbb.com").
+				Name("EMPTYSUB").
+				Auths([]user.Auth{
+					{
+						Provider: user.ProviderReearth,
+						Sub:      "",
+					},
+				}).
+				MustBuild(),
+			email:     "emptysub@bbb.com",
+			wantError: interfaces.ErrUserInvalidPasswordReset,
+		},
 	}
 
 	for _, tt := range tests {
@@ -1496,4 +1530,45 @@ func TestUser_DeleteMe_SoleOwnerOfSharedWorkspaceDeleted(t *testing.T) {
 	assert.ErrorIs(t, err, rerror.ErrNotFound)
 	_, err = r.Workspace.FindByID(ctx, ownedWID)
 	assert.ErrorIs(t, err, rerror.ErrNotFound)
+}
+
+type failingMailer struct{ err error }
+
+func (f *failingMailer) SendMail(_ context.Context, _ []mailer.Contact, _, _, _ string) error {
+	return f.err
+}
+
+func TestUser_StartPasswordReset_TokenPersistedBeforeMailSend(t *testing.T) {
+	user.DefaultPasswordEncoder = &user.NoopPasswordEncoder{}
+	t.Parallel()
+
+	ctx := context.Background()
+	r := memory.New()
+	mailerErr := errors.New("smtp unavailable")
+	g := &gateway.Container{Mailer: &failingMailer{err: mailerErr}}
+	uc := NewUser(r, g, "", "")
+
+	uid := id.NewUserID()
+	tid := id.NewWorkspaceID()
+	u := user.New().
+		ID(uid).
+		Workspace(tid).
+		Email("reset@bbb.com").
+		Name("RESET").
+		Auths([]user.Auth{
+			{Provider: user.ProviderReearth, Sub: "reearth|" + uid.String()},
+		}).
+		MustBuild()
+	assert.NoError(t, r.User.Save(ctx, u))
+
+	err := uc.StartPasswordReset(ctx, "reset@bbb.com")
+
+	assert.ErrorIs(t, err, mailerErr)
+
+	// Token must be committed to DB even though the mailer failed.
+	// This is the key invariant of the fix: the transaction commits before SendMail is called,
+	// so a mailer failure never produces a sent email with an invalidated token.
+	saved, dbErr := r.User.FindByEmail(ctx, "reset@bbb.com")
+	assert.NoError(t, dbErr)
+	assert.NotNil(t, saved.PasswordReset(), "token must be persisted even when mailer fails")
 }
