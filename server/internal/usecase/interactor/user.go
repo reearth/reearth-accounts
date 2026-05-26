@@ -326,14 +326,20 @@ func (i *User) DeleteMe(ctx context.Context, userID user.ID, operator *workspace
 		updatedWorkspaces := make([]*workspace.Workspace, 0, len(workspaces))
 		deletedWorkspaces := []user.WorkspaceID{}
 
-		for _, workspace := range workspaces {
-			if !workspace.IsPersonal() && !workspace.Members().IsOnlyOwner(u.ID()) {
-				_ = workspace.Members().Leave(u.ID())
-				updatedWorkspaces = append(updatedWorkspaces, workspace)
+		for _, ws := range workspaces {
+			if !ws.IsPersonal() && !ws.Members().IsOnlyOwner(u.ID()) {
+				if err := ws.Members().Leave(u.ID()); err != nil {
+					if errors.Is(err, workspace.ErrTargetUserNotInTheWorkspace) {
+						// User already removed by a concurrent change; nothing to save
+						continue
+					}
+					return err
+				}
+				updatedWorkspaces = append(updatedWorkspaces, ws)
 				continue
 			}
 
-			deletedWorkspaces = append(deletedWorkspaces, workspace.ID())
+			deletedWorkspaces = append(deletedWorkspaces, ws.ID())
 		}
 
 		// Save workspaces
