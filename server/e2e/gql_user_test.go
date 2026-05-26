@@ -589,6 +589,76 @@ func TestDeleteMe(t *testing.T) {
 	assert.Equal(t, rerror.ErrNotFound, err)
 }
 
+func TestDeleteMe_LeavesSharedWorkspace(t *testing.T) {
+	ctx := context.Background()
+
+	sharedWID := id.NewWorkspaceID()
+
+	seeder := func(ctx context.Context, r *repo.Container) error {
+		if err := seedRoles(ctx, r); err != nil {
+			return err
+		}
+
+		auth := user.ReearthSub(uId.String())
+		u := user.New().ID(uId).Name("e2e").Email("e2e@e2e.com").Auths([]user.Auth{*auth}).Workspace(wId).MustBuild()
+		if err := r.User.Save(ctx, u); err != nil {
+			return err
+		}
+		u2 := user.New().ID(uId2).Name("e2e2").Email("e2e2@e2e.com").Workspace(wId2).MustBuild()
+		if err := r.User.Save(ctx, u2); err != nil {
+			return err
+		}
+
+		// Personal workspace for uId (will be deleted on DeleteMe)
+		personalWS := workspace.New().ID(wId).Name("e2e").Personal(true).
+			Members(map[idx.ID[id.User]]workspace.Member{
+				uId: {Role: role.RoleOwner, InvitedBy: uId},
+			}).MustBuild()
+		if err := r.Workspace.Save(ctx, personalWS); err != nil {
+			return err
+		}
+
+		// Shared workspace: uId2 is owner, uId is a writer
+		sharedWS := workspace.New().ID(sharedWID).Name("shared").
+			Members(map[idx.ID[id.User]]workspace.Member{
+				uId2: {Role: role.RoleOwner, InvitedBy: uId2},
+				uId:  {Role: role.RoleWriter, InvitedBy: uId2},
+			}).MustBuild()
+		if err := r.Workspace.Save(ctx, sharedWS); err != nil {
+			return err
+		}
+
+		return nil
+	}
+
+	e, r := StartServer(t, &app.Config{}, true, seeder)
+
+	query := fmt.Sprintf(`mutation { deleteMe(input: {userId: "%s"}){ userId }}`, uId)
+	request := GraphQLRequest{Query: query}
+	jsonData, err := json.Marshal(request)
+	assert.NoError(t, err)
+
+	e.POST("/api/graphql").
+		WithHeader("authorization", "Bearer test").
+		WithHeader("Content-Type", "application/json").
+		WithHeader("X-Reearth-Debug-User", uId.String()).
+		WithBytes(jsonData).Expect().Status(http.StatusOK).JSON().Object()
+
+	// User deleted
+	_, err = r.User.FindByID(ctx, uId)
+	assert.Equal(t, rerror.ErrNotFound, err)
+
+	// Personal workspace deleted
+	_, err = r.Workspace.FindByID(ctx, wId)
+	assert.Equal(t, rerror.ErrNotFound, err)
+
+	// Shared workspace still exists, but uId is no longer a member
+	sharedWS, err := r.Workspace.FindByID(ctx, sharedWID)
+	assert.NoError(t, err)
+	assert.False(t, sharedWS.Members().HasUser(uId), "deleted user should not remain in shared workspace")
+	assert.True(t, sharedWS.Members().HasUser(uId2), "other owner should still be in shared workspace")
+}
+
 func TestMe(t *testing.T) {
 	e, _ := StartServer(t, &app.Config{}, true, baseSeederUser)
 	query := ` { me{ id name email metadata { lang theme } myWorkspaceId } }`

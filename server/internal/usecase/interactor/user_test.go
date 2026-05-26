@@ -11,6 +11,7 @@ import (
 	"github.com/reearth/reearth-accounts/server/internal/usecase/interfaces"
 	"github.com/reearth/reearth-accounts/server/internal/usecase/repo"
 	"github.com/reearth/reearth-accounts/server/pkg/id"
+	"github.com/reearth/reearth-accounts/server/pkg/role"
 	"github.com/reearth/reearth-accounts/server/pkg/user"
 	"github.com/reearth/reearth-accounts/server/pkg/workspace"
 	"github.com/reearth/reearthx/mailer"
@@ -1396,4 +1397,103 @@ func TestUser_UpdateMe_WorkspaceMetadataFindByIDError(t *testing.T) {
 
 	assert.ErrorIs(t, err, dbError)
 	assert.Nil(t, result)
+}
+
+func TestUser_DeleteMe_DeletesUserAndPersonalWorkspace(t *testing.T) {
+	ctx := context.Background()
+	r := memory.New()
+	uc := NewUser(r, nil, "", "")
+
+	uid := id.NewUserID()
+	wid := id.NewWorkspaceID()
+	u := user.New().ID(uid).Workspace(wid).Name("Test").Email("test@example.com").MustBuild()
+	ws := workspace.New().ID(wid).Name("Test").Personal(true).Members(map[workspace.UserID]workspace.Member{
+		uid: {Role: role.RoleOwner},
+	}).MustBuild()
+
+	assert.NoError(t, r.User.Save(ctx, u))
+	assert.NoError(t, r.Workspace.Save(ctx, ws))
+
+	op := &workspace.Operator{User: &uid}
+	assert.NoError(t, uc.DeleteMe(ctx, uid, op))
+
+	_, err := r.User.FindByID(ctx, uid)
+	assert.ErrorIs(t, err, rerror.ErrNotFound)
+
+	_, err = r.Workspace.FindByID(ctx, wid)
+	assert.ErrorIs(t, err, rerror.ErrNotFound)
+}
+
+func TestUser_DeleteMe_LeavesSharedWorkspaceAndDeletesUser(t *testing.T) {
+	ctx := context.Background()
+	r := memory.New()
+	uc := NewUser(r, nil, "", "")
+
+	uid := id.NewUserID()
+	wid := id.NewWorkspaceID()
+	sharedWID := id.NewWorkspaceID()
+	ownerUID := id.NewUserID()
+
+	u := user.New().ID(uid).Workspace(wid).Name("Test").Email("test@example.com").MustBuild()
+	personalWS := workspace.New().ID(wid).Name("Test").Personal(true).Members(map[workspace.UserID]workspace.Member{
+		uid: {Role: role.RoleOwner},
+	}).MustBuild()
+	sharedWS := workspace.New().ID(sharedWID).Name("Shared").Members(map[workspace.UserID]workspace.Member{
+		uid:      {Role: role.RoleWriter},
+		ownerUID: {Role: role.RoleOwner},
+	}).MustBuild()
+
+	assert.NoError(t, r.User.Save(ctx, u))
+	assert.NoError(t, r.Workspace.Save(ctx, personalWS))
+	assert.NoError(t, r.Workspace.Save(ctx, sharedWS))
+
+	op := &workspace.Operator{User: &uid}
+	assert.NoError(t, uc.DeleteMe(ctx, uid, op))
+
+	// User and personal workspace deleted
+	_, err := r.User.FindByID(ctx, uid)
+	assert.ErrorIs(t, err, rerror.ErrNotFound)
+	_, err = r.Workspace.FindByID(ctx, wid)
+	assert.ErrorIs(t, err, rerror.ErrNotFound)
+
+	// Shared workspace persists without the deleted user
+	remaining, err := r.Workspace.FindByID(ctx, sharedWID)
+	assert.NoError(t, err)
+	assert.False(t, remaining.Members().HasUser(uid))
+	assert.True(t, remaining.Members().HasUser(ownerUID))
+}
+
+func TestUser_DeleteMe_SoleOwnerOfSharedWorkspaceDeleted(t *testing.T) {
+	ctx := context.Background()
+	r := memory.New()
+	uc := NewUser(r, nil, "", "")
+
+	uid := id.NewUserID()
+	wid := id.NewWorkspaceID()
+	ownedWID := id.NewWorkspaceID()
+
+	u := user.New().ID(uid).Workspace(wid).Name("Test").Email("test@example.com").MustBuild()
+	personalWS := workspace.New().ID(wid).Name("Test").Personal(true).Members(map[workspace.UserID]workspace.Member{
+		uid: {Role: role.RoleOwner},
+	}).MustBuild()
+	// Non-personal workspace where the user is the sole owner
+	ownedWS := workspace.New().ID(ownedWID).Name("Owned").Members(map[workspace.UserID]workspace.Member{
+		uid: {Role: role.RoleOwner},
+	}).MustBuild()
+
+	assert.NoError(t, r.User.Save(ctx, u))
+	assert.NoError(t, r.Workspace.Save(ctx, personalWS))
+	assert.NoError(t, r.Workspace.Save(ctx, ownedWS))
+
+	op := &workspace.Operator{User: &uid}
+	assert.NoError(t, uc.DeleteMe(ctx, uid, op))
+
+	_, err := r.User.FindByID(ctx, uid)
+	assert.ErrorIs(t, err, rerror.ErrNotFound)
+
+	// Both workspaces deleted since user was sole owner of both
+	_, err = r.Workspace.FindByID(ctx, wid)
+	assert.ErrorIs(t, err, rerror.ErrNotFound)
+	_, err = r.Workspace.FindByID(ctx, ownedWID)
+	assert.ErrorIs(t, err, rerror.ErrNotFound)
 }
