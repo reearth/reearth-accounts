@@ -16,9 +16,11 @@ import (
 	"github.com/reearth/reearthx/log"
 
 	"github.com/labstack/echo/v4"
-	"github.com/ravilushqa/otelgqlgen"
 	"github.com/vektah/gqlparser/v2/ast"
 	"github.com/vektah/gqlparser/v2/gqlerror"
+	"go.opentelemetry.io/otel"
+	"go.opentelemetry.io/otel/attribute"
+	"go.opentelemetry.io/otel/trace"
 )
 
 const (
@@ -54,7 +56,9 @@ func GraphqlAPI(conf *Config, dev bool) echo.HandlerFunc {
 		MaxMemory:     maxMemorySize,
 	})
 	srv.SetQueryCache(lru.New[*ast.QueryDocument](1000))
-	srv.Use(otelgqlgen.Middleware())
+
+	// tracing with detailed operation tracking
+	srv.AroundOperations(detailedOperationTracer())
 
 	if conf.GraphQL.ComplexityLimit > 0 {
 		srv.Use(extension.FixedComplexityLimit(conf.GraphQL.ComplexityLimit))
@@ -63,6 +67,8 @@ func GraphqlAPI(conf *Config, dev bool) echo.HandlerFunc {
 	srv.Use(extension.AutomaticPersistedQuery{
 		Cache: lru.New[string](30),
 	})
+
+	srv.SetErrorPresenter(gqlErrorPresenter(dev))
 
 	if dev {
 		srv.Use(extension.Introspection{})
@@ -96,7 +102,18 @@ func GraphqlAPI(conf *Config, dev bool) echo.HandlerFunc {
 		req := c.Request()
 		ctx := req.Context()
 
-		srv.SetErrorPresenter(gqlErrorPresenter(dev))
+		tracer := otel.Tracer("reearth-accounts")
+		// SpanKindInternal: the HTTP server span is already created by otelecho.
+		ctx, span := tracer.Start(ctx, "GraphQL Handler",
+			trace.WithSpanKind(trace.SpanKindInternal),
+			trace.WithAttributes(
+				attribute.String("component", "graphql"),
+				attribute.String("http.method", req.Method),
+				attribute.String("http.url", req.URL.Path),
+				attribute.String("handler", "graphql"),
+			),
+		)
+		defer span.End()
 
 		usecases := adapter.Usecases(ctx)
 		ctx = gql.AttachUsecases(ctx, usecases, str, enableDataLoaders)

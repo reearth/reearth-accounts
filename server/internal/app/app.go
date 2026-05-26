@@ -10,6 +10,7 @@ import (
 	"github.com/labstack/echo/v4"
 	"github.com/labstack/echo/v4/middleware"
 	"github.com/reearth/reearth-accounts/server/internal/adapter"
+	otelapp "github.com/reearth/reearth-accounts/server/internal/app/otel"
 	"github.com/reearth/reearth-accounts/server/internal/usecase/interactor"
 	"github.com/reearth/reearthx/appx"
 	"github.com/reearth/reearthx/log"
@@ -28,6 +29,12 @@ func initEcho(ctx context.Context, cfg *ServerConfig) *echo.Echo {
 
 	logger := log.NewEcho()
 	e.Logger = logger
+	if cfg.Config.OtelEnabled {
+		log.Infof("OpenTelemetry tracing enabled for %s", string(otelapp.OtelAccountsServiceName))
+		e.Use(otelapp.Middleware(string(otelapp.OtelAccountsServiceName)))
+	} else {
+		log.Infof("OpenTelemetry tracing disabled for %s", string(otelapp.OtelAccountsServiceName))
+	}
 	e.Use(AccessLogger(logger))
 
 	origins := allowedOrigins(cfg)

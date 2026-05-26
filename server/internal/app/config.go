@@ -6,6 +6,7 @@ import (
 	"net"
 	"os"
 	"strings"
+	"time"
 
 	"github.com/joho/godotenv"
 	"github.com/kelseyhightower/envconfig"
@@ -57,6 +58,16 @@ type Config struct {
 	StorageBucketName       string `envconfig:"REEARTH_ACCOUNTS_STORAGE_BUCKET_NAME" default:"reearth"`
 	StorageEmulatorEnabled  bool   `envconfig:"REEARTH_ACCOUNTS_STORAGE_EMULATOR_ENABLED"`
 	StorageEmulatorEndpoint string `envconfig:"REEARTH_ACCOUNTS_STORAGE_EMULATOR_ENDPOINT"`
+
+	// OpenTelemetry
+	OtelEnabled            bool          `envconfig:"REEARTH_ACCOUNTS_OTEL_ENABLED" default:"false"`
+	OtelEndpoint           string        `envconfig:"REEARTH_ACCOUNTS_OTEL_ENDPOINT" default:"localhost:4317"`
+	OtelExporterType       string        `envconfig:"REEARTH_ACCOUNTS_OTEL_EXPORTER_TYPE" default:"gcp"` // otlp, jaeger, or gcp
+	OtelInsecure           bool          `envconfig:"REEARTH_ACCOUNTS_OTEL_INSECURE" default:"false"`    // skip TLS for otlp/jaeger (gcp always uses TLS)
+	OtelBatchTimeout       time.Duration `envconfig:"REEARTH_ACCOUNTS_OTEL_BATCH_TIMEOUT" default:"1s"`
+	OtelMaxExportBatchSize int           `envconfig:"REEARTH_ACCOUNTS_OTEL_MAX_EXPORT_BATCH_SIZE" default:"512"`
+	OtelMaxQueueSize       int           `envconfig:"REEARTH_ACCOUNTS_OTEL_MAX_QUEUE_SIZE" default:"2048"`
+	OtelSamplingRatio      float64       `envconfig:"REEARTH_ACCOUNTS_OTEL_SAMPLING_RATIO" default:"1.0"` // 0.0 to 1.0
 }
 
 type AuthConfig struct {
