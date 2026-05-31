@@ -11,6 +11,8 @@ import (
 	"github.com/reearth/reearthx/rerror"
 )
 
+var _ permittable.Repo = (*Permittable)(nil)
+
 type Permittable struct {
 	lock sync.Mutex
 	data map[id.PermittableID]*permittable.Permittable

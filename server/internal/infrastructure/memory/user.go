@@ -10,6 +10,8 @@ import (
 	"github.com/reearth/reearthx/util"
 )
 
+var _ user.Repo = (*User)(nil)
+
 type User struct {
 	data *util.SyncMap[user.ID, *user.User]
 	err  error

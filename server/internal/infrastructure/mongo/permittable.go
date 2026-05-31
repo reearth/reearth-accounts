@@ -12,6 +12,8 @@ import (
 	"go.mongodb.org/mongo-driver/bson"
 )
 
+var _ permittable.Repo = (*Permittable)(nil)
+
 type Permittable struct {
 	client *mongox.ClientCollection
 }

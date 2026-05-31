@@ -12,6 +12,8 @@ import (
 	"github.com/reearth/reearthx/util"
 )
 
+var _ workspace.Repo = (*Workspace)(nil)
+
 type Workspace struct {
 	data *util.SyncMap[workspace.ID, *workspace.Workspace]
 	err  error

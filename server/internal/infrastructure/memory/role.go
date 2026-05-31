@@ -9,6 +9,8 @@ import (
 	"github.com/reearth/reearthx/rerror"
 )
 
+var _ role.Repo = (*Role)(nil)
+
 type Role struct {
 	lock sync.Mutex
 	data map[id.RoleID]*role.Role

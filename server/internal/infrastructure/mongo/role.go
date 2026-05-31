@@ -10,6 +10,8 @@ import (
 	"go.mongodb.org/mongo-driver/bson"
 )
 
+var _ role.Repo = (*Role)(nil)
+
 type Role struct {
 	client *mongox.ClientCollection
 }

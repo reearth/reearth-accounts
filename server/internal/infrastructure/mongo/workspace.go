@@ -18,6 +18,8 @@ import (
 	"go.mongodb.org/mongo-driver/mongo"
 )
 
+var _ workspace.Repo = (*Workspace)(nil)
+
 type Workspace struct {
 	client *mongox.Collection
 	f      workspace.WorkspaceFilter
