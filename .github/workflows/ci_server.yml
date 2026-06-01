@@ -59,3 +59,33 @@ jobs:
       - name: Check for changes in generated files
         run: |
           git diff --exit-code
+
+  # Integration tests that spin real databases via testcontainers (postgres +
+  # mongo). Gated behind the `integration` build tag so the fast unit job above
+  # stays container-free. The ubuntu-latest runner provides a Docker daemon.
+  ci-server-integration:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Harden Runner
+        uses: step-security/harden-runner@fe104658747b27e96e4f7e80cd0a94068e53901d # v2.16.1
+        with:
+          egress-policy: audit
+      - name: checkout
+        uses: actions/checkout@v4
+      - name: setup go
+        uses: actions/setup-go@v5
+        with:
+          go-version: ${{ env.GO_VERSION }}
+          cache-dependency-path: server/go.sum
+      - name: integration test
+        working-directory: server
+        # -p 1 serializes package execution so each package's testcontainers
+        # reaper is created sequentially (parallel binaries collide on its name).
+        # The -run filter selects the postgres-backed tests and the postgres e2e
+        # while skipping the e2e tests that require a separate mongo service.
+        run: >-
+          go test -p 1 -tags integration -timeout 900s
+          ./internal/infrastructure/postgres/...
+          ./internal/infrastructure/conformance/...
+          ./e2e/...
+          -run 'Conformance|TestMigrate|TestTransaction|TestResolveDBTX|TestPostgresE2E_GetAndUpdateMe'

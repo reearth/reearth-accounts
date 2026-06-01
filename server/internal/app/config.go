@@ -18,12 +18,13 @@ import (
 const configPrefix = "reearth"
 
 type Config struct {
-	Port    string `default:"8090" envconfig:"PORT"`
-	Dev     bool
-	DB      string   `default:"mongodb://localhost" envconfig:"REEARTH_ACCOUNTS_DB"`
-	DBName  string   `default:"reearth-account" envconfig:"REEARTH_ACCOUNTS_DB_NAME"`
-	Origins []string `envconfig:"REEARTH_ACCOUNTS_ORIGINS"`
-	Host    string   `default:"0.0.0.0" envconfig:"HOST"`
+	Port     string `default:"8090" envconfig:"PORT"`
+	Dev      bool
+	DB       string   `default:"mongodb://localhost" envconfig:"REEARTH_ACCOUNTS_DB"`
+	DBName   string   `default:"reearth-account" envconfig:"REEARTH_ACCOUNTS_DB_NAME"`
+	DBDriver string   `envconfig:"REEARTH_ACCOUNTS_DB_DRIVER"`
+	Origins  []string `envconfig:"REEARTH_ACCOUNTS_ORIGINS"`
+	Host     string   `default:"0.0.0.0" envconfig:"HOST"`
 
 	GCPProject string `envconfig:"GOOGLE_CLOUD_PROJECT"`
 	Cert       CertConfig
@@ -68,6 +69,24 @@ type Config struct {
 	OtelMaxExportBatchSize int           `envconfig:"REEARTH_ACCOUNTS_OTEL_MAX_EXPORT_BATCH_SIZE" default:"512"`
 	OtelMaxQueueSize       int           `envconfig:"REEARTH_ACCOUNTS_OTEL_MAX_QUEUE_SIZE" default:"2048"`
 	OtelSamplingRatio      float64       `envconfig:"REEARTH_ACCOUNTS_OTEL_SAMPLING_RATIO" default:"1.0"` // 0.0 to 1.0
+}
+
+// ResolveDBDriver honors REEARTH_ACCOUNTS_DB_DRIVER (case-insensitive) and
+// otherwise infers from the DB URI scheme, defaulting to mongo.
+func (c *Config) ResolveDBDriver() string {
+	if c.DBDriver != "" {
+		switch strings.ToLower(c.DBDriver) {
+		case "postgres", "postgresql":
+			return "postgres"
+		case "mongo", "mongodb":
+			return "mongo"
+		}
+	}
+	db := strings.ToLower(c.DB)
+	if strings.HasPrefix(db, "postgres://") || strings.HasPrefix(db, "postgresql://") {
+		return "postgres"
+	}
+	return "mongo"
 }
 
 type AuthConfig struct {
