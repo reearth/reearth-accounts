@@ -28,16 +28,16 @@ func TestApplyPermittableUpdatedAtSchema(t *testing.T) {
 
 	testPermittables := []any{
 		bson.M{
-			"_id":     permittable1ID,
-			"id":      "permittable1",
-			"userid":  "user1",
+			"_id":    permittable1ID,
+			"id":     "permittable1",
+			"userid": "user1",
 			"roleids": []string{},
 			// No updatedat field
 		},
 		bson.M{
-			"_id":     permittable2ID,
-			"id":      "permittable2",
-			"userid":  "user2",
+			"_id":    permittable2ID,
+			"id":     "permittable2",
+			"userid": "user2",
 			"roleids": []string{},
 			// No updatedat field
 		},

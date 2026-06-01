@@ -721,7 +721,7 @@ func testTransaction(t *testing.T, nc Factory) {
 	defer done()
 	ctx := context.Background()
 	uid := id.NewUserID()
-	_ = usecasex.DoTransaction(ctx, c.Transaction, 0, func(ctx context.Context) error {
+	_ = c.Transactor.WithinTransaction(ctx, func(ctx context.Context) error {
 		u, err := user.New().ID(uid).Name("tx").Email("tx@example.com").Workspace(id.NewWorkspaceID()).Build()
 		require.NoError(t, err)
 		require.NoError(t, c.User.Create(ctx, u))

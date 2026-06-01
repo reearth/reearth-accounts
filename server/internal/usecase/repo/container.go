@@ -37,6 +37,10 @@ type Container struct {
 	Workspace   workspace.Repo
 	Role        role.Repo
 	Permittable permittable.Repo
+	// Transaction is the legacy Begin/End-shaped transaction handle preserved
+	// for the public pkg/infrastructure surface. Internal use-case code uses
+	// the closure-shaped Transactor below; this field is wired only by
+	// backends that expose a usecasex.Transaction (mongo, memory).
 	Transaction usecasex.Transaction
 	Transactor  Transactor
 	Users       []user.Repo
