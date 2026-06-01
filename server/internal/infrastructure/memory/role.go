@@ -9,20 +9,18 @@ import (
 	"github.com/reearth/reearthx/rerror"
 )
 
-var _ role.Repo = (*Role)(nil)
-
 type Role struct {
 	lock sync.Mutex
 	data map[id.RoleID]*role.Role
 }
 
-func NewRole() *Role {
+func NewRole() role.Repo {
 	return &Role{
 		data: map[id.RoleID]*role.Role{},
 	}
 }
 
-func NewRoleWith(items ...*role.Role) *Role {
+func NewRoleWith(items ...*role.Role) role.Repo {
 	r := NewRole()
 	ctx := context.Background()
 	for _, i := range items {

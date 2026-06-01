@@ -15,14 +15,12 @@ import (
 
 const configLockName = "config"
 
-var _ config.Repo = (*Config)(nil)
-
 type Config struct {
 	client *mongo.Collection
 	lock   repo.Lock
 }
 
-func NewConfig(client *mongo.Collection, lock repo.Lock) *Config {
+func NewConfig(client *mongo.Collection, lock repo.Lock) config.Repo {
 	return &Config{client: client, lock: lock}
 }
 

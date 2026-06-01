@@ -21,9 +21,7 @@ type Config struct {
 	conn *pgxpool.Conn // session holding the advisory lock; nil when unlocked
 }
 
-func NewConfig(pool *pgxpool.Pool) *Config { return &Config{pool: pool} }
-
-var _ config.Repo = (*Config)(nil)
+func NewConfig(pool *pgxpool.Pool) config.Repo { return &Config{pool: pool} }
 
 func (r *Config) LockAndLoad(ctx context.Context) (*config.Config, error) {
 	r.mu.Lock()

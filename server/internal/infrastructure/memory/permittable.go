@@ -11,20 +11,18 @@ import (
 	"github.com/reearth/reearthx/rerror"
 )
 
-var _ permittable.Repo = (*Permittable)(nil)
-
 type Permittable struct {
 	lock sync.Mutex
 	data map[id.PermittableID]*permittable.Permittable
 }
 
-func NewPermittable() *Permittable {
+func NewPermittable() permittable.Repo {
 	return &Permittable{
 		data: map[id.PermittableID]*permittable.Permittable{},
 	}
 }
 
-func NewPermittableWith(items ...*permittable.Permittable) *Permittable {
+func NewPermittableWith(items ...*permittable.Permittable) permittable.Repo {
 	p := NewPermittable()
 	ctx := context.Background()
 	for _, i := range items {

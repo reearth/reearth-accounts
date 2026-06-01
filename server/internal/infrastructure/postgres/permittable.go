@@ -17,9 +17,7 @@ type Permittable struct {
 	c *Client
 }
 
-func NewPermittable(c *Client) *Permittable { return &Permittable{c: c} }
-
-var _ permittable.Repo = (*Permittable)(nil)
+func NewPermittable(c *Client) permittable.Repo { return &Permittable{c: c} }
 
 // hydrate attaches workspace_roles child rows and builds domain objects.
 func (r *Permittable) hydrate(ctx context.Context, rows []gen.Permittable) (permittable.List, error) {

@@ -17,8 +17,6 @@ import (
 	"go.mongodb.org/mongo-driver/mongo/options"
 )
 
-var _ user.Repo = (*User)(nil)
-
 type User struct {
 	client *mongox.Collection
 	host   string

@@ -13,11 +13,9 @@ type Transaction struct {
 	pool *pgxpool.Pool
 }
 
-func NewTransaction(pool *pgxpool.Pool) *Transaction {
+func NewTransaction(pool *pgxpool.Pool) usecasex.Transaction {
 	return &Transaction{pool: pool}
 }
-
-var _ usecasex.Transaction = (*Transaction)(nil)
 
 func (t *Transaction) Begin(ctx context.Context) (usecasex.Tx, error) {
 	// If a tx is already active in ctx, reuse it (nested calls share the ambient tx).
@@ -38,8 +36,6 @@ type Tx struct {
 	committed bool
 	nested    bool
 }
-
-var _ usecasex.Tx = (*Tx)(nil)
 
 func (t *Tx) Context() context.Context { return t.ctx }
 

@@ -7,8 +7,6 @@ import (
 	"github.com/reearth/reearth-accounts/server/pkg/config"
 )
 
-var _ config.Repo = (*Config)(nil)
-
 type Config struct {
 	lock   sync.Mutex
 	locked bool

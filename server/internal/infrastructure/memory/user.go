@@ -10,21 +10,19 @@ import (
 	"github.com/reearth/reearthx/util"
 )
 
-var _ user.Repo = (*User)(nil)
-
 type User struct {
 	data *util.SyncMap[user.ID, *user.User]
 	err  error
 }
 
-func NewUser() *User {
+func NewUser() user.Repo {
 	return &User{
 		data: &util.SyncMap[user.ID, *user.User]{},
 	}
 }
 
-func NewUserWith(users ...*user.User) *User {
-	r := NewUser()
+func NewUserWith(users ...*user.User) user.Repo {
+	r := &User{data: &util.SyncMap[user.ID, *user.User]{}}
 	for _, u := range users {
 		r.data.Store(u.ID(), u)
 	}

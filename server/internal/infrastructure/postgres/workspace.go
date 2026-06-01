@@ -22,9 +22,7 @@ type Workspace struct {
 	f workspace.WorkspaceFilter
 }
 
-func NewWorkspace(c *Client) *Workspace { return &Workspace{c: c} }
-
-var _ workspace.Repo = (*Workspace)(nil)
+func NewWorkspace(c *Client) workspace.Repo { return &Workspace{c: c} }
 
 func (r *Workspace) Filtered(f workspace.WorkspaceFilter) workspace.Repo {
 	return &Workspace{c: r.c, f: r.f.Merge(f)}

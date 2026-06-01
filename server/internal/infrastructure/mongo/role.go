@@ -10,13 +10,11 @@ import (
 	"go.mongodb.org/mongo-driver/bson"
 )
 
-var _ role.Repo = (*Role)(nil)
-
 type Role struct {
 	client *mongox.ClientCollection
 }
 
-func NewRole(client *mongox.Client) *Role {
+func NewRole(client *mongox.Client) role.Repo {
 	return &Role{
 		client: client.WithCollection("role"),
 	}

@@ -19,9 +19,7 @@ type User struct {
 	c *Client
 }
 
-func NewUser(c *Client) *User { return &User{c: c} }
-
-var _ user.Repo = (*User)(nil)
+func NewUser(c *Client) user.Repo { return &User{c: c} }
 
 func rowToUserRow(r gen.User) *pgdoc.UserRow {
 	return &pgdoc.UserRow{

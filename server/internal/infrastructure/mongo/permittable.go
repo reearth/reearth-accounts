@@ -12,13 +12,11 @@ import (
 	"go.mongodb.org/mongo-driver/bson"
 )
 
-var _ permittable.Repo = (*Permittable)(nil)
-
 type Permittable struct {
 	client *mongox.ClientCollection
 }
 
-func NewPermittable(client *mongox.Client) *Permittable {
+func NewPermittable(client *mongox.Client) permittable.Repo {
 	return &Permittable{
 		client: client.WithCollection("permittable"),
 	}

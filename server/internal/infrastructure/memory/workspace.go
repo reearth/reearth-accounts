@@ -12,21 +12,19 @@ import (
 	"github.com/reearth/reearthx/util"
 )
 
-var _ workspace.Repo = (*Workspace)(nil)
-
 type Workspace struct {
 	data *util.SyncMap[workspace.ID, *workspace.Workspace]
 	err  error
 }
 
-func NewWorkspace() *Workspace {
+func NewWorkspace() workspace.Repo {
 	return &Workspace{
 		data: &util.SyncMap[workspace.ID, *workspace.Workspace]{},
 	}
 }
 
-func NewWorkspaceWith(workspaces ...*workspace.Workspace) *Workspace {
-	r := NewWorkspace()
+func NewWorkspaceWith(workspaces ...*workspace.Workspace) workspace.Repo {
+	r := &Workspace{data: &util.SyncMap[workspace.ID, *workspace.Workspace]{}}
 	for _, ws := range workspaces {
 		r.data.Store(ws.ID(), ws)
 	}

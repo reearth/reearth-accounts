@@ -16,9 +16,7 @@ type Role struct {
 	c *Client
 }
 
-func NewRole(c *Client) *Role { return &Role{c: c} }
-
-var _ role.Repo = (*Role)(nil)
+func NewRole(c *Client) role.Repo { return &Role{c: c} }
 
 func roleModel(r gen.Role) (*role.Role, error) {
 	return pgdoc.RoleRow{ID: r.ID, Name: r.Name}.Model()
