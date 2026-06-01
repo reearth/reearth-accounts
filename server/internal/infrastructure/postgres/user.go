@@ -296,7 +296,9 @@ func paginateUsers(ctx context.Context, c *Client, ids []string, alias *string, 
 		if err != nil {
 			return nil, nil, err
 		}
-		return list, usecasex.NewPageInfo(total, cur(list, true), cur(list, false), false, false), nil
+		hasPrev := p.Offset.Offset > 0
+		hasNext := p.Offset.Offset+p.Offset.Limit < total
+		return list, usecasex.NewPageInfo(total, cur(list, true), cur(list, false), hasNext, hasPrev), nil
 	}
 
 	rows, err := c.db(ctx).Query(ctx, "SELECT "+userColumns+" "+base+" ORDER BY id", args...)

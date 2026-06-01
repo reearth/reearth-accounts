@@ -310,7 +310,7 @@ func paginateWorkspaces(ctx context.Context, r *Workspace, ids []string, p *usec
 	if p != nil && p.Cursor != nil {
 		page, hasNext, hasPrev = sliceCursor(sorted, p.Cursor)
 	} else if p != nil && p.Offset != nil {
-		page = sliceOffset(sorted, p.Offset)
+		page, hasNext, hasPrev = sliceOffset(sorted, p.Offset, total)
 	}
 
 	list, err := r.findByIDStrings(ctx, page)
@@ -327,15 +327,17 @@ func paginateWorkspaces(ctx context.Context, r *Workspace, ids []string, p *usec
 	return list, usecasex.NewPageInfo(total, startCur, endCur, hasNext, hasPrev), nil
 }
 
-func sliceOffset(ids []string, o *usecasex.OffsetPagination) []string {
+func sliceOffset(ids []string, o *usecasex.OffsetPagination, total int64) (page []string, hasNext, hasPrev bool) {
+	hasPrev = o.Offset > 0
+	hasNext = o.Offset+o.Limit < total
 	if o.Offset >= int64(len(ids)) {
-		return nil
+		return nil, hasNext, hasPrev
 	}
 	end := o.Offset + o.Limit
 	if end > int64(len(ids)) {
 		end = int64(len(ids))
 	}
-	return ids[o.Offset:end]
+	return ids[o.Offset:end], hasNext, hasPrev
 }
 
 func sliceCursor(ids []string, cp *usecasex.CursorPagination) (page []string, hasNext, hasPrev bool) {
