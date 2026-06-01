@@ -103,45 +103,51 @@ func (i *Workspace) Create(ctx context.Context, alias, name, description string,
 		return nil, err
 	}
 
-	return Run1(ctx, operator, i.repos, Usecase().Transaction(), func(ctx context.Context) (*workspace.Workspace, error) {
-		metadata := workspace.NewMetadata()
-		metadata.SetDescription(description)
+	var out *workspace.Workspace
+	err = i.repos.Transactor.WithinTransaction(ctx, func(ctx context.Context) error {
+		var fnErr error
+		out, fnErr = func(ctx context.Context) (*workspace.Workspace, error) {
+			metadata := workspace.NewMetadata()
+			metadata.SetDescription(description)
 
-		aliasVal := strings.TrimSpace(alias)
-		wid := workspace.NewID()
-		if aliasVal == "" {
-			aliasVal = "w-" + wid.String()
-		}
-
-		ws, wErr := workspace.New().
-			ID(wid).
-			Alias(aliasVal).
-			Name(name).
-			Metadata(metadata).
-			Build()
-		if wErr != nil {
-			return nil, wErr
-		}
-
-		if err = ws.Members().Join(firstUsers[0], role.RoleOwner, *operator.User); err != nil {
-			return nil, err
-		}
-
-		if err = i.repos.Workspace.Create(ctx, ws); err != nil {
-			if errors.Is(err, workspace.ErrDuplicateWorkspaceAlias) {
-				return nil, interfaces.ErrWorkspaceAliasAlreadyExists
+			aliasVal := strings.TrimSpace(alias)
+			wid := workspace.NewID()
+			if aliasVal == "" {
+				aliasVal = "w-" + wid.String()
 			}
-			return nil, err
-		}
 
-		if err := i.updatePermittable(ctx, firstUsers[0].ID(), ws.ID(), role.RoleOwner); err != nil {
-			return nil, err
-		}
+			ws, wErr := workspace.New().
+				ID(wid).
+				Alias(aliasVal).
+				Name(name).
+				Metadata(metadata).
+				Build()
+			if wErr != nil {
+				return nil, wErr
+			}
 
-		operator.AddNewWorkspace(ws.ID())
-		i.applyDefaultPolicy(ws, operator)
-		return ws, nil
+			if err = ws.Members().Join(firstUsers[0], role.RoleOwner, *operator.User); err != nil {
+				return nil, err
+			}
+
+			if err = i.repos.Workspace.Create(ctx, ws); err != nil {
+				if errors.Is(err, workspace.ErrDuplicateWorkspaceAlias) {
+					return nil, interfaces.ErrWorkspaceAliasAlreadyExists
+				}
+				return nil, err
+			}
+
+			if err := i.updatePermittable(ctx, firstUsers[0].ID(), ws.ID(), role.RoleOwner); err != nil {
+				return nil, err
+			}
+
+			operator.AddNewWorkspace(ws.ID())
+			i.applyDefaultPolicy(ws, operator)
+			return ws, nil
+		}(ctx)
+		return fnErr
 	})
+	return out, err
 }
 
 func (i *Workspace) Update(ctx context.Context, param interfaces.UpdateWorkspaceParam, operator *workspace.Operator) (_ *workspace.Workspace, err error) {
@@ -149,114 +155,120 @@ func (i *Workspace) Update(ctx context.Context, param interfaces.UpdateWorkspace
 		return nil, interfaces.ErrInvalidOperator
 	}
 
-	return Run1(ctx, operator, i.repos, Usecase().Transaction(), func(ctx context.Context) (*workspace.Workspace, error) {
-		ws, err := i.repos.Workspace.FindByID(ctx, param.ID)
-		if err != nil {
-			return nil, applog.ErrorWithCallerLogging(ctx, "failed to find workspace", err)
-		}
-
-		if ws.IsPersonal() {
-			return nil, workspace.ErrCannotModifyPersonalWorkspace
-		}
-
-		// Check permission via Cerbos or fallback to role-based check
-		var cerbosChecked bool
-		if i.cerbos != nil {
-			result, cErr := i.cerbos.CheckPermission(ctx, *operator.User, interfaces.CheckPermissionParam{
-				Service:        rbac.ServiceName,
-				Resource:       rbac.ResourceWorkspace,
-				Action:         rbac.ActionEdit,
-				WorkspaceAlias: ws.Alias(),
-			})
-			if cErr != nil {
-				return nil, applog.ErrorWithCallerLogging(ctx, "failed to check permission", cErr)
+	var out *workspace.Workspace
+	err = i.repos.Transactor.WithinTransaction(ctx, func(ctx context.Context) error {
+		var fnErr error
+		out, fnErr = func(ctx context.Context) (*workspace.Workspace, error) {
+			ws, err := i.repos.Workspace.FindByID(ctx, param.ID)
+			if err != nil {
+				return nil, applog.ErrorWithCallerLogging(ctx, "failed to find workspace", err)
 			}
-			if result != nil {
-				cerbosChecked = true
-				if !result.Allowed {
-					return nil, interfaces.ErrPermissionDenied
+
+			if ws.IsPersonal() {
+				return nil, workspace.ErrCannotModifyPersonalWorkspace
+			}
+
+			// Check permission via Cerbos or fallback to role-based check
+			var cerbosChecked bool
+			if i.cerbos != nil {
+				result, cErr := i.cerbos.CheckPermission(ctx, *operator.User, interfaces.CheckPermissionParam{
+					Service:        rbac.ServiceName,
+					Resource:       rbac.ResourceWorkspace,
+					Action:         rbac.ActionEdit,
+					WorkspaceAlias: ws.Alias(),
+				})
+				if cErr != nil {
+					return nil, applog.ErrorWithCallerLogging(ctx, "failed to check permission", cErr)
 				}
-			}
-		}
-
-		if !cerbosChecked {
-			if ws.Members().UserRole(*operator.User) != role.RoleOwner {
-				return nil, interfaces.ErrOperationDenied
-			}
-		}
-
-		// Update name if provided
-		if param.Name != nil {
-			name := strings.TrimSpace(*param.Name)
-			if len(name) == 0 {
-				return nil, user.ErrInvalidName
-			}
-			ws.Rename(name)
-		}
-
-		// Update alias if provided
-		if param.Alias != nil {
-			aliasVal := strings.TrimSpace(*param.Alias)
-			if aliasVal == "" {
-				aliasVal = "w-" + param.ID.String()
-			}
-			if aliasVal != ws.Alias() {
-				// When Cerbos is configured, check edit_alias permission separately for finer-grained control.
-				// When Cerbos is not configured, alias editing is allowed by the general edit permission (owner-only) check above.
-				if i.cerbos != nil {
-					result, cErr := i.cerbos.CheckPermission(ctx, *operator.User, interfaces.CheckPermissionParam{
-						Service:        rbac.ServiceName,
-						Resource:       rbac.ResourceWorkspace,
-						Action:         rbac.ActionEditAlias,
-						WorkspaceAlias: ws.Alias(),
-					})
-					if cErr != nil {
-						return nil, applog.ErrorWithCallerLogging(ctx, "failed to check alias edit permission", cErr)
-					}
-					if result != nil && !result.Allowed {
+				if result != nil {
+					cerbosChecked = true
+					if !result.Allowed {
 						return nil, interfaces.ErrPermissionDenied
 					}
 				}
+			}
 
-				if existing, ferr := i.repos.Workspace.FindByAlias(ctx, aliasVal); ferr == nil && existing != nil && existing.ID() != ws.ID() {
-					return nil, interfaces.ErrWorkspaceAliasAlreadyExists
+			if !cerbosChecked {
+				if ws.Members().UserRole(*operator.User) != role.RoleOwner {
+					return nil, interfaces.ErrOperationDenied
 				}
-				ws.UpdateAlias(aliasVal)
 			}
-		}
 
-		// Update metadata fields
-		metadata := ws.Metadata()
-
-		if param.Description != nil {
-			metadata.SetDescription(*param.Description)
-		}
-		if param.Website != nil {
-			metadata.SetWebsite(*param.Website)
-		}
-
-		// Handle photo URL
-		// Note: Store the path, not the signed URL. The signed URL is generated on-demand in ToWorkspace converter.
-		if param.PhotoURL != nil {
-			photoURL := strings.TrimSpace(*param.PhotoURL)
-			normalizedPhotoURL := strings.ToLower(photoURL)
-			// Reject full URLs - only paths should be stored
-			if strings.HasPrefix(normalizedPhotoURL, "http://") || strings.HasPrefix(normalizedPhotoURL, "https://") {
-				return nil, interfaces.ErrInvalidPhotoURL
+			// Update name if provided
+			if param.Name != nil {
+				name := strings.TrimSpace(*param.Name)
+				if len(name) == 0 {
+					return nil, user.ErrInvalidName
+				}
+				ws.Rename(name)
 			}
-			metadata.SetPhotoURL(photoURL)
-		}
 
-		ws.SetMetadata(*metadata)
+			// Update alias if provided
+			if param.Alias != nil {
+				aliasVal := strings.TrimSpace(*param.Alias)
+				if aliasVal == "" {
+					aliasVal = "w-" + param.ID.String()
+				}
+				if aliasVal != ws.Alias() {
+					// When Cerbos is configured, check edit_alias permission separately for finer-grained control.
+					// When Cerbos is not configured, alias editing is allowed by the general edit permission (owner-only) check above.
+					if i.cerbos != nil {
+						result, cErr := i.cerbos.CheckPermission(ctx, *operator.User, interfaces.CheckPermissionParam{
+							Service:        rbac.ServiceName,
+							Resource:       rbac.ResourceWorkspace,
+							Action:         rbac.ActionEditAlias,
+							WorkspaceAlias: ws.Alias(),
+						})
+						if cErr != nil {
+							return nil, applog.ErrorWithCallerLogging(ctx, "failed to check alias edit permission", cErr)
+						}
+						if result != nil && !result.Allowed {
+							return nil, interfaces.ErrPermissionDenied
+						}
+					}
 
-		err = i.repos.Workspace.Save(ctx, ws)
-		if err != nil {
-			return nil, applog.ErrorWithCallerLogging(ctx, "failed to save workspace", err)
-		}
+					if existing, ferr := i.repos.Workspace.FindByAlias(ctx, aliasVal); ferr == nil && existing != nil && existing.ID() != ws.ID() {
+						return nil, interfaces.ErrWorkspaceAliasAlreadyExists
+					}
+					ws.UpdateAlias(aliasVal)
+				}
+			}
 
-		i.applyDefaultPolicy(ws, operator)
-		return ws, nil
+			// Update metadata fields
+			metadata := ws.Metadata()
+
+			if param.Description != nil {
+				metadata.SetDescription(*param.Description)
+			}
+			if param.Website != nil {
+				metadata.SetWebsite(*param.Website)
+			}
+
+			// Handle photo URL
+			// Note: Store the path, not the signed URL. The signed URL is generated on-demand in ToWorkspace converter.
+			if param.PhotoURL != nil {
+				photoURL := strings.TrimSpace(*param.PhotoURL)
+				normalizedPhotoURL := strings.ToLower(photoURL)
+				// Reject full URLs - only paths should be stored
+				if strings.HasPrefix(normalizedPhotoURL, "http://") || strings.HasPrefix(normalizedPhotoURL, "https://") {
+					return nil, interfaces.ErrInvalidPhotoURL
+				}
+				metadata.SetPhotoURL(photoURL)
+			}
+
+			ws.SetMetadata(*metadata)
+
+			err = i.repos.Workspace.Save(ctx, ws)
+			if err != nil {
+				return nil, applog.ErrorWithCallerLogging(ctx, "failed to save workspace", err)
+			}
+
+			i.applyDefaultPolicy(ws, operator)
+			return ws, nil
+		}(ctx)
+		return fnErr
 	})
+	return out, err
 }
 
 func (i *Workspace) AddUserMember(ctx context.Context, workspaceID workspace.ID, users map[workspace.UserID]role.RoleType, operator *workspace.Operator) (_ *workspace.Workspace, err error) {
@@ -271,48 +283,57 @@ func (i *Workspace) AddUserMember(ctx context.Context, workspaceID workspace.ID,
 		return nil, applog.ErrorWithCallerLogging(ctx, "failed to fetch user", err)
 	}
 
-	return Run1(ctx, operator, i.repos, Usecase().Transaction().WithWritableWorkspaces(workspaceID), func(ctx context.Context) (*workspace.Workspace, error) {
-		ws, err := i.repos.Workspace.FindByID(ctx, workspaceID)
-		if err != nil {
-			return nil, applog.ErrorWithCallerLogging(ctx, "failed to fetch workspace", err)
-		}
-
-		if ws.IsPersonal() {
-			return nil, workspace.ErrCannotModifyPersonalWorkspace
-		}
-
-		if i.enforceMemberCount != nil {
-			if err := i.enforceMemberCount(ctx, ws, ul, operator); err != nil {
-				return nil, applog.ErrorWithCallerLogging(ctx, "failed to enforce member count", err)
-			}
-		}
-
-		joined := make(map[user.ID]role.RoleType, len(ul))
-		for _, m := range ul {
-			if m == nil {
-				continue
-			}
-
-			err = ws.Members().Join(m, users[m.ID()], *operator.User)
+	if err := Usecase().WithWritableWorkspaces(workspaceID).CheckPermission(operator); err != nil {
+		return nil, err
+	}
+	var out *workspace.Workspace
+	err = i.repos.Transactor.WithinTransaction(ctx, func(ctx context.Context) error {
+		var fnErr error
+		out, fnErr = func(ctx context.Context) (*workspace.Workspace, error) {
+			ws, err := i.repos.Workspace.FindByID(ctx, workspaceID)
 			if err != nil {
-				return nil, applog.ErrorWithCallerLogging(ctx, "failed to join user to workspace", err)
+				return nil, applog.ErrorWithCallerLogging(ctx, "failed to fetch workspace", err)
 			}
 
-			joined[m.ID()] = users[m.ID()]
-		}
+			if ws.IsPersonal() {
+				return nil, workspace.ErrCannotModifyPersonalWorkspace
+			}
 
-		if err := i.bulkUpdatePermittable(ctx, ws.ID(), joined); err != nil {
-			return nil, applog.ErrorWithCallerLogging(ctx, "failed to update permittable", err)
-		}
+			if i.enforceMemberCount != nil {
+				if err := i.enforceMemberCount(ctx, ws, ul, operator); err != nil {
+					return nil, applog.ErrorWithCallerLogging(ctx, "failed to enforce member count", err)
+				}
+			}
 
-		err = i.repos.Workspace.Save(ctx, ws)
-		if err != nil {
-			return nil, applog.ErrorWithCallerLogging(ctx, "failed to save workspace", err)
-		}
+			joined := make(map[user.ID]role.RoleType, len(ul))
+			for _, m := range ul {
+				if m == nil {
+					continue
+				}
 
-		i.applyDefaultPolicy(ws, operator)
-		return ws, nil
+				err = ws.Members().Join(m, users[m.ID()], *operator.User)
+				if err != nil {
+					return nil, applog.ErrorWithCallerLogging(ctx, "failed to join user to workspace", err)
+				}
+
+				joined[m.ID()] = users[m.ID()]
+			}
+
+			if err := i.bulkUpdatePermittable(ctx, ws.ID(), joined); err != nil {
+				return nil, applog.ErrorWithCallerLogging(ctx, "failed to update permittable", err)
+			}
+
+			err = i.repos.Workspace.Save(ctx, ws)
+			if err != nil {
+				return nil, applog.ErrorWithCallerLogging(ctx, "failed to save workspace", err)
+			}
+
+			i.applyDefaultPolicy(ws, operator)
+			return ws, nil
+		}(ctx)
+		return fnErr
 	})
+	return out, err
 }
 
 func (i *Workspace) AddIntegrationMember(ctx context.Context, wId workspace.ID, iId workspace.IntegrationID, role role.RoleType, operator *workspace.Operator) (_ *workspace.Workspace, err error) {
@@ -320,25 +341,34 @@ func (i *Workspace) AddIntegrationMember(ctx context.Context, wId workspace.ID, 
 		return nil, interfaces.ErrInvalidOperator
 	}
 
-	return Run1(ctx, operator, i.repos, Usecase().Transaction().WithOwnableWorkspaces(wId), func(ctx context.Context) (*workspace.Workspace, error) {
-		ws, err := i.repos.Workspace.FindByID(ctx, wId)
-		if err != nil {
-			return nil, err
-		}
+	if err := Usecase().WithOwnableWorkspaces(wId).CheckPermission(operator); err != nil {
+		return nil, err
+	}
+	var out *workspace.Workspace
+	err = i.repos.Transactor.WithinTransaction(ctx, func(ctx context.Context) error {
+		var fnErr error
+		out, fnErr = func(ctx context.Context) (*workspace.Workspace, error) {
+			ws, err := i.repos.Workspace.FindByID(ctx, wId)
+			if err != nil {
+				return nil, err
+			}
 
-		err = ws.Members().AddIntegration(iId, role, *operator.User)
-		if err != nil {
-			return nil, err
-		}
+			err = ws.Members().AddIntegration(iId, role, *operator.User)
+			if err != nil {
+				return nil, err
+			}
 
-		err = i.repos.Workspace.Save(ctx, ws)
-		if err != nil {
-			return nil, err
-		}
+			err = i.repos.Workspace.Save(ctx, ws)
+			if err != nil {
+				return nil, err
+			}
 
-		i.applyDefaultPolicy(ws, operator)
-		return ws, nil
+			i.applyDefaultPolicy(ws, operator)
+			return ws, nil
+		}(ctx)
+		return fnErr
 	})
+	return out, err
 }
 
 func (i *Workspace) RemoveUserMember(ctx context.Context, id workspace.ID, u workspace.UserID, operator *workspace.Operator) (*workspace.Workspace, error) {
@@ -354,41 +384,50 @@ func (i *Workspace) RemoveMultipleUserMembers(ctx context.Context, id workspace.
 		return nil, workspace.ErrNoSpecifiedUsers
 	}
 
-	return Run1(ctx, operator, i.repos, Usecase().Transaction().WithWritableWorkspaces(id), func(ctx context.Context) (*workspace.Workspace, error) {
-		ws, err := i.repos.Workspace.FindByID(ctx, id)
-		if err != nil {
-			return nil, err
-		}
-
-		if ws.IsPersonal() {
-			return nil, workspace.ErrCannotModifyPersonalWorkspace
-		}
-
-		for _, uId := range userIds {
-			isSelfLeave := *operator.User == uId
-
-			if isSelfLeave && ws.Members().IsOnlyOwner(uId) {
-				return nil, interfaces.ErrOwnerCannotLeaveTheWorkspace
-			}
-
-			err := ws.Members().Leave(uId)
+	if err := Usecase().WithWritableWorkspaces(id).CheckPermission(operator); err != nil {
+		return nil, err
+	}
+	var out *workspace.Workspace
+	err = i.repos.Transactor.WithinTransaction(ctx, func(ctx context.Context) error {
+		var fnErr error
+		out, fnErr = func(ctx context.Context) (*workspace.Workspace, error) {
+			ws, err := i.repos.Workspace.FindByID(ctx, id)
 			if err != nil {
 				return nil, err
 			}
 
-			if err := i.removePermittable(ctx, uId, ws.ID()); err != nil {
+			if ws.IsPersonal() {
+				return nil, workspace.ErrCannotModifyPersonalWorkspace
+			}
+
+			for _, uId := range userIds {
+				isSelfLeave := *operator.User == uId
+
+				if isSelfLeave && ws.Members().IsOnlyOwner(uId) {
+					return nil, interfaces.ErrOwnerCannotLeaveTheWorkspace
+				}
+
+				err := ws.Members().Leave(uId)
+				if err != nil {
+					return nil, err
+				}
+
+				if err := i.removePermittable(ctx, uId, ws.ID()); err != nil {
+					return nil, err
+				}
+			}
+
+			err = i.repos.Workspace.Save(ctx, ws)
+			if err != nil {
 				return nil, err
 			}
-		}
 
-		err = i.repos.Workspace.Save(ctx, ws)
-		if err != nil {
-			return nil, err
-		}
-
-		i.applyDefaultPolicy(ws, operator)
-		return ws, nil
+			i.applyDefaultPolicy(ws, operator)
+			return ws, nil
+		}(ctx)
+		return fnErr
 	})
+	return out, err
 }
 
 func (i *Workspace) RemoveIntegration(ctx context.Context, wId workspace.ID, iId workspace.IntegrationID, operator *workspace.Operator) (_ *workspace.Workspace, err error) {
@@ -396,25 +435,34 @@ func (i *Workspace) RemoveIntegration(ctx context.Context, wId workspace.ID, iId
 		return nil, interfaces.ErrInvalidOperator
 	}
 
-	return Run1(ctx, operator, i.repos, Usecase().WithOwnableWorkspaces(wId).Transaction(), func(ctx context.Context) (*workspace.Workspace, error) {
-		ws, err := i.repos.Workspace.FindByID(ctx, wId)
-		if err != nil {
-			return nil, err
-		}
+	if err := Usecase().WithOwnableWorkspaces(wId).CheckPermission(operator); err != nil {
+		return nil, err
+	}
+	var out *workspace.Workspace
+	err = i.repos.Transactor.WithinTransaction(ctx, func(ctx context.Context) error {
+		var fnErr error
+		out, fnErr = func(ctx context.Context) (*workspace.Workspace, error) {
+			ws, err := i.repos.Workspace.FindByID(ctx, wId)
+			if err != nil {
+				return nil, err
+			}
 
-		err = ws.Members().DeleteIntegration(iId)
-		if err != nil {
-			return nil, err
-		}
+			err = ws.Members().DeleteIntegration(iId)
+			if err != nil {
+				return nil, err
+			}
 
-		err = i.repos.Workspace.Save(ctx, ws)
-		if err != nil {
-			return nil, err
-		}
+			err = i.repos.Workspace.Save(ctx, ws)
+			if err != nil {
+				return nil, err
+			}
 
-		i.applyDefaultPolicy(ws, operator)
-		return ws, nil
+			i.applyDefaultPolicy(ws, operator)
+			return ws, nil
+		}(ctx)
+		return fnErr
 	})
+	return out, err
 }
 
 func (i *Workspace) RemoveIntegrations(ctx context.Context, wId workspace.ID, iIDs workspace.IntegrationIDList, operator *workspace.Operator) (_ *workspace.Workspace, err error) {
@@ -422,25 +470,34 @@ func (i *Workspace) RemoveIntegrations(ctx context.Context, wId workspace.ID, iI
 		return nil, interfaces.ErrInvalidOperator
 	}
 
-	return Run1(ctx, operator, i.repos, Usecase().WithOwnableWorkspaces(wId).Transaction(), func(ctx context.Context) (*workspace.Workspace, error) {
-		ws, err := i.repos.Workspace.FindByID(ctx, wId)
-		if err != nil {
-			return nil, err
-		}
+	if err := Usecase().WithOwnableWorkspaces(wId).CheckPermission(operator); err != nil {
+		return nil, err
+	}
+	var out *workspace.Workspace
+	err = i.repos.Transactor.WithinTransaction(ctx, func(ctx context.Context) error {
+		var fnErr error
+		out, fnErr = func(ctx context.Context) (*workspace.Workspace, error) {
+			ws, err := i.repos.Workspace.FindByID(ctx, wId)
+			if err != nil {
+				return nil, err
+			}
 
-		err = ws.DeleteIntegrations(iIDs)
-		if err != nil {
-			return nil, err
-		}
+			err = ws.DeleteIntegrations(iIDs)
+			if err != nil {
+				return nil, err
+			}
 
-		err = i.repos.Workspace.Save(ctx, ws)
-		if err != nil {
-			return nil, err
-		}
+			err = i.repos.Workspace.Save(ctx, ws)
+			if err != nil {
+				return nil, err
+			}
 
-		i.applyDefaultPolicy(ws, operator)
-		return ws, nil
+			i.applyDefaultPolicy(ws, operator)
+			return ws, nil
+		}(ctx)
+		return fnErr
 	})
+	return out, err
 }
 
 func (i *Workspace) UpdateUserMember(ctx context.Context, id workspace.ID, u workspace.UserID, newRole role.RoleType, operator *workspace.Operator) (_ *workspace.Workspace, err error) {
@@ -448,43 +505,52 @@ func (i *Workspace) UpdateUserMember(ctx context.Context, id workspace.ID, u wor
 		return nil, interfaces.ErrInvalidOperator
 	}
 
-	return Run1(ctx, operator, i.repos, Usecase().Transaction().WithWritableWorkspaces(id), func(ctx context.Context) (*workspace.Workspace, error) {
-		ws, err := i.repos.Workspace.FindByID(ctx, id)
-		if err != nil {
-			return nil, err
-		}
-
-		if ws.IsPersonal() {
-			return nil, workspace.ErrCannotModifyPersonalWorkspace
-		}
-
-		if u == *operator.User {
-			currentRole := ws.Members().UserRole(u)
-			if !currentRole.Includes(newRole) {
-				return nil, interfaces.ErrCannotSelfPromote
+	if err := Usecase().WithWritableWorkspaces(id).CheckPermission(operator); err != nil {
+		return nil, err
+	}
+	var out *workspace.Workspace
+	err = i.repos.Transactor.WithinTransaction(ctx, func(ctx context.Context) error {
+		var fnErr error
+		out, fnErr = func(ctx context.Context) (*workspace.Workspace, error) {
+			ws, err := i.repos.Workspace.FindByID(ctx, id)
+			if err != nil {
+				return nil, err
 			}
-			if currentRole == role.RoleOwner && newRole != role.RoleOwner {
-				return nil, interfaces.ErrCannotChangeOwnerRole
+
+			if ws.IsPersonal() {
+				return nil, workspace.ErrCannotModifyPersonalWorkspace
 			}
-		}
 
-		err = ws.Members().UpdateUserRole(u, newRole)
-		if err != nil {
-			return nil, err
-		}
+			if u == *operator.User {
+				currentRole := ws.Members().UserRole(u)
+				if !currentRole.Includes(newRole) {
+					return nil, interfaces.ErrCannotSelfPromote
+				}
+				if currentRole == role.RoleOwner && newRole != role.RoleOwner {
+					return nil, interfaces.ErrCannotChangeOwnerRole
+				}
+			}
 
-		if err := i.updatePermittable(ctx, u, ws.ID(), newRole); err != nil {
-			return nil, err
-		}
+			err = ws.Members().UpdateUserRole(u, newRole)
+			if err != nil {
+				return nil, err
+			}
 
-		err = i.repos.Workspace.Save(ctx, ws)
-		if err != nil {
-			return nil, err
-		}
+			if err := i.updatePermittable(ctx, u, ws.ID(), newRole); err != nil {
+				return nil, err
+			}
 
-		i.applyDefaultPolicy(ws, operator)
-		return ws, nil
+			err = i.repos.Workspace.Save(ctx, ws)
+			if err != nil {
+				return nil, err
+			}
+
+			i.applyDefaultPolicy(ws, operator)
+			return ws, nil
+		}(ctx)
+		return fnErr
 	})
+	return out, err
 }
 
 func (i *Workspace) UpdateIntegration(ctx context.Context, wId workspace.ID, iId workspace.IntegrationID, role role.RoleType, operator *workspace.Operator) (_ *workspace.Workspace, err error) {
@@ -492,25 +558,34 @@ func (i *Workspace) UpdateIntegration(ctx context.Context, wId workspace.ID, iId
 		return nil, interfaces.ErrInvalidOperator
 	}
 
-	return Run1(ctx, operator, i.repos, Usecase().WithOwnableWorkspaces(wId).Transaction(), func(ctx context.Context) (*workspace.Workspace, error) {
-		ws, err := i.repos.Workspace.FindByID(ctx, wId)
-		if err != nil {
-			return nil, err
-		}
+	if err := Usecase().WithOwnableWorkspaces(wId).CheckPermission(operator); err != nil {
+		return nil, err
+	}
+	var out *workspace.Workspace
+	err = i.repos.Transactor.WithinTransaction(ctx, func(ctx context.Context) error {
+		var fnErr error
+		out, fnErr = func(ctx context.Context) (*workspace.Workspace, error) {
+			ws, err := i.repos.Workspace.FindByID(ctx, wId)
+			if err != nil {
+				return nil, err
+			}
 
-		err = ws.Members().UpdateIntegrationRole(iId, role)
-		if err != nil {
-			return nil, err
-		}
+			err = ws.Members().UpdateIntegrationRole(iId, role)
+			if err != nil {
+				return nil, err
+			}
 
-		err = i.repos.Workspace.Save(ctx, ws)
-		if err != nil {
-			return nil, err
-		}
+			err = i.repos.Workspace.Save(ctx, ws)
+			if err != nil {
+				return nil, err
+			}
 
-		i.applyDefaultPolicy(ws, operator)
-		return ws, nil
+			i.applyDefaultPolicy(ws, operator)
+			return ws, nil
+		}(ctx)
+		return fnErr
 	})
+	return out, err
 }
 
 func (i *Workspace) Remove(ctx context.Context, id workspace.ID, operator *workspace.Operator) error {
@@ -518,7 +593,10 @@ func (i *Workspace) Remove(ctx context.Context, id workspace.ID, operator *works
 		return interfaces.ErrInvalidOperator
 	}
 
-	return Run0(ctx, operator, i.repos, Usecase().Transaction().WithOwnableWorkspaces(id), func(ctx context.Context) error {
+	if err := Usecase().WithOwnableWorkspaces(id).CheckPermission(operator); err != nil {
+		return err
+	}
+	return i.repos.Transactor.WithinTransaction(ctx, func(ctx context.Context) error {
 		ws, err := i.repos.Workspace.FindByID(ctx, id)
 		if err != nil {
 			return err
@@ -548,50 +626,59 @@ func (i *Workspace) TransferOwnership(ctx context.Context, workspaceID workspace
 		return nil, interfaces.ErrInvalidOperator
 	}
 
-	return Run1(ctx, operator, i.repos, Usecase().Transaction().WithOwnableWorkspaces(workspaceID), func(ctx context.Context) (*workspace.Workspace, error) {
-		ws, err := i.repos.Workspace.FindByID(ctx, workspaceID)
-		if err != nil {
-			return nil, err
-		}
+	if err := Usecase().WithOwnableWorkspaces(workspaceID).CheckPermission(operator); err != nil {
+		return nil, err
+	}
+	var out *workspace.Workspace
+	err := i.repos.Transactor.WithinTransaction(ctx, func(ctx context.Context) error {
+		var fnErr error
+		out, fnErr = func(ctx context.Context) (*workspace.Workspace, error) {
+			ws, err := i.repos.Workspace.FindByID(ctx, workspaceID)
+			if err != nil {
+				return nil, err
+			}
 
-		if ws.IsPersonal() {
-			return nil, workspace.ErrCannotModifyPersonalWorkspace
-		}
+			if ws.IsPersonal() {
+				return nil, workspace.ErrCannotModifyPersonalWorkspace
+			}
 
-		if !ws.Members().HasUser(newOwnerID) {
-			return nil, workspace.ErrTargetUserNotInTheWorkspace
-		}
+			if !ws.Members().HasUser(newOwnerID) {
+				return nil, workspace.ErrTargetUserNotInTheWorkspace
+			}
 
-		if ws.Members().UserRole(newOwnerID) == role.RoleReader {
-			return nil, workspace.ErrCannotChangeRoleToOwner
-		}
+			if ws.Members().UserRole(newOwnerID) == role.RoleReader {
+				return nil, workspace.ErrCannotChangeRoleToOwner
+			}
 
-		err = ws.Members().UpdateUserRole(newOwnerID, role.RoleOwner)
-		if err != nil {
-			return nil, err
-		}
+			err = ws.Members().UpdateUserRole(newOwnerID, role.RoleOwner)
+			if err != nil {
+				return nil, err
+			}
 
-		if err := i.updatePermittable(ctx, newOwnerID, ws.ID(), role.RoleOwner); err != nil {
-			return nil, err
-		}
+			if err := i.updatePermittable(ctx, newOwnerID, ws.ID(), role.RoleOwner); err != nil {
+				return nil, err
+			}
 
-		err = ws.Members().UpdateUserRole(*operator.User, role.RoleMaintainer)
-		if err != nil {
-			return nil, err
-		}
+			err = ws.Members().UpdateUserRole(*operator.User, role.RoleMaintainer)
+			if err != nil {
+				return nil, err
+			}
 
-		if err := i.updatePermittable(ctx, *operator.User, ws.ID(), role.RoleMaintainer); err != nil {
-			return nil, err
-		}
+			if err := i.updatePermittable(ctx, *operator.User, ws.ID(), role.RoleMaintainer); err != nil {
+				return nil, err
+			}
 
-		err = i.repos.Workspace.Save(ctx, ws)
-		if err != nil {
-			return nil, err
-		}
+			err = i.repos.Workspace.Save(ctx, ws)
+			if err != nil {
+				return nil, err
+			}
 
-		i.applyDefaultPolicy(ws, operator)
-		return ws, nil
+			i.applyDefaultPolicy(ws, operator)
+			return ws, nil
+		}(ctx)
+		return fnErr
 	})
+	return out, err
 }
 
 func (i *Workspace) applyDefaultPolicy(ws *workspace.Workspace, o *workspace.Operator) {

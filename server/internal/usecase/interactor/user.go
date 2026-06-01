@@ -95,35 +95,47 @@ func (i *User) FetchByNameOrAlias(ctx context.Context, nameOrAlias string) (user
 }
 
 func (i *User) GetUserByCredentials(ctx context.Context, inp interfaces.GetUserByCredentials) (u *user.User, err error) {
-	return Run1(ctx, nil, i.repos, Usecase().Transaction(), func(ctx context.Context) (*user.User, error) {
-		u, err = i.repos.User.FindByNameOrEmail(ctx, inp.Email)
-		if err != nil && !errors.Is(err, rerror.ErrNotFound) {
-			return nil, err
-		} else if u == nil {
-			return nil, interfaces.ErrInvalidUserEmail
-		}
-		matched, err := u.MatchPassword(inp.Password)
-		if err != nil {
-			return nil, err
-		}
-		if !matched {
-			return nil, interfaces.ErrInvalidEmailOrPassword
-		}
-		if u.Verification() == nil || !u.Verification().IsVerified() {
-			return nil, interfaces.ErrNotVerifiedUser
-		}
-		return u, nil
+	var out *user.User
+	err = i.repos.Transactor.WithinTransaction(ctx, func(ctx context.Context) error {
+		var fnErr error
+		out, fnErr = func(ctx context.Context) (*user.User, error) {
+			u, err = i.repos.User.FindByNameOrEmail(ctx, inp.Email)
+			if err != nil && !errors.Is(err, rerror.ErrNotFound) {
+				return nil, err
+			} else if u == nil {
+				return nil, interfaces.ErrInvalidUserEmail
+			}
+			matched, err := u.MatchPassword(inp.Password)
+			if err != nil {
+				return nil, err
+			}
+			if !matched {
+				return nil, interfaces.ErrInvalidEmailOrPassword
+			}
+			if u.Verification() == nil || !u.Verification().IsVerified() {
+				return nil, interfaces.ErrNotVerifiedUser
+			}
+			return u, nil
+		}(ctx)
+		return fnErr
 	})
+	return out, err
 }
 
 func (i *User) GetUserBySubject(ctx context.Context, sub string) (u *user.User, err error) {
-	return Run1(ctx, nil, i.repos, Usecase().Transaction(), func(ctx context.Context) (*user.User, error) {
-		u, err = i.repos.User.FindBySub(ctx, sub)
-		if err != nil {
-			return nil, err
-		}
-		return u, nil
+	var out *user.User
+	err = i.repos.Transactor.WithinTransaction(ctx, func(ctx context.Context) error {
+		var fnErr error
+		out, fnErr = func(ctx context.Context) (*user.User, error) {
+			u, err = i.repos.User.FindBySub(ctx, sub)
+			if err != nil {
+				return nil, err
+			}
+			return u, nil
+		}(ctx)
+		return fnErr
 	})
+	return out, err
 }
 
 func (i *User) Logout(ctx context.Context, operator *workspace.Operator) (*user.User, error) {
@@ -131,20 +143,26 @@ func (i *User) Logout(ctx context.Context, operator *workspace.Operator) (*user.
 		return nil, interfaces.ErrInvalidOperator
 	}
 
-	return Run1(ctx, operator, i.repos, Usecase().Transaction(), func(ctx context.Context) (*user.User, error) {
-		u, err := i.repos.User.FindByID(ctx, *operator.User)
-		if err != nil {
-			return nil, err
-		}
+	var out *user.User
+	err := i.repos.Transactor.WithinTransaction(ctx, func(ctx context.Context) error {
+		var fnErr error
+		out, fnErr = func(ctx context.Context) (*user.User, error) {
+			u, err := i.repos.User.FindByID(ctx, *operator.User)
+			if err != nil {
+				return nil, err
+			}
 
-		u.SetLatestLogoutAt(time.Now())
+			u.SetLatestLogoutAt(time.Now())
 
-		if err := i.repos.User.Save(ctx, u); err != nil {
-			return nil, err
-		}
+			if err := i.repos.User.Save(ctx, u); err != nil {
+				return nil, err
+			}
 
-		return u, nil
+			return u, nil
+		}(ctx)
+		return fnErr
 	})
+	return out, err
 }
 
 func (i *User) UpdateMe(ctx context.Context, p interfaces.UpdateMeParam, operator *workspace.Operator) (u *user.User, err error) {
@@ -152,131 +170,137 @@ func (i *User) UpdateMe(ctx context.Context, p interfaces.UpdateMeParam, operato
 		return nil, interfaces.ErrInvalidOperator
 	}
 
-	return Run1(ctx, operator, i.repos, Usecase().Transaction(), func(ctx context.Context) (*user.User, error) {
-		if p.Password != nil {
-			if p.PasswordConfirmation == nil || *p.Password != *p.PasswordConfirmation {
-				return nil, interfaces.ErrUserInvalidPasswordConfirmation
-			}
-		}
-
-		var ws *workspace.Workspace
-
-		u, err = i.repos.User.FindByID(ctx, *operator.User)
-		if err != nil {
-			return nil, err
-		}
-
-		ws, err = i.repos.Workspace.FindByID(ctx, u.Workspace())
-		if err != nil && !errors.Is(err, rerror.ErrNotFound) {
-			return nil, err
-		}
-
-		if ws == nil {
-			return nil, rerror.ErrNotFound
-		}
-
-		if p.Alias != nil && *p.Alias != u.Alias() {
-			existingUser, err := i.repos.User.FindByAlias(ctx, *p.Alias)
-			if err != nil && !errors.Is(err, rerror.ErrNotFound) {
-				return nil, err
-			}
-			if existingUser != nil && existingUser.ID() != u.ID() {
-				return nil, interfaces.ErrUserAliasAlreadyExists
-			}
-			u.UpdateAlias(*p.Alias)
-			ws.UpdateAlias(*p.Alias)
-		}
-		if p.Name != nil && *p.Name != u.Name() {
-			oldName := u.Name()
-			u.UpdateName(*p.Name)
-
-			tn := ws.Name()
-			if tn == "" || tn == oldName {
-				ws.Rename(*p.Name)
-			}
-		}
-		if p.Email != nil {
-			if err = u.UpdateEmail(*p.Email); err != nil {
-				return nil, err
-			}
-		}
-
-		if u.Metadata() != nil {
-			if p.Lang != nil {
-				u.Metadata().LangFrom(p.Lang.String())
-			}
-
-			if p.Theme != nil {
-				u.Metadata().SetTheme(*p.Theme)
-			}
-
-			if p.Description != nil {
-				u.Metadata().SetDescription(*p.Description)
-			}
-
-			if p.Website != nil {
-				u.Metadata().SetWebsite(*p.Website)
-			}
-
-			if p.PhotoURL != nil {
-				u.Metadata().SetPhotoURL(*p.PhotoURL)
-			}
-		}
-
-		if p.Password != nil && u.HasAuthProvider("reearth") {
-			if err := u.SetPassword(*p.Password); err != nil {
-				return nil, err
-			}
-		}
-
-		// Update Auth0 users
-		if p.Name != nil || p.Email != nil || p.Password != nil {
-			for _, a := range u.Auths() {
-				if a.Provider != "auth0" {
-					continue
-				}
-				if _, err = i.gateways.Authenticator.UpdateUser(ctx, gateway.AuthenticatorUpdateUserParam{
-					ID:       a.Sub,
-					Name:     p.Name,
-					Email:    p.Email,
-					Password: p.Password,
-				}); err != nil {
-					return nil, err
+	var out *user.User
+	err = i.repos.Transactor.WithinTransaction(ctx, func(ctx context.Context) error {
+		var fnErr error
+		out, fnErr = func(ctx context.Context) (*user.User, error) {
+			if p.Password != nil {
+				if p.PasswordConfirmation == nil || *p.Password != *p.PasswordConfirmation {
+					return nil, interfaces.ErrUserInvalidPasswordConfirmation
 				}
 			}
-		}
 
-		// Update personal workspace metadata fields (description, website, photoURL)
-		if p.Description != nil || p.Website != nil || p.PhotoURL != nil {
-			if ws != nil && ws.IsPersonal() {
-				metadata := ws.Metadata()
-				if p.Description != nil {
-					metadata.SetDescription(*p.Description)
-				}
-				if p.Website != nil {
-					metadata.SetWebsite(*p.Website)
-				}
-				if p.PhotoURL != nil {
-					metadata.SetPhotoURL(*p.PhotoURL)
-				}
-				ws.SetMetadata(*metadata)
-			}
-		}
+			var ws *workspace.Workspace
 
-		if ws != nil {
-			err = i.repos.Workspace.Save(ctx, ws)
+			u, err = i.repos.User.FindByID(ctx, *operator.User)
 			if err != nil {
 				return nil, err
 			}
-		}
 
-		err = i.repos.User.Save(ctx, u)
-		if err != nil {
-			return nil, err
-		}
+			ws, err = i.repos.Workspace.FindByID(ctx, u.Workspace())
+			if err != nil && !errors.Is(err, rerror.ErrNotFound) {
+				return nil, err
+			}
 
-		return u, nil
+			if ws == nil {
+				return nil, rerror.ErrNotFound
+			}
+
+			if p.Alias != nil && *p.Alias != u.Alias() {
+				existingUser, err := i.repos.User.FindByAlias(ctx, *p.Alias)
+				if err != nil && !errors.Is(err, rerror.ErrNotFound) {
+					return nil, err
+				}
+				if existingUser != nil && existingUser.ID() != u.ID() {
+					return nil, interfaces.ErrUserAliasAlreadyExists
+				}
+				u.UpdateAlias(*p.Alias)
+				ws.UpdateAlias(*p.Alias)
+			}
+			if p.Name != nil && *p.Name != u.Name() {
+				oldName := u.Name()
+				u.UpdateName(*p.Name)
+
+				tn := ws.Name()
+				if tn == "" || tn == oldName {
+					ws.Rename(*p.Name)
+				}
+			}
+			if p.Email != nil {
+				if err = u.UpdateEmail(*p.Email); err != nil {
+					return nil, err
+				}
+			}
+
+			if u.Metadata() != nil {
+				if p.Lang != nil {
+					u.Metadata().LangFrom(p.Lang.String())
+				}
+
+				if p.Theme != nil {
+					u.Metadata().SetTheme(*p.Theme)
+				}
+
+				if p.Description != nil {
+					u.Metadata().SetDescription(*p.Description)
+				}
+
+				if p.Website != nil {
+					u.Metadata().SetWebsite(*p.Website)
+				}
+
+				if p.PhotoURL != nil {
+					u.Metadata().SetPhotoURL(*p.PhotoURL)
+				}
+			}
+
+			if p.Password != nil && u.HasAuthProvider("reearth") {
+				if err := u.SetPassword(*p.Password); err != nil {
+					return nil, err
+				}
+			}
+
+			// Update Auth0 users
+			if p.Name != nil || p.Email != nil || p.Password != nil {
+				for _, a := range u.Auths() {
+					if a.Provider != "auth0" {
+						continue
+					}
+					if _, err = i.gateways.Authenticator.UpdateUser(ctx, gateway.AuthenticatorUpdateUserParam{
+						ID:       a.Sub,
+						Name:     p.Name,
+						Email:    p.Email,
+						Password: p.Password,
+					}); err != nil {
+						return nil, err
+					}
+				}
+			}
+
+			// Update personal workspace metadata fields (description, website, photoURL)
+			if p.Description != nil || p.Website != nil || p.PhotoURL != nil {
+				if ws != nil && ws.IsPersonal() {
+					metadata := ws.Metadata()
+					if p.Description != nil {
+						metadata.SetDescription(*p.Description)
+					}
+					if p.Website != nil {
+						metadata.SetWebsite(*p.Website)
+					}
+					if p.PhotoURL != nil {
+						metadata.SetPhotoURL(*p.PhotoURL)
+					}
+					ws.SetMetadata(*metadata)
+				}
+			}
+
+			if ws != nil {
+				err = i.repos.Workspace.Save(ctx, ws)
+				if err != nil {
+					return nil, err
+				}
+			}
+
+			err = i.repos.User.Save(ctx, u)
+			if err != nil {
+				return nil, err
+			}
+
+			return u, nil
+		}(ctx)
+		return fnErr
 	})
+	return out, err
 }
 
 func (i *User) RemoveMyAuth(ctx context.Context, authProvider string, operator *workspace.Operator) (u *user.User, err error) {
@@ -284,28 +308,34 @@ func (i *User) RemoveMyAuth(ctx context.Context, authProvider string, operator *
 		return nil, interfaces.ErrInvalidOperator
 	}
 
-	return Run1(ctx, operator, i.repos, Usecase().Transaction(), func(ctx context.Context) (*user.User, error) {
-		u, err = i.repos.User.FindByID(ctx, *operator.User)
-		if err != nil {
-			return nil, err
-		}
+	var out *user.User
+	err = i.repos.Transactor.WithinTransaction(ctx, func(ctx context.Context) error {
+		var fnErr error
+		out, fnErr = func(ctx context.Context) (*user.User, error) {
+			u, err = i.repos.User.FindByID(ctx, *operator.User)
+			if err != nil {
+				return nil, err
+			}
 
-		u.RemoveAuthByProvider(authProvider)
+			u.RemoveAuthByProvider(authProvider)
 
-		err = i.repos.User.Save(ctx, u)
-		if err != nil {
-			return nil, err
-		}
+			err = i.repos.User.Save(ctx, u)
+			if err != nil {
+				return nil, err
+			}
 
-		return u, nil
+			return u, nil
+		}(ctx)
+		return fnErr
 	})
+	return out, err
 }
 
 func (i *User) DeleteMe(ctx context.Context, userID user.ID, operator *workspace.Operator) (err error) {
 	if operator.User == nil {
 		return interfaces.ErrInvalidOperator
 	}
-	return Run0(ctx, operator, i.repos, Usecase().Transaction(), func(ctx context.Context) error {
+	return i.repos.Transactor.WithinTransaction(ctx, func(ctx context.Context) error {
 		if userID.IsNil() || userID != *operator.User {
 			return rerror.NewE(i18n.T("invalid user id"))
 		}
@@ -363,29 +393,35 @@ func (i *User) DeleteMe(ctx context.Context, userID user.ID, operator *workspace
 }
 
 func (i *User) VerifyUser(ctx context.Context, code string) (*user.User, error) {
-	return Run1(ctx, nil, i.repos, Usecase().Transaction(), func(ctx context.Context) (*user.User, error) {
+	var out *user.User
+	err := i.repos.Transactor.WithinTransaction(ctx, func(ctx context.Context) error {
+		var fnErr error
+		out, fnErr = func(ctx context.Context) (*user.User, error) {
 
-		u, err := i.repos.User.FindByVerification(ctx, code)
-		if err != nil {
-			return nil, err
-		}
-		if u.Verification().IsExpired() {
-			return nil, errors.New("verification expired")
-		}
-		u.Verification().SetVerified(true)
-		err = i.repos.User.Save(ctx, u)
-		if err != nil {
-			return nil, err
-		}
+			u, err := i.repos.User.FindByVerification(ctx, code)
+			if err != nil {
+				return nil, err
+			}
+			if u.Verification().IsExpired() {
+				return nil, errors.New("verification expired")
+			}
+			u.Verification().SetVerified(true)
+			err = i.repos.User.Save(ctx, u)
+			if err != nil {
+				return nil, err
+			}
 
-		return u, nil
+			return u, nil
+		}(ctx)
+		return fnErr
 	})
+	return out, err
 }
 func (i *User) StartPasswordReset(ctx context.Context, email string) error {
 	var contact mailer.Contact
 	var mailText, mailHTML string
 
-	if err := Run0(ctx, nil, i.repos, Usecase().Transaction(), func(ctx context.Context) error {
+	if err := i.repos.Transactor.WithinTransaction(ctx, func(ctx context.Context) error {
 		u, err := i.repos.User.FindByEmail(ctx, email)
 		if err != nil {
 			return err
@@ -433,7 +469,7 @@ func (i *User) StartPasswordReset(ctx context.Context, email string) error {
 }
 
 func (i *User) PasswordReset(ctx context.Context, password string, token string) error {
-	return Run0(ctx, nil, i.repos, Usecase().Transaction(), func(ctx context.Context) error {
+	return i.repos.Transactor.WithinTransaction(ctx, func(ctx context.Context) error {
 		u, err := i.repos.User.FindByPasswordResetRequest(ctx, token)
 		if err != nil {
 			return err
