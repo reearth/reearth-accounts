@@ -111,13 +111,13 @@ func (r *Permittable) Save(ctx context.Context, p permittable.Permittable) error
 			return rerror.ErrInternalByWithContext(ctx, err)
 		}
 		if err := q.PermittableWorkspaceRolesDeleteByPermittable(ctx, pid); err != nil {
-			return err
+			return rerror.ErrInternalByWithContext(ctx, err)
 		}
 		for _, wr := range wrs {
 			if err := q.PermittableWorkspaceRoleInsert(ctx, gen.PermittableWorkspaceRoleInsertParams{
 				PermittableID: pid, WorkspaceID: wr.WorkspaceID, RoleID: wr.RoleID,
 			}); err != nil {
-				return err
+				return rerror.ErrInternalByWithContext(ctx, err)
 			}
 		}
 		return nil

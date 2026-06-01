@@ -227,23 +227,23 @@ func (r *Workspace) save(ctx context.Context, ws *workspace.Workspace) error {
 			return rerror.ErrInternalByWithContext(ctx, err)
 		}
 		if err := q.WorkspaceMembersDeleteByWorkspace(ctx, row.ID); err != nil {
-			return err
+			return rerror.ErrInternalByWithContext(ctx, err)
 		}
 		for _, m := range members {
 			if err := q.WorkspaceMemberInsert(ctx, gen.WorkspaceMemberInsertParams{
 				WorkspaceID: m.WorkspaceID, UserID: m.UserID, Role: m.Role, InvitedBy: m.InvitedBy, Disabled: m.Disabled,
 			}); err != nil {
-				return err
+				return rerror.ErrInternalByWithContext(ctx, err)
 			}
 		}
 		if err := q.WorkspaceIntegrationsDeleteByWorkspace(ctx, row.ID); err != nil {
-			return err
+			return rerror.ErrInternalByWithContext(ctx, err)
 		}
 		for _, m := range integrations {
 			if err := q.WorkspaceIntegrationInsert(ctx, gen.WorkspaceIntegrationInsertParams{
 				WorkspaceID: m.WorkspaceID, IntegrationID: m.IntegrationID, Role: m.Role, InvitedBy: m.InvitedBy, Disabled: m.Disabled,
 			}); err != nil {
-				return err
+				return rerror.ErrInternalByWithContext(ctx, err)
 			}
 		}
 		return nil

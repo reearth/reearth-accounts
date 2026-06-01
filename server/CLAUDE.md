@@ -137,6 +137,11 @@ server/
   `.../sqlc/gen/`. Regenerate with `make sqlc` after editing any `*.sql`.
 - Runtime migrations: embedded SQL in `.../postgres/migration/` run on startup
   via golang-migrate (advisory-locked, idempotent).
+- Deployment requirement: the embedded `0001_init` migration runs
+  `CREATE EXTENSION IF NOT EXISTS pg_trgm`, so the connecting DB role needs
+  permission to create the extension (or have a DBA pre-create it). This is
+  the default on standard Postgres but may require an admin step on managed
+  offerings such as Cloud SQL, RDS, or Supabase.
 
 ### MongoDB Schema Changes
 
