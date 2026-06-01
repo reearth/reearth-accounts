@@ -2,6 +2,9 @@ package interactor
 
 import (
 	"context"
+	"encoding/json"
+	"net/http"
+	"net/http/httptest"
 	"net/url"
 	"testing"
 	"time"
@@ -377,6 +380,164 @@ func TestUser_Signup(t *testing.T) {
 	}
 }
 
+func TestGetOpenIDConfiguration(t *testing.T) {
+	tests := []struct {
+		name       string
+		handler    http.HandlerFunc
+		iss        string
+		wantErr    bool
+		wantResult OpenIDConfiguration
+	}{
+		{
+			name: "success",
+			handler: func(w http.ResponseWriter, r *http.Request) {
+				w.Header().Set("Content-Type", "application/json")
+				_, _ = w.Write([]byte(`{"userinfo_endpoint":"https://example.com/userinfo"}`))
+			},
+			wantResult: OpenIDConfiguration{UserinfoEndpoint: "https://example.com/userinfo"},
+		},
+		{
+			name: "non-200 response",
+			handler: func(w http.ResponseWriter, r *http.Request) {
+				w.WriteHeader(http.StatusInternalServerError)
+				_, _ = w.Write([]byte("internal server error"))
+			},
+			wantErr: true,
+		},
+		{
+			name: "invalid JSON",
+			handler: func(w http.ResponseWriter, r *http.Request) {
+				w.WriteHeader(http.StatusOK)
+				_, _ = w.Write([]byte("not valid json"))
+			},
+			wantErr: true,
+		},
+		{
+			name:    "empty issuer",
+			iss:     "",
+			wantErr: true,
+		},
+	}
+
+	for _, tt := range tests {
+		tt := tt
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			iss := tt.iss
+			if tt.handler != nil {
+				srv := httptest.NewServer(tt.handler)
+				defer srv.Close()
+				iss = srv.URL
+			}
+
+			result, err := getOpenIDConfiguration(context.Background(), iss)
+
+			if tt.wantErr {
+				assert.Error(t, err)
+			} else {
+				assert.NoError(t, err)
+				assert.Equal(t, tt.wantResult, result)
+			}
+		})
+	}
+}
+
+func TestGetUserInfo(t *testing.T) {
+	tests := []struct {
+		name        string
+		handler     http.HandlerFunc
+		accessToken string
+		wantErr     bool
+		wantResult  UserInfo
+	}{
+		{
+			name: "success",
+			handler: func(w http.ResponseWriter, r *http.Request) {
+				w.Header().Set("Content-Type", "application/json")
+				_, _ = w.Write([]byte(`{"sub":"sub123","email":"user@example.com","name":"Test User"}`))
+			},
+			accessToken: "token123",
+			wantResult:  UserInfo{Sub: "sub123", Email: "user@example.com", Name: "Test User"},
+		},
+		{
+			name: "authorization header forwarded",
+			handler: func(w http.ResponseWriter, r *http.Request) {
+				if r.Header.Get("Authorization") != "Bearer mytoken" {
+					http.Error(w, "unauthorized", http.StatusUnauthorized)
+					return
+				}
+				w.Header().Set("Content-Type", "application/json")
+				_, _ = w.Write([]byte(`{"sub":"sub456","email":"other@example.com"}`))
+			},
+			accessToken: "mytoken",
+			wantResult:  UserInfo{Sub: "sub456", Email: "other@example.com"},
+		},
+		{
+			name: "non-200 response",
+			handler: func(w http.ResponseWriter, r *http.Request) {
+				w.WriteHeader(http.StatusForbidden)
+				_, _ = w.Write([]byte("forbidden"))
+			},
+			accessToken: "token123",
+			wantErr:     true,
+		},
+		{
+			name: "invalid JSON",
+			handler: func(w http.ResponseWriter, r *http.Request) {
+				w.WriteHeader(http.StatusOK)
+				_, _ = w.Write([]byte("not valid json"))
+			},
+			accessToken: "token123",
+			wantErr:     true,
+		},
+		{
+			name: "error field in response",
+			handler: func(w http.ResponseWriter, r *http.Request) {
+				w.Header().Set("Content-Type", "application/json")
+				_, _ = w.Write([]byte(`{"error":"access_denied"}`))
+			},
+			accessToken: "token123",
+			wantErr:     true,
+		},
+		{
+			name: "missing sub",
+			handler: func(w http.ResponseWriter, r *http.Request) {
+				w.Header().Set("Content-Type", "application/json")
+				_, _ = w.Write([]byte(`{"email":"user@example.com"}`))
+			},
+			accessToken: "token123",
+			wantErr:     true,
+		},
+		{
+			name: "missing email",
+			handler: func(w http.ResponseWriter, r *http.Request) {
+				w.Header().Set("Content-Type", "application/json")
+				_, _ = w.Write([]byte(`{"sub":"sub123"}`))
+			},
+			accessToken: "token123",
+			wantErr:     true,
+		},
+	}
+
+	for _, tt := range tests {
+		tt := tt
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			srv := httptest.NewServer(tt.handler)
+			defer srv.Close()
+
+			result, err := getUserInfo(context.Background(), srv.URL, tt.accessToken)
+
+			if tt.wantErr {
+				assert.Error(t, err)
+			} else {
+				assert.NoError(t, err)
+				assert.Equal(t, tt.wantResult, result)
+			}
+		})
+	}
+}
+
 func TestIssToURL(t *testing.T) {
 	assert.Nil(t, issToURL("", ""))
 	assert.Equal(t, &url.URL{Scheme: "https", Host: "iss.com"}, issToURL("iss.com", ""))
@@ -385,6 +546,215 @@ func TestIssToURL(t *testing.T) {
 	assert.Equal(t, &url.URL{Scheme: "https", Host: "iss.com", Path: ""}, issToURL("https://iss.com/", ""))
 	assert.Equal(t, &url.URL{Scheme: "https", Host: "iss.com", Path: "/hoge"}, issToURL("https://iss.com/hoge", ""))
 	assert.Equal(t, &url.URL{Scheme: "https", Host: "iss.com", Path: "/hoge/foobar"}, issToURL("https://iss.com/hoge", "foobar"))
+}
+
+func TestUser_getUserInfoFromISS_AllowlistValidation(t *testing.T) {
+	tests := []struct {
+		name        string
+		allowedISS  []string
+		iss         string
+		accessToken string
+		wantErrMsg  string
+	}{
+		{
+			name:        "empty access token",
+			allowedISS:  nil,
+			iss:         "https://example.com",
+			accessToken: "",
+			wantErrMsg:  "invalid access token",
+		},
+		{
+			name:        "empty iss",
+			allowedISS:  nil,
+			iss:         "",
+			accessToken: "token",
+			wantErrMsg:  "invalid issuer",
+		},
+		{
+			name:        "iss not in allowlist",
+			allowedISS:  []string{"https://trusted.example.com"},
+			iss:         "https://evil.example.com",
+			accessToken: "token",
+			wantErrMsg:  "invalid issuer",
+		},
+		{
+			name:        "second iss not in allowlist",
+			allowedISS:  []string{"https://a.example.com", "https://b.example.com"},
+			iss:         "https://c.example.com",
+			accessToken: "token",
+			wantErrMsg:  "invalid issuer",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			u := &User{allowedISS: tt.allowedISS}
+			_, err := u.getUserInfoFromISS(context.Background(), tt.iss, tt.accessToken)
+			assert.Error(t, err)
+			assert.Contains(t, err.Error(), tt.wantErrMsg)
+		})
+	}
+}
+
+func TestUser_getUserInfoFromISS_AllowlistPermits(t *testing.T) {
+	tests := []struct {
+		name       string
+		allowedISS []string
+		iss        string
+	}{
+		{
+			name:       "empty allowlist permits any iss",
+			allowedISS: nil,
+			iss:        "https://any.example.com",
+		},
+		{
+			name:       "iss present in single-entry allowlist",
+			allowedISS: []string{"https://trusted.example.com"},
+			iss:        "https://trusted.example.com",
+		},
+		{
+			name:       "iss present in multi-entry allowlist",
+			allowedISS: []string{"https://a.example.com", "https://b.example.com"},
+			iss:        "https://b.example.com",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			u := &User{allowedISS: tt.allowedISS}
+			// The ISS passes the allowlist check; error comes from the unreachable host,
+			// not from the "invalid issuer" guard.
+			_, err := u.getUserInfoFromISS(context.Background(), tt.iss, "token")
+			assert.Error(t, err)
+			assert.NotContains(t, err.Error(), "invalid issuer")
+		})
+	}
+}
+
+func TestUser_getUserInfoFromISS_MockServer(t *testing.T) {
+	var serverURL string
+
+	mux := http.NewServeMux()
+	mux.HandleFunc("/.well-known/openid-configuration", func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		_ = json.NewEncoder(w).Encode(OpenIDConfiguration{
+			UserinfoEndpoint: serverURL + "/userinfo",
+		})
+	})
+	mux.HandleFunc("/userinfo", func(w http.ResponseWriter, r *http.Request) {
+		assert.Equal(t, "Bearer mytoken", r.Header.Get("Authorization"))
+		w.Header().Set("Content-Type", "application/json")
+		_ = json.NewEncoder(w).Encode(UserInfo{
+			Sub:   "sub123",
+			Name:  "Test User",
+			Email: "test@example.com",
+		})
+	})
+
+	srv := httptest.NewServer(mux)
+	defer srv.Close()
+	serverURL = srv.URL
+
+	u := &User{allowedISS: []string{srv.URL}}
+	info, err := u.getUserInfoFromISS(context.Background(), srv.URL, "mytoken")
+
+	assert.NoError(t, err)
+	assert.Equal(t, "sub123", info.Sub)
+	assert.Equal(t, "test@example.com", info.Email)
+	assert.Equal(t, "Test User", info.Name)
+}
+
+func TestUser_getUserInfoFromISS_ContextDeadlinePropagated(t *testing.T) {
+	mux := http.NewServeMux()
+	mux.HandleFunc("/.well-known/openid-configuration", func(w http.ResponseWriter, r *http.Request) {
+		<-r.Context().Done()
+	})
+
+	srv := httptest.NewServer(mux)
+	defer srv.Close()
+
+	ctx, cancel := context.WithTimeout(context.Background(), 50*time.Millisecond)
+	defer cancel()
+
+	u := &User{}
+	_, err := u.getUserInfoFromISS(ctx, srv.URL, "token")
+
+	assert.Error(t, err)
+}
+
+func TestUser_SignupOIDC_AllowlistRejectsUnknownISS(t *testing.T) {
+	ctx := context.Background()
+	r := accountmemory.New()
+
+	uc := NewUser(r, nil, "", "", "https://trusted.example.com")
+
+	_, err := uc.SignupOIDC(ctx, interfaces.SignupOIDCParam{
+		Issuer:      "https://evil.example.com",
+		AccessToken: "sometoken",
+		// Sub and Email intentionally empty to trigger getUserInfoFromISS
+	})
+
+	assert.Error(t, err)
+	assert.Contains(t, err.Error(), "invalid issuer")
+}
+
+func TestUser_SignupOIDC_AllowlistPermitsKnownISS(t *testing.T) {
+	var serverURL string
+
+	mux := http.NewServeMux()
+	mux.HandleFunc("/.well-known/openid-configuration", func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		_ = json.NewEncoder(w).Encode(OpenIDConfiguration{
+			UserinfoEndpoint: serverURL + "/userinfo",
+		})
+	})
+	mux.HandleFunc("/userinfo", func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		_ = json.NewEncoder(w).Encode(UserInfo{
+			Sub:   "sub-signup",
+			Email: "oidcuser@example.com",
+			Name:  "OIDC User",
+		})
+	})
+
+	srv := httptest.NewServer(mux)
+	defer srv.Close()
+	serverURL = srv.URL
+
+	ctx := context.Background()
+	r := accountmemory.New()
+
+	selfRole := role.New().NewID().Name(interfaces.RoleSelf).MustBuild()
+	ownerRole := role.New().NewID().Name(role.RoleOwner.String()).MustBuild()
+	assert.NoError(t, r.Role.Save(ctx, *selfRole))
+	assert.NoError(t, r.Role.Save(ctx, *ownerRole))
+
+	uc := NewUser(r, nil, "", "", srv.URL)
+
+	u, err := uc.SignupOIDC(ctx, interfaces.SignupOIDCParam{
+		Issuer:      srv.URL,
+		AccessToken: "token",
+	})
+
+	assert.NoError(t, err)
+	assert.NotNil(t, u)
+	assert.Equal(t, "oidcuser@example.com", u.Email())
+}
+
+func TestUser_FindOrCreate_AllowlistRejectsUnknownISS(t *testing.T) {
+	ctx := context.Background()
+	r := accountmemory.New()
+
+	uc := NewUser(r, nil, "", "", "https://trusted.example.com").(*User)
+
+	_, err := uc.FindOrCreate(ctx, interfaces.UserFindOrCreateParam{
+		Sub:   "sub123",
+		ISS:   "https://evil.example.com",
+		Token: "sometoken",
+	})
+
+	assert.Error(t, err)
+	assert.Contains(t, err.Error(), "invalid issuer")
 }
 
 // mockAuthenticator is a test helper that implements the Authenticator interface

@@ -24,6 +24,7 @@ type User struct {
 	gateways        *gateway.Container
 	signupSecret    string
 	authSrvUIDomain string
+	allowedISS      []string
 	query           interfaces.UserQuery
 }
 
@@ -35,7 +36,7 @@ var (
 	}
 )
 
-func NewUser(r *repo.Container, g *gateway.Container, signupSecret, authSrcUIDomain string) interfaces.User {
+func NewUser(r *repo.Container, g *gateway.Container, signupSecret, authSrcUIDomain string, allowedISS ...string) interfaces.User {
 	var repos []user.Repo
 	if r != nil {
 		repos = []user.Repo{r.User}
@@ -45,18 +46,20 @@ func NewUser(r *repo.Container, g *gateway.Container, signupSecret, authSrcUIDom
 		gateways:        g,
 		signupSecret:    signupSecret,
 		authSrvUIDomain: authSrcUIDomain,
+		allowedISS:      allowedISS,
 		query: &UserQuery{
 			repos: repos,
 		},
 	}
 }
 
-func NewMultiUser(r *repo.Container, g *gateway.Container, signupSecret, authSrcUIDomain string, users []user.Repo) interfaces.User {
+func NewMultiUser(r *repo.Container, g *gateway.Container, signupSecret, authSrcUIDomain string, users []user.Repo, allowedISS ...string) interfaces.User {
 	return &User{
 		repos:           r,
 		gateways:        g,
 		signupSecret:    signupSecret,
 		authSrvUIDomain: authSrcUIDomain,
+		allowedISS:      allowedISS,
 		query: &UserQuery{
 			repos: append([]user.Repo{r.User}, users...),
 		},
@@ -325,14 +328,20 @@ func (i *User) DeleteMe(ctx context.Context, userID user.ID, operator *workspace
 		updatedWorkspaces := make([]*workspace.Workspace, 0, len(workspaces))
 		deletedWorkspaces := []user.WorkspaceID{}
 
-		for _, workspace := range workspaces {
-			if !workspace.IsPersonal() && !workspace.Members().IsOnlyOwner(u.ID()) {
-				_ = workspace.Members().Leave(u.ID())
-				updatedWorkspaces = append(updatedWorkspaces, workspace)
+		for _, ws := range workspaces {
+			if !ws.IsPersonal() && !ws.Members().IsOnlyOwner(u.ID()) {
+				if err := ws.Members().Leave(u.ID()); err != nil {
+					if errors.Is(err, workspace.ErrTargetUserNotInTheWorkspace) {
+						// User already removed by a concurrent change; nothing to save
+						continue
+					}
+					return err
+				}
+				updatedWorkspaces = append(updatedWorkspaces, ws)
 				continue
 			}
 
-			deletedWorkspaces = append(deletedWorkspaces, workspace.ID())
+			deletedWorkspaces = append(deletedWorkspaces, ws.ID())
 		}
 
 		// Save workspaces
@@ -375,7 +384,10 @@ func (i *User) VerifyUser(ctx context.Context, code string) (*user.User, error) 
 	})
 }
 func (i *User) StartPasswordReset(ctx context.Context, email string) error {
-	return Run0(ctx, nil, i.repos, Usecase().Transaction(), func(ctx context.Context) error {
+	var contact mailer.Contact
+	var mailText, mailHTML string
+
+	if err := Run0(ctx, nil, i.repos, Usecase().Transaction(), func(ctx context.Context) error {
 		u, err := i.repos.User.FindByEmail(ctx, email)
 		if err != nil {
 			return err
@@ -389,34 +401,37 @@ func (i *User) StartPasswordReset(ctx context.Context, email string) error {
 		pr := user.NewPasswordReset()
 		u.SetPasswordReset(pr)
 
-		if err := i.repos.User.Save(ctx, u); err != nil {
+		if err = i.repos.User.Save(ctx, u); err != nil {
 			return err
 		}
 
 		var TextOut, HTMLOut bytes.Buffer
 		link := i.authSrvUIDomain + "/?pwd-reset-token=" + pr.Token
-		passwordResetMailContent.UserName = u.Name()
-		passwordResetMailContent.ActionURL = htmlTmpl.URL(link)
-
-		if err := authTextTMPL.Execute(&TextOut, passwordResetMailContent); err != nil {
-			return err
-		}
-		if err := authHTMLTMPL.Execute(&HTMLOut, passwordResetMailContent); err != nil {
-			return err
+		content := mailContent{
+			UserName:    u.Name(),
+			ActionURL:   htmlTmpl.URL(link),
+			Message:     passwordResetMailContent.Message,
+			Suffix:      passwordResetMailContent.Suffix,
+			ActionLabel: passwordResetMailContent.ActionLabel,
 		}
 
-		err = i.gateways.Mailer.SendMail(ctx, []mailer.Contact{
-			{
-				Email: u.Email(),
-				Name:  u.Name(),
-			},
-		}, "Password reset", TextOut.String(), HTMLOut.String())
-		if err != nil {
+		if err = authTextTMPL.Execute(&TextOut, content); err != nil {
 			return err
 		}
+		if err = authHTMLTMPL.Execute(&HTMLOut, content); err != nil {
+			return err
+		}
+
+		contact = mailer.Contact{Email: u.Email(), Name: u.Name()}
+		mailText = TextOut.String()
+		mailHTML = HTMLOut.String()
 
 		return nil
-	})
+	}); err != nil {
+		return err
+	}
+
+	return i.gateways.Mailer.SendMail(ctx, []mailer.Contact{contact}, "Password reset", mailText, mailHTML)
 }
 
 func (i *User) PasswordReset(ctx context.Context, password string, token string) error {

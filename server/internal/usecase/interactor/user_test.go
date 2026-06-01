@@ -11,6 +11,7 @@ import (
 	"github.com/reearth/reearth-accounts/server/internal/usecase/interfaces"
 	"github.com/reearth/reearth-accounts/server/internal/usecase/repo"
 	"github.com/reearth/reearth-accounts/server/pkg/id"
+	"github.com/reearth/reearth-accounts/server/pkg/role"
 	"github.com/reearth/reearth-accounts/server/pkg/user"
 	"github.com/reearth/reearth-accounts/server/pkg/workspace"
 	"github.com/reearth/reearthx/mailer"
@@ -178,6 +179,40 @@ func TestUser_StartPasswordReset(t *testing.T) {
 			name:      "not found",
 			email:     "ccc@bbb.com",
 			wantError: rerror.ErrNotFound,
+		},
+		{
+			name: "no reearth auth",
+			createUserBefore: user.New().
+				ID(id.NewUserID()).
+				Workspace(id.NewWorkspaceID()).
+				Email("noauth@bbb.com").
+				Name("NOAUTH").
+				Auths([]user.Auth{
+					{
+						Provider: "auth0",
+						Sub:      "auth0|someuser",
+					},
+				}).
+				MustBuild(),
+			email:     "noauth@bbb.com",
+			wantError: interfaces.ErrUserInvalidPasswordReset,
+		},
+		{
+			name: "empty sub",
+			createUserBefore: user.New().
+				ID(id.NewUserID()).
+				Workspace(id.NewWorkspaceID()).
+				Email("emptysub@bbb.com").
+				Name("EMPTYSUB").
+				Auths([]user.Auth{
+					{
+						Provider: user.ProviderReearth,
+						Sub:      "",
+					},
+				}).
+				MustBuild(),
+			email:     "emptysub@bbb.com",
+			wantError: interfaces.ErrUserInvalidPasswordReset,
 		},
 	}
 
@@ -1396,4 +1431,144 @@ func TestUser_UpdateMe_WorkspaceMetadataFindByIDError(t *testing.T) {
 
 	assert.ErrorIs(t, err, dbError)
 	assert.Nil(t, result)
+}
+
+func TestUser_DeleteMe_DeletesUserAndPersonalWorkspace(t *testing.T) {
+	ctx := context.Background()
+	r := memory.New()
+	uc := NewUser(r, nil, "", "")
+
+	uid := id.NewUserID()
+	wid := id.NewWorkspaceID()
+	u := user.New().ID(uid).Workspace(wid).Name("Test").Email("test@example.com").MustBuild()
+	ws := workspace.New().ID(wid).Name("Test").Personal(true).Members(map[workspace.UserID]workspace.Member{
+		uid: {Role: role.RoleOwner},
+	}).MustBuild()
+
+	assert.NoError(t, r.User.Save(ctx, u))
+	assert.NoError(t, r.Workspace.Save(ctx, ws))
+
+	op := &workspace.Operator{User: &uid}
+	assert.NoError(t, uc.DeleteMe(ctx, uid, op))
+
+	_, err := r.User.FindByID(ctx, uid)
+	assert.ErrorIs(t, err, rerror.ErrNotFound)
+
+	_, err = r.Workspace.FindByID(ctx, wid)
+	assert.ErrorIs(t, err, rerror.ErrNotFound)
+}
+
+func TestUser_DeleteMe_LeavesSharedWorkspaceAndDeletesUser(t *testing.T) {
+	ctx := context.Background()
+	r := memory.New()
+	uc := NewUser(r, nil, "", "")
+
+	uid := id.NewUserID()
+	wid := id.NewWorkspaceID()
+	sharedWID := id.NewWorkspaceID()
+	ownerUID := id.NewUserID()
+
+	u := user.New().ID(uid).Workspace(wid).Name("Test").Email("test@example.com").MustBuild()
+	personalWS := workspace.New().ID(wid).Name("Test").Personal(true).Members(map[workspace.UserID]workspace.Member{
+		uid: {Role: role.RoleOwner},
+	}).MustBuild()
+	sharedWS := workspace.New().ID(sharedWID).Name("Shared").Members(map[workspace.UserID]workspace.Member{
+		uid:      {Role: role.RoleWriter},
+		ownerUID: {Role: role.RoleOwner},
+	}).MustBuild()
+
+	assert.NoError(t, r.User.Save(ctx, u))
+	assert.NoError(t, r.Workspace.Save(ctx, personalWS))
+	assert.NoError(t, r.Workspace.Save(ctx, sharedWS))
+
+	op := &workspace.Operator{User: &uid}
+	assert.NoError(t, uc.DeleteMe(ctx, uid, op))
+
+	// User and personal workspace deleted
+	_, err := r.User.FindByID(ctx, uid)
+	assert.ErrorIs(t, err, rerror.ErrNotFound)
+	_, err = r.Workspace.FindByID(ctx, wid)
+	assert.ErrorIs(t, err, rerror.ErrNotFound)
+
+	// Shared workspace persists without the deleted user
+	remaining, err := r.Workspace.FindByID(ctx, sharedWID)
+	assert.NoError(t, err)
+	assert.False(t, remaining.Members().HasUser(uid))
+	assert.True(t, remaining.Members().HasUser(ownerUID))
+}
+
+func TestUser_DeleteMe_SoleOwnerOfSharedWorkspaceDeleted(t *testing.T) {
+	ctx := context.Background()
+	r := memory.New()
+	uc := NewUser(r, nil, "", "")
+
+	uid := id.NewUserID()
+	wid := id.NewWorkspaceID()
+	ownedWID := id.NewWorkspaceID()
+
+	u := user.New().ID(uid).Workspace(wid).Name("Test").Email("test@example.com").MustBuild()
+	personalWS := workspace.New().ID(wid).Name("Test").Personal(true).Members(map[workspace.UserID]workspace.Member{
+		uid: {Role: role.RoleOwner},
+	}).MustBuild()
+	// Non-personal workspace where the user is the sole owner
+	ownedWS := workspace.New().ID(ownedWID).Name("Owned").Members(map[workspace.UserID]workspace.Member{
+		uid: {Role: role.RoleOwner},
+	}).MustBuild()
+
+	assert.NoError(t, r.User.Save(ctx, u))
+	assert.NoError(t, r.Workspace.Save(ctx, personalWS))
+	assert.NoError(t, r.Workspace.Save(ctx, ownedWS))
+
+	op := &workspace.Operator{User: &uid}
+	assert.NoError(t, uc.DeleteMe(ctx, uid, op))
+
+	_, err := r.User.FindByID(ctx, uid)
+	assert.ErrorIs(t, err, rerror.ErrNotFound)
+
+	// Both workspaces deleted since user was sole owner of both
+	_, err = r.Workspace.FindByID(ctx, wid)
+	assert.ErrorIs(t, err, rerror.ErrNotFound)
+	_, err = r.Workspace.FindByID(ctx, ownedWID)
+	assert.ErrorIs(t, err, rerror.ErrNotFound)
+}
+
+type failingMailer struct{ err error }
+
+func (f *failingMailer) SendMail(_ context.Context, _ []mailer.Contact, _, _, _ string) error {
+	return f.err
+}
+
+func TestUser_StartPasswordReset_TokenPersistedBeforeMailSend(t *testing.T) {
+	user.DefaultPasswordEncoder = &user.NoopPasswordEncoder{}
+	t.Parallel()
+
+	ctx := context.Background()
+	r := memory.New()
+	mailerErr := errors.New("smtp unavailable")
+	g := &gateway.Container{Mailer: &failingMailer{err: mailerErr}}
+	uc := NewUser(r, g, "", "")
+
+	uid := id.NewUserID()
+	tid := id.NewWorkspaceID()
+	u := user.New().
+		ID(uid).
+		Workspace(tid).
+		Email("reset@bbb.com").
+		Name("RESET").
+		Auths([]user.Auth{
+			{Provider: user.ProviderReearth, Sub: "reearth|" + uid.String()},
+		}).
+		MustBuild()
+	assert.NoError(t, r.User.Save(ctx, u))
+
+	err := uc.StartPasswordReset(ctx, "reset@bbb.com")
+
+	assert.ErrorIs(t, err, mailerErr)
+
+	// Token must be committed to DB even though the mailer failed.
+	// This is the key invariant of the fix: the transaction commits before SendMail is called,
+	// so a mailer failure never produces a sent email with an invalidated token.
+	saved, dbErr := r.User.FindByEmail(ctx, "reset@bbb.com")
+	assert.NoError(t, dbErr)
+	assert.NotNil(t, saved.PasswordReset(), "token must be persisted even when mailer fails")
 }

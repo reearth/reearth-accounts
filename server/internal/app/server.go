@@ -9,17 +9,22 @@ import (
 	"time"
 
 	"github.com/cerbos/cerbos-sdk-go/cerbos"
+	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/labstack/echo/v4"
 	infraCerbos "github.com/reearth/reearth-accounts/server/internal/infrastructure/cerbos"
 	mongorepo "github.com/reearth/reearth-accounts/server/internal/infrastructure/mongo"
 	"github.com/reearth/reearth-accounts/server/internal/infrastructure/mongo/migration"
+	pgmigration "github.com/reearth/reearth-accounts/server/internal/infrastructure/postgres/migration"
 	"github.com/reearth/reearth-accounts/server/internal/usecase/gateway"
 	"github.com/reearth/reearth-accounts/server/internal/usecase/repo"
+
+	otelapp "github.com/reearth/reearth-accounts/server/internal/app/otel"
 	"github.com/reearth/reearthx/log"
 	"github.com/reearth/reearthx/mongox"
 	"go.mongodb.org/mongo-driver/event"
 	"go.mongodb.org/mongo-driver/mongo"
 	"go.mongodb.org/mongo-driver/mongo/options"
+	"go.opentelemetry.io/contrib/instrumentation/go.mongodb.org/mongo-driver/mongo/otelmongo"
 	"golang.org/x/net/http2"
 )
 
@@ -34,59 +39,110 @@ func Start(debug bool) {
 	}
 	log.Infof("config: %s", conf.Print())
 
-	// Init MongoDB client with optional command monitoring
-	var monitor *event.CommandMonitor
-	if debug || os.Getenv("REEARTH_ACCOUNTS_DEV") == "true" {
-		monitor = &event.CommandMonitor{
-			Failed: func(ctx context.Context, evt *event.CommandFailedEvent) {
-				log.Errorf("MongoDB Command Failed: %s - Duration: %v - Error: %s",
-					evt.CommandName, evt.Duration, evt.Failure)
-			},
-			Succeeded: func(ctx context.Context, evt *event.CommandSucceededEvent) {
-				// Only log slow queries or critical operations
-				if evt.Duration > time.Millisecond*100 ||
-					evt.CommandName == "createIndexes" ||
-					evt.CommandName == "dropIndexes" ||
-					evt.CommandName == "drop" {
-					log.Debugf("MongoDB Command: %s - Duration: %v - Reply: %v",
-						evt.CommandName, evt.Duration, evt.Reply)
+	// Init OpenTelemetry tracer
+	if conf.OtelEnabled {
+		tp, terr := otelapp.InitTracer(ctx, &otelapp.Config{
+			Enabled:            conf.OtelEnabled,
+			Endpoint:           conf.OtelEndpoint,
+			ExporterType:       otelapp.ExporterType(conf.OtelExporterType),
+			Insecure:           conf.OtelInsecure,
+			BatchTimeout:       conf.OtelBatchTimeout,
+			MaxExportBatchSize: conf.OtelMaxExportBatchSize,
+			MaxQueueSize:       conf.OtelMaxQueueSize,
+			SamplingRatio:      conf.OtelSamplingRatio,
+			ServiceName:        otelapp.OtelAccountsServiceName,
+		})
+		if terr != nil {
+			log.Warnfc(ctx, "failed to init tracer: %v", terr)
+		} else {
+			defer func() {
+				shutdownCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+				defer cancel()
+				if serr := tp.Shutdown(shutdownCtx); serr != nil {
+					log.Errorfc(ctx, "failed to shutdown tracer: %s", serr.Error())
 				}
-			},
+			}()
 		}
 	}
 
-	client, err := mongo.Connect(
-		ctx,
-		options.Client().
-			ApplyURI(conf.DB).
-			SetConnectTimeout(time.Second*10).
-			SetMonitor(monitor))
-	if err != nil {
-		log.Fatalc(ctx, fmt.Sprintf("repo initialization error: %+v", err))
-	}
+	var repos *repo.Container
+	var gateways *gateway.Container
 
-	// Init repositories
-	repos, gateways := initReposAndGateways(ctx, client, conf)
-
-	// Check if migration mode
-	// Once the permission check migration is complete, it will be deleted.
-	if os.Getenv("RUN_MIGRATION") == "true" {
-		clientx := mongox.NewClient(conf.DBName, client)
-		db := clientx.Database()
-
-		lock, lockErr := mongorepo.NewLock(db.Collection("locks"))
-		if lockErr != nil {
-			log.Fatalf("failed to create lock: %v", lockErr)
+	if conf.ResolveDBDriver() == "postgres" {
+		// 30s startup budget covers connect+ping+migrate.
+		pgCtx, cancel := context.WithTimeout(ctx, 30*time.Second)
+		defer cancel()
+		pool, perr := pgxpool.New(pgCtx, conf.DB)
+		if perr != nil {
+			log.Fatalc(ctx, fmt.Sprintf("postgres pool init error: %+v", perr))
+		}
+		if perr := pool.Ping(pgCtx); perr != nil {
+			log.Fatalc(ctx, fmt.Sprintf("postgres ping error: %+v", perr))
+		}
+		if merr := pgmigration.Migrate(pgCtx, pool); merr != nil {
+			log.Fatalc(ctx, fmt.Sprintf("postgres migration error: %+v", merr))
+		}
+		repos, gateways = initPostgresReposAndGateways(ctx, pool, conf)
+	} else {
+		// Init MongoDB client with optional command monitoring
+		var debugMonitor *event.CommandMonitor
+		if debug || os.Getenv("REEARTH_ACCOUNTS_DEV") == "true" {
+			debugMonitor = &event.CommandMonitor{
+				Failed: func(ctx context.Context, evt *event.CommandFailedEvent) {
+					log.Errorf("MongoDB Command Failed: %s - Duration: %v - Error: %s",
+						evt.CommandName, evt.Duration, evt.Failure)
+				},
+				Succeeded: func(ctx context.Context, evt *event.CommandSucceededEvent) {
+					// Only log slow queries or critical operations
+					if evt.Duration > time.Millisecond*100 ||
+						evt.CommandName == "createIndexes" ||
+						evt.CommandName == "dropIndexes" ||
+						evt.CommandName == "drop" {
+						log.Debugf("MongoDB Command: %s - Duration: %v - Reply: %v",
+							evt.CommandName, evt.Duration, evt.Reply)
+					}
+				},
+			}
 		}
 
-		if migrationErr := runMigration(ctx, repos); migrationErr != nil {
-			log.Fatal(migrationErr)
+		var otelMonitor *event.CommandMonitor
+		if conf.OtelEnabled {
+			otelMonitor = otelmongo.NewMonitor()
 		}
 
-		if migrationErr := migration.Do(ctx, clientx, mongorepo.NewConfig(db.Collection("config"), lock)); migrationErr != nil {
-			log.Fatalf("failed to run migration: %v", migrationErr)
+		client, err := mongo.Connect(
+			ctx,
+			options.Client().
+				ApplyURI(conf.DB).
+				SetConnectTimeout(time.Second*10).
+				SetMonitor(chainMongoMonitors(debugMonitor, otelMonitor)))
+		if err != nil {
+			log.Fatalc(ctx, fmt.Sprintf("repo initialization error: %+v", err))
 		}
-		return
+
+		// Init repositories
+		repos, gateways = initReposAndGateways(ctx, client, conf)
+
+		// Check if migration mode (mongo-only data migrations).
+		// Once the permission check migration is complete, it will be deleted.
+		if os.Getenv("RUN_MIGRATION") == "true" {
+			clientx := mongox.NewClient(conf.DBName, client)
+			db := clientx.Database()
+
+			lock, lockErr := mongorepo.NewLock(db.Collection("locks"))
+			if lockErr != nil {
+				log.Fatalf("failed to create lock: %v", lockErr)
+			}
+
+			if migrationErr := runMigration(ctx, repos); migrationErr != nil {
+				log.Fatal(migrationErr)
+			}
+
+			if migrationErr := migration.Do(ctx, clientx, mongorepo.NewConfig(db.Collection("config"), lock)); migrationErr != nil {
+				log.Fatalf("failed to run migration: %v", migrationErr)
+			}
+			return
+		}
 	}
 
 	// Cerbos
@@ -175,4 +231,42 @@ func (w *WebServer) Serve(l net.Listener) error {
 
 func (w *WebServer) Shutdown(ctx context.Context) error {
 	return w.appServer.Shutdown(ctx)
+}
+
+func chainMongoMonitors(monitors ...*event.CommandMonitor) *event.CommandMonitor {
+	active := monitors[:0]
+	for _, m := range monitors {
+		if m != nil {
+			active = append(active, m)
+		}
+	}
+	if len(active) == 0 {
+		return nil
+	}
+	if len(active) == 1 {
+		return active[0]
+	}
+	return &event.CommandMonitor{
+		Started: func(ctx context.Context, evt *event.CommandStartedEvent) {
+			for _, m := range active {
+				if m.Started != nil {
+					m.Started(ctx, evt)
+				}
+			}
+		},
+		Succeeded: func(ctx context.Context, evt *event.CommandSucceededEvent) {
+			for _, m := range active {
+				if m.Succeeded != nil {
+					m.Succeeded(ctx, evt)
+				}
+			}
+		},
+		Failed: func(ctx context.Context, evt *event.CommandFailedEvent) {
+			for _, m := range active {
+				if m.Failed != nil {
+					m.Failed(ctx, evt)
+				}
+			}
+		},
+	}
 }

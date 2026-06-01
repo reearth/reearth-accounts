@@ -107,10 +107,15 @@ server/
 - `make test` - Run unit tests
   - Use `REEARTH_DB=mongodb://localhost:27017` for custom MongoDB URL
   - Use `TARGET_TEST=./pkg/user` for specific package testing
+- `make test-integration` - Run testcontainers integration tests for the
+  postgres + mongo backends (build tag `integration`; requires Docker)
 
 ### Code Quality
 - `make generate` - Run go generate for all packages
 - `make gql` - Generate GraphQL code and dataloaders
+- `make sqlc` - Regenerate the sqlc query package for the PostgreSQL backend
+  (run after editing any `*.sql` under `internal/infrastructure/postgres/sqlc/`;
+  the generated `sqlc/gen` package is committed)
 
 ### External Dependencies
 - `make run-cerbos` - Start Cerbos authorization server via Docker Compose
@@ -121,6 +126,22 @@ server/
 - Naming pattern: `YYMMDDHHMMSS_description.go`
 - Migrations run automatically on startup
 - Schema management: See [internal/infrastructure/mongo/SCHEMA.md](internal/infrastructure/mongo/SCHEMA.md)
+
+### PostgreSQL backend (opt-in)
+- Selected when `REEARTH_ACCOUNTS_DB` is a `postgres://` DSN (or
+  `REEARTH_ACCOUNTS_DB_DRIVER=postgres`); MongoDB remains the default.
+- Implementation: `internal/infrastructure/postgres/` (mirrors the `mongo/`
+  package; same `repo.Container` consumed by the use case layer).
+- SQL queries: `internal/infrastructure/postgres/sqlc/queries/*.sql`; codegen
+  schema mirror: `.../sqlc/schema/schema.sql`; generated (committed) package:
+  `.../sqlc/gen/`. Regenerate with `make sqlc` after editing any `*.sql`.
+- Runtime migrations: embedded SQL in `.../postgres/migration/` run on startup
+  via golang-migrate (advisory-locked, idempotent).
+- Deployment requirement: the embedded `0001_init` migration runs
+  `CREATE EXTENSION IF NOT EXISTS pg_trgm`, so the connecting DB role needs
+  permission to create the extension (or have a DBA pre-create it). This is
+  the default on standard Postgres but may require an admin step on managed
+  offerings such as Cloud SQL, RDS, or Supabase.
 
 ### MongoDB Schema Changes
 
