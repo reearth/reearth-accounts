@@ -23,7 +23,7 @@ func pgPool(t *testing.T) (*pgxpool.Pool, func()) {
 		tcpostgres.WithDatabase("test"),
 		tcpostgres.WithUsername("test"),
 		tcpostgres.WithPassword("test"),
-		testcontainers.WithWaitStrategy(wait.ForListeningPort("5432/tcp")),
+		testcontainers.WithWaitStrategy(wait.ForLog("database system is ready to accept connections").WithOccurrence(2)),
 	)
 	require.NoError(t, err)
 	dsn, err := c.ConnectionString(ctx, "sslmode=disable")

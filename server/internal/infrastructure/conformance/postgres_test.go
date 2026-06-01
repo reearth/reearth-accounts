@@ -25,7 +25,7 @@ func TestPostgresConformance(t *testing.T) {
 	// One container for the whole suite; reset state between subtests with TRUNCATE.
 	c, err := tcpostgres.Run(ctx, "postgres:17-alpine",
 		tcpostgres.WithDatabase("test"), tcpostgres.WithUsername("test"), tcpostgres.WithPassword("test"),
-		testcontainers.WithWaitStrategy(wait.ForListeningPort("5432/tcp")))
+		testcontainers.WithWaitStrategy(wait.ForLog("database system is ready to accept connections").WithOccurrence(2)))
 	require.NoError(t, err)
 	t.Cleanup(func() { _ = c.Terminate(ctx) })
 
