@@ -15,6 +15,10 @@ import (
 	"cloud.google.com/go/storage"
 	"github.com/reearth/reearth-accounts/server/internal/usecase/gateway"
 	"github.com/reearth/reearthx/asset/domain/file"
+	"go.opentelemetry.io/otel"
+	"go.opentelemetry.io/otel/attribute"
+	"go.opentelemetry.io/otel/codes"
+	"go.opentelemetry.io/otel/trace"
 	"google.golang.org/api/option"
 )
 
@@ -39,8 +43,18 @@ func NewGCPStorage(cfg *Config) (gateway.Storage, error) {
 }
 
 func (s *Storage) GetSignedURL(ctx context.Context, name string) (string, error) {
-	c, err := s.bucket()
+	ctx, span := otel.Tracer("reearth-accounts").Start(ctx, "storage.GetSignedURL",
+		trace.WithAttributes(
+			attribute.String("storage.bucket", s.cfg.BucketName),
+			attribute.Bool("storage.is_local", s.cfg.IsLocal),
+		),
+	)
+	defer span.End()
+
+	c, err := s.bucket(ctx)
 	if err != nil {
+		span.RecordError(err)
+		span.SetStatus(codes.Error, "bucket initialization failed")
 		return "", err
 	}
 
@@ -48,6 +62,8 @@ func (s *Storage) GetSignedURL(ctx context.Context, name string) (string, error)
 	if s.cfg.IsLocal {
 		key, kErr := rsa.GenerateKey(rand.Reader, 2048)
 		if kErr != nil {
+			span.RecordError(kErr)
+			span.SetStatus(codes.Error, "rsa key generation failed")
 			return "", kErr
 		}
 
@@ -65,6 +81,8 @@ func (s *Storage) GetSignedURL(ctx context.Context, name string) (string, error)
 			PrivateKey:     pri,
 		})
 		if sErr != nil {
+			span.RecordError(sErr)
+			span.SetStatus(codes.Error, "signed URL generation failed")
 			return "", sErr
 		}
 
@@ -76,14 +94,19 @@ func (s *Storage) GetSignedURL(ctx context.Context, name string) (string, error)
 		Expires: time.Now().Add(24 * time.Hour),
 	})
 	if sErr != nil {
+		span.RecordError(sErr)
+		span.SetStatus(codes.Error, "signed URL generation failed")
 		return "", sErr
 	}
 
 	return url, nil
 }
 
-func (s *Storage) bucket() (*storage.BucketHandle, error) {
+func (s *Storage) bucket(ctx context.Context) (*storage.BucketHandle, error) {
 	s.once.Do(func() {
+		_, span := otel.Tracer("reearth-accounts").Start(ctx, "storage.initGCSClient")
+		defer span.End()
+
 		var opts []option.ClientOption
 		if s.cfg.EmulatorEnabled {
 			_ = os.Setenv("STORAGE_EMULATOR_HOST", s.cfg.EmulatorEndpoint)
@@ -91,7 +114,12 @@ func (s *Storage) bucket() (*storage.BucketHandle, error) {
 		if s.cfg.IsLocal {
 			opts = append(opts, option.WithoutAuthentication())
 		}
-		s.gcsClient, s.initErr = storage.NewClient(context.Background(), opts...)
+		// Use a non-cancelable context so a canceled caller doesn't permanently latch initErr.
+		s.gcsClient, s.initErr = storage.NewClient(context.WithoutCancel(ctx), opts...)
+		if s.initErr != nil {
+			span.RecordError(s.initErr)
+			span.SetStatus(codes.Error, "GCS client initialization failed")
+		}
 	})
 	if s.initErr != nil {
 		return nil, s.initErr
@@ -100,7 +128,7 @@ func (s *Storage) bucket() (*storage.BucketHandle, error) {
 }
 
 func (s *Storage) Delete(ctx context.Context, name string) error {
-	c, err := s.bucket()
+	c, err := s.bucket(ctx)
 	if err != nil {
 		return err
 	}
@@ -114,7 +142,7 @@ func (s *Storage) Delete(ctx context.Context, name string) error {
 }
 
 func (s *Storage) Upload(ctx context.Context, name string, data *file.File) error {
-	c, err := s.bucket()
+	c, err := s.bucket(ctx)
 	if err != nil {
 		return err
 	}

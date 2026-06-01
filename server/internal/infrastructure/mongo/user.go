@@ -226,16 +226,13 @@ func (r *User) findOne(ctx context.Context, filter any) (*user.User, error) {
 }
 
 func filterUsers(ids []user.ID, rows []*user.User) []*user.User {
+	m := make(map[user.ID]*user.User, len(rows))
+	for _, r := range rows {
+		m[r.ID()] = r
+	}
 	res := make([]*user.User, 0, len(ids))
 	for _, id := range ids {
-		var r2 *user.User
-		for _, r := range rows {
-			if r.ID() == id {
-				r2 = r
-				break
-			}
-		}
-		res = append(res, r2)
+		res = append(res, m[id])
 	}
 	return res
 }

@@ -5,6 +5,8 @@ import (
 
 	"github.com/reearth/reearth-accounts/server/pkg/user"
 	"github.com/reearth/reearth-accounts/server/pkg/workspace"
+	"go.opentelemetry.io/otel"
+	"go.opentelemetry.io/otel/attribute"
 )
 
 func buildExistingUserSetFromWorkspace(
@@ -21,6 +23,9 @@ func buildExistingUserSetFromWorkspaces(
 	ctx context.Context,
 	ws workspace.List,
 ) (map[user.ID]struct{}, error) {
+	ctx, span := otel.Tracer("reearth-accounts").Start(ctx, "buildExistingUserSetFromWorkspaces")
+	defer span.End()
+
 	uniq := make(map[user.ID]struct{}, 256)
 	for _, w := range ws {
 		if w == nil {
@@ -30,6 +35,10 @@ func buildExistingUserSetFromWorkspaces(
 			uniq[uid] = struct{}{}
 		}
 	}
+	span.SetAttributes(
+		attribute.Int("workspaces.count", len(ws)),
+		attribute.Int("users.unique", len(uniq)),
+	)
 	if len(uniq) == 0 {
 		return nil, nil
 	}
