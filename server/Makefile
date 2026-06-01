@@ -14,12 +14,30 @@ help:
 	@echo "  run-migration     Run database migrations"
 	@echo "  gql               Generate GraphQL code include dataloader"
 	@echo "  generate          Run go generate"
+	@echo "  sqlc              Regenerate sqlc query code for the postgres backend"
+	@echo "  test-integration  Run testcontainers integration tests (postgres + mongo)"
 	@echo "  gen-policies      Generate Cerbos policy files"
 
 TARGET_TEST :=./...
 REEARTH_DB := mongodb://localhost
 test:
 	REEARTH_DB=${REEARTH_DB} go test ./... -run ${TARGET_TEST}
+
+# Integration tests that spin real databases (postgres + mongo) via
+# testcontainers. Requires a running Docker daemon. -p 1 serializes packages so
+# their testcontainers reapers don't collide; the -run filter skips e2e tests
+# that need a separate mongo service.
+test-integration:
+	go test -p 1 -tags integration -timeout 900s \
+		./internal/infrastructure/postgres/... \
+		./internal/infrastructure/conformance/... \
+		./e2e/... \
+		-run 'Conformance|TestMigrate|TestTransaction|TestResolveDBTX|TestPostgresE2E_GetAndUpdateMe'
+
+# Regenerate the sqlc query package for the PostgreSQL backend after editing
+# any *.sql under internal/infrastructure/postgres/sqlc. Requires sqlc v1.27+.
+sqlc:
+	sqlc generate
 
 DOCKER_COMPOSE := docker compose -f ../docker-compose.yml
 DOCKER_COMPOSE_DEV := docker compose -f ../docker-compose.dev.yml
@@ -74,4 +92,4 @@ update-schema-json:
 swag:
 	go run github.com/swaggo/swag/cmd/swag init --generalInfo internal/adapter/http/doc.go --dir ./,internal/adapter/http --output ./docs --parseDependency --parseInternal
 
-.PHONY: dev-install dev run down run-app run-cerbos run-migration gql gen-policies update-schema-json swag
+.PHONY: dev-install dev run down run-app run-cerbos run-migration gql gen-policies update-schema-json test test-integration sqlc swag

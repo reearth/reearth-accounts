@@ -77,11 +77,12 @@ func StartServerWithRepos(
 	cfg *app.Config,
 	repos *repo.Container,
 ) *httpexpect.Expect {
-	return startServerWithReposAndDebug(t, cfg, repos, true)
+	return StartServerWithGateways(t, cfg, repos, nil, true)
 }
 
 func StartServerNoDebug(t *testing.T, cfg *app.Config, useMongo bool, seeder Seeder) (*httpexpect.Expect, *repo.Container) {
 	t.Helper()
+
 	ctx := context.Background()
 	var repos *repo.Container
 
@@ -102,13 +103,49 @@ func StartServerNoDebug(t *testing.T, cfg *app.Config, useMongo bool, seeder See
 		}
 	}
 
-	return startServerWithReposAndDebug(t, cfg, repos, false), repos
+	return StartServerWithGateways(t, cfg, repos, nil, false), repos
 }
 
-func startServerWithReposAndDebug(
+func StartServerWithAuthenticator(
+	t *testing.T,
+	cfg *app.Config,
+	useMongo bool,
+	seeder Seeder,
+	authenticator gateway.Authenticator,
+) (*httpexpect.Expect, *repo.Container) {
+	t.Helper()
+
+	ctx := context.Background()
+	var repos *repo.Container
+
+	if useMongo {
+		db := mongorepo.Connect(t)(t)
+		var err error
+		repos, err = mongorepo.New(ctx, db, false, false, nil)
+		if err != nil {
+			log.Fatalf("Failed to init mongo: %+v\n", err)
+		}
+	} else {
+		repos = memory.New()
+	}
+
+	if seeder != nil {
+		if err := seeder(ctx, repos); err != nil {
+			t.Fatalf("failed to seed the db: %s", err)
+		}
+	}
+
+	return StartServerWithGateways(t, cfg, repos, &gateway.Container{
+		Authenticator: authenticator,
+		Mailer:        mailer.New(ctx, &mailer.Config{}),
+	}, true), repos
+}
+
+func StartServerWithGateways(
 	t *testing.T,
 	cfg *app.Config,
 	repos *repo.Container,
+	gateways *gateway.Container,
 	debug bool,
 ) *httpexpect.Expect {
 	t.Helper()
@@ -118,6 +155,12 @@ func startServerWithReposAndDebug(
 	}
 
 	ctx := context.Background()
+	if gateways == nil {
+		gateways = &gateway.Container{
+			Mailer: mailer.New(ctx, &mailer.Config{}),
+		}
+	}
+
 	l, err := net.Listen("tcp", ":0")
 	if err != nil {
 		t.Fatalf("server failed to listen: %v", err)
@@ -134,11 +177,9 @@ func startServerWithReposAndDebug(
 	}
 
 	srv := app.NewServer(ctx, &app.ServerConfig{
-		Config: cfg,
-		Repos:  repos,
-		Gateways: &gateway.Container{
-			Mailer: mailer.New(ctx, &mailer.Config{}),
-		},
+		Config:        cfg,
+		Repos:         repos,
+		Gateways:      gateways,
 		Debug:         debug,
 		CerbosAdapter: cerbosAdapter,
 	})
@@ -160,4 +201,13 @@ func startServerWithReposAndDebug(
 		}
 	})
 	return httpexpect.Default(t, "http://"+l.Addr().String())
+}
+
+func StartServerWithGateway(
+	t *testing.T,
+	cfg *app.Config,
+	repos *repo.Container,
+	gw *gateway.Container,
+) *httpexpect.Expect {
+	return StartServerWithGateways(t, cfg, repos, gw, true)
 }

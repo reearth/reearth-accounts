@@ -11,6 +11,7 @@ import (
 	"github.com/labstack/echo/v4/middleware"
 	"github.com/reearth/reearth-accounts/server/internal/adapter"
 	adapterhttp "github.com/reearth/reearth-accounts/server/internal/adapter/http"
+	otelapp "github.com/reearth/reearth-accounts/server/internal/app/otel"
 	"github.com/reearth/reearth-accounts/server/internal/usecase/interactor"
 	"github.com/reearth/reearth-accounts/server/pkg/user"
 	"github.com/reearth/reearth-accounts/server/pkg/workspace"
@@ -31,6 +32,12 @@ func initEcho(ctx context.Context, cfg *ServerConfig) *echo.Echo {
 
 	logger := log.NewEcho()
 	e.Logger = logger
+	if cfg.Config.OtelEnabled {
+		log.Infof("OpenTelemetry tracing enabled for %s", string(otelapp.OtelAccountsServiceName))
+		e.Use(otelapp.Middleware(string(otelapp.OtelAccountsServiceName)))
+	} else {
+		log.Infof("OpenTelemetry tracing disabled for %s", string(otelapp.OtelAccountsServiceName))
+	}
 	e.Use(AccessLogger(logger))
 
 	origins := allowedOrigins(cfg)
@@ -75,14 +82,22 @@ func initEcho(ctx context.Context, cfg *ServerConfig) *echo.Echo {
 		log.Printf("gql: GraphQL Playground is available")
 	}
 
+	allowedISS := make([]string, 0)
+	for _, a := range cfg.Config.Auths() {
+		if a.ISS != "" {
+			allowedISS = append(allowedISS, a.ISS)
+		}
+	}
+
 	usecaseMiddleware := UsecaseMiddleware(
 		cfg.Repos,
 		cfg.Gateways,
 		nil,
 		cfg.CerbosAdapter,
 		interactor.ContainerConfig{
-			SignupSecret:    cfg.Config.SignupSecret,
+			AllowedISS:      allowedISS,
 			AuthSrvUIDomain: cfg.Config.HostWeb,
+			SignupSecret:    cfg.Config.SignupSecret,
 		})
 
 	// API

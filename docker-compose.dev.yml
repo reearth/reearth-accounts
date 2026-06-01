@@ -9,6 +9,21 @@ services:
     networks:
       - reearth
 
+  # Optional PostgreSQL backend (opt-in). Point the app at it with
+  # REEARTH_ACCOUNTS_DB=postgres://reearth:reearth@postgres:5432/reearth-account?sslmode=disable
+  postgres:
+    image: postgres:17-alpine
+    environment:
+      POSTGRES_USER: reearth
+      POSTGRES_PASSWORD: reearth
+      POSTGRES_DB: reearth-account
+    ports:
+      - 5432:5432
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    networks:
+      - reearth
+
   reearth-accounts-dev:
     build:
       context: ./server
@@ -24,6 +39,9 @@ services:
       - /reearth-accounts/tmp       # Exclude tmp directory
     networks:
       - reearth
+
+volumes:
+  postgres-data:
 
 networks:
   reearth:

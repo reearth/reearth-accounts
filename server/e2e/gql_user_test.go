@@ -3,11 +3,14 @@ package e2e
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"net/http"
 	"testing"
 
 	"github.com/reearth/reearth-accounts/server/internal/app"
+	"github.com/reearth/reearth-accounts/server/internal/infrastructure/memory"
+	"github.com/reearth/reearth-accounts/server/internal/usecase/gateway"
 	"github.com/reearth/reearth-accounts/server/internal/usecase/interfaces"
 	"github.com/reearth/reearth-accounts/server/internal/usecase/repo"
 	"github.com/reearth/reearth-accounts/server/pkg/id"
@@ -16,6 +19,7 @@ import (
 	"github.com/reearth/reearth-accounts/server/pkg/user"
 	"github.com/reearth/reearth-accounts/server/pkg/workspace"
 	"github.com/reearth/reearthx/idx"
+	"github.com/reearth/reearthx/mailer"
 	"github.com/reearth/reearthx/rerror"
 	"github.com/samber/lo"
 	"github.com/stretchr/testify/assert"
@@ -589,6 +593,76 @@ func TestDeleteMe(t *testing.T) {
 	assert.Equal(t, rerror.ErrNotFound, err)
 }
 
+func TestDeleteMe_LeavesSharedWorkspace(t *testing.T) {
+	ctx := context.Background()
+
+	sharedWID := id.NewWorkspaceID()
+
+	seeder := func(ctx context.Context, r *repo.Container) error {
+		if err := seedRoles(ctx, r); err != nil {
+			return err
+		}
+
+		auth := user.ReearthSub(uId.String())
+		u := user.New().ID(uId).Name("e2e").Email("e2e@e2e.com").Auths([]user.Auth{*auth}).Workspace(wId).MustBuild()
+		if err := r.User.Save(ctx, u); err != nil {
+			return err
+		}
+		u2 := user.New().ID(uId2).Name("e2e2").Email("e2e2@e2e.com").Workspace(wId2).MustBuild()
+		if err := r.User.Save(ctx, u2); err != nil {
+			return err
+		}
+
+		// Personal workspace for uId (will be deleted on DeleteMe)
+		personalWS := workspace.New().ID(wId).Name("e2e").Personal(true).
+			Members(map[idx.ID[id.User]]workspace.Member{
+				uId: {Role: role.RoleOwner, InvitedBy: uId},
+			}).MustBuild()
+		if err := r.Workspace.Save(ctx, personalWS); err != nil {
+			return err
+		}
+
+		// Shared workspace: uId2 is owner, uId is a writer
+		sharedWS := workspace.New().ID(sharedWID).Name("shared").
+			Members(map[idx.ID[id.User]]workspace.Member{
+				uId2: {Role: role.RoleOwner, InvitedBy: uId2},
+				uId:  {Role: role.RoleWriter, InvitedBy: uId2},
+			}).MustBuild()
+		if err := r.Workspace.Save(ctx, sharedWS); err != nil {
+			return err
+		}
+
+		return nil
+	}
+
+	e, r := StartServer(t, &app.Config{}, true, seeder)
+
+	query := fmt.Sprintf(`mutation { deleteMe(input: {userId: "%s"}){ userId }}`, uId)
+	request := GraphQLRequest{Query: query}
+	jsonData, err := json.Marshal(request)
+	assert.NoError(t, err)
+
+	e.POST("/api/graphql").
+		WithHeader("authorization", "Bearer test").
+		WithHeader("Content-Type", "application/json").
+		WithHeader("X-Reearth-Debug-User", uId.String()).
+		WithBytes(jsonData).Expect().Status(http.StatusOK).JSON().Object()
+
+	// User deleted
+	_, err = r.User.FindByID(ctx, uId)
+	assert.Equal(t, rerror.ErrNotFound, err)
+
+	// Personal workspace deleted
+	_, err = r.Workspace.FindByID(ctx, wId)
+	assert.Equal(t, rerror.ErrNotFound, err)
+
+	// Shared workspace still exists, but uId is no longer a member
+	sharedWS, err := r.Workspace.FindByID(ctx, sharedWID)
+	assert.NoError(t, err)
+	assert.False(t, sharedWS.Members().HasUser(uId), "deleted user should not remain in shared workspace")
+	assert.True(t, sharedWS.Members().HasUser(uId2), "other owner should still be in shared workspace")
+}
+
 func TestMe(t *testing.T) {
 	e, _ := StartServer(t, &app.Config{}, true, baseSeederUser)
 	query := ` { me{ id name email metadata { lang theme } myWorkspaceId } }`
@@ -666,6 +740,30 @@ func TestNodes(t *testing.T) {
 		WithHeader("X-Reearth-Debug-User", uId.String()).
 		WithBytes(jsonData).Expect().Status(http.StatusOK).JSON().Object().Value("data").Object().Value("nodes")
 	o.Array().ConsistsOf(map[string]string{"id": uId.String()})
+}
+
+func TestNodes_MultipleUsersOrderPreserved(t *testing.T) {
+	e, _ := StartServer(t, &app.Config{}, true, baseSeederUser)
+	// Request IDs in reverse insertion order to verify filterUsers preserves the requested order.
+	query := fmt.Sprintf(
+		`{ nodes(id: ["%s", "%s", "%s"], type: USER){ id } }`,
+		uId3.String(), uId2.String(), uId.String(),
+	)
+	request := GraphQLRequest{Query: query}
+	jsonData, err := json.Marshal(request)
+	assert.NoError(t, err)
+
+	arr := e.POST("/api/graphql").
+		WithHeader("authorization", "Bearer test").
+		WithHeader("Content-Type", "application/json").
+		WithHeader("X-Reearth-Debug-User", uId.String()).
+		WithBytes(jsonData).Expect().Status(http.StatusOK).
+		JSON().Object().Value("data").Object().Value("nodes").Array()
+
+	arr.Length().IsEqual(3)
+	arr.Value(0).Object().Value("id").String().IsEqual(uId3.String())
+	arr.Value(1).Object().Value("id").String().IsEqual(uId2.String())
+	arr.Value(2).Object().Value("id").String().IsEqual(uId.String())
 }
 
 func TestSignup(t *testing.T) {
@@ -965,9 +1063,7 @@ func TestPasswordReset(t *testing.T) {
 	startBody, err := json.Marshal(startReq)
 	assert.NoError(t, err)
 	e.POST("/api/graphql").
-		WithHeader("authorization", "Bearer test").
 		WithHeader("Content-Type", "application/json").
-		WithHeader("X-Reearth-Debug-User", uId.String()).
 		WithBytes(startBody).
 		Expect().Status(http.StatusOK).
 		JSON().Object().
@@ -1017,4 +1113,47 @@ func TestPasswordReset(t *testing.T) {
 	ok, err := u2.MatchPassword(newPass)
 	assert.NoError(t, err)
 	assert.True(t, ok, "password should be updated")
+}
+
+type errMailer struct{ err error }
+
+func (m *errMailer) SendMail(_ context.Context, _ []mailer.Contact, _, _, _ string) error {
+	return m.err
+}
+
+// TestStartPasswordReset_TokenPersistedOnMailerFailure verifies that the
+// password-reset token is committed to the DB before SendMail is called,
+// so a mailer failure does not leave the user with an emailed token that
+// the DB no longer recognises (REL-04).
+func TestStartPasswordReset_TokenPersistedOnMailerFailure(t *testing.T) {
+	ctx := context.Background()
+	repos := memory.New()
+	if err := baseSeederUser(ctx, repos); err != nil {
+		t.Fatalf("seed: %v", err)
+	}
+
+	smtpErr := errors.New("smtp unavailable")
+	e := StartServerWithGateway(t, &app.Config{}, repos, &gateway.Container{
+		Mailer: &errMailer{err: smtpErr},
+	})
+
+	body, err := json.Marshal(GraphQLRequest{
+		Query: `mutation($input: StartPasswordResetInput!) { startPasswordReset(input: $input) }`,
+		Variables: map[string]any{
+			"input": map[string]any{"email": "e2e@e2e.com"},
+		},
+	})
+	assert.NoError(t, err)
+
+	resp := e.POST("/api/graphql").
+		WithHeader("Content-Type", "application/json").
+		WithBytes(body).
+		Expect().Status(http.StatusOK).JSON().Object()
+
+	resp.Value("errors").Array().NotEmpty()
+
+	// Token must be committed even though the mailer failed.
+	saved, dbErr := repos.User.FindByID(ctx, uId)
+	assert.NoError(t, dbErr)
+	assert.NotNil(t, saved.PasswordReset(), "token must be persisted even when mailer fails")
 }
