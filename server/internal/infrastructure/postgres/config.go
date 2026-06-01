@@ -8,6 +8,7 @@ import (
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/reearth/reearth-accounts/server/internal/infrastructure/postgres/pgdoc"
+	"github.com/reearth/reearth-accounts/server/internal/usecase/repo"
 	"github.com/reearth/reearth-accounts/server/pkg/config"
 	"github.com/reearth/reearthx/rerror"
 )
@@ -25,6 +26,15 @@ func NewConfig(pool *pgxpool.Pool) config.Repo { return &Config{pool: pool} }
 func (r *Config) LockAndLoad(ctx context.Context) (*config.Config, error) {
 	r.mu.Lock()
 	defer r.mu.Unlock()
+
+	// Fast-path: if this instance already holds the advisory lock, refuse to
+	// re-acquire. Without this guard, a second LockAndLoad on the same *Config
+	// would block on pg_advisory_lock while still holding r.mu, deadlocking
+	// any concurrent Unlock that needs r.mu to release the existing connection.
+	// We return repo.ErrAlreadyLocked for parity with the Mongo implementation.
+	if r.conn != nil {
+		return nil, repo.ErrAlreadyLocked
+	}
 
 	conn, err := r.pool.Acquire(ctx)
 	if err != nil {
