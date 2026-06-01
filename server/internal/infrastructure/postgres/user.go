@@ -202,7 +202,11 @@ func (r *User) SearchByKeyword(ctx context.Context, keyword string) (user.List, 
 	if err != nil {
 		return nil, rerror.ErrInternalByWithContext(ctx, err)
 	}
-	return scanUsers(rows)
+	list, err := scanUsers(rows)
+	if err != nil {
+		return nil, rerror.ErrInternalByWithContext(ctx, err)
+	}
+	return list, nil
 }
 
 func (r *User) FindBySubOrCreate(ctx context.Context, u *user.User, sub string) (*user.User, error) {
@@ -358,7 +362,10 @@ func cursorPageUsers(ctx context.Context, c *Client, base string, args []any, to
 			list[i], list[j] = list[j], list[i]
 		}
 	}
-	hasNext := forward && hasMore
-	hasPrev := !forward && hasMore
+	// hasNext: there are more items in the forward direction (either we fetched
+	// limit+1 while paging forward, or the caller is paging backward from a
+	// `before` cursor so items exist beyond it). hasPrev: symmetric.
+	hasNext := (forward && hasMore) || (!forward && cp.Before != nil)
+	hasPrev := (!forward && hasMore) || (forward && cp.After != nil)
 	return list, usecasex.NewPageInfo(total, cur(list, true), cur(list, false), hasNext, hasPrev), nil
 }
