@@ -45,6 +45,10 @@ func Migrate(ctx context.Context, pool *pgxpool.Pool) error {
 	if err != nil {
 		return fmt.Errorf("postgres migrate init: %w", err)
 	}
+	// golang-migrate's recommended cleanup: release source + driver resources.
+	// The driver close closes the underlying sql.DB too, so the deferred
+	// db.Close above becomes a (safe, idempotent) no-op after this runs.
+	defer func() { _, _ = m.Close() }()
 
 	if err := m.Up(); err != nil && !errors.Is(err, migrate.ErrNoChange) {
 		return fmt.Errorf("postgres migrate up: %w", err)

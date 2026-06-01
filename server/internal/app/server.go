@@ -71,16 +71,20 @@ func Start(debug bool) {
 	var gateways *gateway.Container
 
 	if conf.ResolveDBDriver() == "postgres" {
-		// Bound pool initialization so a misconfigured/unreachable DB doesn't
-		// hang startup forever. Mirrors the mongo SetConnectTimeout(10s) budget,
-		// extended to 30s to also cover the initial migration run.
+		// Bound the connect + ping + migration window with a single 30s budget
+		// so a misconfigured/unreachable DB can't hang startup. pgxpool.New is
+		// lazy and does not establish a connection on its own, so we Ping
+		// explicitly inside the same context; migrations also run under it.
 		pgCtx, cancel := context.WithTimeout(ctx, 30*time.Second)
+		defer cancel()
 		pool, perr := pgxpool.New(pgCtx, conf.DB)
-		cancel()
 		if perr != nil {
 			log.Fatalc(ctx, fmt.Sprintf("postgres pool init error: %+v", perr))
 		}
-		if merr := pgmigration.Migrate(ctx, pool); merr != nil {
+		if perr := pool.Ping(pgCtx); perr != nil {
+			log.Fatalc(ctx, fmt.Sprintf("postgres ping error: %+v", perr))
+		}
+		if merr := pgmigration.Migrate(pgCtx, pool); merr != nil {
 			log.Fatalc(ctx, fmt.Sprintf("postgres migration error: %+v", merr))
 		}
 		repos, gateways = initPostgresReposAndGateways(ctx, pool, conf)
