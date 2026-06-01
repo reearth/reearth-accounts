@@ -40,9 +40,9 @@ func initReposAndGateways(ctx context.Context, client *mongo.Client, conf *Confi
 	// ResendVerificationEmail) are routed by each user's auth record provider
 	// rather than swapping a single authenticator globally. This keeps Auth0
 	// subs going to Auth0 and CIP subs going to Firebase when both coexist.
-	authenticators := map[string]gateway.Authenticator{}
+	authenticators := map[gateway.Provider]gateway.Authenticator{}
 	if conf.Auth0.Domain != "" {
-		authenticators["auth0"] = auth0.New(conf.Auth0.Domain, conf.Auth0.ClientID, conf.Auth0.ClientSecret)
+		authenticators[gateway.ProviderAuth0] = auth0.New(conf.Auth0.Domain, conf.Auth0.ClientID, conf.Auth0.ClientSecret)
 	}
 	if conf.GetAuthProvider() == "cip" {
 		if conf.CIP.ProjectID == "" {
@@ -55,7 +55,7 @@ func initReposAndGateways(ctx context.Context, client *mongo.Client, conf *Confi
 		if cipErr != nil {
 			log.Fatalf("Failed to init CIP authenticator: %+v\n", cipErr)
 		}
-		authenticators["cip"] = cipAuth
+		authenticators[gateway.ProviderCIP] = cipAuth
 	}
 
 	acGateways := &gateway.Container{

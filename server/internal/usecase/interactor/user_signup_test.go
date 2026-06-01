@@ -575,7 +575,7 @@ func TestUser_CreateVerification(t *testing.T) {
 			}
 			g := &gateway.Container{
 				Mailer:         m,
-				Authenticators: map[string]gateway.Authenticator{"auth0": auth},
+				Authenticators: map[gateway.Provider]gateway.Authenticator{gateway.ProviderAuth0: auth},
 			}
 			uc := NewUser(r, g, "", "")
 
