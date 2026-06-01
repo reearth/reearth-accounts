@@ -23,6 +23,7 @@ CREATE UNIQUE INDEX users_alias_ci_uniq ON users (lower(alias)) WHERE alias <> '
 CREATE INDEX users_subs_gin ON users USING gin (subs);
 CREATE INDEX users_name_trgm ON users USING gin (name gin_trgm_ops);
 CREATE INDEX users_email_trgm ON users USING gin (email gin_trgm_ops);
+CREATE INDEX users_alias_trgm ON users USING gin (alias gin_trgm_ops);
 
 -- workspaces
 CREATE TABLE workspaces (

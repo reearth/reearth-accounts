@@ -30,7 +30,7 @@ func (r *Permittable) hydrate(ctx context.Context, rows []gen.Permittable) (perm
 	}
 	wrRows, err := r.c.queries(ctx).PermittableWorkspaceRolesByPermittableIDs(ctx, ids)
 	if err != nil {
-		return nil, err
+		return nil, rerror.ErrInternalByWithContext(ctx, err)
 	}
 	wrByPerm := map[string][]pgdoc.PermittableWorkspaceRoleRow{}
 	for _, wr := range wrRows {
