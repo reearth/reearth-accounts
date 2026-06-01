@@ -42,11 +42,11 @@ func (r *Workspace) hydrate(ctx context.Context, rows []gen.Workspace) (workspac
 	q := r.c.queries(ctx)
 	memRows, err := q.WorkspaceMembersByWorkspaceIDs(ctx, ids)
 	if err != nil {
-		return nil, err
+		return nil, rerror.ErrInternalByWithContext(ctx, err)
 	}
 	intRows, err := q.WorkspaceIntegrationsByWorkspaceIDs(ctx, ids)
 	if err != nil {
-		return nil, err
+		return nil, rerror.ErrInternalByWithContext(ctx, err)
 	}
 	memByWS := map[string][]pgdoc.WorkspaceMemberRow{}
 	for _, m := range memRows {
@@ -109,7 +109,7 @@ func (r *Workspace) FindByIDs(ctx context.Context, ids id.WorkspaceIDList) (work
 	}
 	rows, err := r.c.queries(ctx).WorkspaceFindByIDs(ctx, ids.Strings())
 	if err != nil {
-		return nil, err
+		return nil, rerror.ErrInternalByWithContext(ctx, err)
 	}
 	list, err := r.hydrate(ctx, rows)
 	if err != nil {
@@ -161,7 +161,7 @@ func (r *Workspace) FindByAliases(ctx context.Context, aliases []string) (worksp
 func (r *Workspace) FindByUser(ctx context.Context, uid user.ID) (workspace.List, error) {
 	wsIDs, err := r.c.queries(ctx).WorkspaceIDsByUser(ctx, uid.String())
 	if err != nil {
-		return nil, err
+		return nil, rerror.ErrInternalByWithContext(ctx, err)
 	}
 	return r.findByIDStrings(ctx, wsIDs)
 }
@@ -169,7 +169,7 @@ func (r *Workspace) FindByUser(ctx context.Context, uid user.ID) (workspace.List
 func (r *Workspace) FindByIntegration(ctx context.Context, iid id.IntegrationID) (workspace.List, error) {
 	wsIDs, err := r.c.queries(ctx).WorkspaceIDsByIntegration(ctx, iid.String())
 	if err != nil {
-		return nil, err
+		return nil, rerror.ErrInternalByWithContext(ctx, err)
 	}
 	return r.findByIDStrings(ctx, wsIDs)
 }
@@ -180,7 +180,7 @@ func (r *Workspace) FindByIntegrations(ctx context.Context, iids id.IntegrationI
 	}
 	wsIDs, err := r.c.queries(ctx).WorkspaceIDsByIntegrations(ctx, iids.Strings())
 	if err != nil {
-		return nil, err
+		return nil, rerror.ErrInternalByWithContext(ctx, err)
 	}
 	return r.findByIDStrings(ctx, wsIDs)
 }
@@ -191,7 +191,7 @@ func (r *Workspace) findByIDStrings(ctx context.Context, ids []string) (workspac
 	}
 	rows, err := r.c.queries(ctx).WorkspaceFindByIDs(ctx, ids)
 	if err != nil {
-		return nil, err
+		return nil, rerror.ErrInternalByWithContext(ctx, err)
 	}
 	return r.hydrate(ctx, rows)
 }
@@ -199,7 +199,7 @@ func (r *Workspace) findByIDStrings(ctx context.Context, ids []string) (workspac
 func (r *Workspace) FindByUserWithPagination(ctx context.Context, uid user.ID, p *usecasex.Pagination) (workspace.List, *usecasex.PageInfo, error) {
 	wsIDs, err := r.c.queries(ctx).WorkspaceIDsByUser(ctx, uid.String())
 	if err != nil {
-		return nil, nil, err
+		return nil, nil, rerror.ErrInternalByWithContext(ctx, err)
 	}
 	return paginateWorkspaces(ctx, r, wsIDs, p)
 }

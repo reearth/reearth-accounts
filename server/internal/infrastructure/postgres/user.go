@@ -183,9 +183,13 @@ func (r *User) FindByNameOrAlias(ctx context.Context, nameOrAlias string) (user.
 	rows, err := r.c.db(ctx).Query(ctx,
 		`SELECT `+userColumns+` FROM users WHERE name ILIKE $1 OR alias ILIKE $1 ORDER BY id`, kw)
 	if err != nil {
-		return nil, err
+		return nil, rerror.ErrInternalByWithContext(ctx, err)
 	}
-	return scanUsers(rows)
+	list, err := scanUsers(rows)
+	if err != nil {
+		return nil, rerror.ErrInternalByWithContext(ctx, err)
+	}
+	return list, nil
 }
 
 // SearchByKeyword: case-insensitive substring on name/email (mongo parity:
@@ -198,7 +202,7 @@ func (r *User) SearchByKeyword(ctx context.Context, keyword string) (user.List, 
 	rows, err := r.c.db(ctx).Query(ctx,
 		`SELECT `+userColumns+` FROM users WHERE name ILIKE $1 OR email ILIKE $1 ORDER BY name LIMIT 10`, kw)
 	if err != nil {
-		return nil, err
+		return nil, rerror.ErrInternalByWithContext(ctx, err)
 	}
 	return scanUsers(rows)
 }
@@ -283,7 +287,7 @@ func paginateUsers(ctx context.Context, c *Client, ids []string, alias *string, 
 
 	var total int64
 	if err := c.db(ctx).QueryRow(ctx, "SELECT count(*) "+base, args...).Scan(&total); err != nil {
-		return nil, nil, err
+		return nil, nil, rerror.ErrInternalByWithContext(ctx, err)
 	}
 
 	if p != nil && p.Cursor != nil {
@@ -294,7 +298,7 @@ func paginateUsers(ctx context.Context, c *Client, ids []string, alias *string, 
 		args = append(args, p.Offset.Limit, p.Offset.Offset)
 		rows, err := c.db(ctx).Query(ctx, q, args...)
 		if err != nil {
-			return nil, nil, err
+			return nil, nil, rerror.ErrInternalByWithContext(ctx, err)
 		}
 		list, err := scanUsers(rows)
 		if err != nil {
@@ -305,7 +309,7 @@ func paginateUsers(ctx context.Context, c *Client, ids []string, alias *string, 
 
 	rows, err := c.db(ctx).Query(ctx, "SELECT "+userColumns+" "+base+" ORDER BY id", args...)
 	if err != nil {
-		return nil, nil, err
+		return nil, nil, rerror.ErrInternalByWithContext(ctx, err)
 	}
 	list, err := scanUsers(rows)
 	if err != nil {
@@ -340,7 +344,7 @@ func cursorPageUsers(ctx context.Context, c *Client, base string, args []any, to
 	args = append(args, limit+1) // fetch one extra to detect more
 	rows, err := c.db(ctx).Query(ctx, "SELECT "+userColumns+" "+conds, args...)
 	if err != nil {
-		return nil, nil, err
+		return nil, nil, rerror.ErrInternalByWithContext(ctx, err)
 	}
 	list, err := scanUsers(rows)
 	if err != nil {

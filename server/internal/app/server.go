@@ -42,7 +42,12 @@ func Start(debug bool) {
 	var gateways *gateway.Container
 
 	if conf.ResolveDBDriver() == "postgres" {
-		pool, perr := pgxpool.New(ctx, conf.DB)
+		// Bound pool initialization so a misconfigured/unreachable DB doesn't
+		// hang startup forever. Mirrors the mongo SetConnectTimeout(10s) budget,
+		// extended to 30s to also cover the initial migration run.
+		pgCtx, cancel := context.WithTimeout(ctx, 30*time.Second)
+		pool, perr := pgxpool.New(pgCtx, conf.DB)
+		cancel()
 		if perr != nil {
 			log.Fatalc(ctx, fmt.Sprintf("postgres pool init error: %+v", perr))
 		}

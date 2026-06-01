@@ -57,16 +57,20 @@ func (r *Config) LockAndLoad(ctx context.Context) (*config.Config, error) {
 	return row.Model(), nil
 }
 
-// exec runs on the locked connection if held, else on the pool. The held
-// connection is read under r.mu to avoid racing with LockAndLoad/Unlock.
+// exec runs on the locked connection if held, else on the pool. The mutex is
+// held for the entire duration of the locked-conn Exec because pgxpool.Conn is
+// not safe for concurrent use, and releasing the mutex mid-Exec would let
+// Unlock return the same conn to the pool while the Exec is still in flight.
+// The pool-only path doesn't need the mutex (pgxpool.Pool is safe for
+// concurrent use).
 func (r *Config) exec(ctx context.Context, sql string, args ...any) error {
 	r.mu.Lock()
-	conn := r.conn
-	r.mu.Unlock()
-	if conn != nil {
-		_, err := conn.Exec(ctx, sql, args...)
+	if r.conn != nil {
+		_, err := r.conn.Exec(ctx, sql, args...)
+		r.mu.Unlock()
 		return err
 	}
+	r.mu.Unlock()
 	_, err := r.pool.Exec(ctx, sql, args...)
 	return err
 }

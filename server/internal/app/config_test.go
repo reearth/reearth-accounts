@@ -14,4 +14,12 @@ func TestResolveDBDriver(t *testing.T) {
 	// explicit override wins over scheme inference
 	assert.Equal(t, "postgres", (&Config{DB: "mongodb://x", DBDriver: "postgres"}).ResolveDBDriver())
 	assert.Equal(t, "mongo", (&Config{DB: "postgres://x", DBDriver: "mongo"}).ResolveDBDriver())
+	// alternative spellings of the override
+	assert.Equal(t, "postgres", (&Config{DB: "mongodb://x", DBDriver: "postgresql"}).ResolveDBDriver())
+	assert.Equal(t, "mongo", (&Config{DB: "postgres://x", DBDriver: "mongodb"}).ResolveDBDriver())
+	// case-insensitive override
+	assert.Equal(t, "postgres", (&Config{DB: "mongodb://x", DBDriver: "Postgres"}).ResolveDBDriver())
+	// unknown override falls through to scheme inference
+	assert.Equal(t, "postgres", (&Config{DB: "postgres://x", DBDriver: "sqlite"}).ResolveDBDriver())
+	assert.Equal(t, "mongo", (&Config{DB: "mongodb://x", DBDriver: "sqlite"}).ResolveDBDriver())
 }

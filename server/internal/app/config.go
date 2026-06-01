@@ -62,11 +62,20 @@ type Config struct {
 
 // ResolveDBDriver returns "postgres" or "mongo", honoring an explicit
 // REEARTH_ACCOUNTS_DB_DRIVER override and otherwise inferring from the DB scheme.
+// Supported override values (case-insensitive): "postgres", "postgresql",
+// "mongo", "mongodb". Unknown overrides are ignored and the DB-scheme fallback
+// (mongo by default) is used.
 func (c *Config) ResolveDBDriver() string {
-	if c.DBDriver != "" {
-		return strings.ToLower(c.DBDriver)
-	}
 	// URI schemes are case-insensitive, so normalize before matching.
+	if c.DBDriver != "" {
+		switch strings.ToLower(c.DBDriver) {
+		case "postgres", "postgresql":
+			return "postgres"
+		case "mongo", "mongodb":
+			return "mongo"
+		}
+		// unknown override -> fall through to scheme inference
+	}
 	db := strings.ToLower(c.DB)
 	if strings.HasPrefix(db, "postgres://") || strings.HasPrefix(db, "postgresql://") {
 		return "postgres"
