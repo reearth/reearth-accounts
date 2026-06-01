@@ -47,7 +47,11 @@ func RegisterRESTRouter(e *echo.Echo, cfg RouterConfig) {
 
 	base := []echo.MiddlewareFunc{}
 	if cfg.JWTMiddleware != nil {
-		base = append(base, cfg.JWTMiddleware) // populates adapter.AuthInfoKey, non-fatal
+		// Wrap so requests bearing the M2M API key skip JWT validation and reach
+		// APIKeyOrAuth (the API key is not a JWT, so the validator would otherwise
+		// reject it as malformed before APIKeyOrAuth ever runs). When no API key is
+		// configured this is a no-op.
+		base = append(base, skipJWTOnAPIKey(cfg.APIKey, cfg.JWTMiddleware))
 	}
 	if cfg.UsecaseMiddleware != nil {
 		base = append(base, cfg.UsecaseMiddleware)

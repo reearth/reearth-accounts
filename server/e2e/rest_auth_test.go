@@ -279,3 +279,31 @@ func flipLastChar(s string) string {
 	}
 	return s[:len(s)-1] + "A"
 }
+
+// TestREST_M2M_APIKey_BypassesJWTValidation guards the JWT-skip-on-API-key path.
+// With JWT middleware on the /api group, a bearer that isn't a JWT (the M2M API
+// key isn't) would otherwise be rejected by the JWT validator before APIKeyOrAuth
+// could admit it. This test asserts the wrapper lets API-key bearers through to
+// the handler while still rejecting arbitrary non-JWT bearers.
+func TestREST_M2M_APIKey_BypassesJWTValidation(t *testing.T) {
+	_, cleanup := installRealJWT(t)
+	defer cleanup()
+
+	cfg := realAuthConfig()
+	cfg.RestAPIKey = "test-m2m-api-key-12345"
+	exp, _ := StartServer(t, cfg, false, nil)
+
+	// Matching API key bypasses JWT validation -> reaches the find-or-create
+	// stub (which returns 204).
+	exp.POST("/api/users/find-or-create").
+		WithHeader("Authorization", "Bearer "+cfg.RestAPIKey).
+		WithJSON(map[string]any{"sub": "m2m-sub", "iss": "m2m-iss", "token": "m2m-token"}).
+		Expect().Status(http.StatusNoContent)
+
+	// A non-JWT bearer that does NOT match the API key is still rejected by the
+	// JWT middleware (regression guard for the bypass condition).
+	exp.POST("/api/users/find-or-create").
+		WithHeader("Authorization", "Bearer not-the-api-key").
+		WithJSON(map[string]any{"sub": "m2m-sub", "iss": "m2m-iss", "token": "m2m-token"}).
+		Expect().Status(http.StatusUnauthorized)
+}

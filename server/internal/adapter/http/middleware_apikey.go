@@ -10,6 +10,29 @@ import (
 
 const bearerPrefix = "Bearer "
 
+// skipJWTOnAPIKey wraps the JWT middleware so a request whose bearer token equals
+// the configured M2M API key bypasses JWT validation and reaches APIKeyOrAuth.
+// Without this, the JWT validator (which runs first on the /api group) would
+// reject the API key as a malformed JWT before the API-key middleware ever runs,
+// effectively breaking the advertised M2M flow.
+func skipJWTOnAPIKey(apiKey string, jwt echo.MiddlewareFunc) echo.MiddlewareFunc {
+	if jwt == nil || apiKey == "" {
+		return jwt
+	}
+	return func(next echo.HandlerFunc) echo.HandlerFunc {
+		return func(c echo.Context) error {
+			h := c.Request().Header.Get(echo.HeaderAuthorization)
+			if strings.HasPrefix(h, bearerPrefix) {
+				token := strings.TrimPrefix(h, bearerPrefix)
+				if subtle.ConstantTimeCompare([]byte(token), []byte(apiKey)) == 1 {
+					return next(c)
+				}
+			}
+			return jwt(next)(c)
+		}
+	}
+}
+
 // APIKeyOrAuth allows a request through if EITHER a valid M2M API key is presented
 // (Authorization: Bearer <key> matching cfgKey) OR the user is already authenticated
 // by a preceding JWT middleware. Used for service-to-service routes (findOrCreate,
