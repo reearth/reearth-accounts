@@ -111,8 +111,11 @@ func RegisterRESTRouter(e *echo.Echo, cfg RouterConfig) {
 	// Basic-auth protected when credentials are configured (served in any environment);
 	// otherwise served only in debug/dev, mirroring how the GraphQL playground is gated,
 	// so API docs aren't unintentionally exposed in production.
+	// BOTH user and password must be set to enable basic-auth Swagger; if only one is
+	// configured (e.g. password env var accidentally omitted) we refuse to mount Swagger
+	// rather than allowing an empty password to gate it.
 	switch {
-	case cfg.SwaggerUser != "":
+	case cfg.SwaggerUser != "" && cfg.SwaggerPass != "":
 		e.GET("/swagger/*", echoSwagger.WrapHandler, middleware.BasicAuth(func(u, p string, _ echo.Context) (bool, error) {
 			// constant-time comparison to avoid leaking credential length/match via timing
 			userOK := subtle.ConstantTimeCompare([]byte(u), []byte(cfg.SwaggerUser)) == 1

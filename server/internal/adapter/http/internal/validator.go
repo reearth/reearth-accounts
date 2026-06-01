@@ -2,6 +2,8 @@ package internal
 
 import (
 	"net/http"
+	"reflect"
+	"strings"
 
 	"github.com/go-playground/locales/en"
 	ut "github.com/go-playground/universal-translator"
@@ -20,6 +22,19 @@ func init() {
 	uni := ut.New(enLocale, enLocale)
 	translator, _ = uni.GetTranslator("en")
 	_ = enTranslations.RegisterDefaultTranslations(validate, translator)
+	// Report the JSON field name (e.g. "email") in validation errors instead of the
+	// Go struct field name (e.g. "Email") so REST error responses match the request
+	// shape clients send and expect.
+	validate.RegisterTagNameFunc(func(fld reflect.StructField) string {
+		name := strings.SplitN(fld.Tag.Get("json"), ",", 2)[0]
+		if name == "-" {
+			return ""
+		}
+		if name == "" {
+			return fld.Name
+		}
+		return name
+	})
 }
 
 func translateFieldError(fe validator.FieldError) string {
