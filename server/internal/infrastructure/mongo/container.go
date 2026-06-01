@@ -28,14 +28,12 @@ func New(ctx context.Context, db *mongo.Database, useTransaction, needCompat boo
 		return nil, err
 	}
 
-	tx := client.Transaction()
 	c := &repo.Container{
 		User:        NewUser(client),
 		Workspace:   ws,
 		Role:        NewRole(client),
 		Permittable: NewPermittable(client),
-		Transaction: tx,
-		Transactor:  repo.TransactorFromTransaction{Tx: tx},
+		Transaction: client.Transaction(),
 		Users:       users,
 		Config:      NewConfig(db.Collection("config"), lock),
 	}

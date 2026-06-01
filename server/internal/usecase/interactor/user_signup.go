@@ -78,82 +78,76 @@ func (i *User) Signup(ctx context.Context, param interfaces.SignupParam) (u *use
 		return nil, err
 	}
 
-	var out *user.User
-	err = i.repos.Transactor.WithinTransaction(ctx, func(ctx context.Context) error {
-		var fnErr error
-		out, fnErr = func(ctx context.Context) (*user.User, error) {
-			log.Debugfc(ctx, "[Signup] Inside transaction")
-			// Check for duplicate email
-			eu, err := i.repos.User.FindByEmail(ctx, param.Email)
-			if err != nil && !errors.Is(err, rerror.ErrNotFound) {
-				log.Errorfc(ctx, "[Signup] Error finding user by email: %v", err)
-				return nil, err
-			}
-			if eu != nil {
-				log.Warnfc(ctx, "[Signup] User already exists with email: %s", param.Email)
+	return Run1(ctx, nil, i.repos, Usecase().Transaction(), func(ctx context.Context) (*user.User, error) {
+		log.Debugfc(ctx, "[Signup] Inside transaction")
+		// Check for duplicate email
+		eu, err := i.repos.User.FindByEmail(ctx, param.Email)
+		if err != nil && !errors.Is(err, rerror.ErrNotFound) {
+			log.Errorfc(ctx, "[Signup] Error finding user by email: %v", err)
+			return nil, err
+		}
+		if eu != nil {
+			log.Warnfc(ctx, "[Signup] User already exists with email: %s", param.Email)
+			return nil, interfaces.ErrUserAlreadyExists
+		}
+
+		u, ws, err := workspace.Init(workspace.InitParams{
+			Email:       param.Email,
+			Name:        param.Name,
+			Password:    lo.ToPtr(param.Password),
+			Lang:        param.Lang,
+			Theme:       param.Theme,
+			UserID:      param.UserID,
+			WorkspaceID: param.WorkspaceID,
+		})
+		if err != nil {
+			return nil, err
+		}
+
+		vr := user.NewVerification()
+		u.SetVerification(vr)
+
+		if err = i.repos.User.Create(ctx, u); err != nil {
+			if errors.Is(err, user.ErrDuplicatedUser) {
 				return nil, interfaces.ErrUserAlreadyExists
 			}
+			return nil, err
+		}
+		if err = i.repos.Workspace.Save(ctx, ws); err != nil {
+			if errors.Is(err, user.ErrDuplicatedUser) {
+				return nil, interfaces.ErrUserAliasAlreadyExists
+			}
+			if errors.Is(err, workspace.ErrDuplicateWorkspaceAlias) {
+				return nil, interfaces.ErrWorkspaceAliasAlreadyExists
+			}
+			return nil, err
+		}
 
-			u, ws, err := workspace.Init(workspace.InitParams{
-				Email:       param.Email,
-				Name:        param.Name,
-				Password:    lo.ToPtr(param.Password),
-				Lang:        param.Lang,
-				Theme:       param.Theme,
-				UserID:      param.UserID,
-				WorkspaceID: param.WorkspaceID,
-			})
-			if err != nil {
+		// Find or create required roles (auto-create when MockAuth is enabled)
+		roleSelf, err := i.findOrCreateRole(ctx, interfaces.RoleSelf, param.MockAuth)
+		if err != nil {
+			return nil, err
+		}
+
+		roleOwner, err := i.findOrCreateRole(ctx, role.RoleOwner.String(), param.MockAuth)
+		if err != nil {
+			return nil, err
+		}
+
+		wsRole := permittable.NewWorkspaceRole(ws.ID(), roleOwner.ID())
+		perm := permittable.New().NewID().RoleIDs([]id.RoleID{roleSelf.ID()}).UserID(u.ID()).WorkspaceRoles([]permittable.WorkspaceRole{wsRole}).MustBuild()
+		if err = i.repos.Permittable.Save(ctx, lo.FromPtr(perm)); err != nil {
+			return nil, err
+		}
+
+		if !param.MockAuth {
+			if err = i.sendVerificationMail(ctx, u, vr); err != nil {
 				return nil, err
 			}
+		}
 
-			vr := user.NewVerification()
-			u.SetVerification(vr)
-
-			if err = i.repos.User.Create(ctx, u); err != nil {
-				if errors.Is(err, user.ErrDuplicatedUser) {
-					return nil, interfaces.ErrUserAlreadyExists
-				}
-				return nil, err
-			}
-			if err = i.repos.Workspace.Save(ctx, ws); err != nil {
-				if errors.Is(err, user.ErrDuplicatedUser) {
-					return nil, interfaces.ErrUserAliasAlreadyExists
-				}
-				if errors.Is(err, workspace.ErrDuplicateWorkspaceAlias) {
-					return nil, interfaces.ErrWorkspaceAliasAlreadyExists
-				}
-				return nil, err
-			}
-
-			// Find or create required roles (auto-create when MockAuth is enabled)
-			roleSelf, err := i.findOrCreateRole(ctx, interfaces.RoleSelf, param.MockAuth)
-			if err != nil {
-				return nil, err
-			}
-
-			roleOwner, err := i.findOrCreateRole(ctx, role.RoleOwner.String(), param.MockAuth)
-			if err != nil {
-				return nil, err
-			}
-
-			wsRole := permittable.NewWorkspaceRole(ws.ID(), roleOwner.ID())
-			perm := permittable.New().NewID().RoleIDs([]id.RoleID{roleSelf.ID()}).UserID(u.ID()).WorkspaceRoles([]permittable.WorkspaceRole{wsRole}).MustBuild()
-			if err = i.repos.Permittable.Save(ctx, lo.FromPtr(perm)); err != nil {
-				return nil, err
-			}
-
-			if !param.MockAuth {
-				if err = i.sendVerificationMail(ctx, u, vr); err != nil {
-					return nil, err
-				}
-			}
-
-			return u, nil
-		}(ctx)
-		return fnErr
+		return u, nil
 	})
-	return out, err
 }
 
 func (i *User) SignupOIDC(ctx context.Context, param interfaces.SignupOIDCParam) (*user.User, error) {
@@ -173,118 +167,106 @@ func (i *User) SignupOIDC(ctx context.Context, param interfaces.SignupOIDCParam)
 		email = ui.Email
 	}
 
-	var out *user.User
-	err := i.repos.Transactor.WithinTransaction(ctx, func(ctx context.Context) error {
-		var fnErr error
-		out, fnErr = func(ctx context.Context) (*user.User, error) {
-			eu, err := i.repos.User.FindByEmail(ctx, email)
-			if err != nil && !errors.Is(err, rerror.ErrNotFound) {
-				return nil, err
-			}
-			if eu != nil {
-				return nil, user.ErrDuplicatedUser
-			}
+	return Run1(ctx, nil, i.repos, Usecase().Transaction(), func(ctx context.Context) (*user.User, error) {
+		eu, err := i.repos.User.FindByEmail(ctx, email)
+		if err != nil && !errors.Is(err, rerror.ErrNotFound) {
+			return nil, err
+		}
+		if eu != nil {
+			return nil, user.ErrDuplicatedUser
+		}
 
-			eu, err = i.repos.User.FindBySub(ctx, sub)
-			if err != nil && !errors.Is(err, rerror.ErrNotFound) {
-				return nil, err
-			}
-			if eu != nil {
-				return nil, user.ErrDuplicatedUser
-			}
+		eu, err = i.repos.User.FindBySub(ctx, sub)
+		if err != nil && !errors.Is(err, rerror.ErrNotFound) {
+			return nil, err
+		}
+		if eu != nil {
+			return nil, user.ErrDuplicatedUser
+		}
 
-			// Initialize user and ws
-			u, ws, err := workspace.Init(workspace.InitParams{
-				Email:       email,
-				Name:        name,
-				Sub:         user.AuthFrom(sub).Ref(),
-				Lang:        param.User.Lang,
-				Theme:       param.User.Theme,
-				UserID:      param.User.UserID,
-				WorkspaceID: param.User.WorkspaceID,
-			})
-			if err != nil {
-				return nil, err
-			}
+		// Initialize user and ws
+		u, ws, err := workspace.Init(workspace.InitParams{
+			Email:       email,
+			Name:        name,
+			Sub:         user.AuthFrom(sub).Ref(),
+			Lang:        param.User.Lang,
+			Theme:       param.User.Theme,
+			UserID:      param.User.UserID,
+			WorkspaceID: param.User.WorkspaceID,
+		})
+		if err != nil {
+			return nil, err
+		}
 
-			if err = i.repos.User.Create(ctx, u); err != nil {
-				return nil, err
-			}
+		if err = i.repos.User.Create(ctx, u); err != nil {
+			return nil, err
+		}
 
-			if err = i.repos.Workspace.Save(ctx, ws); err != nil {
-				return nil, err
-			}
+		if err = i.repos.Workspace.Save(ctx, ws); err != nil {
+			return nil, err
+		}
 
-			// Find or create required roles (auto-create when MockAuth is enabled)
-			// Note: SignupOIDC doesn't have MockAuth param, so roles must exist in DB
-			roleSelf, err := i.repos.Role.FindByName(ctx, interfaces.RoleSelf)
-			if err != nil {
-				return nil, err
-			}
+		// Find or create required roles (auto-create when MockAuth is enabled)
+		// Note: SignupOIDC doesn't have MockAuth param, so roles must exist in DB
+		roleSelf, err := i.repos.Role.FindByName(ctx, interfaces.RoleSelf)
+		if err != nil {
+			return nil, err
+		}
 
-			roleOwner, err := i.repos.Role.FindByName(ctx, role.RoleOwner.String())
-			if err != nil {
-				return nil, err
-			}
+		roleOwner, err := i.repos.Role.FindByName(ctx, role.RoleOwner.String())
+		if err != nil {
+			return nil, err
+		}
 
-			wsRole := permittable.NewWorkspaceRole(ws.ID(), roleOwner.ID())
-			perm := permittable.New().NewID().RoleIDs([]id.RoleID{roleSelf.ID()}).UserID(u.ID()).WorkspaceRoles([]permittable.WorkspaceRole{wsRole}).MustBuild()
-			if err = i.repos.Permittable.Save(ctx, lo.FromPtr(perm)); err != nil {
-				return nil, err
-			}
+		wsRole := permittable.NewWorkspaceRole(ws.ID(), roleOwner.ID())
+		perm := permittable.New().NewID().RoleIDs([]id.RoleID{roleSelf.ID()}).UserID(u.ID()).WorkspaceRoles([]permittable.WorkspaceRole{wsRole}).MustBuild()
+		if err = i.repos.Permittable.Save(ctx, lo.FromPtr(perm)); err != nil {
+			return nil, err
+		}
 
-			return u, nil
-		}(ctx)
-		return fnErr
+		return u, nil
 	})
-	return out, err
 }
 
 func (i *User) FindOrCreate(ctx context.Context, param interfaces.UserFindOrCreateParam) (u *user.User, err error) {
-	var out *user.User
-	err = i.repos.Transactor.WithinTransaction(ctx, func(ctx context.Context) error {
-		var fnErr error
-		out, fnErr = func(ctx context.Context) (*user.User, error) {
-			if param.Sub == "" {
-				return nil, rerror.ErrNotFound
-			}
+	return Run1(ctx, nil, i.repos, Usecase().Transaction(), func(ctx context.Context) (*user.User, error) {
+		if param.Sub == "" {
+			return nil, rerror.ErrNotFound
+		}
 
-			// Check if user already exists
-			existedUser, err := i.repos.User.FindBySub(ctx, param.Sub)
-			if err != nil && !errors.Is(err, rerror.ErrNotFound) {
-				return nil, err
-			} else if existedUser != nil {
-				return existedUser, nil
-			}
+		// Check if user already exists
+		existedUser, err := i.repos.User.FindBySub(ctx, param.Sub)
+		if err != nil && !errors.Is(err, rerror.ErrNotFound) {
+			return nil, err
+		} else if existedUser != nil {
+			return existedUser, nil
+		}
 
-			ui, err := i.getUserInfoFromISS(ctx, param.ISS, param.Token)
-			if err != nil {
-				return nil, err
-			}
+		ui, err := i.getUserInfoFromISS(ctx, param.ISS, param.Token)
+		if err != nil {
+			return nil, err
+		}
 
-			u, workspace, err := workspace.Init(workspace.InitParams{
-				Email: ui.Email,
-				Name:  ui.Name,
-				Sub:   user.AuthFrom(param.Sub).Ref(),
-			})
-			if err != nil {
-				return nil, err
-			}
+		u, workspace, err := workspace.Init(workspace.InitParams{
+			Email: ui.Email,
+			Name:  ui.Name,
+			Sub:   user.AuthFrom(param.Sub).Ref(),
+		})
+		if err != nil {
+			return nil, err
+		}
 
-			u2, err := i.repos.User.FindBySubOrCreate(ctx, u, param.Sub)
-			if err != nil {
-				return nil, err
-			}
+		u2, err := i.repos.User.FindBySubOrCreate(ctx, u, param.Sub)
+		if err != nil {
+			return nil, err
+		}
 
-			if err := i.repos.Workspace.Save(ctx, workspace); err != nil {
-				return nil, err
-			}
+		if err := i.repos.Workspace.Save(ctx, workspace); err != nil {
+			return nil, err
+		}
 
-			return u2, nil
-		}(ctx)
-		return fnErr
+		return u2, nil
 	})
-	return out, err
 }
 
 func (i *User) sendVerificationMail(ctx context.Context, u *user.User, vr *user.Verification) error {
@@ -494,7 +476,7 @@ func (i *User) findOrCreateRole(ctx context.Context, roleName string, mockAuth b
 }
 
 func (i *User) CreateVerification(ctx context.Context, email string) error {
-	return i.repos.Transactor.WithinTransaction(ctx, func(ctx context.Context) error {
+	return Run0(ctx, nil, i.repos, Usecase().Transaction(), func(ctx context.Context) error {
 		u, err := i.repos.User.FindByEmail(ctx, email)
 		if err != nil {
 			return err

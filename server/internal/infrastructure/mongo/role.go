@@ -14,7 +14,7 @@ type Role struct {
 	client *mongox.ClientCollection
 }
 
-func NewRole(client *mongox.Client) role.Repo {
+func NewRole(client *mongox.Client) *Role {
 	return &Role{
 		client: client.WithCollection("role"),
 	}

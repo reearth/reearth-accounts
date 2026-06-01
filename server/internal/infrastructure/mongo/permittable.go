@@ -16,7 +16,7 @@ type Permittable struct {
 	client *mongox.ClientCollection
 }
 
-func NewPermittable(client *mongox.Client) permittable.Repo {
+func NewPermittable(client *mongox.Client) *Permittable {
 	return &Permittable{
 		client: client.WithCollection("permittable"),
 	}

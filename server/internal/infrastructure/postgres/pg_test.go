@@ -14,8 +14,6 @@ import (
 	"github.com/testcontainers/testcontainers-go/wait"
 )
 
-// pgPool spins up a throwaway Postgres (testcontainers), applies migrations, and
-// returns a pool plus cleanup. Shared by repository tests in this package.
 func pgPool(t *testing.T) (*pgxpool.Pool, func()) {
 	t.Helper()
 	ctx := context.Background()

@@ -20,7 +20,7 @@ type Config struct {
 	lock   repo.Lock
 }
 
-func NewConfig(client *mongo.Collection, lock repo.Lock) config.Repo {
+func NewConfig(client *mongo.Collection, lock repo.Lock) *Config {
 	return &Config{client: client, lock: lock}
 }
 

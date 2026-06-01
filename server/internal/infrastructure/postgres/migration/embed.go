@@ -17,13 +17,9 @@ import (
 //go:embed *.sql
 var fs embed.FS
 
-// Migrate applies all pending schema migrations using golang-migrate.
-// golang-migrate manages its own advisory lock and schema_migrations table.
-//
-// It deliberately opens an independent database/sql connection (via the "pgx"
-// driver) rather than borrowing from the pgxpool: golang-migrate owns its
-// connection lifecycle, and binding that to the pool can leave a connection
-// checked out, deadlocking a later pool.Close().
+// Migrate opens its own database/sql conn rather than borrowing from the pool —
+// golang-migrate owns the conn lifecycle and binding it to the pool can leave a
+// conn checked out, deadlocking a later pool.Close().
 func Migrate(ctx context.Context, pool *pgxpool.Pool) error {
 	src, err := iofs.New(fs, ".")
 	if err != nil {
@@ -45,9 +41,6 @@ func Migrate(ctx context.Context, pool *pgxpool.Pool) error {
 	if err != nil {
 		return fmt.Errorf("postgres migrate init: %w", err)
 	}
-	// golang-migrate's recommended cleanup: release source + driver resources.
-	// The driver close closes the underlying sql.DB too, so the deferred
-	// db.Close above becomes a (safe, idempotent) no-op after this runs.
 	defer func() { _, _ = m.Close() }()
 
 	if err := m.Up(); err != nil && !errors.Is(err, migrate.ErrNoChange) {

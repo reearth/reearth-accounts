@@ -28,7 +28,6 @@ func (r *Workspace) Filtered(f workspace.WorkspaceFilter) workspace.Repo {
 	return &Workspace{c: r.c, f: r.f.Merge(f)}
 }
 
-// hydrate loads child rows for the given workspace rows and builds domain objects.
 func (r *Workspace) hydrate(ctx context.Context, rows []gen.Workspace) (workspace.List, error) {
 	if len(rows) == 0 {
 		return workspace.List{}, nil
@@ -90,7 +89,7 @@ func (r *Workspace) one(ctx context.Context, w gen.Workspace, err error) (*works
 	return list[0], nil
 }
 
-// FindByID does not apply the read filter (mirrors mongo).
+// FindByID does not apply the read filter (mongo parity).
 func (r *Workspace) FindByID(ctx context.Context, wid id.WorkspaceID) (*workspace.Workspace, error) {
 	w, err := r.c.queries(ctx).WorkspaceFindByID(ctx, wid.String())
 	return r.one(ctx, w, err)
@@ -139,8 +138,8 @@ func (r *Workspace) FindByAlias(ctx context.Context, alias string) (*workspace.W
 	return r.one(ctx, w, err)
 }
 
-// FindByAliases uses case-insensitive matching (the alias unique index is
-// case-insensitive); the query compares lower(alias), so lowercase the inputs.
+// FindByAliases lowercases inputs because the SQL query compares lower(alias)
+// to match the case-insensitive alias unique index.
 func (r *Workspace) FindByAliases(ctx context.Context, aliases []string) (workspace.List, error) {
 	if len(aliases) == 0 {
 		return nil, nil
@@ -301,8 +300,6 @@ func (r *Workspace) RemoveAll(ctx context.Context, ids id.WorkspaceIDList) error
 	})
 }
 
-// paginateWorkspaces paginates a pre-resolved set of workspace ids (cursor or
-// offset) and hydrates the page. No read filter is applied (mirrors mongo).
 func paginateWorkspaces(ctx context.Context, r *Workspace, ids []string, p *usecasex.Pagination) (workspace.List, *usecasex.PageInfo, error) {
 	total := int64(len(ids))
 	sorted := append([]string(nil), ids...)

@@ -7,7 +7,6 @@ import (
 	"github.com/reearth/reearth-accounts/server/pkg/permittable"
 )
 
-// PermittableWorkspaceRoleRow mirrors a permittable_workspace_roles row.
 type PermittableWorkspaceRoleRow struct {
 	PermittableID string
 	WorkspaceID   string
@@ -21,8 +20,6 @@ type PermittableRow struct {
 	UpdatedAt time.Time
 }
 
-// NewPermittableRow decomposes a permittable into its parent row plus the
-// workspace-role child rows (mirroring mongodoc, which persists workspace_roles).
 func NewPermittableRow(p permittable.Permittable) (PermittableRow, []PermittableWorkspaceRoleRow) {
 	roleIDs := make([]string, 0, len(p.RoleIDs()))
 	for _, rid := range p.RoleIDs() {

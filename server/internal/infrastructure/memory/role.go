@@ -14,13 +14,13 @@ type Role struct {
 	data map[id.RoleID]*role.Role
 }
 
-func NewRole() role.Repo {
+func NewRole() *Role {
 	return &Role{
 		data: map[id.RoleID]*role.Role{},
 	}
 }
 
-func NewRoleWith(items ...*role.Role) role.Repo {
+func NewRoleWith(items ...*role.Role) *Role {
 	r := NewRole()
 	ctx := context.Background()
 	for _, i := range items {

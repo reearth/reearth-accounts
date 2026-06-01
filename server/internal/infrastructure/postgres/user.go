@@ -173,9 +173,7 @@ func (r *User) FindByPasswordResetRequest(ctx context.Context, token string) (*u
 	return one(ctx, row, err)
 }
 
-// FindByNameOrAlias: case-insensitive substring match on name OR alias, mirroring
-// the Mongo backend (case-insensitive regex on name/alias). Returns an empty list
-// when nothing matches.
+// FindByNameOrAlias does a case-insensitive substring match for mongo parity.
 func (r *User) FindByNameOrAlias(ctx context.Context, nameOrAlias string) (user.List, error) {
 	kw := likeContains(nameOrAlias)
 	rows, err := r.c.db(ctx).Query(ctx,
@@ -190,8 +188,7 @@ func (r *User) FindByNameOrAlias(ctx context.Context, nameOrAlias string) (user.
 	return list, nil
 }
 
-// SearchByKeyword: case-insensitive substring on name/email (mongo parity:
-// minimum 3 characters, limit 10, ordered by name).
+// SearchByKeyword requires >=3 chars and caps at 10 results for mongo parity.
 func (r *User) SearchByKeyword(ctx context.Context, keyword string) (user.List, error) {
 	if len(keyword) < 3 {
 		return nil, nil
@@ -225,9 +222,6 @@ func (r *User) FindByIDsWithPagination(ctx context.Context, ids user.IDList, ali
 	return paginateUsers(ctx, r.c, ids.Strings(), alias, p)
 }
 
-// --- helpers ---
-
-// likeContains builds an escaped "%keyword%" ILIKE pattern.
 func likeContains(s string) string {
 	s = strings.ReplaceAll(s, `\`, `\\`)
 	s = strings.ReplaceAll(s, "%", `\%`)
@@ -235,9 +229,7 @@ func likeContains(s string) string {
 	return "%" + s + "%"
 }
 
-// userColumns is the explicit column list for hand-built queries, in the exact
-// order scanUsers (and gen.User) expects. Using it instead of `SELECT *` keeps
-// row scanning stable if the table's column order ever changes.
+// userColumns matches scanUsers/gen.User scan order; avoid SELECT * to keep scanning stable.
 const userColumns = "id, name, alias, email, workspace, password, subs, " +
 	"latest_logout_at, metadata, verification, password_reset, team, lang, theme, updated_at"
 
@@ -276,8 +268,6 @@ func cur(list user.List, start bool) *usecasex.Cursor {
 	return &c
 }
 
-// paginateUsers supports cursor and offset pagination, restricted to the given
-// ids and optionally filtered by a name/alias substring (mongo's alias param).
 func paginateUsers(ctx context.Context, c *Client, ids []string, alias *string, p *usecasex.Pagination) (user.List, *usecasex.PageInfo, error) {
 	where := []string{"id = ANY($1::text[])"}
 	args := []any{ids}
@@ -320,8 +310,6 @@ func paginateUsers(ctx context.Context, c *Client, ids []string, alias *string, 
 	return list, usecasex.NewPageInfo(total, cur(list, true), cur(list, false), false, false), nil
 }
 
-// cursorPageUsers implements forward (after/first) and backward (before/last)
-// paging keyed on id.
 func cursorPageUsers(ctx context.Context, c *Client, base string, args []any, total int64, cp *usecasex.CursorPagination) (user.List, *usecasex.PageInfo, error) {
 	forward := cp.First != nil
 	var limit int64
@@ -343,7 +331,7 @@ func cursorPageUsers(ctx context.Context, c *Client, base string, args []any, to
 		}
 		conds += " ORDER BY id DESC LIMIT $" + itoa(len(args)+1)
 	}
-	args = append(args, limit+1) // fetch one extra to detect more
+	args = append(args, limit+1) // +1 to detect hasMore
 	rows, err := c.db(ctx).Query(ctx, "SELECT "+userColumns+" "+conds, args...)
 	if err != nil {
 		return nil, nil, rerror.ErrInternalByWithContext(ctx, err)
@@ -362,9 +350,6 @@ func cursorPageUsers(ctx context.Context, c *Client, base string, args []any, to
 			list[i], list[j] = list[j], list[i]
 		}
 	}
-	// hasNext: there are more items in the forward direction (either we fetched
-	// limit+1 while paging forward, or the caller is paging backward from a
-	// `before` cursor so items exist beyond it). hasPrev: symmetric.
 	hasNext := (forward && hasMore) || (!forward && cp.Before != nil)
 	hasPrev := (!forward && hasMore) || (forward && cp.After != nil)
 	return list, usecasex.NewPageInfo(total, cur(list, true), cur(list, false), hasNext, hasPrev), nil

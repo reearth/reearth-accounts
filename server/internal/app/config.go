@@ -71,13 +71,9 @@ type Config struct {
 	OtelSamplingRatio      float64       `envconfig:"REEARTH_ACCOUNTS_OTEL_SAMPLING_RATIO" default:"1.0"` // 0.0 to 1.0
 }
 
-// ResolveDBDriver returns "postgres" or "mongo", honoring an explicit
-// REEARTH_ACCOUNTS_DB_DRIVER override and otherwise inferring from the DB scheme.
-// Supported override values (case-insensitive): "postgres", "postgresql",
-// "mongo", "mongodb". Unknown overrides are ignored and the DB-scheme fallback
-// (mongo by default) is used.
+// ResolveDBDriver honors REEARTH_ACCOUNTS_DB_DRIVER (case-insensitive) and
+// otherwise infers from the DB URI scheme, defaulting to mongo.
 func (c *Config) ResolveDBDriver() string {
-	// URI schemes are case-insensitive, so normalize before matching.
 	if c.DBDriver != "" {
 		switch strings.ToLower(c.DBDriver) {
 		case "postgres", "postgresql":
@@ -85,7 +81,6 @@ func (c *Config) ResolveDBDriver() string {
 		case "mongo", "mongodb":
 			return "mongo"
 		}
-		// unknown override -> fall through to scheme inference
 	}
 	db := strings.ToLower(c.DB)
 	if strings.HasPrefix(db, "postgres://") || strings.HasPrefix(db, "postgresql://") {

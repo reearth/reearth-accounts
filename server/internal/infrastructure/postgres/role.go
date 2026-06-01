@@ -53,8 +53,7 @@ func (r *Role) FindByID(ctx context.Context, rid id.RoleID) (*role.Role, error) 
 	return roleModel(row)
 }
 
-// FindByIDs returns only the roles that exist (no nil placeholders), mirroring
-// the Mongo backend which returns found rows without preserving request order.
+// FindByIDs returns found rows without preserving request order (mongo parity).
 func (r *Role) FindByIDs(ctx context.Context, ids id.RoleIDList) (role.List, error) {
 	if len(ids) == 0 {
 		return nil, nil

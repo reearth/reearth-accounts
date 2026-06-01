@@ -17,8 +17,6 @@ import (
 	"go.mongodb.org/mongo-driver/mongo"
 )
 
-// initGateways builds the shared gateway container (storage, mailer, auth) used
-// by every backend.
 func initGateways(ctx context.Context, conf *Config) *gateway.Container {
 	str, err := storage.NewGCPStorage(&storage.Config{
 		IsLocal:          conf.StorageIsLocal,
@@ -37,7 +35,6 @@ func initGateways(ctx context.Context, conf *Config) *gateway.Container {
 	}
 }
 
-// initPostgresReposAndGateways wires the PostgreSQL-backed repo container.
 func initPostgresReposAndGateways(ctx context.Context, pool *pgxpool.Pool, conf *Config) (*repo.Container, *gateway.Container) {
 	repos, err := postgres.New(ctx, pool, []user.Repo{})
 	if err != nil {

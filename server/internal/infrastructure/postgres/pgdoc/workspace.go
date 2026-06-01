@@ -47,9 +47,8 @@ type WorkspaceRow struct {
 	UpdatedAt   time.Time
 }
 
-// NewWorkspaceRows decomposes a workspace into the parent row + child rows and
-// computes members_hash identically to mongodoc (shared algorithm) so the
-// composite (lower(alias), members_hash) unique index matches mongo's behavior.
+// NewWorkspaceRows uses mongodoc.ComputeWorkspaceMembersHash so the composite
+// (lower(alias), members_hash) unique index behaves identically to mongo.
 func NewWorkspaceRows(ws *workspace.Workspace) (*WorkspaceRow, []WorkspaceMemberRow, []WorkspaceIntegrationRow) {
 	wid := ws.ID().String()
 
@@ -126,8 +125,7 @@ func WorkspaceModel(r *WorkspaceRow, members []WorkspaceMemberRow, integrations 
 		if err != nil {
 			return nil, err
 		}
-		// invited_by may be empty/invalid (text column, default ''); parse safely
-		// and fall back to the zero UserID rather than panicking (MustUserID).
+		// invited_by may be empty/invalid; fall back to zero UserID instead of panicking
 		inviter, err := id.UserIDFrom(m.InvitedBy)
 		if err != nil {
 			inviter = id.UserID{}

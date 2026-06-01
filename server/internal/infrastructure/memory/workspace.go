@@ -17,14 +17,14 @@ type Workspace struct {
 	err  error
 }
 
-func NewWorkspace() workspace.Repo {
+func NewWorkspace() *Workspace {
 	return &Workspace{
 		data: &util.SyncMap[workspace.ID, *workspace.Workspace]{},
 	}
 }
 
-func NewWorkspaceWith(workspaces ...*workspace.Workspace) workspace.Repo {
-	r := &Workspace{data: &util.SyncMap[workspace.ID, *workspace.Workspace]{}}
+func NewWorkspaceWith(workspaces ...*workspace.Workspace) *Workspace {
+	r := NewWorkspace()
 	for _, ws := range workspaces {
 		r.data.Store(ws.ID(), ws)
 	}

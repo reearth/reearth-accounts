@@ -19,7 +19,6 @@ type Permittable struct {
 
 func NewPermittable(c *Client) permittable.Repo { return &Permittable{c: c} }
 
-// hydrate attaches workspace_roles child rows and builds domain objects.
 func (r *Permittable) hydrate(ctx context.Context, rows []gen.Permittable) (permittable.List, error) {
 	if len(rows) == 0 {
 		return permittable.List{}, nil
@@ -65,8 +64,7 @@ func (r *Permittable) FindByUserID(ctx context.Context, uid user.ID) (*permittab
 	return list[0], nil
 }
 
-// FindByUserIDs returns ErrNotFound when nothing matches, mirroring the Mongo
-// backend (its find wrapper errors on an empty result set).
+// FindByUserIDs returns ErrNotFound on empty result for mongo parity.
 func (r *Permittable) FindByUserIDs(ctx context.Context, ids user.IDList) (permittable.List, error) {
 	rows, err := r.c.queries(ctx).PermittableFindByUserIDs(ctx, ids.Strings())
 	if err != nil {
@@ -82,7 +80,7 @@ func (r *Permittable) FindByUserIDs(ctx context.Context, ids user.IDList) (permi
 	return list, nil
 }
 
-// FindByRoleID returns ErrNotFound when nothing matches, mirroring the Mongo backend.
+// FindByRoleID returns ErrNotFound on empty result for mongo parity.
 func (r *Permittable) FindByRoleID(ctx context.Context, rid id.RoleID) (permittable.List, error) {
 	rows, err := r.c.queries(ctx).PermittableFindByRoleID(ctx, rid.String())
 	if err != nil {
@@ -102,8 +100,7 @@ func (r *Permittable) Save(ctx context.Context, p permittable.Permittable) error
 	row, wrs := pgdoc.NewPermittableRow(p)
 	return r.c.WithinTransaction(ctx, func(ctx context.Context) error {
 		q := r.c.queries(ctx)
-		// ON CONFLICT (user_id) keeps the existing row's id; use the returned
-		// canonical id for the workspace_roles child rows.
+		// ON CONFLICT (user_id) keeps the existing row's id; use the returned id for child rows.
 		pid, err := q.PermittableUpsert(ctx, gen.PermittableUpsertParams{
 			ID: row.ID, UserID: row.UserID, RoleIds: row.RoleIDs, UpdatedAt: row.UpdatedAt,
 		})

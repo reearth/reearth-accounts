@@ -44,6 +44,6 @@ func TestMigrate(t *testing.T) {
 		`SELECT count(*) FROM information_schema.tables WHERE table_name = 'users'`).Scan(&n))
 	assert.Equal(t, 1, n)
 
-	// idempotent: a second Migrate is a no-op (ErrNoChange swallowed)
+	// idempotent: second Migrate is a no-op (ErrNoChange swallowed)
 	require.NoError(t, migration.Migrate(ctx, pool))
 }

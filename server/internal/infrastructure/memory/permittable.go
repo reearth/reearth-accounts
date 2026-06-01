@@ -16,13 +16,13 @@ type Permittable struct {
 	data map[id.PermittableID]*permittable.Permittable
 }
 
-func NewPermittable() permittable.Repo {
+func NewPermittable() *Permittable {
 	return &Permittable{
 		data: map[id.PermittableID]*permittable.Permittable{},
 	}
 }
 
-func NewPermittableWith(items ...*permittable.Permittable) permittable.Repo {
+func NewPermittableWith(items ...*permittable.Permittable) *Permittable {
 	p := NewPermittable()
 	ctx := context.Background()
 	for _, i := range items {

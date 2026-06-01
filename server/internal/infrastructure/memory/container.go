@@ -6,14 +6,12 @@ import (
 )
 
 func New() *repo.Container {
-	tx := &usecasex.NopTransaction{}
 	return &repo.Container{
 		User:        NewUser(),
 		Workspace:   NewWorkspace(),
 		Role:        NewRole(),
 		Permittable: NewPermittable(),
-		Transaction: tx,
-		Transactor:  repo.TransactorFromTransaction{Tx: tx},
+		Transaction: &usecasex.NopTransaction{},
 		Config:      NewConfig(),
 	}
 }

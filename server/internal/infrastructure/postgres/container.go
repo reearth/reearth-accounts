@@ -8,7 +8,6 @@ import (
 	"github.com/reearth/reearth-accounts/server/pkg/user"
 )
 
-// New builds a repo.Container backed by PostgreSQL.
 func New(_ context.Context, pool *pgxpool.Pool, users []user.Repo) (*repo.Container, error) {
 	c := NewClient(pool)
 	return &repo.Container{
@@ -16,7 +15,7 @@ func New(_ context.Context, pool *pgxpool.Pool, users []user.Repo) (*repo.Contai
 		Workspace:   NewWorkspace(c),
 		Role:        NewRole(c),
 		Permittable: NewPermittable(c),
-		Transactor:  c, // *Client.WithinTransaction satisfies repo.Transactor
+		Transaction: NewTransaction(pool),
 		Users:       users,
 		Config:      NewConfig(pool),
 	}, nil

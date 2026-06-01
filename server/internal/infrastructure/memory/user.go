@@ -15,14 +15,14 @@ type User struct {
 	err  error
 }
 
-func NewUser() user.Repo {
+func NewUser() *User {
 	return &User{
 		data: &util.SyncMap[user.ID, *user.User]{},
 	}
 }
 
-func NewUserWith(users ...*user.User) user.Repo {
-	r := &User{data: &util.SyncMap[user.ID, *user.User]{}}
+func NewUserWith(users ...*user.User) *User {
+	r := NewUser()
 	for _, u := range users {
 		r.data.Store(u.ID(), u)
 	}

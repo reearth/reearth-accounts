@@ -8,9 +8,6 @@ import (
 	"github.com/reearth/reearth-accounts/server/pkg/user"
 )
 
-// UserMetadataJSON is the postgres jsonb shape for user.Metadata. It is private
-// to the postgres backend (parity is per-field on the domain, not byte-for-byte
-// with mongo's bson).
 type UserMetadataJSON struct {
 	Description string `json:"description"`
 	Website     string `json:"website"`
@@ -30,7 +27,6 @@ type UserPasswordResetJSON struct {
 	CreatedAt time.Time `json:"createdat"`
 }
 
-// UserRow mirrors the users table; field types match the sqlc-generated gen.User.
 type UserRow struct {
 	ID             string
 	Name           string

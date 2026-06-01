@@ -65,16 +65,11 @@ func Start(debug bool) {
 		}
 	}
 
-	// Select persistence backend by DB URI scheme (mongo by default, postgres
-	// when REEARTH_ACCOUNTS_DB is a postgres:// DSN or DB_DRIVER=postgres).
 	var repos *repo.Container
 	var gateways *gateway.Container
 
 	if conf.ResolveDBDriver() == "postgres" {
-		// Bound the connect + ping + migration window with a single 30s budget
-		// so a misconfigured/unreachable DB can't hang startup. pgxpool.New is
-		// lazy and does not establish a connection on its own, so we Ping
-		// explicitly inside the same context; migrations also run under it.
+		// 30s startup budget covers connect+ping+migrate.
 		pgCtx, cancel := context.WithTimeout(ctx, 30*time.Second)
 		defer cancel()
 		pool, perr := pgxpool.New(pgCtx, conf.DB)
@@ -238,8 +233,6 @@ func (w *WebServer) Shutdown(ctx context.Context) error {
 	return w.appServer.Shutdown(ctx)
 }
 
-// chainMongoMonitors composes multiple mongo CommandMonitors into one.
-// nil monitors are ignored. Returns nil if all inputs are nil.
 func chainMongoMonitors(monitors ...*event.CommandMonitor) *event.CommandMonitor {
 	active := monitors[:0]
 	for _, m := range monitors {

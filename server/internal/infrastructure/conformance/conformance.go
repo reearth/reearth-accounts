@@ -1,11 +1,3 @@
-// Package conformance holds a single, parameterized repository test suite that
-// every persistence backend (memory, mongo, postgres) must satisfy. Backends
-// declare which optional behaviors they support via Caps so the shared suite can
-// gate backend-specific assertions instead of forking per backend.
-//
-// Running the same assertions against mongo and postgres is the consistency
-// proof: where the two backends are expected to behave identically, the test is
-// ungated and must pass on both.
 package conformance
 
 import (
@@ -26,25 +18,20 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-// Caps describes optional behaviors a backend may or may not implement.
-// mongo and postgres set all of these true; memory (an in-process map) sets them
-// false because it does not enforce them.
+// Caps gates backend-specific assertions; memory leaves them false.
 type Caps struct {
-	RealTransactions     bool // Begin/Commit/Rollback actually isolate writes
-	EnforcesFilter       bool // Filtered() enforces read/write permissions
-	OrderedFindByIDs     bool // user FindByIDs preserves request order with nil holes
-	RealPagination       bool // cursor/offset pagination is honored
-	UniqueEmail          bool // duplicate emails are rejected on Create
-	SubstringSearch      bool // FindByNameOrAlias matches case-insensitive substrings
-	CaseInsensitiveEmail bool // FindByEmail/FindByAlias match case-insensitively
+	RealTransactions     bool
+	EnforcesFilter       bool
+	OrderedFindByIDs     bool
+	RealPagination       bool
+	UniqueEmail          bool
+	SubstringSearch      bool
+	CaseInsensitiveEmail bool
 }
 
-// Factory returns a fresh, empty repo.Container, its capabilities, and cleanup.
 type Factory func(t *testing.T) (*repo.Container, Caps, func())
 
-// Run executes the full conformance suite against the given backend factory.
 func Run(t *testing.T, nc Factory) {
-	// user
 	t.Run("User_CRUD", func(t *testing.T) { testUserCRUD(t, nc) })
 	t.Run("User_SaveUpdate", func(t *testing.T) { testUserSaveUpdate(t, nc) })
 	t.Run("User_FindAll", func(t *testing.T) { testUserFindAll(t, nc) })
@@ -59,7 +46,6 @@ func Run(t *testing.T, nc Factory) {
 	t.Run("User_FindByIDs_Ordering", func(t *testing.T) { testUserFindByIDsOrdering(t, nc) })
 	t.Run("User_SearchByKeyword", func(t *testing.T) { testUserSearch(t, nc) })
 	t.Run("User_Pagination", func(t *testing.T) { testUserPagination(t, nc) })
-	// workspace
 	t.Run("Workspace_CRUD_Members", func(t *testing.T) { testWorkspaceCRUD(t, nc) })
 	t.Run("Workspace_SaveUpdate", func(t *testing.T) { testWorkspaceSaveUpdate(t, nc) })
 	t.Run("Workspace_FindByName_Alias", func(t *testing.T) { testWorkspaceFindByNameAlias(t, nc) })
@@ -70,20 +56,15 @@ func Run(t *testing.T, nc Factory) {
 	t.Run("Workspace_SaveAll_RemoveAll", func(t *testing.T) { testWorkspaceSaveAllRemoveAll(t, nc) })
 	t.Run("Workspace_Remove", func(t *testing.T) { testWorkspaceRemove(t, nc) })
 	t.Run("Workspace_Filtered", func(t *testing.T) { testWorkspaceFiltered(t, nc) })
-	// role
 	t.Run("Role_CRUD", func(t *testing.T) { testRoleCRUD(t, nc) })
 	t.Run("Role_FindAll_FindByIDs", func(t *testing.T) { testRoleFindAllAndByIDs(t, nc) })
-	// permittable
 	t.Run("Permittable_RoleQueries", func(t *testing.T) { testPermittable(t, nc) })
 	t.Run("Permittable_WorkspaceRoles", func(t *testing.T) { testPermittableWorkspaceRoles(t, nc) })
 	t.Run("Permittable_FindByUserIDs_SaveMany", func(t *testing.T) { testPermittableFindByUserIDsAndSaveMany(t, nc) })
 	t.Run("Permittable_NotFound", func(t *testing.T) { testPermittableNotFound(t, nc) })
-	// config
 	t.Run("Config_LockLoadSave", func(t *testing.T) { testConfig(t, nc) })
 	t.Run("Config_SaveAuth", func(t *testing.T) { testConfigSaveAuth(t, nc) })
-	// transaction
 	t.Run("Transaction_CommitRollback", func(t *testing.T) { testTransaction(t, nc) })
-	t.Run("Transactor_Wiring", func(t *testing.T) { testTransactorWiring(t, nc) })
 }
 
 func newUser(t *testing.T, name, email string) *user.User {
@@ -93,8 +74,6 @@ func newUser(t *testing.T, name, email string) *user.User {
 	return u
 }
 
-// timeFixed is a stable timestamp (UTC, second precision) for fields that must
-// round-trip identically across backends.
 func timeFixed() time.Time { return time.Date(2026, 1, 2, 3, 4, 5, 0, time.UTC) }
 
 func newWorkspace(t *testing.T, name string, owner id.UserID) *workspace.Workspace {
@@ -104,8 +83,6 @@ func newWorkspace(t *testing.T, name string, owner id.UserID) *workspace.Workspa
 	require.NoError(t, err)
 	return ws
 }
-
-// ---- user ----
 
 func testUserCRUD(t *testing.T, nc Factory) {
 	c, _, done := nc(t)
@@ -125,7 +102,6 @@ func testUserCRUD(t *testing.T, nc Factory) {
 	require.NoError(t, err)
 	assert.Equal(t, uid, byEmail.ID())
 
-	// not found
 	_, err = c.User.FindByEmail(ctx, "nobody@example.com")
 	assert.ErrorIs(t, err, rerror.ErrNotFound)
 
@@ -200,7 +176,6 @@ func testUserFindByNameOrAlias(t *testing.T, nc Factory) {
 	require.NoError(t, err)
 	require.NoError(t, c.User.Create(ctx, u))
 
-	// full-term match works on every backend
 	res, err := c.User.FindByNameOrAlias(ctx, "Zaphod")
 	require.NoError(t, err)
 	require.NotEmpty(t, res)
@@ -219,7 +194,7 @@ func testUserFindByNameOrAliasSubstring(t *testing.T, nc Factory) {
 	require.NoError(t, err)
 	require.NoError(t, c.User.Create(ctx, u))
 
-	res, err := c.User.FindByNameOrAlias(ctx, "EBLEB") // case-insensitive substring of name
+	res, err := c.User.FindByNameOrAlias(ctx, "EBLEB")
 	require.NoError(t, err)
 	require.Len(t, res, 1)
 	assert.Equal(t, u.ID(), res[0].ID())
@@ -267,12 +242,10 @@ func testUserFindBySubOrCreate(t *testing.T, nc Factory) {
 		Workspace(id.NewWorkspaceID()).Auths([]user.Auth{user.AuthFrom("sub-soc")}).Build()
 	require.NoError(t, err)
 
-	// first call creates
 	created, err := c.User.FindBySubOrCreate(ctx, u, "sub-soc")
 	require.NoError(t, err)
 	assert.Equal(t, u.ID(), created.ID())
 
-	// second call finds the existing one
 	again, err := c.User.FindBySubOrCreate(ctx, newUser(t, "other", "other@example.com"), "sub-soc")
 	require.NoError(t, err)
 	assert.Equal(t, u.ID(), again.ID())
@@ -305,7 +278,7 @@ func testUserDuplicateEmail(t *testing.T, nc Factory) {
 	}
 	ctx := context.Background()
 	require.NoError(t, c.User.Create(ctx, newUser(t, "a", "dup@example.com")))
-	err := c.User.Create(ctx, newUser(t, "b", "DUP@example.com")) // case-insensitive unique index
+	err := c.User.Create(ctx, newUser(t, "b", "DUP@example.com"))
 	assert.ErrorIs(t, err, user.ErrDuplicatedUser)
 }
 
@@ -362,8 +335,6 @@ func testUserPagination(t *testing.T, nc Factory) {
 	assert.True(t, info.HasNextPage)
 }
 
-// ---- workspace ----
-
 func testWorkspaceCRUD(t *testing.T, nc Factory) {
 	c, _, done := nc(t)
 	defer done()
@@ -411,7 +382,6 @@ func testWorkspaceFindByNameAlias(t *testing.T, nc Factory) {
 	require.NoError(t, err)
 	assert.Equal(t, ws.ID(), byAlias.ID())
 
-	// empty string -> not found (mongo/memory/postgres all guard this)
 	_, err = c.Workspace.FindByName(ctx, "")
 	assert.ErrorIs(t, err, rerror.ErrNotFound)
 }
@@ -442,7 +412,6 @@ func testWorkspaceFindByIDs(t *testing.T, nc Factory) {
 	require.NoError(t, c.Workspace.Create(ctx, a))
 	require.NoError(t, c.Workspace.Create(ctx, b))
 
-	// found-only (a missing id is skipped, not nil-filled), set-equal
 	got, err := c.Workspace.FindByIDs(ctx, id.WorkspaceIDList{a.ID(), id.NewWorkspaceID(), b.ID()})
 	require.NoError(t, err)
 	require.Len(t, got, 2)
@@ -532,8 +501,6 @@ func testWorkspaceFiltered(t *testing.T, nc Factory) {
 	require.NoError(t, c.Workspace.Create(ctx, visible))
 	require.NoError(t, c.Workspace.Create(ctx, hidden))
 
-	// constrain both read and write to `visible` so `hidden` is neither readable
-	// (CanRead falls through to CanWrite) nor writable.
 	f := c.Workspace.Filtered(workspace.WorkspaceFilter{
 		Readable: id.WorkspaceIDList{visible.ID()},
 		Writable: id.WorkspaceIDList{visible.ID()},
@@ -550,8 +517,6 @@ func testWorkspaceFiltered(t *testing.T, nc Factory) {
 	assert.Error(t, f.Save(ctx, hidden))
 	assert.NoError(t, f.Save(ctx, visible))
 }
-
-// ---- role ----
 
 func testRoleCRUD(t *testing.T, nc Factory) {
 	c, _, done := nc(t)
@@ -584,7 +549,6 @@ func testRoleFindAllAndByIDs(t *testing.T, nc Factory) {
 	require.NoError(t, err)
 	assert.GreaterOrEqual(t, len(all), 2)
 
-	// found-only (a missing id is skipped), set-equal
 	got, err := c.Role.FindByIDs(ctx, id.RoleIDList{r1.ID(), id.NewRoleID(), r2.ID()})
 	require.NoError(t, err)
 	require.Len(t, got, 2)
@@ -595,8 +559,6 @@ func testRoleFindAllAndByIDs(t *testing.T, nc Factory) {
 	}
 	assert.True(t, found[r1.ID()] && found[r2.ID()])
 }
-
-// ---- permittable ----
 
 func newPermittable(t *testing.T, uid id.UserID, rids ...id.RoleID) permittable.Permittable {
 	t.Helper()
@@ -663,12 +625,10 @@ func testPermittableNotFound(t *testing.T, nc Factory) {
 	ctx := context.Background()
 	_, err := c.Permittable.FindByUserID(ctx, id.NewUserID())
 	assert.ErrorIs(t, err, rerror.ErrNotFound)
-	// plural queries also return ErrNotFound on an empty result (mongo parity)
+	// FindByRoleID returns ErrNotFound on empty result for mongo parity
 	_, err = c.Permittable.FindByRoleID(ctx, id.NewRoleID())
 	assert.ErrorIs(t, err, rerror.ErrNotFound)
 }
-
-// ---- config ----
 
 func testConfig(t *testing.T, nc Factory) {
 	c, _, done := nc(t)
@@ -704,31 +664,19 @@ func testConfigSaveAuth(t *testing.T, nc Factory) {
 	require.NoError(t, c.Config.Unlock(ctx))
 }
 
-// ---- transaction ----
-
-// testTransactorWiring asserts every backend exposes a non-nil Transactor and a
-// no-op closure round-trips. Behavior parity with usecasex.Transaction is
-// already covered by testTransaction; this is the wiring smoke check.
-func testTransactorWiring(t *testing.T, nc Factory) {
-	c, _, done := nc(t)
-	defer done()
-	require.NotNil(t, c.Transactor, "repo.Container.Transactor must be wired")
-	require.NoError(t, c.Transactor.WithinTransaction(context.Background(), func(ctx context.Context) error { return nil }))
-}
-
 func testTransaction(t *testing.T, nc Factory) {
 	c, caps, done := nc(t)
 	defer done()
 	ctx := context.Background()
 	uid := id.NewUserID()
-	_ = c.Transactor.WithinTransaction(ctx, func(ctx context.Context) error {
+	_ = usecasex.DoTransaction(ctx, c.Transaction, 0, func(ctx context.Context) error {
 		u, err := user.New().ID(uid).Name("tx").Email("tx@example.com").Workspace(id.NewWorkspaceID()).Build()
 		require.NoError(t, err)
 		require.NoError(t, c.User.Create(ctx, u))
-		return assert.AnError // force rollback
+		return assert.AnError
 	})
 	_, err := c.User.FindByID(ctx, uid)
 	if caps.RealTransactions {
-		assert.ErrorIs(t, err, rerror.ErrNotFound) // rolled back -> not found
+		assert.ErrorIs(t, err, rerror.ErrNotFound)
 	}
 }

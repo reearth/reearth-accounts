@@ -19,7 +19,6 @@ import (
 func TestMongoConformance(t *testing.T) {
 	ctx := context.Background()
 
-	// One container for the whole suite; isolate subtests with a fresh database each.
 	c, err := tcmongo.Run(ctx, "mongo:6")
 	require.NoError(t, err)
 	t.Cleanup(func() { _ = c.Terminate(ctx) })
@@ -33,8 +32,7 @@ func TestMongoConformance(t *testing.T) {
 		dbName := "conf_" + uuid.NewString()
 		db := cli.Database(dbName)
 
-		// Create the case-insensitive unique email index (mirrors the production
-		// mongo migration) so duplicate-email parity is exercised here too.
+		// case-insensitive unique email index mirrors the production mongo migration
 		_, err := db.Collection("user").Indexes().CreateOne(ctx, mongo.IndexModel{
 			Keys:    bson.D{{Key: "email", Value: 1}},
 			Options: options.Index().SetUnique(true).SetCollation(&options.Collation{Locale: "en", Strength: 2}),

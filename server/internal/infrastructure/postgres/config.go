@@ -12,7 +12,6 @@ import (
 	"github.com/reearth/reearthx/rerror"
 )
 
-// configAdvisoryLockKey is an arbitrary, stable 64-bit key for the single config row.
 const configAdvisoryLockKey int64 = 0x52454143 // "REAC"
 
 type Config struct {
@@ -44,9 +43,7 @@ func (r *Config) LockAndLoad(ctx context.Context) (*config.Config, error) {
 		return &config.Config{}, nil
 	}
 	if err != nil {
-		// Release the advisory lock and connection so a failed load doesn't leak
-		// a pool connection or hold the lock forever. Safe to clear r.conn here:
-		// we still hold r.mu (released by the deferred Unlock above).
+		// release lock+conn on load failure to avoid leaking either
 		_, _ = conn.Exec(ctx, `SELECT pg_advisory_unlock($1)`, configAdvisoryLockKey)
 		conn.Release()
 		r.conn = nil
@@ -55,12 +52,8 @@ func (r *Config) LockAndLoad(ctx context.Context) (*config.Config, error) {
 	return row.Model(), nil
 }
 
-// exec runs on the locked connection if held, else on the pool. The mutex is
-// held for the entire duration of the locked-conn Exec because pgxpool.Conn is
-// not safe for concurrent use, and releasing the mutex mid-Exec would let
-// Unlock return the same conn to the pool while the Exec is still in flight.
-// The pool-only path doesn't need the mutex (pgxpool.Pool is safe for
-// concurrent use).
+// exec holds r.mu across the locked-conn Exec because pgxpool.Conn isn't safe
+// for concurrent use; releasing mid-Exec would race Unlock returning the conn to the pool.
 func (r *Config) exec(ctx context.Context, sql string, args ...any) error {
 	r.mu.Lock()
 	if r.conn != nil {

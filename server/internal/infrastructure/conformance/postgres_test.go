@@ -22,7 +22,6 @@ const pgTruncate = `TRUNCATE users, workspaces, workspace_members, workspace_int
 func TestPostgresConformance(t *testing.T) {
 	ctx := context.Background()
 
-	// One container for the whole suite; reset state between subtests with TRUNCATE.
 	c, err := tcpostgres.Run(ctx, "postgres:17-alpine",
 		tcpostgres.WithDatabase("test"), tcpostgres.WithUsername("test"), tcpostgres.WithPassword("test"),
 		testcontainers.WithWaitStrategy(wait.ForLog("database system is ready to accept connections").WithOccurrence(2)))
