@@ -1,6 +1,8 @@
 package repo
 
 import (
+	"context"
+
 	"github.com/reearth/reearth-accounts/server/pkg/config"
 	"github.com/reearth/reearth-accounts/server/pkg/permittable"
 	"github.com/reearth/reearth-accounts/server/pkg/role"
@@ -11,12 +13,32 @@ import (
 	"github.com/reearth/reearthx/usecasex"
 )
 
+// Transactor is the closure-based transaction API the use-case layer should use.
+// Implementations begin a transaction, pass a tx-enriched ctx to fn, then commit
+// on success or roll back if fn returns an error. Nested calls reuse the
+// ambient transaction. Implemented by every backend.
+type Transactor interface {
+	WithinTransaction(ctx context.Context, fn func(ctx context.Context) error) error
+}
+
+// TransactorFromTransaction adapts a usecasex.Transaction (Begin/End-shaped)
+// into a Transactor (closure-shaped) so backends that already expose the
+// usecasex interface get a Transactor for free via usecasex.DoTransaction.
+type TransactorFromTransaction struct {
+	Tx usecasex.Transaction
+}
+
+func (t TransactorFromTransaction) WithinTransaction(ctx context.Context, fn func(ctx context.Context) error) error {
+	return usecasex.DoTransaction(ctx, t.Tx, 0, fn)
+}
+
 type Container struct {
 	User        user.Repo
 	Workspace   workspace.Repo
 	Role        role.Repo
 	Permittable permittable.Repo
 	Transaction usecasex.Transaction
+	Transactor  Transactor
 	Users       []user.Repo
 	Config      config.Repo
 }
@@ -36,6 +58,8 @@ func (c *Container) Filtered(f workspace.WorkspaceFilter) *Container {
 		Role:        c.Role,
 		Permittable: c.Permittable,
 		Transaction: c.Transaction,
+		Transactor:  c.Transactor,
+		Config:      c.Config,
 	}
 }
 

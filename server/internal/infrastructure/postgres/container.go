@@ -17,6 +17,7 @@ func New(_ context.Context, pool *pgxpool.Pool, users []user.Repo) (*repo.Contai
 		Role:        NewRole(c),
 		Permittable: NewPermittable(c),
 		Transaction: NewTransaction(pool),
+		Transactor:  c, // *Client.WithinTransaction satisfies repo.Transactor
 		Users:       users,
 		Config:      NewConfig(pool),
 	}, nil

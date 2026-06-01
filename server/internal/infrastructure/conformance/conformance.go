@@ -83,6 +83,7 @@ func Run(t *testing.T, nc Factory) {
 	t.Run("Config_SaveAuth", func(t *testing.T) { testConfigSaveAuth(t, nc) })
 	// transaction
 	t.Run("Transaction_CommitRollback", func(t *testing.T) { testTransaction(t, nc) })
+	t.Run("Transactor_Wiring", func(t *testing.T) { testTransactorWiring(t, nc) })
 }
 
 func newUser(t *testing.T, name, email string) *user.User {
@@ -704,6 +705,16 @@ func testConfigSaveAuth(t *testing.T, nc Factory) {
 }
 
 // ---- transaction ----
+
+// testTransactorWiring asserts every backend exposes a non-nil Transactor and a
+// no-op closure round-trips. Behavior parity with usecasex.Transaction is
+// already covered by testTransaction; this is the wiring smoke check.
+func testTransactorWiring(t *testing.T, nc Factory) {
+	c, _, done := nc(t)
+	defer done()
+	require.NotNil(t, c.Transactor, "repo.Container.Transactor must be wired")
+	require.NoError(t, c.Transactor.WithinTransaction(context.Background(), func(ctx context.Context) error { return nil }))
+}
 
 func testTransaction(t *testing.T, nc Factory) {
 	c, caps, done := nc(t)
