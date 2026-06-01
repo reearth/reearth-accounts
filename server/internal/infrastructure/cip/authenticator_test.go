@@ -140,6 +140,45 @@ func TestCIP_ResendVerificationEmail(t *testing.T) {
 	assert.True(t, fm.sent)
 	assert.Equal(t, "u@example.com", fm.to[0].Email)
 	assert.Contains(t, fm.text, "https://verify.example/u@example.com")
+	// The HTML body must embed the link in the href attribute.
+	assert.Contains(t, fm.html, `href="https://verify.example/u@example.com"`)
+}
+
+func TestCIP_ResendVerificationEmail_HTMLEscapesLink(t *testing.T) {
+	// Treat the verification URL as untrusted: any quote/angle bracket must be
+	// escaped before being embedded into the href attribute of the HTML body.
+	fake := &fakeAuthClient{
+		getUser: func(_ context.Context, uid string) (*fbauth.UserRecord, error) {
+			return &fbauth.UserRecord{UserInfo: &fbauth.UserInfo{UID: uid, Email: "u@example.com"}}, nil
+		},
+	}
+	// Override EmailVerificationLink behavior via a wrapper so we can return a
+	// link containing characters that must be escaped.
+	wrapped := &linkOverrideClient{fakeAuthClient: fake, link: `https://verify.example/?token=a"b&c<d`}
+	fm := &fakeMailer{}
+	a := &Authenticator{client: wrapped, mailer: fm}
+
+	err := a.ResendVerificationEmail(context.Background(), "uid-1")
+	assert.NoError(t, err)
+	assert.True(t, fm.sent)
+	// Plain-text body keeps the raw link.
+	assert.Contains(t, fm.text, `https://verify.example/?token=a"b&c<d`)
+	// HTML body must contain the escaped form inside the href attribute and
+	// must NOT contain the raw unescaped quote/ampersand/angle-bracket payload.
+	assert.Contains(t, fm.html, `href="https://verify.example/?token=a&#34;b&amp;c&lt;d"`)
+	assert.NotContains(t, fm.html, `a"b&c<d`)
+}
+
+// linkOverrideClient is a tiny wrapper around fakeAuthClient that returns a
+// caller-supplied verification link, used to exercise HTML escaping.
+type linkOverrideClient struct {
+	*fakeAuthClient
+	link string
+}
+
+func (l *linkOverrideClient) EmailVerificationLink(_ context.Context, email string) (string, error) {
+	l.fakeAuthClient.verifyLinkEmail = email
+	return l.link, nil
 }
 
 func TestCIP_ResendVerificationEmail_NoEmail(t *testing.T) {

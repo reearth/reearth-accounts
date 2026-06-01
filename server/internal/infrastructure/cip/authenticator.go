@@ -3,6 +3,7 @@ package cip
 import (
 	"context"
 	"fmt"
+	"html"
 
 	firebase "firebase.google.com/go/v4"
 	fbauth "firebase.google.com/go/v4/auth"
@@ -109,11 +110,9 @@ func (a *Authenticator) ResendVerificationEmail(ctx context.Context, userID stri
 		return rerror.NewE(i18n.T("failed to resend verification email"))
 	}
 
-	// Generate the out-of-band verification link. Delivery is handled out-of-band
-	// (Firebase email templates or the configured mailer); generating the link
-	// validates the user and triggers Firebase-managed email when templates are on.
-	// The Firebase Admin SDK only generates the verification link; it does not
-	// send any email. Deliver it via the configured mailer.
+	// The Firebase Admin SDK's EmailVerificationLink only generates an
+	// out-of-band verification URL; it does not send any email itself.
+	// Delivery is handled below via the configured app Mailer.
 	link, err := a.client.EmailVerificationLink(ctx, rec.Email)
 	if err != nil {
 		log.Errorf("cip: email verification link: %+v", err)
@@ -125,8 +124,10 @@ func (a *Authenticator) ResendVerificationEmail(ctx context.Context, userID stri
 	}
 
 	text := "Please verify your email address by opening the following link:\n" + link
-	html := fmt.Sprintf(`<p>Please verify your email address by clicking <a href="%s">this link</a>.</p>`, link)
-	if err := a.mailer.SendMail(ctx, []mailer.Contact{{Email: rec.Email, Name: rec.DisplayName}}, "email verification", text, html); err != nil {
+	// Treat the link as untrusted input and HTML-escape it before embedding in the
+	// href attribute to prevent accidental injection or broken markup.
+	htmlBody := fmt.Sprintf(`<p>Please verify your email address by clicking <a href="%s">this link</a>.</p>`, html.EscapeString(link))
+	if err := a.mailer.SendMail(ctx, []mailer.Contact{{Email: rec.Email, Name: rec.DisplayName}}, "email verification", text, htmlBody); err != nil {
 		log.Errorf("cip: send verification email: %+v", err)
 		return rerror.NewE(i18n.T("failed to resend verification email"))
 	}
