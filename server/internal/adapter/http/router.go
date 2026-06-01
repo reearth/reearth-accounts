@@ -6,11 +6,8 @@ import (
 	"github.com/labstack/echo/v4"
 	"github.com/labstack/echo/v4/middleware"
 	"github.com/reearth/reearth-accounts/server/internal/adapter"
-	authh "github.com/reearth/reearth-accounts/server/internal/adapter/http/auth"
+	"github.com/reearth/reearth-accounts/server/internal/adapter/http/handlers"
 	httpinternal "github.com/reearth/reearth-accounts/server/internal/adapter/http/internal"
-	permh "github.com/reearth/reearth-accounts/server/internal/adapter/http/permission"
-	userh "github.com/reearth/reearth-accounts/server/internal/adapter/http/user"
-	wsh "github.com/reearth/reearth-accounts/server/internal/adapter/http/workspace"
 	_ "github.com/reearth/reearth-accounts/server/docs" // generated OpenAPI spec (make swag)
 	echoSwagger "github.com/swaggo/echo-swagger"
 )
@@ -63,12 +60,12 @@ func RegisterRESTRouter(e *echo.Echo, cfg RouterConfig) {
 	api := e.Group("/api", base...)
 
 	// --- Auth ---
-	ah := authh.NewHandler(cfg.AuthConfigProvider)
+	ah := handlers.NewAuthHandler(cfg.AuthConfigProvider)
 	api.GET("/auth/config", ah.Config)            // public
 	api.POST("/auth/logout", ah.Logout, required) // JWT
 
 	// --- Users ---
-	uh := userh.NewHandler()
+	uh := handlers.NewUserHandler()
 	api.GET("/users/me", uh.Me, required)
 	api.PATCH("/users/me", uh.UpdateMe, required)
 	api.DELETE("/users/me", uh.DeleteMe, required)
@@ -88,7 +85,7 @@ func RegisterRESTRouter(e *echo.Echo, cfg RouterConfig) {
 	api.POST("/users/find-or-create", uh.FindOrCreate, optional, apikeyOrAuth)
 
 	// --- Workspaces ---
-	wh := wsh.NewHandler()
+	wh := handlers.NewWorkspaceHandler()
 	api.POST("/workspaces", wh.Create, required)
 	api.GET("/workspaces", wh.List, required) // ?ids= | ?name= | ?alias= | ?user_id=(&page=&page_size=)
 	api.GET("/workspaces/:id", wh.Get, required)
@@ -105,7 +102,7 @@ func RegisterRESTRouter(e *echo.Echo, cfg RouterConfig) {
 	api.POST("/workspaces/:id/transfer-ownership", wh.TransferOwnership, required)
 
 	// --- Permission ---
-	ph := permh.NewHandler()
+	ph := handlers.NewPermissionHandler()
 	// OptionalAuth resolves a JWT/mock user (attaching it for APIKeyOrAuth and the
 	// handler's RequireUser); APIKeyOrAuth then admits either that user or a valid M2M key.
 	api.POST("/permissions/check", ph.Check, optional, apikeyOrAuth)

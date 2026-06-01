@@ -1,4 +1,4 @@
-package permission
+package handlers
 
 import (
 	"net/http"
@@ -10,9 +10,9 @@ import (
 	"github.com/samber/lo"
 )
 
-type Handler struct{}
+type PermissionHandler struct{}
 
-func NewHandler() *Handler { return &Handler{} }
+func NewPermissionHandler() *PermissionHandler { return &PermissionHandler{} }
 
 // Check godoc
 // @Tags Permission
@@ -29,7 +29,7 @@ func NewHandler() *Handler { return &Handler{} }
 // resolved user is still required: when absent the handler returns 401 Unauthorized
 // (the REST-appropriate status; the GraphQL resolver instead returns ErrNotFound).
 // M2M callers must therefore present a user token; the API-key gate only governs route entry.
-func (h *Handler) Check(c echo.Context) error {
+func (h *PermissionHandler) Check(c echo.Context) error {
 	ctx := c.Request().Context()
 	req := &httpmodel.CheckPermissionRequest{}
 	if err := httpinternal.BindValidate(c, req); err != nil {

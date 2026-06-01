@@ -1,4 +1,4 @@
-package auth
+package handlers
 
 import (
 	"net/http"
@@ -9,12 +9,12 @@ import (
 	httpinternal "github.com/reearth/reearth-accounts/server/internal/adapter/http/internal"
 )
 
-type Handler struct {
+type AuthHandler struct {
 	authConfig adapter.Auth0ConfigProvider
 }
 
-func NewHandler(authConfig adapter.Auth0ConfigProvider) *Handler {
-	return &Handler{authConfig: authConfig}
+func NewAuthHandler(authConfig adapter.Auth0ConfigProvider) *AuthHandler {
+	return &AuthHandler{authConfig: authConfig}
 }
 
 // Config godoc
@@ -23,7 +23,7 @@ func NewHandler(authConfig adapter.Auth0ConfigProvider) *Handler {
 // @Produce json
 // @Success 200 {object} httpmodel.AuthConfigResponse
 // @Router /api/auth/config [get]
-func (h *Handler) Config(c echo.Context) error {
+func (h *AuthHandler) Config(c echo.Context) error {
 	data := adapter.ExtractAuthConfigData(h.authConfig)
 	return c.JSON(http.StatusOK, httpmodel.NewAuthConfigResponse(data))
 }
@@ -36,7 +36,7 @@ func (h *Handler) Config(c echo.Context) error {
 // @Success 200 {object} httpmodel.MeResponse
 // @Failure 401 {object} internal.ErrorResponse
 // @Router /api/auth/logout [post]
-func (h *Handler) Logout(c echo.Context) error {
+func (h *AuthHandler) Logout(c echo.Context) error {
 	ctx := c.Request().Context()
 	op := httpinternal.Operator(c)
 	u, err := httpinternal.Usecases(c).User.Logout(ctx, op)

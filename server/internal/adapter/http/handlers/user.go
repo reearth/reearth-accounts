@@ -1,4 +1,4 @@
-package user
+package handlers
 
 import (
 	"net/http"
@@ -15,9 +15,9 @@ import (
 	"github.com/samber/lo"
 )
 
-type Handler struct{}
+type UserHandler struct{}
 
-func NewHandler() *Handler { return &Handler{} }
+func NewUserHandler() *UserHandler { return &UserHandler{} }
 
 // Me godoc
 // @Tags User
@@ -27,7 +27,7 @@ func NewHandler() *Handler { return &Handler{} }
 // @Success 200 {object} httpmodel.MeResponse
 // @Failure 401 {object} internal.ErrorResponse
 // @Router /api/users/me [get]
-func (h *Handler) Me(c echo.Context) error {
+func (h *UserHandler) Me(c echo.Context) error {
 	u, err := httpinternal.RequireUser(c)
 	if err != nil {
 		return err
@@ -46,7 +46,7 @@ func (h *Handler) Me(c echo.Context) error {
 // @Failure 400 {object} internal.ErrorResponse
 // @Failure 401 {object} internal.ErrorResponse
 // @Router /api/users/me [patch]
-func (h *Handler) UpdateMe(c echo.Context) error {
+func (h *UserHandler) UpdateMe(c echo.Context) error {
 	ctx := c.Request().Context()
 	req := &httpmodel.UpdateMeRequest{}
 	if err := httpinternal.BindValidate(c, req); err != nil {
@@ -67,7 +67,7 @@ func (h *Handler) UpdateMe(c echo.Context) error {
 // @Success 204
 // @Failure 401 {object} internal.ErrorResponse
 // @Router /api/users/me [delete]
-func (h *Handler) DeleteMe(c echo.Context) error {
+func (h *UserHandler) DeleteMe(c echo.Context) error {
 	ctx := c.Request().Context()
 	u, err := httpinternal.RequireUser(c)
 	if err != nil {
@@ -87,7 +87,7 @@ func (h *Handler) DeleteMe(c echo.Context) error {
 // @Produce json
 // @Success 200 {object} httpmodel.MeResponse
 // @Router /api/users/me/auths/{sub} [delete]
-func (h *Handler) RemoveMyAuth(c echo.Context) error {
+func (h *UserHandler) RemoveMyAuth(c echo.Context) error {
 	ctx := c.Request().Context()
 	sub := c.Param("sub")
 	u, err := httpinternal.Usecases(c).User.RemoveMyAuth(ctx, sub, httpinternal.Operator(c))
@@ -106,7 +106,7 @@ func (h *Handler) RemoveMyAuth(c echo.Context) error {
 // @Success 200 {object} httpmodel.UserResponse
 // @Failure 404 {object} internal.ErrorResponse
 // @Router /api/users/{id} [get]
-func (h *Handler) Get(c echo.Context) error {
+func (h *UserHandler) Get(c echo.Context) error {
 	ctx := c.Request().Context()
 	uid, err := id.UserIDFrom(c.Param("id"))
 	if err != nil {
@@ -134,7 +134,7 @@ func (h *Handler) Get(c echo.Context) error {
 // @Produce json
 // @Success 200 {array} httpmodel.UserResponse "array form; the paginated form returns an object wrapper (see description)"
 // @Router /api/users [get]
-func (h *Handler) List(c echo.Context) error {
+func (h *UserHandler) List(c echo.Context) error {
 	ctx := c.Request().Context()
 	uc := httpinternal.Usecases(c).User
 
@@ -181,7 +181,7 @@ func (h *Handler) List(c echo.Context) error {
 // @Produce json
 // @Success 200 {array} httpmodel.UserResponse
 // @Router /api/users/search [get]
-func (h *Handler) Search(c echo.Context) error {
+func (h *UserHandler) Search(c echo.Context) error {
 	ctx := c.Request().Context()
 	keyword := c.QueryParam("keyword")
 	res, err := httpinternal.Usecases(c).User.SearchUser(ctx, keyword)
@@ -200,7 +200,7 @@ func (h *Handler) Search(c echo.Context) error {
 // @Success 200 {object} httpmodel.UserResponse
 // @Failure 404 {object} internal.ErrorResponse
 // @Router /api/users/by-alias [get]
-func (h *Handler) FindByAlias(c echo.Context) error {
+func (h *UserHandler) FindByAlias(c echo.Context) error {
 	ctx := c.Request().Context()
 	res, err := httpinternal.Usecases(c).User.FetchByAlias(ctx, c.QueryParam("alias"))
 	if err != nil {
@@ -218,7 +218,7 @@ func (h *Handler) FindByAlias(c echo.Context) error {
 // @Success 200 {object} httpmodel.SimpleUserResponse
 // @Failure 404 {object} internal.ErrorResponse
 // @Router /api/users/by-name-or-email [get]
-func (h *Handler) FindByNameOrEmail(c echo.Context) error {
+func (h *UserHandler) FindByNameOrEmail(c echo.Context) error {
 	ctx := c.Request().Context()
 	res, err := httpinternal.Usecases(c).User.FetchByNameOrEmail(ctx, c.QueryParam("q"))
 	if err != nil {
@@ -235,7 +235,7 @@ func (h *Handler) FindByNameOrEmail(c echo.Context) error {
 // @Produce json
 // @Success 200 {array} httpmodel.UserResponse
 // @Router /api/users/by-name-or-alias [get]
-func (h *Handler) FindByNameOrAlias(c echo.Context) error {
+func (h *UserHandler) FindByNameOrAlias(c echo.Context) error {
 	ctx := c.Request().Context()
 	res, err := httpinternal.Usecases(c).User.FetchByNameOrAlias(ctx, c.QueryParam("q"))
 	if err != nil {
@@ -254,7 +254,7 @@ func (h *Handler) FindByNameOrAlias(c echo.Context) error {
 // @Failure 400 {object} internal.ErrorResponse
 // @Failure 409 {object} internal.ErrorResponse
 // @Router /api/users/signup [post]
-func (h *Handler) Signup(c echo.Context) error {
+func (h *UserHandler) Signup(c echo.Context) error {
 	ctx := c.Request().Context()
 	req := &httpmodel.SignupRequest{}
 	if err := httpinternal.BindValidate(c, req); err != nil {
@@ -294,7 +294,7 @@ func (h *Handler) Signup(c echo.Context) error {
 // @Param body body httpmodel.SignupOIDCRequest true "OIDC signup fields"
 // @Success 200 {object} httpmodel.UserResponse
 // @Router /api/users/signup-oidc [post]
-func (h *Handler) SignupOIDC(c echo.Context) error {
+func (h *UserHandler) SignupOIDC(c echo.Context) error {
 	ctx := c.Request().Context()
 	req := &httpmodel.SignupOIDCRequest{}
 	if err := httpinternal.BindValidate(c, req); err != nil {
@@ -341,7 +341,7 @@ func (h *Handler) SignupOIDC(c echo.Context) error {
 // @Param body body httpmodel.CreateVerificationRequest true "email"
 // @Success 200 {object} httpmodel.MessageResponse
 // @Router /api/users/verifications [post]
-func (h *Handler) CreateVerification(c echo.Context) error {
+func (h *UserHandler) CreateVerification(c echo.Context) error {
 	ctx := c.Request().Context()
 	req := &httpmodel.CreateVerificationRequest{}
 	if err := httpinternal.BindValidate(c, req); err != nil {
@@ -361,7 +361,7 @@ func (h *Handler) CreateVerification(c echo.Context) error {
 // @Param body body httpmodel.VerifyUserRequest true "code"
 // @Success 200 {object} httpmodel.UserResponse
 // @Router /api/users/verify [post]
-func (h *Handler) VerifyUser(c echo.Context) error {
+func (h *UserHandler) VerifyUser(c echo.Context) error {
 	ctx := c.Request().Context()
 	req := &httpmodel.VerifyUserRequest{}
 	if err := httpinternal.BindValidate(c, req); err != nil {
@@ -382,7 +382,7 @@ func (h *Handler) VerifyUser(c echo.Context) error {
 // @Param body body httpmodel.StartPasswordResetRequest true "email"
 // @Success 200 {object} httpmodel.MessageResponse
 // @Router /api/users/password-reset/start [post]
-func (h *Handler) StartPasswordReset(c echo.Context) error {
+func (h *UserHandler) StartPasswordReset(c echo.Context) error {
 	ctx := c.Request().Context()
 	req := &httpmodel.StartPasswordResetRequest{}
 	if err := httpinternal.BindValidate(c, req); err != nil {
@@ -402,7 +402,7 @@ func (h *Handler) StartPasswordReset(c echo.Context) error {
 // @Param body body httpmodel.PasswordResetRequest true "password and token"
 // @Success 200 {object} httpmodel.MessageResponse
 // @Router /api/users/password-reset [post]
-func (h *Handler) PasswordReset(c echo.Context) error {
+func (h *UserHandler) PasswordReset(c echo.Context) error {
 	ctx := c.Request().Context()
 	req := &httpmodel.PasswordResetRequest{}
 	if err := httpinternal.BindValidate(c, req); err != nil {
@@ -423,7 +423,7 @@ func (h *Handler) PasswordReset(c echo.Context) error {
 // @Success 204 "No Content (stub mirroring the GraphQL findOrCreate resolver)"
 // @Failure 400 {object} internal.ErrorResponse
 // @Router /api/users/find-or-create [post]
-func (h *Handler) FindOrCreate(c echo.Context) error {
+func (h *UserHandler) FindOrCreate(c echo.Context) error {
 	// The GraphQL findOrCreate resolver is currently a stub (returns nil), and the
 	// User.FindOrCreate interactor — although implemented on the concrete interactor —
 	// is NOT exposed on the interfaces.User interface that the container holds, so it

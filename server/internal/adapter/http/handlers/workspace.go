@@ -1,4 +1,4 @@
-package workspace
+package handlers
 
 import (
 	"net/http"
@@ -11,9 +11,9 @@ import (
 	"github.com/reearth/reearth-accounts/server/pkg/id"
 )
 
-type Handler struct{}
+type WorkspaceHandler struct{}
 
-func NewHandler() *Handler { return &Handler{} }
+func NewWorkspaceHandler() *WorkspaceHandler { return &WorkspaceHandler{} }
 
 func badRequest(msg string) error {
 	return httpinternal.NewError(http.StatusBadRequest, msg, nil)
@@ -28,7 +28,7 @@ func badRequest(msg string) error {
 // @Param body body httpmodel.CreateWorkspaceRequest true "workspace fields"
 // @Success 200 {object} httpmodel.WorkspaceResponse
 // @Router /api/workspaces [post]
-func (h *Handler) Create(c echo.Context) error {
+func (h *WorkspaceHandler) Create(c echo.Context) error {
 	ctx := c.Request().Context()
 	req := &httpmodel.CreateWorkspaceRequest{}
 	if err := httpinternal.BindValidate(c, req); err != nil {
@@ -58,7 +58,7 @@ func (h *Handler) Create(c echo.Context) error {
 // @Success 200 {object} httpmodel.WorkspaceResponse
 // @Failure 404 {object} internal.ErrorResponse
 // @Router /api/workspaces/{id} [get]
-func (h *Handler) Get(c echo.Context) error {
+func (h *WorkspaceHandler) Get(c echo.Context) error {
 	ctx := c.Request().Context()
 	wid, err := id.WorkspaceIDFrom(c.Param("id"))
 	if err != nil {
@@ -85,7 +85,7 @@ func (h *Handler) Get(c echo.Context) error {
 // @Produce json
 // @Success 200 {array} httpmodel.WorkspaceResponse "array for ids/user_id; a single object for name/alias; a paginated object when paginating by user_id (see description)"
 // @Router /api/workspaces [get]
-func (h *Handler) List(c echo.Context) error {
+func (h *WorkspaceHandler) List(c echo.Context) error {
 	ctx := c.Request().Context()
 	uc := httpinternal.Usecases(c).Workspace
 	op := httpinternal.Operator(c)
@@ -163,7 +163,7 @@ func (h *Handler) List(c echo.Context) error {
 // @Param body body httpmodel.UpdateWorkspaceRequest true "fields to update"
 // @Success 200 {object} httpmodel.WorkspaceResponse
 // @Router /api/workspaces/{id} [patch]
-func (h *Handler) Update(c echo.Context) error {
+func (h *WorkspaceHandler) Update(c echo.Context) error {
 	ctx := c.Request().Context()
 	wid, err := id.WorkspaceIDFrom(c.Param("id"))
 	if err != nil {
@@ -189,7 +189,7 @@ func (h *Handler) Update(c echo.Context) error {
 // @Param id path string true "workspace ID"
 // @Success 204
 // @Router /api/workspaces/{id} [delete]
-func (h *Handler) Delete(c echo.Context) error {
+func (h *WorkspaceHandler) Delete(c echo.Context) error {
 	ctx := c.Request().Context()
 	wid, err := id.WorkspaceIDFrom(c.Param("id"))
 	if err != nil {
@@ -211,7 +211,7 @@ func (h *Handler) Delete(c echo.Context) error {
 // @Param body body httpmodel.AddMembersRequest true "users to add"
 // @Success 200 {object} httpmodel.WorkspaceResponse
 // @Router /api/workspaces/{id}/members [post]
-func (h *Handler) AddMembers(c echo.Context) error {
+func (h *WorkspaceHandler) AddMembers(c echo.Context) error {
 	ctx := c.Request().Context()
 	wid, err := id.WorkspaceIDFrom(c.Param("id"))
 	if err != nil {
@@ -243,7 +243,7 @@ func (h *Handler) AddMembers(c echo.Context) error {
 // @Param body body httpmodel.UpdateMemberRequest true "new role"
 // @Success 200 {object} httpmodel.WorkspaceResponse
 // @Router /api/workspaces/{id}/members/{user_id} [patch]
-func (h *Handler) UpdateMember(c echo.Context) error {
+func (h *WorkspaceHandler) UpdateMember(c echo.Context) error {
 	ctx := c.Request().Context()
 	wid, err := id.WorkspaceIDFrom(c.Param("id"))
 	if err != nil {
@@ -273,7 +273,7 @@ func (h *Handler) UpdateMember(c echo.Context) error {
 // @Produce json
 // @Success 200 {object} httpmodel.WorkspaceResponse
 // @Router /api/workspaces/{id}/members/{user_id} [delete]
-func (h *Handler) RemoveMember(c echo.Context) error {
+func (h *WorkspaceHandler) RemoveMember(c echo.Context) error {
 	ctx := c.Request().Context()
 	wid, err := id.WorkspaceIDFrom(c.Param("id"))
 	if err != nil {
@@ -300,7 +300,7 @@ func (h *Handler) RemoveMember(c echo.Context) error {
 // @Param body body httpmodel.RemoveMembersRequest true "user IDs"
 // @Success 200 {object} httpmodel.WorkspaceResponse
 // @Router /api/workspaces/{id}/members [delete]
-func (h *Handler) RemoveMembers(c echo.Context) error {
+func (h *WorkspaceHandler) RemoveMembers(c echo.Context) error {
 	ctx := c.Request().Context()
 	wid, err := id.WorkspaceIDFrom(c.Param("id"))
 	if err != nil {
@@ -331,7 +331,7 @@ func (h *Handler) RemoveMembers(c echo.Context) error {
 // @Param body body httpmodel.AddIntegrationRequest true "integration and role"
 // @Success 200 {object} httpmodel.WorkspaceResponse
 // @Router /api/workspaces/{id}/integrations [post]
-func (h *Handler) AddIntegration(c echo.Context) error {
+func (h *WorkspaceHandler) AddIntegration(c echo.Context) error {
 	ctx := c.Request().Context()
 	wid, err := id.WorkspaceIDFrom(c.Param("id"))
 	if err != nil {
@@ -363,7 +363,7 @@ func (h *Handler) AddIntegration(c echo.Context) error {
 // @Param body body httpmodel.UpdateIntegrationRequest true "new role"
 // @Success 200 {object} httpmodel.WorkspaceResponse
 // @Router /api/workspaces/{id}/integrations/{integration_id} [patch]
-func (h *Handler) UpdateIntegration(c echo.Context) error {
+func (h *WorkspaceHandler) UpdateIntegration(c echo.Context) error {
 	ctx := c.Request().Context()
 	wid, err := id.WorkspaceIDFrom(c.Param("id"))
 	if err != nil {
@@ -393,7 +393,7 @@ func (h *Handler) UpdateIntegration(c echo.Context) error {
 // @Produce json
 // @Success 200 {object} httpmodel.WorkspaceResponse
 // @Router /api/workspaces/{id}/integrations/{integration_id} [delete]
-func (h *Handler) RemoveIntegration(c echo.Context) error {
+func (h *WorkspaceHandler) RemoveIntegration(c echo.Context) error {
 	ctx := c.Request().Context()
 	wid, err := id.WorkspaceIDFrom(c.Param("id"))
 	if err != nil {
@@ -420,7 +420,7 @@ func (h *Handler) RemoveIntegration(c echo.Context) error {
 // @Param body body httpmodel.RemoveIntegrationsRequest true "integration IDs"
 // @Success 200 {object} httpmodel.WorkspaceResponse
 // @Router /api/workspaces/{id}/integrations [delete]
-func (h *Handler) RemoveIntegrations(c echo.Context) error {
+func (h *WorkspaceHandler) RemoveIntegrations(c echo.Context) error {
 	ctx := c.Request().Context()
 	wid, err := id.WorkspaceIDFrom(c.Param("id"))
 	if err != nil {
@@ -455,7 +455,7 @@ func (h *Handler) RemoveIntegrations(c echo.Context) error {
 // @Param body body httpmodel.TransferOwnershipRequest true "new owner ID"
 // @Success 200 {object} httpmodel.WorkspaceResponse
 // @Router /api/workspaces/{id}/transfer-ownership [post]
-func (h *Handler) TransferOwnership(c echo.Context) error {
+func (h *WorkspaceHandler) TransferOwnership(c echo.Context) error {
 	ctx := c.Request().Context()
 	wid, err := id.WorkspaceIDFrom(c.Param("id"))
 	if err != nil {
