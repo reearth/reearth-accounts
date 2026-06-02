@@ -84,3 +84,52 @@ func TestREST_FullFlow_Mongo(t *testing.T) {
 
 	exp.DELETE("/api/workspaces/" + wid).Expect().Status(http.StatusNoContent)
 }
+
+// --- Mock_Auth=false (real JWT pipeline) FullFlow ---
+//
+// Mirrors TestREST_FullFlow's coverage through the real JWT pipeline (per
+// reviewer feedback that mock-only e2e coverage hid past auth incidents):
+// public signup, JWT-authenticated /me, workspace create + add-member, swagger.
+
+const realJWTFullFlowSub = "test|realjwt-fullflow"
+
+func TestREST_RealJWT_FullFlow(t *testing.T) {
+	key, cleanup := installRealJWT(t)
+	defer cleanup()
+
+	exp, _ := StartServer(t, realAuthConfig(), false, seedJWTUsers(realJWTFullFlowSub))
+	token := signTestToken(t, key, realJWTFullFlowSub)
+	bearer := "Bearer " + token
+
+	// 1. Public signup (optional auth; mock_auth=true in BODY only -- that's a
+	// request flag to auto-seed the new user's permittable roles and skip the
+	// verification mail; it has no relation to the server's cfg.Mock_Auth).
+	exp.POST("/api/users/signup").
+		WithJSON(map[string]any{"name": "JWT Flow Signup", "email": "jwt-flow-signup@example.com", "password": "Passw0rd!", "mock_auth": true}).
+		Expect().Status(http.StatusOK).JSON().Object().HasValue("email", "jwt-flow-signup@example.com")
+
+	// 2. /api/users/me resolves the JWT-authenticated primary user via FindBySub.
+	me := exp.GET("/api/users/me").
+		WithHeader("Authorization", bearer).
+		Expect().Status(http.StatusOK).JSON().Object()
+	me.HasValue("name", "JWT Primary")
+	me.HasValue("my_workspace_id", jwtPrimaryWID.String())
+
+	// 3. Create a workspace.
+	wid := exp.POST("/api/workspaces").
+		WithHeader("Authorization", bearer).
+		WithJSON(map[string]any{"alias": "jwt-flow-team", "name": "JWT Flow Team"}).
+		Expect().Status(http.StatusOK).JSON().Object().Value("id").String().Raw()
+
+	// 4. Add the second seeded user.
+	exp.POST("/api/workspaces/"+wid+"/members").
+		WithHeader("Authorization", bearer).
+		WithJSON(map[string]any{"users": []map[string]any{
+			{"user_id": jwtSecondUID.String(), "role": "writer"},
+		}}).
+		Expect().Status(http.StatusOK).JSON().Object().
+		Value("members").Array().Length().IsEqual(2)
+
+	// 5. Swagger UI is served on the debug server regardless of auth.
+	exp.GET("/swagger/index.html").Expect().Status(http.StatusOK)
+}

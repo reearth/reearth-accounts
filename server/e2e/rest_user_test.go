@@ -65,3 +65,49 @@ func TestREST_GetUserByID(t *testing.T) {
 		Expect().Status(http.StatusOK).
 		JSON().Object().HasValue("id", restOtherUID.String())
 }
+
+// --- Mock_Auth=false (real JWT pipeline) variants ---
+// Mirror the assertions of the Mock_Auth=true tests above through the real
+// JWT pipeline so any auth-pipeline regression is caught at the same
+// endpoints (per reviewer feedback: mock-only coverage hid past incidents).
+
+const realJWTUserSub = "test|realjwt-user"
+
+func TestREST_RealJWT_UpdateMe(t *testing.T) {
+	key, cleanup := installRealJWT(t)
+	defer cleanup()
+
+	exp, _ := StartServer(t, realAuthConfig(), false, seedJWTUsers(realJWTUserSub))
+	token := signTestToken(t, key, realJWTUserSub)
+
+	exp.PATCH("/api/users/me").
+		WithHeader("Authorization", "Bearer "+token).
+		WithJSON(map[string]any{"name": "Renamed via JWT"}).
+		Expect().Status(http.StatusOK).
+		JSON().Object().HasValue("name", "Renamed via JWT")
+}
+
+func TestREST_RealJWT_Search(t *testing.T) {
+	key, cleanup := installRealJWT(t)
+	defer cleanup()
+
+	exp, _ := StartServer(t, realAuthConfig(), false, seedJWTUsers(realJWTUserSub))
+	token := signTestToken(t, key, realJWTUserSub)
+
+	exp.GET("/api/users/search").WithQuery("keyword", "JWT Second").
+		WithHeader("Authorization", "Bearer "+token).
+		Expect().Status(http.StatusOK).JSON().Array()
+}
+
+func TestREST_RealJWT_GetUserByID(t *testing.T) {
+	key, cleanup := installRealJWT(t)
+	defer cleanup()
+
+	exp, _ := StartServer(t, realAuthConfig(), false, seedJWTUsers(realJWTUserSub))
+	token := signTestToken(t, key, realJWTUserSub)
+
+	exp.GET("/api/users/" + jwtSecondUID.String()).
+		WithHeader("Authorization", "Bearer "+token).
+		Expect().Status(http.StatusOK).
+		JSON().Object().HasValue("id", jwtSecondUID.String())
+}

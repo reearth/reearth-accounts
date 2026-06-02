@@ -24,3 +24,22 @@ func TestREST_PermissionBadRequest(t *testing.T) {
 		WithJSON(map[string]any{}).
 		Expect().Status(http.StatusBadRequest)
 }
+
+// --- Mock_Auth=false (real JWT pipeline) variant ---
+
+const realJWTPermissionSub = "test|realjwt-permission"
+
+func TestREST_RealJWT_PermissionBadRequest(t *testing.T) {
+	key, cleanup := installRealJWT(t)
+	defer cleanup()
+
+	exp, _ := StartServer(t, realAuthConfig(), false, seedJWTUsers(realJWTPermissionSub))
+	token := signTestToken(t, key, realJWTPermissionSub)
+
+	// JWT validates -> OptionalAuth attaches the resolved user -> APIKeyOrAuth admits
+	// the request -> handler validates an empty body -> 400.
+	exp.POST("/api/permissions/check").
+		WithHeader("Authorization", "Bearer "+token).
+		WithJSON(map[string]any{}).
+		Expect().Status(http.StatusBadRequest)
+}

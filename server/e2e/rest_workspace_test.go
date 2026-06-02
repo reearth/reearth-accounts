@@ -59,3 +59,60 @@ func TestREST_WorkspaceUnauthorized(t *testing.T) {
 		WithJSON(map[string]any{"alias": "x", "name": "X"}).
 		Expect().Status(http.StatusUnauthorized)
 }
+
+// --- Mock_Auth=false (real JWT pipeline) variants ---
+
+const realJWTWorkspaceSub = "test|realjwt-workspace"
+
+func TestREST_RealJWT_WorkspaceCRUD(t *testing.T) {
+	key, cleanup := installRealJWT(t)
+	defer cleanup()
+
+	exp, _ := StartServer(t, realAuthConfig(), false, seedJWTUsers(realJWTWorkspaceSub))
+	token := signTestToken(t, key, realJWTWorkspaceSub)
+	bearer := "Bearer " + token
+
+	// Create
+	wsObj := exp.POST("/api/workspaces").
+		WithHeader("Authorization", bearer).
+		WithJSON(map[string]any{"alias": "jwt-team", "name": "JWT Team"}).
+		Expect().Status(http.StatusOK).JSON().Object()
+	wsObj.HasValue("name", "JWT Team")
+	wid := wsObj.Value("id").String().Raw()
+
+	// Get
+	exp.GET("/api/workspaces/" + wid).
+		WithHeader("Authorization", bearer).
+		Expect().Status(http.StatusOK).JSON().Object().HasValue("id", wid)
+
+	// Add the second seeded user as writer.
+	exp.POST("/api/workspaces/"+wid+"/members").
+		WithHeader("Authorization", bearer).
+		WithJSON(map[string]any{"users": []map[string]any{
+			{"user_id": jwtSecondUID.String(), "role": "writer"},
+		}}).
+		Expect().Status(http.StatusOK).JSON().Object().
+		Value("members").Array().Length().IsEqual(2)
+
+	// Delete
+	exp.DELETE("/api/workspaces/" + wid).
+		WithHeader("Authorization", bearer).
+		Expect().Status(http.StatusNoContent)
+
+	// Confirm gone
+	exp.GET("/api/workspaces/" + wid).
+		WithHeader("Authorization", bearer).
+		Expect().Status(http.StatusNotFound)
+}
+
+func TestREST_RealJWT_WorkspaceListByUser(t *testing.T) {
+	key, cleanup := installRealJWT(t)
+	defer cleanup()
+
+	exp, _ := StartServer(t, realAuthConfig(), false, seedJWTUsers(realJWTWorkspaceSub))
+	token := signTestToken(t, key, realJWTWorkspaceSub)
+
+	exp.GET("/api/workspaces").WithQuery("user_id", jwtPrimaryUID.String()).
+		WithHeader("Authorization", "Bearer "+token).
+		Expect().Status(http.StatusOK).JSON().Array().NotEmpty()
+}
