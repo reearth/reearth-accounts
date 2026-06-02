@@ -1,0 +1,22 @@
+apiVersion: backstage.io/v1alpha1
+kind: Component
+metadata:
+  name: reearth-accounts
+  namespace: reearth
+  description: Centralized account management and authorization (Auth0 + Cerbos) for
+    Re:Earth microservices
+  annotations:
+    github.com/project-slug: reearth/reearth-accounts
+  links:
+  - url: https://github.com/reearth/reearth-accounts
+    title: GitHub
+    icon: github
+  tags:
+  - go
+  - graphql
+  - auth
+  - ddd
+spec:
+  type: service
+  lifecycle: production
+  owner: reearth/cto-office
