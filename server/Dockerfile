@@ -10,6 +10,7 @@ COPY go.mod go.sum main.go /reearth-accounts-api/
 RUN go mod download
 
 COPY cmd/ /reearth-accounts-api/cmd/
+COPY docs/ /reearth-accounts-api/docs/
 COPY pkg/ /reearth-accounts-api/pkg/
 COPY internal/ /reearth-accounts-api/internal/
 
