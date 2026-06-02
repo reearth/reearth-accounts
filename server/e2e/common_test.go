@@ -136,8 +136,8 @@ func StartServerWithAuthenticator(
 	}
 
 	return StartServerWithGateways(t, cfg, repos, &gateway.Container{
-		Authenticator: authenticator,
-		Mailer:        mailer.New(ctx, &mailer.Config{}),
+		Authenticators: map[gateway.Provider]gateway.Authenticator{gateway.ProviderAuth0: authenticator},
+		Mailer:         mailer.New(ctx, &mailer.Config{}),
 	}, true), repos
 }
 

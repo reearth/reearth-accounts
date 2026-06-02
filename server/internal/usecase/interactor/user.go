@@ -229,13 +229,15 @@ func (i *User) UpdateMe(ctx context.Context, p interfaces.UpdateMeParam, operato
 			}
 		}
 
-		// Update Auth0 users
+		// Sync external IdP users to their provider, routed per auth record so
+		// Auth0 subs go to Auth0 and CIP subs go to Firebase when both coexist.
 		if p.Name != nil || p.Email != nil || p.Password != nil {
 			for _, a := range u.Auths() {
-				if a.Provider != "auth0" {
+				authenticator := i.gateways.AuthenticatorFor(a.Provider)
+				if authenticator == nil {
 					continue
 				}
-				if _, err = i.gateways.Authenticator.UpdateUser(ctx, gateway.AuthenticatorUpdateUserParam{
+				if _, err = authenticator.UpdateUser(ctx, gateway.AuthenticatorUpdateUserParam{
 					ID:       a.Sub,
 					Name:     p.Name,
 					Email:    p.Email,

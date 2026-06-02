@@ -58,6 +58,10 @@ type ComplexityRoot struct {
 		Auth0ClientID func(childComplexity int) int
 		Auth0Domain   func(childComplexity int) int
 		AuthProvider  func(childComplexity int) int
+		CipAPIKey     func(childComplexity int) int
+		CipAuthDomain func(childComplexity int) int
+		CipProjectID  func(childComplexity int) int
+		CipTenantID   func(childComplexity int) int
 	}
 
 	CheckPermissionPayload struct {
@@ -335,6 +339,30 @@ func (e *executableSchema) Complexity(ctx context.Context, typeName, field strin
 		}
 
 		return e.complexity.AuthConfig.AuthProvider(childComplexity), true
+	case "AuthConfig.cipApiKey":
+		if e.complexity.AuthConfig.CipAPIKey == nil {
+			break
+		}
+
+		return e.complexity.AuthConfig.CipAPIKey(childComplexity), true
+	case "AuthConfig.cipAuthDomain":
+		if e.complexity.AuthConfig.CipAuthDomain == nil {
+			break
+		}
+
+		return e.complexity.AuthConfig.CipAuthDomain(childComplexity), true
+	case "AuthConfig.cipProjectId":
+		if e.complexity.AuthConfig.CipProjectID == nil {
+			break
+		}
+
+		return e.complexity.AuthConfig.CipProjectID(childComplexity), true
+	case "AuthConfig.cipTenantId":
+		if e.complexity.AuthConfig.CipTenantID == nil {
+			break
+		}
+
+		return e.complexity.AuthConfig.CipTenantID(childComplexity), true
 
 	case "CheckPermissionPayload.allowed":
 		if e.complexity.CheckPermissionPayload.Allowed == nil {
@@ -1345,6 +1373,18 @@ type AuthConfig {
 
   """Authentication provider type"""
   authProvider: String
+
+  """CIP (Cloud Identity Platform) public client API key"""
+  cipApiKey: String
+
+  """CIP auth domain (e.g., my-proj.firebaseapp.com)"""
+  cipAuthDomain: String
+
+  """CIP / Firebase project id"""
+  cipProjectId: String
+
+  """CIP GCIP tenant id (optional)"""
+  cipTenantId: String
 }
 
 extend type Query {
@@ -2362,6 +2402,122 @@ func (ec *executionContext) _AuthConfig_authProvider(ctx context.Context, field 
 }
 
 func (ec *executionContext) fieldContext_AuthConfig_authProvider(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "AuthConfig",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type String does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _AuthConfig_cipApiKey(ctx context.Context, field graphql.CollectedField, obj *gqlmodel.AuthConfig) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		ec.fieldContext_AuthConfig_cipApiKey,
+		func(ctx context.Context) (any, error) {
+			return obj.CipAPIKey, nil
+		},
+		nil,
+		ec.marshalOString2ᚖstring,
+		true,
+		false,
+	)
+}
+
+func (ec *executionContext) fieldContext_AuthConfig_cipApiKey(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "AuthConfig",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type String does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _AuthConfig_cipAuthDomain(ctx context.Context, field graphql.CollectedField, obj *gqlmodel.AuthConfig) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		ec.fieldContext_AuthConfig_cipAuthDomain,
+		func(ctx context.Context) (any, error) {
+			return obj.CipAuthDomain, nil
+		},
+		nil,
+		ec.marshalOString2ᚖstring,
+		true,
+		false,
+	)
+}
+
+func (ec *executionContext) fieldContext_AuthConfig_cipAuthDomain(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "AuthConfig",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type String does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _AuthConfig_cipProjectId(ctx context.Context, field graphql.CollectedField, obj *gqlmodel.AuthConfig) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		ec.fieldContext_AuthConfig_cipProjectId,
+		func(ctx context.Context) (any, error) {
+			return obj.CipProjectID, nil
+		},
+		nil,
+		ec.marshalOString2ᚖstring,
+		true,
+		false,
+	)
+}
+
+func (ec *executionContext) fieldContext_AuthConfig_cipProjectId(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "AuthConfig",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type String does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _AuthConfig_cipTenantId(ctx context.Context, field graphql.CollectedField, obj *gqlmodel.AuthConfig) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		ec.fieldContext_AuthConfig_cipTenantId,
+		func(ctx context.Context) (any, error) {
+			return obj.CipTenantID, nil
+		},
+		nil,
+		ec.marshalOString2ᚖstring,
+		true,
+		false,
+	)
+}
+
+func (ec *executionContext) fieldContext_AuthConfig_cipTenantId(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
 	fc = &graphql.FieldContext{
 		Object:     "AuthConfig",
 		Field:      field,
@@ -3963,6 +4119,14 @@ func (ec *executionContext) fieldContext_Query_authConfig(_ context.Context, fie
 				return ec.fieldContext_AuthConfig_auth0ClientId(ctx, field)
 			case "authProvider":
 				return ec.fieldContext_AuthConfig_authProvider(ctx, field)
+			case "cipApiKey":
+				return ec.fieldContext_AuthConfig_cipApiKey(ctx, field)
+			case "cipAuthDomain":
+				return ec.fieldContext_AuthConfig_cipAuthDomain(ctx, field)
+			case "cipProjectId":
+				return ec.fieldContext_AuthConfig_cipProjectId(ctx, field)
+			case "cipTenantId":
+				return ec.fieldContext_AuthConfig_cipTenantId(ctx, field)
 			}
 			return nil, fmt.Errorf("no field named %q was found under type AuthConfig", field.Name)
 		},
@@ -9102,6 +9266,14 @@ func (ec *executionContext) _AuthConfig(ctx context.Context, sel ast.SelectionSe
 			out.Values[i] = ec._AuthConfig_auth0ClientId(ctx, field, obj)
 		case "authProvider":
 			out.Values[i] = ec._AuthConfig_authProvider(ctx, field, obj)
+		case "cipApiKey":
+			out.Values[i] = ec._AuthConfig_cipApiKey(ctx, field, obj)
+		case "cipAuthDomain":
+			out.Values[i] = ec._AuthConfig_cipAuthDomain(ctx, field, obj)
+		case "cipProjectId":
+			out.Values[i] = ec._AuthConfig_cipProjectId(ctx, field, obj)
+		case "cipTenantId":
+			out.Values[i] = ec._AuthConfig_cipTenantId(ctx, field, obj)
 		default:
 			panic("unknown field " + strconv.Quote(field.Name))
 		}
