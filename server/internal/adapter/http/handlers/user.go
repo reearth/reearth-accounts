@@ -184,6 +184,9 @@ func (h *UserHandler) List(c echo.Context) error {
 func (h *UserHandler) Search(c echo.Context) error {
 	ctx := c.Request().Context()
 	keyword := c.QueryParam("keyword")
+	if keyword == "" {
+		return httpinternal.NewError(http.StatusBadRequest, "keyword is required", nil)
+	}
 	res, err := httpinternal.Usecases(c).User.SearchUser(ctx, keyword)
 	if err != nil {
 		return err
@@ -202,7 +205,11 @@ func (h *UserHandler) Search(c echo.Context) error {
 // @Router /api/users/by-alias [get]
 func (h *UserHandler) FindByAlias(c echo.Context) error {
 	ctx := c.Request().Context()
-	res, err := httpinternal.Usecases(c).User.FetchByAlias(ctx, c.QueryParam("alias"))
+	alias := c.QueryParam("alias")
+	if alias == "" {
+		return httpinternal.NewError(http.StatusBadRequest, "alias is required", nil)
+	}
+	res, err := httpinternal.Usecases(c).User.FetchByAlias(ctx, alias)
 	if err != nil {
 		return err
 	}
@@ -220,7 +227,11 @@ func (h *UserHandler) FindByAlias(c echo.Context) error {
 // @Router /api/users/by-name-or-email [get]
 func (h *UserHandler) FindByNameOrEmail(c echo.Context) error {
 	ctx := c.Request().Context()
-	res, err := httpinternal.Usecases(c).User.FetchByNameOrEmail(ctx, c.QueryParam("q"))
+	q := c.QueryParam("q")
+	if q == "" {
+		return httpinternal.NewError(http.StatusBadRequest, "q is required", nil)
+	}
+	res, err := httpinternal.Usecases(c).User.FetchByNameOrEmail(ctx, q)
 	if err != nil {
 		return err
 	}
@@ -237,7 +248,11 @@ func (h *UserHandler) FindByNameOrEmail(c echo.Context) error {
 // @Router /api/users/by-name-or-alias [get]
 func (h *UserHandler) FindByNameOrAlias(c echo.Context) error {
 	ctx := c.Request().Context()
-	res, err := httpinternal.Usecases(c).User.FetchByNameOrAlias(ctx, c.QueryParam("q"))
+	q := c.QueryParam("q")
+	if q == "" {
+		return httpinternal.NewError(http.StatusBadRequest, "q is required", nil)
+	}
+	res, err := httpinternal.Usecases(c).User.FetchByNameOrAlias(ctx, q)
 	if err != nil {
 		return err
 	}

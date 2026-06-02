@@ -254,7 +254,8 @@ type GraphQLConfig struct {
 
 func (c Config) Print() string {
 	s := fmt.Sprintf("%+v", c)
-	for _, secret := range []string{c.DB} {
+	// Mask credential-like values so the startup log line doesn't leak them.
+	for _, secret := range []string{c.DB, c.RestAPIKey, c.SwaggerBasicPass} {
 		if secret == "" {
 			continue
 		}

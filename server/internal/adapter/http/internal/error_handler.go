@@ -53,7 +53,15 @@ func CustomHTTPErrorHandler(err error, c echo.Context) {
 	resp := mapError(err)
 
 	if resp.Err != nil {
-		log.Errorfc(c.Request().Context(), "rest: %d %s: %v", resp.Status, resp.Message, resp.Err)
+		// 5xx surfaces a genuine server-side failure worth flagging at error level;
+		// 4xx client errors (validation, conflict, forbidden, ...) log at warn so
+		// they don't drown the real errors.
+		ctx := c.Request().Context()
+		if resp.Status >= http.StatusInternalServerError {
+			log.Errorfc(ctx, "rest: %d %s: %v", resp.Status, resp.Message, resp.Err)
+		} else {
+			log.Warnfc(ctx, "rest: %d %s: %v", resp.Status, resp.Message, resp.Err)
+		}
 	}
 	if jsonErr := c.JSON(resp.Status, resp); jsonErr != nil {
 		log.Errorfc(c.Request().Context(), "rest: failed to write error response: %v", jsonErr)
