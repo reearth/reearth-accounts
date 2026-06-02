@@ -944,8 +944,8 @@ func TestUser_CreateVerification(t *testing.T) {
 				resendVerificationEmailError: tt.authenticatorError,
 			}
 			g := &gateway.Container{
-				Mailer:        m,
-				Authenticator: auth,
+				Mailer:         m,
+				Authenticators: map[gateway.Provider]gateway.Authenticator{gateway.ProviderAuth0: auth},
 			}
 			uc := NewUser(r, g, "", "")
 

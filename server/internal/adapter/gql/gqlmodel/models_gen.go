@@ -45,6 +45,14 @@ type AuthConfig struct {
 	Auth0ClientID *string `json:"auth0ClientId,omitempty"`
 	// Authentication provider type
 	AuthProvider *string `json:"authProvider,omitempty"`
+	// CIP (Cloud Identity Platform) public client API key
+	CipAPIKey *string `json:"cipApiKey,omitempty"`
+	// CIP auth domain (e.g., my-proj.firebaseapp.com)
+	CipAuthDomain *string `json:"cipAuthDomain,omitempty"`
+	// CIP / Firebase project id
+	CipProjectID *string `json:"cipProjectId,omitempty"`
+	// CIP GCIP tenant id (optional)
+	CipTenantID *string `json:"cipTenantId,omitempty"`
 }
 
 type CheckPermissionInput struct {

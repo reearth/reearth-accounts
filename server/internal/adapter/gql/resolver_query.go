@@ -129,5 +129,9 @@ func (r *queryResolver) AuthConfig(ctx context.Context) (*gqlmodel.AuthConfig, e
 		Auth0Audience: authData.Auth0Audience,
 		Auth0ClientID: authData.Auth0ClientID,
 		AuthProvider:  authData.AuthProvider,
+		CipAPIKey:     authData.CIPAPIKey,
+		CipAuthDomain: authData.CIPAuthDomain,
+		CipProjectID:  authData.CIPProjectID,
+		CipTenantID:   authData.CIPTenantID,
 	}, nil
 }
