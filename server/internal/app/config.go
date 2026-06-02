@@ -63,6 +63,11 @@ type Config struct {
 	StorageEmulatorEnabled  bool   `envconfig:"REEARTH_ACCOUNTS_STORAGE_EMULATOR_ENABLED"`
 	StorageEmulatorEndpoint string `envconfig:"REEARTH_ACCOUNTS_STORAGE_EMULATOR_ENDPOINT"`
 
+	// REST
+	RestAPIKey       string `envconfig:"REEARTH_ACCOUNTS_REST_API_KEY"`
+	SwaggerBasicUser string `envconfig:"REEARTH_ACCOUNTS_SWAGGER_BASIC_USER"`
+	SwaggerBasicPass string `envconfig:"REEARTH_ACCOUNTS_SWAGGER_BASIC_PASS"`
+
 	// OpenTelemetry
 	OtelEnabled            bool          `envconfig:"REEARTH_ACCOUNTS_OTEL_ENABLED" default:"false"`
 	OtelEndpoint           string        `envconfig:"REEARTH_ACCOUNTS_OTEL_ENDPOINT" default:"localhost:4317"`
@@ -249,7 +254,8 @@ type GraphQLConfig struct {
 
 func (c Config) Print() string {
 	s := fmt.Sprintf("%+v", c)
-	for _, secret := range []string{c.DB} {
+	// Mask credential-like values so the startup log line doesn't leak them.
+	for _, secret := range []string{c.DB, c.RestAPIKey, c.SwaggerBasicPass} {
 		if secret == "" {
 			continue
 		}
