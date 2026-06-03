@@ -13,6 +13,7 @@ var (
 
 type Container struct {
 	Cerbos    Cerbos
+	SSO       SSO
 	User      User
 	Workspace Workspace
 }

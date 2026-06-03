@@ -125,6 +125,16 @@ func (r *Workspace) FindByName(ctx context.Context, name string) (*workspace.Wor
 	return w, nil
 }
 
+func (r *Workspace) FindByEmailDomain(ctx context.Context, domain string) (*workspace.Workspace, error) {
+	if domain == "" {
+		return nil, rerror.ErrNotFound
+	}
+	return r.findOne(ctx, bson.M{
+		"ssoconfig.email_domains": domain,
+		"ssoconfig.enabled":       true,
+	})
+}
+
 func (r *Workspace) FindByAlias(ctx context.Context, alias string) (*workspace.Workspace, error) {
 	if alias == "" {
 		return nil, rerror.ErrNotFound

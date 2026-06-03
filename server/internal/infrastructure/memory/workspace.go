@@ -135,6 +135,19 @@ func (r *Workspace) FindByName(_ context.Context, name string) (*workspace.Works
 	}), rerror.ErrNotFound)
 }
 
+func (r *Workspace) FindByEmailDomain(_ context.Context, domain string) (*workspace.Workspace, error) {
+	if r.err != nil {
+		return nil, r.err
+	}
+	if domain == "" {
+		return nil, rerror.ErrNotFound
+	}
+	return rerror.ErrIfNil(r.data.Find(func(_ workspace.ID, value *workspace.Workspace) bool {
+		sso := value.SSOConfig()
+		return sso != nil && sso.Enabled() && sso.HasEmailDomain(domain)
+	}), rerror.ErrNotFound)
+}
+
 func (r *Workspace) FindByAlias(_ context.Context, alias string) (*workspace.Workspace, error) {
 	if r.err != nil {
 		return nil, r.err

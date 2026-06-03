@@ -100,6 +100,21 @@ func (mr *MockRepoMockRecorder) FindByAliases(ctx, aliases any) *gomock.Call {
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "FindByAliases", reflect.TypeOf((*MockRepo)(nil).FindByAliases), ctx, aliases)
 }
 
+// FindByEmailDomain mocks base method.
+func (m *MockRepo) FindByEmailDomain(ctx context.Context, domain string) (*Workspace, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "FindByEmailDomain", ctx, domain)
+	ret0, _ := ret[0].(*Workspace)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// FindByEmailDomain indicates an expected call of FindByEmailDomain.
+func (mr *MockRepoMockRecorder) FindByEmailDomain(ctx, domain any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "FindByEmailDomain", reflect.TypeOf((*MockRepo)(nil).FindByEmailDomain), ctx, domain)
+}
+
 // FindByID mocks base method.
 func (m *MockRepo) FindByID(arg0 context.Context, arg1 ID) (*Workspace, error) {
 	m.ctrl.T.Helper()

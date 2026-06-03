@@ -10,6 +10,7 @@ import (
 	"github.com/labstack/echo/v4"
 	"github.com/labstack/echo/v4/middleware"
 	"github.com/reearth/reearth-accounts/server/internal/adapter"
+	"github.com/reearth/reearth-accounts/server/internal/adapter/rest"
 	otelapp "github.com/reearth/reearth-accounts/server/internal/app/otel"
 	"github.com/reearth/reearth-accounts/server/internal/usecase/interactor"
 	"github.com/reearth/reearthx/appx"
@@ -123,6 +124,18 @@ func initEcho(ctx context.Context, cfg *ServerConfig) *echo.Echo {
 	)
 
 	api.POST("/graphql", GraphqlAPI(cfg.Config, cfg.Config.Dev), middlewares...)
+
+	// SSO REST endpoints — authenticated (workspace-scoped)
+	ssoHandler := rest.NewSSOHandler()
+	wsSSO := api.Group("/workspaces/:workspace_id/sso", middlewares...)
+	wsSSO.GET("", ssoHandler.GetSSOConfig)
+	wsSSO.PUT("", ssoHandler.UpsertSSOConfig)
+	wsSSO.DELETE("", ssoHandler.DeleteSSOConfig)
+	wsSSO.POST("/verify", ssoHandler.VerifySSOConfig)
+
+	// SSO lookup — public (unauthenticated), only usecase middleware needed
+	publicSSO := api.Group("/sso", usecaseMiddleware)
+	publicSSO.GET("/lookup", ssoHandler.Lookup)
 
 	return e
 }

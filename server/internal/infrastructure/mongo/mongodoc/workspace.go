@@ -5,9 +5,31 @@ import (
 
 	"github.com/reearth/reearth-accounts/server/pkg/id"
 	"github.com/reearth/reearth-accounts/server/pkg/role"
+	"github.com/reearth/reearth-accounts/server/pkg/sso"
 	"github.com/reearth/reearth-accounts/server/pkg/workspace"
 	"github.com/samber/lo"
 )
+
+type WorkspaceSSOConfigDocument struct {
+	Auth0ConnectionID string   `json:"auth0_connection_id,omitempty" bson:"auth0_connection_id,omitempty"`
+	Auth0OrgID        string   `json:"auth0_org_id,omitempty" bson:"auth0_org_id,omitempty"`
+	ClientID          string   `json:"client_id,omitempty" bson:"client_id,omitempty"`
+	ClientSecret      string   `json:"client_secret,omitempty" bson:"client_secret,omitempty"`
+	ConnectionType    string   `json:"connection_type" bson:"connection_type"`
+	DirectoryDomain   string   `json:"directory_domain,omitempty" bson:"directory_domain,omitempty"`
+	EmailDomains      []string `json:"email_domains,omitempty" bson:"email_domains,omitempty"`
+	Enabled           bool     `json:"enabled" bson:"enabled"`
+	JITDefaultRole    string   `json:"jit_default_role,omitempty" bson:"jit_default_role,omitempty"`
+	OIDCClientID      string   `json:"oidc_client_id,omitempty" bson:"oidc_client_id,omitempty"`
+	OIDCClientSecret  string   `json:"oidc_client_secret,omitempty" bson:"oidc_client_secret,omitempty"`
+	OIDCDiscoveryURL  string   `json:"oidc_discovery_url,omitempty" bson:"oidc_discovery_url,omitempty"`
+	SAMLEntityID      string   `json:"saml_entity_id,omitempty" bszon:"saml_entity_id,omitempty"`
+	SAMLMetadataURL   string   `json:"saml_metadata_url,omitempty" bson:"saml_metadata_url,omitempty"`
+	SAMLSignInURL     string   `json:"saml_sign_in_url,omitempty" bson:"saml_sign_in_url,omitempty"`
+	SAMLSignOutURL    string   `json:"saml_sign_out_url,omitempty" bson:"saml_sign_out_url,omitempty"`
+	SAMLX509Cert      string   `json:"saml_x509_cert,omitempty" bson:"saml_x509_cert,omitempty"`
+	Verified          bool     `json:"verified" bson:"verified"`
+}
 
 type WorkspaceMemberDocument struct {
 	Role      string `json:"role" jsonschema:"description=Member role (owner, maintainer, writer, reader). Default: \"\""`
@@ -34,6 +56,7 @@ type WorkspaceDocument struct {
 	MembersHash  string                             `json:"members_hash" bson:"members_hash,omitempty" jsonschema:"description=SHA256 hash of members and integrations for uniqueness tracking. Default: \"\""`
 	Personal     bool                               `json:"personal" bson:"personal" jsonschema:"required,description=Whether this is a personal workspace. Default: false"`
 	Policy       string                             `json:"policy" bson:"policy,omitempty" jsonschema:"description=Policy ID reference. Default: \"\""`
+	SSOConfig    *WorkspaceSSOConfigDocument        `json:"ssoconfig,omitempty" bson:"ssoconfig,omitempty" jsonschema:"description=SSO configuration for enterprise workspaces"`
 	UpdatedAt    time.Time                          `json:"updatedat" bson:"updatedat" jsonschema:"description=Last update timestamp"`
 }
 
@@ -72,6 +95,30 @@ func NewWorkspace(ws *workspace.Workspace) (*WorkspaceDocument, string) {
 		membersHash = ""
 	}
 
+	var ssoDoc *WorkspaceSSOConfigDocument
+	if sso := ws.SSOConfig(); sso != nil {
+		ssoDoc = &WorkspaceSSOConfigDocument{
+			Auth0ConnectionID: sso.Auth0ConnectionID(),
+			Auth0OrgID:        sso.Auth0OrgID(),
+			ClientID:          sso.ClientID(),
+			ClientSecret:      sso.ClientSecret(),
+			ConnectionType:    string(sso.ConnectionType()),
+			DirectoryDomain:   sso.DirectoryDomain(),
+			EmailDomains:      sso.EmailDomains(),
+			Enabled:           sso.Enabled(),
+			JITDefaultRole:    sso.JITDefaultRole(),
+			OIDCClientID:      sso.OIDCClientID(),
+			OIDCClientSecret:  sso.OIDCClientSecret(),
+			OIDCDiscoveryURL:  sso.OIDCDiscoveryURL(),
+			SAMLEntityID:      sso.SAMLEntityID(),
+			SAMLMetadataURL:   sso.SAMLMetadataURL(),
+			SAMLSignInURL:     sso.SAMLSignInURL(),
+			SAMLSignOutURL:    sso.SAMLSignOutURL(),
+			SAMLX509Cert:      sso.SAMLX509Cert(),
+			Verified:          sso.Verified(),
+		}
+	}
+
 	wId := ws.ID().String()
 	updatedAt := ws.UpdatedAt()
 	if updatedAt.IsZero() {
@@ -88,6 +135,7 @@ func NewWorkspace(ws *workspace.Workspace) (*WorkspaceDocument, string) {
 		MembersHash:  membersHash,
 		Personal:     ws.IsPersonal(),
 		Policy:       lo.FromPtr(ws.Policy()).String(),
+		SSOConfig:    ssoDoc,
 		UpdatedAt:    updatedAt,
 	}, wId
 }
@@ -139,6 +187,28 @@ func (d *WorkspaceDocument) Model() (*workspace.Workspace, error) {
 
 	metadata := workspace.MetadataFrom(d.Metadata.Description, d.Metadata.Website, d.Metadata.Location, d.Metadata.BillingEmail, d.Metadata.PhotoURL)
 
+	var ssoConfig *sso.Config
+	if d.SSOConfig != nil {
+		ssoConfig = sso.New(sso.ConnectionType(d.SSOConfig.ConnectionType))
+		ssoConfig.SetAuth0ConnectionID(d.SSOConfig.Auth0ConnectionID)
+		ssoConfig.SetAuth0OrgID(d.SSOConfig.Auth0OrgID)
+		ssoConfig.SetClientID(d.SSOConfig.ClientID)
+		ssoConfig.SetClientSecret(d.SSOConfig.ClientSecret)
+		ssoConfig.SetDirectoryDomain(d.SSOConfig.DirectoryDomain)
+		ssoConfig.SetEmailDomains(d.SSOConfig.EmailDomains)
+		ssoConfig.SetEnabled(d.SSOConfig.Enabled)
+		ssoConfig.SetJITDefaultRole(d.SSOConfig.JITDefaultRole)
+		ssoConfig.SetOIDCClientID(d.SSOConfig.OIDCClientID)
+		ssoConfig.SetOIDCClientSecret(d.SSOConfig.OIDCClientSecret)
+		ssoConfig.SetOIDCDiscoveryURL(d.SSOConfig.OIDCDiscoveryURL)
+		ssoConfig.SetSAMLEntityID(d.SSOConfig.SAMLEntityID)
+		ssoConfig.SetSAMLMetadataURL(d.SSOConfig.SAMLMetadataURL)
+		ssoConfig.SetSAMLSignInURL(d.SSOConfig.SAMLSignInURL)
+		ssoConfig.SetSAMLSignOutURL(d.SSOConfig.SAMLSignOutURL)
+		ssoConfig.SetSAMLX509Cert(d.SSOConfig.SAMLX509Cert)
+		ssoConfig.SetVerified(d.SSOConfig.Verified)
+	}
+
 	return workspace.New().
 		ID(tid).
 		Name(d.Name).
@@ -149,6 +219,7 @@ func (d *WorkspaceDocument) Model() (*workspace.Workspace, error) {
 		Integrations(integrations).
 		Personal(d.Personal).
 		Policy(policy).
+		SSOConfig(ssoConfig).
 		UpdatedAt(d.UpdatedAt).
 		Build()
 }

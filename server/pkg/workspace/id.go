@@ -25,6 +25,8 @@ var ErrInvalidID = id.ErrInvalidID
 
 type PolicyID string
 
+const PolicyEnterprise PolicyID = "enterprise"
+
 func (id PolicyID) Ref() *PolicyID {
 	return &id
 }

@@ -5,6 +5,7 @@ import (
 	"time"
 
 	"github.com/reearth/reearth-accounts/server/pkg/role"
+	"github.com/reearth/reearth-accounts/server/pkg/sso"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -101,4 +102,34 @@ func TestWorkspace_UpdatedAt_Getter(t *testing.T) {
 	}
 
 	assert.Equal(t, now, w.UpdatedAt())
+}
+
+func TestWorkspace_IsEnterprise(t *testing.T) {
+	p := PolicyEnterprise
+
+	enterprise := New().NewID().Name("Enterprise Corp").Personal(false).Policy(&p).MustBuild()
+	assert.True(t, enterprise.IsEnterprise())
+
+	free := New().NewID().Name("Free Workspace").Personal(false).MustBuild()
+	assert.False(t, free.IsEnterprise())
+
+	other := PolicyID("starter")
+	other2 := New().NewID().Name("Starter").Personal(false).Policy(&other).MustBuild()
+	assert.False(t, other2.IsEnterprise())
+}
+
+func TestWorkspace_SSOConfig(t *testing.T) {
+	ws := New().NewID().Name("Test").Personal(false).MustBuild()
+	assert.Nil(t, ws.SSOConfig())
+
+	cfg := sso.New(sso.ConnectionTypeSAML)
+	cfg.SetEnabled(true)
+	cfg.SetEmailDomains([]string{"corp.com"})
+
+	ws.SetSSOConfig(cfg)
+	assert.NotNil(t, ws.SSOConfig())
+	assert.True(t, ws.SSOConfig().Enabled())
+
+	ws.DeleteSSOConfig()
+	assert.Nil(t, ws.SSOConfig())
 }

@@ -4,6 +4,7 @@ import (
 	"errors"
 	"time"
 
+	"github.com/reearth/reearth-accounts/server/pkg/sso"
 	"github.com/reearth/reearthx/util"
 )
 
@@ -112,6 +113,11 @@ func (b *Builder) Personal(p bool) *Builder {
 
 func (b *Builder) Policy(p *PolicyID) *Builder {
 	b.w.policy = util.CloneRef(p)
+	return b
+}
+
+func (b *Builder) SSOConfig(cfg *sso.Config) *Builder {
+	b.w.ssoConfig = cfg
 	return b
 }
 
