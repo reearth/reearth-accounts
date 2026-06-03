@@ -35,7 +35,20 @@ jobs:
         run: gcloud auth configure-docker ${{ env.REGION }}-docker.pkg.dev --quiet
 
       - name: Pull docker image from DockerHub
-        run: docker pull ${{ env.IMAGE }}
+        run: |
+          for i in 1 2 3; do
+            if docker pull "${{ env.IMAGE }}"; then
+              exit 0
+            fi
+
+            if [ "$i" -lt 3 ]; then
+              echo "docker pull failed (attempt $i), retrying in 15 seconds..."
+              sleep 15
+            fi
+          done
+
+          echo "docker pull failed after 3 attempts" >&2
+          exit 1
 
       - name: Tag docker image for Google Cloud Artifact Registry
         run: docker tag ${{ env.IMAGE }} ${{ env.IMAGE_GC }}
