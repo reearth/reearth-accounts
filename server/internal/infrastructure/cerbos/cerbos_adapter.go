@@ -4,7 +4,7 @@ import (
 	"context"
 
 	"github.com/cerbos/cerbos-sdk-go/cerbos"
-	"github.com/reearth/reearth-accounts/server/internal/adapter"
+	sharedauth "github.com/reearth/reearth-accounts/server/internal/shared/auth"
 )
 
 type CerbosAdapter struct {
@@ -21,7 +21,7 @@ func (c *CerbosAdapter) CheckPermissions(ctx context.Context, principal *cerbos.
 		batch.Add(resource, actions...)
 	}
 
-	authInfo := adapter.GetAuthInfo(ctx)
+	authInfo := sharedauth.GetAuthInfo(ctx)
 	if authInfo != nil {
 		return c.client.With(cerbos.AuxDataJWT(authInfo.Token, "jwt")).CheckResources(ctx, principal, batch)
 	}

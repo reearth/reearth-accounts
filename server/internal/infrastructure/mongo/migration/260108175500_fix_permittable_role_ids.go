@@ -5,7 +5,7 @@ import (
 	"slices"
 
 	"github.com/reearth/reearth-accounts/server/internal/infrastructure/mongo/mongodoc"
-	"github.com/reearth/reearth-accounts/server/internal/usecase/interfaces"
+	"github.com/reearth/reearth-accounts/server/internal/reearth-accounts/usecase/interfaces"
 	"github.com/reearth/reearth-accounts/server/pkg/role"
 	"github.com/reearth/reearthx/mongox"
 	"github.com/samber/lo"

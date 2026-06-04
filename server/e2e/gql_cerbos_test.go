@@ -6,7 +6,7 @@ import (
 	"testing"
 
 	httpexpect "github.com/gavv/httpexpect/v2"
-	"github.com/reearth/reearth-accounts/server/internal/app"
+	"github.com/reearth/reearth-accounts/server/internal/reearth-accounts/app"
 	"github.com/reearth/reearth-accounts/server/internal/usecase/repo"
 	"github.com/reearth/reearth-accounts/server/pkg/id"
 	"github.com/reearth/reearth-accounts/server/pkg/permittable"

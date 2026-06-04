@@ -7,7 +7,7 @@ import (
 
 	"github.com/oklog/ulid"
 	"github.com/reearth/reearth-accounts/server/internal/infrastructure/mongo/mongodoc"
-	"github.com/reearth/reearth-accounts/server/internal/usecase/interfaces"
+	"github.com/reearth/reearth-accounts/server/internal/reearth-accounts/usecase/interfaces"
 	"github.com/reearth/reearthx/mongox"
 	"go.mongodb.org/mongo-driver/bson"
 )

@@ -7,8 +7,8 @@ import (
 	"net/http"
 	"testing"
 
-	"github.com/reearth/reearth-accounts/server/internal/app"
-	"github.com/reearth/reearth-accounts/server/internal/usecase/interfaces"
+	"github.com/reearth/reearth-accounts/server/internal/reearth-accounts/app"
+	"github.com/reearth/reearth-accounts/server/internal/reearth-accounts/usecase/interfaces"
 	"github.com/reearth/reearth-accounts/server/internal/usecase/repo"
 	"github.com/reearth/reearth-accounts/server/pkg/id"
 	"github.com/reearth/reearth-accounts/server/pkg/permittable"

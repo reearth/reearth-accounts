@@ -62,7 +62,20 @@ gen-policies:
 	go run ./cmd/policy-generator
 
 gql:
-	go generate ./internal/adapter/gql
+	go generate ./internal/reearth-accounts/adapter/gql
+
+wire-admin:
+	go run github.com/goforj/wire/cmd/wire gen ./internal/reearth-accounts-admin/di
+
+swag-admin:
+	go run github.com/swaggo/swag/cmd/swag init \
+		-g main.go \
+		-d cmd/reearth-accounts-admin,internal/reearth-accounts-admin \
+		-o docs/admin \
+		--parseInternal --useStructName
+
+run-admin:
+	go run ./cmd/reearth-accounts-admin
 
 run-migration:
 	RUN_MIGRATION=true go run ./cmd/reearth-accounts
@@ -71,4 +84,4 @@ update-schema-json:
 	go run ./tools/cmd/mongoschemagen -output ./internal/infrastructure/mongo/schema
 	go run ./tools/cmd/ergen -schema ./internal/infrastructure/mongo/schema -mongodoc ./internal/infrastructure/mongo/mongodoc -output ./internal/infrastructure/mongo/schema/ER.md
 
-.PHONY: dev-install dev run down run-app run-cerbos run-migration gql gen-policies update-schema-json
+.PHONY: dev-install dev run down run-app run-cerbos run-migration gql gen-policies update-schema-json wire-admin swag-admin run-admin

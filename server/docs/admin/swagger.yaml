@@ -1,0 +1,70 @@
+basePath: /api/v1
+definitions:
+  ErrorResponse:
+    properties:
+      code:
+        example: Bad Request
+        type: string
+      message:
+        example: invalid request
+        type: string
+    type: object
+  ListUsersResponse:
+    properties:
+      items:
+        items:
+          $ref: '#/definitions/UserDTO'
+        type: array
+    type: object
+  UserDTO:
+    properties:
+      alias:
+        type: string
+      email:
+        type: string
+      id:
+        type: string
+      name:
+        type: string
+    type: object
+info:
+  contact: {}
+  description: Admin REST API for the internal management console.
+  title: Re:Earth Accounts Admin API
+  version: "1.0"
+paths:
+  /users:
+    get:
+      consumes:
+      - application/json
+      description: 全ユーザーを取得する（管理者権限が必要）
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/ListUsersResponse'
+        "401":
+          description: 認証エラー
+          schema:
+            $ref: '#/definitions/ErrorResponse'
+        "403":
+          description: 権限エラー
+          schema:
+            $ref: '#/definitions/ErrorResponse'
+        "500":
+          description: サーバーエラー
+          schema:
+            $ref: '#/definitions/ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: ユーザー一覧を取得
+      tags:
+      - users
+securityDefinitions:
+  BearerAuth:
+    in: header
+    name: Authorization
+    type: apiKey
+swagger: "2.0"
