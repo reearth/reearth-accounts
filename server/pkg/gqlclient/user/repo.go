@@ -13,7 +13,6 @@ import (
 	"github.com/reearth/reearth-accounts/server/pkg/gqlclient/gqlmodel"
 	"github.com/reearth/reearth-accounts/server/pkg/gqlclient/gqlutil"
 	"github.com/reearth/reearth-accounts/server/pkg/user"
-	"github.com/reearth/reearthx/rerror"
 )
 
 var (
@@ -221,11 +220,6 @@ func (r *userRepo) FindByAlias(ctx context.Context, alias string) (*user.User, e
 		"alias": graphql.String(alias),
 	}
 	if err := r.client.Query(ctx, &q, vars); err != nil {
-		// A missing user is an expected condition (e.g. alias availability checks),
-		// so return the sentinel error without logging it at ERROR level.
-		if ErrUserNotFound(err) {
-			return nil, rerror.ErrNotFound
-		}
 		return nil, gqlerror.ReturnAccountsError(ctx, err)
 	}
 
