@@ -6,6 +6,7 @@ import (
 	"runtime"
 	"strings"
 
+	"github.com/hasura/go-graphql-client"
 	"github.com/reearth/reearthx/log"
 )
 
@@ -16,11 +17,28 @@ var ErrUnauthorized AccountsError = errors.New("unauthorized")
 var ErrNotFound AccountsError = errors.New("not found")
 
 func IsUnauthorized(err error) bool {
+	if err == nil {
+		return false
+	}
 	return strings.Contains(err.Error(), ErrUnauthorized.Error())
 }
 
 func IsNotFound(err error) bool {
-	return strings.Contains(err.Error(), "not found")
+	if err == nil {
+		return false
+	}
+	if errors.Is(err, ErrNotFound) {
+		return true
+	}
+	var gqlErrs graphql.Errors
+	if errors.As(err, &gqlErrs) {
+		for _, gqlErr := range gqlErrs {
+			if strings.Contains(strings.ToLower(gqlErr.Message), "not found") {
+				return true
+			}
+		}
+	}
+	return false
 }
 
 func ReturnAccountsError(ctx context.Context, err error) AccountsError {
