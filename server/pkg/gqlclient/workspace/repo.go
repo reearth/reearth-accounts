@@ -10,6 +10,7 @@ import (
 	"github.com/reearth/reearth-accounts/server/pkg/gqlclient/gqlerror"
 	"github.com/reearth/reearth-accounts/server/pkg/gqlclient/gqlmodel"
 	"github.com/reearth/reearth-accounts/server/pkg/workspace"
+	"github.com/reearth/reearthx/rerror"
 )
 
 var (
@@ -159,6 +160,11 @@ func (r *workspaceRepo) FindByAlias(ctx context.Context, alias string) (*workspa
 		"alias": graphql.String(alias),
 	}
 	if err := r.client.Query(ctx, &q, vars); err != nil {
+		// A missing workspace is an expected condition (e.g. permission evaluation
+		// by alias), so return the sentinel error without logging it at ERROR level.
+		if ErrWorkspaceNotFound(err) {
+			return nil, rerror.ErrNotFound
+		}
 		return nil, gqlerror.ReturnAccountsError(ctx, err)
 	}
 
