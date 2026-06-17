@@ -14,6 +14,9 @@ import (
 
 var (
 	ErrWorkspaceNotFound = func(err error) bool {
+		if errors.Is(err, gqlerror.ErrNotFound) {
+			return true
+		}
 		var gqlErrs graphql.Errors
 		if errors.As(err, &gqlErrs) {
 			for _, gqlErr := range gqlErrs {
