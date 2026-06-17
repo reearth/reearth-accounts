@@ -10,8 +10,8 @@ import (
 
 	"github.com/jarcoal/httpmock"
 	"github.com/reearth/reearth-accounts/server/pkg/gqlclient"
+	"github.com/reearth/reearth-accounts/server/pkg/gqlclient/gqlerror"
 	"github.com/reearth/reearth-accounts/server/pkg/gqlclient/user"
-	"github.com/reearth/reearthx/rerror"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -579,7 +579,7 @@ func TestUserRepo_FindByAlias(t *testing.T) {
 
 		got, err := client.UserRepo.FindByAlias(ctx, "nonexistent")
 
-		assert.ErrorIs(t, err, rerror.ErrNotFound)
+		assert.ErrorIs(t, err, gqlerror.ErrNotFound)
 		assert.Nil(t, got)
 	})
 

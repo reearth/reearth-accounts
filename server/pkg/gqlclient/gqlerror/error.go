@@ -7,14 +7,13 @@ import (
 	"strings"
 
 	"github.com/reearth/reearthx/log"
-	"github.com/reearth/reearthx/rerror"
 )
 
 type AccountsError error
 
 var ErrUnauthorized AccountsError = errors.New("unauthorized")
 
-var ErrNotFound AccountsError = rerror.ErrNotFound
+var ErrNotFound AccountsError = errors.New("not found")
 
 func IsUnauthorized(err error) bool {
 	return strings.Contains(err.Error(), ErrUnauthorized.Error())
