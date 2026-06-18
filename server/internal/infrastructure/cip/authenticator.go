@@ -4,6 +4,8 @@ import (
 	"context"
 	"fmt"
 	"html"
+	"net/http"
+	"time"
 
 	firebase "firebase.google.com/go/v4"
 	fbauth "firebase.google.com/go/v4/auth"
@@ -12,6 +14,7 @@ import (
 	"github.com/reearth/reearthx/log"
 	"github.com/reearth/reearthx/mailer"
 	"github.com/reearth/reearthx/rerror"
+	"google.golang.org/api/option"
 )
 
 // firebaseAuthClient is the narrow surface of the Firebase Admin SDK auth client
@@ -49,7 +52,8 @@ func New(ctx context.Context, p Params, m mailer.Mailer) (*Authenticator, error)
 		return nil, rerror.NewE(i18n.T("cip project id is required"))
 	}
 
-	app, err := firebase.NewApp(ctx, &firebase.Config{ProjectID: p.ProjectID})
+	httpClient := &http.Client{Timeout: 30 * time.Second}
+	app, err := firebase.NewApp(ctx, &firebase.Config{ProjectID: p.ProjectID}, option.WithHTTPClient(httpClient))
 	if err != nil {
 		log.Errorf("cip: init firebase app: %+v", err)
 		return nil, rerror.NewE(i18n.T("cip is not set up"))
