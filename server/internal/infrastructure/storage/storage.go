@@ -29,18 +29,29 @@ type Config struct {
 	EmulatorEndpoint string
 }
 
+type cachedURL struct {
+	url       string
+	expiresAt time.Time
+}
+
 type Storage struct {
 	cfg       *Config
 	once      sync.Once
 	gcsClient *storage.Client
 	initErr   error
+	cacheMu   sync.RWMutex
+	cache     map[string]cachedURL
 }
 
 func NewGCPStorage(cfg *Config) (gateway.Storage, error) {
 	return &Storage{
-		cfg: cfg,
+		cfg:   cfg,
+		cache: make(map[string]cachedURL),
 	}, nil
 }
+
+const signedURLExpiry = 24 * time.Hour
+const signedURLCacheTTL = signedURLExpiry - 30*time.Minute
 
 func (s *Storage) GetSignedURL(ctx context.Context, name string) (string, error) {
 	ctx, span := otel.Tracer("reearth-accounts").Start(ctx, "storage.GetSignedURL",
@@ -51,6 +62,13 @@ func (s *Storage) GetSignedURL(ctx context.Context, name string) (string, error)
 	)
 	defer span.End()
 
+	s.cacheMu.RLock()
+	if cached, ok := s.cache[name]; ok && time.Now().Before(cached.expiresAt) {
+		s.cacheMu.RUnlock()
+		return cached.url, nil
+	}
+	s.cacheMu.RUnlock()
+
 	c, err := s.bucket(ctx)
 	if err != nil {
 		span.RecordError(err)
@@ -58,6 +76,7 @@ func (s *Storage) GetSignedURL(ctx context.Context, name string) (string, error)
 		return "", err
 	}
 
+	var url string
 	// If the storage is local, we generate a signed URL with a temporary RSA key.
 	if s.cfg.IsLocal {
 		key, kErr := rsa.GenerateKey(rand.Reader, 2048)
@@ -74,30 +93,28 @@ func (s *Storage) GetSignedURL(ctx context.Context, name string) (string, error)
 			},
 		)
 
-		url, sErr := c.SignedURL(name, &storage.SignedURLOptions{
+		url, err = c.SignedURL(name, &storage.SignedURLOptions{
 			Method:         "GET",
-			Expires:        time.Now().Add(24 * time.Hour),
+			Expires:        time.Now().Add(signedURLExpiry),
 			GoogleAccessID: "default",
 			PrivateKey:     pri,
 		})
-		if sErr != nil {
-			span.RecordError(sErr)
-			span.SetStatus(codes.Error, "signed URL generation failed")
-			return "", sErr
-		}
-
-		return url, nil
+	} else {
+		url, err = c.SignedURL(name, &storage.SignedURLOptions{
+			Method:  "GET",
+			Expires: time.Now().Add(signedURLExpiry),
+		})
 	}
 
-	url, sErr := c.SignedURL(name, &storage.SignedURLOptions{
-		Method:  "GET",
-		Expires: time.Now().Add(24 * time.Hour),
-	})
-	if sErr != nil {
-		span.RecordError(sErr)
+	if err != nil {
+		span.RecordError(err)
 		span.SetStatus(codes.Error, "signed URL generation failed")
-		return "", sErr
+		return "", err
 	}
+
+	s.cacheMu.Lock()
+	s.cache[name] = cachedURL{url: url, expiresAt: time.Now().Add(signedURLCacheTTL)}
+	s.cacheMu.Unlock()
 
 	return url, nil
 }

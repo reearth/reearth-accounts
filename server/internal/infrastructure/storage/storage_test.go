@@ -6,7 +6,9 @@ import (
 	"io"
 	"os"
 	"strings"
+	"sync"
 	"testing"
+	"time"
 
 	"github.com/reearth/reearthx/asset/domain/file"
 	"github.com/stretchr/testify/assert"
@@ -459,6 +461,88 @@ func TestStorage_bucket(t *testing.T) {
 
 		// The GCS client should be reused (sync.Once guarantees single initialization)
 		assert.Same(t, firstClient, s.gcsClient)
+	})
+}
+
+func TestGetSignedURL_Cache(t *testing.T) {
+	t.Run("returns cached URL without hitting GCS", func(t *testing.T) {
+		s := &Storage{
+			cfg:   &Config{IsLocal: false, BucketName: "test-bucket"},
+			cache: make(map[string]cachedURL),
+		}
+		s.cache["photo.jpg"] = cachedURL{
+			url:       "https://cached.example.com/photo.jpg",
+			expiresAt: time.Now().Add(1 * time.Hour),
+		}
+
+		url, err := s.GetSignedURL(context.Background(), "photo.jpg")
+
+		assert.NoError(t, err)
+		assert.Equal(t, "https://cached.example.com/photo.jpg", url)
+	})
+
+	t.Run("expired cache entry triggers new GCS call", func(t *testing.T) {
+		s := &Storage{
+			cfg:   &Config{IsLocal: false, BucketName: "test-bucket"},
+			cache: make(map[string]cachedURL),
+		}
+		s.cache["photo.jpg"] = cachedURL{
+			url:       "https://expired.example.com/photo.jpg",
+			expiresAt: time.Now().Add(-1 * time.Minute),
+		}
+
+		url, err := s.GetSignedURL(context.Background(), "photo.jpg")
+
+		// GCS call fails without real credentials — confirms the stale entry was bypassed
+		assert.Error(t, err)
+		assert.Empty(t, url)
+	})
+
+	t.Run("different object names are cached independently", func(t *testing.T) {
+		s := &Storage{
+			cfg:   &Config{IsLocal: false, BucketName: "test-bucket"},
+			cache: make(map[string]cachedURL),
+		}
+		s.cache["a.jpg"] = cachedURL{url: "https://cdn.example.com/a.jpg", expiresAt: time.Now().Add(1 * time.Hour)}
+		s.cache["b.jpg"] = cachedURL{url: "https://cdn.example.com/b.jpg", expiresAt: time.Now().Add(1 * time.Hour)}
+
+		urlA, errA := s.GetSignedURL(context.Background(), "a.jpg")
+		urlB, errB := s.GetSignedURL(context.Background(), "b.jpg")
+
+		assert.NoError(t, errA)
+		assert.Equal(t, "https://cdn.example.com/a.jpg", urlA)
+		assert.NoError(t, errB)
+		assert.Equal(t, "https://cdn.example.com/b.jpg", urlB)
+	})
+
+	t.Run("concurrent reads on cached entries are race-free", func(t *testing.T) {
+		s := &Storage{
+			cfg:   &Config{IsLocal: false, BucketName: "test-bucket"},
+			cache: make(map[string]cachedURL),
+		}
+		s.cache["shared.jpg"] = cachedURL{
+			url:       "https://cdn.example.com/shared.jpg",
+			expiresAt: time.Now().Add(1 * time.Hour),
+		}
+
+		const goroutines = 50
+		results := make([]string, goroutines)
+		var wg sync.WaitGroup
+		wg.Add(goroutines)
+		for i := range goroutines {
+			i := i
+			go func() {
+				defer wg.Done()
+				url, err := s.GetSignedURL(context.Background(), "shared.jpg")
+				require.NoError(t, err)
+				results[i] = url
+			}()
+		}
+		wg.Wait()
+
+		for _, url := range results {
+			assert.Equal(t, "https://cdn.example.com/shared.jpg", url)
+		}
 	})
 }
 
