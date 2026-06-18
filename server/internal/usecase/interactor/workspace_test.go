@@ -2150,3 +2150,110 @@ func TestWorkspace_BulkUpdatePermittable(t *testing.T) {
 		assert.Error(t, err)
 	})
 }
+
+func TestWorkspace_BulkRemovePermittable(t *testing.T) {
+	t.Parallel()
+	ctx := context.Background()
+
+	makeInteractor := func(db *repo.Container) *Workspace {
+		return &Workspace{
+			repos:           db,
+			permittableRepo: db.Permittable,
+			roleRepo:        db.Role,
+		}
+	}
+
+	t.Run("empty slice is a no-op", func(t *testing.T) {
+		t.Parallel()
+		db := memory.New()
+		i := makeInteractor(db)
+		wsID := id.NewWorkspaceID()
+		err := i.bulkRemovePermittable(ctx, wsID, user.IDList{})
+		assert.NoError(t, err)
+	})
+
+	t.Run("removes workspace role from existing permittable", func(t *testing.T) {
+		t.Parallel()
+		db := memory.New()
+		i := makeInteractor(db)
+		wsID := id.NewWorkspaceID()
+		uID := id.NewUserID()
+
+		existing, _ := permittable.New().NewID().UserID(uID).
+			WorkspaceRoles([]permittable.WorkspaceRole{
+				permittable.NewWorkspaceRole(wsID, id.NewRoleID()),
+			}).Build()
+		_ = db.Permittable.Save(ctx, *existing)
+
+		err := i.bulkRemovePermittable(ctx, wsID, user.IDList{uID})
+		assert.NoError(t, err)
+
+		p, err := db.Permittable.FindByUserID(ctx, uID)
+		assert.NoError(t, err)
+		assert.Empty(t, p.WorkspaceRoles())
+	})
+
+	t.Run("skips users with no permittable without error", func(t *testing.T) {
+		t.Parallel()
+		db := memory.New()
+		i := makeInteractor(db)
+		wsID := id.NewWorkspaceID()
+		uID := id.NewUserID()
+
+		err := i.bulkRemovePermittable(ctx, wsID, user.IDList{uID})
+		assert.NoError(t, err)
+	})
+
+	t.Run("preserves other workspace roles when removing one", func(t *testing.T) {
+		t.Parallel()
+		db := memory.New()
+		i := makeInteractor(db)
+		wsID1 := id.NewWorkspaceID()
+		wsID2 := id.NewWorkspaceID()
+		uID := id.NewUserID()
+		roleID2 := id.NewRoleID()
+
+		existing, _ := permittable.New().NewID().UserID(uID).
+			WorkspaceRoles([]permittable.WorkspaceRole{
+				permittable.NewWorkspaceRole(wsID1, id.NewRoleID()),
+				permittable.NewWorkspaceRole(wsID2, roleID2),
+			}).Build()
+		_ = db.Permittable.Save(ctx, *existing)
+
+		err := i.bulkRemovePermittable(ctx, wsID1, user.IDList{uID})
+		assert.NoError(t, err)
+
+		p, err := db.Permittable.FindByUserID(ctx, uID)
+		assert.NoError(t, err)
+		wrs := p.WorkspaceRoles()
+		assert.Len(t, wrs, 1)
+		assert.Equal(t, wsID2, wrs[0].ID())
+		assert.Equal(t, roleID2, wrs[0].RoleID())
+	})
+
+	t.Run("removes permittables for multiple users in one batch", func(t *testing.T) {
+		t.Parallel()
+		db := memory.New()
+		i := makeInteractor(db)
+		wsID := id.NewWorkspaceID()
+
+		uIDs := make(user.IDList, 5)
+		for j := range uIDs {
+			uIDs[j] = id.NewUserID()
+			p, _ := permittable.New().NewID().UserID(uIDs[j]).
+				WorkspaceRoles([]permittable.WorkspaceRole{
+					permittable.NewWorkspaceRole(wsID, id.NewRoleID()),
+				}).Build()
+			_ = db.Permittable.Save(ctx, *p)
+		}
+
+		err := i.bulkRemovePermittable(ctx, wsID, uIDs)
+		assert.NoError(t, err)
+
+		for _, uID := range uIDs {
+			p, err := db.Permittable.FindByUserID(ctx, uID)
+			assert.NoError(t, err)
+			assert.Empty(t, p.WorkspaceRoles())
+		}
+	})
+}
