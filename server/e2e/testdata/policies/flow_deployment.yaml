@@ -1,0 +1,15 @@
+apiVersion: api.cerbos.dev/v1
+# Fixture mirroring a downstream service (Re:Earth Flow) resource policy, used by
+# TestCheckPermission_FlowWorkspaceOwner to verify that workspace_roles are
+# resolved into the Cerbos principal when a workspace alias is supplied.
+resourcePolicy:
+  version: default
+  resource: flow:deployment
+  rules:
+    - actions:
+        - any
+      effect: EFFECT_ALLOW
+      roles:
+        - writer
+        - maintainer
+        - owner
