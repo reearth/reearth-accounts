@@ -762,17 +762,3 @@ func (i *Workspace) bulkUpdatePermittable(ctx context.Context, workspaceID works
 
 	return i.permittableRepo.SaveMany(ctx, toSave)
 }
-
-func (i *Workspace) removePermittable(ctx context.Context, userID user.ID, workspaceID workspace.ID) error {
-	p, err := i.permittableRepo.FindByUserID(ctx, userID)
-	if err != nil {
-		if errors.Is(err, rerror.ErrNotFound) {
-			return nil
-		}
-		return err
-	}
-
-	p.RemoveWorkspaceRole(workspaceID)
-
-	return i.permittableRepo.Save(ctx, *p)
-}
