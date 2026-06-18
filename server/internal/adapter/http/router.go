@@ -16,6 +16,8 @@ import (
 type RouterConfig struct {
 	// AuthResolver reuses app/auth.go's FindBySub + operator builder pipeline.
 	AuthResolver AuthResolver
+	// CacheControl sets response cache headers (e.g. Cache-Control: private) on all REST responses.
+	CacheControl echo.MiddlewareFunc
 	// UsecaseMiddleware attaches *interfaces.Container to context (same as GraphQL path).
 	UsecaseMiddleware echo.MiddlewareFunc
 	// JWTMiddleware validates the bearer token into adapter.AuthInfoKey (appx). May be nil under mock auth.
@@ -55,6 +57,9 @@ func RegisterRESTRouter(e *echo.Echo, cfg RouterConfig) {
 	}
 	if cfg.UsecaseMiddleware != nil {
 		base = append(base, cfg.UsecaseMiddleware)
+	}
+	if cfg.CacheControl != nil {
+		base = append(base, cfg.CacheControl)
 	}
 
 	required := RequiredAuth(cfg.AuthResolver)
