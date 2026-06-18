@@ -200,6 +200,17 @@ type SignupOIDCRequest struct {
 	Secret      *string `json:"secret,omitempty"`
 }
 
+// SignupSSORequest mirrors signupSSO input.
+type SignupSSORequest struct {
+	ID          *string `json:"id,omitempty"`
+	WorkspaceID *string `json:"workspace_id,omitempty"`
+	Name        string  `json:"name" validate:"required"`
+	Email       string  `json:"email" validate:"required,email"`
+	AuthSub     string  `json:"auth_sub" validate:"required"`
+	Lang        *string `json:"lang,omitempty"`
+	Theme       *string `json:"theme,omitempty" validate:"omitempty,oneof=default dark light"`
+}
+
 // CreateVerificationRequest mirrors createVerification input.
 type CreateVerificationRequest struct {
 	Email string `json:"email" validate:"required,email"`

@@ -80,6 +80,26 @@ func (r *mutationResolver) Signup(ctx context.Context, input gqlmodel.SignupInpu
 	return &gqlmodel.UserPayload{User: gqlmodel.ToUser(u)}, nil
 }
 
+func (r *mutationResolver) SignupSso(ctx context.Context, input gqlmodel.SignupSSOInput) (*gqlmodel.UserPayload, error) {
+	var lang language.Tag
+	if input.Lang != nil {
+		lang = language.Make(*input.Lang)
+	}
+	u, err := usecases(ctx).User.SignupSSO(ctx, interfaces.SignupSSOParam{
+		Email:       input.Email,
+		Lang:        &lang,
+		Name:        input.Name,
+		Sub:         input.AuthSub,
+		Theme:       gqlmodel.ToTheme(input.Theme),
+		UserID:      gqlmodel.ToIDRef[id.User](input.ID),
+		WorkspaceID: gqlmodel.ToIDRef[id.Workspace](input.WorkspaceID),
+	})
+	if err != nil {
+		return nil, err
+	}
+	return &gqlmodel.UserPayload{User: gqlmodel.ToUser(u)}, nil
+}
+
 func (r *mutationResolver) SignupOidc(ctx context.Context, input gqlmodel.SignupOIDCInput) (*gqlmodel.UserPayload, error) {
 	au := adapter.GetAuthInfo(ctx)
 

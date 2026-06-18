@@ -76,6 +76,22 @@ func (u *User) SignupOIDC(ctx context.Context, param interfaces.SignupOIDCParam)
 	return FragmentToUser(res.SignupOIDC.User.FragmentUser)
 }
 
+func (u *User) SignupSSO(ctx context.Context, param interfaces.SignupSSOParam) (*user.User, error) {
+	input := SignupSSOInput{
+		Id:          param.UserID.String(),
+		WorkspaceID: param.WorkspaceID.String(),
+		Name:        param.Name,
+		Email:       param.Email,
+		AuthSub:     param.Sub,
+		Lang:        param.Lang.String(),
+	}
+	res, err := SignupSSO(ctx, u.gql, input)
+	if err != nil {
+		return nil, err
+	}
+	return FragmentToUser(res.SignupSSO.User.FragmentUser)
+}
+
 func (u *User) FindOrCreate(ctx context.Context, param interfaces.UserFindOrCreateParam) (*user.User, error) {
 	input := FindOrCreateInput{
 		Sub:   param.Sub,

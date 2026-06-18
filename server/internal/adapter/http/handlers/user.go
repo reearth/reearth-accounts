@@ -348,6 +348,46 @@ func (h *UserHandler) SignupOIDC(c echo.Context) error {
 	return c.JSON(http.StatusOK, httpmodel.NewUserResponse(u))
 }
 
+// SignupSSO godoc
+// @Tags User
+// @Summary Sign up via SSO (Auth0 SAML enterprise connection)
+// @Accept json
+// @Produce json
+// @Param body body httpmodel.SignupSSORequest true "SSO signup fields"
+// @Success 200 {object} httpmodel.UserResponse
+// @Failure 400 {object} internal.ErrorResponse
+// @Failure 409 {object} internal.ErrorResponse
+// @Router /api/users/signup-sso [post]
+func (h *UserHandler) SignupSSO(c echo.Context) error {
+	ctx := c.Request().Context()
+	req := &httpmodel.SignupSSORequest{}
+	if err := httpinternal.BindValidate(c, req); err != nil {
+		return err
+	}
+	uid, err := parseUserIDRef(req.ID)
+	if err != nil {
+		return httpinternal.NewError(http.StatusBadRequest, "invalid id", nil)
+	}
+	wid, err := parseWorkspaceIDRef(req.WorkspaceID)
+	if err != nil {
+		return httpinternal.NewError(http.StatusBadRequest, "invalid workspace_id", nil)
+	}
+	param := interfaces.SignupSSOParam{
+		Email:       req.Email,
+		Lang:        httpmodel.ParseLang(req.Lang),
+		Name:        req.Name,
+		Sub:         req.AuthSub,
+		Theme:       httpmodel.ParseTheme(req.Theme),
+		UserID:      uid,
+		WorkspaceID: wid,
+	}
+	u, err := httpinternal.Usecases(c).User.SignupSSO(ctx, param)
+	if err != nil {
+		return err
+	}
+	return c.JSON(http.StatusOK, httpmodel.NewUserResponse(u))
+}
+
 // CreateVerification godoc
 // @Tags User
 // @Summary Create an email verification
