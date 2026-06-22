@@ -4,6 +4,7 @@ import (
 	"time"
 
 	"github.com/reearth/reearth-accounts/server/internal/usecase/interfaces"
+	"github.com/reearth/reearth-accounts/server/pkg/dregexp"
 	"github.com/reearth/reearth-accounts/server/pkg/user"
 	"github.com/reearth/reearthx/util"
 )
@@ -206,7 +207,7 @@ type SignupSSORequest struct {
 	WorkspaceID *string `json:"workspace_id,omitempty"`
 	Name        string  `json:"name" validate:"required"`
 	Email       string  `json:"email" validate:"required,email"`
-	AuthSub     string  `json:"auth_sub" validate:"required"`
+	Sub         string  `json:"sub" validate:"required"`
 	Lang        *string `json:"lang,omitempty"`
 	Theme       *string `json:"theme,omitempty" validate:"omitempty,oneof=default dark light"`
 }
@@ -242,4 +243,13 @@ type FindOrCreateRequest struct {
 // MessageResponse is a simple {success:true} body for void mutations.
 type MessageResponse struct {
 	Success bool `json:"success"`
+}
+
+// SanitizeUsername replaces email-formatted usernames with a unique string
+func SanitizeUsername(username string) string {
+	if dregexp.IsEmailFormat(username) {
+		// Generate unique string using ULID (26 characters, guaranteed unique)
+		return "user-" + user.NewID().String()
+	}
+	return username
 }

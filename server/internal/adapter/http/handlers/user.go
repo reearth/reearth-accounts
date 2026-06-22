@@ -375,8 +375,8 @@ func (h *UserHandler) SignupSSO(c echo.Context) error {
 	param := interfaces.SignupSSOParam{
 		Email:       req.Email,
 		Lang:        httpmodel.ParseLang(req.Lang),
-		Name:        req.Name,
-		Sub:         req.AuthSub,
+		Name:        httpmodel.SanitizeUsername(req.Email),
+		Sub:         req.Sub,
 		Theme:       httpmodel.ParseTheme(req.Theme),
 		UserID:      uid,
 		WorkspaceID: wid,
