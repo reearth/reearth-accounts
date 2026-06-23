@@ -13,6 +13,7 @@ import (
 	"time"
 
 	"cloud.google.com/go/storage"
+	lruexpirable "github.com/hashicorp/golang-lru/v2/expirable"
 	"github.com/reearth/reearth-accounts/server/internal/usecase/gateway"
 	"github.com/reearth/reearthx/asset/domain/file"
 	"go.opentelemetry.io/otel"
@@ -22,6 +23,12 @@ import (
 	"google.golang.org/api/option"
 )
 
+const (
+	signedURLExpiry    = 24 * time.Hour
+	signedURLCacheTTL  = signedURLExpiry - 30*time.Minute
+	signedURLCacheSize = 1024
+)
+
 type Config struct {
 	IsLocal          bool
 	BucketName       string
@@ -29,29 +36,20 @@ type Config struct {
 	EmulatorEndpoint string
 }
 
-type cachedURL struct {
-	url       string
-	expiresAt time.Time
-}
-
 type Storage struct {
 	cfg       *Config
 	once      sync.Once
 	gcsClient *storage.Client
 	initErr   error
-	cacheMu   sync.RWMutex
-	cache     map[string]cachedURL
+	cache     *lruexpirable.LRU[string, string]
 }
 
 func NewGCPStorage(cfg *Config) (gateway.Storage, error) {
 	return &Storage{
 		cfg:   cfg,
-		cache: make(map[string]cachedURL),
+		cache: lruexpirable.NewLRU[string, string](signedURLCacheSize, nil, signedURLCacheTTL),
 	}, nil
 }
-
-const signedURLExpiry = 24 * time.Hour
-const signedURLCacheTTL = signedURLExpiry - 30*time.Minute
 
 func (s *Storage) GetSignedURL(ctx context.Context, name string) (string, error) {
 	ctx, span := otel.Tracer("reearth-accounts").Start(ctx, "storage.GetSignedURL",
@@ -62,12 +60,9 @@ func (s *Storage) GetSignedURL(ctx context.Context, name string) (string, error)
 	)
 	defer span.End()
 
-	s.cacheMu.RLock()
-	if cached, ok := s.cache[name]; ok && time.Now().Before(cached.expiresAt) {
-		s.cacheMu.RUnlock()
-		return cached.url, nil
+	if cached, ok := s.cache.Get(name); ok {
+		return cached, nil
 	}
-	s.cacheMu.RUnlock()
 
 	c, err := s.bucket(ctx)
 	if err != nil {
@@ -112,9 +107,7 @@ func (s *Storage) GetSignedURL(ctx context.Context, name string) (string, error)
 		return "", err
 	}
 
-	s.cacheMu.Lock()
-	s.cache[name] = cachedURL{url: url, expiresAt: time.Now().Add(signedURLCacheTTL)}
-	s.cacheMu.Unlock()
+	s.cache.Add(name, url)
 
 	return url, nil
 }
@@ -155,6 +148,8 @@ func (s *Storage) Delete(ctx context.Context, name string) error {
 		return err
 	}
 
+	s.cache.Remove(name)
+
 	return nil
 }
 
@@ -176,6 +171,8 @@ func (s *Storage) Upload(ctx context.Context, name string, data *file.File) erro
 	if err = w.Close(); err != nil {
 		return err
 	}
+
+	s.cache.Remove(name)
 
 	return nil
 }

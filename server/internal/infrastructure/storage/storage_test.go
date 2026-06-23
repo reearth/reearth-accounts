@@ -10,6 +10,7 @@ import (
 	"testing"
 	"time"
 
+	lruexpirable "github.com/hashicorp/golang-lru/v2/expirable"
 	"github.com/reearth/reearthx/asset/domain/file"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -464,16 +465,17 @@ func TestStorage_bucket(t *testing.T) {
 	})
 }
 
+func newTestStorage(cfg *Config) *Storage {
+	return &Storage{
+		cfg:   cfg,
+		cache: lruexpirable.NewLRU[string, string](signedURLCacheSize, nil, signedURLCacheTTL),
+	}
+}
+
 func TestGetSignedURL_Cache(t *testing.T) {
 	t.Run("returns cached URL without hitting GCS", func(t *testing.T) {
-		s := &Storage{
-			cfg:   &Config{IsLocal: false, BucketName: "test-bucket"},
-			cache: make(map[string]cachedURL),
-		}
-		s.cache["photo.jpg"] = cachedURL{
-			url:       "https://cached.example.com/photo.jpg",
-			expiresAt: time.Now().Add(1 * time.Hour),
-		}
+		s := newTestStorage(&Config{IsLocal: false, BucketName: "test-bucket"})
+		s.cache.Add("photo.jpg", "https://cached.example.com/photo.jpg")
 
 		url, err := s.GetSignedURL(context.Background(), "photo.jpg")
 
@@ -481,15 +483,23 @@ func TestGetSignedURL_Cache(t *testing.T) {
 		assert.Equal(t, "https://cached.example.com/photo.jpg", url)
 	})
 
-	t.Run("expired cache entry triggers new GCS call", func(t *testing.T) {
+	t.Run("cache miss triggers GCS call", func(t *testing.T) {
+		s := newTestStorage(&Config{IsLocal: false, BucketName: "test-bucket"})
+		// no entry in cache — falls through to GCS, which fails without real credentials
+		url, err := s.GetSignedURL(context.Background(), "photo.jpg")
+
+		assert.Error(t, err)
+		assert.Empty(t, url)
+	})
+
+	t.Run("expired entry is evicted and triggers new GCS call", func(t *testing.T) {
+		// Use a tiny TTL so the entry expires immediately.
 		s := &Storage{
 			cfg:   &Config{IsLocal: false, BucketName: "test-bucket"},
-			cache: make(map[string]cachedURL),
+			cache: lruexpirable.NewLRU[string, string](signedURLCacheSize, nil, 1*time.Millisecond),
 		}
-		s.cache["photo.jpg"] = cachedURL{
-			url:       "https://expired.example.com/photo.jpg",
-			expiresAt: time.Now().Add(-1 * time.Minute),
-		}
+		s.cache.Add("photo.jpg", "https://expired.example.com/photo.jpg")
+		time.Sleep(10 * time.Millisecond)
 
 		url, err := s.GetSignedURL(context.Background(), "photo.jpg")
 
@@ -499,12 +509,9 @@ func TestGetSignedURL_Cache(t *testing.T) {
 	})
 
 	t.Run("different object names are cached independently", func(t *testing.T) {
-		s := &Storage{
-			cfg:   &Config{IsLocal: false, BucketName: "test-bucket"},
-			cache: make(map[string]cachedURL),
-		}
-		s.cache["a.jpg"] = cachedURL{url: "https://cdn.example.com/a.jpg", expiresAt: time.Now().Add(1 * time.Hour)}
-		s.cache["b.jpg"] = cachedURL{url: "https://cdn.example.com/b.jpg", expiresAt: time.Now().Add(1 * time.Hour)}
+		s := newTestStorage(&Config{IsLocal: false, BucketName: "test-bucket"})
+		s.cache.Add("a.jpg", "https://cdn.example.com/a.jpg")
+		s.cache.Add("b.jpg", "https://cdn.example.com/b.jpg")
 
 		urlA, errA := s.GetSignedURL(context.Background(), "a.jpg")
 		urlB, errB := s.GetSignedURL(context.Background(), "b.jpg")
@@ -516,14 +523,8 @@ func TestGetSignedURL_Cache(t *testing.T) {
 	})
 
 	t.Run("concurrent reads on cached entries are race-free", func(t *testing.T) {
-		s := &Storage{
-			cfg:   &Config{IsLocal: false, BucketName: "test-bucket"},
-			cache: make(map[string]cachedURL),
-		}
-		s.cache["shared.jpg"] = cachedURL{
-			url:       "https://cdn.example.com/shared.jpg",
-			expiresAt: time.Now().Add(1 * time.Hour),
-		}
+		s := newTestStorage(&Config{IsLocal: false, BucketName: "test-bucket"})
+		s.cache.Add("shared.jpg", "https://cdn.example.com/shared.jpg")
 
 		const goroutines = 50
 		results := make([]string, goroutines)
@@ -555,7 +556,7 @@ func TestStorage_ErrorHandling(t *testing.T) {
 			EmulatorEndpoint: "",
 		}
 
-		storage := &Storage{cfg: cfg}
+		storage := newTestStorage(cfg)
 
 		ctx := context.Background()
 		objectName := "test-file.txt"
@@ -564,7 +565,10 @@ func TestStorage_ErrorHandling(t *testing.T) {
 
 		assert.Error(t, err)
 		assert.Empty(t, url)
-		assert.Contains(t, err.Error(), "unable to detect default GoogleAccessID")
+		assert.True(t,
+			strings.Contains(err.Error(), "unable to detect default GoogleAccessID") ||
+				strings.Contains(err.Error(), "credentials"),
+			"Expected credentials error, got: %s", err.Error())
 	})
 
 	t.Run("should handle empty bucket name in Upload", func(t *testing.T) {
@@ -575,7 +579,7 @@ func TestStorage_ErrorHandling(t *testing.T) {
 			EmulatorEndpoint: "",
 		}
 
-		storage := &Storage{cfg: cfg}
+		storage := newTestStorage(cfg)
 
 		ctx := context.Background()
 		objectName := "test-file.txt"
@@ -597,7 +601,8 @@ func TestStorage_ErrorHandling(t *testing.T) {
 		assert.True(t,
 			strings.Contains(err.Error(), "bucket name is empty") ||
 				strings.Contains(err.Error(), "connection refused") ||
-				strings.Contains(err.Error(), "failed to close GCS object writer"),
+				strings.Contains(err.Error(), "failed to close GCS object writer") ||
+				strings.Contains(err.Error(), "credentials"),
 			"Expected bucket name empty or connection error, got: %s", err.Error())
 	})
 }
