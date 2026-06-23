@@ -52,7 +52,7 @@ func New(ctx context.Context, p Params, m mailer.Mailer) (*Authenticator, error)
 		return nil, rerror.NewE(i18n.T("cip project id is required"))
 	}
 
-	httpClient := &http.Client{Timeout: 30 * time.Second}
+	httpClient := &http.Client{Timeout: 5 * time.Second}
 	app, err := firebase.NewApp(ctx, &firebase.Config{ProjectID: p.ProjectID}, option.WithHTTPClient(httpClient))
 	if err != nil {
 		log.Errorf("cip: init firebase app: %+v", err)
