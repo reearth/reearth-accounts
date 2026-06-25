@@ -68,6 +68,11 @@ type Config struct {
 	SwaggerBasicUser string `envconfig:"REEARTH_ACCOUNTS_SWAGGER_BASIC_USER"`
 	SwaggerBasicPass string `envconfig:"REEARTH_ACCOUNTS_SWAGGER_BASIC_PASS"`
 
+	// HTTP server timeouts
+	ServerIdleTimeout       time.Duration `envconfig:"REEARTH_ACCOUNTS_SERVER_IDLE_TIMEOUT" default:"120s"`
+	ServerReadHeaderTimeout time.Duration `envconfig:"REEARTH_ACCOUNTS_SERVER_READ_HEADER_TIMEOUT" default:"10s"`
+	ServerReadTimeout       time.Duration `envconfig:"REEARTH_ACCOUNTS_SERVER_READ_TIMEOUT" default:"10s"`
+
 	// OpenTelemetry
 	OtelEnabled            bool          `envconfig:"REEARTH_ACCOUNTS_OTEL_ENABLED" default:"false"`
 	OtelEndpoint           string        `envconfig:"REEARTH_ACCOUNTS_OTEL_ENDPOINT" default:"localhost:4317"`
@@ -110,6 +115,7 @@ type Auth0Config struct {
 	Audience     string
 	ClientID     string
 	ClientSecret string
+	HTTPTimeout  time.Duration `envconfig:"REEARTH_ACCOUNTS_AUTH0_HTTP_TIMEOUT" default:"5s"`
 	WebClientID  string
 }
 
@@ -124,7 +130,8 @@ type CIPConfig struct {
 	// APIKey is the public client API key advertised via authConfig (not a secret).
 	APIKey string `envconfig:"REEARTH_ACCOUNTS_CIP_API_KEY"`
 	// AuthDomain is the public client auth domain advertised via authConfig.
-	AuthDomain string `envconfig:"REEARTH_ACCOUNTS_CIP_AUTH_DOMAIN"`
+	AuthDomain  string        `envconfig:"REEARTH_ACCOUNTS_CIP_AUTH_DOMAIN"`
+	HTTPTimeout time.Duration `envconfig:"REEARTH_ACCOUNTS_CIP_HTTP_TIMEOUT" default:"5s"`
 }
 
 // AuthConfig builds the JWT validation parameters for CIP-issued ID tokens.

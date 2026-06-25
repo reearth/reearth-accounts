@@ -5,7 +5,6 @@ import (
 	"errors"
 	"net/http"
 	"net/http/pprof"
-	"time"
 
 	"github.com/99designs/gqlgen/graphql/playground"
 	"github.com/labstack/echo/v4"
@@ -30,8 +29,9 @@ func initEcho(ctx context.Context, cfg *ServerConfig) *echo.Echo {
 	e.Debug = cfg.Debug
 	e.HideBanner = true
 	e.HidePort = true
-	e.Server.ReadTimeout = 10 * time.Second
-	e.Server.IdleTimeout = 120 * time.Second
+	e.Server.IdleTimeout = cfg.Config.ServerIdleTimeout
+	e.Server.ReadHeaderTimeout = cfg.Config.ServerReadHeaderTimeout
+	e.Server.ReadTimeout = cfg.Config.ServerReadTimeout
 
 	logger := log.NewEcho()
 	e.Logger = logger

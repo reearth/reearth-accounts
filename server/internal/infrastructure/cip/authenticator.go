@@ -26,10 +26,13 @@ type firebaseAuthClient interface {
 	EmailVerificationLink(ctx context.Context, email string) (string, error)
 }
 
+const defaultHTTPTimeout = 5 * time.Second
+
 // Params configures the CIP Authenticator (Firebase Admin SDK).
 type Params struct {
-	ProjectID string
-	TenantID  string // optional GCIP multi-tenant scope
+	HTTPTimeout time.Duration // defaults to 5s when zero
+	ProjectID   string
+	TenantID    string // optional GCIP multi-tenant scope
 }
 
 // Authenticator implements gateway.Authenticator backed by Cloud Identity Platform
@@ -52,7 +55,11 @@ func New(ctx context.Context, p Params, m mailer.Mailer) (*Authenticator, error)
 		return nil, rerror.NewE(i18n.T("cip project id is required"))
 	}
 
-	httpClient := &http.Client{Timeout: 5 * time.Second}
+	timeout := p.HTTPTimeout
+	if timeout <= 0 {
+		timeout = defaultHTTPTimeout
+	}
+	httpClient := &http.Client{Timeout: timeout}
 	app, err := firebase.NewApp(ctx, &firebase.Config{ProjectID: p.ProjectID}, option.WithHTTPClient(httpClient))
 	if err != nil {
 		log.Errorf("cip: init firebase app: %+v", err)
