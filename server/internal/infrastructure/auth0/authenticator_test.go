@@ -38,7 +38,7 @@ func TestURLFromDomain(t *testing.T) {
 }
 
 func TestAuth0(t *testing.T) {
-	a := New(domain, clientID, clientSecret)
+	a := New(domain, clientID, clientSecret, 0)
 	a.client = client(t) // inject mock
 	a.current = func() time.Time { return current }
 	a.disableLogging = true
