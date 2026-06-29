@@ -43,10 +43,11 @@ func TestMongoConformance(t *testing.T) {
 		require.NoError(t, err)
 		return repos, Caps{
 			EnforcesFilter:   true,
+			EnforcesLimit:    true,
 			OrderedFindByIDs: true,
 			RealPagination:   true,
-			UniqueEmail:      true,
 			SubstringSearch:  true,
+			UniqueEmail:      true,
 		}, func() { _ = db.Drop(ctx) }
 	})
 }

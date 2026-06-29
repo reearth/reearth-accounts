@@ -116,7 +116,7 @@ func (r *User) FindByNameOrAlias(ctx context.Context, nameOrAlias string) (user.
 			{"name": regex},
 			{"alias": regex},
 		},
-	})
+	}, options.Find().SetLimit(50).SetSort(bson.M{"name": 1}))
 }
 
 func (r *User) FindByNameOrEmail(ctx context.Context, nameOrEmail string) (*user.User, error) {

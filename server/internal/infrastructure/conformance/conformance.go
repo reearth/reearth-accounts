@@ -2,6 +2,7 @@ package conformance
 
 import (
 	"context"
+	"fmt"
 	"testing"
 	"time"
 
@@ -20,13 +21,14 @@ import (
 
 // Caps gates backend-specific assertions; memory leaves them false.
 type Caps struct {
-	RealTransactions     bool
+	CaseInsensitiveEmail bool
 	EnforcesFilter       bool
+	EnforcesLimit        bool
 	OrderedFindByIDs     bool
 	RealPagination       bool
-	UniqueEmail          bool
+	RealTransactions     bool
 	SubstringSearch      bool
-	CaseInsensitiveEmail bool
+	UniqueEmail          bool
 }
 
 type Factory func(t *testing.T) (*repo.Container, Caps, func())
@@ -38,6 +40,7 @@ func Run(t *testing.T, nc Factory) {
 	t.Run("User_FindByName_Alias_NameOrEmail", func(t *testing.T) { testUserFindByNameAliasEmail(t, nc) })
 	t.Run("User_FindByNameOrAlias", func(t *testing.T) { testUserFindByNameOrAlias(t, nc) })
 	t.Run("User_FindByNameOrAlias_Substring", func(t *testing.T) { testUserFindByNameOrAliasSubstring(t, nc) })
+	t.Run("User_FindByNameOrAlias_Limit", func(t *testing.T) { testUserFindByNameOrAliasLimit(t, nc) })
 	t.Run("User_CaseInsensitiveEmailAlias", func(t *testing.T) { testUserCaseInsensitiveEmailAlias(t, nc) })
 	t.Run("User_FindBySub", func(t *testing.T) { testUserFindBySub(t, nc) })
 	t.Run("User_FindBySubOrCreate", func(t *testing.T) { testUserFindBySubOrCreate(t, nc) })
@@ -198,6 +201,28 @@ func testUserFindByNameOrAliasSubstring(t *testing.T, nc Factory) {
 	require.NoError(t, err)
 	require.Len(t, res, 1)
 	assert.Equal(t, u.ID(), res[0].ID())
+}
+
+func testUserFindByNameOrAliasLimit(t *testing.T, nc Factory) {
+	c, caps, done := nc(t)
+	defer done()
+	if !caps.EnforcesLimit {
+		t.Skip("backend does not enforce FindByNameOrAlias result limit")
+	}
+	ctx := context.Background()
+	for i := range 51 {
+		u, err := user.New().NewID().
+			Name(fmt.Sprintf("LimitTest%02d", i)).
+			Alias(fmt.Sprintf("limitalias%02d", i)).
+			Email(fmt.Sprintf("limit%02d@example.com", i)).
+			Workspace(id.NewWorkspaceID()).Build()
+		require.NoError(t, err)
+		require.NoError(t, c.User.Create(ctx, u))
+	}
+
+	res, err := c.User.FindByNameOrAlias(ctx, "LimitTest")
+	require.NoError(t, err)
+	assert.LessOrEqual(t, len(res), 50)
 }
 
 func testUserCaseInsensitiveEmailAlias(t *testing.T, nc Factory) {

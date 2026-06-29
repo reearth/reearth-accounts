@@ -177,7 +177,7 @@ func (r *User) FindByPasswordResetRequest(ctx context.Context, token string) (*u
 func (r *User) FindByNameOrAlias(ctx context.Context, nameOrAlias string) (user.List, error) {
 	kw := likeContains(nameOrAlias)
 	rows, err := r.c.db(ctx).Query(ctx,
-		`SELECT `+userColumns+` FROM users WHERE name ILIKE $1 OR alias ILIKE $1 ORDER BY id`, kw)
+		`SELECT `+userColumns+` FROM users WHERE name ILIKE $1 OR alias ILIKE $1 ORDER BY name LIMIT 50`, kw)
 	if err != nil {
 		return nil, rerror.ErrInternalByWithContext(ctx, err)
 	}
