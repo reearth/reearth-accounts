@@ -76,7 +76,7 @@ func (u *User) SignupOIDC(ctx context.Context, param interfaces.SignupOIDCParam)
 	return FragmentToUser(res.SignupOIDC.User.FragmentUser)
 }
 
-func (u *User) SignupSSO(_ context.Context, _ interfaces.SignupSSOParam) (*user.User, error) {
+func (u *User) SyncSSOUser(_ context.Context, _ interfaces.SyncSSOUserParam) (*user.User, error) {
 	panic("unsupported")
 }
 

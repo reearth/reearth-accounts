@@ -201,8 +201,8 @@ type SignupOIDCRequest struct {
 	Secret      *string `json:"secret,omitempty"`
 }
 
-// SignupSSORequest mirrors signupSSO input.
-type SignupSSORequest struct {
+// SyncSSOUserRequest is the request body for POST /users/sync-sso.
+type SyncSSOUserRequest struct {
 	ID          *string `json:"id,omitempty"`
 	WorkspaceID *string `json:"workspace_id,omitempty"`
 	Name        string  `json:"name" validate:"required"`

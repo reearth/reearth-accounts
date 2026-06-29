@@ -348,19 +348,19 @@ func (h *UserHandler) SignupOIDC(c echo.Context) error {
 	return c.JSON(http.StatusOK, httpmodel.NewUserResponse(u))
 }
 
-// SignupSSO godoc
+// SyncSSOUser godoc
 // @Tags User
-// @Summary Sign up via SSO (Auth0 SAML enterprise connection)
+// @Summary Sync (provision) a SAML SSO user into accounts
 // @Accept json
 // @Produce json
-// @Param body body httpmodel.SignupSSORequest true "SSO signup fields"
+// @Param body body httpmodel.SyncSSOUserRequest true "SSO user fields"
 // @Success 200 {object} httpmodel.UserResponse
 // @Failure 400 {object} internal.ErrorResponse
 // @Failure 409 {object} internal.ErrorResponse
-// @Router /api/users/signup-sso [post]
-func (h *UserHandler) SignupSSO(c echo.Context) error {
+// @Router /api/users/sync-sso [post]
+func (h *UserHandler) SyncSSOUser(c echo.Context) error {
 	ctx := c.Request().Context()
-	req := &httpmodel.SignupSSORequest{}
+	req := &httpmodel.SyncSSOUserRequest{}
 	if err := httpinternal.BindValidate(c, req); err != nil {
 		return err
 	}
@@ -372,16 +372,16 @@ func (h *UserHandler) SignupSSO(c echo.Context) error {
 	if err != nil {
 		return httpinternal.NewError(http.StatusBadRequest, "invalid workspace_id", nil)
 	}
-	param := interfaces.SignupSSOParam{
+	param := interfaces.SyncSSOUserParam{
 		Email:       req.Email,
 		Lang:        httpmodel.ParseLang(req.Lang),
-		Name:        httpmodel.SanitizeUsername(req.Email),
+		Name:        httpmodel.SanitizeUsername(req.Name),
 		Sub:         req.Sub,
 		Theme:       httpmodel.ParseTheme(req.Theme),
 		UserID:      uid,
 		WorkspaceID: wid,
 	}
-	u, err := httpinternal.Usecases(c).User.SignupSSO(ctx, param)
+	u, err := httpinternal.Usecases(c).User.SyncSSOUser(ctx, param)
 	if err != nil {
 		return err
 	}

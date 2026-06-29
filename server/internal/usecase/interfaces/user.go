@@ -33,7 +33,7 @@ type SignupOIDCParam struct {
 	User        SignupUserParam
 }
 
-type SignupSSOParam struct {
+type SyncSSOUserParam struct {
 	Email       string
 	Lang        *language.Tag
 	Name        string
@@ -112,7 +112,7 @@ type User interface {
 	// sign up
 	Signup(context.Context, SignupParam) (*user.User, error)
 	SignupOIDC(context.Context, SignupOIDCParam) (*user.User, error)
-	SignupSSO(context.Context, SignupSSOParam) (*user.User, error)
+	SyncSSOUser(context.Context, SyncSSOUserParam) (*user.User, error)
 
 	// session management
 	Logout(context.Context, *workspace.Operator) (*user.User, error)

@@ -969,7 +969,7 @@ func TestUser_CreateVerification(t *testing.T) {
 	}
 }
 
-func TestUser_SignupSSO(t *testing.T) {
+func TestUser_SyncSSOUser(t *testing.T) {
 	uid := id.NewUserID()
 	wid := id.NewWorkspaceID()
 	const sub = "samlp|org123|idp456"
@@ -987,7 +987,7 @@ func TestUser_SignupSSO(t *testing.T) {
 		setupRoles(ctx, r)
 
 		uc := NewUser(r, nil, "", "")
-		u, err := uc.SignupSSO(ctx, interfaces.SignupSSOParam{
+		u, err := uc.SyncSSOUser(ctx, interfaces.SyncSSOUserParam{
 			Email:       "sso@example.com",
 			Name:        "SSO User",
 			Sub:         sub,
@@ -1007,7 +1007,7 @@ func TestUser_SignupSSO(t *testing.T) {
 		setupRoles(ctx, r)
 
 		uc := NewUser(r, nil, "", "")
-		first, err := uc.SignupSSO(ctx, interfaces.SignupSSOParam{
+		first, err := uc.SyncSSOUser(ctx, interfaces.SyncSSOUserParam{
 			Email:       "sso@example.com",
 			Name:        "SSO User",
 			Sub:         sub,
@@ -1016,7 +1016,7 @@ func TestUser_SignupSSO(t *testing.T) {
 		})
 		assert.NoError(t, err)
 
-		second, err := uc.SignupSSO(ctx, interfaces.SignupSSOParam{
+		second, err := uc.SyncSSOUser(ctx, interfaces.SyncSSOUserParam{
 			Email:       "sso@example.com",
 			Name:        "SSO User",
 			Sub:         sub,
@@ -1035,7 +1035,7 @@ func TestUser_SignupSSO(t *testing.T) {
 		assert.NoError(t, r.User.Save(ctx, existing))
 
 		uc := NewUser(r, nil, "", "")
-		_, err := uc.SignupSSO(ctx, interfaces.SignupSSOParam{
+		_, err := uc.SyncSSOUser(ctx, interfaces.SyncSSOUserParam{
 			Email: "taken@example.com",
 			Name:  "SSO User",
 			Sub:   "samlp|org123|other",
@@ -1050,7 +1050,7 @@ func TestUser_SignupSSO(t *testing.T) {
 		setupRoles(ctx, r)
 
 		uc := NewUser(r, nil, "", "")
-		u, err := uc.SignupSSO(ctx, interfaces.SignupSSOParam{
+		u, err := uc.SyncSSOUser(ctx, interfaces.SyncSSOUserParam{
 			Email: "sso2@example.com",
 			Name:  "SSO User 2",
 			Sub:   "samlp|org123|idp789",
