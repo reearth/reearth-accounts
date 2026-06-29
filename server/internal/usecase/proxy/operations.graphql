@@ -76,12 +76,6 @@ mutation SignupOIDC($input: SignupOIDCInput!) {
     }
 }
 
-mutation SignupSSO($input: SignupSSOInput!) {
-    signupSSO(input: $input) {
-        user {...FragmentUser}
-    }
-}
-
 mutation VerifyUser($input: VerifyUserInput!) {
     verifyUser(input: $input) {
         user {...FragmentUser}

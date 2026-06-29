@@ -194,16 +194,6 @@ type SignupOIDCInput struct {
 	Secret      *string `json:"secret,omitempty"`
 }
 
-type SignupSSOInput struct {
-	ID          *ID     `json:"id,omitempty"`
-	WorkspaceID *ID     `json:"workspaceID,omitempty"`
-	Name        string  `json:"name"`
-	Email       string  `json:"email"`
-	AuthSub     string  `json:"authSub"`
-	Lang        *string `json:"lang,omitempty"`
-	Theme       *Theme  `json:"theme,omitempty"`
-}
-
 type StartPasswordResetInput struct {
 	Email string `json:"email"`
 }

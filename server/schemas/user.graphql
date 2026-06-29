@@ -64,15 +64,6 @@ input SignupOIDCInput {
   secret: String
 }
 
-input SignupSSOInput {
-  id: ID
-  workspaceID: ID
-  name: String!
-  email: String!
-  authSub: String!
-  lang: Lang
-  theme: Theme
-}
 
 input FindOrCreateInput {
   sub: String!
@@ -149,7 +140,7 @@ extend type Mutation {
   removeMyAuth(input: RemoveMyAuthInput!): UpdateMePayload
   signup(input: SignupInput!): UserPayload
   signupOIDC(input: SignupOIDCInput!): UserPayload
-  signupSSO(input: SignupSSOInput!): UserPayload
+
   startPasswordReset(input: StartPasswordResetInput!): Boolean
   updateMe(input: UpdateMeInput!): UpdateMePayload
   logout: Me
