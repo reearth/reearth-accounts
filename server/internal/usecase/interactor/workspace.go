@@ -693,8 +693,11 @@ func (i *Workspace) bulkRemovePermittable(ctx context.Context, workspaceID works
 
 	toSave := make(permittable.List, 0, len(existing))
 	for _, p := range existing {
+		before := p.UpdatedAt()
 		p.RemoveWorkspaceRole(workspaceID)
-		toSave = append(toSave, p)
+		if p.UpdatedAt() != before {
+			toSave = append(toSave, p)
+		}
 	}
 
 	if len(toSave) == 0 {
