@@ -1476,6 +1476,7 @@ input SignupOIDCInput {
   secret: String
 }
 
+
 input FindOrCreateInput {
   sub: String!
   iss: String!
@@ -1551,6 +1552,7 @@ extend type Mutation {
   removeMyAuth(input: RemoveMyAuthInput!): UpdateMePayload
   signup(input: SignupInput!): UserPayload
   signupOIDC(input: SignupOIDCInput!): UserPayload
+
   startPasswordReset(input: StartPasswordResetInput!): Boolean
   updateMe(input: UpdateMeInput!): UpdateMePayload
   logout: Me

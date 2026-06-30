@@ -15,6 +15,7 @@ import (
 	accountmemory "github.com/reearth/reearth-accounts/server/internal/infrastructure/memory"
 	"github.com/reearth/reearth-accounts/server/internal/usecase/gateway"
 	"github.com/reearth/reearth-accounts/server/internal/usecase/interfaces"
+	"github.com/reearth/reearth-accounts/server/internal/usecase/repo"
 	"github.com/reearth/reearth-accounts/server/pkg/id"
 	"github.com/reearth/reearth-accounts/server/pkg/role"
 	"github.com/reearth/reearth-accounts/server/pkg/user"
@@ -966,4 +967,99 @@ func TestUser_CreateVerification(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestUser_SyncSSOUser(t *testing.T) {
+	uid := id.NewUserID()
+	wid := id.NewWorkspaceID()
+	const sub = "samlp|org123|idp456"
+
+	setupRoles := func(ctx context.Context, r *repo.Container) {
+		selfRole := role.New().NewID().Name(interfaces.RoleSelf).MustBuild()
+		ownerRole := role.New().NewID().Name(role.RoleOwner.String()).MustBuild()
+		_ = r.Role.Save(ctx, *selfRole)
+		_ = r.Role.Save(ctx, *ownerRole)
+	}
+
+	t.Run("creates new user", func(t *testing.T) {
+		ctx := context.Background()
+		r := accountmemory.New()
+		setupRoles(ctx, r)
+
+		uc := NewUser(r, nil, "", "")
+		u, err := uc.SyncSSOUser(ctx, interfaces.SyncSSOUserParam{
+			Email:       "sso@example.com",
+			Name:        "SSO User",
+			Sub:         sub,
+			UserID:      &uid,
+			WorkspaceID: &wid,
+		})
+
+		assert.NoError(t, err)
+		assert.NotNil(t, u)
+		assert.Equal(t, "sso@example.com", u.Email())
+		assert.Equal(t, "SSO User", u.Name())
+	})
+
+	t.Run("idempotent: returns existing user when sub already registered", func(t *testing.T) {
+		ctx := context.Background()
+		r := accountmemory.New()
+		setupRoles(ctx, r)
+
+		uc := NewUser(r, nil, "", "")
+		first, err := uc.SyncSSOUser(ctx, interfaces.SyncSSOUserParam{
+			Email:       "sso@example.com",
+			Name:        "SSO User",
+			Sub:         sub,
+			UserID:      &uid,
+			WorkspaceID: &wid,
+		})
+		assert.NoError(t, err)
+
+		second, err := uc.SyncSSOUser(ctx, interfaces.SyncSSOUserParam{
+			Email:       "sso@example.com",
+			Name:        "SSO User",
+			Sub:         sub,
+		})
+		assert.NoError(t, err)
+		assert.NotNil(t, second)
+		assert.Equal(t, first.ID(), second.ID())
+	})
+
+	t.Run("returns error when email already used by different user", func(t *testing.T) {
+		ctx := context.Background()
+		r := accountmemory.New()
+		setupRoles(ctx, r)
+
+		existing := user.New().NewID().Workspace(wid).Name("Existing").Email("taken@example.com").MustBuild()
+		assert.NoError(t, r.User.Save(ctx, existing))
+
+		uc := NewUser(r, nil, "", "")
+		_, err := uc.SyncSSOUser(ctx, interfaces.SyncSSOUserParam{
+			Email: "taken@example.com",
+			Name:  "SSO User",
+			Sub:   "samlp|org123|other",
+		})
+
+		assert.ErrorIs(t, err, interfaces.ErrUserAlreadyExists)
+	})
+
+	t.Run("supports optional lang and theme", func(t *testing.T) {
+		ctx := context.Background()
+		r := accountmemory.New()
+		setupRoles(ctx, r)
+
+		uc := NewUser(r, nil, "", "")
+		u, err := uc.SyncSSOUser(ctx, interfaces.SyncSSOUserParam{
+			Email: "sso2@example.com",
+			Name:  "SSO User 2",
+			Sub:   "samlp|org123|idp789",
+			Lang:  lo.ToPtr(language.Japanese),
+			Theme: user.ThemeDark.Ref(),
+		})
+
+		assert.NoError(t, err)
+		assert.NotNil(t, u)
+		assert.Equal(t, "sso2@example.com", u.Email())
+	})
 }

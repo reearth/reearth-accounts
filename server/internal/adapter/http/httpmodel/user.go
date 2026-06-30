@@ -4,6 +4,7 @@ import (
 	"time"
 
 	"github.com/reearth/reearth-accounts/server/internal/usecase/interfaces"
+	"github.com/reearth/reearth-accounts/server/pkg/dregexp"
 	"github.com/reearth/reearth-accounts/server/pkg/user"
 	"github.com/reearth/reearthx/util"
 )
@@ -200,6 +201,17 @@ type SignupOIDCRequest struct {
 	Secret      *string `json:"secret,omitempty"`
 }
 
+// SyncSSOUserRequest is the request body for POST /users/sync-sso.
+type SyncSSOUserRequest struct {
+	ID          *string `json:"id,omitempty"`
+	WorkspaceID *string `json:"workspace_id,omitempty"`
+	Name        string  `json:"name" validate:"required"`
+	Email       string  `json:"email" validate:"required,email"`
+	Sub         string  `json:"sub" validate:"required"`
+	Lang        *string `json:"lang,omitempty"`
+	Theme       *string `json:"theme,omitempty" validate:"omitempty,oneof=default dark light"`
+}
+
 // CreateVerificationRequest mirrors createVerification input.
 type CreateVerificationRequest struct {
 	Email string `json:"email" validate:"required,email"`
@@ -231,4 +243,13 @@ type FindOrCreateRequest struct {
 // MessageResponse is a simple {success:true} body for void mutations.
 type MessageResponse struct {
 	Success bool `json:"success"`
+}
+
+// SanitizeUsername replaces email-formatted usernames with a unique string
+func SanitizeUsername(username string) string {
+	if dregexp.IsEmailFormat(username) {
+		// Generate unique string using ULID (26 characters, guaranteed unique)
+		return "user-" + user.NewID().String()
+	}
+	return username
 }

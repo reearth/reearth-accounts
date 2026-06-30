@@ -63,6 +63,7 @@ var bypassedFields = map[string]struct{}{
 	"findusersbyidswithpagination": {},
 	"signup":                       {},
 	"signupoidc":                   {},
+	"signupsso":                    {},
 	"startpasswordreset":           {},
 }
 

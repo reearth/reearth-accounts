@@ -7,6 +7,7 @@ import (
 	"crypto/x509"
 	"encoding/pem"
 	"errors"
+	"fmt"
 	"io"
 	"os"
 	"sync"
@@ -156,7 +157,7 @@ func (s *Storage) Delete(ctx context.Context, name string) error {
 func (s *Storage) Upload(ctx context.Context, name string, data *file.File) error {
 	c, err := s.bucket(ctx)
 	if err != nil {
-		return err
+		return fmt.Errorf("failed to get GCS client: %w", err)
 	}
 
 	obj := c.Object(name)
@@ -165,11 +166,12 @@ func (s *Storage) Upload(ctx context.Context, name string, data *file.File) erro
 
 	_, err = io.Copy(w, data.Content)
 	if err != nil {
-		return err
+		_ = w.Close()
+		return fmt.Errorf("failed to save GCS object: %w", err)
 	}
 
 	if err = w.Close(); err != nil {
-		return err
+		return fmt.Errorf("failed to close GCS object writer: %w", err)
 	}
 
 	s.cache.Remove(name)

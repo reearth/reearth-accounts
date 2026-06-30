@@ -76,6 +76,10 @@ func (u *User) SignupOIDC(ctx context.Context, param interfaces.SignupOIDCParam)
 	return FragmentToUser(res.SignupOIDC.User.FragmentUser)
 }
 
+func (u *User) SyncSSOUser(_ context.Context, _ interfaces.SyncSSOUserParam) (*user.User, error) {
+	panic("unsupported")
+}
+
 func (u *User) FindOrCreate(ctx context.Context, param interfaces.UserFindOrCreateParam) (*user.User, error) {
 	input := FindOrCreateInput{
 		Sub:   param.Sub,
