@@ -5,10 +5,10 @@ import (
 
 	"github.com/labstack/echo/v4"
 	"github.com/labstack/echo/v4/middleware"
+	_ "github.com/reearth/reearth-accounts/server/docs" // generated OpenAPI spec (make swag)
 	"github.com/reearth/reearth-accounts/server/internal/adapter"
 	"github.com/reearth/reearth-accounts/server/internal/adapter/http/handlers"
 	httpinternal "github.com/reearth/reearth-accounts/server/internal/adapter/http/internal"
-	_ "github.com/reearth/reearth-accounts/server/docs" // generated OpenAPI spec (make swag)
 	echoSwagger "github.com/swaggo/echo-swagger"
 )
 
@@ -16,6 +16,8 @@ import (
 type RouterConfig struct {
 	// AuthResolver reuses app/auth.go's FindBySub + operator builder pipeline.
 	AuthResolver AuthResolver
+	// CacheControl sets response cache headers (e.g. Cache-Control: private) on all REST responses.
+	CacheControl echo.MiddlewareFunc
 	// UsecaseMiddleware attaches *interfaces.Container to context (same as GraphQL path).
 	UsecaseMiddleware echo.MiddlewareFunc
 	// JWTMiddleware validates the bearer token into adapter.AuthInfoKey (appx). May be nil under mock auth.
@@ -56,6 +58,9 @@ func RegisterRESTRouter(e *echo.Echo, cfg RouterConfig) {
 	if cfg.UsecaseMiddleware != nil {
 		base = append(base, cfg.UsecaseMiddleware)
 	}
+	if cfg.CacheControl != nil {
+		base = append(base, cfg.CacheControl)
+	}
 
 	required := RequiredAuth(cfg.AuthResolver)
 	optional := OptionalAuth(cfg.AuthResolver)
@@ -82,6 +87,7 @@ func RegisterRESTRouter(e *echo.Echo, cfg RouterConfig) {
 	api.GET("/users/:id", uh.Get, required)
 	api.POST("/users/signup", uh.Signup, optional)
 	api.POST("/users/signup-oidc", uh.SignupOIDC, optional)
+	api.POST("/users/sync-sso", uh.SyncSSOUser, optional)
 	api.POST("/users/verifications", uh.CreateVerification, optional)
 	api.POST("/users/verify", uh.VerifyUser)
 	api.POST("/users/password-reset/start", uh.StartPasswordReset)

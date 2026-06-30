@@ -80,6 +80,7 @@ func (r *mutationResolver) Signup(ctx context.Context, input gqlmodel.SignupInpu
 	return &gqlmodel.UserPayload{User: gqlmodel.ToUser(u)}, nil
 }
 
+
 func (r *mutationResolver) SignupOidc(ctx context.Context, input gqlmodel.SignupOIDCInput) (*gqlmodel.UserPayload, error) {
 	au := adapter.GetAuthInfo(ctx)
 

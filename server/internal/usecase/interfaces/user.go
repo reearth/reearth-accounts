@@ -33,6 +33,16 @@ type SignupOIDCParam struct {
 	User        SignupUserParam
 }
 
+type SyncSSOUserParam struct {
+	Email       string
+	Lang        *language.Tag
+	Name        string
+	Sub         string // samlp|<organization-id>|<idpID>
+	Theme       *user.Theme
+	UserID      *user.ID
+	WorkspaceID *workspace.ID
+}
+
 type SignupUserParam struct {
 	UserID      *user.ID
 	Lang        *language.Tag
@@ -102,6 +112,7 @@ type User interface {
 	// sign up
 	Signup(context.Context, SignupParam) (*user.User, error)
 	SignupOIDC(context.Context, SignupOIDCParam) (*user.User, error)
+	SyncSSOUser(context.Context, SyncSSOUserParam) (*user.User, error)
 
 	// session management
 	Logout(context.Context, *workspace.Operator) (*user.User, error)

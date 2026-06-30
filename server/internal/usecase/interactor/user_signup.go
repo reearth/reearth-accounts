@@ -228,6 +228,70 @@ func (i *User) SignupOIDC(ctx context.Context, param interfaces.SignupOIDCParam)
 	})
 }
 
+func (i *User) SyncSSOUser(ctx context.Context, param interfaces.SyncSSOUserParam) (*user.User, error) {
+	return Run1(ctx, nil, i.repos, Usecase().Transaction(), func(ctx context.Context) (*user.User, error) {
+		eu, err := i.repos.User.FindBySub(ctx, param.Sub)
+		if err != nil && !errors.Is(err, rerror.ErrNotFound) {
+			return nil, err
+		}
+		if eu != nil {
+			return eu, nil
+		}
+
+		eu, err = i.repos.User.FindByEmail(ctx, param.Email)
+		if err != nil && !errors.Is(err, rerror.ErrNotFound) {
+			return nil, err
+		}
+		if eu != nil {
+			return nil, interfaces.ErrUserAlreadyExists
+		}
+
+		u, ws, err := workspace.Init(workspace.InitParams{
+			Email:       param.Email,
+			Lang:        param.Lang,
+			Name:        param.Name,
+			Sub:         user.AuthFrom(param.Sub).Ref(),
+			Theme:       param.Theme,
+			UserID:      param.UserID,
+			WorkspaceID: param.WorkspaceID,
+		})
+		if err != nil {
+			return nil, err
+		}
+
+		if err = i.repos.User.Create(ctx, u); err != nil {
+			if errors.Is(err, user.ErrDuplicatedUser) {
+				return nil, interfaces.ErrUserAlreadyExists
+			}
+			return nil, err
+		}
+		if err = i.repos.Workspace.Save(ctx, ws); err != nil {
+			if errors.Is(err, workspace.ErrDuplicateWorkspaceAlias) {
+				return nil, interfaces.ErrWorkspaceAliasAlreadyExists
+			}
+			return nil, err
+		}
+
+		roleSelf, err := i.repos.Role.FindByName(ctx, interfaces.RoleSelf)
+		if err != nil {
+			return nil, err
+		}
+
+		roleOwner, err := i.repos.Role.FindByName(ctx, role.RoleOwner.String())
+		if err != nil {
+			return nil, err
+		}
+
+		wsRole := permittable.NewWorkspaceRole(ws.ID(), roleOwner.ID())
+		perm := permittable.New().NewID().RoleIDs([]id.RoleID{roleSelf.ID()}).UserID(u.ID()).WorkspaceRoles([]permittable.WorkspaceRole{wsRole}).MustBuild()
+		if err = i.repos.Permittable.Save(ctx, lo.FromPtr(perm)); err != nil {
+			return nil, err
+		}
+
+		return u, nil
+	})
+}
+
 func (i *User) FindOrCreate(ctx context.Context, param interfaces.UserFindOrCreateParam) (u *user.User, err error) {
 	return Run1(ctx, nil, i.repos, Usecase().Transaction(), func(ctx context.Context) (*user.User, error) {
 		if param.Sub == "" {

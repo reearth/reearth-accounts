@@ -41,13 +41,14 @@ func TestPostgresConformance(t *testing.T) {
 		repos, err := postgres.New(ctx, pool, nil)
 		require.NoError(t, err)
 		return repos, Caps{
-			RealTransactions:     true,
+			CaseInsensitiveEmail: true,
 			EnforcesFilter:       true,
+			EnforcesLimit:        true,
 			OrderedFindByIDs:     true,
 			RealPagination:       true,
-			UniqueEmail:          true,
+			RealTransactions:     true,
 			SubstringSearch:      true,
-			CaseInsensitiveEmail: true,
+			UniqueEmail:          true,
 		}, func() {}
 	})
 }
