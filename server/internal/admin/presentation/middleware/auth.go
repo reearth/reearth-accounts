@@ -6,7 +6,7 @@ import (
 	"net/http"
 
 	"github.com/labstack/echo/v4"
-	"github.com/reearth/reearth-accounts/server/internal/reearth-accounts-admin/presentation/internal"
+	"github.com/reearth/reearth-accounts/server/internal/admin/presentation/internal"
 	"github.com/reearth/reearth-accounts/server/pkg/user"
 	"github.com/reearth/reearthx/appx"
 	"github.com/reearth/reearthx/log"

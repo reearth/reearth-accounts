@@ -3,7 +3,7 @@ package main
 import (
 	"log"
 
-	adminrbac "github.com/reearth/reearth-accounts/server/internal/reearth-accounts-admin/rbac"
+	adminrbac "github.com/reearth/reearth-accounts/server/internal/admin/rbac"
 	"github.com/reearth/reearth-accounts/server/internal/rbac"
 	"github.com/reearth/reearthx/cerbos/generator"
 )

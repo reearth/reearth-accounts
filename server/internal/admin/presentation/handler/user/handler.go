@@ -3,8 +3,8 @@
 package user
 
 import (
-	_ "github.com/reearth/reearth-accounts/server/internal/reearth-accounts-admin/presentation/internal" // for swagger ErrorResponse
-	"github.com/reearth/reearth-accounts/server/internal/reearth-accounts-admin/usecase/useruc"
+	_ "github.com/reearth/reearth-accounts/server/internal/admin/presentation/internal" // for swagger ErrorResponse
+	"github.com/reearth/reearth-accounts/server/internal/admin/usecase/useruc"
 )
 
 // Handler aggregates the user-related admin usecases.

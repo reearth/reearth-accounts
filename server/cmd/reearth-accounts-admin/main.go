@@ -1,7 +1,7 @@
 package main
 
 import (
-	"github.com/reearth/reearth-accounts/server/internal/reearth-accounts-admin/di"
+	"github.com/reearth/reearth-accounts/server/internal/admin/di"
 	"github.com/reearth/reearthx/log"
 )
 

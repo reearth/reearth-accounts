@@ -5,8 +5,8 @@ import (
 	"net/http"
 
 	"github.com/labstack/echo/v4"
-	"github.com/reearth/reearth-accounts/server/internal/reearth-accounts-admin/presentation/internal"
-	"github.com/reearth/reearth-accounts/server/internal/reearth-accounts-admin/usecase/useruc"
+	"github.com/reearth/reearth-accounts/server/internal/admin/presentation/internal"
+	"github.com/reearth/reearth-accounts/server/internal/admin/usecase/useruc"
 	"github.com/reearth/reearthx/log"
 	"github.com/reearth/reearthx/rerror"
 )

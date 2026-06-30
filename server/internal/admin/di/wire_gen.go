@@ -6,11 +6,11 @@
 package di
 
 import (
-	"github.com/reearth/reearth-accounts/server/internal/reearth-accounts-admin/presentation"
-	"github.com/reearth/reearth-accounts/server/internal/reearth-accounts-admin/presentation/handler/user"
-	"github.com/reearth/reearth-accounts/server/internal/reearth-accounts-admin/presentation/middleware"
-	"github.com/reearth/reearth-accounts/server/internal/reearth-accounts-admin/usecase/authz"
-	"github.com/reearth/reearth-accounts/server/internal/reearth-accounts-admin/usecase/useruc"
+	"github.com/reearth/reearth-accounts/server/internal/admin/presentation"
+	"github.com/reearth/reearth-accounts/server/internal/admin/presentation/handler/user"
+	"github.com/reearth/reearth-accounts/server/internal/admin/presentation/middleware"
+	"github.com/reearth/reearth-accounts/server/internal/admin/usecase/authz"
+	"github.com/reearth/reearth-accounts/server/internal/admin/usecase/useruc"
 )
 
 // Injectors from wire.go:

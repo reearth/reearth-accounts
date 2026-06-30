@@ -5,8 +5,8 @@ package di
 
 import (
 	"github.com/goforj/wire"
-	"github.com/reearth/reearth-accounts/server/internal/reearth-accounts-admin/presentation"
-	mw "github.com/reearth/reearth-accounts/server/internal/reearth-accounts-admin/presentation/middleware"
+	"github.com/reearth/reearth-accounts/server/internal/admin/presentation"
+	mw "github.com/reearth/reearth-accounts/server/internal/admin/presentation/middleware"
 )
 
 // middlewareWire provides the JWT providers, the auth middleware, and the

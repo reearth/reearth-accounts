@@ -10,7 +10,7 @@ import (
 
 	"github.com/labstack/echo/v4"
 	"github.com/labstack/echo/v4/middleware"
-	"github.com/reearth/reearth-accounts/server/internal/reearth-accounts-admin/presentation"
+	"github.com/reearth/reearth-accounts/server/internal/admin/presentation"
 	"github.com/reearth/reearthx/log"
 )
 

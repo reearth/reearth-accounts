@@ -2,7 +2,7 @@ package presentation
 
 import (
 	"github.com/labstack/echo/v4"
-	"github.com/reearth/reearth-accounts/server/internal/reearth-accounts-admin/presentation/handler/user"
+	"github.com/reearth/reearth-accounts/server/internal/admin/presentation/handler/user"
 )
 
 // Handler aggregates all resource-specific admin handlers plus the auth middleware.

@@ -6,7 +6,7 @@ import (
 	"testing"
 
 	"github.com/cerbos/cerbos-sdk-go/cerbos"
-	adminrbac "github.com/reearth/reearth-accounts/server/internal/reearth-accounts-admin/rbac"
+	adminrbac "github.com/reearth/reearth-accounts/server/internal/admin/rbac"
 	"github.com/reearth/reearth-accounts/server/pkg/id"
 	"github.com/reearth/reearth-accounts/server/pkg/permittable"
 	"github.com/reearth/reearth-accounts/server/pkg/role"

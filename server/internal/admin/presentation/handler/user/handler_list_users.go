@@ -4,8 +4,8 @@ import (
 	"net/http"
 
 	"github.com/labstack/echo/v4"
-	"github.com/reearth/reearth-accounts/server/internal/reearth-accounts-admin/presentation/internal"
-	_ "github.com/reearth/reearth-accounts/server/internal/reearth-accounts-admin/usecase/useruc" // for swagger
+	"github.com/reearth/reearth-accounts/server/internal/admin/presentation/internal"
+	_ "github.com/reearth/reearth-accounts/server/internal/admin/usecase/useruc" // for swagger
 )
 
 // ListUsers godoc

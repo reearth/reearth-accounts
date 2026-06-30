@@ -3,8 +3,8 @@ package useruc
 import (
 	"context"
 
-	adminrbac "github.com/reearth/reearth-accounts/server/internal/reearth-accounts-admin/rbac"
-	"github.com/reearth/reearth-accounts/server/internal/reearth-accounts-admin/usecase/authz"
+	adminrbac "github.com/reearth/reearth-accounts/server/internal/admin/rbac"
+	"github.com/reearth/reearth-accounts/server/internal/admin/usecase/authz"
 	"github.com/reearth/reearth-accounts/server/pkg/user"
 	"github.com/reearth/reearthx/i18n"
 	"github.com/reearth/reearthx/rerror"

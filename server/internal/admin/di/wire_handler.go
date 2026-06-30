@@ -5,8 +5,8 @@ package di
 
 import (
 	"github.com/goforj/wire"
-	"github.com/reearth/reearth-accounts/server/internal/reearth-accounts-admin/presentation"
-	userhandler "github.com/reearth/reearth-accounts/server/internal/reearth-accounts-admin/presentation/handler/user"
+	"github.com/reearth/reearth-accounts/server/internal/admin/presentation"
+	userhandler "github.com/reearth/reearth-accounts/server/internal/admin/presentation/handler/user"
 )
 
 // handlerWire provides the per-resource handlers and the aggregated Handler.

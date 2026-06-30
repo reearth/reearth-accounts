@@ -93,17 +93,17 @@ swag:
 	go run github.com/swaggo/swag/cmd/swag init --generalInfo internal/adapter/http/doc.go --dir ./,internal/adapter/http --output ./docs --parseDependency --parseInternal
 
 wire-admin:
-	go run github.com/goforj/wire/cmd/wire gen ./internal/reearth-accounts-admin/di
+	go run github.com/goforj/wire/cmd/wire gen ./internal/admin/di
 	@# Strip the generated `//go:generate ... -mod=mod ... wire` directive: `-mod=mod`
 	@# is incompatible with this repo's Go workspace mode and would break
 	@# `go generate ./...` in CI. Regenerate via this target instead.
-	sed -i.bak '/go:generate go run -mod=mod github.com\/goforj\/wire/d' internal/reearth-accounts-admin/di/wire_gen.go && rm -f internal/reearth-accounts-admin/di/wire_gen.go.bak
+	sed -i.bak '/go:generate go run -mod=mod github.com\/goforj\/wire/d' internal/admin/di/wire_gen.go && rm -f internal/admin/di/wire_gen.go.bak
 
 swag-admin:
 	@# swag resolves --generalInfo relative to the FIRST --dir, so `-g main.go`
 	@# reads cmd/reearth-accounts-admin/main.go (the annotated admin entrypoint),
 	@# not the server/main.go stub. Keep the admin cmd dir first.
-	go run github.com/swaggo/swag/cmd/swag init -g main.go -d cmd/reearth-accounts-admin,internal/reearth-accounts-admin -o docs/admin --parseInternal --useStructName
+	go run github.com/swaggo/swag/cmd/swag init -g main.go -d cmd/reearth-accounts-admin,internal/admin -o docs/admin --parseInternal --useStructName
 
 run-admin:
 	go run ./cmd/reearth-accounts-admin
