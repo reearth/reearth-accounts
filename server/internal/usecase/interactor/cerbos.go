@@ -4,7 +4,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"log"
 
 	"github.com/cerbos/cerbos-sdk-go/cerbos"
 	effectv1 "github.com/cerbos/cerbos/api/genpb/cerbos/effect/v1"
@@ -17,6 +16,7 @@ import (
 	"github.com/reearth/reearth-accounts/server/pkg/role"
 	"github.com/reearth/reearth-accounts/server/pkg/user"
 	"github.com/reearth/reearth-accounts/server/pkg/workspace"
+	"github.com/reearth/reearthx/log"
 	"github.com/reearth/reearthx/rerror"
 )
 
@@ -96,11 +96,11 @@ func (i *Cerbos) CheckPermission(ctx context.Context, userId user.ID, param inte
 
 	allowed := false
 	for _, result := range resp.Results {
-		log.Printf("RoleNames: %+v, Result Actions: %+v", roleNames, result.Actions)
+		log.Debugfc(ctx, "RoleNames: %+v, Result Actions: %+v", roleNames, result.Actions)
 
 		actionResult, exists := result.Actions[param.Action]
 		if !exists {
-			log.Printf("Action %s not found in result.Actions\n", param.Action)
+			log.Debugfc(ctx, "Action %s not found in result.Actions", param.Action)
 			continue
 		}
 		if actionResult == effectv1.Effect_EFFECT_ALLOW {
@@ -109,7 +109,7 @@ func (i *Cerbos) CheckPermission(ctx context.Context, userId user.ID, param inte
 		}
 	}
 
-	log.Printf("Final permission result for user %s: %v", userId.String(), allowed)
+	log.Debugfc(ctx, "Final permission result for user %s: %v", userId.String(), allowed)
 
 	return &interfaces.CheckPermissionResult{
 		Allowed: allowed,
