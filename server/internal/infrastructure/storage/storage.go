@@ -13,6 +13,7 @@ import (
 	"time"
 
 	"cloud.google.com/go/storage"
+	lruexpirable "github.com/hashicorp/golang-lru/v2/expirable"
 	"github.com/reearth/reearth-accounts/server/internal/usecase/gateway"
 	"github.com/reearth/reearthx/asset/domain/file"
 	"go.opentelemetry.io/otel"
@@ -20,6 +21,12 @@ import (
 	"go.opentelemetry.io/otel/codes"
 	"go.opentelemetry.io/otel/trace"
 	"google.golang.org/api/option"
+)
+
+const (
+	signedURLExpiry    = 24 * time.Hour
+	signedURLCacheTTL  = signedURLExpiry - 30*time.Minute
+	signedURLCacheSize = 1024
 )
 
 type Config struct {
@@ -34,11 +41,13 @@ type Storage struct {
 	once      sync.Once
 	gcsClient *storage.Client
 	initErr   error
+	cache     *lruexpirable.LRU[string, string]
 }
 
 func NewGCPStorage(cfg *Config) (gateway.Storage, error) {
 	return &Storage{
-		cfg: cfg,
+		cfg:   cfg,
+		cache: lruexpirable.NewLRU[string, string](signedURLCacheSize, nil, signedURLCacheTTL),
 	}, nil
 }
 
@@ -51,6 +60,10 @@ func (s *Storage) GetSignedURL(ctx context.Context, name string) (string, error)
 	)
 	defer span.End()
 
+	if cached, ok := s.cache.Get(name); ok {
+		return cached, nil
+	}
+
 	c, err := s.bucket(ctx)
 	if err != nil {
 		span.RecordError(err)
@@ -58,6 +71,7 @@ func (s *Storage) GetSignedURL(ctx context.Context, name string) (string, error)
 		return "", err
 	}
 
+	var url string
 	// If the storage is local, we generate a signed URL with a temporary RSA key.
 	if s.cfg.IsLocal {
 		key, kErr := rsa.GenerateKey(rand.Reader, 2048)
@@ -74,30 +88,26 @@ func (s *Storage) GetSignedURL(ctx context.Context, name string) (string, error)
 			},
 		)
 
-		url, sErr := c.SignedURL(name, &storage.SignedURLOptions{
+		url, err = c.SignedURL(name, &storage.SignedURLOptions{
 			Method:         "GET",
-			Expires:        time.Now().Add(24 * time.Hour),
+			Expires:        time.Now().Add(signedURLExpiry),
 			GoogleAccessID: "default",
 			PrivateKey:     pri,
 		})
-		if sErr != nil {
-			span.RecordError(sErr)
-			span.SetStatus(codes.Error, "signed URL generation failed")
-			return "", sErr
-		}
-
-		return url, nil
+	} else {
+		url, err = c.SignedURL(name, &storage.SignedURLOptions{
+			Method:  "GET",
+			Expires: time.Now().Add(signedURLExpiry),
+		})
 	}
 
-	url, sErr := c.SignedURL(name, &storage.SignedURLOptions{
-		Method:  "GET",
-		Expires: time.Now().Add(24 * time.Hour),
-	})
-	if sErr != nil {
-		span.RecordError(sErr)
+	if err != nil {
+		span.RecordError(err)
 		span.SetStatus(codes.Error, "signed URL generation failed")
-		return "", sErr
+		return "", err
 	}
+
+	s.cache.Add(name, url)
 
 	return url, nil
 }
@@ -138,6 +148,8 @@ func (s *Storage) Delete(ctx context.Context, name string) error {
 		return err
 	}
 
+	s.cache.Remove(name)
+
 	return nil
 }
 
@@ -159,6 +171,8 @@ func (s *Storage) Upload(ctx context.Context, name string, data *file.File) erro
 	if err = w.Close(); err != nil {
 		return err
 	}
+
+	s.cache.Remove(name)
 
 	return nil
 }
