@@ -375,10 +375,10 @@ func (i *Workspace) RemoveMultipleUserMembers(ctx context.Context, id workspace.
 			if err != nil {
 				return nil, err
 			}
+		}
 
-			if err := i.removePermittable(ctx, uId, ws.ID()); err != nil {
-				return nil, err
-			}
+		if err := i.bulkRemovePermittable(ctx, id, user.IDList(userIds)); err != nil {
+			return nil, err
 		}
 
 		err = i.repos.Workspace.Save(ctx, ws)
@@ -528,10 +528,12 @@ func (i *Workspace) Remove(ctx context.Context, id workspace.ID, operator *works
 			return workspace.ErrCannotModifyPersonalWorkspace
 		}
 
+		userIDs := make(user.IDList, 0, len(ws.Members().Users()))
 		for uId := range ws.Members().Users() {
-			if err := i.removePermittable(ctx, uId, id); err != nil {
-				return err
-			}
+			userIDs = append(userIDs, uId)
+		}
+		if err := i.bulkRemovePermittable(ctx, id, userIDs); err != nil {
+			return err
 		}
 
 		err = i.repos.Workspace.Remove(ctx, id)
@@ -679,6 +681,32 @@ func (i *Workspace) updatePermittable(ctx context.Context, userID user.ID, works
 	return i.permittableRepo.Save(ctx, *p)
 }
 
+func (i *Workspace) bulkRemovePermittable(ctx context.Context, workspaceID workspace.ID, userIDs user.IDList) error {
+	if len(userIDs) == 0 {
+		return nil
+	}
+
+	existing, err := i.permittableRepo.FindByUserIDs(ctx, userIDs)
+	if err != nil && !errors.Is(err, rerror.ErrNotFound) {
+		return applog.ErrorWithCallerLogging(ctx, "failed to fetch permittables", err)
+	}
+
+	toSave := make(permittable.List, 0, len(existing))
+	for _, p := range existing {
+		before := p.UpdatedAt()
+		p.RemoveWorkspaceRole(workspaceID)
+		if p.UpdatedAt() != before {
+			toSave = append(toSave, p)
+		}
+	}
+
+	if len(toSave) == 0 {
+		return nil
+	}
+
+	return i.permittableRepo.SaveMany(ctx, toSave)
+}
+
 func (i *Workspace) bulkUpdatePermittable(ctx context.Context, workspaceID workspace.ID, userRoles map[user.ID]role.RoleType) error {
 	if len(userRoles) == 0 {
 		return nil
@@ -736,18 +764,4 @@ func (i *Workspace) bulkUpdatePermittable(ctx context.Context, workspaceID works
 	}
 
 	return i.permittableRepo.SaveMany(ctx, toSave)
-}
-
-func (i *Workspace) removePermittable(ctx context.Context, userID user.ID, workspaceID workspace.ID) error {
-	p, err := i.permittableRepo.FindByUserID(ctx, userID)
-	if err != nil {
-		if errors.Is(err, rerror.ErrNotFound) {
-			return nil
-		}
-		return err
-	}
-
-	p.RemoveWorkspaceRole(workspaceID)
-
-	return i.permittableRepo.Save(ctx, *p)
 }
