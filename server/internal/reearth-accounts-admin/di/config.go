@@ -112,10 +112,12 @@ func (c *Config) IsDevelopment() bool { return c.Env == "Development" || c.Env =
 // else infer from the DB URI scheme, defaulting to mongo.
 func (c *Config) resolveDBDriver() string {
 	if c.DBDriver != "" {
-		if strings.ToLower(c.DBDriver) == "postgres" {
+		switch strings.ToLower(c.DBDriver) {
+		case "postgres", "postgresql":
 			return "postgres"
+		default:
+			return "mongo"
 		}
-		return "mongo"
 	}
 	if strings.HasPrefix(c.DB, "postgres://") || strings.HasPrefix(c.DB, "postgresql://") {
 		return "postgres"
@@ -194,9 +196,13 @@ func provideRepoContainer(cfg *Config) (*repo.Container, func(), error) {
 
 // provideCerbosClient builds the Cerbos gRPC client. When CERBOS_HOST is unset
 // it returns nil; the authz checker treats a nil client as "allow" for local
-// development.
+// development. In production a missing CERBOS_HOST is a misconfiguration that
+// would silently disable all admin authorization, so we fail fast instead.
 func provideCerbosClient(cfg *Config) (*cerbos.GRPCClient, error) {
 	if cfg.CerbosHost == "" {
+		if cfg.IsProduction() {
+			return nil, fmt.Errorf("CERBOS_HOST is required in production: admin authorization cannot be disabled")
+		}
 		log.Warnf("cerbos host not configured; admin permission checks will be skipped")
 		return nil, nil
 	}

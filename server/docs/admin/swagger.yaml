@@ -13,10 +13,10 @@ definitions:
     properties:
       items:
         items:
-          $ref: '#/definitions/UserDTO'
+          $ref: '#/definitions/User'
         type: array
     type: object
-  UserDTO:
+  User:
     properties:
       alias:
         type: string

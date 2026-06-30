@@ -45,9 +45,12 @@ func classify(err error) (status int, code, msg string) {
 		return http.StatusForbidden, http.StatusText(http.StatusForbidden), "operation denied"
 	case errors.Is(err, rerror.ErrNotFound):
 		return http.StatusNotFound, http.StatusText(http.StatusNotFound), "not found"
-	case rerror.UnwrapErrInternal(err) != nil:
-		return http.StatusInternalServerError, http.StatusText(http.StatusInternalServerError), "internal server error"
 	default:
-		return http.StatusBadRequest, http.StatusText(http.StatusBadRequest), err.Error()
+		// Unrecognized errors (DB/network failures, programming errors, ...) are
+		// treated as server-side faults: respond with a generic 500 so internal
+		// details are never leaked to clients. The original error is logged by
+		// CustomHTTPErrorHandler. Handlers that mean "bad request" should return
+		// an *echo.HTTPError with the appropriate 4xx code.
+		return http.StatusInternalServerError, http.StatusText(http.StatusInternalServerError), "internal server error"
 	}
 }

@@ -82,12 +82,12 @@ const docTemplate = `{
                 "items": {
                     "type": "array",
                     "items": {
-                        "$ref": "#/definitions/UserDTO"
+                        "$ref": "#/definitions/User"
                     }
                 }
             }
         },
-        "UserDTO": {
+        "User": {
             "type": "object",
             "properties": {
                 "alias": {

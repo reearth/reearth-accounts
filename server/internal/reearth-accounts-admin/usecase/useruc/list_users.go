@@ -15,8 +15,28 @@ var ErrOperationDenied = rerror.NewE(i18n.T("operation denied"))
 
 // ListUsersOutput is the response for listing users.
 type ListUsersOutput struct {
-	Items []*UserDTO `json:"items"`
+	Items []*UserItem `json:"items"`
 } // @name ListUsersResponse
+
+// UserItem represents a single user in the admin API response.
+type UserItem struct {
+	ID    string `json:"id"`
+	Name  string `json:"name"`
+	Email string `json:"email"`
+	Alias string `json:"alias"`
+} // @name User
+
+func toUserItem(u *user.User) *UserItem {
+	if u == nil {
+		return nil
+	}
+	return &UserItem{
+		ID:    u.ID().String(),
+		Name:  u.Name(),
+		Email: u.Email(),
+		Alias: u.Alias(),
+	}
+}
 
 // ListUsersUseCase lists all users for the admin console.
 type ListUsersUseCase struct {
@@ -44,9 +64,9 @@ func (uc *ListUsersUseCase) Execute(ctx context.Context, operator *user.User) (*
 		return nil, err
 	}
 
-	items := make([]*UserDTO, 0, len(users))
+	items := make([]*UserItem, 0, len(users))
 	for _, u := range users {
-		items = append(items, toUserDTO(u))
+		items = append(items, toUserItem(u))
 	}
 	return &ListUsersOutput{Items: items}, nil
 }
