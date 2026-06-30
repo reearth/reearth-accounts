@@ -375,7 +375,7 @@ func (h *UserHandler) SyncSSOUser(c echo.Context) error {
 	param := interfaces.SyncSSOUserParam{
 		Email:       req.Email,
 		Lang:        httpmodel.ParseLang(req.Lang),
-		Name:        httpmodel.SanitizeUsername(req.Name),
+		Name:        "user-", // To trigger intake-form on first login; the actual name is set by the user in the intake form.
 		Sub:         req.Sub,
 		Theme:       httpmodel.ParseTheme(req.Theme),
 		UserID:      uid,
