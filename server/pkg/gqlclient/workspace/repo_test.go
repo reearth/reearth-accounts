@@ -10,6 +10,7 @@ import (
 
 	"github.com/jarcoal/httpmock"
 	"github.com/reearth/reearth-accounts/server/pkg/gqlclient"
+	"github.com/reearth/reearth-accounts/server/pkg/gqlclient/gqlerror"
 	accountsGqlWorkspace "github.com/reearth/reearth-accounts/server/pkg/gqlclient/workspace"
 	"github.com/stretchr/testify/assert"
 )
@@ -1046,6 +1047,70 @@ func TestWorkspaceRepo_UpdateUserOfWorkspace(t *testing.T) {
 		got, err := client.WorkspaceRepo.UpdateUserOfWorkspace(ctx, input)
 
 		assert.Error(t, err)
+		assert.Nil(t, got)
+	})
+}
+
+func TestWorkspaceRepo_FindByAlias(t *testing.T) {
+	ctx := context.Background()
+
+	t.Run("successfully find workspace by alias", func(t *testing.T) {
+		httpmock.Activate()
+		defer httpmock.DeactivateAndReset()
+
+		transport := httpmock.DefaultTransport
+		client := gqlclient.NewClient("https://accounts.example.com", 30, transport)
+
+		httpmock.RegisterResponder("POST", "https://accounts.example.com/api/graphql",
+			httpmock.NewStringResponder(http.StatusOK, `{
+				"data": {
+					"findByAlias": {
+						"id": "01j9x0yy00000000000000001a",
+						"name": "Personal Workspace",
+						"alias": "personal",
+						"personal": true,
+						"metadata": {
+							"description": "My personal workspace",
+							"website": "https://example.com",
+							"location": "Tokyo",
+							"billingEmail": "billing@example.com",
+							"photoURL": "https://example.com/photo.jpg"
+						},
+						"members": []
+					}
+				}
+			}`),
+		)
+
+		got, err := client.WorkspaceRepo.FindByAlias(ctx, "personal")
+
+		assert.NoError(t, err)
+		assert.NotNil(t, got)
+		assert.Equal(t, "Personal Workspace", got.Name())
+		assert.Equal(t, "personal", got.Alias())
+		assert.True(t, got.IsPersonal())
+	})
+
+	t.Run("workspace not found by alias", func(t *testing.T) {
+		httpmock.Activate()
+		defer httpmock.DeactivateAndReset()
+
+		transport := httpmock.DefaultTransport
+		client := gqlclient.NewClient("https://accounts.example.com", 30, transport)
+
+		httpmock.RegisterResponder("POST", "https://accounts.example.com/api/graphql",
+			httpmock.NewStringResponder(http.StatusOK, `{
+				"errors": [
+					{
+						"message": "input: findByAlias not found"
+					}
+				]
+			}`),
+		)
+
+		got, err := client.WorkspaceRepo.FindByAlias(ctx, "nonexistent")
+
+		assert.ErrorIs(t, err, gqlerror.ErrNotFound)
 		assert.Nil(t, got)
 	})
 }
