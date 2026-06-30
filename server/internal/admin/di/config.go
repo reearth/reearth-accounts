@@ -105,8 +105,11 @@ func (c Config) Auths() (res []appx.JWTProvider) {
 	return append(res, c.Auth...)
 }
 
-func (c *Config) IsProduction() bool  { return c.Env == "Production" }
-func (c *Config) IsDevelopment() bool { return c.Env == "Development" || c.Env == "" }
+// Env checks are case-insensitive so a mis-cased REEARTH_ACCOUNTS_ADMIN_ENV
+// (e.g. "production") can't accidentally enable non-prod behavior such as
+// serving Swagger or allowing CERBOS_HOST to be unset.
+func (c *Config) IsProduction() bool  { return strings.EqualFold(c.Env, "Production") }
+func (c *Config) IsDevelopment() bool { return c.Env == "" || strings.EqualFold(c.Env, "Development") }
 
 // resolveDBDriver mirrors the main service: honor REEARTH_ACCOUNTS_DB_DRIVER,
 // else infer from the DB URI scheme, defaulting to mongo.
@@ -179,8 +182,12 @@ func provideRepoContainer(cfg *Config) (*repo.Container, func(), error) {
 		return repos, func() { pool.Close() }, nil
 	}
 
+	// Bound startup connection like the Postgres branch so a network issue
+	// can't hang the process indefinitely.
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel()
 	client, err := mongo.Connect(
-		context.Background(),
+		ctx,
 		options.Client().ApplyURI(cfg.DB).SetConnectTimeout(time.Second*10))
 	if err != nil {
 		return nil, nil, fmt.Errorf("mongo connect: %w", err)

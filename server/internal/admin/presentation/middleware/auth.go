@@ -38,14 +38,17 @@ func NewAuthMiddleware(providers []appx.JWTProvider, userRepo user.Repo) (echo.M
 			ai, ok := ctx.Value(ctxAuthInfo).(appx.AuthInfo)
 			if !ok || ai.Sub == "" {
 				log.Warnfc(ctx, "[admin] rejecting request with empty sub")
-				return echo.NewHTTPError(http.StatusUnauthorized, "missing or invalid token")
+				return echo.NewHTTPError(http.StatusUnauthorized, "unauthorized")
 			}
 
 			usr, err := userRepo.FindBySub(ctx, ai.Sub)
 			if err != nil {
 				if errors.Is(err, rerror.ErrNotFound) {
+					// Use the same generic 401 as the invalid-token case so the
+					// response can't be used to probe which subjects have admin
+					// accounts; the specific reason stays in the logs.
 					log.Warnfc(ctx, "[admin] user not found for sub=%s", ai.Sub)
-					return echo.NewHTTPError(http.StatusUnauthorized, "admin not found")
+					return echo.NewHTTPError(http.StatusUnauthorized, "unauthorized")
 				}
 				log.Errorfc(ctx, "[admin] error finding user by sub=%s: %v", ai.Sub, err)
 				return echo.NewHTTPError(http.StatusInternalServerError)

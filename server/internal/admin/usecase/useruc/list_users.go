@@ -13,6 +13,11 @@ import (
 // ErrOperationDenied is returned when the operator lacks the required admin permission.
 var ErrOperationDenied = rerror.NewE(i18n.T("operation denied"))
 
+// ErrInvalidOperator is returned when no authenticated operator is supplied.
+// In practice the auth middleware always provides one; this is a defensive
+// guard against a nil dereference from future call sites.
+var ErrInvalidOperator = rerror.NewE(i18n.T("invalid operator"))
+
 // ListUsersOutput is the response for listing users.
 type ListUsersOutput struct {
 	Items []*UserItem `json:"items"`
@@ -51,6 +56,10 @@ func NewListUsersUseCase(userRepo user.Repo, checker *authz.Checker) *ListUsersU
 
 // Execute returns all users after verifying the operator's admin permission.
 func (uc *ListUsersUseCase) Execute(ctx context.Context, operator *user.User) (*ListUsersOutput, error) {
+	if operator == nil {
+		return nil, ErrInvalidOperator
+	}
+
 	allowed, err := uc.authz.Allowed(ctx, operator.ID(), adminrbac.ResourceUser, adminrbac.ActionList)
 	if err != nil {
 		return nil, err

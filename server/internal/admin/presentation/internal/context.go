@@ -23,5 +23,5 @@ func GetUser(c echo.Context) (*user.User, error) {
 	if u, ok := c.Get(userContextKey).(*user.User); ok && u != nil {
 		return u, nil
 	}
-	return nil, echo.NewHTTPError(http.StatusUnauthorized, "user not found in context")
+	return nil, echo.NewHTTPError(http.StatusUnauthorized, "unauthorized")
 }
