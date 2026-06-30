@@ -67,10 +67,15 @@ func (u response) Error() string {
 	return u.Message
 }
 
-func New(domain, clientID, clientSecret string) *Auth0 {
+const defaultHTTPTimeout = 5 * time.Second
+
+func New(domain, clientID, clientSecret string, httpTimeout time.Duration) *Auth0 {
+	if httpTimeout <= 0 {
+		httpTimeout = defaultHTTPTimeout
+	}
 	return &Auth0{
 		domain:       urlFromDomain(domain),
-		client:       &http.Client{Timeout: 30 * time.Second},
+		client:       &http.Client{Timeout: httpTimeout},
 		clientID:     clientID,
 		clientSecret: clientSecret,
 	}

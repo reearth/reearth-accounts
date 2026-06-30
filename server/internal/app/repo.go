@@ -37,15 +37,16 @@ func initGateways(ctx context.Context, conf *Config) *gateway.Container {
 	// subs going to Auth0 and CIP subs going to Firebase when both coexist.
 	authenticators := map[gateway.Provider]gateway.Authenticator{}
 	if conf.Auth0.Domain != "" {
-		authenticators[gateway.ProviderAuth0] = auth0.New(conf.Auth0.Domain, conf.Auth0.ClientID, conf.Auth0.ClientSecret)
+		authenticators[gateway.ProviderAuth0] = auth0.New(conf.Auth0.Domain, conf.Auth0.ClientID, conf.Auth0.ClientSecret, conf.Auth0.HTTPTimeout)
 	}
 	if conf.GetAuthProvider() == "cip" {
 		if conf.CIP.ProjectID == "" {
 			log.Fatalf("REEARTH_ACCOUNTS_AUTH_PROVIDER=cip requires REEARTH_ACCOUNTS_CIP_PROJECT_ID")
 		}
 		cipAuth, cipErr := cip.New(ctx, cip.Params{
-			ProjectID: conf.CIP.ProjectID,
-			TenantID:  conf.CIP.TenantID,
+			HTTPTimeout: conf.CIP.HTTPTimeout,
+			ProjectID:   conf.CIP.ProjectID,
+			TenantID:    conf.CIP.TenantID,
 		}, mailerInstance)
 		if cipErr != nil {
 			log.Fatalf("Failed to init CIP authenticator: %+v\n", cipErr)

@@ -29,6 +29,9 @@ func initEcho(ctx context.Context, cfg *ServerConfig) *echo.Echo {
 	e.Debug = cfg.Debug
 	e.HideBanner = true
 	e.HidePort = true
+	e.Server.IdleTimeout = cfg.Config.ServerIdleTimeout
+	e.Server.ReadHeaderTimeout = cfg.Config.ServerReadHeaderTimeout
+	e.Server.ReadTimeout = cfg.Config.ServerReadTimeout
 
 	logger := log.NewEcho()
 	e.Logger = logger

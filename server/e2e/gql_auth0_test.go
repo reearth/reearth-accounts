@@ -87,7 +87,7 @@ func TestUpdateMe_Auth0User_UpdatesName(t *testing.T) {
 	mockSrv := newMockAuth0Server(t)
 	defer mockSrv.Close()
 
-	authenticator := auth0.New(mockSrv.URL, "clientid", "clientsecret")
+	authenticator := auth0.New(mockSrv.URL, "clientid", "clientsecret", 0)
 	e, _ := StartServerWithAuthenticator(t, &app.Config{}, true, seedAuth0User, authenticator)
 
 	query := `mutation { updateMe(input: {name: "renameduser"}){ me{ id name } }}`
