@@ -144,6 +144,7 @@ func initEcho(ctx context.Context, cfg *ServerConfig) *echo.Echo {
 	}
 	adapterhttp.RegisterRESTRouter(e, adapterhttp.RouterConfig{
 		AuthResolver:       restAuthResolver(cfg),
+		CacheControl:       cacheControl,
 		UsecaseMiddleware:  usecaseMiddleware,
 		JWTMiddleware:      restJWT,
 		AuthConfigProvider: cfg.Config,
