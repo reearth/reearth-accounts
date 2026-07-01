@@ -11,6 +11,7 @@ import (
 func New(_ context.Context, pool *pgxpool.Pool, users []user.Repo) (*repo.Container, error) {
 	c := NewClient(pool)
 	return &repo.Container{
+		AdminUser:   NewAdminUser(c),
 		User:        NewUser(c),
 		Workspace:   NewWorkspace(c),
 		Role:        NewRole(c),
