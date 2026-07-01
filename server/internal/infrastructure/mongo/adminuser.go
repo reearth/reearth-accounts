@@ -9,6 +9,7 @@ import (
 	"github.com/reearth/reearthx/rerror"
 	"github.com/reearth/reearthx/usecasex"
 	"go.mongodb.org/mongo-driver/bson"
+	"go.mongodb.org/mongo-driver/mongo"
 )
 
 type AdminUser struct {
@@ -58,7 +59,13 @@ func (r *AdminUser) Save(ctx context.Context, u *adminuser.AdminUser) error {
 		return nil
 	}
 	doc, uid := mongodoc.NewAdminUser(*u)
-	return r.client.SaveOne(ctx, uid, doc)
+	if err := r.client.SaveOne(ctx, uid, doc); err != nil {
+		if mongo.IsDuplicateKeyError(err) {
+			return adminuser.ErrDuplicatedAdminUser
+		}
+		return err
+	}
+	return nil
 }
 
 func (r *AdminUser) find(ctx context.Context, filter any) (adminuser.List, error) {
@@ -79,13 +86,16 @@ func (r *AdminUser) findOne(ctx context.Context, filter any) (*adminuser.AdminUs
 
 // filterAdminUsers keeps the order of ids and drops missing ones.
 func filterAdminUsers(ids adminuser.IDList, rows adminuser.List) adminuser.List {
+	m := make(map[adminuser.ID]*adminuser.AdminUser, len(rows))
+	for _, r := range rows {
+		if r != nil {
+			m[r.ID()] = r
+		}
+	}
 	res := make(adminuser.List, 0, len(ids))
 	for _, id := range ids {
-		for _, r := range rows {
-			if r != nil && r.ID() == id {
-				res = append(res, r)
-				break
-			}
+		if u, ok := m[id]; ok {
+			res = append(res, u)
 		}
 	}
 	return res

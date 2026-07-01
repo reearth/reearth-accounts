@@ -15,8 +15,8 @@ type AdminUserDocument struct {
 	Status     string    `json:"status" bson:"status" jsonschema:"required,description=Admin user status: pending, approved or rejected"`
 	ApprovedBy string    `json:"approvedby" bson:"approvedby" jsonschema:"description=ID of the admin who approved this user (ULID format). Default: \"\""`
 	ApprovedAt time.Time `json:"approvedat" bson:"approvedat" jsonschema:"description=Approval timestamp"`
-	CreatedAt  time.Time `json:"createdat" bson:"createdat" jsonschema:"description=Creation timestamp"`
-	UpdatedAt  time.Time `json:"updatedat" bson:"updatedat" jsonschema:"description=Last update timestamp"`
+	CreatedAt  time.Time `json:"createdat" bson:"createdat" jsonschema:"required,description=Creation timestamp"`
+	UpdatedAt  time.Time `json:"updatedat" bson:"updatedat" jsonschema:"required,description=Last update timestamp"`
 }
 
 type AdminUserConsumer = Consumer[*AdminUserDocument, *adminuser.AdminUser]

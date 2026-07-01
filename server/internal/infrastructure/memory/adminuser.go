@@ -115,6 +115,13 @@ func (r *AdminUser) Save(ctx context.Context, u *adminuser.AdminUser) error {
 	r.lock.Lock()
 	defer r.lock.Unlock()
 
+	// enforce the same unique-email invariant as the Mongo unique index
+	for id, v := range r.data {
+		if id != u.ID() && v.Email() == u.Email() {
+			return adminuser.ErrDuplicatedAdminUser
+		}
+	}
+
 	r.data[u.ID()] = u
 	return nil
 }

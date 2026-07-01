@@ -32,6 +32,22 @@ func TestAdminUser_SaveAndFind(t *testing.T) {
 	assert.Equal(t, rerror.ErrNotFound, err)
 }
 
+func TestAdminUser_Save_DuplicateEmail(t *testing.T) {
+	ctx := context.Background()
+	r := NewAdminUser()
+
+	u1 := adminuser.New().NewID().Name("Alice").Email("alice@eukarya.io").MustBuild()
+	assert.NoError(t, r.Save(ctx, u1))
+
+	// different id, same email -> rejected
+	u2 := adminuser.New().NewID().Name("Alice2").Email("alice@eukarya.io").MustBuild()
+	assert.Equal(t, adminuser.ErrDuplicatedAdminUser, r.Save(ctx, u2))
+
+	// updating the same record keeps working
+	u1.Approve(adminuser.NewID())
+	assert.NoError(t, r.Save(ctx, u1))
+}
+
 func TestAdminUser_FindByIDs(t *testing.T) {
 	ctx := context.Background()
 	u1 := adminuser.New().NewID().Name("A").Email("a@eukarya.io").MustBuild()

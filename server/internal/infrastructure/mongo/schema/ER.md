@@ -9,12 +9,12 @@ erDiagram
         string id UK
         date approvedat "optional"
         string approvedby "optional"
-        date createdat "optional"
+        date createdat
         string email
         string name
         string pictureurl "optional"
         string status
-        date updatedat "optional"
+        date updatedat
     }
 
     Config {
