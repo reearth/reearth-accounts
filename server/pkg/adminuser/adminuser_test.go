@@ -82,5 +82,9 @@ func TestAdminUser_UpdateProfile(t *testing.T) {
 
 func TestNormalizeEmail(t *testing.T) {
 	assert.Equal(t, "alice@eukarya.io", NormalizeEmail("  Alice@Eukarya.io "))
+	// display-name form is reduced to the bare address
+	assert.Equal(t, "alice@eukarya.io", NormalizeEmail("Alice <Alice@Eukarya.io>"))
+	// invalid input is returned lowercased/trimmed unchanged
+	assert.Equal(t, "not-an-email", NormalizeEmail("  Not-An-Email "))
 	assert.Equal(t, "", NormalizeEmail(""))
 }

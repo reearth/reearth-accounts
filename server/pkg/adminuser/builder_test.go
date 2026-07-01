@@ -87,6 +87,17 @@ func TestBuilder_Build(t *testing.T) {
 	}
 }
 
+func TestBuilder_ApprovedStatusDefaultsApprovedAt(t *testing.T) {
+	u := New().NewID().Name("Alice").Email("alice@eukarya.io").Status(StatusApproved).MustBuild()
+	assert.True(t, u.IsApproved())
+	assert.False(t, u.ApprovedAt().IsZero())
+}
+
+func TestBuilder_NormalizesDisplayNameEmail(t *testing.T) {
+	u := New().NewID().Name("Alice").Email("Alice <Alice@Eukarya.io>").MustBuild()
+	assert.Equal(t, "alice@eukarya.io", u.Email())
+}
+
 func TestBuilder_NewID(t *testing.T) {
 	u := New().NewID().Name("Bob").Email("bob@eukarya.io").MustBuild()
 	assert.False(t, u.ID().IsEmpty())

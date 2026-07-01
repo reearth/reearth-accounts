@@ -107,10 +107,11 @@ func (u *AdminUser) Approve(by ID) {
 	if u == nil {
 		return
 	}
+	now := time.Now()
 	u.status = StatusApproved
 	u.approvedBy = by
-	u.approvedAt = time.Now()
-	u.updatedAt = time.Now()
+	u.approvedAt = now
+	u.updatedAt = now
 }
 
 // Reject marks the user as rejected. It is used both to reject a pending user
@@ -139,15 +140,23 @@ func (u *AdminUser) UpdateProfile(name, pictureURL string) error {
 	return nil
 }
 
-// NormalizeEmail lowercases and trims an email so it can be used as a stable,
-// case-insensitive unique key.
+// NormalizeEmail parses an email, strips any display-name portion, then
+// lowercases and trims the address so it can be used as a stable,
+// case-insensitive unique key. Invalid input is returned lowercased/trimmed
+// unchanged so callers using it purely as a lookup key still get a stable form.
 func NormalizeEmail(email string) string {
+	if addr, err := mail.ParseAddress(email); err == nil {
+		return strings.ToLower(strings.TrimSpace(addr.Address))
+	}
 	return strings.ToLower(strings.TrimSpace(email))
 }
 
-func validateEmail(email string) error {
-	if _, err := mail.ParseAddress(email); err != nil {
-		return ErrInvalidEmail
+// normalizeAndValidateEmail validates an email and returns its canonical form
+// (address only, lowercased, trimmed).
+func normalizeAndValidateEmail(email string) (string, error) {
+	addr, err := mail.ParseAddress(email)
+	if err != nil {
+		return "", ErrInvalidEmail
 	}
-	return nil
+	return strings.ToLower(strings.TrimSpace(addr.Address)), nil
 }

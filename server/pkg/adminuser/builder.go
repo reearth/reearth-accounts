@@ -17,9 +17,11 @@ func (b *Builder) Build() (*AdminUser, error) {
 	if b.u.name == "" {
 		return nil, ErrEmptyName
 	}
-	if err := validateEmail(b.u.email); err != nil {
+	email, err := normalizeAndValidateEmail(b.u.email)
+	if err != nil {
 		return nil, err
 	}
+	b.u.email = email
 
 	// Default to pending when no status was explicitly set.
 	if b.u.status == "" {
@@ -34,7 +36,12 @@ func (b *Builder) Build() (*AdminUser, error) {
 		b.u.updatedAt = time.Now()
 	}
 
-	b.u.email = NormalizeEmail(b.u.email)
+	// Keep approval metadata consistent: an approved user must have an
+	// approvedAt. approvedBy may legitimately be empty (e.g. bootstrap-approved
+	// users have no human approver).
+	if b.u.status == StatusApproved && b.u.approvedAt.IsZero() {
+		b.u.approvedAt = b.u.updatedAt
+	}
 
 	return b.u, nil
 }
