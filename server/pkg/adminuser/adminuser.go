@@ -103,8 +103,11 @@ func (u *AdminUser) IsRejected() bool {
 }
 
 // Approve marks the user as approved and records who approved it and when.
+// It is idempotent for already-approved users so the original approval audit
+// data (approvedBy / approvedAt) is preserved on duplicate actions or retries;
+// a rejected user can still be re-approved.
 func (u *AdminUser) Approve(by ID) {
-	if u == nil {
+	if u == nil || u.status == StatusApproved {
 		return
 	}
 	now := time.Now()

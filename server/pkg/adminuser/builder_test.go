@@ -93,6 +93,17 @@ func TestBuilder_ApprovedStatusDefaultsApprovedAt(t *testing.T) {
 	assert.False(t, u.ApprovedAt().IsZero())
 }
 
+func TestBuilder_PendingClearsApprovalMetadata(t *testing.T) {
+	u := New().NewID().Name("Alice").Email("alice@eukarya.io").
+		Status(StatusPending).
+		ApprovedBy(NewID()).
+		ApprovedAt(time.Now()).
+		MustBuild()
+	assert.True(t, u.IsPending())
+	assert.True(t, u.ApprovedBy().IsEmpty())
+	assert.True(t, u.ApprovedAt().IsZero())
+}
+
 func TestBuilder_NormalizesDisplayNameEmail(t *testing.T) {
 	u := New().NewID().Name("Alice").Email("Alice <Alice@Eukarya.io>").MustBuild()
 	assert.Equal(t, "alice@eukarya.io", u.Email())

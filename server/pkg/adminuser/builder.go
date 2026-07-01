@@ -36,11 +36,19 @@ func (b *Builder) Build() (*AdminUser, error) {
 		b.u.updatedAt = time.Now()
 	}
 
-	// Keep approval metadata consistent: an approved user must have an
-	// approvedAt. approvedBy may legitimately be empty (e.g. bootstrap-approved
-	// users have no human approver).
-	if b.u.status == StatusApproved && b.u.approvedAt.IsZero() {
-		b.u.approvedAt = b.u.updatedAt
+	// Keep approval metadata consistent with the status.
+	switch b.u.status {
+	case StatusApproved:
+		// An approved user must have an approvedAt. approvedBy may legitimately
+		// be empty (e.g. bootstrap-approved users have no human approver).
+		if b.u.approvedAt.IsZero() {
+			b.u.approvedAt = b.u.updatedAt
+		}
+	case StatusPending:
+		// A pending user has never been approved, so it must carry no approval
+		// metadata.
+		b.u.approvedAt = time.Time{}
+		b.u.approvedBy = ID{}
 	}
 
 	return b.u, nil

@@ -55,6 +55,30 @@ func TestAdminUser_Approve(t *testing.T) {
 	assert.False(t, u.UpdatedAt().Before(before))
 }
 
+func TestAdminUser_Approve_Idempotent(t *testing.T) {
+	u := newTestAdminUser()
+	first := NewID()
+	u.Approve(first)
+	approvedAt := u.ApprovedAt()
+
+	// re-approving an already-approved user must not overwrite audit data
+	u.Approve(NewID())
+	assert.Equal(t, first, u.ApprovedBy())
+	assert.Equal(t, approvedAt, u.ApprovedAt())
+}
+
+func TestAdminUser_Approve_AfterReject(t *testing.T) {
+	u := newTestAdminUser()
+	u.Approve(NewID())
+	u.Reject()
+	assert.True(t, u.IsRejected())
+
+	second := NewID()
+	u.Approve(second)
+	assert.True(t, u.IsApproved())
+	assert.Equal(t, second, u.ApprovedBy())
+}
+
 func TestAdminUser_Reject(t *testing.T) {
 	u := newTestAdminUser()
 	approver := NewID()
