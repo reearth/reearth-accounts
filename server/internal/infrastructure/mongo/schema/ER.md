@@ -4,6 +4,19 @@
 
 ```mermaid
 erDiagram
+    Adminuser {
+        objectId _id PK
+        string id UK
+        date approvedat "optional"
+        string approvedby "optional"
+        date createdat "optional"
+        string email
+        string name
+        string pictureurl "optional"
+        string status
+        date updatedat "optional"
+    }
+
     Config {
         objectId _id PK
         object auth "optional"

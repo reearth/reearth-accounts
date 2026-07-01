@@ -40,4 +40,7 @@ var migrations = migration.Migrations[DBClient]{
 	260128010002: ApplyPermittableUpdatedAtSchema,
 	260330120000: ApplyUserLatestLogoutAtSchema,
 	260422140204: SyncPersonalWorkspaceAlias,
+	260701120000: ApplyAdminUserSchema,
+	260701120001: AddAdminUserEmailIndex,
+	260701120002: AddAdminUserStatusCreatedAtIndex,
 }
