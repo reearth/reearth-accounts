@@ -24,8 +24,10 @@ type RouterConfig struct {
 	JWTMiddleware echo.MiddlewareFunc
 	// AuthConfigProvider exposes Auth0 settings for GET /api/auth/config.
 	AuthConfigProvider adapter.Auth0ConfigProvider
-	// APIKey is the M2M key for service-to-service routes.
+	// APIKey is the M2M key for service-to-service routes (find-or-create, permissions/check).
 	APIKey string
+	// SyncSSOAPIKey is the dedicated M2M key for the sync-sso route.
+	SyncSSOAPIKey string
 	// Swagger basic-auth (optional).
 	SwaggerUser, SwaggerPass string
 	// Debug enables serving /swagger without credentials (debug/dev only); in
@@ -53,7 +55,7 @@ func RegisterRESTRouter(e *echo.Echo, cfg RouterConfig) {
 		// APIKeyOrAuth (the API key is not a JWT, so the validator would otherwise
 		// reject it as malformed before APIKeyOrAuth ever runs). When no API key is
 		// configured this is a no-op.
-		base = append(base, skipJWTOnAPIKey(cfg.APIKey, cfg.JWTMiddleware))
+		base = append(base, skipJWTOnAPIKey(cfg.JWTMiddleware, cfg.APIKey, cfg.SyncSSOAPIKey))
 	}
 	if cfg.UsecaseMiddleware != nil {
 		base = append(base, cfg.UsecaseMiddleware)
@@ -65,6 +67,7 @@ func RegisterRESTRouter(e *echo.Echo, cfg RouterConfig) {
 	required := RequiredAuth(cfg.AuthResolver)
 	optional := OptionalAuth(cfg.AuthResolver)
 	apikeyOrAuth := APIKeyOrAuth(cfg.APIKey)
+	syncSSOApikeyOrAuth := APIKeyOrAuth(cfg.SyncSSOAPIKey)
 
 	api := e.Group("/api", base...)
 
@@ -87,7 +90,7 @@ func RegisterRESTRouter(e *echo.Echo, cfg RouterConfig) {
 	api.GET("/users/:id", uh.Get, required)
 	api.POST("/users/signup", uh.Signup, optional)
 	api.POST("/users/signup-oidc", uh.SignupOIDC, optional)
-	api.POST("/users/sync-sso", uh.SyncSSOUser, optional)
+	api.POST("/users/sync-sso", uh.SyncSSOUser, optional, syncSSOApikeyOrAuth)
 	api.POST("/users/verifications", uh.CreateVerification, optional)
 	api.POST("/users/verify", uh.VerifyUser)
 	api.POST("/users/password-reset/start", uh.StartPasswordReset)
