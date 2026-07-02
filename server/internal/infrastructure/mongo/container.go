@@ -29,6 +29,7 @@ func New(ctx context.Context, db *mongo.Database, useTransaction, needCompat boo
 	}
 
 	c := &repo.Container{
+		AdminUser:   NewAdminUser(client),
 		User:        NewUser(client),
 		Workspace:   ws,
 		Role:        NewRole(client),

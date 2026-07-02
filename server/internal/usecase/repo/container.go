@@ -1,6 +1,7 @@
 package repo
 
 import (
+	"github.com/reearth/reearth-accounts/server/pkg/adminuser"
 	"github.com/reearth/reearth-accounts/server/pkg/config"
 	"github.com/reearth/reearth-accounts/server/pkg/permittable"
 	"github.com/reearth/reearth-accounts/server/pkg/role"
@@ -12,6 +13,7 @@ import (
 )
 
 type Container struct {
+	AdminUser   adminuser.Repo
 	User        user.Repo
 	Workspace   workspace.Repo
 	Role        role.Repo
@@ -31,6 +33,7 @@ func (c *Container) Filtered(f workspace.WorkspaceFilter) *Container {
 	}
 	return &Container{
 		Workspace:   c.Workspace.Filtered(f),
+		AdminUser:   c.AdminUser,
 		User:        c.User,
 		Users:       c.Users,
 		Role:        c.Role,

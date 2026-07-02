@@ -8,6 +8,18 @@ import (
 	"time"
 )
 
+type AdminUser struct {
+	ID         string
+	Email      string
+	Name       string
+	PictureUrl string
+	Status     string
+	ApprovedBy string
+	ApprovedAt *time.Time
+	CreatedAt  time.Time
+	UpdatedAt  time.Time
+}
+
 type Config struct {
 	ID            int32
 	Migration     int64

@@ -7,6 +7,7 @@ import (
 
 func New() *repo.Container {
 	return &repo.Container{
+		AdminUser:   NewAdminUser(),
 		User:        NewUser(),
 		Workspace:   NewWorkspace(),
 		Role:        NewRole(),

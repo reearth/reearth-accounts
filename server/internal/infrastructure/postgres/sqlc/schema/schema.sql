@@ -50,6 +50,18 @@ CREATE TABLE workspace_integrations (
     PRIMARY KEY (workspace_id, integration_id)
 );
 
+CREATE TABLE admin_users (
+    id          text PRIMARY KEY,
+    email       text NOT NULL,
+    name        text NOT NULL,
+    picture_url text NOT NULL DEFAULT '',
+    status      text NOT NULL,
+    approved_by text NOT NULL DEFAULT '',
+    approved_at timestamptz,
+    created_at  timestamptz NOT NULL DEFAULT now(),
+    updated_at  timestamptz NOT NULL DEFAULT now()
+);
+
 CREATE TABLE roles (
     id   text PRIMARY KEY,
     name text NOT NULL
