@@ -84,6 +84,17 @@ func TestAdminUser_List(t *testing.T) {
 	assert.Equal(t, int64(1), pi.TotalCount)
 }
 
+func TestAdminUser_List_RejectsCursorPagination(t *testing.T) {
+	ctx := context.Background()
+	r := NewAdminUserWith(adminuser.New().NewID().Name("A").Email("a@eukarya.io").MustBuild())
+
+	cur := usecasex.Cursor("x")
+	first := int64(1)
+	p := usecasex.CursorPagination{First: &first, After: &cur}.Wrap()
+	_, _, err := r.List(ctx, adminuser.ListFilter{Pagination: p})
+	assert.ErrorIs(t, err, adminuser.ErrCursorPaginationUnsupported)
+}
+
 func TestAdminUser_List_Pagination(t *testing.T) {
 	ctx := context.Background()
 	u1 := adminuser.New().NewID().Name("1").Email("1@eukarya.io").MustBuild()

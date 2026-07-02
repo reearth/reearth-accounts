@@ -103,6 +103,10 @@ func orderAdminUsersByIDs(ids adminuser.IDList, rows adminuser.List) adminuser.L
 }
 
 func (r *AdminUser) List(ctx context.Context, f adminuser.ListFilter) (adminuser.List, *usecasex.PageInfo, error) {
+	if f.Pagination != nil && f.Pagination.Cursor != nil {
+		return nil, nil, adminuser.ErrCursorPaginationUnsupported
+	}
+
 	var where []string
 	var args []any
 	if f.Status != nil {

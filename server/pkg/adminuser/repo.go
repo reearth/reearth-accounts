@@ -8,7 +8,13 @@ import (
 	"github.com/reearth/reearthx/usecasex"
 )
 
-var ErrDuplicatedAdminUser = rerror.NewE(i18n.T("duplicated admin user"))
+var (
+	ErrDuplicatedAdminUser = rerror.NewE(i18n.T("duplicated admin user"))
+	// ErrCursorPaginationUnsupported is returned by List when cursor-based
+	// pagination is requested. Admin user listing is offset-based only
+	// (page / per_page), consistently across all backends.
+	ErrCursorPaginationUnsupported = rerror.NewE(i18n.T("cursor pagination is not supported for admin users"))
+)
 
 // ListFilter narrows and paginates a List query.
 type ListFilter struct {

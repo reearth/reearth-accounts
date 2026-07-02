@@ -67,6 +67,10 @@ func (r *AdminUser) FindByIDs(ctx context.Context, ids adminuser.IDList) (adminu
 }
 
 func (r *AdminUser) List(ctx context.Context, f adminuser.ListFilter) (adminuser.List, *usecasex.PageInfo, error) {
+	if f.Pagination != nil && f.Pagination.Cursor != nil {
+		return nil, nil, adminuser.ErrCursorPaginationUnsupported
+	}
+
 	r.lock.Lock()
 	defer r.lock.Unlock()
 
