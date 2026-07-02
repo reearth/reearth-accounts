@@ -11,12 +11,21 @@ import (
 const bearerPrefix = "Bearer "
 
 // skipJWTOnAPIKey wraps the JWT middleware so a request whose bearer token equals
-// the configured M2M API key bypasses JWT validation and reaches APIKeyOrAuth.
-// Without this, the JWT validator (which runs first on the /api group) would
-// reject the API key as a malformed JWT before the API-key middleware ever runs,
-// effectively breaking the advertised M2M flow.
-func skipJWTOnAPIKey(apiKey string, jwt echo.MiddlewareFunc) echo.MiddlewareFunc {
-	if jwt == nil || apiKey == "" {
+// any of the configured M2M API keys bypasses JWT validation and reaches the
+// per-route key middleware. Without this, the JWT validator (which runs first on
+// the /api group) would reject the API key as a malformed JWT before the
+// API-key middleware ever runs, effectively breaking the advertised M2M flow.
+func skipJWTOnAPIKey(jwt echo.MiddlewareFunc, apiKeys ...string) echo.MiddlewareFunc {
+	if jwt == nil {
+		return jwt
+	}
+	keys := make([]string, 0, len(apiKeys))
+	for _, k := range apiKeys {
+		if k != "" {
+			keys = append(keys, k)
+		}
+	}
+	if len(keys) == 0 {
 		return jwt
 	}
 	return func(next echo.HandlerFunc) echo.HandlerFunc {
@@ -24,8 +33,10 @@ func skipJWTOnAPIKey(apiKey string, jwt echo.MiddlewareFunc) echo.MiddlewareFunc
 			h := c.Request().Header.Get(echo.HeaderAuthorization)
 			if strings.HasPrefix(h, bearerPrefix) {
 				token := strings.TrimPrefix(h, bearerPrefix)
-				if subtle.ConstantTimeCompare([]byte(token), []byte(apiKey)) == 1 {
-					return next(c)
+				for _, k := range keys {
+					if subtle.ConstantTimeCompare([]byte(token), []byte(k)) == 1 {
+						return next(c)
+					}
 				}
 			}
 			return jwt(next)(c)

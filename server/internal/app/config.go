@@ -65,6 +65,7 @@ type Config struct {
 
 	// REST
 	RestAPIKey       string `envconfig:"REEARTH_ACCOUNTS_REST_API_KEY"`
+	SyncSSOAPIKey    string `envconfig:"REEARTH_ACCOUNTS_SYNC_SSO_API_KEY"`
 	SwaggerBasicUser string `envconfig:"REEARTH_ACCOUNTS_SWAGGER_BASIC_USER"`
 	SwaggerBasicPass string `envconfig:"REEARTH_ACCOUNTS_SWAGGER_BASIC_PASS"`
 
