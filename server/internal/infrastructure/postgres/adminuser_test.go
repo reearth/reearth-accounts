@@ -83,9 +83,12 @@ func TestAdminUser_FindByIDs(t *testing.T) {
 	require.NoError(t, r.Save(ctx, u1))
 	require.NoError(t, r.Save(ctx, u2))
 
-	got, err := r.FindByIDs(ctx, adminuser.IDList{u1.ID(), u2.ID()})
+	// requested-order is preserved (u2 before u1)
+	got, err := r.FindByIDs(ctx, adminuser.IDList{u2.ID(), u1.ID()})
 	require.NoError(t, err)
-	assert.Equal(t, 2, len(got))
+	require.Equal(t, 2, len(got))
+	assert.Equal(t, u2.ID(), got[0].ID())
+	assert.Equal(t, u1.ID(), got[1].ID())
 
 	got, err = r.FindByIDs(ctx, adminuser.IDList{adminuser.NewID()})
 	require.NoError(t, err)

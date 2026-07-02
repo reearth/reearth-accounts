@@ -77,7 +77,29 @@ func (r *AdminUser) FindByIDs(ctx context.Context, ids adminuser.IDList) (adminu
 	if err != nil {
 		return nil, rerror.ErrInternalByWithContext(ctx, err)
 	}
-	return adminUserModels(rows)
+	list, err := adminUserModels(rows)
+	if err != nil {
+		return nil, err
+	}
+	return orderAdminUsersByIDs(ids, list), nil
+}
+
+// orderAdminUsersByIDs reorders rows to match the requested id order and drops
+// missing ones, matching the Mongo/in-memory FindByIDs behavior.
+func orderAdminUsersByIDs(ids adminuser.IDList, rows adminuser.List) adminuser.List {
+	m := make(map[adminuser.ID]*adminuser.AdminUser, len(rows))
+	for _, r := range rows {
+		if r != nil {
+			m[r.ID()] = r
+		}
+	}
+	out := make(adminuser.List, 0, len(ids))
+	for _, id := range ids {
+		if u, ok := m[id]; ok {
+			out = append(out, u)
+		}
+	}
+	return out
 }
 
 func (r *AdminUser) List(ctx context.Context, f adminuser.ListFilter) (adminuser.List, *usecasex.PageInfo, error) {
