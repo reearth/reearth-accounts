@@ -16,12 +16,15 @@ func TestAdminUser_FindByIDAndEmail(t *testing.T) {
 	c := Connect(t)(t)
 	ctx := context.Background()
 	uid := adminuser.NewID()
+	now := time.Now()
 
 	_, _ = c.Collection("adminuser").InsertOne(ctx, bson.M{
-		"id":     uid.String(),
-		"email":  "alice@eukarya.io",
-		"name":   "Alice",
-		"status": "pending",
+		"id":        uid.String(),
+		"email":     "alice@eukarya.io",
+		"name":      "Alice",
+		"status":    "pending",
+		"createdat": now,
+		"updatedat": now,
 	})
 
 	r := NewAdminUser(mongox.NewClientWithDatabase(c))
@@ -45,10 +48,11 @@ func TestAdminUser_FindByIDs(t *testing.T) {
 	ctx := context.Background()
 	uid := adminuser.NewID()
 	uid2 := adminuser.NewID()
+	now := time.Now()
 
 	_, _ = c.Collection("adminuser").InsertMany(ctx, []any{
-		bson.M{"id": uid.String(), "email": "a@eukarya.io", "name": "A", "status": "pending"},
-		bson.M{"id": uid2.String(), "email": "b@eukarya.io", "name": "B", "status": "approved"},
+		bson.M{"id": uid.String(), "email": "a@eukarya.io", "name": "A", "status": "pending", "createdat": now, "updatedat": now},
+		bson.M{"id": uid2.String(), "email": "b@eukarya.io", "name": "B", "status": "approved", "createdat": now, "updatedat": now},
 	})
 
 	r := NewAdminUser(mongox.NewClientWithDatabase(c))
@@ -92,9 +96,9 @@ func TestAdminUser_List(t *testing.T) {
 	now := time.Now()
 
 	_, _ = c.Collection("adminuser").InsertMany(ctx, []any{
-		bson.M{"id": adminuser.NewID().String(), "email": "p1@eukarya.io", "name": "P1", "status": "pending", "createdat": now.Add(-2 * time.Hour)},
-		bson.M{"id": adminuser.NewID().String(), "email": "p2@eukarya.io", "name": "P2", "status": "pending", "createdat": now.Add(-1 * time.Hour)},
-		bson.M{"id": adminuser.NewID().String(), "email": "a1@eukarya.io", "name": "A1", "status": "approved", "createdat": now},
+		bson.M{"id": adminuser.NewID().String(), "email": "p1@eukarya.io", "name": "P1", "status": "pending", "createdat": now.Add(-2 * time.Hour), "updatedat": now},
+		bson.M{"id": adminuser.NewID().String(), "email": "p2@eukarya.io", "name": "P2", "status": "pending", "createdat": now.Add(-1 * time.Hour), "updatedat": now},
+		bson.M{"id": adminuser.NewID().String(), "email": "a1@eukarya.io", "name": "A1", "status": "approved", "createdat": now, "updatedat": now},
 	})
 
 	r := NewAdminUser(mongox.NewClientWithDatabase(c))
