@@ -49,5 +49,8 @@ func (h *Handler) clearSessionCookie() *http.Cookie {
 		Secure:   h.secure,
 		SameSite: http.SameSiteLaxMode,
 		MaxAge:   -1,
+		// Also set a past Expires for clients/proxies that honor the legacy
+		// RFC6265 deletion behavior rather than Max-Age.
+		Expires: time.Unix(0, 0),
 	}
 }

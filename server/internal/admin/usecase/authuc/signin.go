@@ -112,6 +112,14 @@ func (uc *GoogleSignInUseCase) Execute(ctx context.Context, idToken string) (*ad
 		return nil, err
 	}
 	if err := uc.repo.Save(ctx, created); err != nil {
+		// Lost a race with a concurrent first sign-in for the same email: the
+		// unique-email constraint rejected our insert, but the account now
+		// exists — return it instead of failing.
+		if errors.Is(err, adminuser.ErrDuplicatedAdminUser) {
+			if existing, ferr := uc.repo.FindByEmail(ctx, email); ferr == nil && existing != nil {
+				return existing, nil
+			}
+		}
 		return nil, err
 	}
 	return created, nil
