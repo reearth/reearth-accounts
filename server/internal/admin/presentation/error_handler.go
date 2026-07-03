@@ -6,6 +6,7 @@ import (
 
 	"github.com/labstack/echo/v4"
 	"github.com/reearth/reearth-accounts/server/internal/admin/presentation/internal"
+	"github.com/reearth/reearth-accounts/server/internal/admin/usecase/authuc"
 	"github.com/reearth/reearth-accounts/server/internal/admin/usecase/useruc"
 	"github.com/reearth/reearthx/log"
 	"github.com/reearth/reearthx/rerror"
@@ -43,6 +44,12 @@ func classify(err error) (status int, code, msg string) {
 	switch {
 	case errors.Is(err, useruc.ErrOperationDenied):
 		return http.StatusForbidden, http.StatusText(http.StatusForbidden), "operation denied"
+	case errors.Is(err, authuc.ErrInvalidToken):
+		return http.StatusUnauthorized, http.StatusText(http.StatusUnauthorized), "invalid id token"
+	case errors.Is(err, authuc.ErrEmailNotVerified):
+		return http.StatusForbidden, http.StatusText(http.StatusForbidden), "email not verified"
+	case errors.Is(err, authuc.ErrDomainNotAllowed):
+		return http.StatusForbidden, http.StatusText(http.StatusForbidden), "email domain not allowed"
 	case errors.Is(err, rerror.ErrNotFound):
 		return http.StatusNotFound, http.StatusText(http.StatusNotFound), "not found"
 	default:

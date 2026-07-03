@@ -17,6 +17,7 @@ require (
 	github.com/go-playground/validator/v10 v10.28.0
 	github.com/goforj/wire v1.2.0
 	github.com/golang-jwt/jwt v3.2.2+incompatible
+	github.com/golang-jwt/jwt/v5 v5.3.1
 	github.com/golang-migrate/migrate/v4 v4.19.1
 	github.com/google/uuid v1.6.0
 	github.com/hashicorp/golang-lru/v2 v2.0.7
