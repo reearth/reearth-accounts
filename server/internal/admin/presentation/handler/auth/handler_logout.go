@@ -8,8 +8,8 @@ import (
 
 // Logout godoc
 //
-//	@Summary		ログアウト
-//	@Description	セッション Cookie を破棄する。公開エンドポイント（期限切れ/無効なトークンでも Cookie を消去できるようにするため）。
+//	@Summary		Log out
+//	@Description	Clears the session cookie. Public endpoint so the cookie can be cleared even with an expired/invalid token.
 //	@Tags			auth
 //	@Produce		json
 //	@Success		204	"No Content"

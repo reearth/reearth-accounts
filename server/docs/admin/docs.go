@@ -17,7 +17,7 @@ const docTemplate = `{
     "paths": {
         "/auth/google": {
             "post": {
-                "description": "Google の id_token を検証し、管理者セッション Cookie を発行する。新規アカウントは pending（bootstrap 対象なら approved）。",
+                "description": "Verifies the Google id_token and issues an admin session cookie. New accounts are created as pending (approved when the email is bootstrapped).",
                 "consumes": [
                     "application/json"
                 ],
@@ -27,7 +27,7 @@ const docTemplate = `{
                 "tags": [
                     "auth"
                 ],
-                "summary": "Google id_token でサインイン",
+                "summary": "Sign in with a Google id_token",
                 "parameters": [
                     {
                         "description": "Google id_token",
@@ -47,19 +47,19 @@ const docTemplate = `{
                         }
                     },
                     "400": {
-                        "description": "リクエスト不正",
+                        "description": "invalid request",
                         "schema": {
                             "$ref": "#/definitions/ErrorResponse"
                         }
                     },
                     "401": {
-                        "description": "id_token 検証失敗",
+                        "description": "id_token verification failed",
                         "schema": {
                             "$ref": "#/definitions/ErrorResponse"
                         }
                     },
                     "403": {
-                        "description": "ドメイン不許可 / 未検証メール",
+                        "description": "domain not allowed / email not verified",
                         "schema": {
                             "$ref": "#/definitions/ErrorResponse"
                         }
@@ -69,14 +69,14 @@ const docTemplate = `{
         },
         "/auth/logout": {
             "post": {
-                "description": "セッション Cookie を破棄する。公開エンドポイント（期限切れ/無効なトークンでも Cookie を消去できるようにするため）。",
+                "description": "Clears the session cookie. Public endpoint so the cookie can be cleared even with an expired/invalid token.",
                 "produces": [
                     "application/json"
                 ],
                 "tags": [
                     "auth"
                 ],
-                "summary": "ログアウト",
+                "summary": "Log out",
                 "responses": {
                     "204": {
                         "description": "No Content"
@@ -86,14 +86,14 @@ const docTemplate = `{
         },
         "/me": {
             "get": {
-                "description": "セッション Cookie に対応する管理者ユーザーのレコードを返す（status を問わない）。",
+                "description": "Returns the admin user record for the session cookie (any status).",
                 "produces": [
                     "application/json"
                 ],
                 "tags": [
                     "auth"
                 ],
-                "summary": "現在の管理者ユーザーを取得",
+                "summary": "Get the current admin user",
                 "responses": {
                     "200": {
                         "description": "OK",
@@ -102,13 +102,13 @@ const docTemplate = `{
                         }
                     },
                     "401": {
-                        "description": "未認証",
+                        "description": "unauthorized",
                         "schema": {
                             "$ref": "#/definitions/ErrorResponse"
                         }
                     },
                     "404": {
-                        "description": "アカウントが存在しない",
+                        "description": "account not found",
                         "schema": {
                             "$ref": "#/definitions/ErrorResponse"
                         }

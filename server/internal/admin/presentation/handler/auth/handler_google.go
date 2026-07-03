@@ -9,16 +9,16 @@ import (
 
 // GoogleSignIn godoc
 //
-//	@Summary		Google id_token でサインイン
-//	@Description	Google の id_token を検証し、管理者セッション Cookie を発行する。新規アカウントは pending（bootstrap 対象なら approved）。
+//	@Summary		Sign in with a Google id_token
+//	@Description	Verifies the Google id_token and issues an admin session cookie. New accounts are created as pending (approved when the email is bootstrapped).
 //	@Tags			auth
 //	@Accept			json
 //	@Produce		json
 //	@Param			body	body		GoogleSignInRequest	true	"Google id_token"
 //	@Success		200		{object}	GoogleSignInResponse
-//	@Failure		400		{object}	internal.ErrorResponse	"リクエスト不正"
-//	@Failure		401		{object}	internal.ErrorResponse	"id_token 検証失敗"
-//	@Failure		403		{object}	internal.ErrorResponse	"ドメイン不許可 / 未検証メール"
+//	@Failure		400		{object}	internal.ErrorResponse	"invalid request"
+//	@Failure		401		{object}	internal.ErrorResponse	"id_token verification failed"
+//	@Failure		403		{object}	internal.ErrorResponse	"domain not allowed / email not verified"
 //	@Router			/auth/google [post]
 func (h *Handler) GoogleSignIn(c echo.Context) error {
 	var req GoogleSignInRequest

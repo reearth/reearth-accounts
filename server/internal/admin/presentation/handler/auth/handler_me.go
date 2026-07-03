@@ -13,13 +13,13 @@ import (
 // emits) has no cookie-auth security type, so there is no @Security annotation
 // here; the browser sends the cookie automatically.
 //
-//	@Summary		現在の管理者ユーザーを取得
-//	@Description	セッション Cookie に対応する管理者ユーザーのレコードを返す（status を問わない）。
+//	@Summary		Get the current admin user
+//	@Description	Returns the admin user record for the session cookie (any status).
 //	@Tags			auth
 //	@Produce		json
 //	@Success		200	{object}	MeResponse
-//	@Failure		401	{object}	internal.ErrorResponse	"未認証"
-//	@Failure		404	{object}	internal.ErrorResponse	"アカウントが存在しない"
+//	@Failure		401	{object}	internal.ErrorResponse	"unauthorized"
+//	@Failure		404	{object}	internal.ErrorResponse	"account not found"
 //	@Router			/me [get]
 func (h *Handler) Me(c echo.Context) error {
 	id, err := internal.GetSessionAdminUserID(c)
