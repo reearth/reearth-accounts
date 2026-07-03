@@ -9,6 +9,10 @@ import (
 
 // Me godoc
 //
+// Authenticates via the admin_session HttpOnly cookie. Swagger 2.0 (what swag
+// emits) has no cookie-auth security type, so there is no @Security annotation
+// here; the browser sends the cookie automatically.
+//
 //	@Summary		現在の管理者ユーザーを取得
 //	@Description	セッション Cookie に対応する管理者ユーザーのレコードを返す（status を問わない）。
 //	@Tags			auth
@@ -17,10 +21,6 @@ import (
 //	@Failure		401	{object}	internal.ErrorResponse	"未認証"
 //	@Failure		404	{object}	internal.ErrorResponse	"アカウントが存在しない"
 //	@Router			/me [get]
-
-// Note: this endpoint authenticates via the admin_session HttpOnly cookie.
-// Swagger 2.0 (what swag emits) has no cookie-auth security type, so there is
-// no @Security annotation here; the cookie is sent automatically by the browser.
 func (h *Handler) Me(c echo.Context) error {
 	id, err := internal.GetSessionAdminUserID(c)
 	if err != nil {

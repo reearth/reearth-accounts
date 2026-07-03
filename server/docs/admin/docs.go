@@ -84,6 +84,38 @@ const docTemplate = `{
                 }
             }
         },
+        "/me": {
+            "get": {
+                "description": "セッション Cookie に対応する管理者ユーザーのレコードを返す（status を問わない）。",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "auth"
+                ],
+                "summary": "現在の管理者ユーザーを取得",
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/MeResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "未認証",
+                        "schema": {
+                            "$ref": "#/definitions/ErrorResponse"
+                        }
+                    },
+                    "404": {
+                        "description": "アカウントが存在しない",
+                        "schema": {
+                            "$ref": "#/definitions/ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
         "/users": {
             "get": {
                 "security": [
@@ -181,6 +213,38 @@ const docTemplate = `{
                     "items": {
                         "$ref": "#/definitions/User"
                     }
+                }
+            }
+        },
+        "MeResponse": {
+            "type": "object",
+            "properties": {
+                "approvedAt": {
+                    "type": "string"
+                },
+                "approvedBy": {
+                    "type": "string"
+                },
+                "createdAt": {
+                    "type": "string"
+                },
+                "email": {
+                    "type": "string"
+                },
+                "id": {
+                    "type": "string"
+                },
+                "name": {
+                    "type": "string"
+                },
+                "pictureUrl": {
+                    "type": "string"
+                },
+                "status": {
+                    "type": "string"
+                },
+                "updatedAt": {
+                    "type": "string"
                 }
             }
         },

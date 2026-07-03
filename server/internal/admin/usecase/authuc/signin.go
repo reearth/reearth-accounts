@@ -57,7 +57,7 @@ func NewGoogleSignInUseCase(repo adminuser.Repo, verifier google.Verifier, opts 
 // returns the (created or existing) admin user.
 func (uc *GoogleSignInUseCase) Execute(ctx context.Context, idToken string) (*adminuser.AdminUser, error) {
 	claims, err := uc.verifier.Verify(ctx, idToken)
-	if err != nil {
+	if err != nil || claims == nil {
 		return nil, ErrInvalidToken
 	}
 	if !claims.EmailVerified {
