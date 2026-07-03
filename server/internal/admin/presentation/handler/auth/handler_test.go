@@ -50,7 +50,7 @@ func newTestEcho(t *testing.T, claims *google.Claims) *echo.Echo {
 	e.Validator = testValidator{v: validator.New()}
 	e.HTTPErrorHandler = adminhttp.CustomHTTPErrorHandler
 	e.POST("/api/v1/auth/google", h.GoogleSignIn)
-	e.POST("/api/v1/auth/logout", h.Logout, sessionMw)
+	e.POST("/api/v1/auth/logout", h.Logout) // public, mirrors the real router
 	e.GET("/api/v1/me", h.Me, sessionMw)
 	return e
 }
@@ -103,6 +103,23 @@ func TestAuthFlow_GoogleThenMeThenLogout(t *testing.T) {
 
 	var cleared bool
 	for _, c := range logoutRec.Result().Cookies() {
+		if c.Name == session.CookieName && c.MaxAge < 0 {
+			cleared = true
+		}
+	}
+	assert.True(t, cleared, "logout must expire the session cookie")
+}
+
+func TestLogout_NoCookie_Succeeds(t *testing.T) {
+	e := newTestEcho(t, nil)
+	req := httptest.NewRequest(http.MethodPost, "/api/v1/auth/logout", nil)
+	rec := httptest.NewRecorder()
+	e.ServeHTTP(rec, req)
+	// logout is public: it clears the cookie even with no/expired session
+	assert.Equal(t, http.StatusNoContent, rec.Code)
+
+	var cleared bool
+	for _, c := range rec.Result().Cookies() {
 		if c.Name == session.CookieName && c.MaxAge < 0 {
 			cleared = true
 		}
