@@ -16,8 +16,11 @@ import (
 //	@Success		200	{object}	MeResponse
 //	@Failure		401	{object}	internal.ErrorResponse	"未認証"
 //	@Failure		404	{object}	internal.ErrorResponse	"アカウントが存在しない"
-//	@Security		AdminSession
 //	@Router			/me [get]
+
+// Note: this endpoint authenticates via the admin_session HttpOnly cookie.
+// Swagger 2.0 (what swag emits) has no cookie-auth security type, so there is
+// no @Security annotation here; the cookie is sent automatically by the browser.
 func (h *Handler) Me(c echo.Context) error {
 	id, err := internal.GetSessionAdminUserID(c)
 	if err != nil {
