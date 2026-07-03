@@ -5,6 +5,7 @@ package di
 
 import (
 	"github.com/goforj/wire"
+	"github.com/reearth/reearth-accounts/server/internal/admin/usecase/authuc"
 	"github.com/reearth/reearth-accounts/server/internal/admin/usecase/authz"
 	"github.com/reearth/reearth-accounts/server/internal/admin/usecase/useruc"
 )
@@ -14,4 +15,11 @@ import (
 var usecaseWire = wire.NewSet(
 	authz.NewChecker,
 	useruc.NewListUsersUseCase,
+
+	// session auth dependencies + usecases
+	provideGoogleVerifier,
+	provideSessionManager,
+	provideGoogleSignInOptions,
+	authuc.NewGoogleSignInUseCase,
+	authuc.NewGetMeUseCase,
 )

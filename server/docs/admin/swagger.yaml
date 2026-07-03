@@ -9,12 +9,51 @@ definitions:
         example: invalid request
         type: string
     type: object
+  GoogleSignInRequest:
+    properties:
+      id_token:
+        type: string
+    required:
+    - id_token
+    type: object
+  GoogleSignInResponse:
+    properties:
+      email:
+        type: string
+      name:
+        type: string
+      pictureUrl:
+        type: string
+      status:
+        type: string
+    type: object
   ListUsersResponse:
     properties:
       items:
         items:
           $ref: '#/definitions/User'
         type: array
+    type: object
+  MeResponse:
+    properties:
+      approvedAt:
+        type: string
+      approvedBy:
+        type: string
+      createdAt:
+        type: string
+      email:
+        type: string
+      id:
+        type: string
+      name:
+        type: string
+      pictureUrl:
+        type: string
+      status:
+        type: string
+      updatedAt:
+        type: string
     type: object
   User:
     properties:
@@ -33,6 +72,74 @@ info:
   title: Re:Earth Accounts Admin API
   version: "1.0"
 paths:
+  /auth/google:
+    post:
+      consumes:
+      - application/json
+      description: Verifies the Google id_token and issues an admin session cookie.
+        New accounts are created as pending (approved when the email is bootstrapped).
+      parameters:
+      - description: Google id_token
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/GoogleSignInRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/GoogleSignInResponse'
+        "400":
+          description: invalid request
+          schema:
+            $ref: '#/definitions/ErrorResponse'
+        "401":
+          description: id_token verification failed
+          schema:
+            $ref: '#/definitions/ErrorResponse'
+        "403":
+          description: domain not allowed / email not verified
+          schema:
+            $ref: '#/definitions/ErrorResponse'
+      summary: Sign in with a Google id_token
+      tags:
+      - auth
+  /auth/logout:
+    post:
+      description: Clears the session cookie. Public endpoint so the cookie can be
+        cleared even with an expired/invalid token.
+      produces:
+      - application/json
+      responses:
+        "204":
+          description: No Content
+      summary: Log out
+      tags:
+      - auth
+  /me:
+    get:
+      description: Returns the admin user record for the session cookie (any status).
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/MeResponse'
+        "401":
+          description: unauthorized
+          schema:
+            $ref: '#/definitions/ErrorResponse'
+        "404":
+          description: account not found
+          schema:
+            $ref: '#/definitions/ErrorResponse'
+      summary: Get the current admin user
+      tags:
+      - auth
   /users:
     get:
       consumes:
