@@ -37,11 +37,19 @@ func InitializeEcho() (*Server, func(), error) {
 	checker := authz.NewChecker(grpcClient, roleRepo, permittableRepo)
 	listUsersUseCase := useruc.NewListUsersUseCase(repo, checker)
 	userHandler := user.NewHandler(listUsersUseCase)
-	verifier := provideGoogleVerifier(config)
+	verifier, err := provideGoogleVerifier(config)
+	if err != nil {
+		cleanup()
+		return nil, nil, err
+	}
 	googleSignInOptions := provideGoogleSignInOptions(config)
 	googleSignInUseCase := authuc.NewGoogleSignInUseCase(adminUserRepo, verifier, googleSignInOptions)
 	getMeUseCase := authuc.NewGetMeUseCase(adminUserRepo)
-	manager := provideSessionManager(config)
+	manager, err := provideSessionManager(config)
+	if err != nil {
+		cleanup()
+		return nil, nil, err
+	}
 	cookieSecure := provideCookieSecure(config)
 	authHandler := auth.NewHandler(googleSignInUseCase, getMeUseCase, manager, cookieSecure)
 	v := provideJWTProviders(config)

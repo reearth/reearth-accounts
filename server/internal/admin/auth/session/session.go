@@ -16,7 +16,8 @@ var (
 	// ErrInvalidToken is returned when a token is malformed, has a bad
 	// signature, is expired, or carries an unusable subject.
 	ErrInvalidToken = errors.New("invalid session token")
-	// ErrEmptySecret is returned by NewManager when no signing secret is set.
+	// ErrEmptySecret is returned by Issue/Parse when no signing secret is
+	// configured (NewManager itself never fails).
 	ErrEmptySecret = errors.New("session secret is empty")
 )
 

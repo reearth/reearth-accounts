@@ -69,12 +69,7 @@ const docTemplate = `{
         },
         "/auth/logout": {
             "post": {
-                "security": [
-                    {
-                        "AdminSession": []
-                    }
-                ],
-                "description": "セッション Cookie を破棄する。",
+                "description": "セッション Cookie を破棄する。公開エンドポイント（期限切れ/無効なトークンでも Cookie を消去できるようにするため）。",
                 "produces": [
                     "application/json"
                 ],
@@ -85,12 +80,6 @@ const docTemplate = `{
                 "responses": {
                     "204": {
                         "description": "No Content"
-                    },
-                    "401": {
-                        "description": "未認証",
-                        "schema": {
-                            "$ref": "#/definitions/ErrorResponse"
-                        }
                     }
                 }
             }

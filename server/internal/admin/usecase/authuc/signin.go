@@ -78,9 +78,19 @@ func (uc *GoogleSignInUseCase) Execute(ctx context.Context, idToken string) (*ad
 	}
 
 	if u != nil {
-		// refresh the profile from the latest Google data on each sign-in
+		// Refresh the profile from the latest Google data on each sign-in.
+		// Name and picture are updated independently, and an empty Google claim
+		// keeps the stored value (UpdateProfile requires a non-empty name).
+		name := u.Name()
 		if claims.Name != "" {
-			if err := u.UpdateProfile(claims.Name, claims.PictureURL); err != nil {
+			name = claims.Name
+		}
+		picture := u.PictureURL()
+		if claims.PictureURL != "" {
+			picture = claims.PictureURL
+		}
+		if name != u.Name() || picture != u.PictureURL() {
+			if err := u.UpdateProfile(name, picture); err != nil {
 				return nil, err
 			}
 			if err := uc.repo.Save(ctx, u); err != nil {

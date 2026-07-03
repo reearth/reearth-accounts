@@ -173,14 +173,33 @@ func provideJWTProviders(cfg *Config) []appx.JWTProvider {
 }
 
 // provideGoogleVerifier builds the Google id_token verifier bound to the admin
-// OAuth client ID.
-func provideGoogleVerifier(cfg *Config) google.Verifier {
-	return google.NewVerifier(cfg.GoogleOAuthClientID)
+// OAuth client ID. A missing client ID is a misconfiguration that would reject
+// every sign-in, so we fail fast in production (and warn in development).
+func provideGoogleVerifier(cfg *Config) (google.Verifier, error) {
+	if cfg.GoogleOAuthClientID == "" {
+		if cfg.IsProduction() {
+			return nil, fmt.Errorf("REEARTH_ACCOUNTS_ADMIN_GOOGLE_OAUTH_CLIENT_ID is required in production")
+		}
+		log.Warnf("admin Google OAuth client ID not configured; Google sign-in will reject all tokens")
+	}
+	return google.NewVerifier(cfg.GoogleOAuthClientID), nil
 }
 
-// provideSessionManager builds the session-token issuer/parser.
-func provideSessionManager(cfg *Config) *session.Manager {
-	return session.NewManager(cfg.SessionSecret, cfg.SessionTTL)
+// provideSessionManager builds the session-token issuer/parser. An empty secret
+// or non-positive TTL would silently break sign-in (500s / immediately-expired
+// tokens), so we validate up front: TTL is always required, and the secret is
+// required in production (a warning in development).
+func provideSessionManager(cfg *Config) (*session.Manager, error) {
+	if cfg.SessionTTL <= 0 {
+		return nil, fmt.Errorf("REEARTH_ACCOUNTS_ADMIN_SESSION_TTL must be positive")
+	}
+	if cfg.SessionSecret == "" {
+		if cfg.IsProduction() {
+			return nil, fmt.Errorf("REEARTH_ACCOUNTS_ADMIN_SESSION_SECRET is required in production")
+		}
+		log.Warnf("admin session secret not configured; Google sign-in will fail until REEARTH_ACCOUNTS_ADMIN_SESSION_SECRET is set")
+	}
+	return session.NewManager(cfg.SessionSecret, cfg.SessionTTL), nil
 }
 
 // provideGoogleSignInOptions maps config to the sign-in policy.
