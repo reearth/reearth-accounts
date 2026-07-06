@@ -31,6 +31,7 @@ func RegisterRoutes(e *echo.Echo, h *Handler) {
 		requireApproved := echo.MiddlewareFunc(h.RequireApproved)
 		adminUsers := v1.Group("/admin-users", requireApproved)
 		adminUsers.GET("", h.AdminUser.ListAdminUsers)
+		adminUsers.POST("/:id/approve", h.AdminUser.ApproveAdminUser)
 
 		// Users (requires admin auth)
 		users := v1.Group("/users", h.AuthMw)

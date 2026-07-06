@@ -8,10 +8,14 @@ import (
 
 // Handler serves the /admin-users endpoints.
 type Handler struct {
-	list *adminuseruc.ListAdminUsersUseCase
+	list    *adminuseruc.ListAdminUsersUseCase
+	approve *adminuseruc.ApproveAdminUserUseCase
 }
 
 // NewHandler is a Wire provider for the admin-user Handler.
-func NewHandler(list *adminuseruc.ListAdminUsersUseCase) *Handler {
-	return &Handler{list: list}
+func NewHandler(
+	list *adminuseruc.ListAdminUsersUseCase,
+	approve *adminuseruc.ApproveAdminUserUseCase,
+) *Handler {
+	return &Handler{list: list, approve: approve}
 }
