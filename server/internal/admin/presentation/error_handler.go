@@ -6,6 +6,7 @@ import (
 
 	"github.com/labstack/echo/v4"
 	"github.com/reearth/reearth-accounts/server/internal/admin/presentation/internal"
+	"github.com/reearth/reearth-accounts/server/internal/admin/usecase/adminuseruc"
 	"github.com/reearth/reearth-accounts/server/internal/admin/usecase/authuc"
 	"github.com/reearth/reearth-accounts/server/internal/admin/usecase/useruc"
 	"github.com/reearth/reearthx/log"
@@ -50,6 +51,8 @@ func classify(err error) (status int, code, msg string) {
 		return http.StatusForbidden, http.StatusText(http.StatusForbidden), "email not verified"
 	case errors.Is(err, authuc.ErrDomainNotAllowed):
 		return http.StatusForbidden, http.StatusText(http.StatusForbidden), "email domain not allowed"
+	case errors.Is(err, adminuseruc.ErrCannotModifySelf):
+		return http.StatusBadRequest, http.StatusText(http.StatusBadRequest), "cannot modify your own admin account"
 	case errors.Is(err, rerror.ErrNotFound):
 		return http.StatusNotFound, http.StatusText(http.StatusNotFound), "not found"
 	default:

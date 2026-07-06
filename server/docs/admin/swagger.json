@@ -71,6 +71,59 @@
                 }
             }
         },
+        "/admin-users/{id}/approve": {
+            "post": {
+                "description": "Approves a pending or rejected admin user, recording the current admin as approver. Idempotent for already-approved users (the original approver/timestamp is kept). Cannot approve your own account.",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "admin-users"
+                ],
+                "summary": "Approve an admin user",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Admin user ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/AdminUser"
+                        }
+                    },
+                    "400": {
+                        "description": "invalid id / cannot modify self",
+                        "schema": {
+                            "$ref": "#/definitions/ErrorResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/ErrorResponse"
+                        }
+                    },
+                    "403": {
+                        "description": "not approved",
+                        "schema": {
+                            "$ref": "#/definitions/ErrorResponse"
+                        }
+                    },
+                    "404": {
+                        "description": "not found",
+                        "schema": {
+                            "$ref": "#/definitions/ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
         "/auth/google": {
             "post": {
                 "description": "Verifies the Google id_token and issues an admin session cookie. New accounts are created as pending (approved when the email is bootstrapped).",

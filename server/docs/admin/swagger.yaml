@@ -149,6 +149,43 @@ paths:
       summary: List admin users
       tags:
       - admin-users
+  /admin-users/{id}/approve:
+    post:
+      description: Approves a pending or rejected admin user, recording the current
+        admin as approver. Idempotent for already-approved users (the original approver/timestamp
+        is kept). Cannot approve your own account.
+      parameters:
+      - description: Admin user ID
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/AdminUser'
+        "400":
+          description: invalid id / cannot modify self
+          schema:
+            $ref: '#/definitions/ErrorResponse'
+        "401":
+          description: unauthorized
+          schema:
+            $ref: '#/definitions/ErrorResponse'
+        "403":
+          description: not approved
+          schema:
+            $ref: '#/definitions/ErrorResponse'
+        "404":
+          description: not found
+          schema:
+            $ref: '#/definitions/ErrorResponse'
+      summary: Approve an admin user
+      tags:
+      - admin-users
   /auth/google:
     post:
       consumes:
