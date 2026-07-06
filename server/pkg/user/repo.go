@@ -23,6 +23,7 @@ type Repo interface {
 
 type Query interface {
 	FindAll(context.Context) (List, error)
+	FindAllWithPagination(ctx context.Context, keyword *string, pagination *usecasex.Pagination) (List, *usecasex.PageInfo, error)
 	FindByAlias(context.Context, string) (*User, error)
 	FindByEmail(context.Context, string) (*User, error)
 	FindByID(context.Context, ID) (*User, error)

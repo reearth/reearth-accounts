@@ -29,6 +29,23 @@ func (u MultiUser) FindAll(ctx context.Context) (user.List, error) {
 	return res, nil
 }
 
+func (u MultiUser) FindAllWithPagination(ctx context.Context, keyword *string, pagination *usecasex.Pagination) (user.List, *usecasex.PageInfo, error) {
+	res := user.List{}
+	var pi *usecasex.PageInfo
+	for _, r := range u {
+		users, pageInfo, err := r.FindAllWithPagination(ctx, keyword, pagination)
+		if err != nil {
+			if !errors.Is(err, rerror.ErrNotFound) {
+				return nil, nil, err
+			}
+			continue
+		}
+		res = append(res, users...)
+		pi = pageInfo
+	}
+	return res, pi, nil
+}
+
 func (u MultiUser) FindByID(ctx context.Context, id user.ID) (*user.User, error) {
 	return u.findOne(func(r user.Repo) (*user.User, error) {
 		return r.FindByID(ctx, id)

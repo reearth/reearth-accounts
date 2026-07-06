@@ -138,6 +138,43 @@ func (r *User) FindAll(ctx context.Context) (user.List, error) {
 	return userModels(rows)
 }
 
+func (r *User) FindAllWithPagination(ctx context.Context, keyword *string, p *usecasex.Pagination) (user.List, *usecasex.PageInfo, error) {
+	var where []string
+	var args []any
+	if keyword != nil && strings.TrimSpace(*keyword) != "" {
+		args = append(args, likeContains(strings.TrimSpace(*keyword)))
+		i := itoa(len(args))
+		where = append(where, "(name ILIKE $"+i+" OR alias ILIKE $"+i+" OR email ILIKE $"+i+")")
+	}
+	base := "FROM users"
+	if len(where) > 0 {
+		base += " WHERE " + strings.Join(where, " AND ")
+	}
+
+	var total int64
+	if err := r.c.db(ctx).QueryRow(ctx, "SELECT count(*) "+base, args...).Scan(&total); err != nil {
+		return nil, nil, rerror.ErrInternalByWithContext(ctx, err)
+	}
+
+	q := "SELECT " + userColumns + " " + base + " ORDER BY id"
+	var hasNext, hasPrev bool
+	if p != nil && p.Offset != nil {
+		q += " LIMIT $" + itoa(len(args)+1) + " OFFSET $" + itoa(len(args)+2)
+		args = append(args, p.Offset.Limit, p.Offset.Offset)
+		hasPrev = p.Offset.Offset > 0
+		hasNext = p.Offset.Offset+p.Offset.Limit < total
+	}
+	rows, err := r.c.db(ctx).Query(ctx, q, args...)
+	if err != nil {
+		return nil, nil, rerror.ErrInternalByWithContext(ctx, err)
+	}
+	list, err := scanUsers(rows)
+	if err != nil {
+		return nil, nil, err
+	}
+	return list, usecasex.NewPageInfo(total, cur(list, true), cur(list, false), hasNext, hasPrev), nil
+}
+
 func (r *User) FindByEmail(ctx context.Context, email string) (*user.User, error) {
 	row, err := r.c.queries(ctx).UserFindByEmail(ctx, email)
 	return one(ctx, row, err)
