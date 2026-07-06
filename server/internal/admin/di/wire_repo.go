@@ -12,5 +12,5 @@ import (
 // the individual repository interfaces consumed by the usecase layer.
 var repoWire = wire.NewSet(
 	provideRepoContainer,
-	wire.FieldsOf(new(*repo.Container), "AdminUser", "User", "Role", "Permittable"),
+	wire.FieldsOf(new(*repo.Container), "AdminUser", "User", "Workspace", "Role", "Permittable"),
 )

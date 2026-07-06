@@ -10,11 +10,13 @@ import (
 	adminuserhandler "github.com/reearth/reearth-accounts/server/internal/admin/presentation/handler/adminuser"
 	"github.com/reearth/reearth-accounts/server/internal/admin/presentation/handler/auth"
 	"github.com/reearth/reearth-accounts/server/internal/admin/presentation/handler/user"
+	workspacehandler "github.com/reearth/reearth-accounts/server/internal/admin/presentation/handler/workspace"
 	"github.com/reearth/reearth-accounts/server/internal/admin/presentation/middleware"
 	"github.com/reearth/reearth-accounts/server/internal/admin/usecase/adminuseruc"
 	"github.com/reearth/reearth-accounts/server/internal/admin/usecase/authuc"
 	"github.com/reearth/reearth-accounts/server/internal/admin/usecase/authz"
 	"github.com/reearth/reearth-accounts/server/internal/admin/usecase/useruc"
+	"github.com/reearth/reearth-accounts/server/internal/admin/usecase/workspaceuc"
 )
 
 // Injectors from wire.go:
@@ -58,6 +60,9 @@ func InitializeEcho() (*Server, func(), error) {
 	approveAdminUserUseCase := adminuseruc.NewApproveAdminUserUseCase(adminUserRepo)
 	rejectAdminUserUseCase := adminuseruc.NewRejectAdminUserUseCase(adminUserRepo)
 	adminUserHandler := adminuserhandler.NewHandler(listAdminUsersUseCase, approveAdminUserUseCase, rejectAdminUserUseCase)
+	workspaceRepo := container.Workspace
+	listWorkspacesUseCase := workspaceuc.NewListWorkspacesUseCase(workspaceRepo)
+	workspaceHandler := workspacehandler.NewHandler(listWorkspacesUseCase)
 	v := provideJWTProviders(config)
 	middlewareFunc, err := middleware.NewAuthMiddleware(v, repo)
 	if err != nil {
@@ -66,7 +71,7 @@ func InitializeEcho() (*Server, func(), error) {
 	}
 	sessionMiddleware := middleware.NewSessionMiddleware(manager)
 	requireApprovedMiddleware := middleware.NewRequireApprovedMiddleware(manager, adminUserRepo)
-	presentationHandler := presentation.NewHandler(adminUserHandler, authHandler, userHandler, middlewareFunc, sessionMiddleware, requireApprovedMiddleware)
+	presentationHandler := presentation.NewHandler(adminUserHandler, authHandler, userHandler, workspaceHandler, middlewareFunc, sessionMiddleware, requireApprovedMiddleware)
 	appMiddlewares := presentation.NewAppMiddlewares()
 	server := NewAppEchoServer(config, presentationHandler, appMiddlewares)
 	return server, func() {

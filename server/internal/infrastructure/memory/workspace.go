@@ -3,6 +3,8 @@ package memory
 import (
 	"context"
 	"slices"
+	"sort"
+	"strings"
 
 	"github.com/reearth/reearth-accounts/server/pkg/id"
 	"github.com/reearth/reearth-accounts/server/pkg/user"
@@ -14,6 +16,7 @@ import (
 
 type Workspace struct {
 	data *util.SyncMap[workspace.ID, *workspace.Workspace]
+	f    workspace.WorkspaceFilter
 	err  error
 }
 
@@ -34,8 +37,52 @@ func NewWorkspaceWith(workspaces ...*workspace.Workspace) *Workspace {
 func (r *Workspace) Filtered(f workspace.WorkspaceFilter) workspace.Repo {
 	return &Workspace{
 		data: r.data,
+		f:    r.f.Merge(f),
 		err:  r.err,
 	}
+}
+
+func (r *Workspace) FindAll(_ context.Context, keyword *string, pagination *usecasex.Pagination) (workspace.List, *usecasex.PageInfo, error) {
+	if r.err != nil {
+		return nil, nil, r.err
+	}
+	if pagination != nil && pagination.Cursor != nil {
+		return nil, nil, workspace.ErrCursorPaginationUnsupported
+	}
+
+	kw := ""
+	if keyword != nil {
+		kw = strings.ToLower(strings.TrimSpace(*keyword))
+	}
+	all := workspace.List(r.data.FindAll(func(id workspace.ID, v *workspace.Workspace) bool {
+		// respect the readable-workspace filter (unset for the admin base repo)
+		if !r.f.CanRead(id) {
+			return false
+		}
+		if kw == "" {
+			return true
+		}
+		return strings.Contains(strings.ToLower(v.Name()), kw) || strings.Contains(strings.ToLower(v.Alias()), kw)
+	}))
+
+	// deterministic order by id (ULID = creation order)
+	sort.SliceStable(all, func(i, j int) bool { return all[i].ID().Compare(all[j].ID()) < 0 })
+
+	total := int64(len(all))
+	if pagination == nil || pagination.Offset == nil {
+		return all, usecasex.NewPageInfo(total, nil, nil, false, false), nil
+	}
+
+	offset := pagination.Offset.Offset
+	limit := pagination.Offset.Limit
+	if offset > total {
+		offset = total
+	}
+	end := offset + limit
+	if end > total {
+		end = total
+	}
+	return all[offset:end], usecasex.NewPageInfo(total, nil, nil, end < total, offset > 0), nil
 }
 
 func (r *Workspace) FindByUser(_ context.Context, i id.UserID) (workspace.List, error) {

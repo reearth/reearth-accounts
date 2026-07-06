@@ -37,5 +37,9 @@ func RegisterRoutes(e *echo.Echo, h *Handler) {
 		// Users (requires admin auth)
 		users := v1.Group("/users", h.AuthMw)
 		users.GET("", h.User.ListUsers)
+
+		// Cross-tenant workspace listing (requires an approved admin session)
+		workspaces := v1.Group("/workspaces", requireApproved)
+		workspaces.GET("", h.Workspace.ListWorkspaces)
 	}
 }
