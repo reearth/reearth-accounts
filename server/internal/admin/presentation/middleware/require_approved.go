@@ -52,7 +52,7 @@ func NewRequireApprovedMiddleware(sess *session.Manager, repo adminuser.Repo) Re
 			}
 
 			if !u.IsApproved() {
-				return echo.NewHTTPError(http.StatusForbidden, "forbidden")
+				return echo.NewHTTPError(http.StatusForbidden, "not approved")
 			}
 
 			internal.SetAdminUser(c, u)

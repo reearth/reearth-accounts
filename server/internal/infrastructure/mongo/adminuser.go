@@ -49,12 +49,13 @@ func (r *AdminUser) List(ctx context.Context, f adminuser.ListFilter) (adminuser
 		filter["status"] = f.Status.String()
 	}
 
-	// Sort by id (a ULID) rather than createdat: the ULID's leading bits are the
-	// creation timestamp, so this preserves creation order while being unique,
-	// giving a deterministic total order for stable offset pagination (createdat
-	// alone can tie at millisecond granularity). Matches the {createdat, id}
-	// ordering used by the Postgres and in-memory repos.
-	sort := &usecasex.Sort{Key: "id"}
+	// Sort by createdat for creation order; mongox.Paginate automatically
+	// appends the unique "id" field as a tie-breaker, so the effective sort is
+	// {createdat, id} — deterministic across offset pages even when createdat
+	// ties at millisecond granularity. Using createdat as the primary key also
+	// lets the {status, createdat} index serve status-filtered listings, and
+	// matches the {createdat, id} ordering of the Postgres and in-memory repos.
+	sort := &usecasex.Sort{Key: "createdat"}
 	c := mongodoc.NewAdminUserConsumer()
 	pageInfo, err := r.client.Paginate(ctx, filter, sort, f.Pagination, c)
 	if err != nil {
