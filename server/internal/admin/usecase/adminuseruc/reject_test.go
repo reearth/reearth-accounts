@@ -5,6 +5,8 @@ import (
 	"testing"
 
 	"github.com/reearth/reearth-accounts/server/internal/infrastructure/memory"
+	"github.com/reearth/reearth-accounts/server/pkg/adminuser"
+	"github.com/reearth/reearthx/rerror"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -41,6 +43,16 @@ func TestReject_CannotRejectSelf(t *testing.T) {
 
 	_, err := uc.Execute(ctx, operator.ID(), operator.ID())
 	assert.ErrorIs(t, err, ErrCannotModifySelf)
+}
+
+func TestReject_NotFound(t *testing.T) {
+	ctx := context.Background()
+	operator := approved("op@eukarya.io")
+	repo := memory.NewAdminUserWith(operator)
+	uc := NewRejectAdminUserUseCase(repo)
+
+	_, err := uc.Execute(ctx, operator.ID(), adminuser.NewID())
+	assert.ErrorIs(t, err, rerror.ErrNotFound)
 }
 
 func TestReject_LastApprovedAdminBlocked(t *testing.T) {
