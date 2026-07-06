@@ -28,6 +28,21 @@ func TestApprove(t *testing.T) {
 	assert.True(t, reloaded.IsApproved())
 }
 
+func TestApprove_AlreadyApprovedIsIdempotent(t *testing.T) {
+	ctx := context.Background()
+	firstApprover := adminuser.NewID()
+	target := pending("t@eukarya.io")
+	target.Approve(firstApprover) // pending -> approved by firstApprover
+	repo := memory.NewAdminUserWith(target)
+	uc := NewApproveAdminUserUseCase(repo)
+
+	// a different operator re-approves: no-op, original approver preserved
+	got, err := uc.Execute(ctx, adminuser.NewID(), target.ID())
+	require.NoError(t, err)
+	assert.True(t, got.IsApproved())
+	assert.Equal(t, firstApprover, got.ApprovedBy())
+}
+
 func TestApprove_CannotApproveSelf(t *testing.T) {
 	ctx := context.Background()
 	operator := approved("op@eukarya.io")

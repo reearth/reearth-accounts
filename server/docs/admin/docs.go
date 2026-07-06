@@ -80,7 +80,7 @@ const docTemplate = `{
         },
         "/admin-users/{id}/approve": {
             "post": {
-                "description": "Approves a pending admin user, recording the current admin as approver. Cannot approve your own account.",
+                "description": "Approves a pending or rejected admin user, recording the current admin as approver. Idempotent for already-approved users (the original approver/timestamp is kept). Cannot approve your own account.",
                 "produces": [
                     "application/json"
                 ],

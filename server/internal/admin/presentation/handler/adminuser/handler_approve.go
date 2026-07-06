@@ -11,7 +11,7 @@ import (
 // ApproveAdminUser godoc
 //
 //	@Summary		Approve an admin user
-//	@Description	Approves a pending admin user, recording the current admin as approver. Cannot approve your own account.
+//	@Description	Approves a pending or rejected admin user, recording the current admin as approver. Idempotent for already-approved users (the original approver/timestamp is kept). Cannot approve your own account.
 //	@Tags			admin-users
 //	@Produce		json
 //	@Param			id	path		string	true	"Admin user ID"
