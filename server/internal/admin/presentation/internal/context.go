@@ -14,6 +14,8 @@ const userContextKey = "admin:auth:user"
 
 const sessionAdminUserIDKey = "admin:session:adminuserid"
 
+const adminUserContextKey = "admin:session:adminuser"
+
 // SetUser stores the authenticated admin user in the echo context.
 // It must only be called from the auth middleware.
 func SetUser(c echo.Context, u *user.User) {
@@ -42,4 +44,20 @@ func GetSessionAdminUserID(c echo.Context) (adminuser.ID, error) {
 		return id, nil
 	}
 	return adminuser.ID{}, echo.NewHTTPError(http.StatusUnauthorized, "unauthorized")
+}
+
+// SetAdminUser stores the fully-loaded, approved admin user in the echo context.
+// It must only be called from the RequireApproved middleware.
+func SetAdminUser(c echo.Context, u *adminuser.AdminUser) {
+	c.Set(adminUserContextKey, u)
+}
+
+// GetAdminUser retrieves the approved admin user loaded by the RequireApproved
+// middleware, returning 401 if absent. It must only be called from handlers
+// behind that middleware.
+func GetAdminUser(c echo.Context) (*adminuser.AdminUser, error) {
+	if u, ok := c.Get(adminUserContextKey).(*adminuser.AdminUser); ok && u != nil {
+		return u, nil
+	}
+	return nil, echo.NewHTTPError(http.StatusUnauthorized, "unauthorized")
 }

@@ -5,6 +5,7 @@ package di
 
 import (
 	"github.com/goforj/wire"
+	"github.com/reearth/reearth-accounts/server/internal/admin/usecase/adminuseruc"
 	"github.com/reearth/reearth-accounts/server/internal/admin/usecase/authuc"
 	"github.com/reearth/reearth-accounts/server/internal/admin/usecase/authz"
 	"github.com/reearth/reearth-accounts/server/internal/admin/usecase/useruc"
@@ -22,4 +23,7 @@ var usecaseWire = wire.NewSet(
 	provideGoogleSignInOptions,
 	authuc.NewGoogleSignInUseCase,
 	authuc.NewGetMeUseCase,
+
+	// admin-user management usecases
+	adminuseruc.NewListAdminUsersUseCase,
 )
