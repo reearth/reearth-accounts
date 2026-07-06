@@ -45,11 +45,12 @@ func TestReject_CannotRejectSelf(t *testing.T) {
 
 func TestReject_LastApprovedAdminBlocked(t *testing.T) {
 	ctx := context.Background()
-	operator := approved("op@eukarya.io")
-	// target is the only approved admin in the repo; rejecting it would leave
-	// zero approved admins.
+	// The target is the only approved admin in the repo; the operator is still
+	// pending. Rejecting the sole approved admin would leave zero approved
+	// admins, so it must be blocked.
+	operator := pending("op@eukarya.io")
 	target := approved("solo@eukarya.io")
-	repo := memory.NewAdminUserWith(target)
+	repo := memory.NewAdminUserWith(operator, target)
 	uc := NewRejectAdminUserUseCase(repo)
 
 	_, err := uc.Execute(ctx, operator.ID(), target.ID())
