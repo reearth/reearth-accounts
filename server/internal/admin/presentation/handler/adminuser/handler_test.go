@@ -98,6 +98,21 @@ func TestListAdminUsers_InvalidStatus(t *testing.T) {
 	assert.Equal(t, http.StatusBadRequest, rec.Code)
 }
 
+func TestListAdminUsers_InvalidPagination(t *testing.T) {
+	op := approvedUser("op@eukarya.io")
+	repo := memory.NewAdminUserWith(op)
+	sess := session.NewManager(testSecret, time.Hour)
+	e := newTestEcho(repo, sess)
+
+	for _, q := range []string{"page=abc", "page=0", "page=-1", "per_page=abc", "per_page=0"} {
+		req := httptest.NewRequest(http.MethodGet, "/api/v1/admin-users?"+q, nil)
+		req.AddCookie(cookieFor(t, sess, op.ID()))
+		rec := httptest.NewRecorder()
+		e.ServeHTTP(rec, req)
+		assert.Equal(t, http.StatusBadRequest, rec.Code, "query %q should be 400", q)
+	}
+}
+
 func TestListAdminUsers_Unauthorized_NoCookie(t *testing.T) {
 	repo := memory.NewAdminUserWith(approvedUser("op@eukarya.io"))
 	sess := session.NewManager(testSecret, time.Hour)

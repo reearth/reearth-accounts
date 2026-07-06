@@ -1,6 +1,7 @@
 package adminuser
 
 import (
+	"errors"
 	"net/http"
 	"strconv"
 
@@ -34,8 +35,14 @@ func (h *Handler) ListAdminUsers(c echo.Context) error {
 		filter.Status = &status
 	}
 
-	page := parseInt(c.QueryParam("page"))
-	perPage := parseInt(c.QueryParam("per_page"))
+	page, err := parsePageParam(c.QueryParam("page"))
+	if err != nil {
+		return echo.NewHTTPError(http.StatusBadRequest, "invalid page")
+	}
+	perPage, err := parsePageParam(c.QueryParam("per_page"))
+	if err != nil {
+		return echo.NewHTTPError(http.StatusBadRequest, "invalid per_page")
+	}
 	p := pagination.ToPagination(page, perPage)
 	filter.Pagination = p
 
@@ -56,16 +63,20 @@ func (h *Handler) ListAdminUsers(c echo.Context) error {
 	})
 }
 
-// parseInt parses a non-negative int64, returning 0 for empty or invalid input.
-// Callers treat 0 as the "use the default" sentinel (pagination.ToPagination
-// applies its own page/per_page defaults).
-func parseInt(s string) int64 {
+// parsePageParam parses a 1-based pagination query parameter. An empty value
+// returns 0, the "use the default" sentinel for pagination.ToPagination. A
+// present but non-numeric or < 1 value is an error, so client mistakes surface
+// as 400 instead of silently falling back to defaults (consistent with the
+// invalid-status handling above).
+func parsePageParam(s string) (int64, error) {
 	if s == "" {
-		return 0
+		return 0, nil
 	}
 	n, err := strconv.ParseInt(s, 10, 64)
-	if err != nil || n < 0 {
-		return 0
+	if err != nil || n < 1 {
+		return 0, errInvalidPageParam
 	}
-	return n
+	return n, nil
 }
+
+var errInvalidPageParam = errors.New("invalid pagination parameter")
