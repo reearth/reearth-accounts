@@ -176,7 +176,7 @@ const docTemplate = `{
                         }
                     },
                     "404": {
-                        "description": "admin user not found",
+                        "description": "not found",
                         "schema": {
                             "$ref": "#/definitions/ErrorResponse"
                         }

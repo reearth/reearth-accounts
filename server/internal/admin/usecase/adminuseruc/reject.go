@@ -4,6 +4,7 @@ import (
 	"context"
 
 	"github.com/reearth/reearth-accounts/server/pkg/adminuser"
+	"github.com/reearth/reearthx/usecasex"
 )
 
 // RejectAdminUserUseCase rejects a pending admin user or revokes an approved one.
@@ -32,7 +33,12 @@ func (uc *RejectAdminUserUseCase) Execute(ctx context.Context, operatorID, targe
 	// to zero (otherwise nobody could ever approve again).
 	if target.IsApproved() {
 		approved := adminuser.StatusApproved
-		_, pi, err := uc.repo.List(ctx, adminuser.ListFilter{Status: &approved})
+		// Only the total count is needed; limit to a single row so repos don't
+		// fetch the entire approved-admin list on every revoke.
+		_, pi, err := uc.repo.List(ctx, adminuser.ListFilter{
+			Status:     &approved,
+			Pagination: usecasex.OffsetPagination{Offset: 0, Limit: 1}.Wrap(),
+		})
 		if err != nil {
 			return nil, err
 		}
