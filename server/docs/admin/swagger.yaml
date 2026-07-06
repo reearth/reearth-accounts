@@ -186,6 +186,42 @@ paths:
       summary: Approve an admin user
       tags:
       - admin-users
+  /admin-users/{id}/reject:
+    post:
+      description: Rejects a pending admin user or revokes an approved one. Cannot
+        reject your own account, and the last approved admin cannot be rejected.
+      parameters:
+      - description: Admin user ID
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/AdminUser'
+        "400":
+          description: invalid id / cannot modify self / last approved admin
+          schema:
+            $ref: '#/definitions/ErrorResponse'
+        "401":
+          description: unauthorized
+          schema:
+            $ref: '#/definitions/ErrorResponse'
+        "403":
+          description: not approved
+          schema:
+            $ref: '#/definitions/ErrorResponse'
+        "404":
+          description: admin user not found
+          schema:
+            $ref: '#/definitions/ErrorResponse'
+      summary: Reject or revoke an admin user
+      tags:
+      - admin-users
   /auth/google:
     post:
       consumes:

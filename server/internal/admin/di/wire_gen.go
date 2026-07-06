@@ -56,7 +56,8 @@ func InitializeEcho() (*Server, func(), error) {
 	authHandler := auth.NewHandler(googleSignInUseCase, getMeUseCase, manager, cookieSecure)
 	listAdminUsersUseCase := adminuseruc.NewListAdminUsersUseCase(adminUserRepo)
 	approveAdminUserUseCase := adminuseruc.NewApproveAdminUserUseCase(adminUserRepo)
-	adminUserHandler := adminuserhandler.NewHandler(listAdminUsersUseCase, approveAdminUserUseCase)
+	rejectAdminUserUseCase := adminuseruc.NewRejectAdminUserUseCase(adminUserRepo)
+	adminUserHandler := adminuserhandler.NewHandler(listAdminUsersUseCase, approveAdminUserUseCase, rejectAdminUserUseCase)
 	v := provideJWTProviders(config)
 	middlewareFunc, err := middleware.NewAuthMiddleware(v, repo)
 	if err != nil {
