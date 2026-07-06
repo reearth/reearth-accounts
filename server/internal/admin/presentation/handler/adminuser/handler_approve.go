@@ -19,7 +19,7 @@ import (
 //	@Failure		400	{object}	internal.ErrorResponse	"invalid id / cannot modify self"
 //	@Failure		401	{object}	internal.ErrorResponse	"unauthorized"
 //	@Failure		403	{object}	internal.ErrorResponse	"not approved"
-//	@Failure		404	{object}	internal.ErrorResponse	"admin user not found"
+//	@Failure		404	{object}	internal.ErrorResponse	"not found"
 //	@Router			/admin-users/{id}/approve [post]
 func (h *Handler) ApproveAdminUser(c echo.Context) error {
 	operator, err := internal.GetAdminUser(c)
