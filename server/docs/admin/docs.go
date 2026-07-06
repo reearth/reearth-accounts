@@ -287,22 +287,34 @@ const docTemplate = `{
         },
         "/users": {
             "get": {
-                "security": [
-                    {
-                        "BearerAuth": []
-                    }
-                ],
-                "description": "全ユーザーを取得する（管理者権限が必要）",
-                "consumes": [
-                    "application/json"
-                ],
+                "description": "Lists users, optionally filtered by a name/alias/email keyword, with offset pagination.",
                 "produces": [
                     "application/json"
                 ],
                 "tags": [
                     "users"
                 ],
-                "summary": "ユーザー一覧を取得",
+                "summary": "List users",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Search by name, alias or email",
+                        "name": "q",
+                        "in": "query"
+                    },
+                    {
+                        "type": "integer",
+                        "description": "Page number (1-based)",
+                        "name": "page",
+                        "in": "query"
+                    },
+                    {
+                        "type": "integer",
+                        "description": "Items per page (max 100)",
+                        "name": "per_page",
+                        "in": "query"
+                    }
+                ],
                 "responses": {
                     "200": {
                         "description": "OK",
@@ -310,20 +322,20 @@ const docTemplate = `{
                             "$ref": "#/definitions/ListUsersResponse"
                         }
                     },
+                    "400": {
+                        "description": "invalid query",
+                        "schema": {
+                            "$ref": "#/definitions/ErrorResponse"
+                        }
+                    },
                     "401": {
-                        "description": "認証エラー",
+                        "description": "unauthorized",
                         "schema": {
                             "$ref": "#/definitions/ErrorResponse"
                         }
                     },
                     "403": {
-                        "description": "権限エラー",
-                        "schema": {
-                            "$ref": "#/definitions/ErrorResponse"
-                        }
-                    },
-                    "500": {
-                        "description": "サーバーエラー",
+                        "description": "not approved",
                         "schema": {
                             "$ref": "#/definitions/ErrorResponse"
                         }
@@ -498,6 +510,15 @@ const docTemplate = `{
                     "items": {
                         "$ref": "#/definitions/User"
                     }
+                },
+                "page": {
+                    "type": "integer"
+                },
+                "perPage": {
+                    "type": "integer"
+                },
+                "totalCount": {
+                    "type": "integer"
                 }
             }
         },

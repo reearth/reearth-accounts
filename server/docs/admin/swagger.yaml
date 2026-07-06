@@ -67,6 +67,12 @@ definitions:
         items:
           $ref: '#/definitions/User'
         type: array
+      page:
+        type: integer
+      perPage:
+        type: integer
+      totalCount:
+        type: integer
     type: object
   ListWorkspacesResponse:
     properties:
@@ -320,9 +326,21 @@ paths:
       - auth
   /users:
     get:
-      consumes:
-      - application/json
-      description: 全ユーザーを取得する（管理者権限が必要）
+      description: Lists users, optionally filtered by a name/alias/email keyword,
+        with offset pagination.
+      parameters:
+      - description: Search by name, alias or email
+        in: query
+        name: q
+        type: string
+      - description: Page number (1-based)
+        in: query
+        name: page
+        type: integer
+      - description: Items per page (max 100)
+        in: query
+        name: per_page
+        type: integer
       produces:
       - application/json
       responses:
@@ -330,21 +348,19 @@ paths:
           description: OK
           schema:
             $ref: '#/definitions/ListUsersResponse'
+        "400":
+          description: invalid query
+          schema:
+            $ref: '#/definitions/ErrorResponse'
         "401":
-          description: 認証エラー
+          description: unauthorized
           schema:
             $ref: '#/definitions/ErrorResponse'
         "403":
-          description: 権限エラー
+          description: not approved
           schema:
             $ref: '#/definitions/ErrorResponse'
-        "500":
-          description: サーバーエラー
-          schema:
-            $ref: '#/definitions/ErrorResponse'
-      security:
-      - BearerAuth: []
-      summary: ユーザー一覧を取得
+      summary: List users
       tags:
       - users
   /workspaces:

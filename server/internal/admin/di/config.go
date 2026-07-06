@@ -168,10 +168,6 @@ func LoadConfig() *Config {
 	return &cfg
 }
 
-func provideJWTProviders(cfg *Config) []appx.JWTProvider {
-	return cfg.Auths()
-}
-
 // provideGoogleVerifier builds the Google id_token verifier bound to the admin
 // OAuth client ID. A missing client ID is a misconfiguration that would reject
 // every sign-in, so we fail fast in production (and warn in development).
