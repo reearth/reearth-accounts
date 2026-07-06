@@ -56,8 +56,9 @@ func (h *Handler) ListAdminUsers(c echo.Context) error {
 	})
 }
 
-// parseInt returns the parsed positive int64, or 0 when empty/invalid (callers
-// treat 0 as "use the default").
+// parseInt parses a non-negative int64, returning 0 for empty or invalid input.
+// Callers treat 0 as the "use the default" sentinel (pagination.ToPagination
+// applies its own page/per_page defaults).
 func parseInt(s string) int64 {
 	if s == "" {
 		return 0

@@ -33,6 +33,12 @@ func NewRequireApprovedMiddleware(sess *session.Manager, repo adminuser.Repo) Re
 
 			id, err := sess.Parse(cookie.Value)
 			if err != nil {
+				// An empty signing secret is a server misconfiguration, not a
+				// client auth failure — surface it as 500 so it isn't hidden.
+				if errors.Is(err, session.ErrEmptySecret) {
+					log.Errorfc(ctx, "[admin] session secret not configured: %v", err)
+					return echo.NewHTTPError(http.StatusInternalServerError)
+				}
 				return echo.NewHTTPError(http.StatusUnauthorized, "unauthorized")
 			}
 
