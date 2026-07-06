@@ -246,3 +246,17 @@ func TestRejectAdminUser_InvalidID(t *testing.T) {
 	e.ServeHTTP(rec, req)
 	assert.Equal(t, http.StatusBadRequest, rec.Code)
 }
+
+func TestRejectAdminUser_NotFound(t *testing.T) {
+	op := approvedUser("op@eukarya.io")
+	repo := memory.NewAdminUserWith(op)
+	sess := session.NewManager(testSecret, time.Hour)
+	e := newTestEcho(repo, sess)
+
+	// valid but non-existent id -> rerror.ErrNotFound -> 404 via error handler
+	req := httptest.NewRequest(http.MethodPost, "/api/v1/admin-users/"+adminuser.NewID().String()+"/reject", nil)
+	req.AddCookie(cookieFor(t, sess, op.ID()))
+	rec := httptest.NewRecorder()
+	e.ServeHTTP(rec, req)
+	assert.Equal(t, http.StatusNotFound, rec.Code)
+}

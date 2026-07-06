@@ -2,8 +2,10 @@ package adminuseruc
 
 import (
 	"context"
+	"errors"
 
 	"github.com/reearth/reearth-accounts/server/pkg/adminuser"
+	"github.com/reearth/reearthx/rerror"
 	"github.com/reearth/reearthx/usecasex"
 )
 
@@ -50,7 +52,14 @@ func (uc *RejectAdminUserUseCase) Execute(ctx context.Context, operatorID, targe
 		if err != nil {
 			return nil, err
 		}
-		if pi != nil && pi.TotalCount <= 1 {
+		// PageInfo is part of the Repo.List contract (the ListAdminUsers handler
+		// dereferences it unconditionally too). Fail fast on a nil rather than
+		// silently skipping the guard, which would let the last approved admin be
+		// rejected.
+		if pi == nil {
+			return nil, rerror.ErrInternalBy(errors.New("admin user list returned nil page info"))
+		}
+		if pi.TotalCount <= 1 {
 			return nil, ErrLastApprovedAdmin
 		}
 	}
