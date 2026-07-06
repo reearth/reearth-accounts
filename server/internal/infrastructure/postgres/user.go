@@ -218,6 +218,10 @@ func (r *User) FindBySubOrCreate(ctx context.Context, u *user.User, sub string) 
 	return u, nil
 }
 
+func (r *User) FindAllWithPagination(ctx context.Context, keyword *string, p *usecasex.Pagination) (user.List, *usecasex.PageInfo, error) {
+	return paginateAllUsers(ctx, r.c, keyword, p)
+}
+
 func (r *User) FindByIDsWithPagination(ctx context.Context, ids user.IDList, alias *string, p *usecasex.Pagination) (user.List, *usecasex.PageInfo, error) {
 	return paginateUsers(ctx, r.c, ids.Strings(), alias, p)
 }
@@ -355,4 +359,47 @@ func cursorPageUsers(ctx context.Context, c *Client, base string, args []any, to
 	hasNext := (forward && hasMore) || (!forward && cp.Before != nil)
 	hasPrev := (!forward && hasMore) || (forward && cp.After != nil)
 	return list, usecasex.NewPageInfo(total, cur(list, true), cur(list, false), hasNext, hasPrev), nil
+}
+
+func paginateAllUsers(ctx context.Context, c *Client, keyword *string, p *usecasex.Pagination) (user.List, *usecasex.PageInfo, error) {
+	args := []any{}
+	base := "FROM users"
+	if keyword != nil && *keyword != "" {
+		args = append(args, likeContains(*keyword))
+		base += " WHERE (name ILIKE $1 OR alias ILIKE $1)"
+	}
+
+	var total int64
+	if err := c.db(ctx).QueryRow(ctx, "SELECT count(*) "+base, args...).Scan(&total); err != nil {
+		return nil, nil, rerror.ErrInternalByWithContext(ctx, err)
+	}
+
+	if p != nil && p.Offset != nil {
+		q := "SELECT " + userColumns + " " + base + " ORDER BY id LIMIT $" + itoa(len(args)+1) + " OFFSET $" + itoa(len(args)+2)
+		args = append(args, p.Offset.Limit, p.Offset.Offset)
+		rows, err := c.db(ctx).Query(ctx, q, args...)
+		if err != nil {
+			return nil, nil, rerror.ErrInternalByWithContext(ctx, err)
+		}
+		list, err := scanUsers(rows)
+		if err != nil {
+			return nil, nil, err
+		}
+		hasPrev := p.Offset.Offset > 0
+		hasNext := p.Offset.Offset+p.Offset.Limit < total
+		return list, usecasex.NewPageInfo(total, cur(list, true), cur(list, false), hasNext, hasPrev), nil
+	}
+
+	// Fallback: no pagination supplied — cap at 50 to prevent unbounded loads.
+	q := "SELECT " + userColumns + " " + base + " ORDER BY id LIMIT $" + itoa(len(args)+1)
+	args = append(args, int64(50))
+	rows, err := c.db(ctx).Query(ctx, q, args...)
+	if err != nil {
+		return nil, nil, rerror.ErrInternalByWithContext(ctx, err)
+	}
+	list, err := scanUsers(rows)
+	if err != nil {
+		return nil, nil, err
+	}
+	return list, usecasex.NewPageInfo(total, cur(list, true), cur(list, false), false, false), nil
 }

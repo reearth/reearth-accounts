@@ -38,6 +38,18 @@ func (r *User) FindAll(ctx context.Context) (user.List, error) {
 	return res, nil
 }
 
+func (r *User) FindAllWithPagination(ctx context.Context, keyword *string, pagination *usecasex.Pagination) (user.List, *usecasex.PageInfo, error) {
+	filter := bson.M{}
+	if keyword != nil && *keyword != "" {
+		regex := bson.M{"$regex": primitive.Regex{Pattern: regexp.QuoteMeta(lo.FromPtr(keyword)), Options: "i"}}
+		filter["$or"] = []bson.M{
+			{"name": regex},
+			{"alias": regex},
+		}
+	}
+	return r.paginate(ctx, filter, pagination)
+}
+
 func (r *User) FindByID(ctx context.Context, id2 user.ID) (*user.User, error) {
 	return r.findOne(ctx, bson.M{"id": id2.String()})
 }

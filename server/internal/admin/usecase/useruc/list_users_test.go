@@ -13,7 +13,7 @@ func TestListUsersUseCase_Execute_NilOperator(t *testing.T) {
 	// nil deps are fine: Execute returns before touching them.
 	uc := NewListUsersUseCase(nil, authz.NewChecker(nil, nil, nil))
 
-	out, err := uc.Execute(context.Background(), nil)
+	out, err := uc.Execute(context.Background(), nil, ListUsersInput{})
 	assert.ErrorIs(t, err, ErrInvalidOperator)
 	assert.Nil(t, out)
 }

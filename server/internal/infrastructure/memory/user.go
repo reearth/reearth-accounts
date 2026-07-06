@@ -41,6 +41,53 @@ func (r *User) FindAll(ctx context.Context) (user.List, error) {
 	return res, nil
 }
 
+func (r *User) FindAllWithPagination(_ context.Context, keyword *string, p *usecasex.Pagination) (user.List, *usecasex.PageInfo, error) {
+	if r.err != nil {
+		return nil, nil, r.err
+	}
+
+	kw := ""
+	if keyword != nil {
+		kw = strings.ToLower(strings.TrimSpace(*keyword))
+	}
+
+	all := user.List(r.data.FindAll(func(_ user.ID, value *user.User) bool {
+		if kw == "" {
+			return true
+		}
+		return strings.Contains(strings.ToLower(value.Name()), kw) ||
+			strings.Contains(strings.ToLower(value.Alias()), kw)
+	}))
+
+	total := int64(len(all))
+
+	var offset, limit int64 = 0, 50
+	if p != nil && p.Offset != nil {
+		offset = p.Offset.Offset
+		limit = p.Offset.Limit
+	}
+
+	if offset > total {
+		offset = total
+	}
+	end := offset + limit
+	if end > total {
+		end = total
+	}
+	page := all[offset:end]
+
+	var startCursor, endCursor *usecasex.Cursor
+	if len(page) > 0 {
+		s := usecasex.Cursor(page[0].ID().String())
+		e := usecasex.Cursor(page[len(page)-1].ID().String())
+		startCursor, endCursor = &s, &e
+	}
+
+	hasNext := end < total
+	hasPrev := offset > 0
+	return page, usecasex.NewPageInfo(total, startCursor, endCursor, hasNext, hasPrev), nil
+}
+
 func (r *User) FindByIDs(_ context.Context, ids user.IDList) (user.List, error) {
 	if r.err != nil {
 		return nil, r.err
