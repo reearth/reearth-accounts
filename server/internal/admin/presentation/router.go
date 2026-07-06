@@ -32,6 +32,7 @@ func RegisterRoutes(e *echo.Echo, h *Handler) {
 		adminUsers := v1.Group("/admin-users", requireApproved)
 		adminUsers.GET("", h.AdminUser.ListAdminUsers)
 		adminUsers.POST("/:id/approve", h.AdminUser.ApproveAdminUser)
+		adminUsers.POST("/:id/reject", h.AdminUser.RejectAdminUser)
 
 		// Users (requires admin auth)
 		users := v1.Group("/users", h.AuthMw)

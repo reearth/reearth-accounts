@@ -27,4 +27,5 @@ var usecaseWire = wire.NewSet(
 	// admin-user management usecases
 	adminuseruc.NewListAdminUsersUseCase,
 	adminuseruc.NewApproveAdminUserUseCase,
+	adminuseruc.NewRejectAdminUserUseCase,
 )

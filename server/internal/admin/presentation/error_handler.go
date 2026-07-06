@@ -53,6 +53,8 @@ func classify(err error) (status int, code, msg string) {
 		return http.StatusForbidden, http.StatusText(http.StatusForbidden), "email domain not allowed"
 	case errors.Is(err, adminuseruc.ErrCannotModifySelf):
 		return http.StatusBadRequest, http.StatusText(http.StatusBadRequest), "cannot modify your own admin account"
+	case errors.Is(err, adminuseruc.ErrLastApprovedAdmin):
+		return http.StatusBadRequest, http.StatusText(http.StatusBadRequest), "cannot reject the last approved admin"
 	case errors.Is(err, rerror.ErrNotFound):
 		return http.StatusNotFound, http.StatusText(http.StatusNotFound), "not found"
 	default:

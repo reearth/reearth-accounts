@@ -32,6 +32,7 @@ func newTestEcho(repo adminuser.Repo, sess *session.Manager) *echo.Echo {
 	h := adminuserhandler.NewHandler(
 		adminuseruc.NewListAdminUsersUseCase(repo),
 		adminuseruc.NewApproveAdminUserUseCase(repo),
+		adminuseruc.NewRejectAdminUserUseCase(repo),
 	)
 	requireApproved := echo.MiddlewareFunc(mw.NewRequireApprovedMiddleware(sess, repo))
 
@@ -40,6 +41,7 @@ func newTestEcho(repo adminuser.Repo, sess *session.Manager) *echo.Echo {
 	g := e.Group("/api/v1/admin-users", requireApproved)
 	g.GET("", h.ListAdminUsers)
 	g.POST("/:id/approve", h.ApproveAdminUser)
+	g.POST("/:id/reject", h.RejectAdminUser)
 	return e
 }
 
@@ -194,6 +196,65 @@ func TestApproveAdminUser_NotFound(t *testing.T) {
 
 	// valid but non-existent id -> rerror.ErrNotFound -> 404 via error handler
 	req := httptest.NewRequest(http.MethodPost, "/api/v1/admin-users/"+adminuser.NewID().String()+"/approve", nil)
+	req.AddCookie(cookieFor(t, sess, op.ID()))
+	rec := httptest.NewRecorder()
+	e.ServeHTTP(rec, req)
+	assert.Equal(t, http.StatusNotFound, rec.Code)
+}
+
+func TestRejectAdminUser_OK(t *testing.T) {
+	op := approvedUser("op@eukarya.io")
+	target := pendingUser("new@eukarya.io")
+	repo := memory.NewAdminUserWith(op, target)
+	sess := session.NewManager(testSecret, time.Hour)
+	e := newTestEcho(repo, sess)
+
+	req := httptest.NewRequest(http.MethodPost, "/api/v1/admin-users/"+target.ID().String()+"/reject", nil)
+	req.AddCookie(cookieFor(t, sess, op.ID()))
+	rec := httptest.NewRecorder()
+	e.ServeHTTP(rec, req)
+	require.Equal(t, http.StatusOK, rec.Code)
+
+	var body adminuserhandler.AdminUserResponse
+	require.NoError(t, json.Unmarshal(rec.Body.Bytes(), &body))
+	assert.Equal(t, "rejected", body.Status)
+}
+
+func TestRejectAdminUser_CannotRejectSelf(t *testing.T) {
+	op := approvedUser("op@eukarya.io")
+	other := approvedUser("other@eukarya.io") // keep >1 approved so self-guard is what triggers
+	repo := memory.NewAdminUserWith(op, other)
+	sess := session.NewManager(testSecret, time.Hour)
+	e := newTestEcho(repo, sess)
+
+	req := httptest.NewRequest(http.MethodPost, "/api/v1/admin-users/"+op.ID().String()+"/reject", nil)
+	req.AddCookie(cookieFor(t, sess, op.ID()))
+	rec := httptest.NewRecorder()
+	e.ServeHTTP(rec, req)
+	assert.Equal(t, http.StatusBadRequest, rec.Code)
+}
+
+func TestRejectAdminUser_InvalidID(t *testing.T) {
+	op := approvedUser("op@eukarya.io")
+	repo := memory.NewAdminUserWith(op)
+	sess := session.NewManager(testSecret, time.Hour)
+	e := newTestEcho(repo, sess)
+
+	req := httptest.NewRequest(http.MethodPost, "/api/v1/admin-users/not-an-id/reject", nil)
+	req.AddCookie(cookieFor(t, sess, op.ID()))
+	rec := httptest.NewRecorder()
+	e.ServeHTTP(rec, req)
+	assert.Equal(t, http.StatusBadRequest, rec.Code)
+}
+
+func TestRejectAdminUser_NotFound(t *testing.T) {
+	op := approvedUser("op@eukarya.io")
+	repo := memory.NewAdminUserWith(op)
+	sess := session.NewManager(testSecret, time.Hour)
+	e := newTestEcho(repo, sess)
+
+	// valid but non-existent id -> rerror.ErrNotFound -> 404 via error handler
+	req := httptest.NewRequest(http.MethodPost, "/api/v1/admin-users/"+adminuser.NewID().String()+"/reject", nil)
 	req.AddCookie(cookieFor(t, sess, op.ID()))
 	rec := httptest.NewRecorder()
 	e.ServeHTTP(rec, req)

@@ -10,12 +10,14 @@ import (
 type Handler struct {
 	list    *adminuseruc.ListAdminUsersUseCase
 	approve *adminuseruc.ApproveAdminUserUseCase
+	reject  *adminuseruc.RejectAdminUserUseCase
 }
 
 // NewHandler is a Wire provider for the admin-user Handler.
 func NewHandler(
 	list *adminuseruc.ListAdminUsersUseCase,
 	approve *adminuseruc.ApproveAdminUserUseCase,
+	reject *adminuseruc.RejectAdminUserUseCase,
 ) *Handler {
-	return &Handler{list: list, approve: approve}
+	return &Handler{list: list, approve: approve, reject: reject}
 }

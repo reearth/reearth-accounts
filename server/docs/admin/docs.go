@@ -131,6 +131,59 @@ const docTemplate = `{
                 }
             }
         },
+        "/admin-users/{id}/reject": {
+            "post": {
+                "description": "Rejects a pending admin user or revokes an approved one. Cannot reject your own account, and the last approved admin cannot be rejected.",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "admin-users"
+                ],
+                "summary": "Reject or revoke an admin user",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Admin user ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/AdminUser"
+                        }
+                    },
+                    "400": {
+                        "description": "invalid id / cannot modify self / last approved admin",
+                        "schema": {
+                            "$ref": "#/definitions/ErrorResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/ErrorResponse"
+                        }
+                    },
+                    "403": {
+                        "description": "not approved",
+                        "schema": {
+                            "$ref": "#/definitions/ErrorResponse"
+                        }
+                    },
+                    "404": {
+                        "description": "not found",
+                        "schema": {
+                            "$ref": "#/definitions/ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
         "/auth/google": {
             "post": {
                 "description": "Verifies the Google id_token and issues an admin session cookie. New accounts are created as pending (approved when the email is bootstrapped).",
