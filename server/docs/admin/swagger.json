@@ -8,6 +8,175 @@
     },
     "basePath": "/api/v1",
     "paths": {
+        "/admin-users": {
+            "get": {
+                "description": "Lists admin users in creation order, optionally filtered by status, with offset pagination.",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "admin-users"
+                ],
+                "summary": "List admin users",
+                "parameters": [
+                    {
+                        "enum": [
+                            "pending",
+                            "approved",
+                            "rejected"
+                        ],
+                        "type": "string",
+                        "description": "Filter by status",
+                        "name": "status",
+                        "in": "query"
+                    },
+                    {
+                        "type": "integer",
+                        "description": "Page number (1-based)",
+                        "name": "page",
+                        "in": "query"
+                    },
+                    {
+                        "type": "integer",
+                        "description": "Items per page (max 100)",
+                        "name": "per_page",
+                        "in": "query"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/ListAdminUsersResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "invalid query",
+                        "schema": {
+                            "$ref": "#/definitions/ErrorResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/ErrorResponse"
+                        }
+                    },
+                    "403": {
+                        "description": "not approved",
+                        "schema": {
+                            "$ref": "#/definitions/ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/admin-users/{id}/approve": {
+            "post": {
+                "description": "Approves a pending admin user, recording the current admin as approver. Cannot approve your own account.",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "admin-users"
+                ],
+                "summary": "Approve an admin user",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Admin user ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/AdminUser"
+                        }
+                    },
+                    "400": {
+                        "description": "invalid id / cannot modify self",
+                        "schema": {
+                            "$ref": "#/definitions/ErrorResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/ErrorResponse"
+                        }
+                    },
+                    "403": {
+                        "description": "not approved",
+                        "schema": {
+                            "$ref": "#/definitions/ErrorResponse"
+                        }
+                    },
+                    "404": {
+                        "description": "admin user not found",
+                        "schema": {
+                            "$ref": "#/definitions/ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/admin-users/{id}/reject": {
+            "post": {
+                "description": "Rejects a pending admin user or revokes an approved one. Cannot reject your own account, and the last approved admin cannot be rejected.",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "admin-users"
+                ],
+                "summary": "Reject or revoke an admin user",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Admin user ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/AdminUser"
+                        }
+                    },
+                    "400": {
+                        "description": "invalid id / cannot modify self / last approved admin",
+                        "schema": {
+                            "$ref": "#/definitions/ErrorResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/ErrorResponse"
+                        }
+                    },
+                    "403": {
+                        "description": "not approved",
+                        "schema": {
+                            "$ref": "#/definitions/ErrorResponse"
+                        }
+                    },
+                    "404": {
+                        "description": "admin user not found",
+                        "schema": {
+                            "$ref": "#/definitions/ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
         "/auth/google": {
             "post": {
                 "description": "Verifies the Google id_token and issues an admin session cookie. New accounts are created as pending (approved when the email is bootstrapped).",
@@ -157,6 +326,38 @@
         }
     },
     "definitions": {
+        "AdminUser": {
+            "type": "object",
+            "properties": {
+                "approvedAt": {
+                    "type": "string"
+                },
+                "approvedBy": {
+                    "type": "string"
+                },
+                "createdAt": {
+                    "type": "string"
+                },
+                "email": {
+                    "type": "string"
+                },
+                "id": {
+                    "type": "string"
+                },
+                "name": {
+                    "type": "string"
+                },
+                "pictureUrl": {
+                    "type": "string"
+                },
+                "status": {
+                    "type": "string"
+                },
+                "updatedAt": {
+                    "type": "string"
+                }
+            }
+        },
         "ErrorResponse": {
             "type": "object",
             "properties": {
@@ -195,6 +396,26 @@
                 },
                 "status": {
                     "type": "string"
+                }
+            }
+        },
+        "ListAdminUsersResponse": {
+            "type": "object",
+            "properties": {
+                "items": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/AdminUser"
+                    }
+                },
+                "page": {
+                    "type": "integer"
+                },
+                "perPage": {
+                    "type": "integer"
+                },
+                "totalCount": {
+                    "type": "integer"
                 }
             }
         },

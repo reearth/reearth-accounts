@@ -1,5 +1,26 @@
 basePath: /api/v1
 definitions:
+  AdminUser:
+    properties:
+      approvedAt:
+        type: string
+      approvedBy:
+        type: string
+      createdAt:
+        type: string
+      email:
+        type: string
+      id:
+        type: string
+      name:
+        type: string
+      pictureUrl:
+        type: string
+      status:
+        type: string
+      updatedAt:
+        type: string
+    type: object
   ErrorResponse:
     properties:
       code:
@@ -26,6 +47,19 @@ definitions:
         type: string
       status:
         type: string
+    type: object
+  ListAdminUsersResponse:
+    properties:
+      items:
+        items:
+          $ref: '#/definitions/AdminUser'
+        type: array
+      page:
+        type: integer
+      perPage:
+        type: integer
+      totalCount:
+        type: integer
     type: object
   ListUsersResponse:
     properties:
@@ -72,6 +106,121 @@ info:
   title: Re:Earth Accounts Admin API
   version: "1.0"
 paths:
+  /admin-users:
+    get:
+      description: Lists admin users in creation order, optionally filtered by status,
+        with offset pagination.
+      parameters:
+      - description: Filter by status
+        enum:
+        - pending
+        - approved
+        - rejected
+        in: query
+        name: status
+        type: string
+      - description: Page number (1-based)
+        in: query
+        name: page
+        type: integer
+      - description: Items per page (max 100)
+        in: query
+        name: per_page
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/ListAdminUsersResponse'
+        "400":
+          description: invalid query
+          schema:
+            $ref: '#/definitions/ErrorResponse'
+        "401":
+          description: unauthorized
+          schema:
+            $ref: '#/definitions/ErrorResponse'
+        "403":
+          description: not approved
+          schema:
+            $ref: '#/definitions/ErrorResponse'
+      summary: List admin users
+      tags:
+      - admin-users
+  /admin-users/{id}/approve:
+    post:
+      description: Approves a pending admin user, recording the current admin as approver.
+        Cannot approve your own account.
+      parameters:
+      - description: Admin user ID
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/AdminUser'
+        "400":
+          description: invalid id / cannot modify self
+          schema:
+            $ref: '#/definitions/ErrorResponse'
+        "401":
+          description: unauthorized
+          schema:
+            $ref: '#/definitions/ErrorResponse'
+        "403":
+          description: not approved
+          schema:
+            $ref: '#/definitions/ErrorResponse'
+        "404":
+          description: admin user not found
+          schema:
+            $ref: '#/definitions/ErrorResponse'
+      summary: Approve an admin user
+      tags:
+      - admin-users
+  /admin-users/{id}/reject:
+    post:
+      description: Rejects a pending admin user or revokes an approved one. Cannot
+        reject your own account, and the last approved admin cannot be rejected.
+      parameters:
+      - description: Admin user ID
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/AdminUser'
+        "400":
+          description: invalid id / cannot modify self / last approved admin
+          schema:
+            $ref: '#/definitions/ErrorResponse'
+        "401":
+          description: unauthorized
+          schema:
+            $ref: '#/definitions/ErrorResponse'
+        "403":
+          description: not approved
+          schema:
+            $ref: '#/definitions/ErrorResponse'
+        "404":
+          description: admin user not found
+          schema:
+            $ref: '#/definitions/ErrorResponse'
+      summary: Reject or revoke an admin user
+      tags:
+      - admin-users
   /auth/google:
     post:
       consumes:
