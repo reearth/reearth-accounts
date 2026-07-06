@@ -31,6 +31,14 @@ func (uc *RejectAdminUserUseCase) Execute(ctx context.Context, operatorID, targe
 
 	// Revoking an approved admin must never drop the count of approved admins
 	// to zero (otherwise nobody could ever approve again).
+	//
+	// NOTE: this is a check-then-act guard, not atomic. Two approved admins
+	// rejecting each other at the exact same moment could both observe
+	// TotalCount == 2 and both succeed, leaving zero approved admins. Given the
+	// admin set is a tiny closed group (Eukarya employees) this race is
+	// acceptable for V1; enforcing it atomically would require backend-specific
+	// locking (e.g. a Postgres advisory lock / serializable transaction or a
+	// conditional update) and is deferred until it's actually needed.
 	if target.IsApproved() {
 		approved := adminuser.StatusApproved
 		// Only the total count is needed; limit to a single row so repos don't
