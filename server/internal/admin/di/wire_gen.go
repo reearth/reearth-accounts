@@ -7,9 +7,11 @@ package di
 
 import (
 	"github.com/reearth/reearth-accounts/server/internal/admin/presentation"
+	adminuserhandler "github.com/reearth/reearth-accounts/server/internal/admin/presentation/handler/adminuser"
 	"github.com/reearth/reearth-accounts/server/internal/admin/presentation/handler/auth"
 	"github.com/reearth/reearth-accounts/server/internal/admin/presentation/handler/user"
 	"github.com/reearth/reearth-accounts/server/internal/admin/presentation/middleware"
+	"github.com/reearth/reearth-accounts/server/internal/admin/usecase/adminuseruc"
 	"github.com/reearth/reearth-accounts/server/internal/admin/usecase/authuc"
 	"github.com/reearth/reearth-accounts/server/internal/admin/usecase/authz"
 	"github.com/reearth/reearth-accounts/server/internal/admin/usecase/useruc"
@@ -52,6 +54,8 @@ func InitializeEcho() (*Server, func(), error) {
 	}
 	cookieSecure := provideCookieSecure(config)
 	authHandler := auth.NewHandler(googleSignInUseCase, getMeUseCase, manager, cookieSecure)
+	listAdminUsersUseCase := adminuseruc.NewListAdminUsersUseCase(adminUserRepo)
+	adminUserHandler := adminuserhandler.NewHandler(listAdminUsersUseCase)
 	v := provideJWTProviders(config)
 	middlewareFunc, err := middleware.NewAuthMiddleware(v, repo)
 	if err != nil {
@@ -59,7 +63,8 @@ func InitializeEcho() (*Server, func(), error) {
 		return nil, nil, err
 	}
 	sessionMiddleware := middleware.NewSessionMiddleware(manager)
-	presentationHandler := presentation.NewHandler(authHandler, userHandler, middlewareFunc, sessionMiddleware)
+	requireApprovedMiddleware := middleware.NewRequireApprovedMiddleware(manager, adminUserRepo)
+	presentationHandler := presentation.NewHandler(adminUserHandler, authHandler, userHandler, middlewareFunc, sessionMiddleware, requireApprovedMiddleware)
 	appMiddlewares := presentation.NewAppMiddlewares()
 	server := NewAppEchoServer(config, presentationHandler, appMiddlewares)
 	return server, func() {
