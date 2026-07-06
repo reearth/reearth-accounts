@@ -49,7 +49,12 @@ func (r *AdminUser) List(ctx context.Context, f adminuser.ListFilter) (adminuser
 		filter["status"] = f.Status.String()
 	}
 
-	sort := &usecasex.Sort{Key: "createdat"}
+	// Sort by id (a ULID) rather than createdat: the ULID's leading bits are the
+	// creation timestamp, so this preserves creation order while being unique,
+	// giving a deterministic total order for stable offset pagination (createdat
+	// alone can tie at millisecond granularity). Matches the {createdat, id}
+	// ordering used by the Postgres and in-memory repos.
+	sort := &usecasex.Sort{Key: "id"}
 	c := mongodoc.NewAdminUserConsumer()
 	pageInfo, err := r.client.Paginate(ctx, filter, sort, f.Pagination, c)
 	if err != nil {
