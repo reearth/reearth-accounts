@@ -873,9 +873,11 @@ const docTemplate = `{
                     "type": "boolean"
                 },
                 "email": {
+                    "description": "empty string if the member's user cannot be resolved",
                     "type": "string"
                 },
                 "name": {
+                    "description": "empty string if the member's user cannot be resolved",
                     "type": "string"
                 },
                 "role": {
