@@ -6,6 +6,7 @@ import (
 	"sort"
 	"strings"
 
+	"github.com/reearth/reearth-accounts/server/internal/usecase/repo"
 	"github.com/reearth/reearth-accounts/server/pkg/id"
 	"github.com/reearth/reearth-accounts/server/pkg/user"
 	"github.com/reearth/reearth-accounts/server/pkg/workspace"
@@ -153,6 +154,12 @@ func (r *Workspace) FindByIDs(_ context.Context, ids workspace.IDList) (workspac
 		return nil, r.err
 	}
 
+	for _, id := range ids {
+		if !r.f.CanRead(id) {
+			return nil, rerror.ErrNotFound
+		}
+	}
+
 	res := r.data.FindAll(func(key workspace.ID, value *workspace.Workspace) bool {
 		return ids.Has(key)
 	})
@@ -177,9 +184,18 @@ func (r *Workspace) FindByName(_ context.Context, name string) (*workspace.Works
 	if name == "" {
 		return nil, rerror.ErrNotFound
 	}
-	return rerror.ErrIfNil(r.data.Find(func(key workspace.ID, value *workspace.Workspace) bool {
+	w, err := rerror.ErrIfNil(r.data.Find(func(key workspace.ID, value *workspace.Workspace) bool {
 		return value.Name() == name
 	}), rerror.ErrNotFound)
+	if err != nil {
+		return nil, err
+	}
+
+	if !r.f.CanRead(w.ID()) {
+		return nil, rerror.ErrNotFound
+	}
+
+	return w, nil
 }
 
 func (r *Workspace) FindByAlias(_ context.Context, alias string) (*workspace.Workspace, error) {
@@ -231,6 +247,10 @@ func (r *Workspace) Save(_ context.Context, t *workspace.Workspace) error {
 		return r.err
 	}
 
+	if !r.f.CanWrite(t.ID()) {
+		return repo.ErrOperationDenied
+	}
+
 	r.data.Store(t.ID(), t)
 	return nil
 }
@@ -238,6 +258,12 @@ func (r *Workspace) Save(_ context.Context, t *workspace.Workspace) error {
 func (r *Workspace) SaveAll(_ context.Context, workspaces workspace.List) error {
 	if r.err != nil {
 		return r.err
+	}
+
+	for _, w := range workspaces {
+		if !r.f.CanWrite(w.ID()) {
+			return repo.ErrOperationDenied
+		}
 	}
 
 	for _, t := range workspaces {
@@ -251,6 +277,10 @@ func (r *Workspace) Remove(_ context.Context, wid workspace.ID) error {
 		return r.err
 	}
 
+	if !r.f.CanWrite(wid) {
+		return repo.ErrOperationDenied
+	}
+
 	r.data.Delete(wid)
 	return nil
 }
@@ -258,6 +288,12 @@ func (r *Workspace) Remove(_ context.Context, wid workspace.ID) error {
 func (r *Workspace) RemoveAll(_ context.Context, ids workspace.IDList) error {
 	if r.err != nil {
 		return r.err
+	}
+
+	for _, id := range ids {
+		if !r.f.CanWrite(id) {
+			return repo.ErrOperationDenied
+		}
 	}
 
 	for _, wid := range ids {

@@ -21,6 +21,7 @@ import (
 //	@Failure		400			{object}	internal.ErrorResponse	"invalid query"
 //	@Failure		401			{object}	internal.ErrorResponse	"unauthorized"
 //	@Failure		403			{object}	internal.ErrorResponse	"not approved"
+//	@Failure		501			{object}	internal.ErrorResponse	"not implemented on this backend"
 //	@Router			/workspaces [get]
 func (h *Handler) ListWorkspaces(c echo.Context) error {
 	var keyword *string
