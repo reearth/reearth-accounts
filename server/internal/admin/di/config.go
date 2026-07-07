@@ -12,6 +12,10 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/joho/godotenv"
 	"github.com/kelseyhightower/envconfig"
+	"github.com/reearth/reearth-accounts/server/internal/admin/auth/session"
+	"github.com/reearth/reearth-accounts/server/internal/admin/gateway/google"
+	authhandler "github.com/reearth/reearth-accounts/server/internal/admin/presentation/handler/auth"
+	"github.com/reearth/reearth-accounts/server/internal/admin/usecase/authuc"
 	mongorepo "github.com/reearth/reearth-accounts/server/internal/infrastructure/mongo"
 	"github.com/reearth/reearth-accounts/server/internal/infrastructure/postgres"
 	"github.com/reearth/reearth-accounts/server/internal/usecase/repo"
@@ -46,6 +50,13 @@ type Config struct {
 	// cerbos
 	CerbosHost   string `envconfig:"CERBOS_HOST"`
 	CerbosUseSSL bool   `default:"true" envconfig:"REEARTH_ACCOUNTS_CERBOS_USE_SSL"`
+
+	// admin session auth (Google OAuth + self-issued session JWT)
+	GoogleOAuthClientID string        `envconfig:"REEARTH_ACCOUNTS_ADMIN_GOOGLE_OAUTH_CLIENT_ID"`
+	SessionSecret       string        `envconfig:"REEARTH_ACCOUNTS_ADMIN_SESSION_SECRET"`
+	SessionTTL          time.Duration `default:"12h" envconfig:"REEARTH_ACCOUNTS_ADMIN_SESSION_TTL"`
+	BootstrapEmails     []string      `envconfig:"REEARTH_ACCOUNTS_ADMIN_BOOTSTRAP_EMAILS"`
+	AllowedEmailDomain  string        `default:"eukarya.io" envconfig:"REEARTH_ACCOUNTS_ADMIN_ALLOWED_EMAIL_DOMAIN"`
 }
 
 type Auth0Config struct {
@@ -133,6 +144,9 @@ func (c *Config) Print() {
 	if masked.DB != "" {
 		masked.DB = "***"
 	}
+	if masked.SessionSecret != "" {
+		masked.SessionSecret = "***"
+	}
 	log.Infof("admin config: %+v", masked)
 }
 
@@ -156,6 +170,49 @@ func LoadConfig() *Config {
 
 func provideJWTProviders(cfg *Config) []appx.JWTProvider {
 	return cfg.Auths()
+}
+
+// provideGoogleVerifier builds the Google id_token verifier bound to the admin
+// OAuth client ID. A missing client ID is a misconfiguration that would reject
+// every sign-in, so we fail fast in production (and warn in development).
+func provideGoogleVerifier(cfg *Config) (google.Verifier, error) {
+	if cfg.GoogleOAuthClientID == "" {
+		if cfg.IsProduction() {
+			return nil, fmt.Errorf("REEARTH_ACCOUNTS_ADMIN_GOOGLE_OAUTH_CLIENT_ID is required in production")
+		}
+		log.Warnf("admin Google OAuth client ID not configured; Google sign-in will reject all tokens")
+	}
+	return google.NewVerifier(cfg.GoogleOAuthClientID), nil
+}
+
+// provideSessionManager builds the session-token issuer/parser. An empty secret
+// or non-positive TTL would silently break sign-in (500s / immediately-expired
+// tokens), so we validate up front: TTL is always required, and the secret is
+// required in production (a warning in development).
+func provideSessionManager(cfg *Config) (*session.Manager, error) {
+	if cfg.SessionTTL <= 0 {
+		return nil, fmt.Errorf("REEARTH_ACCOUNTS_ADMIN_SESSION_TTL must be positive")
+	}
+	if cfg.SessionSecret == "" {
+		if cfg.IsProduction() {
+			return nil, fmt.Errorf("REEARTH_ACCOUNTS_ADMIN_SESSION_SECRET is required in production")
+		}
+		log.Warnf("admin session secret not configured; Google sign-in will fail until REEARTH_ACCOUNTS_ADMIN_SESSION_SECRET is set")
+	}
+	return session.NewManager(cfg.SessionSecret, cfg.SessionTTL), nil
+}
+
+// provideGoogleSignInOptions maps config to the sign-in policy.
+func provideGoogleSignInOptions(cfg *Config) authuc.GoogleSignInOptions {
+	return authuc.GoogleSignInOptions{
+		AllowedDomain:   cfg.AllowedEmailDomain,
+		BootstrapEmails: cfg.BootstrapEmails,
+	}
+}
+
+// provideCookieSecure sets the session cookie's Secure attribute (on in prod).
+func provideCookieSecure(cfg *Config) authhandler.CookieSecure {
+	return authhandler.CookieSecure(cfg.IsProduction())
 }
 
 // provideRepoContainer connects to the configured backend (Mongo or Postgres)

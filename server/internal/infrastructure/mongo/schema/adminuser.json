@@ -1,0 +1,58 @@
+{
+  "$jsonSchema": {
+    "additionalProperties": false,
+    "bsonType": "object",
+    "description": "Schema for adminuser documents in the reearth-accounts database",
+    "properties": {
+      "_id": {
+        "bsonType": "objectId",
+        "description": "MongoDB internal ID"
+      },
+      "approvedat": {
+        "bsonType": "date",
+        "description": "Approval timestamp"
+      },
+      "approvedby": {
+        "bsonType": "string",
+        "description": "ID of the admin who approved this user (ULID format). Default: \"\""
+      },
+      "createdat": {
+        "bsonType": "date",
+        "description": "Creation timestamp"
+      },
+      "email": {
+        "bsonType": "string",
+        "description": "Admin user email address (lowercase, unique)"
+      },
+      "id": {
+        "bsonType": "string",
+        "description": "Admin user ID (ULID format)"
+      },
+      "name": {
+        "bsonType": "string",
+        "description": "Admin user display name"
+      },
+      "pictureurl": {
+        "bsonType": "string",
+        "description": "Admin user picture URL from Google profile. Default: \"\""
+      },
+      "status": {
+        "bsonType": "string",
+        "description": "Admin user status: pending, approved or rejected"
+      },
+      "updatedat": {
+        "bsonType": "date",
+        "description": "Last update timestamp"
+      }
+    },
+    "required": [
+      "id",
+      "email",
+      "name",
+      "status",
+      "createdat",
+      "updatedat"
+    ],
+    "title": "AdminUser Collection Schema"
+  }
+}

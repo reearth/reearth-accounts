@@ -14,5 +14,7 @@ import (
 var middlewareWire = wire.NewSet(
 	provideJWTProviders,
 	mw.NewAuthMiddleware,
+	mw.NewSessionMiddleware,
+	mw.NewRequireApprovedMiddleware,
 	presentation.NewAppMiddlewares,
 )

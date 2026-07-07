@@ -8,6 +8,12 @@ import (
 // This file is project-specific and should be modified when adding new collections.
 func RegisterSchemas(g *Generator) {
 	g.RegisterSchema(
+		"adminuser",
+		mongodoc.AdminUserDocument{},
+		"AdminUser Collection Schema",
+		"Schema for adminuser documents in the reearth-accounts database",
+	)
+	g.RegisterSchema(
 		"user",
 		mongodoc.UserDocument{},
 		"User Collection Schema",

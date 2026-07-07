@@ -9,6 +9,10 @@ import (
 )
 
 type Querier interface {
+	AdminUserFindByEmail(ctx context.Context, lower string) (AdminUser, error)
+	AdminUserFindByID(ctx context.Context, id string) (AdminUser, error)
+	AdminUserFindByIDs(ctx context.Context, dollar_1 []string) ([]AdminUser, error)
+	AdminUserUpsert(ctx context.Context, arg AdminUserUpsertParams) error
 	ConfigLoad(ctx context.Context) (ConfigLoadRow, error)
 	ConfigUpsert(ctx context.Context, arg ConfigUpsertParams) error
 	ConfigUpsertAuth(ctx context.Context, arg ConfigUpsertAuthParams) error

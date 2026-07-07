@@ -36,7 +36,16 @@ func NewAppEchoServer(
 		middleware.RequestID(),
 	)
 	if origins := allowedOrigins(cfg); len(origins) > 0 {
-		e.Use(middleware.CORSWithConfig(middleware.CORSConfig{AllowOrigins: origins}))
+		// AllowCredentials is required so the browser stores/sends the
+		// admin_session HttpOnly cookie on cross-origin requests from the admin
+		// frontend; combined with the explicit AllowOrigins allow-list and the
+		// JSON preflight, it also blocks cross-origin cookie-writing requests
+		// from untrusted origins (login-CSRF mitigation for V1, backed by
+		// SameSite=Lax).
+		e.Use(middleware.CORSWithConfig(middleware.CORSConfig{
+			AllowOrigins:     origins,
+			AllowCredentials: true,
+		}))
 	}
 	e.Use(appMiddlewares.Middlewares()...)
 

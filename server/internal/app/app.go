@@ -149,6 +149,7 @@ func initEcho(ctx context.Context, cfg *ServerConfig) *echo.Echo {
 		JWTMiddleware:      restJWT,
 		AuthConfigProvider: cfg.Config,
 		APIKey:             cfg.Config.RestAPIKey,
+		SyncSSOAPIKey:      cfg.Config.SyncSSOAPIKey,
 		SwaggerUser:        cfg.Config.SwaggerBasicUser,
 		SwaggerPass:        cfg.Config.SwaggerBasicPass,
 		Debug:              cfg.Debug || cfg.Config.Dev,

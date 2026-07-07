@@ -10,6 +10,7 @@ See also: [ER Diagram](schema/ER.md)
 infrastructure/mongo/
 ├── schema/
 │   ├── schema.go          # Embeds JSON schema files
+│   ├── adminuser.json     # AdminUser collection schema
 │   ├── user.json          # User collection schema
 │   ├── workspace.json     # Workspace collection schema
 │   ├── role.json          # Role collection schema

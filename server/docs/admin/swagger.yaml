@@ -1,5 +1,26 @@
 basePath: /api/v1
 definitions:
+  AdminUser:
+    properties:
+      approvedAt:
+        type: string
+      approvedBy:
+        type: string
+      createdAt:
+        type: string
+      email:
+        type: string
+      id:
+        type: string
+      name:
+        type: string
+      pictureUrl:
+        type: string
+      status:
+        type: string
+      updatedAt:
+        type: string
+    type: object
   ErrorResponse:
     properties:
       code:
@@ -9,12 +30,77 @@ definitions:
         example: invalid request
         type: string
     type: object
+  GoogleSignInRequest:
+    properties:
+      id_token:
+        type: string
+    required:
+    - id_token
+    type: object
+  GoogleSignInResponse:
+    properties:
+      email:
+        type: string
+      name:
+        type: string
+      pictureUrl:
+        type: string
+      status:
+        type: string
+    type: object
+  ListAdminUsersResponse:
+    properties:
+      items:
+        items:
+          $ref: '#/definitions/AdminUser'
+        type: array
+      page:
+        type: integer
+      perPage:
+        type: integer
+      totalCount:
+        type: integer
+    type: object
   ListUsersResponse:
     properties:
       items:
         items:
           $ref: '#/definitions/User'
         type: array
+    type: object
+  ListWorkspacesResponse:
+    properties:
+      items:
+        items:
+          $ref: '#/definitions/Workspace'
+        type: array
+      page:
+        type: integer
+      perPage:
+        type: integer
+      totalCount:
+        type: integer
+    type: object
+  MeResponse:
+    properties:
+      approvedAt:
+        type: string
+      approvedBy:
+        type: string
+      createdAt:
+        type: string
+      email:
+        type: string
+      id:
+        type: string
+      name:
+        type: string
+      pictureUrl:
+        type: string
+      status:
+        type: string
+      updatedAt:
+        type: string
     type: object
   User:
     properties:
@@ -27,12 +113,211 @@ definitions:
       name:
         type: string
     type: object
+  Workspace:
+    properties:
+      alias:
+        type: string
+      id:
+        type: string
+      memberCount:
+        type: integer
+      name:
+        type: string
+      personal:
+        type: boolean
+      updatedAt:
+        type: string
+    type: object
 info:
   contact: {}
   description: Admin REST API for the internal management console.
   title: Re:Earth Accounts Admin API
   version: "1.0"
 paths:
+  /admin-users:
+    get:
+      description: Lists admin users in creation order, optionally filtered by status,
+        with offset pagination.
+      parameters:
+      - description: Filter by status
+        enum:
+        - pending
+        - approved
+        - rejected
+        in: query
+        name: status
+        type: string
+      - description: Page number (1-based)
+        in: query
+        name: page
+        type: integer
+      - description: Items per page (max 100)
+        in: query
+        name: per_page
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/ListAdminUsersResponse'
+        "400":
+          description: invalid query
+          schema:
+            $ref: '#/definitions/ErrorResponse'
+        "401":
+          description: unauthorized
+          schema:
+            $ref: '#/definitions/ErrorResponse'
+        "403":
+          description: not approved
+          schema:
+            $ref: '#/definitions/ErrorResponse'
+      summary: List admin users
+      tags:
+      - admin-users
+  /admin-users/{id}/approve:
+    post:
+      description: Approves a pending or rejected admin user, recording the current
+        admin as approver. Idempotent for already-approved users (the original approver/timestamp
+        is kept). Cannot approve your own account.
+      parameters:
+      - description: Admin user ID
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/AdminUser'
+        "400":
+          description: invalid id / cannot modify self
+          schema:
+            $ref: '#/definitions/ErrorResponse'
+        "401":
+          description: unauthorized
+          schema:
+            $ref: '#/definitions/ErrorResponse'
+        "403":
+          description: not approved
+          schema:
+            $ref: '#/definitions/ErrorResponse'
+        "404":
+          description: not found
+          schema:
+            $ref: '#/definitions/ErrorResponse'
+      summary: Approve an admin user
+      tags:
+      - admin-users
+  /admin-users/{id}/reject:
+    post:
+      description: Rejects a pending admin user or revokes an approved one. Cannot
+        reject your own account, and the last approved admin cannot be rejected.
+      parameters:
+      - description: Admin user ID
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/AdminUser'
+        "400":
+          description: invalid id / cannot modify self / last approved admin
+          schema:
+            $ref: '#/definitions/ErrorResponse'
+        "401":
+          description: unauthorized
+          schema:
+            $ref: '#/definitions/ErrorResponse'
+        "403":
+          description: not approved
+          schema:
+            $ref: '#/definitions/ErrorResponse'
+        "404":
+          description: not found
+          schema:
+            $ref: '#/definitions/ErrorResponse'
+      summary: Reject or revoke an admin user
+      tags:
+      - admin-users
+  /auth/google:
+    post:
+      consumes:
+      - application/json
+      description: Verifies the Google id_token and issues an admin session cookie.
+        New accounts are created as pending (approved when the email is bootstrapped).
+      parameters:
+      - description: Google id_token
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/GoogleSignInRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/GoogleSignInResponse'
+        "400":
+          description: invalid request
+          schema:
+            $ref: '#/definitions/ErrorResponse'
+        "401":
+          description: id_token verification failed
+          schema:
+            $ref: '#/definitions/ErrorResponse'
+        "403":
+          description: domain not allowed / email not verified
+          schema:
+            $ref: '#/definitions/ErrorResponse'
+      summary: Sign in with a Google id_token
+      tags:
+      - auth
+  /auth/logout:
+    post:
+      description: Clears the session cookie. Public endpoint so the cookie can be
+        cleared even with an expired/invalid token.
+      produces:
+      - application/json
+      responses:
+        "204":
+          description: No Content
+      summary: Log out
+      tags:
+      - auth
+  /me:
+    get:
+      description: Returns the admin user record for the session cookie (any status).
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/MeResponse'
+        "401":
+          description: unauthorized
+          schema:
+            $ref: '#/definitions/ErrorResponse'
+        "404":
+          description: account not found
+          schema:
+            $ref: '#/definitions/ErrorResponse'
+      summary: Get the current admin user
+      tags:
+      - auth
   /users:
     get:
       consumes:
@@ -62,6 +347,49 @@ paths:
       summary: ユーザー一覧を取得
       tags:
       - users
+  /workspaces:
+    get:
+      description: Lists workspaces across all tenants, optionally filtered by a name/alias
+        keyword, with offset pagination.
+      parameters:
+      - description: Search by name or alias
+        in: query
+        name: q
+        type: string
+      - description: Page number (1-based)
+        in: query
+        name: page
+        type: integer
+      - description: Items per page (max 100)
+        in: query
+        name: per_page
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/ListWorkspacesResponse'
+        "400":
+          description: invalid query
+          schema:
+            $ref: '#/definitions/ErrorResponse'
+        "401":
+          description: unauthorized
+          schema:
+            $ref: '#/definitions/ErrorResponse'
+        "403":
+          description: not approved
+          schema:
+            $ref: '#/definitions/ErrorResponse'
+        "501":
+          description: not implemented on this backend
+          schema:
+            $ref: '#/definitions/ErrorResponse'
+      summary: List workspaces
+      tags:
+      - workspaces
 securityDefinitions:
   BearerAuth:
     in: header
