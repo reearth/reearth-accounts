@@ -24,6 +24,16 @@ type ListWorkspacesResponse struct {
 	PerPage    int64               `json:"perPage"`
 } // @name ListWorkspacesResponse
 
+// WorkspaceMemberResponse is a single member of a workspace, with the member's
+// role and (when resolvable) the underlying user's name and email.
+type WorkspaceMemberResponse struct {
+	UserID   string `json:"userId"`
+	Name     string `json:"name"`
+	Email    string `json:"email"`
+	Role     string `json:"role"`
+	Disabled bool   `json:"disabled"`
+} // @name WorkspaceMember
+
 func newWorkspaceResponse(w *workspace.Workspace) WorkspaceResponse {
 	res := WorkspaceResponse{
 		ID:        w.ID().String(),

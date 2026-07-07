@@ -15,7 +15,9 @@ import (
 	"github.com/reearth/reearth-accounts/server/internal/admin/usecase/useruc"
 	"github.com/reearth/reearth-accounts/server/internal/infrastructure/memory"
 	"github.com/reearth/reearth-accounts/server/pkg/adminuser"
+	"github.com/reearth/reearth-accounts/server/pkg/role"
 	"github.com/reearth/reearth-accounts/server/pkg/user"
+	"github.com/reearth/reearth-accounts/server/pkg/workspace"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -31,13 +33,23 @@ func usr(name, alias, email string) *user.User {
 }
 
 func newTestEcho(userRepo user.Repo, adminRepo adminuser.Repo, sess *session.Manager) *echo.Echo {
-	h := userhandler.NewHandler(useruc.NewListUsersUseCase(userRepo))
+	return newTestEchoWithWorkspaces(userRepo, memory.NewWorkspaceWith(), adminRepo, sess)
+}
+
+func newTestEchoWithWorkspaces(userRepo user.Repo, wsRepo workspace.Repo, adminRepo adminuser.Repo, sess *session.Manager) *echo.Echo {
+	h := userhandler.NewHandler(
+		useruc.NewGetUserUseCase(userRepo),
+		useruc.NewGetUserWorkspacesUseCase(wsRepo),
+		useruc.NewListUsersUseCase(userRepo),
+	)
 	requireApproved := echo.MiddlewareFunc(mw.NewRequireApprovedMiddleware(sess, adminRepo))
 
 	e := echo.New()
 	e.HTTPErrorHandler = adminpresentation.CustomHTTPErrorHandler
 	g := e.Group("/api/v1/users", requireApproved)
 	g.GET("", h.ListUsers)
+	g.GET("/:id", h.GetUser)
+	g.GET("/:id/workspaces", h.GetUserWorkspaces)
 	return e
 }
 
@@ -115,4 +127,98 @@ func TestListUsers_InvalidPagination(t *testing.T) {
 			assert.Equal(t, http.StatusBadRequest, rec.Code)
 		})
 	}
+}
+
+func TestGetUser_OK(t *testing.T) {
+	op := approvedAdmin("op@eukarya.io")
+	adminRepo := memory.NewAdminUserWith(op)
+	u := usr("Alice", "alice", "alice@example.com")
+	userRepo := memory.NewUserWith(u)
+	sess := session.NewManager(testSecret, time.Hour)
+	e := newTestEcho(userRepo, adminRepo, sess)
+
+	req := httptest.NewRequest(http.MethodGet, "/api/v1/users/"+u.ID().String(), nil)
+	req.AddCookie(cookieFor(t, sess, op.ID()))
+	rec := httptest.NewRecorder()
+	e.ServeHTTP(rec, req)
+	require.Equal(t, http.StatusOK, rec.Code)
+
+	var body userhandler.UserDetailResponse
+	require.NoError(t, json.Unmarshal(rec.Body.Bytes(), &body))
+	assert.Equal(t, u.ID().String(), body.ID)
+	assert.Equal(t, "Alice", body.Name)
+	assert.Equal(t, "alice@example.com", body.Email)
+}
+
+func TestGetUser_InvalidID(t *testing.T) {
+	op := approvedAdmin("op@eukarya.io")
+	adminRepo := memory.NewAdminUserWith(op)
+	userRepo := memory.NewUserWith(usr("A", "a", "a@example.com"))
+	sess := session.NewManager(testSecret, time.Hour)
+	e := newTestEcho(userRepo, adminRepo, sess)
+
+	req := httptest.NewRequest(http.MethodGet, "/api/v1/users/not-an-id", nil)
+	req.AddCookie(cookieFor(t, sess, op.ID()))
+	rec := httptest.NewRecorder()
+	e.ServeHTTP(rec, req)
+	assert.Equal(t, http.StatusBadRequest, rec.Code)
+}
+
+func TestGetUser_NotFound(t *testing.T) {
+	op := approvedAdmin("op@eukarya.io")
+	adminRepo := memory.NewAdminUserWith(op)
+	userRepo := memory.NewUserWith(usr("A", "a", "a@example.com"))
+	sess := session.NewManager(testSecret, time.Hour)
+	e := newTestEcho(userRepo, adminRepo, sess)
+
+	req := httptest.NewRequest(http.MethodGet, "/api/v1/users/"+user.NewID().String(), nil)
+	req.AddCookie(cookieFor(t, sess, op.ID()))
+	rec := httptest.NewRecorder()
+	e.ServeHTTP(rec, req)
+	assert.Equal(t, http.StatusNotFound, rec.Code)
+}
+
+func TestGetUserWorkspaces_OK(t *testing.T) {
+	op := approvedAdmin("op@eukarya.io")
+	adminRepo := memory.NewAdminUserWith(op)
+	u := usr("Alice", "alice", "alice@example.com")
+	userRepo := memory.NewUserWith(u)
+	w := workspace.New().NewID().Name("Team").Alias("team").Members(map[workspace.UserID]workspace.Member{
+		u.ID(): {Role: role.RoleOwner},
+	}).MustBuild()
+	wsRepo := memory.NewWorkspaceWith(w)
+	sess := session.NewManager(testSecret, time.Hour)
+	e := newTestEchoWithWorkspaces(userRepo, wsRepo, adminRepo, sess)
+
+	req := httptest.NewRequest(http.MethodGet, "/api/v1/users/"+u.ID().String()+"/workspaces", nil)
+	req.AddCookie(cookieFor(t, sess, op.ID()))
+	rec := httptest.NewRecorder()
+	e.ServeHTTP(rec, req)
+	require.Equal(t, http.StatusOK, rec.Code)
+
+	var body []userhandler.UserWorkspaceResponse
+	require.NoError(t, json.Unmarshal(rec.Body.Bytes(), &body))
+	require.Len(t, body, 1)
+	assert.Equal(t, w.ID().String(), body[0].ID)
+	assert.Equal(t, "owner", body[0].Role)
+}
+
+func TestGetUserWorkspaces_Empty(t *testing.T) {
+	op := approvedAdmin("op@eukarya.io")
+	adminRepo := memory.NewAdminUserWith(op)
+	u := usr("Alice", "alice", "alice@example.com")
+	userRepo := memory.NewUserWith(u)
+	wsRepo := memory.NewWorkspaceWith()
+	sess := session.NewManager(testSecret, time.Hour)
+	e := newTestEchoWithWorkspaces(userRepo, wsRepo, adminRepo, sess)
+
+	req := httptest.NewRequest(http.MethodGet, "/api/v1/users/"+u.ID().String()+"/workspaces", nil)
+	req.AddCookie(cookieFor(t, sess, op.ID()))
+	rec := httptest.NewRecorder()
+	e.ServeHTTP(rec, req)
+	require.Equal(t, http.StatusOK, rec.Code)
+
+	var body []userhandler.UserWorkspaceResponse
+	require.NoError(t, json.Unmarshal(rec.Body.Bytes(), &body))
+	assert.Empty(t, body)
 }
