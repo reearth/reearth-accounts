@@ -68,6 +68,19 @@ definitions:
           $ref: '#/definitions/User'
         type: array
     type: object
+  ListWorkspacesResponse:
+    properties:
+      items:
+        items:
+          $ref: '#/definitions/Workspace'
+        type: array
+      page:
+        type: integer
+      perPage:
+        type: integer
+      totalCount:
+        type: integer
+    type: object
   MeResponse:
     properties:
       approvedAt:
@@ -98,6 +111,21 @@ definitions:
       id:
         type: string
       name:
+        type: string
+    type: object
+  Workspace:
+    properties:
+      alias:
+        type: string
+      id:
+        type: string
+      memberCount:
+        type: integer
+      name:
+        type: string
+      personal:
+        type: boolean
+      updatedAt:
         type: string
     type: object
 info:
@@ -319,6 +347,49 @@ paths:
       summary: ユーザー一覧を取得
       tags:
       - users
+  /workspaces:
+    get:
+      description: Lists workspaces across all tenants, optionally filtered by a name/alias
+        keyword, with offset pagination.
+      parameters:
+      - description: Search by name or alias
+        in: query
+        name: q
+        type: string
+      - description: Page number (1-based)
+        in: query
+        name: page
+        type: integer
+      - description: Items per page (max 100)
+        in: query
+        name: per_page
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/ListWorkspacesResponse'
+        "400":
+          description: invalid query
+          schema:
+            $ref: '#/definitions/ErrorResponse'
+        "401":
+          description: unauthorized
+          schema:
+            $ref: '#/definitions/ErrorResponse'
+        "403":
+          description: not approved
+          schema:
+            $ref: '#/definitions/ErrorResponse'
+        "501":
+          description: not implemented on this backend
+          schema:
+            $ref: '#/definitions/ErrorResponse'
+      summary: List workspaces
+      tags:
+      - workspaces
 securityDefinitions:
   BearerAuth:
     in: header

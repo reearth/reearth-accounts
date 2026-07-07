@@ -3,6 +3,7 @@ package mongo
 import (
 	"context"
 	"log"
+	"regexp"
 	"strings"
 
 	"github.com/reearth/reearth-accounts/server/internal/infrastructure/mongo/mongodoc"
@@ -15,6 +16,7 @@ import (
 	"github.com/reearth/reearthx/rerror"
 	"github.com/reearth/reearthx/usecasex"
 	"go.mongodb.org/mongo-driver/bson"
+	"go.mongodb.org/mongo-driver/bson/primitive"
 	"go.mongodb.org/mongo-driver/mongo"
 )
 
@@ -36,6 +38,30 @@ func (r *Workspace) Filtered(f workspace.WorkspaceFilter) workspace.Repo {
 		client: r.client,
 		f:      r.f.Merge(f),
 	}
+}
+
+func (r *Workspace) FindAll(ctx context.Context, keyword *string, pagination *usecasex.Pagination) (workspace.List, *usecasex.PageInfo, error) {
+	if pagination != nil && pagination.Cursor != nil {
+		return nil, nil, workspace.ErrCursorPaginationUnsupported
+	}
+
+	filter := bson.M{}
+	if keyword != nil && strings.TrimSpace(*keyword) != "" {
+		re := primitive.Regex{Pattern: regexp.QuoteMeta(strings.TrimSpace(*keyword)), Options: "i"}
+		filter["$or"] = []bson.M{
+			{"name": bson.M{"$regex": re}},
+			{"alias": bson.M{"$regex": re}},
+		}
+	}
+
+	// Respect the readable-workspace filter: for the admin base repo it is unset
+	// (returns everything), but a Filtered(...) repo restricts to its readable set.
+	c := mongodoc.NewWorkspaceConsumer()
+	pageInfo, err := r.client.Paginate(ctx, r.f.Filter(filter), nil, pagination, c)
+	if err != nil {
+		return nil, nil, rerror.ErrInternalBy(err)
+	}
+	return c.Result, pageInfo, nil
 }
 
 func (r *Workspace) FindByUser(ctx context.Context, id user.ID) (workspace.List, error) {

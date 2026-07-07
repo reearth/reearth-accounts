@@ -9,6 +9,7 @@ import (
 	"github.com/reearth/reearth-accounts/server/internal/admin/usecase/authuc"
 	"github.com/reearth/reearth-accounts/server/internal/admin/usecase/authz"
 	"github.com/reearth/reearth-accounts/server/internal/admin/usecase/useruc"
+	"github.com/reearth/reearth-accounts/server/internal/admin/usecase/workspaceuc"
 )
 
 // usecaseWire provides the admin authorization checker and the usecases
@@ -28,4 +29,7 @@ var usecaseWire = wire.NewSet(
 	adminuseruc.NewListAdminUsersUseCase,
 	adminuseruc.NewApproveAdminUserUseCase,
 	adminuseruc.NewRejectAdminUserUseCase,
+
+	// cross-tenant workspace usecases
+	workspaceuc.NewListWorkspacesUseCase,
 )

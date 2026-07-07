@@ -3,7 +3,10 @@ package memory
 import (
 	"context"
 	"slices"
+	"sort"
+	"strings"
 
+	"github.com/reearth/reearth-accounts/server/internal/usecase/repo"
 	"github.com/reearth/reearth-accounts/server/pkg/id"
 	"github.com/reearth/reearth-accounts/server/pkg/user"
 	"github.com/reearth/reearth-accounts/server/pkg/workspace"
@@ -14,6 +17,7 @@ import (
 
 type Workspace struct {
 	data *util.SyncMap[workspace.ID, *workspace.Workspace]
+	f    workspace.WorkspaceFilter
 	err  error
 }
 
@@ -34,8 +38,52 @@ func NewWorkspaceWith(workspaces ...*workspace.Workspace) *Workspace {
 func (r *Workspace) Filtered(f workspace.WorkspaceFilter) workspace.Repo {
 	return &Workspace{
 		data: r.data,
+		f:    r.f.Merge(f),
 		err:  r.err,
 	}
+}
+
+func (r *Workspace) FindAll(_ context.Context, keyword *string, pagination *usecasex.Pagination) (workspace.List, *usecasex.PageInfo, error) {
+	if r.err != nil {
+		return nil, nil, r.err
+	}
+	if pagination != nil && pagination.Cursor != nil {
+		return nil, nil, workspace.ErrCursorPaginationUnsupported
+	}
+
+	kw := ""
+	if keyword != nil {
+		kw = strings.ToLower(strings.TrimSpace(*keyword))
+	}
+	all := workspace.List(r.data.FindAll(func(id workspace.ID, v *workspace.Workspace) bool {
+		// respect the readable-workspace filter (unset for the admin base repo)
+		if !r.f.CanRead(id) {
+			return false
+		}
+		if kw == "" {
+			return true
+		}
+		return strings.Contains(strings.ToLower(v.Name()), kw) || strings.Contains(strings.ToLower(v.Alias()), kw)
+	}))
+
+	// deterministic order by id (ULID = creation order)
+	sort.SliceStable(all, func(i, j int) bool { return all[i].ID().Compare(all[j].ID()) < 0 })
+
+	total := int64(len(all))
+	if pagination == nil || pagination.Offset == nil {
+		return all, usecasex.NewPageInfo(total, nil, nil, false, false), nil
+	}
+
+	offset := pagination.Offset.Offset
+	limit := pagination.Offset.Limit
+	if offset > total {
+		offset = total
+	}
+	end := offset + limit
+	if end > total {
+		end = total
+	}
+	return all[offset:end], usecasex.NewPageInfo(total, nil, nil, end < total, offset > 0), nil
 }
 
 func (r *Workspace) FindByUser(_ context.Context, i id.UserID) (workspace.List, error) {
@@ -106,6 +154,12 @@ func (r *Workspace) FindByIDs(_ context.Context, ids workspace.IDList) (workspac
 		return nil, r.err
 	}
 
+	for _, id := range ids {
+		if !r.f.CanRead(id) {
+			return nil, rerror.ErrNotFound
+		}
+	}
+
 	res := r.data.FindAll(func(key workspace.ID, value *workspace.Workspace) bool {
 		return ids.Has(key)
 	})
@@ -130,9 +184,18 @@ func (r *Workspace) FindByName(_ context.Context, name string) (*workspace.Works
 	if name == "" {
 		return nil, rerror.ErrNotFound
 	}
-	return rerror.ErrIfNil(r.data.Find(func(key workspace.ID, value *workspace.Workspace) bool {
+	w, err := rerror.ErrIfNil(r.data.Find(func(key workspace.ID, value *workspace.Workspace) bool {
 		return value.Name() == name
 	}), rerror.ErrNotFound)
+	if err != nil {
+		return nil, err
+	}
+
+	if !r.f.CanRead(w.ID()) {
+		return nil, rerror.ErrNotFound
+	}
+
+	return w, nil
 }
 
 func (r *Workspace) FindByAlias(_ context.Context, alias string) (*workspace.Workspace, error) {
@@ -184,6 +247,10 @@ func (r *Workspace) Save(_ context.Context, t *workspace.Workspace) error {
 		return r.err
 	}
 
+	if !r.f.CanWrite(t.ID()) {
+		return repo.ErrOperationDenied
+	}
+
 	r.data.Store(t.ID(), t)
 	return nil
 }
@@ -191,6 +258,12 @@ func (r *Workspace) Save(_ context.Context, t *workspace.Workspace) error {
 func (r *Workspace) SaveAll(_ context.Context, workspaces workspace.List) error {
 	if r.err != nil {
 		return r.err
+	}
+
+	for _, w := range workspaces {
+		if !r.f.CanWrite(w.ID()) {
+			return repo.ErrOperationDenied
+		}
 	}
 
 	for _, t := range workspaces {
@@ -204,6 +277,10 @@ func (r *Workspace) Remove(_ context.Context, wid workspace.ID) error {
 		return r.err
 	}
 
+	if !r.f.CanWrite(wid) {
+		return repo.ErrOperationDenied
+	}
+
 	r.data.Delete(wid)
 	return nil
 }
@@ -211,6 +288,12 @@ func (r *Workspace) Remove(_ context.Context, wid workspace.ID) error {
 func (r *Workspace) RemoveAll(_ context.Context, ids workspace.IDList) error {
 	if r.err != nil {
 		return r.err
+	}
+
+	for _, id := range ids {
+		if !r.f.CanWrite(id) {
+			return repo.ErrOperationDenied
+		}
 	}
 
 	for _, wid := range ids {

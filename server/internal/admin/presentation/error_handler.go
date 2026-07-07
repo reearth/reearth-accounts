@@ -9,6 +9,7 @@ import (
 	"github.com/reearth/reearth-accounts/server/internal/admin/usecase/adminuseruc"
 	"github.com/reearth/reearth-accounts/server/internal/admin/usecase/authuc"
 	"github.com/reearth/reearth-accounts/server/internal/admin/usecase/useruc"
+	"github.com/reearth/reearth-accounts/server/pkg/workspace"
 	"github.com/reearth/reearthx/log"
 	"github.com/reearth/reearthx/rerror"
 )
@@ -55,6 +56,10 @@ func classify(err error) (status int, code, msg string) {
 		return http.StatusBadRequest, http.StatusText(http.StatusBadRequest), "cannot modify your own admin account"
 	case errors.Is(err, adminuseruc.ErrLastApprovedAdmin):
 		return http.StatusBadRequest, http.StatusText(http.StatusBadRequest), "cannot reject the last approved admin"
+	case errors.Is(err, workspace.ErrCursorPaginationUnsupported):
+		return http.StatusBadRequest, http.StatusText(http.StatusBadRequest), "cursor pagination is not supported"
+	case errors.Is(err, workspace.ErrNotImplemented):
+		return http.StatusNotImplemented, http.StatusText(http.StatusNotImplemented), "not implemented on this backend"
 	case errors.Is(err, rerror.ErrNotFound):
 		return http.StatusNotFound, http.StatusText(http.StatusNotFound), "not found"
 	default:
