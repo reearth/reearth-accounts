@@ -5,6 +5,7 @@ import (
 
 	adminrbac "github.com/reearth/reearth-accounts/server/internal/admin/rbac"
 	"github.com/reearth/reearth-accounts/server/internal/admin/usecase/authz"
+	"github.com/reearth/reearth-accounts/server/pkg/pagination"
 	"github.com/reearth/reearth-accounts/server/pkg/user"
 	"github.com/reearth/reearthx/i18n"
 	"github.com/reearth/reearthx/rerror"
@@ -18,9 +19,18 @@ var ErrOperationDenied = rerror.NewE(i18n.T("operation denied"))
 // guard against a nil dereference from future call sites.
 var ErrInvalidOperator = rerror.NewE(i18n.T("invalid operator"))
 
+// ListUsersInput carries pagination parameters for the list-users request.
+type ListUsersInput struct {
+	Page     int64
+	PageSize int64
+} // @name ListUsersRequest
+
 // ListUsersOutput is the response for listing users.
 type ListUsersOutput struct {
-	Items []*UserItem `json:"items"`
+	Items    []*UserItem `json:"items"`
+	Total    int64       `json:"total"`
+	Page     int64       `json:"page"`
+	PageSize int64       `json:"page_size"`
 } // @name ListUsersResponse
 
 // UserItem represents a single user in the admin API response.
@@ -54,8 +64,8 @@ func NewListUsersUseCase(userRepo user.Repo, checker *authz.Checker) *ListUsersU
 	return &ListUsersUseCase{userRepo: userRepo, authz: checker}
 }
 
-// Execute returns all users after verifying the operator's admin permission.
-func (uc *ListUsersUseCase) Execute(ctx context.Context, operator *user.User) (*ListUsersOutput, error) {
+// Execute returns a paginated list of users after verifying the operator's admin permission.
+func (uc *ListUsersUseCase) Execute(ctx context.Context, operator *user.User, input ListUsersInput) (*ListUsersOutput, error) {
 	if operator == nil {
 		return nil, ErrInvalidOperator
 	}
@@ -68,7 +78,8 @@ func (uc *ListUsersUseCase) Execute(ctx context.Context, operator *user.User) (*
 		return nil, ErrOperationDenied
 	}
 
-	users, err := uc.userRepo.FindAll(ctx)
+	p := pagination.ToPagination(input.Page, input.PageSize)
+	users, pageInfo, err := uc.userRepo.FindAllWithPagination(ctx, nil, p)
 	if err != nil {
 		return nil, err
 	}
@@ -77,5 +88,28 @@ func (uc *ListUsersUseCase) Execute(ctx context.Context, operator *user.User) (*
 	for _, u := range users {
 		items = append(items, toUserItem(u))
 	}
-	return &ListUsersOutput{Items: items}, nil
+
+	page := input.Page
+	if page < 1 {
+		page = 1
+	}
+	pageSize := input.PageSize
+	if pageSize < 1 {
+		pageSize = 50
+	}
+	if pageSize > 100 {
+		pageSize = 100
+	}
+
+	var total int64
+	if pageInfo != nil {
+		total = pageInfo.TotalCount
+	}
+
+	return &ListUsersOutput{
+		Items:    items,
+		Total:    total,
+		Page:     page,
+		PageSize: pageSize,
+	}, nil
 }

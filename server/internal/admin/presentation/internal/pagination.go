@@ -5,6 +5,12 @@ import (
 	"strconv"
 )
 
+const (
+	defaultPage     = 1
+	defaultPageSize = 50
+	maxPageSize     = 100
+)
+
 // ErrInvalidPageParam is returned by ParsePageParam for a present but invalid
 // pagination query parameter.
 var ErrInvalidPageParam = errors.New("invalid pagination parameter")
@@ -15,6 +21,28 @@ var ErrInvalidPageParam = errors.New("invalid pagination parameter")
 // larger than any realistic request yet leaves offset (<= maxPageParam*100) well
 // within int64, so values above it are rejected as 400 rather than accepted.
 const maxPageParam int64 = 1_000_000_000_000 // 1e12
+
+// PageParams are offset-pagination query parameters for admin endpoints.
+type PageParams struct {
+	Page     int `query:"page"`
+	PageSize int `query:"page_size"`
+}
+
+// Normalized returns clamped (page, pageSize) applying defaults and the max bound.
+func (p PageParams) Normalized() (page int, pageSize int) {
+	page = p.Page
+	if page < 1 {
+		page = defaultPage
+	}
+	pageSize = p.PageSize
+	if pageSize < 1 {
+		pageSize = defaultPageSize
+	}
+	if pageSize > maxPageSize {
+		pageSize = maxPageSize
+	}
+	return page, pageSize
+}
 
 // ParsePageParam parses a 1-based pagination query parameter (page / per_page).
 // An empty value returns 0, the "use the default" sentinel understood by
