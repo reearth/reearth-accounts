@@ -17,8 +17,8 @@ Two roles, a small fixed enum.
 
 The existing single Cerbos role literal `"admin"` is **renamed** to `system_admin`;
 a third role (e.g. `user_admin`) is deferred (Open Questions). The enum mirrors the
-existing `adminuser.Status` pattern in `server/pkg/adminuser/enum.go` and is already
-implemented in PR #282.
+existing `adminuser.Status` pattern in `server/pkg/adminuser/enum.go`; the
+implementation is in reearth/reearth-accounts#282 (in review).
 
 ## Storage
 
@@ -42,11 +42,13 @@ A per-route `RequirePermission` middleware, layered on `RequireApproved`, reads 
 already-loaded role from the `AdminUser` in the echo context and hands it to the
 admin `authz.Checker`, which does a Cerbos `CheckResources` against the
 `accounts-admin` policy for the route's `(resource, action)`. This is **exactly one
-Cerbos gRPC call per protected request**. When the Cerbos client is nil (local dev,
-no `CERBOS_HOST`), the check **fails open** (allow), as it does today.
+Cerbos gRPC call per protected request**. When the Cerbos client is nil
+(`CERBOS_HOST` unset), the check **fails open** (allow) — but only outside
+production: `provideCerbosClient` fails fast at startup when `CERBOS_HOST` is
+unset in production, so admin authorization cannot be silently disabled there.
 
 ```go
-// presentation/middleware/require_permission.go
+// server/internal/admin/presentation/middleware/require_permission.go
 func RequirePermission(chk *authz.Checker, resource, action string) echo.MiddlewareFunc {
     return func(next echo.HandlerFunc) echo.HandlerFunc {
         return func(c echo.Context) error {
@@ -89,7 +91,8 @@ distribution proves prohibitive.
 | `GET /api/v1/workspaces` | `workspace` | `list` | viewer |
 | `GET /api/v1/workspaces/:id` | `workspace` | `read` | viewer |
 | `GET /api/v1/workspaces/:id/members` | `workspace` | `read_member` | viewer |
-| *(future)* `PATCH/DELETE users/workspaces` | resp. | `edit` / `delete` | system_admin |
+| *(future)* `PATCH /api/v1/users/:id`, `DELETE /api/v1/users/:id` | `user` | `edit` / `delete` | system_admin |
+| *(future)* `PATCH /api/v1/workspaces/:id`, `DELETE /api/v1/workspaces/:id` | `workspace` | `edit` / `delete` | system_admin |
 | `PUT /api/v1/admin-users/:id/roles` | `admin_user` | `assign_role` | system_admin |
 
 Notes:
@@ -114,7 +117,7 @@ Notes:
 | `workspace` | `list` / `read` / `read_member` | system_admin, viewer |
 | `workspace` | `edit` / `delete` | system_admin |
 
-`resourceRules` in `internal/admin/rbac/definitions.go` is the single source of
+`resourceRules` in `server/internal/admin/rbac/definitions.go` is the single source of
 truth, compiled into the `accounts-admin` Cerbos policy via `make gen-policies`
 (`cmd/policy-generator`).
 
@@ -124,7 +127,7 @@ truth, compiled into the `accounts-admin` Cerbos policy via `make gen-policies`
 > `server/.gitignore`). **Nothing is checked in** — there is no `policies/`
 > directory at the repo root and no policy YAML committed anywhere. **The
 > mechanism by which the generated `accounts-admin` YAML reaches the running
-> Cerbos instance is unknown.** CLAUDE.md mentions a GCS sync via GitHub Actions,
+> Cerbos instance is unknown.** `server/CLAUDE.md` mentions a GCS sync via GitHub Actions,
 > but **no such workflow exists** under `.github/workflows/`. Because enforcement
 > is Cerbos-based, the policy MUST reach the running Cerbos instance or protected
 > endpoints will fail. **This must be confirmed with the platform/Cerbos owner
