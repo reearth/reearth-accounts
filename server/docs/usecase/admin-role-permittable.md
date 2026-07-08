@@ -8,7 +8,7 @@
 
 ## Roles
 
-Two roles for V1, a small fixed enum.
+Two roles, a small fixed enum.
 
 | Role (enum value) | Holders | Capabilities |
 |---|---|---|
@@ -32,7 +32,7 @@ mappings; `adminUserRepo.Save` persists it.
 Why this shape: minimal change; no `user.ID`-vs-`adminuser.ID` confusion (the role
 lives in the admin's own ID space, so there is no `permittable`-style lookup); the
 role is already loaded by `RequireApproved`, so the check needs **zero extra reads**;
-and a single role suffices for V1. The deferred multi-role alternative (a binding
+and a single role is sufficient. The deferred multi-role alternative (a binding
 aggregate mapping `adminuser.ID` → `[]role.ID`) is documented in git history and
 revisited only if multi-role is ever needed.
 
@@ -209,4 +209,4 @@ sequenceDiagram
    checked in and the distribution mechanism is not evidenced in this repo. Confirm
    with the platform/Cerbos owner before rollout.
 2. **A third `user_admin` role** (may approve admins but not touch workspaces) —
-   easy to add via the enum + matrix; deferred, not built for V1.
+   easy to add via the enum + matrix; deferred, not built now.
