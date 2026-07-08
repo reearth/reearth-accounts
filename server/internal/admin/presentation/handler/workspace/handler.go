@@ -8,10 +8,12 @@ import (
 
 // Handler serves the /workspaces endpoints.
 type Handler struct {
-	list *workspaceuc.ListWorkspacesUseCase
+	get     *workspaceuc.GetWorkspaceUseCase
+	list    *workspaceuc.ListWorkspacesUseCase
+	members *workspaceuc.ListWorkspaceMembersUseCase
 }
 
 // NewHandler is a Wire provider for the workspace Handler.
-func NewHandler(list *workspaceuc.ListWorkspacesUseCase) *Handler {
-	return &Handler{list: list}
+func NewHandler(get *workspaceuc.GetWorkspaceUseCase, list *workspaceuc.ListWorkspacesUseCase, members *workspaceuc.ListWorkspaceMembersUseCase) *Handler {
+	return &Handler{get: get, list: list, members: members}
 }
