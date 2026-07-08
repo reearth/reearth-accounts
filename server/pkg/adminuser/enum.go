@@ -62,10 +62,10 @@ func StatusFrom(s string) (Status, error) {
 type Role string
 
 // Valid reports whether r is one of the known roles. The empty string is NOT
-// valid: it denotes "unset" on pre-migration records and is tolerated only as
-// an absent value at load time (the mappers skip empty roles); enforcement
-// code treating an unset role as invalid — and therefore denying — is the
-// intended behavior.
+// valid: it denotes "unset" (pre-migration records). Construction and the
+// mongo/postgres mappers tolerate an empty role — the builder accepts it and
+// the mappers skip parsing it — but enforcement code treating an unset role
+// as invalid, and therefore denying, is the intended behavior.
 func (r Role) Valid() bool {
 	return slices.Contains(roles, r)
 }
