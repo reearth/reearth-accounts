@@ -117,6 +117,14 @@ func TestBuilder_NewID(t *testing.T) {
 func TestBuilder_Role(t *testing.T) {
 	u := New().NewID().Name("Bob").Email("bob@eukarya.io").Role(RoleSystemAdmin).MustBuild()
 	assert.Equal(t, RoleSystemAdmin, u.Role())
+
+	// empty means "unset" (pre-migration records) and still builds
+	u = New().NewID().Name("Bob").Email("bob@eukarya.io").MustBuild()
+	assert.Equal(t, Role(""), u.Role())
+
+	// an invalid role is rejected at construction time
+	_, err := New().NewID().Name("Bob").Email("bob@eukarya.io").Role(Role("bogus")).Build()
+	assert.ErrorIs(t, err, ErrInvalidRole)
 }
 
 func TestBuilder_MustBuild_Panics(t *testing.T) {
