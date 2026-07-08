@@ -28,11 +28,11 @@ func (uc *ListWorkspaceMembersUseCase) Execute(ctx context.Context, id workspace
 		return nil, nil, err
 	}
 
-	ids := make(user.IDList, 0)
+	var ids user.IDList
 	if m := ws.Members(); m != nil {
-		for uid := range m.Users() {
-			ids = append(ids, uid)
-		}
+		// UserIDs() avoids cloning the whole members map (Users()) when only the
+		// ids are needed to resolve users.
+		ids = user.IDList(m.UserIDs())
 	}
 
 	users := make(map[user.ID]*user.User, len(ids))
