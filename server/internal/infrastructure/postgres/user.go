@@ -139,6 +139,9 @@ func (r *User) FindAll(ctx context.Context) (user.List, error) {
 }
 
 func (r *User) FindAllWithPagination(ctx context.Context, keyword *string, p *usecasex.Pagination) (user.List, *usecasex.PageInfo, error) {
+	if p != nil && p.Cursor != nil {
+		return nil, nil, user.ErrCursorPaginationUnsupported
+	}
 	var where []string
 	var args []any
 	if keyword != nil && strings.TrimSpace(*keyword) != "" {

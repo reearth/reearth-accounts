@@ -237,6 +237,9 @@ func filterUsers(ids []user.ID, rows []*user.User) []*user.User {
 }
 
 func (r *User) FindAllWithPagination(ctx context.Context, keyword *string, pagination *usecasex.Pagination) (user.List, *usecasex.PageInfo, error) {
+	if pagination != nil && pagination.Cursor != nil {
+		return nil, nil, user.ErrCursorPaginationUnsupported
+	}
 	filter := bson.M{}
 	if keyword != nil && strings.TrimSpace(*keyword) != "" {
 		re := primitive.Regex{Pattern: regexp.QuoteMeta(strings.TrimSpace(*keyword)), Options: "i"}

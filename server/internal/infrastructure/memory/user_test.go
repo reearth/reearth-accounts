@@ -9,6 +9,7 @@ import (
 	"github.com/reearth/reearth-accounts/server/pkg/id"
 	"github.com/reearth/reearth-accounts/server/pkg/user"
 	"github.com/reearth/reearthx/rerror"
+	"github.com/reearth/reearthx/usecasex"
 	"github.com/reearth/reearthx/util"
 	"github.com/stretchr/testify/assert"
 )
@@ -457,4 +458,15 @@ func TestUser_Remove(t *testing.T) {
 	wantErr := errors.New("test")
 	SetUserError(r, wantErr)
 	assert.Same(t, wantErr, r.Remove(ctx, u.ID()))
+}
+
+func TestUser_FindAllWithPagination_RejectsCursor(t *testing.T) {
+	ctx := context.Background()
+	r := NewUserWith(user.New().NewID().Name("hoge").Email("aa@bb.cc").MustBuild())
+
+	first := int64(10)
+	pagination := &usecasex.Pagination{Cursor: &usecasex.CursorPagination{First: &first}}
+
+	_, _, err := r.FindAllWithPagination(ctx, nil, pagination)
+	assert.ErrorIs(t, err, user.ErrCursorPaginationUnsupported)
 }

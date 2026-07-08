@@ -46,6 +46,9 @@ func (r *User) FindAllWithPagination(_ context.Context, keyword *string, paginat
 	if r.err != nil {
 		return nil, nil, r.err
 	}
+	if pagination != nil && pagination.Cursor != nil {
+		return nil, nil, user.ErrCursorPaginationUnsupported
+	}
 
 	kw := ""
 	if keyword != nil {

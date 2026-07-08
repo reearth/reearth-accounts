@@ -88,15 +88,31 @@ func TestListUsers_Keyword(t *testing.T) {
 }
 
 func TestListUsers_InvalidPagination(t *testing.T) {
-	op := approvedAdmin("op@eukarya.io")
-	adminRepo := memory.NewAdminUserWith(op)
-	userRepo := memory.NewUserWith(usr("A", "a", "a@example.com"))
-	sess := session.NewManager(testSecret, time.Hour)
-	e := newTestEcho(userRepo, adminRepo, sess)
+	cases := []struct {
+		name  string
+		query string
+	}{
+		{name: "page not a number", query: "page=abc"},
+		{name: "page zero", query: "page=0"},
+		{name: "page negative", query: "page=-1"},
+		{name: "per_page not a number", query: "per_page=abc"},
+		{name: "per_page zero", query: "per_page=0"},
+		{name: "page above upper bound", query: "page=1000000000001"},
+	}
 
-	req := httptest.NewRequest(http.MethodGet, "/api/v1/users?page=abc", nil)
-	req.AddCookie(cookieFor(t, sess, op.ID()))
-	rec := httptest.NewRecorder()
-	e.ServeHTTP(rec, req)
-	assert.Equal(t, http.StatusBadRequest, rec.Code)
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			op := approvedAdmin("op@eukarya.io")
+			adminRepo := memory.NewAdminUserWith(op)
+			userRepo := memory.NewUserWith(usr("A", "a", "a@example.com"))
+			sess := session.NewManager(testSecret, time.Hour)
+			e := newTestEcho(userRepo, adminRepo, sess)
+
+			req := httptest.NewRequest(http.MethodGet, "/api/v1/users?"+tc.query, nil)
+			req.AddCookie(cookieFor(t, sess, op.ID()))
+			rec := httptest.NewRecorder()
+			e.ServeHTTP(rec, req)
+			assert.Equal(t, http.StatusBadRequest, rec.Code)
+		})
+	}
 }
