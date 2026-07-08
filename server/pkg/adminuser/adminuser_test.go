@@ -59,10 +59,14 @@ func TestAdminUser_SetRole(t *testing.T) {
 	u := newTestAdminUser()
 	before := u.UpdatedAt()
 
-	u.SetRole(RoleSystemAdmin)
+	assert.NoError(t, u.SetRole(RoleSystemAdmin))
 
 	assert.Equal(t, RoleSystemAdmin, u.Role())
 	assert.False(t, u.UpdatedAt().Before(before))
+
+	// an invalid role is rejected and leaves the user unchanged
+	assert.ErrorIs(t, u.SetRole(Role("bogus")), ErrInvalidRole)
+	assert.Equal(t, RoleSystemAdmin, u.Role())
 }
 
 func TestAdminUser_Approve_Idempotent(t *testing.T) {

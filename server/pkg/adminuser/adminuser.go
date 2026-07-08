@@ -136,13 +136,19 @@ func (u *AdminUser) Reject() {
 	u.updatedAt = time.Now()
 }
 
-// SetRole assigns the given role to the user.
-func (u *AdminUser) SetRole(r Role) {
+// SetRole assigns the given role to the user. Invalid roles are rejected so a
+// value the mongo/postgres mappers cannot load back (they error on
+// present-but-invalid roles) is never persisted.
+func (u *AdminUser) SetRole(r Role) error {
 	if u == nil {
-		return
+		return nil
+	}
+	if !r.Valid() {
+		return ErrInvalidRole
 	}
 	u.role = r
 	u.updatedAt = time.Now()
+	return nil
 }
 
 // UpdateProfile refreshes the display name and picture from the Google profile
