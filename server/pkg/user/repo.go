@@ -2,6 +2,7 @@ package user
 
 import (
 	"context"
+	"errors"
 
 	"github.com/reearth/reearthx/i18n"
 	"github.com/reearth/reearthx/rerror"
@@ -9,6 +10,10 @@ import (
 )
 
 var ErrDuplicatedUser = rerror.NewE(i18n.T("duplicated user"))
+
+// ErrCursorPaginationUnsupported is returned by FindAllWithPagination when
+// cursor-based pagination is requested; the admin list endpoints are offset-only.
+var ErrCursorPaginationUnsupported = errors.New("cursor pagination is not supported")
 
 //go:generate mockgen -source=./user.go -destination=./mock_user.go -package user
 type Repo interface {
@@ -23,7 +28,7 @@ type Repo interface {
 
 type Query interface {
 	FindAll(context.Context) (List, error)
-	FindAllWithPagination(context.Context, *string, *usecasex.Pagination) (List, *usecasex.PageInfo, error)
+	FindAllWithPagination(ctx context.Context, keyword *string, pagination *usecasex.Pagination) (List, *usecasex.PageInfo, error)
 	FindByAlias(context.Context, string) (*User, error)
 	FindByEmail(context.Context, string) (*User, error)
 	FindByID(context.Context, ID) (*User, error)

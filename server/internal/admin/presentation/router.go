@@ -34,8 +34,8 @@ func RegisterRoutes(e *echo.Echo, h *Handler) {
 		adminUsers.POST("/:id/approve", h.AdminUser.ApproveAdminUser)
 		adminUsers.POST("/:id/reject", h.AdminUser.RejectAdminUser)
 
-		// Users (requires admin auth)
-		users := v1.Group("/users", h.AuthMw)
+		// Users (requires an approved admin session)
+		users := v1.Group("/users", requireApproved)
 		users.GET("", h.User.ListUsers)
 
 		// Cross-tenant workspace listing (requires an approved admin session)

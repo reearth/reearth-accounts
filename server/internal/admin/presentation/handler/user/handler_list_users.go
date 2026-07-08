@@ -5,45 +5,52 @@ import (
 
 	"github.com/labstack/echo/v4"
 	"github.com/reearth/reearth-accounts/server/internal/admin/presentation/internal"
-	"github.com/reearth/reearth-accounts/server/internal/admin/usecase/useruc"
+	"github.com/reearth/reearth-accounts/server/pkg/pagination"
 )
 
 // ListUsers godoc
 //
-//	@Summary		ユーザー一覧を取得
-//	@Description	ユーザーをページネーション付きで取得する（管理者権限が必要）
+//	@Summary		List users
+//	@Description	Lists users, optionally filtered by a name/alias/email keyword, with offset pagination.
 //	@Tags			users
-//	@Accept			json
 //	@Produce		json
-//	@Param			page		query		int	false	"ページ番号（デフォルト: 1）"
-//	@Param			page_size	query		int	false	"1ページあたりの件数（デフォルト: 50、最大: 100）"
-//	@Success		200	{object}	useruc.ListUsersOutput
-//	@Failure		401	{object}	internal.ErrorResponse	"認証エラー"
-//	@Failure		403	{object}	internal.ErrorResponse	"権限エラー"
-//	@Failure		500	{object}	internal.ErrorResponse	"サーバーエラー"
-//	@Security		BearerAuth
+//	@Param			q			query		string	false	"Search by name, alias or email"
+//	@Param			page		query		int		false	"Page number (1-based)"
+//	@Param			per_page	query		int		false	"Items per page (max 100)"
+//	@Success		200			{object}	ListUsersResponse
+//	@Failure		400			{object}	internal.ErrorResponse	"invalid query"
+//	@Failure		401			{object}	internal.ErrorResponse	"unauthorized"
+//	@Failure		403			{object}	internal.ErrorResponse	"not approved"
 //	@Router			/users [get]
 func (h *Handler) ListUsers(c echo.Context) error {
-	operator, err := internal.GetUser(c)
+	var keyword *string
+	if q := c.QueryParam("q"); q != "" {
+		keyword = &q
+	}
+
+	page, err := internal.ParsePageParam(c.QueryParam("page"))
+	if err != nil {
+		return echo.NewHTTPError(http.StatusBadRequest, "invalid page")
+	}
+	perPage, err := internal.ParsePageParam(c.QueryParam("per_page"))
+	if err != nil {
+		return echo.NewHTTPError(http.StatusBadRequest, "invalid per_page")
+	}
+	p := pagination.ToPagination(page, perPage)
+
+	list, pi, err := h.listUC.Execute(c.Request().Context(), keyword, p)
 	if err != nil {
 		return err
 	}
 
-	var params internal.PageParams
-	if err := c.Bind(&params); err != nil {
-		return err
+	effectivePage := int64(1)
+	if page > 0 {
+		effectivePage = page
 	}
-	page, pageSize := params.Normalized()
-
-	input := useruc.ListUsersInput{
-		Page:     int64(page),
-		PageSize: int64(pageSize),
-	}
-
-	output, err := h.listUC.Execute(c.Request().Context(), operator, input)
-	if err != nil {
-		return err
-	}
-
-	return c.JSON(http.StatusOK, output)
+	return c.JSON(http.StatusOK, ListUsersResponse{
+		Items:      newUserResponses(list),
+		TotalCount: pi.TotalCount,
+		Page:       effectivePage,
+		PerPage:    p.Offset.Limit,
+	})
 }

@@ -168,10 +168,6 @@ func LoadConfig() *Config {
 	return &cfg
 }
 
-func provideJWTProviders(cfg *Config) []appx.JWTProvider {
-	return cfg.Auths()
-}
-
 // provideGoogleVerifier builds the Google id_token verifier bound to the admin
 // OAuth client ID. A missing client ID is a misconfiguration that would reject
 // every sign-in, so we fail fast in production (and warn in development).
@@ -262,6 +258,13 @@ func provideRepoContainer(cfg *Config) (*repo.Container, func(), error) {
 // it returns nil; the authz checker treats a nil client as "allow" for local
 // development. In production a missing CERBOS_HOST is a misconfiguration that
 // would silently disable all admin authorization, so we fail fast instead.
+//
+// Currently dormant: the admin API treats every approved admin as equal, so no
+// endpoint consumes the Cerbos checker yet. It is retained (together with the
+// authz/rbac packages and the wireinject provider sets) for the granular
+// admin-permissions follow-up (reearth-dashboard#1316), which will re-wire it.
+//
+//nolint:unused // retained (dormant) for reearth-dashboard#1316; see comment above
 func provideCerbosClient(cfg *Config) (*cerbos.GRPCClient, error) {
 	if cfg.CerbosHost == "" {
 		if cfg.IsProduction() {

@@ -14,7 +14,6 @@ import (
 	"github.com/reearth/reearth-accounts/server/internal/admin/presentation/middleware"
 	"github.com/reearth/reearth-accounts/server/internal/admin/usecase/adminuseruc"
 	"github.com/reearth/reearth-accounts/server/internal/admin/usecase/authuc"
-	"github.com/reearth/reearth-accounts/server/internal/admin/usecase/authz"
 	"github.com/reearth/reearth-accounts/server/internal/admin/usecase/useruc"
 	"github.com/reearth/reearth-accounts/server/internal/admin/usecase/workspaceuc"
 )
@@ -31,15 +30,7 @@ func InitializeEcho() (*Server, func(), error) {
 	}
 	adminUserRepo := container.AdminUser
 	repo := container.User
-	grpcClient, err := provideCerbosClient(config)
-	if err != nil {
-		cleanup()
-		return nil, nil, err
-	}
-	roleRepo := container.Role
-	permittableRepo := container.Permittable
-	checker := authz.NewChecker(grpcClient, roleRepo, permittableRepo)
-	listUsersUseCase := useruc.NewListUsersUseCase(repo, checker)
+	listUsersUseCase := useruc.NewListUsersUseCase(repo)
 	userHandler := user.NewHandler(listUsersUseCase)
 	verifier, err := provideGoogleVerifier(config)
 	if err != nil {
@@ -63,15 +54,9 @@ func InitializeEcho() (*Server, func(), error) {
 	workspaceRepo := container.Workspace
 	listWorkspacesUseCase := workspaceuc.NewListWorkspacesUseCase(workspaceRepo)
 	workspaceHandler := workspacehandler.NewHandler(listWorkspacesUseCase)
-	v := provideJWTProviders(config)
-	middlewareFunc, err := middleware.NewAuthMiddleware(v, repo)
-	if err != nil {
-		cleanup()
-		return nil, nil, err
-	}
 	sessionMiddleware := middleware.NewSessionMiddleware(manager)
 	requireApprovedMiddleware := middleware.NewRequireApprovedMiddleware(manager, adminUserRepo)
-	presentationHandler := presentation.NewHandler(adminUserHandler, authHandler, userHandler, workspaceHandler, middlewareFunc, sessionMiddleware, requireApprovedMiddleware)
+	presentationHandler := presentation.NewHandler(adminUserHandler, authHandler, userHandler, workspaceHandler, sessionMiddleware, requireApprovedMiddleware)
 	appMiddlewares := presentation.NewAppMiddlewares()
 	server := NewAppEchoServer(config, presentationHandler, appMiddlewares)
 	return server, func() {

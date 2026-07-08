@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"regexp"
+	"strings"
 
 	"github.com/reearth/reearth-accounts/server/internal/infrastructure/mongo/mongodoc"
 	"github.com/reearth/reearth-accounts/server/pkg/user"
@@ -36,18 +37,6 @@ func (r *User) FindAll(ctx context.Context) (user.List, error) {
 		return nil, err
 	}
 	return res, nil
-}
-
-func (r *User) FindAllWithPagination(ctx context.Context, keyword *string, pagination *usecasex.Pagination) (user.List, *usecasex.PageInfo, error) {
-	filter := bson.M{}
-	if keyword != nil && *keyword != "" {
-		regex := bson.M{"$regex": primitive.Regex{Pattern: regexp.QuoteMeta(lo.FromPtr(keyword)), Options: "i"}}
-		filter["$or"] = []bson.M{
-			{"name": regex},
-			{"alias": regex},
-		}
-	}
-	return r.paginate(ctx, filter, pagination)
 }
 
 func (r *User) FindByID(ctx context.Context, id2 user.ID) (*user.User, error) {
@@ -245,6 +234,22 @@ func filterUsers(ids []user.ID, rows []*user.User) []*user.User {
 		res = append(res, m[id])
 	}
 	return res
+}
+
+func (r *User) FindAllWithPagination(ctx context.Context, keyword *string, pagination *usecasex.Pagination) (user.List, *usecasex.PageInfo, error) {
+	if pagination != nil && pagination.Cursor != nil {
+		return nil, nil, user.ErrCursorPaginationUnsupported
+	}
+	filter := bson.M{}
+	if keyword != nil && strings.TrimSpace(*keyword) != "" {
+		re := primitive.Regex{Pattern: regexp.QuoteMeta(strings.TrimSpace(*keyword)), Options: "i"}
+		filter["$or"] = []bson.M{
+			{"name": bson.M{"$regex": re}},
+			{"alias": bson.M{"$regex": re}},
+			{"email": bson.M{"$regex": re}},
+		}
+	}
+	return r.paginate(ctx, filter, pagination)
 }
 
 func (r *User) paginate(ctx context.Context, filter bson.M, pagination *usecasex.Pagination) (user.List, *usecasex.PageInfo, error) {

@@ -30,15 +30,25 @@ func (u MultiUser) FindAll(ctx context.Context) (user.List, error) {
 }
 
 func (u MultiUser) FindAllWithPagination(ctx context.Context, keyword *string, pagination *usecasex.Pagination) (user.List, *usecasex.PageInfo, error) {
+	// Pagination is delegated per underlying repo, matching FindByIDsWithPagination.
+	// In practice MultiUser wraps a single queryable repo for this path, so the
+	// last non-error PageInfo is authoritative. Guard against a nil PageInfo (all
+	// repos returning ErrNotFound, or no repos) so callers can't nil-deref.
 	res := user.List{}
 	var pi *usecasex.PageInfo
 	for _, r := range u {
-		if users, pageInfo, err := r.FindAllWithPagination(ctx, keyword, pagination); err != nil {
-			return nil, nil, err
-		} else {
-			res = append(res, users...)
-			pi = pageInfo
+		users, pageInfo, err := r.FindAllWithPagination(ctx, keyword, pagination)
+		if err != nil {
+			if !errors.Is(err, rerror.ErrNotFound) {
+				return nil, nil, err
+			}
+			continue
 		}
+		res = append(res, users...)
+		pi = pageInfo
+	}
+	if pi == nil {
+		pi = usecasex.NewPageInfo(int64(len(res)), nil, nil, false, false)
 	}
 	return res, pi, nil
 }

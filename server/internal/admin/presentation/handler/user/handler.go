@@ -3,7 +3,6 @@
 package user
 
 import (
-	_ "github.com/reearth/reearth-accounts/server/internal/admin/presentation/internal" // for swagger ErrorResponse
 	"github.com/reearth/reearth-accounts/server/internal/admin/usecase/useruc"
 )
 

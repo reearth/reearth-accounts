@@ -9,11 +9,9 @@ import (
 	mw "github.com/reearth/reearth-accounts/server/internal/admin/presentation/middleware"
 )
 
-// middlewareWire provides the JWT providers, the auth middleware, and the
-// application middleware bundle.
+// middlewareWire provides the session/approval middlewares and the application
+// middleware bundle.
 var middlewareWire = wire.NewSet(
-	provideJWTProviders,
-	mw.NewAuthMiddleware,
 	mw.NewSessionMiddleware,
 	mw.NewRequireApprovedMiddleware,
 	presentation.NewAppMiddlewares,

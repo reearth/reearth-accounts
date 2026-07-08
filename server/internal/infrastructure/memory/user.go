@@ -2,6 +2,7 @@ package memory
 
 import (
 	"context"
+	"sort"
 	"strings"
 
 	"github.com/reearth/reearth-accounts/server/pkg/user"
@@ -41,32 +42,34 @@ func (r *User) FindAll(ctx context.Context) (user.List, error) {
 	return res, nil
 }
 
-func (r *User) FindAllWithPagination(_ context.Context, keyword *string, p *usecasex.Pagination) (user.List, *usecasex.PageInfo, error) {
+func (r *User) FindAllWithPagination(_ context.Context, keyword *string, pagination *usecasex.Pagination) (user.List, *usecasex.PageInfo, error) {
 	if r.err != nil {
 		return nil, nil, r.err
+	}
+	if pagination != nil && pagination.Cursor != nil {
+		return nil, nil, user.ErrCursorPaginationUnsupported
 	}
 
 	kw := ""
 	if keyword != nil {
 		kw = strings.ToLower(strings.TrimSpace(*keyword))
 	}
-
-	all := user.List(r.data.FindAll(func(_ user.ID, value *user.User) bool {
+	all := r.data.FindAll(func(_ user.ID, v *user.User) bool {
 		if kw == "" {
 			return true
 		}
-		return strings.Contains(strings.ToLower(value.Name()), kw) ||
-			strings.Contains(strings.ToLower(value.Alias()), kw)
-	}))
+		return strings.Contains(strings.ToLower(v.Name()), kw) ||
+			strings.Contains(strings.ToLower(v.Alias()), kw) ||
+			strings.Contains(strings.ToLower(v.Email()), kw)
+	})
+	sort.SliceStable(all, func(i, j int) bool { return all[i].ID().Compare(all[j].ID()) < 0 })
 
 	total := int64(len(all))
-
-	var offset, limit int64 = 0, 50
-	if p != nil && p.Offset != nil {
-		offset = p.Offset.Offset
-		limit = p.Offset.Limit
+	if pagination == nil || pagination.Offset == nil {
+		return all, usecasex.NewPageInfo(total, nil, nil, false, false), nil
 	}
-
+	offset := pagination.Offset.Offset
+	limit := pagination.Offset.Limit
 	if offset > total {
 		offset = total
 	}
@@ -74,18 +77,7 @@ func (r *User) FindAllWithPagination(_ context.Context, keyword *string, p *usec
 	if end > total {
 		end = total
 	}
-	page := all[offset:end]
-
-	var startCursor, endCursor *usecasex.Cursor
-	if len(page) > 0 {
-		s := usecasex.Cursor(page[0].ID().String())
-		e := usecasex.Cursor(page[len(page)-1].ID().String())
-		startCursor, endCursor = &s, &e
-	}
-
-	hasNext := end < total
-	hasPrev := offset > 0
-	return page, usecasex.NewPageInfo(total, startCursor, endCursor, hasNext, hasPrev), nil
+	return all[offset:end], usecasex.NewPageInfo(total, nil, nil, end < total, offset > 0), nil
 }
 
 func (r *User) FindByIDs(_ context.Context, ids user.IDList) (user.List, error) {
