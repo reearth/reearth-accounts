@@ -11,18 +11,24 @@ import (
 
 // GetUserWorkspacesUseCase lists the workspaces a user belongs to.
 type GetUserWorkspacesUseCase struct {
+	userRepo      user.Repo
 	workspaceRepo workspace.Repo
 }
 
 // NewGetUserWorkspacesUseCase is a Wire provider for GetUserWorkspacesUseCase.
-func NewGetUserWorkspacesUseCase(workspaceRepo workspace.Repo) *GetUserWorkspacesUseCase {
-	return &GetUserWorkspacesUseCase{workspaceRepo: workspaceRepo}
+func NewGetUserWorkspacesUseCase(userRepo user.Repo, workspaceRepo workspace.Repo) *GetUserWorkspacesUseCase {
+	return &GetUserWorkspacesUseCase{userRepo: userRepo, workspaceRepo: workspaceRepo}
 }
 
-// Execute returns the workspaces the user belongs to. A user that belongs to no
-// workspace is a valid empty result, not a 404, so rerror.ErrNotFound from the
-// repository is translated into an empty list.
+// Execute returns the workspaces the user belongs to. The user is verified to
+// exist first, so a missing user surfaces as rerror.ErrNotFound (404); an
+// existing user that belongs to no workspace is a valid empty result, so
+// rerror.ErrNotFound from FindByUser is translated into an empty list.
 func (uc *GetUserWorkspacesUseCase) Execute(ctx context.Context, id user.ID) (workspace.List, error) {
+	if _, err := uc.userRepo.FindByID(ctx, id); err != nil {
+		return nil, err
+	}
+
 	list, err := uc.workspaceRepo.FindByUser(ctx, id)
 	if err != nil {
 		if errors.Is(err, rerror.ErrNotFound) {

@@ -398,7 +398,7 @@ const docTemplate = `{
         },
         "/users/{id}/workspaces": {
             "get": {
-                "description": "Returns the workspaces the user belongs to, with the user's role in each. A user in no workspace returns an empty list.",
+                "description": "Returns the workspaces the user belongs to, with the user's role in each. An existing user in no workspace returns an empty list; a non-existent user returns 404.",
                 "produces": [
                     "application/json"
                 ],
@@ -439,6 +439,12 @@ const docTemplate = `{
                     },
                     "403": {
                         "description": "not approved",
+                        "schema": {
+                            "$ref": "#/definitions/ErrorResponse"
+                        }
+                    },
+                    "404": {
+                        "description": "user not found",
                         "schema": {
                             "$ref": "#/definitions/ErrorResponse"
                         }

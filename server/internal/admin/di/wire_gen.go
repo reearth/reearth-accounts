@@ -32,7 +32,7 @@ func InitializeEcho() (*Server, func(), error) {
 	repo := container.User
 	workspaceRepo := container.Workspace
 	getUserUseCase := useruc.NewGetUserUseCase(repo)
-	getUserWorkspacesUseCase := useruc.NewGetUserWorkspacesUseCase(workspaceRepo)
+	getUserWorkspacesUseCase := useruc.NewGetUserWorkspacesUseCase(repo, workspaceRepo)
 	listUsersUseCase := useruc.NewListUsersUseCase(repo)
 	userHandler := user.NewHandler(getUserUseCase, getUserWorkspacesUseCase, listUsersUseCase)
 	verifier, err := provideGoogleVerifier(config)

@@ -39,7 +39,7 @@ func newTestEcho(userRepo user.Repo, adminRepo adminuser.Repo, sess *session.Man
 func newTestEchoWithWorkspaces(userRepo user.Repo, wsRepo workspace.Repo, adminRepo adminuser.Repo, sess *session.Manager) *echo.Echo {
 	h := userhandler.NewHandler(
 		useruc.NewGetUserUseCase(userRepo),
-		useruc.NewGetUserWorkspacesUseCase(wsRepo),
+		useruc.NewGetUserWorkspacesUseCase(userRepo, wsRepo),
 		useruc.NewListUsersUseCase(userRepo),
 	)
 	requireApproved := echo.MiddlewareFunc(mw.NewRequireApprovedMiddleware(sess, adminRepo))
@@ -221,4 +221,21 @@ func TestGetUserWorkspaces_Empty(t *testing.T) {
 	var body []userhandler.UserWorkspaceResponse
 	require.NoError(t, json.Unmarshal(rec.Body.Bytes(), &body))
 	assert.Empty(t, body)
+}
+
+func TestGetUserWorkspaces_NotFound(t *testing.T) {
+	op := approvedAdmin("op@eukarya.io")
+	adminRepo := memory.NewAdminUserWith(op)
+	userRepo := memory.NewUserWith(usr("Alice", "alice", "alice@example.com"))
+	wsRepo := memory.NewWorkspaceWith()
+	sess := session.NewManager(testSecret, time.Hour)
+	e := newTestEchoWithWorkspaces(userRepo, wsRepo, adminRepo, sess)
+
+	// A well-formed but non-existent user id must return 404, not an empty list.
+	missing := user.NewID()
+	req := httptest.NewRequest(http.MethodGet, "/api/v1/users/"+missing.String()+"/workspaces", nil)
+	req.AddCookie(cookieFor(t, sess, op.ID()))
+	rec := httptest.NewRecorder()
+	e.ServeHTTP(rec, req)
+	require.Equal(t, http.StatusNotFound, rec.Code)
 }
