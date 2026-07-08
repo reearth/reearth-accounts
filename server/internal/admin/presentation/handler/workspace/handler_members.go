@@ -34,7 +34,12 @@ func (h *Handler) GetWorkspaceMembers(c echo.Context) error {
 
 	res := make([]WorkspaceMemberResponse, 0)
 	if m := ws.Members(); m != nil {
-		for uid, member := range m.Users() {
+		// Iterate ids + per-id lookup instead of Users(), which clones the map.
+		for _, uid := range m.UserIDs() {
+			member := m.User(uid)
+			if member == nil {
+				continue
+			}
 			item := WorkspaceMemberResponse{
 				UserID:   uid.String(),
 				Role:     string(member.Role),
