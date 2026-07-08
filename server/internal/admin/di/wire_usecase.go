@@ -16,6 +16,8 @@ import (
 // (one struct per action).
 var usecaseWire = wire.NewSet(
 	authz.NewChecker,
+	useruc.NewGetUserUseCase,
+	useruc.NewGetUserWorkspacesUseCase,
 	useruc.NewListUsersUseCase,
 
 	// session auth dependencies + usecases
@@ -31,5 +33,7 @@ var usecaseWire = wire.NewSet(
 	adminuseruc.NewRejectAdminUserUseCase,
 
 	// cross-tenant workspace usecases
+	workspaceuc.NewGetWorkspaceUseCase,
+	workspaceuc.NewListWorkspaceMembersUseCase,
 	workspaceuc.NewListWorkspacesUseCase,
 )

@@ -119,6 +119,32 @@ definitions:
       name:
         type: string
     type: object
+  UserDetail:
+    properties:
+      alias:
+        type: string
+      email:
+        type: string
+      host:
+        type: string
+      id:
+        type: string
+      name:
+        type: string
+    type: object
+  UserWorkspace:
+    properties:
+      alias:
+        type: string
+      id:
+        type: string
+      name:
+        type: string
+      personal:
+        type: boolean
+      role:
+        type: string
+    type: object
   Workspace:
     properties:
       alias:
@@ -132,6 +158,21 @@ definitions:
       personal:
         type: boolean
       updatedAt:
+        type: string
+    type: object
+  WorkspaceMember:
+    properties:
+      disabled:
+        type: boolean
+      email:
+        description: empty string if the member's user cannot be resolved
+        type: string
+      name:
+        description: empty string if the member's user cannot be resolved
+        type: string
+      role:
+        type: string
+      userId:
         type: string
     type: object
 info:
@@ -363,6 +404,80 @@ paths:
       summary: List users
       tags:
       - users
+  /users/{id}:
+    get:
+      description: Returns the detail of a single user by ID.
+      parameters:
+      - description: User ID
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/UserDetail'
+        "400":
+          description: invalid id
+          schema:
+            $ref: '#/definitions/ErrorResponse'
+        "401":
+          description: unauthorized
+          schema:
+            $ref: '#/definitions/ErrorResponse'
+        "403":
+          description: not approved
+          schema:
+            $ref: '#/definitions/ErrorResponse'
+        "404":
+          description: not found
+          schema:
+            $ref: '#/definitions/ErrorResponse'
+      summary: Get a user
+      tags:
+      - users
+  /users/{id}/workspaces:
+    get:
+      description: Returns the workspaces the user belongs to, with the user's role
+        in each. An existing user in no workspace returns an empty list; a non-existent
+        user returns 404.
+      parameters:
+      - description: User ID
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            items:
+              $ref: '#/definitions/UserWorkspace'
+            type: array
+        "400":
+          description: invalid id
+          schema:
+            $ref: '#/definitions/ErrorResponse'
+        "401":
+          description: unauthorized
+          schema:
+            $ref: '#/definitions/ErrorResponse'
+        "403":
+          description: not approved
+          schema:
+            $ref: '#/definitions/ErrorResponse'
+        "404":
+          description: user not found
+          schema:
+            $ref: '#/definitions/ErrorResponse'
+      summary: List a user's workspaces
+      tags:
+      - users
   /workspaces:
     get:
       description: Lists workspaces across all tenants, optionally filtered by a name/alias
@@ -404,6 +519,79 @@ paths:
           schema:
             $ref: '#/definitions/ErrorResponse'
       summary: List workspaces
+      tags:
+      - workspaces
+  /workspaces/{id}:
+    get:
+      description: Returns the detail of a single workspace by ID.
+      parameters:
+      - description: Workspace ID
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/Workspace'
+        "400":
+          description: invalid id
+          schema:
+            $ref: '#/definitions/ErrorResponse'
+        "401":
+          description: unauthorized
+          schema:
+            $ref: '#/definitions/ErrorResponse'
+        "403":
+          description: not approved
+          schema:
+            $ref: '#/definitions/ErrorResponse'
+        "404":
+          description: not found
+          schema:
+            $ref: '#/definitions/ErrorResponse'
+      summary: Get a workspace
+      tags:
+      - workspaces
+  /workspaces/{id}/members:
+    get:
+      description: Returns the members of a workspace, each with their role and (when
+        resolvable) the underlying user's name and email.
+      parameters:
+      - description: Workspace ID
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            items:
+              $ref: '#/definitions/WorkspaceMember'
+            type: array
+        "400":
+          description: invalid id
+          schema:
+            $ref: '#/definitions/ErrorResponse'
+        "401":
+          description: unauthorized
+          schema:
+            $ref: '#/definitions/ErrorResponse'
+        "403":
+          description: not approved
+          schema:
+            $ref: '#/definitions/ErrorResponse'
+        "404":
+          description: not found
+          schema:
+            $ref: '#/definitions/ErrorResponse'
+      summary: List a workspace's members
       tags:
       - workspaces
 securityDefinitions:

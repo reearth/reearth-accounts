@@ -37,9 +37,13 @@ func RegisterRoutes(e *echo.Echo, h *Handler) {
 		// Users (requires an approved admin session)
 		users := v1.Group("/users", requireApproved)
 		users.GET("", h.User.ListUsers)
+		users.GET("/:id", h.User.GetUser)
+		users.GET("/:id/workspaces", h.User.GetUserWorkspaces)
 
 		// Cross-tenant workspace listing (requires an approved admin session)
 		workspaces := v1.Group("/workspaces", requireApproved)
 		workspaces.GET("", h.Workspace.ListWorkspaces)
+		workspaces.GET("/:id", h.Workspace.GetWorkspace)
+		workspaces.GET("/:id/members", h.Workspace.GetWorkspaceMembers)
 	}
 }

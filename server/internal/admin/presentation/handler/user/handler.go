@@ -8,10 +8,12 @@ import (
 
 // Handler aggregates the user-related admin usecases.
 type Handler struct {
-	listUC *useruc.ListUsersUseCase
+	getUC           *useruc.GetUserUseCase
+	getWorkspacesUC *useruc.GetUserWorkspacesUseCase
+	listUC          *useruc.ListUsersUseCase
 }
 
 // NewHandler is a Wire provider for the user Handler.
-func NewHandler(listUC *useruc.ListUsersUseCase) *Handler {
-	return &Handler{listUC: listUC}
+func NewHandler(getUC *useruc.GetUserUseCase, getWorkspacesUC *useruc.GetUserWorkspacesUseCase, listUC *useruc.ListUsersUseCase) *Handler {
+	return &Handler{getUC: getUC, getWorkspacesUC: getWorkspacesUC, listUC: listUC}
 }

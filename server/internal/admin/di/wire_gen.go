@@ -30,8 +30,11 @@ func InitializeEcho() (*Server, func(), error) {
 	}
 	adminUserRepo := container.AdminUser
 	repo := container.User
+	workspaceRepo := container.Workspace
+	getUserUseCase := useruc.NewGetUserUseCase(repo)
+	getUserWorkspacesUseCase := useruc.NewGetUserWorkspacesUseCase(repo, workspaceRepo)
 	listUsersUseCase := useruc.NewListUsersUseCase(repo)
-	userHandler := user.NewHandler(listUsersUseCase)
+	userHandler := user.NewHandler(getUserUseCase, getUserWorkspacesUseCase, listUsersUseCase)
 	verifier, err := provideGoogleVerifier(config)
 	if err != nil {
 		cleanup()
@@ -51,9 +54,10 @@ func InitializeEcho() (*Server, func(), error) {
 	approveAdminUserUseCase := adminuseruc.NewApproveAdminUserUseCase(adminUserRepo)
 	rejectAdminUserUseCase := adminuseruc.NewRejectAdminUserUseCase(adminUserRepo)
 	adminUserHandler := adminuserhandler.NewHandler(listAdminUsersUseCase, approveAdminUserUseCase, rejectAdminUserUseCase)
-	workspaceRepo := container.Workspace
+	getWorkspaceUseCase := workspaceuc.NewGetWorkspaceUseCase(workspaceRepo)
 	listWorkspacesUseCase := workspaceuc.NewListWorkspacesUseCase(workspaceRepo)
-	workspaceHandler := workspacehandler.NewHandler(listWorkspacesUseCase)
+	listWorkspaceMembersUseCase := workspaceuc.NewListWorkspaceMembersUseCase(workspaceRepo, repo)
+	workspaceHandler := workspacehandler.NewHandler(getWorkspaceUseCase, listWorkspacesUseCase, listWorkspaceMembersUseCase)
 	sessionMiddleware := middleware.NewSessionMiddleware(manager)
 	requireApprovedMiddleware := middleware.NewRequireApprovedMiddleware(manager, adminUserRepo)
 	presentationHandler := presentation.NewHandler(adminUserHandler, authHandler, userHandler, workspaceHandler, sessionMiddleware, requireApprovedMiddleware)
