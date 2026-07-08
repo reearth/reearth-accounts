@@ -12,6 +12,7 @@ type AdminUserDocument struct {
 	Email      string    `json:"email" bson:"email" jsonschema:"required,description=Admin user email address (lowercase, unique)"`
 	Name       string    `json:"name" bson:"name" jsonschema:"required,description=Admin user display name"`
 	PictureURL string    `json:"pictureurl" bson:"pictureurl" jsonschema:"description=Admin user picture URL from Google profile. Default: \"\""`
+	Role       string    `json:"role" bson:"role" jsonschema:"description=Admin user role: system_admin or viewer. Default: \"\""`
 	Status     string    `json:"status" bson:"status" jsonschema:"required,description=Admin user status: pending, approved or rejected"`
 	ApprovedBy string    `json:"approvedby" bson:"approvedby" jsonschema:"description=ID of the admin who approved this user (ULID format). Default: \"\""`
 	ApprovedAt time.Time `json:"approvedat" bson:"approvedat" jsonschema:"description=Approval timestamp"`
@@ -45,6 +46,7 @@ func NewAdminUser(u adminuser.AdminUser) (*AdminUserDocument, string) {
 		Email:      u.Email(),
 		Name:       u.Name(),
 		PictureURL: u.PictureURL(),
+		Role:       u.Role().String(),
 		Status:     u.Status().String(),
 		ApprovedBy: approvedBy,
 		ApprovedAt: u.ApprovedAt(),
@@ -76,6 +78,16 @@ func (d *AdminUserDocument) Model() (*adminuser.AdminUser, error) {
 		Status(status).
 		ApprovedAt(d.ApprovedAt).
 		UpdatedAt(d.UpdatedAt)
+
+	// Tolerate empty/absent role so pre-migration documents still load; only
+	// error on a present-but-invalid value.
+	if d.Role != "" {
+		role, err := adminuser.RoleFrom(d.Role)
+		if err != nil {
+			return nil, err
+		}
+		b = b.Role(role)
+	}
 
 	if d.ApprovedBy != "" {
 		by, err := id.AdminUserIDFrom(d.ApprovedBy)

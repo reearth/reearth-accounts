@@ -11,7 +11,7 @@ import (
 )
 
 const adminUserFindByEmail = `-- name: AdminUserFindByEmail :one
-SELECT id, email, name, picture_url, status, approved_by, approved_at, created_at, updated_at FROM admin_users WHERE lower(email) = lower($1) LIMIT 1
+SELECT id, email, name, picture_url, role, status, approved_by, approved_at, created_at, updated_at FROM admin_users WHERE lower(email) = lower($1) LIMIT 1
 `
 
 func (q *Queries) AdminUserFindByEmail(ctx context.Context, lower string) (AdminUser, error) {
@@ -22,6 +22,7 @@ func (q *Queries) AdminUserFindByEmail(ctx context.Context, lower string) (Admin
 		&i.Email,
 		&i.Name,
 		&i.PictureUrl,
+		&i.Role,
 		&i.Status,
 		&i.ApprovedBy,
 		&i.ApprovedAt,
@@ -32,7 +33,7 @@ func (q *Queries) AdminUserFindByEmail(ctx context.Context, lower string) (Admin
 }
 
 const adminUserFindByID = `-- name: AdminUserFindByID :one
-SELECT id, email, name, picture_url, status, approved_by, approved_at, created_at, updated_at FROM admin_users WHERE id = $1
+SELECT id, email, name, picture_url, role, status, approved_by, approved_at, created_at, updated_at FROM admin_users WHERE id = $1
 `
 
 func (q *Queries) AdminUserFindByID(ctx context.Context, id string) (AdminUser, error) {
@@ -43,6 +44,7 @@ func (q *Queries) AdminUserFindByID(ctx context.Context, id string) (AdminUser, 
 		&i.Email,
 		&i.Name,
 		&i.PictureUrl,
+		&i.Role,
 		&i.Status,
 		&i.ApprovedBy,
 		&i.ApprovedAt,
@@ -53,7 +55,7 @@ func (q *Queries) AdminUserFindByID(ctx context.Context, id string) (AdminUser, 
 }
 
 const adminUserFindByIDs = `-- name: AdminUserFindByIDs :many
-SELECT id, email, name, picture_url, status, approved_by, approved_at, created_at, updated_at FROM admin_users WHERE id = ANY($1::text[]) ORDER BY id
+SELECT id, email, name, picture_url, role, status, approved_by, approved_at, created_at, updated_at FROM admin_users WHERE id = ANY($1::text[]) ORDER BY id
 `
 
 func (q *Queries) AdminUserFindByIDs(ctx context.Context, dollar_1 []string) ([]AdminUser, error) {
@@ -70,6 +72,7 @@ func (q *Queries) AdminUserFindByIDs(ctx context.Context, dollar_1 []string) ([]
 			&i.Email,
 			&i.Name,
 			&i.PictureUrl,
+			&i.Role,
 			&i.Status,
 			&i.ApprovedBy,
 			&i.ApprovedAt,
@@ -87,12 +90,13 @@ func (q *Queries) AdminUserFindByIDs(ctx context.Context, dollar_1 []string) ([]
 }
 
 const adminUserUpsert = `-- name: AdminUserUpsert :exec
-INSERT INTO admin_users (id, email, name, picture_url, status, approved_by, approved_at, created_at, updated_at)
-VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9)
+INSERT INTO admin_users (id, email, name, picture_url, role, status, approved_by, approved_at, created_at, updated_at)
+VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10)
 ON CONFLICT (id) DO UPDATE SET
     email=EXCLUDED.email,
     name=EXCLUDED.name,
     picture_url=EXCLUDED.picture_url,
+    role=EXCLUDED.role,
     status=EXCLUDED.status,
     approved_by=EXCLUDED.approved_by,
     approved_at=EXCLUDED.approved_at,
@@ -104,6 +108,7 @@ type AdminUserUpsertParams struct {
 	Email      string
 	Name       string
 	PictureUrl string
+	Role       string
 	Status     string
 	ApprovedBy string
 	ApprovedAt *time.Time
@@ -117,6 +122,7 @@ func (q *Queries) AdminUserUpsert(ctx context.Context, arg AdminUserUpsertParams
 		arg.Email,
 		arg.Name,
 		arg.PictureUrl,
+		arg.Role,
 		arg.Status,
 		arg.ApprovedBy,
 		arg.ApprovedAt,

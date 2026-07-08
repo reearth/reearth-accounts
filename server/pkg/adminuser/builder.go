@@ -97,6 +97,11 @@ func (b *Builder) PictureURL(pictureURL string) *Builder {
 	return b
 }
 
+func (b *Builder) Role(role Role) *Builder {
+	b.u.role = role
+	return b
+}
+
 func (b *Builder) Status(status Status) *Builder {
 	b.u.status = status
 	return b

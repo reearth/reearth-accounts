@@ -114,6 +114,11 @@ func TestBuilder_NewID(t *testing.T) {
 	assert.False(t, u.ID().IsEmpty())
 }
 
+func TestBuilder_Role(t *testing.T) {
+	u := New().NewID().Name("Bob").Email("bob@eukarya.io").Role(RoleSystemAdmin).MustBuild()
+	assert.Equal(t, RoleSystemAdmin, u.Role())
+}
+
 func TestBuilder_MustBuild_Panics(t *testing.T) {
 	assert.Panics(t, func() {
 		New().Name("Bob").Email("bob@eukarya.io").MustBuild()

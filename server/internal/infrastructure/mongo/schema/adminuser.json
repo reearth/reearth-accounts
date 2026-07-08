@@ -36,6 +36,10 @@
         "bsonType": "string",
         "description": "Admin user picture URL from Google profile. Default: \"\""
       },
+      "role": {
+        "bsonType": "string",
+        "description": "Admin user role: system_admin or viewer. Default: \"\""
+      },
       "status": {
         "bsonType": "string",
         "description": "Admin user status: pending, approved or rejected"

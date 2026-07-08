@@ -22,6 +22,7 @@ type AdminUser struct {
 	id         ID
 	name       string
 	pictureURL string
+	role       Role
 	status     Status
 	updatedAt  time.Time
 }
@@ -76,6 +77,13 @@ func (u *AdminUser) PictureURL() string {
 	return u.pictureURL
 }
 
+func (u *AdminUser) Role() Role {
+	if u == nil {
+		return ""
+	}
+	return u.role
+}
+
 func (u *AdminUser) Status() Status {
 	if u == nil {
 		return ""
@@ -125,6 +133,15 @@ func (u *AdminUser) Reject() {
 		return
 	}
 	u.status = StatusRejected
+	u.updatedAt = time.Now()
+}
+
+// SetRole assigns the given role to the user.
+func (u *AdminUser) SetRole(r Role) {
+	if u == nil {
+		return
+	}
+	u.role = r
 	u.updatedAt = time.Now()
 }
 

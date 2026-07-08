@@ -13,7 +13,7 @@ import (
 	"github.com/reearth/reearthx/usecasex"
 )
 
-const adminUserColumns = "id, email, name, picture_url, status, approved_by, approved_at, created_at, updated_at"
+const adminUserColumns = "id, email, name, picture_url, role, status, approved_by, approved_at, created_at, updated_at"
 
 type AdminUser struct {
 	c *Client
@@ -27,6 +27,7 @@ func adminUserModel(a gen.AdminUser) (*adminuser.AdminUser, error) {
 		Email:      a.Email,
 		Name:       a.Name,
 		PictureURL: a.PictureUrl,
+		Role:       a.Role,
 		Status:     a.Status,
 		ApprovedBy: a.ApprovedBy,
 		ApprovedAt: a.ApprovedAt,
@@ -154,6 +155,7 @@ func (r *AdminUser) Save(ctx context.Context, u *adminuser.AdminUser) error {
 		Email:      row.Email,
 		Name:       row.Name,
 		PictureUrl: row.PictureURL,
+		Role:       row.Role,
 		Status:     row.Status,
 		ApprovedBy: row.ApprovedBy,
 		ApprovedAt: row.ApprovedAt,
@@ -174,7 +176,7 @@ func scanAdminUsers(rows pgx.Rows) (adminuser.List, error) {
 	for rows.Next() {
 		var d pgdoc.AdminUserRow
 		if err := rows.Scan(
-			&d.ID, &d.Email, &d.Name, &d.PictureURL, &d.Status,
+			&d.ID, &d.Email, &d.Name, &d.PictureURL, &d.Role, &d.Status,
 			&d.ApprovedBy, &d.ApprovedAt, &d.CreatedAt, &d.UpdatedAt,
 		); err != nil {
 			return nil, err

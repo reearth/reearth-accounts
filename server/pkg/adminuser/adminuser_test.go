@@ -55,6 +55,16 @@ func TestAdminUser_Approve(t *testing.T) {
 	assert.False(t, u.UpdatedAt().Before(before))
 }
 
+func TestAdminUser_SetRole(t *testing.T) {
+	u := newTestAdminUser()
+	before := u.UpdatedAt()
+
+	u.SetRole(RoleSystemAdmin)
+
+	assert.Equal(t, RoleSystemAdmin, u.Role())
+	assert.False(t, u.UpdatedAt().Before(before))
+}
+
 func TestAdminUser_Approve_Idempotent(t *testing.T) {
 	u := newTestAdminUser()
 	first := NewID()

@@ -12,6 +12,7 @@ type AdminUserRow struct {
 	Email      string
 	Name       string
 	PictureURL string
+	Role       string
 	Status     string
 	ApprovedBy string
 	ApprovedAt *time.Time
@@ -33,6 +34,7 @@ func NewAdminUserRow(u adminuser.AdminUser) AdminUserRow {
 		Email:      u.Email(),
 		Name:       u.Name(),
 		PictureURL: u.PictureURL(),
+		Role:       u.Role().String(),
 		Status:     u.Status().String(),
 		ApprovedBy: approvedBy,
 		ApprovedAt: approvedAt,
@@ -59,6 +61,16 @@ func (r AdminUserRow) Model() (*adminuser.AdminUser, error) {
 		PictureURL(r.PictureURL).
 		Status(status).
 		UpdatedAt(r.UpdatedAt)
+
+	// Tolerate empty/absent role so pre-migration rows still load; only error on
+	// a present-but-invalid value.
+	if r.Role != "" {
+		role, err := adminuser.RoleFrom(r.Role)
+		if err != nil {
+			return nil, err
+		}
+		b = b.Role(role)
+	}
 
 	if r.ApprovedAt != nil {
 		b = b.ApprovedAt(*r.ApprovedAt)
