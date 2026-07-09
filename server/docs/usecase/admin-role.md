@@ -122,12 +122,14 @@ truth, compiled into the `accounts-admin` Cerbos policy via `make gen-policies`
 (`cmd/policy-generator`).
 
 > **⚠ Dependency / Risk (launch blocker) — runtime policy distribution.**
-> Policies are generated locally into the **gitignored** `server/policies/`
+> Generated policies are written locally into the **gitignored** `server/policies/`
 > directory (`PolicyFileDir = "policies"` relative to `server/`; `/policies` is in
-> `server/.gitignore`). **Nothing is checked in** — there is no `policies/`
-> directory at the repo root and no policy YAML committed anywhere. **The
-> mechanism by which the generated `accounts-admin` YAML reaches the running
-> Cerbos instance is unknown.** `server/CLAUDE.md` mentions a GCS sync via GitHub Actions,
+> `server/.gitignore`). **No generated `accounts-admin` policy YAML is checked in**
+> — the only committed policy YAML is the Cerbos e2e fixtures under
+> `server/e2e/testdata/policies/` (e.g. `service_resource.yaml`), which are test
+> data, not the runtime policy source. **The mechanism by which the generated
+> `accounts-admin` YAML reaches the running Cerbos instance is unknown.**
+> `server/CLAUDE.md` mentions a GCS sync via GitHub Actions,
 > but **no such workflow exists** under `.github/workflows/`. Because enforcement
 > is Cerbos-based, the policy MUST reach the running Cerbos instance or protected
 > endpoints will fail. **This must be confirmed with the platform/Cerbos owner
