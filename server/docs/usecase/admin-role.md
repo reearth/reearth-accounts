@@ -54,7 +54,7 @@ func RequirePermission(chk *authz.Checker, resource, action string) echo.Middlew
         return func(c echo.Context) error {
             u, err := internal.GetAdminUser(c) // set by RequireApproved; role loaded
             if err != nil {
-                return echo.NewHTTPError(http.StatusUnauthorized)
+                return err // already an echo.HTTPError(401)
             }
             ok, err := chk.Allowed(c.Request().Context(), u.Role(), resource, action)
             if err != nil {
