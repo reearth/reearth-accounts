@@ -1,10 +1,11 @@
 -- name: AdminUserUpsert :exec
-INSERT INTO admin_users (id, email, name, picture_url, status, approved_by, approved_at, created_at, updated_at)
-VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9)
+INSERT INTO admin_users (id, email, name, picture_url, role, status, approved_by, approved_at, created_at, updated_at)
+VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10)
 ON CONFLICT (id) DO UPDATE SET
     email=EXCLUDED.email,
     name=EXCLUDED.name,
     picture_url=EXCLUDED.picture_url,
+    role=EXCLUDED.role,
     status=EXCLUDED.status,
     approved_by=EXCLUDED.approved_by,
     approved_at=EXCLUDED.approved_at,

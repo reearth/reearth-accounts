@@ -22,6 +22,7 @@ type AdminUser struct {
 	id         ID
 	name       string
 	pictureURL string
+	role       Role
 	status     Status
 	updatedAt  time.Time
 }
@@ -76,6 +77,13 @@ func (u *AdminUser) PictureURL() string {
 	return u.pictureURL
 }
 
+func (u *AdminUser) Role() Role {
+	if u == nil {
+		return ""
+	}
+	return u.role
+}
+
 func (u *AdminUser) Status() Status {
 	if u == nil {
 		return ""
@@ -126,6 +134,21 @@ func (u *AdminUser) Reject() {
 	}
 	u.status = StatusRejected
 	u.updatedAt = time.Now()
+}
+
+// SetRole assigns the given role to the user. Invalid roles are rejected so a
+// value the mongo/postgres mappers cannot load back (they error on
+// present-but-invalid roles) is never persisted.
+func (u *AdminUser) SetRole(r Role) error {
+	if u == nil {
+		return nil
+	}
+	if !r.Valid() {
+		return ErrInvalidRole
+	}
+	u.role = r
+	u.updatedAt = time.Now()
+	return nil
 }
 
 // UpdateProfile refreshes the display name and picture from the Google profile

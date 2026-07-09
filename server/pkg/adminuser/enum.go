@@ -26,6 +26,21 @@ var (
 	ErrInvalidStatus = errors.New("invalid status")
 )
 
+var (
+	// RoleSystemAdmin is a role with full administrative privileges over the
+	// admin application.
+	RoleSystemAdmin = Role("system_admin")
+	// RoleViewer is a role with read-only access to the admin application.
+	RoleViewer = Role("viewer")
+
+	roles = []Role{
+		RoleSystemAdmin,
+		RoleViewer,
+	}
+
+	ErrInvalidRole = errors.New("invalid role")
+)
+
 type Status string
 
 func (s Status) Valid() bool {
@@ -42,4 +57,27 @@ func StatusFrom(s string) (Status, error) {
 		return status, nil
 	}
 	return status, ErrInvalidStatus
+}
+
+type Role string
+
+// Valid reports whether r is one of the known roles. The empty string is NOT
+// valid: it denotes "unset" (pre-migration records). Construction and the
+// mongo/postgres mappers tolerate an empty role — the builder accepts it and
+// the mappers skip parsing it — but enforcement code treating an unset role
+// as invalid, and therefore denying, is the intended behavior.
+func (r Role) Valid() bool {
+	return slices.Contains(roles, r)
+}
+
+func (r Role) String() string {
+	return string(r)
+}
+
+func RoleFrom(s string) (Role, error) {
+	role := Role(strings.ToLower(s))
+	if role.Valid() {
+		return role, nil
+	}
+	return role, ErrInvalidRole
 }

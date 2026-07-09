@@ -55,6 +55,7 @@ CREATE TABLE admin_users (
     email       text NOT NULL,
     name        text NOT NULL,
     picture_url text NOT NULL DEFAULT '',
+    role        text NOT NULL DEFAULT '',
     status      text NOT NULL,
     approved_by text NOT NULL DEFAULT '',
     approved_at timestamptz,

@@ -31,6 +31,12 @@ func (b *Builder) Build() (*AdminUser, error) {
 		return nil, ErrInvalidStatus
 	}
 
+	// Empty means "unset" (pre-migration records); anything else must be a
+	// known role so an unloadable value is never constructed/persisted.
+	if b.u.role != "" && !b.u.role.Valid() {
+		return nil, ErrInvalidRole
+	}
+
 	// Set default updatedAt if not explicitly set.
 	if b.u.updatedAt.IsZero() {
 		b.u.updatedAt = time.Now()
@@ -94,6 +100,11 @@ func (b *Builder) Name(name string) *Builder {
 
 func (b *Builder) PictureURL(pictureURL string) *Builder {
 	b.u.pictureURL = pictureURL
+	return b
+}
+
+func (b *Builder) Role(role Role) *Builder {
+	b.u.role = role
 	return b
 }
 

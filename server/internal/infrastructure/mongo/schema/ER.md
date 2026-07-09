@@ -13,6 +13,7 @@ erDiagram
         string email
         string name
         string pictureurl "optional"
+        string role "optional"
         string status
         date updatedat
     }

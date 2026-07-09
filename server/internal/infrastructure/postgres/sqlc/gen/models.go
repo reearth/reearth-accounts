@@ -13,6 +13,7 @@ type AdminUser struct {
 	Email      string
 	Name       string
 	PictureUrl string
+	Role       string
 	Status     string
 	ApprovedBy string
 	ApprovedAt *time.Time
