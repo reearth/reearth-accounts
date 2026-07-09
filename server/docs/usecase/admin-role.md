@@ -118,8 +118,9 @@ Notes:
 | `workspace` | `edit` / `delete` | system_admin |
 
 `resourceRules` in `server/internal/admin/rbac/definitions.go` is the single source of
-truth, compiled into the `accounts-admin` Cerbos policy via `make gen-policies`
-(`cmd/policy-generator`).
+truth, compiled into the `accounts-admin` Cerbos policy via
+`(cd server && make gen-policies)` (the target lives in `server/Makefile`; it runs
+`cmd/policy-generator`).
 
 > **⚠ Dependency / Risk (launch blocker) — runtime policy distribution.**
 > Generated policies are written locally into the **gitignored** `server/policies/`
@@ -162,12 +163,15 @@ valve.
 
 ## Rollout
 
-- **A — deploy.** Land the `accounts-admin` policy, ship the additive migration
-  (backfill = `system_admin`) and `RequirePermission`. Every existing admin holds
-  `system_admin`, so every check ALLOWs — behavior identical to today, effectively
-  permissive; **no feature flag required**.
-- **B — verify.** Confirm the `accounts-admin` policy is loaded by the running
-  Cerbos instance (the launch-blocker dependency). All existing admins still pass.
+- **A — distribute & verify policy.** Land the `accounts-admin` policy and
+  **confirm it is loaded by the running Cerbos instance** (the launch-blocker
+  dependency) *before* any enforcement code goes live. This must happen first:
+  once `RequirePermission` calls Cerbos, a missing/unloaded policy would deny or
+  error even for system_admins.
+- **B — deploy enforcement.** Ship the additive migration (backfill =
+  `system_admin`) and `RequirePermission`. Because step A verified the policy is
+  loaded and every existing admin holds `system_admin`, every check ALLOWs —
+  behavior identical to today, effectively permissive; **no feature flag required**.
 - **C — tighten.** A system_admin demotes read-only operators to `viewer` via the
   role endpoint. This is a reversible data operation, not a deploy.
 
@@ -179,7 +183,7 @@ unused, so no data rollback is needed. If locked out, re-grant via
 
 ```mermaid
 sequenceDiagram
-    participant Browser as admin/ frontend
+    participant Browser as admin frontend
     participant MW as RequireApproved MW
     participant PMW as RequirePermission MW
     participant Chk as authz.Checker (admin)
