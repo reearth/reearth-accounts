@@ -172,7 +172,7 @@ valve.
   error even for system_admins.
 - **B — deploy enforcement.** Ship the additive migration (backfill =
   `system_admin`) and `RequirePermission`. Because step A verified the policy is
-  loaded and every existing admin holds `system_admin`, every check ALLOWs —
+  loaded and every existing admin holds `system_admin`, every check returns ALLOW —
   behavior identical to today, effectively permissive; **no feature flag required**.
 - **C — tighten.** A system_admin demotes read-only operators to `viewer` via the
   role endpoint. This is a reversible data operation, not a deploy.
