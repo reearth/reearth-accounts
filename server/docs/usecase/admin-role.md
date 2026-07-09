@@ -125,15 +125,17 @@ truth, compiled into the `accounts-admin` Cerbos policy via
 > **⚠ Dependency / Risk (launch blocker) — runtime policy distribution.**
 > Generated policies are written locally into the **gitignored** `server/policies/`
 > directory (`PolicyFileDir = "policies"` relative to `server/`; `/policies` is in
-> `server/.gitignore`). **No generated `accounts-admin` policy YAML is checked in**
-> — the only committed policy YAML is the Cerbos e2e fixtures under
-> `server/e2e/testdata/policies/` (e.g. `service_resource.yaml`), which are test
-> data, not the runtime policy source. **The mechanism by which the generated
-> `accounts-admin` YAML reaches the running Cerbos instance is unknown.**
-> `server/CLAUDE.md` mentions a GCS sync via GitHub Actions,
-> but **no such workflow exists** under `.github/workflows/`. Because enforcement
-> is Cerbos-based, the policy MUST reach the running Cerbos instance or protected
-> endpoints will fail. **This must be confirmed with the platform/Cerbos owner
+> `server/.gitignore`). **No generated `accounts-admin` policy YAML is checked in.**
+> For **local dev / e2e** only, hand-maintained fixtures under
+> `server/e2e/testdata/policies/` (e.g. `service_resource.yaml`, `.cerbos.yaml`)
+> are mounted into the Cerbos container as `/policies` by `docker-compose.yml` /
+> `docker-compose.dev.yml` (`server --config=/policies/.cerbos.yaml`) — so any new
+> `accounts-admin` rules must be reflected there for local testing. **But the
+> mechanism by which the generated `accounts-admin` YAML reaches the *deployed*
+> Cerbos instance is unknown.** `server/CLAUDE.md` mentions a GCS sync via GitHub
+> Actions, but **no such workflow exists** under `.github/workflows/`. Because
+> enforcement is Cerbos-based, the policy MUST reach the deployed Cerbos instance
+> or protected endpoints will fail. **This must be confirmed with the platform/Cerbos owner
 > before rollout** — it is the single remaining open dependency (see Open
 > Questions).
 
