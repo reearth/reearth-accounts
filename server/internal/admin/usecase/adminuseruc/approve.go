@@ -43,6 +43,15 @@ func (uc *ApproveAdminUserUseCase) Execute(ctx context.Context, operatorID, targ
 	}
 
 	target.Approve(operatorID)
+	// A freshly approved admin defaults to viewer (least-privilege). A record
+	// that already carries a role — e.g. a previously-assigned admin who was
+	// rejected and is now being re-approved — keeps it; we never clobber or
+	// downgrade an existing role here.
+	if target.Role() == "" {
+		if err := target.SetRole(adminuser.RoleViewer); err != nil {
+			return nil, err
+		}
+	}
 	if err := uc.repo.Save(ctx, target); err != nil {
 		return nil, err
 	}

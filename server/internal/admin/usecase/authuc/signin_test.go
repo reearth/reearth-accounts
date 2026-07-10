@@ -38,6 +38,7 @@ func TestGoogleSignIn_NewUser_Pending(t *testing.T) {
 	assert.Equal(t, "alice@eukarya.io", u.Email())
 	assert.Equal(t, "Alice", u.Name())
 	assert.True(t, u.IsPending())
+	assert.Equal(t, adminuser.Role(""), u.Role()) // non-bootstrap new account has no role
 
 	// persisted
 	got, err := repo.FindByEmail(context.Background(), "alice@eukarya.io")
@@ -53,6 +54,51 @@ func TestGoogleSignIn_NewUser_Bootstrapped(t *testing.T) {
 	require.NoError(t, err)
 	assert.True(t, u.IsApproved())
 	assert.False(t, u.ApprovedAt().IsZero())
+	assert.Equal(t, adminuser.RoleSystemAdmin, u.Role())
+}
+
+func TestGoogleSignIn_ExistingUser_BootstrapElevatesAndApproves(t *testing.T) {
+	// A pre-existing pending viewer whose email is (re-)added to the bootstrap
+	// list is approved and elevated to system_admin on next sign-in.
+	existing := adminuser.New().NewID().Email("boss@eukarya.io").Name("Boss").Status(adminuser.StatusPending).Role(adminuser.RoleViewer).MustBuild()
+	repo := memory.NewAdminUserWith(existing)
+	v := fakeVerifier{claims: &google.Claims{Email: "boss@eukarya.io", EmailVerified: true, HD: "eukarya.io", Name: "Boss"}}
+	uc := NewGoogleSignInUseCase(repo, v, GoogleSignInOptions{AllowedDomain: "eukarya.io", BootstrapEmails: []string{"boss@eukarya.io"}})
+
+	u, err := uc.Execute(context.Background(), "tok")
+	require.NoError(t, err)
+	assert.Equal(t, existing.ID(), u.ID())
+	assert.True(t, u.IsApproved())
+	assert.Equal(t, adminuser.RoleSystemAdmin, u.Role())
+
+	got, err := repo.FindByEmail(context.Background(), "boss@eukarya.io")
+	require.NoError(t, err)
+	assert.True(t, got.IsApproved())
+	assert.Equal(t, adminuser.RoleSystemAdmin, got.Role()) // persisted
+}
+
+func TestGoogleSignIn_ExistingUser_BootstrapSystemAdminNotDowngraded(t *testing.T) {
+	existing := adminuser.New().NewID().Email("boss@eukarya.io").Name("Boss").Status(adminuser.StatusApproved).Role(adminuser.RoleSystemAdmin).MustBuild()
+	repo := memory.NewAdminUserWith(existing)
+	v := fakeVerifier{claims: &google.Claims{Email: "boss@eukarya.io", EmailVerified: true, HD: "eukarya.io", Name: "Boss"}}
+	uc := NewGoogleSignInUseCase(repo, v, GoogleSignInOptions{AllowedDomain: "eukarya.io", BootstrapEmails: []string{"boss@eukarya.io"}})
+
+	u, err := uc.Execute(context.Background(), "tok")
+	require.NoError(t, err)
+	assert.True(t, u.IsApproved())
+	assert.Equal(t, adminuser.RoleSystemAdmin, u.Role())
+}
+
+func TestGoogleSignIn_ExistingUser_NonBootstrapRoleUntouched(t *testing.T) {
+	existing := adminuser.New().NewID().Email("alice@eukarya.io").Name("Alice").Status(adminuser.StatusApproved).Role(adminuser.RoleViewer).MustBuild()
+	repo := memory.NewAdminUserWith(existing)
+	v := fakeVerifier{claims: &google.Claims{Email: "alice@eukarya.io", EmailVerified: true, HD: "eukarya.io", Name: "Alice"}}
+	uc := NewGoogleSignInUseCase(repo, v, GoogleSignInOptions{AllowedDomain: "eukarya.io"})
+
+	u, err := uc.Execute(context.Background(), "tok")
+	require.NoError(t, err)
+	assert.True(t, u.IsApproved())
+	assert.Equal(t, adminuser.RoleViewer, u.Role()) // not bootstrapped: role unchanged
 }
 
 func TestGoogleSignIn_ExistingUser_RefreshesProfileAndKeepsStatus(t *testing.T) {
