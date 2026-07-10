@@ -78,6 +78,8 @@ func (uc *GoogleSignInUseCase) Execute(ctx context.Context, idToken string) (*ad
 	}
 
 	if u != nil {
+		changed := false
+
 		// Refresh the profile from the latest Google data on each sign-in.
 		// Name and picture are updated independently, and an empty Google claim
 		// keeps the stored value (UpdateProfile requires a non-empty name).
@@ -93,6 +95,27 @@ func (uc *GoogleSignInUseCase) Execute(ctx context.Context, idToken string) (*ad
 			if err := u.UpdateProfile(name, picture); err != nil {
 				return nil, err
 			}
+			changed = true
+		}
+
+		// Reconcile bootstrap admins on every sign-in: re-adding an email to the
+		// bootstrap env var re-grants access (the lock-out recovery valve). This
+		// only ever approves/elevates; the system_admin guard means it never
+		// downgrades an already-system_admin record.
+		if uc.bootstrap[email] {
+			if !u.IsApproved() {
+				u.Approve(adminuser.ID{}) // bootstrap has no human approver
+				changed = true
+			}
+			if u.Role() != adminuser.RoleSystemAdmin {
+				if err := u.SetRole(adminuser.RoleSystemAdmin); err != nil {
+					return nil, err
+				}
+				changed = true
+			}
+		}
+
+		if changed {
 			if err := uc.repo.Save(ctx, u); err != nil {
 				return nil, err
 			}
@@ -103,7 +126,9 @@ func (uc *GoogleSignInUseCase) Execute(ctx context.Context, idToken string) (*ad
 	// new account: pending unless bootstrapped
 	b := adminuser.New().NewID().Email(email).Name(displayName(claims.Name, email)).PictureURL(claims.PictureURL)
 	if uc.bootstrap[email] {
-		b = b.Status(adminuser.StatusApproved)
+		// Bootstrap admins are auto-approved and seeded as system_admin so a
+		// fresh DB can gain its first system_admin.
+		b = b.Status(adminuser.StatusApproved).Role(adminuser.RoleSystemAdmin)
 	} else {
 		b = b.Status(adminuser.StatusPending)
 	}
