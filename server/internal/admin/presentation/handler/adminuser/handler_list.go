@@ -16,6 +16,7 @@ import (
 //	@Tags			admin-users
 //	@Produce		json
 //	@Param			status		query		string	false	"Filter by status"	Enums(pending, approved, rejected)
+//	@Param			role		query		string	false	"Filter by role"	Enums(system_admin, viewer)
 //	@Param			page		query		int		false	"Page number (1-based)"
 //	@Param			per_page	query		int		false	"Items per page (max 100)"
 //	@Success		200			{object}	ListAdminUsersResponse
@@ -32,6 +33,14 @@ func (h *Handler) ListAdminUsers(c echo.Context) error {
 			return echo.NewHTTPError(http.StatusBadRequest, "invalid status")
 		}
 		filter.Status = &status
+	}
+
+	if v := c.QueryParam("role"); v != "" {
+		role, err := adminuser.RoleFrom(v)
+		if err != nil {
+			return echo.NewHTTPError(http.StatusBadRequest, "invalid role")
+		}
+		filter.Role = &role
 	}
 
 	page, err := internal.ParsePageParam(c.QueryParam("page"))

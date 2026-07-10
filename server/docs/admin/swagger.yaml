@@ -203,6 +203,13 @@ paths:
         in: query
         name: status
         type: string
+      - description: Filter by role
+        enum:
+        - system_admin
+        - viewer
+        in: query
+        name: role
+        type: string
       - description: Page number (1-based)
         in: query
         name: page

@@ -38,6 +38,16 @@ const docTemplate = `{
                         "in": "query"
                     },
                     {
+                        "enum": [
+                            "system_admin",
+                            "viewer"
+                        ],
+                        "type": "string",
+                        "description": "Filter by role",
+                        "name": "role",
+                        "in": "query"
+                    },
+                    {
                         "type": "integer",
                         "description": "Page number (1-based)",
                         "name": "page",

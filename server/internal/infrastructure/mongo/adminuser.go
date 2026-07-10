@@ -48,6 +48,9 @@ func (r *AdminUser) List(ctx context.Context, f adminuser.ListFilter) (adminuser
 	if f.Status != nil {
 		filter["status"] = f.Status.String()
 	}
+	if f.Role != nil {
+		filter["role"] = f.Role.String()
+	}
 
 	// Sort by createdat for creation order; mongox.Paginate automatically
 	// appends the unique "id" field as a tie-breaker, so the effective sort is
