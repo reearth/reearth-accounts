@@ -40,7 +40,7 @@ func (h *Handler) SetAdminUserRole(c echo.Context) error {
 
 	var body SetAdminUserRoleRequest
 	if err := c.Bind(&body); err != nil {
-		return echo.NewHTTPError(http.StatusBadRequest, "invalid role")
+		return echo.NewHTTPError(http.StatusBadRequest, "invalid request body")
 	}
 	if body.Role == "" {
 		return echo.NewHTTPError(http.StatusBadRequest, "invalid role")

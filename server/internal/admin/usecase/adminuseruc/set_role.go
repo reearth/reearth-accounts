@@ -68,10 +68,14 @@ func (uc *SetRoleUseCase) Execute(ctx context.Context, operatorID, targetID admi
 			for _, u := range list {
 				if u.Role() == adminuser.RoleSystemAdmin {
 					count++
+					// count includes the target itself; >= 2 means another
+					// approved system_admin exists, so the demotion is safe and
+					// we can stop scanning entirely.
+					if count >= 2 {
+						break
+					}
 				}
 			}
-			// count includes the target itself; >= 2 means another approved
-			// system_admin exists, so the demotion is safe and we can stop paging.
 			if count >= 2 || len(list) < pageSize {
 				break
 			}
