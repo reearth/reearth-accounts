@@ -5,6 +5,7 @@ package authz
 
 import (
 	"context"
+	"errors"
 	"fmt"
 
 	"github.com/cerbos/cerbos-sdk-go/cerbos"
@@ -12,6 +13,12 @@ import (
 	adminrbac "github.com/reearth/reearth-accounts/server/internal/admin/rbac"
 	"github.com/reearth/reearth-accounts/server/pkg/adminuser"
 )
+
+// ErrNilChecker is returned when Allowed is called on a nil Checker. This is a
+// wiring bug rather than a client error; callers should surface it as a 500.
+// It is returned (rather than panicking) so a misconfigured checker fails
+// closed instead of crashing the request.
+var ErrNilChecker = errors.New("authz: nil checker")
 
 // Checker builds a Cerbos principal from the admin's role and evaluates it
 // against the admin policy set. The role lives directly on the AdminUser
@@ -29,6 +36,10 @@ func NewChecker(client *cerbos.GRPCClient) *Checker {
 // Allowed reports whether an admin with the given role may perform action on
 // resource within the admin Cerbos service.
 func (c *Checker) Allowed(ctx context.Context, principalID adminuser.ID, role adminuser.Role, resource, action string) (bool, error) {
+	// A nil checker is a wiring bug; fail closed rather than panic.
+	if c == nil {
+		return false, ErrNilChecker
+	}
 	if c.client == nil {
 		return true, nil
 	}

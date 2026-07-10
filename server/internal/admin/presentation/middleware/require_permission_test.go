@@ -61,6 +61,25 @@ func TestRequirePermission_NilClient_Bypass(t *testing.T) {
 	assert.Equal(t, http.StatusOK, c.Response().Status)
 }
 
+func TestRequirePermission_CheckerError_InternalServerError(t *testing.T) {
+	c, called := newContext(t)
+	u := adminuser.New().NewID().
+		Email("op@eukarya.io").Name("op").
+		Status(adminuser.StatusApproved).Role(adminuser.RoleSystemAdmin).MustBuild()
+	internal.SetAdminUser(c, u)
+
+	// A nil checker makes Allowed fail closed with an error, exercising the
+	// middleware's 500 branch (a miswired DI would look like this).
+	var checker *authz.Checker
+	m := mw.RequirePermission(checker, adminrbac.ResourceUser, adminrbac.ActionList)
+	err := m(next(called))(c)
+
+	var httpErr *echo.HTTPError
+	require.ErrorAs(t, err, &httpErr)
+	assert.Equal(t, http.StatusInternalServerError, httpErr.Code)
+	assert.False(t, *called)
+}
+
 func TestRequirePermission_InvalidRole_Forbidden(t *testing.T) {
 	c, called := newContext(t)
 	// A non-nil (but never-dialed) client forces the checker past the nil-client
