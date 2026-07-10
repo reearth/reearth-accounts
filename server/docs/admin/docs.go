@@ -223,7 +223,7 @@ const docTemplate = `{
                         }
                     },
                     "400": {
-                        "description": "invalid id / invalid role",
+                        "description": "invalid id / invalid role / cannot demote the last system admin",
                         "schema": {
                             "$ref": "#/definitions/ErrorResponse"
                         }
@@ -235,7 +235,7 @@ const docTemplate = `{
                         }
                     },
                     "403": {
-                        "description": "forbidden / cannot demote the last system admin",
+                        "description": "forbidden",
                         "schema": {
                             "$ref": "#/definitions/ErrorResponse"
                         }

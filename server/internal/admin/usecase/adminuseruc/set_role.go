@@ -26,8 +26,11 @@ func (uc *SetRoleUseCase) Execute(ctx context.Context, operatorID, targetID admi
 		return nil, err
 	}
 
-	// Demoting a system_admin must never drop the count of system_admins to zero
-	// (otherwise nobody could ever assign roles again).
+	// Demoting an approved system_admin must never drop the count of approved
+	// system_admins to zero (otherwise nobody could ever assign roles again).
+	// Only approved system_admins count toward the minimum, so demoting a
+	// rejected/pending system_admin is always allowed: such a target isn't part
+	// of the approved set the count is taken over.
 	//
 	// NOTE: this is a check-then-act guard, not atomic. Two system_admins
 	// demoting each other at the exact same moment could both observe two
@@ -37,22 +40,33 @@ func (uc *SetRoleUseCase) Execute(ctx context.Context, operatorID, targetID admi
 	// it's actually needed.
 	//
 	// The repo List filter only supports Status (not Role) today, so we count
-	// system_admins in-memory from the approved set. This is acceptable for the
-	// tiny closed admin set; a follow-up can use an efficient role filter once the
-	// repo supports it.
-	if target.Role() == adminuser.RoleSystemAdmin && role != adminuser.RoleSystemAdmin {
+	// system_admins in-memory from the approved set, paging through it until
+	// exhaustion to avoid silently truncating a large set. We only need to know
+	// whether another approved system_admin exists besides the target, so we exit
+	// early once a second one is found. This is acceptable for the tiny closed
+	// admin set; a follow-up can use an efficient role filter once the repo
+	// supports it.
+	if target.IsApproved() && target.Role() == adminuser.RoleSystemAdmin && role != adminuser.RoleSystemAdmin {
 		approved := adminuser.StatusApproved
-		list, _, err := uc.repo.List(ctx, adminuser.ListFilter{
-			Status:     &approved,
-			Pagination: usecasex.OffsetPagination{Offset: 0, Limit: 1000}.Wrap(),
-		})
-		if err != nil {
-			return nil, err
-		}
+		const pageSize = 100
 		count := 0
-		for _, u := range list {
-			if u.Role() == adminuser.RoleSystemAdmin {
-				count++
+		for offset := 0; ; offset += pageSize {
+			list, _, err := uc.repo.List(ctx, adminuser.ListFilter{
+				Status:     &approved,
+				Pagination: usecasex.OffsetPagination{Offset: int64(offset), Limit: pageSize}.Wrap(),
+			})
+			if err != nil {
+				return nil, err
+			}
+			for _, u := range list {
+				if u.Role() == adminuser.RoleSystemAdmin {
+					count++
+				}
+			}
+			// count includes the target itself; >= 2 means another approved
+			// system_admin exists, so the demotion is safe and we can stop paging.
+			if count >= 2 || len(list) < pageSize {
+				break
 			}
 		}
 		// count includes the target itself; <= 1 means the target is the only

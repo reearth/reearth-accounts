@@ -331,7 +331,7 @@ paths:
           schema:
             $ref: '#/definitions/AdminUser'
         "400":
-          description: invalid id / invalid role
+          description: invalid id / invalid role / cannot demote the last system admin
           schema:
             $ref: '#/definitions/ErrorResponse'
         "401":
@@ -339,7 +339,7 @@ paths:
           schema:
             $ref: '#/definitions/ErrorResponse'
         "403":
-          description: forbidden / cannot demote the last system admin
+          description: forbidden
           schema:
             $ref: '#/definitions/ErrorResponse'
         "404":

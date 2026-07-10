@@ -19,6 +19,14 @@ func approvedWithRole(email string, role adminuser.Role) *adminuser.AdminUser {
 	return u
 }
 
+func rejectedWithRole(email string, role adminuser.Role) *adminuser.AdminUser {
+	u := adminuser.New().NewID().Name(email).Email(email).Status(adminuser.StatusRejected).MustBuild()
+	if err := u.SetRole(role); err != nil {
+		panic(err)
+	}
+	return u
+}
+
 func TestSetRole_DemoteSystemAdmin_OK(t *testing.T) {
 	ctx := context.Background()
 	operator := approvedWithRole("op@eukarya.io", adminuser.RoleSystemAdmin)
@@ -47,6 +55,26 @@ func TestSetRole_DemoteLastSystemAdminBlocked(t *testing.T) {
 
 	_, err := uc.Execute(ctx, target.ID(), target.ID(), adminuser.RoleViewer)
 	assert.ErrorIs(t, err, ErrLastSystemAdmin)
+}
+
+func TestSetRole_DemoteRejectedSystemAdmin_OK(t *testing.T) {
+	ctx := context.Background()
+	// The operator is the only approved system_admin; target is a rejected
+	// system_admin. Rejected admins aren't part of the approved set, so demoting
+	// target must not trip the last-system_admin guard even though there is only
+	// one approved system_admin.
+	operator := approvedWithRole("op@eukarya.io", adminuser.RoleSystemAdmin)
+	target := rejectedWithRole("target@eukarya.io", adminuser.RoleSystemAdmin)
+	repo := memory.NewAdminUserWith(operator, target)
+	uc := NewSetRoleUseCase(repo)
+
+	got, err := uc.Execute(ctx, operator.ID(), target.ID(), adminuser.RoleViewer)
+	require.NoError(t, err)
+	assert.Equal(t, adminuser.RoleViewer, got.Role())
+
+	reloaded, err := repo.FindByID(ctx, target.ID())
+	require.NoError(t, err)
+	assert.Equal(t, adminuser.RoleViewer, reloaded.Role())
 }
 
 func TestSetRole_PromoteViewer_OK(t *testing.T) {
