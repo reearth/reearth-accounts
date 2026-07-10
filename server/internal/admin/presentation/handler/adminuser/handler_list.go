@@ -12,7 +12,7 @@ import (
 // ListAdminUsers godoc
 //
 //	@Summary		List admin users
-//	@Description	Lists admin users in creation order, optionally filtered by status, with offset pagination.
+//	@Description	Lists admin users in creation order, optionally filtered by status and/or role, with offset pagination.
 //	@Tags			admin-users
 //	@Produce		json
 //	@Param			status		query		string	false	"Filter by status"	Enums(pending, approved, rejected)

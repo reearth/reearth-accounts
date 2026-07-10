@@ -17,7 +17,7 @@ const docTemplate = `{
     "paths": {
         "/admin-users": {
             "get": {
-                "description": "Lists admin users in creation order, optionally filtered by status, with offset pagination.",
+                "description": "Lists admin users in creation order, optionally filtered by status and/or role, with offset pagination.",
                 "produces": [
                     "application/json"
                 ],

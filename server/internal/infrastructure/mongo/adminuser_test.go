@@ -9,6 +9,7 @@ import (
 	"github.com/reearth/reearthx/mongox"
 	"github.com/reearth/reearthx/usecasex"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 	"go.mongodb.org/mongo-driver/bson"
 )
 
@@ -144,11 +145,12 @@ func TestAdminUser_List_RoleFilter(t *testing.T) {
 	ctx := context.Background()
 	now := time.Now()
 
-	_, _ = c.Collection("adminuser").InsertMany(ctx, []any{
+	_, err := c.Collection("adminuser").InsertMany(ctx, []any{
 		bson.M{"id": adminuser.NewID().String(), "email": "admin@eukarya.io", "name": "A", "role": "system_admin", "status": "approved", "createdat": now.Add(-2 * time.Hour), "updatedat": now},
 		bson.M{"id": adminuser.NewID().String(), "email": "viewer@eukarya.io", "name": "V", "role": "viewer", "status": "approved", "createdat": now.Add(-1 * time.Hour), "updatedat": now},
 		bson.M{"id": adminuser.NewID().String(), "email": "pviewer@eukarya.io", "name": "PV", "role": "viewer", "status": "pending", "createdat": now, "updatedat": now},
 	})
+	require.NoError(t, err)
 
 	r := NewAdminUser(mongox.NewClientWithDatabase(c))
 	p := usecasex.OffsetPagination{Offset: 0, Limit: 10}.Wrap()
