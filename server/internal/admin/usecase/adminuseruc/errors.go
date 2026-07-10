@@ -12,4 +12,7 @@ var (
 	// ErrLastApprovedAdmin is returned when rejecting would remove the last
 	// approved admin.
 	ErrLastApprovedAdmin = rerror.NewE(i18n.T("cannot reject the last approved admin"))
+	// ErrLastSystemAdmin is returned when demoting would remove the last
+	// system admin.
+	ErrLastSystemAdmin = rerror.NewE(i18n.T("cannot demote the last system admin"))
 )

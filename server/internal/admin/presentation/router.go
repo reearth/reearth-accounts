@@ -38,6 +38,7 @@ func RegisterRoutes(e *echo.Echo, h *Handler) {
 		adminUsers.GET("", h.AdminUser.ListAdminUsers, mw.RequirePermission(h.Checker, adminrbac.ResourceAdminUser, adminrbac.ActionList))
 		adminUsers.POST("/:id/approve", h.AdminUser.ApproveAdminUser, mw.RequirePermission(h.Checker, adminrbac.ResourceAdminUser, adminrbac.ActionApprove))
 		adminUsers.POST("/:id/reject", h.AdminUser.RejectAdminUser, mw.RequirePermission(h.Checker, adminrbac.ResourceAdminUser, adminrbac.ActionReject))
+		adminUsers.PUT("/:id/roles", h.AdminUser.SetAdminUserRole, mw.RequirePermission(h.Checker, adminrbac.ResourceAdminUser, adminrbac.ActionAssignRole))
 
 		// Users (requires an approved admin session)
 		users := v1.Group("/users", requireApproved)

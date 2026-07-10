@@ -12,6 +12,7 @@ type AdminUserResponse struct {
 	Email      string     `json:"email"`
 	Name       string     `json:"name"`
 	PictureURL string     `json:"pictureUrl"`
+	Role       string     `json:"role,omitempty"`
 	Status     string     `json:"status"`
 	ApprovedBy string     `json:"approvedBy,omitempty"`
 	ApprovedAt *time.Time `json:"approvedAt,omitempty"`
@@ -33,6 +34,7 @@ func newAdminUserResponse(u *adminuser.AdminUser) AdminUserResponse {
 		Email:      u.Email(),
 		Name:       u.Name(),
 		PictureURL: u.PictureURL(),
+		Role:       u.Role().String(),
 		Status:     u.Status().String(),
 		CreatedAt:  u.CreatedAt(),
 		UpdatedAt:  u.UpdatedAt(),

@@ -184,6 +184,71 @@ const docTemplate = `{
                 }
             }
         },
+        "/admin-users/{id}/roles": {
+            "put": {
+                "description": "Assigns a role (e.g. system_admin, viewer) to the target admin user. Changing your own role is allowed, but the last system_admin cannot be demoted (the system must never reach zero system_admins).",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "admin-users"
+                ],
+                "summary": "Assign a role to an admin user",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Admin user ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "description": "Role to assign",
+                        "name": "body",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/SetAdminUserRoleRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/AdminUser"
+                        }
+                    },
+                    "400": {
+                        "description": "invalid id / invalid role",
+                        "schema": {
+                            "$ref": "#/definitions/ErrorResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/ErrorResponse"
+                        }
+                    },
+                    "403": {
+                        "description": "forbidden / cannot demote the last system admin",
+                        "schema": {
+                            "$ref": "#/definitions/ErrorResponse"
+                        }
+                    },
+                    "404": {
+                        "description": "not found",
+                        "schema": {
+                            "$ref": "#/definitions/ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
         "/auth/google": {
             "post": {
                 "description": "Verifies the Google id_token and issues an admin session cookie. New accounts are created as pending (approved when the email is bootstrapped).",
@@ -651,6 +716,9 @@ const docTemplate = `{
                 "pictureUrl": {
                     "type": "string"
                 },
+                "role": {
+                    "type": "string"
+                },
                 "status": {
                     "type": "string"
                 },
@@ -788,6 +856,14 @@ const docTemplate = `{
                     "type": "string"
                 },
                 "updatedAt": {
+                    "type": "string"
+                }
+            }
+        },
+        "SetAdminUserRoleRequest": {
+            "type": "object",
+            "properties": {
+                "role": {
                     "type": "string"
                 }
             }

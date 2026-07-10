@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 	"time"
 
@@ -33,6 +34,7 @@ func newTestEcho(repo adminuser.Repo, sess *session.Manager) *echo.Echo {
 		adminuseruc.NewListAdminUsersUseCase(repo),
 		adminuseruc.NewApproveAdminUserUseCase(repo),
 		adminuseruc.NewRejectAdminUserUseCase(repo),
+		adminuseruc.NewSetRoleUseCase(repo),
 	)
 	requireApproved := echo.MiddlewareFunc(mw.NewRequireApprovedMiddleware(sess, repo))
 
@@ -42,6 +44,7 @@ func newTestEcho(repo adminuser.Repo, sess *session.Manager) *echo.Echo {
 	g.GET("", h.ListAdminUsers)
 	g.POST("/:id/approve", h.ApproveAdminUser)
 	g.POST("/:id/reject", h.RejectAdminUser)
+	g.PUT("/:id/roles", h.SetAdminUserRole)
 	return e
 }
 
@@ -259,4 +262,68 @@ func TestRejectAdminUser_NotFound(t *testing.T) {
 	rec := httptest.NewRecorder()
 	e.ServeHTTP(rec, req)
 	assert.Equal(t, http.StatusNotFound, rec.Code)
+}
+
+func setRoleRequest(t *testing.T, sess *session.Manager, opID adminuser.ID, targetID adminuser.ID, body string) *http.Request {
+	t.Helper()
+	req := httptest.NewRequest(http.MethodPut, "/api/v1/admin-users/"+targetID.String()+"/roles", strings.NewReader(body))
+	req.Header.Set(echo.HeaderContentType, echo.MIMEApplicationJSON)
+	req.AddCookie(cookieFor(t, sess, opID))
+	return req
+}
+
+func TestSetAdminUserRole_OK(t *testing.T) {
+	op := approvedUser("op@eukarya.io")
+	require.NoError(t, op.SetRole(adminuser.RoleSystemAdmin))
+	target := approvedUser("target@eukarya.io")
+	require.NoError(t, target.SetRole(adminuser.RoleViewer))
+	repo := memory.NewAdminUserWith(op, target)
+	sess := session.NewManager(testSecret, time.Hour)
+	e := newTestEcho(repo, sess)
+
+	req := setRoleRequest(t, sess, op.ID(), target.ID(), `{"role":"system_admin"}`)
+	rec := httptest.NewRecorder()
+	e.ServeHTTP(rec, req)
+	require.Equal(t, http.StatusOK, rec.Code)
+
+	reloaded, err := repo.FindByID(req.Context(), target.ID())
+	require.NoError(t, err)
+	assert.Equal(t, adminuser.RoleSystemAdmin, reloaded.Role())
+
+	// the response echoes the updated role
+	var body adminuserhandler.AdminUserResponse
+	require.NoError(t, json.Unmarshal(rec.Body.Bytes(), &body))
+	assert.Equal(t, adminuser.RoleSystemAdmin.String(), body.Role)
+}
+
+func TestSetAdminUserRole_InvalidRole(t *testing.T) {
+	op := approvedUser("op@eukarya.io")
+	require.NoError(t, op.SetRole(adminuser.RoleSystemAdmin))
+	target := approvedUser("target@eukarya.io")
+	require.NoError(t, target.SetRole(adminuser.RoleViewer))
+	repo := memory.NewAdminUserWith(op, target)
+	sess := session.NewManager(testSecret, time.Hour)
+	e := newTestEcho(repo, sess)
+
+	for _, body := range []string{`{"role":"bogus"}`, `{"role":""}`, `{}`} {
+		req := setRoleRequest(t, sess, op.ID(), target.ID(), body)
+		rec := httptest.NewRecorder()
+		e.ServeHTTP(rec, req)
+		assert.Equal(t, http.StatusBadRequest, rec.Code, "body %q should be 400", body)
+	}
+}
+
+func TestSetAdminUserRole_InvalidID(t *testing.T) {
+	op := approvedUser("op@eukarya.io")
+	require.NoError(t, op.SetRole(adminuser.RoleSystemAdmin))
+	repo := memory.NewAdminUserWith(op)
+	sess := session.NewManager(testSecret, time.Hour)
+	e := newTestEcho(repo, sess)
+
+	req := httptest.NewRequest(http.MethodPut, "/api/v1/admin-users/not-an-id/roles", strings.NewReader(`{"role":"viewer"}`))
+	req.Header.Set(echo.HeaderContentType, echo.MIMEApplicationJSON)
+	req.AddCookie(cookieFor(t, sess, op.ID()))
+	rec := httptest.NewRecorder()
+	e.ServeHTTP(rec, req)
+	assert.Equal(t, http.StatusBadRequest, rec.Code)
 }

@@ -33,7 +33,8 @@ func InitializeEcho() (*Server, func(), error) {
 	listAdminUsersUseCase := adminuseruc.NewListAdminUsersUseCase(repo)
 	approveAdminUserUseCase := adminuseruc.NewApproveAdminUserUseCase(repo)
 	rejectAdminUserUseCase := adminuseruc.NewRejectAdminUserUseCase(repo)
-	handler := adminuser.NewHandler(listAdminUsersUseCase, approveAdminUserUseCase, rejectAdminUserUseCase)
+	setRoleUseCase := adminuseruc.NewSetRoleUseCase(repo)
+	handler := adminuser.NewHandler(listAdminUsersUseCase, approveAdminUserUseCase, rejectAdminUserUseCase, setRoleUseCase)
 	verifier, err := provideGoogleVerifier(config)
 	if err != nil {
 		cleanup()
