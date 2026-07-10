@@ -100,6 +100,18 @@ func TestSetRole_InvalidRole(t *testing.T) {
 	assert.ErrorIs(t, err, adminuser.ErrInvalidRole)
 }
 
+// An invalid role must be reported as ErrInvalidRole even when the target is the
+// only approved system_admin — input validation runs before the demotion guard.
+func TestSetRole_InvalidRole_LastSystemAdmin(t *testing.T) {
+	ctx := context.Background()
+	operator := approvedWithRole("op@eukarya.io", adminuser.RoleSystemAdmin)
+	repo := memory.NewAdminUserWith(operator)
+	uc := NewSetRoleUseCase(repo)
+
+	_, err := uc.Execute(ctx, operator.ID(), operator.ID(), adminuser.Role("bogus"))
+	assert.ErrorIs(t, err, adminuser.ErrInvalidRole)
+}
+
 func TestSetRole_NotFound(t *testing.T) {
 	ctx := context.Background()
 	operator := approvedWithRole("op@eukarya.io", adminuser.RoleSystemAdmin)

@@ -21,6 +21,13 @@ func NewSetRoleUseCase(repo adminuser.Repo) *SetRoleUseCase {
 // one's own role is allowed; the zero-system_admin guard below still prevents the
 // last system_admin from demoting themselves.
 func (uc *SetRoleUseCase) Execute(ctx context.Context, operatorID, targetID adminuser.ID, role adminuser.Role) (*adminuser.AdminUser, error) {
+	// Validate the requested role before anything else so a bad input is
+	// reported as ErrInvalidRole regardless of target state (otherwise the
+	// demotion guard below could mask it with ErrLastSystemAdmin).
+	if !role.Valid() {
+		return nil, adminuser.ErrInvalidRole
+	}
+
 	target, err := uc.repo.FindByID(ctx, targetID)
 	if err != nil {
 		return nil, err
