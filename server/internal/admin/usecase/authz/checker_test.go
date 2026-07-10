@@ -22,6 +22,16 @@ func newTestClient(t *testing.T) *cerbos.GRPCClient {
 	return client
 }
 
+// A nil checker (a wiring bug) must fail closed with ErrNilChecker rather than
+// panicking on the client dereference.
+func TestChecker_Allowed_NilCheckerFailsClosed(t *testing.T) {
+	var c *Checker
+
+	allowed, err := c.Allowed(context.Background(), adminuser.NewID(), adminuser.RoleSystemAdmin, adminrbac.ResourceUser, adminrbac.ActionList)
+	assert.ErrorIs(t, err, ErrNilChecker)
+	assert.False(t, allowed)
+}
+
 // A nil client (Cerbos unconfigured, e.g. local dev) must bypass authorization.
 func TestChecker_Allowed_NilClientBypasses(t *testing.T) {
 	c := NewChecker(nil)

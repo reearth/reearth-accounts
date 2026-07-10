@@ -7,13 +7,14 @@ package di
 
 import (
 	"github.com/reearth/reearth-accounts/server/internal/admin/presentation"
-	adminuserhandler "github.com/reearth/reearth-accounts/server/internal/admin/presentation/handler/adminuser"
+	"github.com/reearth/reearth-accounts/server/internal/admin/presentation/handler/adminuser"
 	"github.com/reearth/reearth-accounts/server/internal/admin/presentation/handler/auth"
 	"github.com/reearth/reearth-accounts/server/internal/admin/presentation/handler/user"
-	workspacehandler "github.com/reearth/reearth-accounts/server/internal/admin/presentation/handler/workspace"
+	"github.com/reearth/reearth-accounts/server/internal/admin/presentation/handler/workspace"
 	"github.com/reearth/reearth-accounts/server/internal/admin/presentation/middleware"
 	"github.com/reearth/reearth-accounts/server/internal/admin/usecase/adminuseruc"
 	"github.com/reearth/reearth-accounts/server/internal/admin/usecase/authuc"
+	"github.com/reearth/reearth-accounts/server/internal/admin/usecase/authz"
 	"github.com/reearth/reearth-accounts/server/internal/admin/usecase/useruc"
 	"github.com/reearth/reearth-accounts/server/internal/admin/usecase/workspaceuc"
 )
@@ -28,21 +29,19 @@ func InitializeEcho() (*Server, func(), error) {
 	if err != nil {
 		return nil, nil, err
 	}
-	adminUserRepo := container.AdminUser
-	repo := container.User
-	workspaceRepo := container.Workspace
-	getUserUseCase := useruc.NewGetUserUseCase(repo)
-	getUserWorkspacesUseCase := useruc.NewGetUserWorkspacesUseCase(repo, workspaceRepo)
-	listUsersUseCase := useruc.NewListUsersUseCase(repo)
-	userHandler := user.NewHandler(getUserUseCase, getUserWorkspacesUseCase, listUsersUseCase)
+	repo := container.AdminUser
+	listAdminUsersUseCase := adminuseruc.NewListAdminUsersUseCase(repo)
+	approveAdminUserUseCase := adminuseruc.NewApproveAdminUserUseCase(repo)
+	rejectAdminUserUseCase := adminuseruc.NewRejectAdminUserUseCase(repo)
+	handler := adminuser.NewHandler(listAdminUsersUseCase, approveAdminUserUseCase, rejectAdminUserUseCase)
 	verifier, err := provideGoogleVerifier(config)
 	if err != nil {
 		cleanup()
 		return nil, nil, err
 	}
 	googleSignInOptions := provideGoogleSignInOptions(config)
-	googleSignInUseCase := authuc.NewGoogleSignInUseCase(adminUserRepo, verifier, googleSignInOptions)
-	getMeUseCase := authuc.NewGetMeUseCase(adminUserRepo)
+	googleSignInUseCase := authuc.NewGoogleSignInUseCase(repo, verifier, googleSignInOptions)
+	getMeUseCase := authuc.NewGetMeUseCase(repo)
 	manager, err := provideSessionManager(config)
 	if err != nil {
 		cleanup()
@@ -50,17 +49,25 @@ func InitializeEcho() (*Server, func(), error) {
 	}
 	cookieSecure := provideCookieSecure(config)
 	authHandler := auth.NewHandler(googleSignInUseCase, getMeUseCase, manager, cookieSecure)
-	listAdminUsersUseCase := adminuseruc.NewListAdminUsersUseCase(adminUserRepo)
-	approveAdminUserUseCase := adminuseruc.NewApproveAdminUserUseCase(adminUserRepo)
-	rejectAdminUserUseCase := adminuseruc.NewRejectAdminUserUseCase(adminUserRepo)
-	adminUserHandler := adminuserhandler.NewHandler(listAdminUsersUseCase, approveAdminUserUseCase, rejectAdminUserUseCase)
+	userRepo := container.User
+	getUserUseCase := useruc.NewGetUserUseCase(userRepo)
+	workspaceRepo := container.Workspace
+	getUserWorkspacesUseCase := useruc.NewGetUserWorkspacesUseCase(userRepo, workspaceRepo)
+	listUsersUseCase := useruc.NewListUsersUseCase(userRepo)
+	userHandler := user.NewHandler(getUserUseCase, getUserWorkspacesUseCase, listUsersUseCase)
 	getWorkspaceUseCase := workspaceuc.NewGetWorkspaceUseCase(workspaceRepo)
 	listWorkspacesUseCase := workspaceuc.NewListWorkspacesUseCase(workspaceRepo)
-	listWorkspaceMembersUseCase := workspaceuc.NewListWorkspaceMembersUseCase(workspaceRepo, repo)
-	workspaceHandler := workspacehandler.NewHandler(getWorkspaceUseCase, listWorkspacesUseCase, listWorkspaceMembersUseCase)
+	listWorkspaceMembersUseCase := workspaceuc.NewListWorkspaceMembersUseCase(workspaceRepo, userRepo)
+	workspaceHandler := workspace.NewHandler(getWorkspaceUseCase, listWorkspacesUseCase, listWorkspaceMembersUseCase)
 	sessionMiddleware := middleware.NewSessionMiddleware(manager)
-	requireApprovedMiddleware := middleware.NewRequireApprovedMiddleware(manager, adminUserRepo)
-	presentationHandler := presentation.NewHandler(adminUserHandler, authHandler, userHandler, workspaceHandler, sessionMiddleware, requireApprovedMiddleware)
+	requireApprovedMiddleware := middleware.NewRequireApprovedMiddleware(manager, repo)
+	grpcClient, err := provideCerbosClient(config)
+	if err != nil {
+		cleanup()
+		return nil, nil, err
+	}
+	checker := authz.NewChecker(grpcClient)
+	presentationHandler := presentation.NewHandler(handler, authHandler, userHandler, workspaceHandler, sessionMiddleware, requireApprovedMiddleware, checker)
 	appMiddlewares := presentation.NewAppMiddlewares()
 	server := NewAppEchoServer(config, presentationHandler, appMiddlewares)
 	return server, func() {
