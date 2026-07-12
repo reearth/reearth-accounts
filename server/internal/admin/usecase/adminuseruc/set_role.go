@@ -18,9 +18,10 @@ func NewSetRoleUseCase(repo adminuser.Repo) *SetRoleUseCase {
 }
 
 // Execute assigns role to the target admin user. Unlike approve/reject, changing
-// one's own role is allowed; the zero-system_admin guard below still prevents the
-// last system_admin from demoting themselves.
-func (uc *SetRoleUseCase) Execute(ctx context.Context, operatorID, targetID adminuser.ID, role adminuser.Role) (*adminuser.AdminUser, error) {
+// one's own role is allowed, so the operator is intentionally unused (the RBAC
+// check happens in the middleware); the zero-system_admin guard below still
+// prevents the last system_admin from demoting themselves.
+func (uc *SetRoleUseCase) Execute(ctx context.Context, _, targetID adminuser.ID, role adminuser.Role) (*adminuser.AdminUser, error) {
 	// Validate the requested role before anything else so a bad input is
 	// reported as ErrInvalidRole regardless of target state (otherwise the
 	// demotion guard below could mask it with ErrLastSystemAdmin).

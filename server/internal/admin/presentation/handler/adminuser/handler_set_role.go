@@ -10,7 +10,7 @@ import (
 
 // SetAdminUserRoleRequest is the request body for assigning a role.
 type SetAdminUserRoleRequest struct {
-	Role string `json:"role"`
+	Role string `json:"role" validate:"required"`
 } // @name SetAdminUserRoleRequest
 
 // SetAdminUserRole godoc

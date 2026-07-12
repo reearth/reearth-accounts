@@ -862,6 +862,9 @@ const docTemplate = `{
         },
         "SetAdminUserRoleRequest": {
             "type": "object",
+            "required": [
+                "role"
+            ],
             "properties": {
                 "role": {
                     "type": "string"
