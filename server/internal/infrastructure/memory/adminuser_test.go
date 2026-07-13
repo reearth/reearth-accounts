@@ -107,7 +107,8 @@ func TestAdminUser_ExistsApprovedSystemAdminExcept(t *testing.T) {
 
 	r := NewAdminUserWith(sysAdmin, viewer, pendingSys)
 
-	// excluding the only approved system_admin -> none left
+	// excluding the only approved system_admin -> none left (pendingSys is a
+	// system_admin but not approved, so it must not be counted here)
 	got, err := r.ExistsApprovedSystemAdminExcept(ctx, sysAdmin.ID())
 	assert.NoError(t, err)
 	assert.False(t, got)
@@ -116,11 +117,6 @@ func TestAdminUser_ExistsApprovedSystemAdminExcept(t *testing.T) {
 	got, err = r.ExistsApprovedSystemAdminExcept(ctx, viewer.ID())
 	assert.NoError(t, err)
 	assert.True(t, got)
-
-	// a pending system_admin is not counted, so excluding sysAdmin still yields none
-	got, err = r.ExistsApprovedSystemAdminExcept(ctx, sysAdmin.ID())
-	assert.NoError(t, err)
-	assert.False(t, got)
 }
 
 func TestAdminUser_List_Pagination(t *testing.T) {
