@@ -327,3 +327,32 @@ func TestSetAdminUserRole_InvalidID(t *testing.T) {
 	e.ServeHTTP(rec, req)
 	assert.Equal(t, http.StatusBadRequest, rec.Code)
 }
+
+func TestSetAdminUserRole_NotFound(t *testing.T) {
+	op := approvedUser("op@eukarya.io")
+	require.NoError(t, op.SetRole(adminuser.RoleSystemAdmin))
+	repo := memory.NewAdminUserWith(op)
+	sess := session.NewManager(testSecret, time.Hour)
+	e := newTestEcho(repo, sess)
+
+	// valid but non-existent target id -> rerror.ErrNotFound -> 404 via error handler
+	req := setRoleRequest(t, sess, op.ID(), adminuser.NewID(), `{"role":"viewer"}`)
+	rec := httptest.NewRecorder()
+	e.ServeHTTP(rec, req)
+	assert.Equal(t, http.StatusNotFound, rec.Code)
+}
+
+func TestSetAdminUserRole_LastSystemAdmin(t *testing.T) {
+	// op is the only approved system_admin; demoting it must map to 400 via the
+	// ErrLastSystemAdmin classification, not a generic 500.
+	op := approvedUser("op@eukarya.io")
+	require.NoError(t, op.SetRole(adminuser.RoleSystemAdmin))
+	repo := memory.NewAdminUserWith(op)
+	sess := session.NewManager(testSecret, time.Hour)
+	e := newTestEcho(repo, sess)
+
+	req := setRoleRequest(t, sess, op.ID(), op.ID(), `{"role":"viewer"}`)
+	rec := httptest.NewRecorder()
+	e.ServeHTTP(rec, req)
+	assert.Equal(t, http.StatusBadRequest, rec.Code)
+}
