@@ -28,5 +28,8 @@ type Repo interface {
 	FindByID(context.Context, ID) (*AdminUser, error)
 	FindByIDs(context.Context, IDList) (List, error)
 	List(context.Context, ListFilter) (List, *usecasex.PageInfo, error)
+	// ExistsApprovedSystemAdminExcept reports whether an approved system_admin
+	// other than excludeID exists. Used to guard against demoting the last one.
+	ExistsApprovedSystemAdminExcept(ctx context.Context, excludeID ID) (bool, error)
 	Save(context.Context, *AdminUser) error
 }

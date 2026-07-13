@@ -4,7 +4,6 @@ import (
 	"context"
 
 	"github.com/reearth/reearth-accounts/server/pkg/adminuser"
-	"github.com/reearth/reearthx/usecasex"
 )
 
 // SetRoleUseCase assigns a role to an admin user.
@@ -37,36 +36,14 @@ func (uc *SetRoleUseCase) Execute(ctx context.Context, in SetRoleInput) (*adminu
 		return nil, err
 	}
 
-	// Demoting an approved system_admin is blocked if it is the last one. Count
-	// approved system_admins by paging the approved set until a second one is
-	// found (check-then-act, not atomic; acceptable for the tiny admin set).
+	// Demoting an approved system_admin is blocked if it is the last one
+	// (check-then-act, not atomic; acceptable for the tiny closed admin set).
 	if target.IsApproved() && target.Role() == adminuser.RoleSystemAdmin && in.Role != adminuser.RoleSystemAdmin {
-		approved := adminuser.StatusApproved
-		const pageSize = 100
-		count := 0
-		for offset := 0; ; offset += pageSize {
-			list, _, err := uc.adminUserRepo.List(ctx, adminuser.ListFilter{
-				Status:     &approved,
-				Pagination: usecasex.OffsetPagination{Offset: int64(offset), Limit: pageSize}.Wrap(),
-			})
-			if err != nil {
-				return nil, err
-			}
-			for _, u := range list {
-				if u.Role() == adminuser.RoleSystemAdmin {
-					count++
-					// count includes the target; >= 2 means the demotion is safe.
-					if count >= 2 {
-						break
-					}
-				}
-			}
-			if count >= 2 || len(list) < pageSize {
-				break
-			}
+		hasOther, err := uc.adminUserRepo.ExistsApprovedSystemAdminExcept(ctx, target.ID())
+		if err != nil {
+			return nil, err
 		}
-		// <= 1 means the target is the only approved system_admin.
-		if count <= 1 {
+		if !hasOther {
 			return nil, ErrLastSystemAdmin
 		}
 	}

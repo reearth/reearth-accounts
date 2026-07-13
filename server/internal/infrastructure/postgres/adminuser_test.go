@@ -129,3 +129,30 @@ func TestAdminUser_List(t *testing.T) {
 	assert.True(t, pi.HasNextPage)
 	assert.True(t, pi.HasPreviousPage)
 }
+
+func TestAdminUser_ExistsApprovedSystemAdminExcept(t *testing.T) {
+	pool, cleanup := pgPool(t)
+	defer cleanup()
+	ctx := context.Background()
+	r := NewAdminUser(NewClient(pool))
+
+	sysAdmin := adminuser.New().NewID().Name("sys").Email("sys@eukarya.io").
+		Status(adminuser.StatusApproved).Role(adminuser.RoleSystemAdmin).MustBuild()
+	viewer := adminuser.New().NewID().Name("viewer").Email("viewer@eukarya.io").
+		Status(adminuser.StatusApproved).Role(adminuser.RoleViewer).MustBuild()
+	pendingSys := adminuser.New().NewID().Name("pending").Email("pending@eukarya.io").
+		Status(adminuser.StatusPending).Role(adminuser.RoleSystemAdmin).MustBuild()
+	require.NoError(t, r.Save(ctx, sysAdmin))
+	require.NoError(t, r.Save(ctx, viewer))
+	require.NoError(t, r.Save(ctx, pendingSys))
+
+	// excluding the only approved system_admin -> none left
+	got, err := r.ExistsApprovedSystemAdminExcept(ctx, sysAdmin.ID())
+	require.NoError(t, err)
+	assert.False(t, got)
+
+	// excluding a viewer -> the approved system_admin still counts
+	got, err = r.ExistsApprovedSystemAdminExcept(ctx, viewer.ID())
+	require.NoError(t, err)
+	assert.True(t, got)
+}

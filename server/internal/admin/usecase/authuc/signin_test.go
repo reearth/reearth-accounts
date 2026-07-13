@@ -137,6 +137,9 @@ func (r *raceRepo) FindByIDs(context.Context, adminuser.IDList) (adminuser.List,
 func (r *raceRepo) List(context.Context, adminuser.ListFilter) (adminuser.List, *usecasex.PageInfo, error) {
 	return nil, nil, nil
 }
+func (r *raceRepo) ExistsApprovedSystemAdminExcept(context.Context, adminuser.ID) (bool, error) {
+	return false, nil
+}
 func (r *raceRepo) Save(_ context.Context, u *adminuser.AdminUser) error {
 	r.existing = u
 	return adminuser.ErrDuplicatedAdminUser
