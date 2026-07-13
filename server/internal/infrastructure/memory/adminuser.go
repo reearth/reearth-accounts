@@ -112,6 +112,21 @@ func (r *AdminUser) List(ctx context.Context, f adminuser.ListFilter) (adminuser
 	return page, usecasex.NewPageInfo(total, nil, nil, hasNext, hasPrev), nil
 }
 
+func (r *AdminUser) ExistsApprovedSystemAdminExcept(ctx context.Context, excludeID adminuser.ID) (bool, error) {
+	r.lock.Lock()
+	defer r.lock.Unlock()
+
+	for id, v := range r.data {
+		if id == excludeID {
+			continue
+		}
+		if v.Status() == adminuser.StatusApproved && v.Role() == adminuser.RoleSystemAdmin {
+			return true, nil
+		}
+	}
+	return false, nil
+}
+
 func (r *AdminUser) Save(ctx context.Context, u *adminuser.AdminUser) error {
 	if u == nil {
 		return nil

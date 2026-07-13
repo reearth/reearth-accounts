@@ -145,6 +145,17 @@ func (r *AdminUser) List(ctx context.Context, f adminuser.ListFilter) (adminuser
 	return list, usecasex.NewPageInfo(total, nil, nil, hasNext, hasPrev), nil
 }
 
+func (r *AdminUser) ExistsApprovedSystemAdminExcept(ctx context.Context, excludeID adminuser.ID) (bool, error) {
+	const q = `SELECT EXISTS(SELECT 1 FROM admin_users WHERE status = $1 AND role = $2 AND id <> $3)`
+	var exists bool
+	if err := r.c.db(ctx).QueryRow(ctx, q,
+		adminuser.StatusApproved.String(), adminuser.RoleSystemAdmin.String(), excludeID.String(),
+	).Scan(&exists); err != nil {
+		return false, rerror.ErrInternalByWithContext(ctx, err)
+	}
+	return exists, nil
+}
+
 func (r *AdminUser) Save(ctx context.Context, u *adminuser.AdminUser) error {
 	if u == nil {
 		return nil

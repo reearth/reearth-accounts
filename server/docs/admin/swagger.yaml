@@ -16,6 +16,8 @@ definitions:
         type: string
       pictureUrl:
         type: string
+      role:
+        type: string
       status:
         type: string
       updatedAt:
@@ -107,6 +109,13 @@ definitions:
         type: string
       updatedAt:
         type: string
+    type: object
+  SetAdminUserRoleRequest:
+    properties:
+      role:
+        type: string
+    required:
+    - role
     type: object
   User:
     properties:
@@ -295,6 +304,51 @@ paths:
           schema:
             $ref: '#/definitions/ErrorResponse'
       summary: Reject or revoke an admin user
+      tags:
+      - admin-users
+  /admin-users/{id}/roles:
+    put:
+      consumes:
+      - application/json
+      description: Assigns a role (e.g. system_admin, viewer) to the target admin
+        user. Changing your own role is allowed, but the last system_admin cannot
+        be demoted (the system must never reach zero system_admins).
+      parameters:
+      - description: Admin user ID
+        in: path
+        name: id
+        required: true
+        type: string
+      - description: Role to assign
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/SetAdminUserRoleRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/AdminUser'
+        "400":
+          description: invalid id / invalid role / cannot demote the last system admin
+          schema:
+            $ref: '#/definitions/ErrorResponse'
+        "401":
+          description: unauthorized
+          schema:
+            $ref: '#/definitions/ErrorResponse'
+        "403":
+          description: not approved / forbidden
+          schema:
+            $ref: '#/definitions/ErrorResponse'
+        "404":
+          description: not found
+          schema:
+            $ref: '#/definitions/ErrorResponse'
+      summary: Assign a role to an admin user
       tags:
       - admin-users
   /auth/google:

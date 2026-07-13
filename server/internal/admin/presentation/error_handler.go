@@ -54,6 +54,8 @@ func classify(err error) (status int, code, msg string) {
 		return http.StatusBadRequest, http.StatusText(http.StatusBadRequest), "cannot modify your own admin account"
 	case errors.Is(err, adminuseruc.ErrLastApprovedAdmin):
 		return http.StatusBadRequest, http.StatusText(http.StatusBadRequest), "cannot reject the last approved admin"
+	case errors.Is(err, adminuseruc.ErrLastSystemAdmin):
+		return http.StatusBadRequest, http.StatusText(http.StatusBadRequest), "cannot demote the last system admin"
 	case errors.Is(err, user.ErrCursorPaginationUnsupported):
 		return http.StatusBadRequest, http.StatusText(http.StatusBadRequest), "cursor pagination is not supported"
 	case errors.Is(err, workspace.ErrCursorPaginationUnsupported):

@@ -95,6 +95,30 @@ func TestAdminUser_List_RejectsCursorPagination(t *testing.T) {
 	assert.ErrorIs(t, err, adminuser.ErrCursorPaginationUnsupported)
 }
 
+func TestAdminUser_ExistsApprovedSystemAdminExcept(t *testing.T) {
+	ctx := context.Background()
+
+	sysAdmin := adminuser.New().NewID().Name("sys").Email("sys@eukarya.io").
+		Status(adminuser.StatusApproved).Role(adminuser.RoleSystemAdmin).MustBuild()
+	viewer := adminuser.New().NewID().Name("viewer").Email("viewer@eukarya.io").
+		Status(adminuser.StatusApproved).Role(adminuser.RoleViewer).MustBuild()
+	pendingSys := adminuser.New().NewID().Name("pending").Email("pending@eukarya.io").
+		Status(adminuser.StatusPending).Role(adminuser.RoleSystemAdmin).MustBuild()
+
+	r := NewAdminUserWith(sysAdmin, viewer, pendingSys)
+
+	// excluding the only approved system_admin -> none left (pendingSys is a
+	// system_admin but not approved, so it must not be counted here)
+	got, err := r.ExistsApprovedSystemAdminExcept(ctx, sysAdmin.ID())
+	assert.NoError(t, err)
+	assert.False(t, got)
+
+	// excluding a viewer -> the approved system_admin still counts
+	got, err = r.ExistsApprovedSystemAdminExcept(ctx, viewer.ID())
+	assert.NoError(t, err)
+	assert.True(t, got)
+}
+
 func TestAdminUser_List_Pagination(t *testing.T) {
 	ctx := context.Background()
 	u1 := adminuser.New().NewID().Name("1").Email("1@eukarya.io").MustBuild()

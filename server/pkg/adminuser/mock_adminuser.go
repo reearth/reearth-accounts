@@ -41,6 +41,21 @@ func (m *MockRepo) EXPECT() *MockRepoMockRecorder {
 	return m.recorder
 }
 
+// ExistsApprovedSystemAdminExcept mocks base method.
+func (m *MockRepo) ExistsApprovedSystemAdminExcept(ctx context.Context, excludeID ID) (bool, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "ExistsApprovedSystemAdminExcept", ctx, excludeID)
+	ret0, _ := ret[0].(bool)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// ExistsApprovedSystemAdminExcept indicates an expected call of ExistsApprovedSystemAdminExcept.
+func (mr *MockRepoMockRecorder) ExistsApprovedSystemAdminExcept(ctx, excludeID any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ExistsApprovedSystemAdminExcept", reflect.TypeOf((*MockRepo)(nil).ExistsApprovedSystemAdminExcept), ctx, excludeID)
+}
+
 // FindByEmail mocks base method.
 func (m *MockRepo) FindByEmail(arg0 context.Context, arg1 string) (*AdminUser, error) {
 	m.ctrl.T.Helper()

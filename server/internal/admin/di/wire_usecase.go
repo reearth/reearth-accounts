@@ -31,6 +31,7 @@ var usecaseWire = wire.NewSet(
 	adminuseruc.NewListAdminUsersUseCase,
 	adminuseruc.NewApproveAdminUserUseCase,
 	adminuseruc.NewRejectAdminUserUseCase,
+	adminuseruc.NewSetRoleUseCase,
 
 	// cross-tenant workspace usecases
 	workspaceuc.NewGetWorkspaceUseCase,

@@ -112,3 +112,29 @@ func TestAdminUser_List(t *testing.T) {
 	assert.Equal(t, "p2@eukarya.io", got[1].Email())
 	assert.Equal(t, int64(2), pi.TotalCount)
 }
+
+func TestAdminUser_ExistsApprovedSystemAdminExcept(t *testing.T) {
+	c := Connect(t)(t)
+	ctx := context.Background()
+	r := NewAdminUser(mongox.NewClientWithDatabase(c))
+
+	sysAdmin := adminuser.New().NewID().Name("sys").Email("sys@eukarya.io").
+		Status(adminuser.StatusApproved).Role(adminuser.RoleSystemAdmin).MustBuild()
+	viewer := adminuser.New().NewID().Name("viewer").Email("viewer@eukarya.io").
+		Status(adminuser.StatusApproved).Role(adminuser.RoleViewer).MustBuild()
+	pendingSys := adminuser.New().NewID().Name("pending").Email("pending@eukarya.io").
+		Status(adminuser.StatusPending).Role(adminuser.RoleSystemAdmin).MustBuild()
+	assert.NoError(t, r.Save(ctx, sysAdmin))
+	assert.NoError(t, r.Save(ctx, viewer))
+	assert.NoError(t, r.Save(ctx, pendingSys))
+
+	// excluding the only approved system_admin -> none left
+	got, err := r.ExistsApprovedSystemAdminExcept(ctx, sysAdmin.ID())
+	assert.NoError(t, err)
+	assert.False(t, got)
+
+	// excluding a viewer -> the approved system_admin still counts
+	got, err = r.ExistsApprovedSystemAdminExcept(ctx, viewer.ID())
+	assert.NoError(t, err)
+	assert.True(t, got)
+}

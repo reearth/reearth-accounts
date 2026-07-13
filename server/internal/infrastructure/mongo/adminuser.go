@@ -64,6 +64,19 @@ func (r *AdminUser) List(ctx context.Context, f adminuser.ListFilter) (adminuser
 	return c.Result, pageInfo, nil
 }
 
+func (r *AdminUser) ExistsApprovedSystemAdminExcept(ctx context.Context, excludeID adminuser.ID) (bool, error) {
+	filter := bson.M{
+		"status": adminuser.StatusApproved.String(),
+		"role":   adminuser.RoleSystemAdmin.String(),
+		"id":     bson.M{"$ne": excludeID.String()},
+	}
+	n, err := r.client.Count(ctx, filter)
+	if err != nil {
+		return false, rerror.ErrInternalBy(err)
+	}
+	return n > 0, nil
+}
+
 func (r *AdminUser) Save(ctx context.Context, u *adminuser.AdminUser) error {
 	if u == nil {
 		return nil
