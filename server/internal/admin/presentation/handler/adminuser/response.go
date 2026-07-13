@@ -12,7 +12,7 @@ type AdminUserResponse struct {
 	Email      string     `json:"email"`
 	Name       string     `json:"name"`
 	PictureURL string     `json:"pictureUrl"`
-	Role       string     `json:"role,omitempty"`
+	Role       string     `json:"role"`
 	Status     string     `json:"status"`
 	ApprovedBy string     `json:"approvedBy,omitempty"`
 	ApprovedAt *time.Time `json:"approvedAt,omitempty"`
