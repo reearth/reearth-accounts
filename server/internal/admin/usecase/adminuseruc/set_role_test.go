@@ -46,8 +46,7 @@ func TestSetRole_DemoteSystemAdmin_OK(t *testing.T) {
 
 func TestSetRole_DemoteLastSystemAdminBlocked(t *testing.T) {
 	ctx := context.Background()
-	// target is the only approved system_admin; the other approved admin is a
-	// viewer, so demoting target would leave zero system_admins.
+	// target is the only approved system_admin, so demoting it is blocked.
 	target := approvedWithRole("solo@eukarya.io", adminuser.RoleSystemAdmin)
 	viewer := approvedWithRole("viewer@eukarya.io", adminuser.RoleViewer)
 	repo := memory.NewAdminUserWith(target, viewer)
@@ -59,10 +58,7 @@ func TestSetRole_DemoteLastSystemAdminBlocked(t *testing.T) {
 
 func TestSetRole_DemoteRejectedSystemAdmin_OK(t *testing.T) {
 	ctx := context.Background()
-	// The operator is the only approved system_admin; target is a rejected
-	// system_admin. Rejected admins aren't part of the approved set, so demoting
-	// target must not trip the last-system_admin guard even though there is only
-	// one approved system_admin.
+	// target is a rejected system_admin, so it isn't counted and demotion is allowed.
 	operator := approvedWithRole("op@eukarya.io", adminuser.RoleSystemAdmin)
 	target := rejectedWithRole("target@eukarya.io", adminuser.RoleSystemAdmin)
 	repo := memory.NewAdminUserWith(operator, target)
@@ -100,8 +96,7 @@ func TestSetRole_InvalidRole(t *testing.T) {
 	assert.ErrorIs(t, err, adminuser.ErrInvalidRole)
 }
 
-// An invalid role must be reported as ErrInvalidRole even when the target is the
-// only approved system_admin — input validation runs before the demotion guard.
+// An invalid role is reported as ErrInvalidRole even for the last system_admin.
 func TestSetRole_InvalidRole_LastSystemAdmin(t *testing.T) {
 	ctx := context.Background()
 	operator := approvedWithRole("op@eukarya.io", adminuser.RoleSystemAdmin)

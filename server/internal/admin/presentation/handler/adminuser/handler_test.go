@@ -343,8 +343,7 @@ func TestSetAdminUserRole_NotFound(t *testing.T) {
 }
 
 func TestSetAdminUserRole_LastSystemAdmin(t *testing.T) {
-	// op is the only approved system_admin; demoting it must map to 400 via the
-	// ErrLastSystemAdmin classification, not a generic 500.
+	// op is the only approved system_admin; demoting it must map to 400, not 500.
 	op := approvedUser("op@eukarya.io")
 	require.NoError(t, op.SetRole(adminuser.RoleSystemAdmin))
 	repo := memory.NewAdminUserWith(op)

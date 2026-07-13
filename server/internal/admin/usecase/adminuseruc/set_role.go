@@ -17,14 +17,11 @@ func NewSetRoleUseCase(repo adminuser.Repo) *SetRoleUseCase {
 	return &SetRoleUseCase{repo: repo}
 }
 
-// Execute assigns role to the target admin user. Unlike approve/reject, changing
-// one's own role is allowed, so the operator is intentionally unused (the RBAC
-// check happens in the middleware); the zero-system_admin guard below still
-// prevents the last system_admin from demoting themselves.
+// Execute assigns role to the target admin user. Self-role changes are allowed
+// (RBAC is enforced in the middleware), but the last approved system_admin
+// cannot be demoted.
 func (uc *SetRoleUseCase) Execute(ctx context.Context, _, targetID adminuser.ID, role adminuser.Role) (*adminuser.AdminUser, error) {
-	// Validate the requested role before anything else so a bad input is
-	// reported as ErrInvalidRole regardless of target state (otherwise the
-	// demotion guard below could mask it with ErrLastSystemAdmin).
+	// Validate before loading the target so a bad input maps to ErrInvalidRole.
 	if !role.Valid() {
 		return nil, adminuser.ErrInvalidRole
 	}
@@ -34,26 +31,9 @@ func (uc *SetRoleUseCase) Execute(ctx context.Context, _, targetID adminuser.ID,
 		return nil, err
 	}
 
-	// Demoting an approved system_admin must never drop the count of approved
-	// system_admins to zero (otherwise nobody could ever assign roles again).
-	// Only approved system_admins count toward the minimum, so demoting a
-	// rejected/pending system_admin is always allowed: such a target isn't part
-	// of the approved set the count is taken over.
-	//
-	// NOTE: this is a check-then-act guard, not atomic. Two system_admins
-	// demoting each other at the exact same moment could both observe two
-	// system_admins and both succeed, leaving zero. Given the admin set is a tiny
-	// closed group (Eukarya employees) this race is acceptable for V1; enforcing
-	// it atomically would require backend-specific locking and is deferred until
-	// it's actually needed.
-	//
-	// The repo List filter only supports Status (not Role) today, so we count
-	// system_admins in-memory from the approved set, paging through it until
-	// exhaustion to avoid silently truncating a large set. We only need to know
-	// whether another approved system_admin exists besides the target, so we exit
-	// early once a second one is found. This is acceptable for the tiny closed
-	// admin set; a follow-up can use an efficient role filter once the repo
-	// supports it.
+	// Demoting an approved system_admin is blocked if it is the last one. Count
+	// approved system_admins by paging the approved set until a second one is
+	// found (check-then-act, not atomic; acceptable for the tiny admin set).
 	if target.IsApproved() && target.Role() == adminuser.RoleSystemAdmin && role != adminuser.RoleSystemAdmin {
 		approved := adminuser.StatusApproved
 		const pageSize = 100
@@ -69,9 +49,7 @@ func (uc *SetRoleUseCase) Execute(ctx context.Context, _, targetID adminuser.ID,
 			for _, u := range list {
 				if u.Role() == adminuser.RoleSystemAdmin {
 					count++
-					// count includes the target itself; >= 2 means another
-					// approved system_admin exists, so the demotion is safe and
-					// we can stop scanning entirely.
+					// count includes the target; >= 2 means the demotion is safe.
 					if count >= 2 {
 						break
 					}
@@ -81,8 +59,7 @@ func (uc *SetRoleUseCase) Execute(ctx context.Context, _, targetID adminuser.ID,
 				break
 			}
 		}
-		// count includes the target itself; <= 1 means the target is the only
-		// approved system_admin.
+		// <= 1 means the target is the only approved system_admin.
 		if count <= 1 {
 			return nil, ErrLastSystemAdmin
 		}
