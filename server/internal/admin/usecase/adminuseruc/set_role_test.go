@@ -35,7 +35,7 @@ func TestSetRole_DemoteSystemAdmin_OK(t *testing.T) {
 	repo := memory.NewAdminUserWith(operator, target, other)
 	uc := NewSetRoleUseCase(repo)
 
-	got, err := uc.Execute(ctx, operator.ID(), target.ID(), adminuser.RoleViewer)
+	got, err := uc.Execute(ctx, SetRoleInput{TargetID: target.ID(), Role: adminuser.RoleViewer})
 	require.NoError(t, err)
 	assert.Equal(t, adminuser.RoleViewer, got.Role())
 
@@ -52,7 +52,7 @@ func TestSetRole_DemoteLastSystemAdminBlocked(t *testing.T) {
 	repo := memory.NewAdminUserWith(target, viewer)
 	uc := NewSetRoleUseCase(repo)
 
-	_, err := uc.Execute(ctx, target.ID(), target.ID(), adminuser.RoleViewer)
+	_, err := uc.Execute(ctx, SetRoleInput{TargetID: target.ID(), Role: adminuser.RoleViewer})
 	assert.ErrorIs(t, err, ErrLastSystemAdmin)
 }
 
@@ -64,7 +64,7 @@ func TestSetRole_DemoteRejectedSystemAdmin_OK(t *testing.T) {
 	repo := memory.NewAdminUserWith(operator, target)
 	uc := NewSetRoleUseCase(repo)
 
-	got, err := uc.Execute(ctx, operator.ID(), target.ID(), adminuser.RoleViewer)
+	got, err := uc.Execute(ctx, SetRoleInput{TargetID: target.ID(), Role: adminuser.RoleViewer})
 	require.NoError(t, err)
 	assert.Equal(t, adminuser.RoleViewer, got.Role())
 
@@ -80,7 +80,7 @@ func TestSetRole_PromoteViewer_OK(t *testing.T) {
 	repo := memory.NewAdminUserWith(operator, target)
 	uc := NewSetRoleUseCase(repo)
 
-	got, err := uc.Execute(ctx, operator.ID(), target.ID(), adminuser.RoleSystemAdmin)
+	got, err := uc.Execute(ctx, SetRoleInput{TargetID: target.ID(), Role: adminuser.RoleSystemAdmin})
 	require.NoError(t, err)
 	assert.Equal(t, adminuser.RoleSystemAdmin, got.Role())
 }
@@ -92,7 +92,7 @@ func TestSetRole_InvalidRole(t *testing.T) {
 	repo := memory.NewAdminUserWith(operator, target)
 	uc := NewSetRoleUseCase(repo)
 
-	_, err := uc.Execute(ctx, operator.ID(), target.ID(), adminuser.Role("bogus"))
+	_, err := uc.Execute(ctx, SetRoleInput{TargetID: target.ID(), Role: adminuser.Role("bogus")})
 	assert.ErrorIs(t, err, adminuser.ErrInvalidRole)
 }
 
@@ -103,7 +103,7 @@ func TestSetRole_InvalidRole_LastSystemAdmin(t *testing.T) {
 	repo := memory.NewAdminUserWith(operator)
 	uc := NewSetRoleUseCase(repo)
 
-	_, err := uc.Execute(ctx, operator.ID(), operator.ID(), adminuser.Role("bogus"))
+	_, err := uc.Execute(ctx, SetRoleInput{TargetID: operator.ID(), Role: adminuser.Role("bogus")})
 	assert.ErrorIs(t, err, adminuser.ErrInvalidRole)
 }
 
@@ -113,6 +113,6 @@ func TestSetRole_NotFound(t *testing.T) {
 	repo := memory.NewAdminUserWith(operator)
 	uc := NewSetRoleUseCase(repo)
 
-	_, err := uc.Execute(ctx, operator.ID(), adminuser.NewID(), adminuser.RoleViewer)
+	_, err := uc.Execute(ctx, SetRoleInput{TargetID: adminuser.NewID(), Role: adminuser.RoleViewer})
 	assert.ErrorIs(t, err, rerror.ErrNotFound)
 }

@@ -5,6 +5,7 @@ import (
 
 	"github.com/labstack/echo/v4"
 	"github.com/reearth/reearth-accounts/server/internal/admin/presentation/internal"
+	"github.com/reearth/reearth-accounts/server/internal/admin/usecase/adminuseruc"
 	"github.com/reearth/reearth-accounts/server/pkg/adminuser"
 )
 
@@ -29,8 +30,7 @@ type SetAdminUserRoleRequest struct {
 //	@Failure		404		{object}	internal.ErrorResponse	"not found"
 //	@Router			/admin-users/{id}/roles [put]
 func (h *Handler) SetAdminUserRole(c echo.Context) error {
-	operator, err := internal.GetAdminUser(c)
-	if err != nil {
+	if _, err := internal.GetAdminUser(c); err != nil {
 		return err
 	}
 	targetID, err := adminuser.IDFrom(c.Param("id"))
@@ -50,7 +50,10 @@ func (h *Handler) SetAdminUserRole(c echo.Context) error {
 		return echo.NewHTTPError(http.StatusBadRequest, "invalid role")
 	}
 
-	u, err := h.setRole.Execute(c.Request().Context(), operator.ID(), targetID, role)
+	u, err := h.setRole.Execute(c.Request().Context(), adminuseruc.SetRoleInput{
+		TargetID: targetID,
+		Role:     role,
+	})
 	if err != nil {
 		return err
 	}
