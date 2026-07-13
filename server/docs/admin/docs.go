@@ -235,7 +235,7 @@ const docTemplate = `{
                         }
                     },
                     "403": {
-                        "description": "forbidden",
+                        "description": "not approved / forbidden",
                         "schema": {
                             "$ref": "#/definitions/ErrorResponse"
                         }
