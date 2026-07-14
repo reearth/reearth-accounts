@@ -37,6 +37,14 @@ type Verification {
   verified: Boolean!
 }
 
+type MFAEnrollResult {
+  enrollmentUrl: String!
+}
+
+type MFAStatus {
+  enrolled: Boolean!
+}
+
 type UsersWithPagination {
   users: [User!]!
   totalCount: Int!
@@ -114,10 +122,11 @@ extend type Query {
   findUsersByIDsWithPagination(ids: [ID!]!, alias: String, pagination: Pagination!): UsersWithPagination!
   findUsersByIDs(ids: [ID!]!): [User!]!
   me: Me
+  mfaStatus: MFAStatus!
   searchUser(keyword: String!): [User!]!
   user(id: ID!): User
-  userByNameOrEmail(nameOrEmail: String!): User
   userByNameOrAlias(nameOrAlias: String!): [User!]!
+  userByNameOrEmail(nameOrEmail: String!): User
 }
 
 type UserPayload {
@@ -135,14 +144,15 @@ type DeleteMePayload {
 extend type Mutation {
   createVerification(input: CreateVerificationInput!): Boolean
   deleteMe(input: DeleteMeInput!): DeleteMePayload
+  disableMFA: Boolean!
+  enableMFA: MFAEnrollResult!
   findOrCreate(input: FindOrCreateInput!): UserPayload
+  logout: Me
   passwordReset(input: PasswordResetInput!): Boolean
   removeMyAuth(input: RemoveMyAuthInput!): UpdateMePayload
   signup(input: SignupInput!): UserPayload
   signupOIDC(input: SignupOIDCInput!): UserPayload
-
   startPasswordReset(input: StartPasswordResetInput!): Boolean
   updateMe(input: UpdateMeInput!): UpdateMePayload
-  logout: Me
   verifyUser(input: VerifyUserInput!): UserPayload
 }

@@ -16,7 +16,14 @@ type AuthenticatorUser struct {
 	EmailVerified bool
 }
 
+type MFAStatus struct {
+	Enrolled bool
+}
+
 type Authenticator interface {
-	UpdateUser(context.Context, AuthenticatorUpdateUserParam) (AuthenticatorUser, error)
+	DisableMFA(ctx context.Context, sub string) error
+	EnableMFA(ctx context.Context, sub string) (enrollmentURL string, err error)
+	GetMFAStatus(ctx context.Context, sub string) (MFAStatus, error)
 	ResendVerificationEmail(ctx context.Context, userID string) error
+	UpdateUser(context.Context, AuthenticatorUpdateUserParam) (AuthenticatorUser, error)
 }

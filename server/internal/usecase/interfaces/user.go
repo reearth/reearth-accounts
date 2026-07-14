@@ -3,6 +3,7 @@ package interfaces
 import (
 	"context"
 
+	"github.com/reearth/reearth-accounts/server/internal/usecase/gateway"
 	"github.com/reearth/reearth-accounts/server/pkg/user"
 	"github.com/reearth/reearth-accounts/server/pkg/workspace"
 	"github.com/reearth/reearthx/i18n"
@@ -127,4 +128,9 @@ type User interface {
 	VerifyUser(context.Context, string) (*user.User, error)
 	StartPasswordReset(context.Context, string) error
 	PasswordReset(context.Context, string, string) error
+
+	// mfa
+	DisableMFA(context.Context, *workspace.Operator) error
+	EnableMFA(context.Context, *workspace.Operator) (enrollmentURL string, err error)
+	GetMFAStatus(context.Context, *workspace.Operator) (gateway.MFAStatus, error)
 }

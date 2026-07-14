@@ -6,6 +6,7 @@ import (
 	"context"
 	"errors"
 
+	"github.com/reearth/reearth-accounts/server/internal/usecase/gateway"
 	"github.com/reearth/reearth-accounts/server/pkg/user"
 	"github.com/reearth/reearth-accounts/server/pkg/workspace"
 	"github.com/reearth/reearthx/util"
@@ -198,4 +199,16 @@ func (u *User) PasswordReset(ctx context.Context, password string, token string)
 		return err
 	}
 	return nil
+}
+
+func (u *User) DisableMFA(_ context.Context, _ *workspace.Operator) error {
+	return errors.New("DisableMFA is not supported in proxy mode")
+}
+
+func (u *User) EnableMFA(_ context.Context, _ *workspace.Operator) (string, error) {
+	return "", errors.New("EnableMFA is not supported in proxy mode")
+}
+
+func (u *User) GetMFAStatus(_ context.Context, _ *workspace.Operator) (gateway.MFAStatus, error) {
+	return gateway.MFAStatus{}, errors.New("GetMFAStatus is not supported in proxy mode")
 }

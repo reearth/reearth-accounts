@@ -303,6 +303,80 @@ func (i *User) RemoveMyAuth(ctx context.Context, authProvider string, operator *
 	})
 }
 
+func (i *User) DisableMFA(ctx context.Context, operator *workspace.Operator) error {
+	if operator == nil || operator.User == nil {
+		return interfaces.ErrInvalidOperator
+	}
+	return Run0(ctx, operator, i.repos, Usecase().Transaction(), func(ctx context.Context) error {
+		u, err := i.repos.User.FindByID(ctx, *operator.User)
+		if err != nil {
+			return err
+		}
+		for _, a := range u.Auths() {
+			authenticator := i.gateways.AuthenticatorFor(a.Provider)
+			if authenticator == nil {
+				continue
+			}
+			if err := authenticator.DisableMFA(ctx, a.Sub); err != nil {
+				return err
+			}
+		}
+		return nil
+	})
+}
+
+func (i *User) EnableMFA(ctx context.Context, operator *workspace.Operator) (string, error) {
+	if operator == nil || operator.User == nil {
+		return "", interfaces.ErrInvalidOperator
+	}
+	return Run1(ctx, operator, i.repos, Usecase().Transaction(), func(ctx context.Context) (string, error) {
+		u, err := i.repos.User.FindByID(ctx, *operator.User)
+		if err != nil {
+			return "", err
+		}
+		for _, a := range u.Auths() {
+			authenticator := i.gateways.AuthenticatorFor(a.Provider)
+			if authenticator == nil {
+				continue
+			}
+			enrollmentURL, err := authenticator.EnableMFA(ctx, a.Sub)
+			if err != nil {
+				return "", err
+			}
+			if enrollmentURL != "" {
+				return enrollmentURL, nil
+			}
+		}
+		return "", rerror.NewE(i18n.T("no authenticator found"))
+	})
+}
+
+func (i *User) GetMFAStatus(ctx context.Context, operator *workspace.Operator) (gateway.MFAStatus, error) {
+	if operator == nil || operator.User == nil {
+		return gateway.MFAStatus{}, interfaces.ErrInvalidOperator
+	}
+	return Run1(ctx, operator, i.repos, Usecase().Transaction(), func(ctx context.Context) (gateway.MFAStatus, error) {
+		u, err := i.repos.User.FindByID(ctx, *operator.User)
+		if err != nil {
+			return gateway.MFAStatus{}, err
+		}
+		for _, a := range u.Auths() {
+			authenticator := i.gateways.AuthenticatorFor(a.Provider)
+			if authenticator == nil {
+				continue
+			}
+			status, err := authenticator.GetMFAStatus(ctx, a.Sub)
+			if err != nil {
+				return gateway.MFAStatus{}, err
+			}
+			if status.Enrolled {
+				return status, nil
+			}
+		}
+		return gateway.MFAStatus{Enrolled: false}, nil
+	})
+}
+
 func (i *User) DeleteMe(ctx context.Context, userID user.ID, operator *workspace.Operator) (err error) {
 	if operator.User == nil {
 		return interfaces.ErrInvalidOperator

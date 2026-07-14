@@ -40,10 +40,16 @@ type response struct {
 	Email            string `json:"email"`
 	EmailVerified    bool   `json:"email_verified"`
 	Message          string `json:"message"`
+	TicketURL        string `json:"ticket_url"`
 	Token            string `json:"access_token"`
 	Scope            string `json:"scope"`
 	ExpiresIn        int64  `json:"expires_in"`
 	ErrorDescription string `json:"error_description"`
+}
+
+type enrollment struct {
+	ID     string `json:"id"`
+	Status string `json:"status"`
 }
 
 func (u response) Into() gateway.AuthenticatorUser {
@@ -142,6 +148,93 @@ func (a *Auth0) ResendVerificationEmail(ctx context.Context, userID string) erro
 	return nil
 }
 
+func (a *Auth0) DisableMFA(ctx context.Context, sub string) error {
+	if err := a.updateToken(ctx); err != nil {
+		return err
+	}
+
+	var enrollments []enrollment
+	if err := a.execInto(ctx, http.MethodGet, "api/v2/users/"+sub+"/enrollments", a.token, nil, &enrollments); err != nil {
+		if !a.disableLogging {
+			log.Errorf("auth0: disable mfa: list enrollments: %+v", err)
+		}
+		return rerror.NewE(i18n.T("failed to list mfa enrollments"))
+	}
+
+	for _, e := range enrollments {
+		if e.Status != "confirmed" {
+			continue
+		}
+		if err := a.execInto(ctx, http.MethodDelete, "api/v2/guardian/enrollments/"+e.ID, a.token, nil, nil); err != nil {
+			if !a.disableLogging {
+				log.Errorf("auth0: disable mfa: delete enrollment %s: %+v", e.ID, err)
+			}
+			return rerror.NewE(i18n.T("failed to delete mfa enrollment"))
+		}
+	}
+
+	if _, err := a.exec(ctx, http.MethodPatch, "api/v2/users/"+sub, a.token, map[string]any{
+		"app_metadata": map[string]any{"mfa_enabled": false},
+	}); err != nil {
+		if !a.disableLogging {
+			log.Errorf("auth0: disable mfa: update app_metadata: %+v", err)
+		}
+		return rerror.NewE(i18n.T("failed to update mfa status"))
+	}
+
+	return nil
+}
+
+func (a *Auth0) EnableMFA(ctx context.Context, sub string) (string, error) {
+	if err := a.updateToken(ctx); err != nil {
+		return "", err
+	}
+
+	if _, err := a.exec(ctx, http.MethodPatch, "api/v2/users/"+sub, a.token, map[string]any{
+		"app_metadata": map[string]any{"mfa_enabled": true},
+	}); err != nil {
+		if !a.disableLogging {
+			log.Errorf("auth0: enable mfa: update app_metadata: %+v", err)
+		}
+		return "", rerror.NewE(i18n.T("failed to update mfa status"))
+	}
+
+	r, err := a.exec(ctx, http.MethodPost, "api/v2/guardian/enrollments/ticket", a.token, map[string]any{
+		"user_id":   sub,
+		"send_mail": false,
+	})
+	if err != nil {
+		if !a.disableLogging {
+			log.Errorf("auth0: enable mfa: create enrollment ticket: %+v", err)
+		}
+		return "", rerror.NewE(i18n.T("failed to create mfa enrollment ticket"))
+	}
+
+	return r.TicketURL, nil
+}
+
+func (a *Auth0) GetMFAStatus(ctx context.Context, sub string) (gateway.MFAStatus, error) {
+	if err := a.updateToken(ctx); err != nil {
+		return gateway.MFAStatus{}, err
+	}
+
+	var enrollments []enrollment
+	if err := a.execInto(ctx, http.MethodGet, "api/v2/users/"+sub+"/enrollments", a.token, nil, &enrollments); err != nil {
+		if !a.disableLogging {
+			log.Errorf("auth0: get mfa status: %+v", err)
+		}
+		return gateway.MFAStatus{}, rerror.NewE(i18n.T("failed to get mfa status"))
+	}
+
+	for _, e := range enrollments {
+		if e.Status == "confirmed" {
+			return gateway.MFAStatus{Enrolled: true}, nil
+		}
+	}
+
+	return gateway.MFAStatus{Enrolled: false}, nil
+}
+
 func (a *Auth0) needsFetchToken() bool {
 	if a == nil {
 		return false
@@ -173,7 +266,7 @@ func (a *Auth0) updateToken(ctx context.Context) error {
 		"client_secret": a.clientSecret,
 		"audience":      urlFromDomain(a.domain) + "api/v2/",
 		"grant_type":    "client_credentials",
-		"scope":         "read:users update:users",
+		"scope":         "read:users update:users create:guardian_enrollment_tickets delete:guardian_enrollments",
 	})
 	if err != nil {
 		if !a.disableLogging {
@@ -256,6 +349,68 @@ func (a *Auth0) exec(ctx context.Context, method, path, token string, b interfac
 		return
 	}
 	return
+}
+
+// execInto is like exec but unmarshals the response into target (any type, including
+// slices). Pass nil for target on endpoints that return 204 No Content.
+func (a *Auth0) execInto(ctx context.Context, method, path, token string, b, target any) error {
+	if a == nil || a.domain == "" {
+		return rerror.NewE(i18n.T("auth0: domain is not set"))
+	}
+
+	var body io.Reader
+	if b != nil {
+		b2, err := json.Marshal(b)
+		if err != nil {
+			return err
+		}
+		body = bytes.NewReader(b2)
+	}
+
+	req, err := http.NewRequestWithContext(ctx, method, urlFromDomain(a.domain)+path, body)
+	if err != nil {
+		return err
+	}
+
+	req.Header.Set("Content-Type", "application/json")
+	if token != "" {
+		req.Header.Set("Authorization", "Bearer "+token)
+	}
+
+	resp, err := a.client.Do(req)
+	if err != nil {
+		return err
+	}
+	defer func() { _ = resp.Body.Close() }()
+
+	if resp.StatusCode == http.StatusNoContent {
+		return nil
+	}
+
+	respb, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return err
+	}
+
+	if !a.disableLogging {
+		log.Infof("auth0: path: %s, status: %d, resp: %s", path, resp.StatusCode, respb)
+	}
+
+	if resp.StatusCode >= 300 {
+		var r response
+		if jsonErr := json.Unmarshal(respb, &r); jsonErr == nil && r.Error() != "" {
+			return errors.New(r.Error())
+		}
+		return errors.New(string(respb))
+	}
+
+	if target != nil {
+		if err := json.Unmarshal(respb, target); err != nil {
+			return err
+		}
+	}
+
+	return nil
 }
 
 func urlFromDomain(path string) string {

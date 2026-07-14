@@ -80,6 +80,14 @@ type ComplexityRoot struct {
 		WorkspaceID func(childComplexity int) int
 	}
 
+	MFAEnrollResult struct {
+		EnrollmentURL func(childComplexity int) int
+	}
+
+	MFAStatus struct {
+		Enrolled func(childComplexity int) int
+	}
+
 	Me struct {
 		Alias          func(childComplexity int) int
 		Auths          func(childComplexity int) int
@@ -100,6 +108,8 @@ type ComplexityRoot struct {
 		CreateWorkspace                  func(childComplexity int, input gqlmodel.CreateWorkspaceInput) int
 		DeleteMe                         func(childComplexity int, input gqlmodel.DeleteMeInput) int
 		DeleteWorkspace                  func(childComplexity int, input gqlmodel.DeleteWorkspaceInput) int
+		DisableMfa                       func(childComplexity int) int
+		EnableMfa                        func(childComplexity int) int
 		FindOrCreate                     func(childComplexity int, input gqlmodel.FindOrCreateInput) int
 		Logout                           func(childComplexity int) int
 		PasswordReset                    func(childComplexity int, input gqlmodel.PasswordResetInput) int
@@ -132,6 +142,7 @@ type ComplexityRoot struct {
 		FindUsersByIDs               func(childComplexity int, ids []gqlmodel.ID) int
 		FindUsersByIDsWithPagination func(childComplexity int, ids []gqlmodel.ID, alias *string, pagination gqlmodel.Pagination) int
 		Me                           func(childComplexity int) int
+		MfaStatus                    func(childComplexity int) int
 		Node                         func(childComplexity int, id gqlmodel.ID, typeArg gqlmodel.NodeType) int
 		Nodes                        func(childComplexity int, id []gqlmodel.ID, typeArg gqlmodel.NodeType) int
 		SearchUser                   func(childComplexity int, keyword string) int
@@ -243,14 +254,16 @@ type MeResolver interface {
 type MutationResolver interface {
 	CreateVerification(ctx context.Context, input gqlmodel.CreateVerificationInput) (*bool, error)
 	DeleteMe(ctx context.Context, input gqlmodel.DeleteMeInput) (*gqlmodel.DeleteMePayload, error)
+	DisableMfa(ctx context.Context) (bool, error)
+	EnableMfa(ctx context.Context) (*gqlmodel.MFAEnrollResult, error)
 	FindOrCreate(ctx context.Context, input gqlmodel.FindOrCreateInput) (*gqlmodel.UserPayload, error)
+	Logout(ctx context.Context) (*gqlmodel.Me, error)
 	PasswordReset(ctx context.Context, input gqlmodel.PasswordResetInput) (*bool, error)
 	RemoveMyAuth(ctx context.Context, input gqlmodel.RemoveMyAuthInput) (*gqlmodel.UpdateMePayload, error)
 	Signup(ctx context.Context, input gqlmodel.SignupInput) (*gqlmodel.UserPayload, error)
 	SignupOidc(ctx context.Context, input gqlmodel.SignupOIDCInput) (*gqlmodel.UserPayload, error)
 	StartPasswordReset(ctx context.Context, input gqlmodel.StartPasswordResetInput) (*bool, error)
 	UpdateMe(ctx context.Context, input gqlmodel.UpdateMeInput) (*gqlmodel.UpdateMePayload, error)
-	Logout(ctx context.Context) (*gqlmodel.Me, error)
 	VerifyUser(ctx context.Context, input gqlmodel.VerifyUserInput) (*gqlmodel.UserPayload, error)
 	CreateWorkspace(ctx context.Context, input gqlmodel.CreateWorkspaceInput) (*gqlmodel.CreateWorkspacePayload, error)
 	DeleteWorkspace(ctx context.Context, input gqlmodel.DeleteWorkspaceInput) (*gqlmodel.DeleteWorkspacePayload, error)
@@ -274,10 +287,11 @@ type QueryResolver interface {
 	FindUsersByIDsWithPagination(ctx context.Context, ids []gqlmodel.ID, alias *string, pagination gqlmodel.Pagination) (*gqlmodel.UsersWithPagination, error)
 	FindUsersByIDs(ctx context.Context, ids []gqlmodel.ID) ([]*gqlmodel.User, error)
 	Me(ctx context.Context) (*gqlmodel.Me, error)
+	MfaStatus(ctx context.Context) (*gqlmodel.MFAStatus, error)
 	SearchUser(ctx context.Context, keyword string) ([]*gqlmodel.User, error)
 	User(ctx context.Context, id gqlmodel.ID) (*gqlmodel.User, error)
-	UserByNameOrEmail(ctx context.Context, nameOrEmail string) (*gqlmodel.User, error)
 	UserByNameOrAlias(ctx context.Context, nameOrAlias string) ([]*gqlmodel.User, error)
+	UserByNameOrEmail(ctx context.Context, nameOrEmail string) (*gqlmodel.User, error)
 	FindByID(ctx context.Context, id gqlmodel.ID) (*gqlmodel.Workspace, error)
 	FindByIDs(ctx context.Context, ids []gqlmodel.ID) ([]*gqlmodel.Workspace, error)
 	FindByName(ctx context.Context, name string) (*gqlmodel.Workspace, error)
@@ -391,6 +405,20 @@ func (e *executableSchema) Complexity(ctx context.Context, typeName, field strin
 		}
 
 		return e.complexity.DeleteWorkspacePayload.WorkspaceID(childComplexity), true
+
+	case "MFAEnrollResult.enrollmentUrl":
+		if e.complexity.MFAEnrollResult.EnrollmentURL == nil {
+			break
+		}
+
+		return e.complexity.MFAEnrollResult.EnrollmentURL(childComplexity), true
+
+	case "MFAStatus.enrolled":
+		if e.complexity.MFAStatus.Enrolled == nil {
+			break
+		}
+
+		return e.complexity.MFAStatus.Enrolled(childComplexity), true
 
 	case "Me.alias":
 		if e.complexity.Me.Alias == nil {
@@ -519,6 +547,18 @@ func (e *executableSchema) Complexity(ctx context.Context, typeName, field strin
 		}
 
 		return e.complexity.Mutation.DeleteWorkspace(childComplexity, args["input"].(gqlmodel.DeleteWorkspaceInput)), true
+	case "Mutation.disableMFA":
+		if e.complexity.Mutation.DisableMfa == nil {
+			break
+		}
+
+		return e.complexity.Mutation.DisableMfa(childComplexity), true
+	case "Mutation.enableMFA":
+		if e.complexity.Mutation.EnableMfa == nil {
+			break
+		}
+
+		return e.complexity.Mutation.EnableMfa(childComplexity), true
 	case "Mutation.findOrCreate":
 		if e.complexity.Mutation.FindOrCreate == nil {
 			break
@@ -824,6 +864,12 @@ func (e *executableSchema) Complexity(ctx context.Context, typeName, field strin
 		}
 
 		return e.complexity.Query.Me(childComplexity), true
+	case "Query.mfaStatus":
+		if e.complexity.Query.MfaStatus == nil {
+			break
+		}
+
+		return e.complexity.Query.MfaStatus(childComplexity), true
 	case "Query.node":
 		if e.complexity.Query.Node == nil {
 			break
@@ -1449,6 +1495,14 @@ type Verification {
   verified: Boolean!
 }
 
+type MFAEnrollResult {
+  enrollmentUrl: String!
+}
+
+type MFAStatus {
+  enrolled: Boolean!
+}
+
 type UsersWithPagination {
   users: [User!]!
   totalCount: Int!
@@ -1526,10 +1580,11 @@ extend type Query {
   findUsersByIDsWithPagination(ids: [ID!]!, alias: String, pagination: Pagination!): UsersWithPagination!
   findUsersByIDs(ids: [ID!]!): [User!]!
   me: Me
+  mfaStatus: MFAStatus!
   searchUser(keyword: String!): [User!]!
   user(id: ID!): User
-  userByNameOrEmail(nameOrEmail: String!): User
   userByNameOrAlias(nameOrAlias: String!): [User!]!
+  userByNameOrEmail(nameOrEmail: String!): User
 }
 
 type UserPayload {
@@ -1547,15 +1602,16 @@ type DeleteMePayload {
 extend type Mutation {
   createVerification(input: CreateVerificationInput!): Boolean
   deleteMe(input: DeleteMeInput!): DeleteMePayload
+  disableMFA: Boolean!
+  enableMFA: MFAEnrollResult!
   findOrCreate(input: FindOrCreateInput!): UserPayload
+  logout: Me
   passwordReset(input: PasswordResetInput!): Boolean
   removeMyAuth(input: RemoveMyAuthInput!): UpdateMePayload
   signup(input: SignupInput!): UserPayload
   signupOIDC(input: SignupOIDCInput!): UserPayload
-
   startPasswordReset(input: StartPasswordResetInput!): Boolean
   updateMe(input: UpdateMeInput!): UpdateMePayload
-  logout: Me
   verifyUser(input: VerifyUserInput!): UserPayload
 }
 `, BuiltIn: false},
@@ -2662,6 +2718,64 @@ func (ec *executionContext) fieldContext_DeleteWorkspacePayload_workspaceId(_ co
 	return fc, nil
 }
 
+func (ec *executionContext) _MFAEnrollResult_enrollmentUrl(ctx context.Context, field graphql.CollectedField, obj *gqlmodel.MFAEnrollResult) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		ec.fieldContext_MFAEnrollResult_enrollmentUrl,
+		func(ctx context.Context) (any, error) {
+			return obj.EnrollmentURL, nil
+		},
+		nil,
+		ec.marshalNString2string,
+		true,
+		true,
+	)
+}
+
+func (ec *executionContext) fieldContext_MFAEnrollResult_enrollmentUrl(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "MFAEnrollResult",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type String does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _MFAStatus_enrolled(ctx context.Context, field graphql.CollectedField, obj *gqlmodel.MFAStatus) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		ec.fieldContext_MFAStatus_enrolled,
+		func(ctx context.Context) (any, error) {
+			return obj.Enrolled, nil
+		},
+		nil,
+		ec.marshalNBoolean2bool,
+		true,
+		true,
+	)
+}
+
+func (ec *executionContext) fieldContext_MFAStatus_enrolled(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "MFAStatus",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type Boolean does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
 func (ec *executionContext) _Me_id(ctx context.Context, field graphql.CollectedField, obj *gqlmodel.Me) (ret graphql.Marshaler) {
 	return graphql.ResolveField(
 		ctx,
@@ -3064,6 +3178,68 @@ func (ec *executionContext) fieldContext_Mutation_deleteMe(ctx context.Context, 
 	return fc, nil
 }
 
+func (ec *executionContext) _Mutation_disableMFA(ctx context.Context, field graphql.CollectedField) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		ec.fieldContext_Mutation_disableMFA,
+		func(ctx context.Context) (any, error) {
+			return ec.resolvers.Mutation().DisableMfa(ctx)
+		},
+		nil,
+		ec.marshalNBoolean2bool,
+		true,
+		true,
+	)
+}
+
+func (ec *executionContext) fieldContext_Mutation_disableMFA(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "Mutation",
+		Field:      field,
+		IsMethod:   true,
+		IsResolver: true,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type Boolean does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _Mutation_enableMFA(ctx context.Context, field graphql.CollectedField) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		ec.fieldContext_Mutation_enableMFA,
+		func(ctx context.Context) (any, error) {
+			return ec.resolvers.Mutation().EnableMfa(ctx)
+		},
+		nil,
+		ec.marshalNMFAEnrollResult2ᚖgithubᚗcomᚋreearthᚋreearthᚑaccountsᚋserverᚋinternalᚋadapterᚋgqlᚋgqlmodelᚐMFAEnrollResult,
+		true,
+		true,
+	)
+}
+
+func (ec *executionContext) fieldContext_Mutation_enableMFA(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "Mutation",
+		Field:      field,
+		IsMethod:   true,
+		IsResolver: true,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			switch field.Name {
+			case "enrollmentUrl":
+				return ec.fieldContext_MFAEnrollResult_enrollmentUrl(ctx, field)
+			}
+			return nil, fmt.Errorf("no field named %q was found under type MFAEnrollResult", field.Name)
+		},
+	}
+	return fc, nil
+}
+
 func (ec *executionContext) _Mutation_findOrCreate(ctx context.Context, field graphql.CollectedField) (ret graphql.Marshaler) {
 	return graphql.ResolveField(
 		ctx,
@@ -3105,6 +3281,57 @@ func (ec *executionContext) fieldContext_Mutation_findOrCreate(ctx context.Conte
 	if fc.Args, err = ec.field_Mutation_findOrCreate_args(ctx, field.ArgumentMap(ec.Variables)); err != nil {
 		ec.Error(ctx, err)
 		return fc, err
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _Mutation_logout(ctx context.Context, field graphql.CollectedField) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		ec.fieldContext_Mutation_logout,
+		func(ctx context.Context) (any, error) {
+			return ec.resolvers.Mutation().Logout(ctx)
+		},
+		nil,
+		ec.marshalOMe2ᚖgithubᚗcomᚋreearthᚋreearthᚑaccountsᚋserverᚋinternalᚋadapterᚋgqlᚋgqlmodelᚐMe,
+		true,
+		false,
+	)
+}
+
+func (ec *executionContext) fieldContext_Mutation_logout(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "Mutation",
+		Field:      field,
+		IsMethod:   true,
+		IsResolver: true,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			switch field.Name {
+			case "id":
+				return ec.fieldContext_Me_id(ctx, field)
+			case "name":
+				return ec.fieldContext_Me_name(ctx, field)
+			case "alias":
+				return ec.fieldContext_Me_alias(ctx, field)
+			case "email":
+				return ec.fieldContext_Me_email(ctx, field)
+			case "metadata":
+				return ec.fieldContext_Me_metadata(ctx, field)
+			case "host":
+				return ec.fieldContext_Me_host(ctx, field)
+			case "latestLogoutAt":
+				return ec.fieldContext_Me_latestLogoutAt(ctx, field)
+			case "myWorkspaceId":
+				return ec.fieldContext_Me_myWorkspaceId(ctx, field)
+			case "auths":
+				return ec.fieldContext_Me_auths(ctx, field)
+			case "myWorkspace":
+				return ec.fieldContext_Me_myWorkspace(ctx, field)
+			}
+			return nil, fmt.Errorf("no field named %q was found under type Me", field.Name)
+		},
 	}
 	return fc, nil
 }
@@ -3367,57 +3594,6 @@ func (ec *executionContext) fieldContext_Mutation_updateMe(ctx context.Context, 
 	if fc.Args, err = ec.field_Mutation_updateMe_args(ctx, field.ArgumentMap(ec.Variables)); err != nil {
 		ec.Error(ctx, err)
 		return fc, err
-	}
-	return fc, nil
-}
-
-func (ec *executionContext) _Mutation_logout(ctx context.Context, field graphql.CollectedField) (ret graphql.Marshaler) {
-	return graphql.ResolveField(
-		ctx,
-		ec.OperationContext,
-		field,
-		ec.fieldContext_Mutation_logout,
-		func(ctx context.Context) (any, error) {
-			return ec.resolvers.Mutation().Logout(ctx)
-		},
-		nil,
-		ec.marshalOMe2ᚖgithubᚗcomᚋreearthᚋreearthᚑaccountsᚋserverᚋinternalᚋadapterᚋgqlᚋgqlmodelᚐMe,
-		true,
-		false,
-	)
-}
-
-func (ec *executionContext) fieldContext_Mutation_logout(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
-	fc = &graphql.FieldContext{
-		Object:     "Mutation",
-		Field:      field,
-		IsMethod:   true,
-		IsResolver: true,
-		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
-			switch field.Name {
-			case "id":
-				return ec.fieldContext_Me_id(ctx, field)
-			case "name":
-				return ec.fieldContext_Me_name(ctx, field)
-			case "alias":
-				return ec.fieldContext_Me_alias(ctx, field)
-			case "email":
-				return ec.fieldContext_Me_email(ctx, field)
-			case "metadata":
-				return ec.fieldContext_Me_metadata(ctx, field)
-			case "host":
-				return ec.fieldContext_Me_host(ctx, field)
-			case "latestLogoutAt":
-				return ec.fieldContext_Me_latestLogoutAt(ctx, field)
-			case "myWorkspaceId":
-				return ec.fieldContext_Me_myWorkspaceId(ctx, field)
-			case "auths":
-				return ec.fieldContext_Me_auths(ctx, field)
-			case "myWorkspace":
-				return ec.fieldContext_Me_myWorkspace(ctx, field)
-			}
-			return nil, fmt.Errorf("no field named %q was found under type Me", field.Name)
-		},
 	}
 	return fc, nil
 }
@@ -4401,6 +4577,39 @@ func (ec *executionContext) fieldContext_Query_me(_ context.Context, field graph
 	return fc, nil
 }
 
+func (ec *executionContext) _Query_mfaStatus(ctx context.Context, field graphql.CollectedField) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		ec.fieldContext_Query_mfaStatus,
+		func(ctx context.Context) (any, error) {
+			return ec.resolvers.Query().MfaStatus(ctx)
+		},
+		nil,
+		ec.marshalNMFAStatus2ᚖgithubᚗcomᚋreearthᚋreearthᚑaccountsᚋserverᚋinternalᚋadapterᚋgqlᚋgqlmodelᚐMFAStatus,
+		true,
+		true,
+	)
+}
+
+func (ec *executionContext) fieldContext_Query_mfaStatus(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "Query",
+		Field:      field,
+		IsMethod:   true,
+		IsResolver: true,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			switch field.Name {
+			case "enrolled":
+				return ec.fieldContext_MFAStatus_enrolled(ctx, field)
+			}
+			return nil, fmt.Errorf("no field named %q was found under type MFAStatus", field.Name)
+		},
+	}
+	return fc, nil
+}
+
 func (ec *executionContext) _Query_searchUser(ctx context.Context, field graphql.CollectedField) (ret graphql.Marshaler) {
 	return graphql.ResolveField(
 		ctx,
@@ -4523,67 +4732,6 @@ func (ec *executionContext) fieldContext_Query_user(ctx context.Context, field g
 	return fc, nil
 }
 
-func (ec *executionContext) _Query_userByNameOrEmail(ctx context.Context, field graphql.CollectedField) (ret graphql.Marshaler) {
-	return graphql.ResolveField(
-		ctx,
-		ec.OperationContext,
-		field,
-		ec.fieldContext_Query_userByNameOrEmail,
-		func(ctx context.Context) (any, error) {
-			fc := graphql.GetFieldContext(ctx)
-			return ec.resolvers.Query().UserByNameOrEmail(ctx, fc.Args["nameOrEmail"].(string))
-		},
-		nil,
-		ec.marshalOUser2ᚖgithubᚗcomᚋreearthᚋreearthᚑaccountsᚋserverᚋinternalᚋadapterᚋgqlᚋgqlmodelᚐUser,
-		true,
-		false,
-	)
-}
-
-func (ec *executionContext) fieldContext_Query_userByNameOrEmail(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
-	fc = &graphql.FieldContext{
-		Object:     "Query",
-		Field:      field,
-		IsMethod:   true,
-		IsResolver: true,
-		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
-			switch field.Name {
-			case "id":
-				return ec.fieldContext_User_id(ctx, field)
-			case "name":
-				return ec.fieldContext_User_name(ctx, field)
-			case "alias":
-				return ec.fieldContext_User_alias(ctx, field)
-			case "email":
-				return ec.fieldContext_User_email(ctx, field)
-			case "host":
-				return ec.fieldContext_User_host(ctx, field)
-			case "workspace":
-				return ec.fieldContext_User_workspace(ctx, field)
-			case "auths":
-				return ec.fieldContext_User_auths(ctx, field)
-			case "metadata":
-				return ec.fieldContext_User_metadata(ctx, field)
-			case "verification":
-				return ec.fieldContext_User_verification(ctx, field)
-			}
-			return nil, fmt.Errorf("no field named %q was found under type User", field.Name)
-		},
-	}
-	defer func() {
-		if r := recover(); r != nil {
-			err = ec.Recover(ctx, r)
-			ec.Error(ctx, err)
-		}
-	}()
-	ctx = graphql.WithFieldContext(ctx, fc)
-	if fc.Args, err = ec.field_Query_userByNameOrEmail_args(ctx, field.ArgumentMap(ec.Variables)); err != nil {
-		ec.Error(ctx, err)
-		return fc, err
-	}
-	return fc, nil
-}
-
 func (ec *executionContext) _Query_userByNameOrAlias(ctx context.Context, field graphql.CollectedField) (ret graphql.Marshaler) {
 	return graphql.ResolveField(
 		ctx,
@@ -4639,6 +4787,67 @@ func (ec *executionContext) fieldContext_Query_userByNameOrAlias(ctx context.Con
 	}()
 	ctx = graphql.WithFieldContext(ctx, fc)
 	if fc.Args, err = ec.field_Query_userByNameOrAlias_args(ctx, field.ArgumentMap(ec.Variables)); err != nil {
+		ec.Error(ctx, err)
+		return fc, err
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _Query_userByNameOrEmail(ctx context.Context, field graphql.CollectedField) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		ec.fieldContext_Query_userByNameOrEmail,
+		func(ctx context.Context) (any, error) {
+			fc := graphql.GetFieldContext(ctx)
+			return ec.resolvers.Query().UserByNameOrEmail(ctx, fc.Args["nameOrEmail"].(string))
+		},
+		nil,
+		ec.marshalOUser2ᚖgithubᚗcomᚋreearthᚋreearthᚑaccountsᚋserverᚋinternalᚋadapterᚋgqlᚋgqlmodelᚐUser,
+		true,
+		false,
+	)
+}
+
+func (ec *executionContext) fieldContext_Query_userByNameOrEmail(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "Query",
+		Field:      field,
+		IsMethod:   true,
+		IsResolver: true,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			switch field.Name {
+			case "id":
+				return ec.fieldContext_User_id(ctx, field)
+			case "name":
+				return ec.fieldContext_User_name(ctx, field)
+			case "alias":
+				return ec.fieldContext_User_alias(ctx, field)
+			case "email":
+				return ec.fieldContext_User_email(ctx, field)
+			case "host":
+				return ec.fieldContext_User_host(ctx, field)
+			case "workspace":
+				return ec.fieldContext_User_workspace(ctx, field)
+			case "auths":
+				return ec.fieldContext_User_auths(ctx, field)
+			case "metadata":
+				return ec.fieldContext_User_metadata(ctx, field)
+			case "verification":
+				return ec.fieldContext_User_verification(ctx, field)
+			}
+			return nil, fmt.Errorf("no field named %q was found under type User", field.Name)
+		},
+	}
+	defer func() {
+		if r := recover(); r != nil {
+			err = ec.Recover(ctx, r)
+			ec.Error(ctx, err)
+		}
+	}()
+	ctx = graphql.WithFieldContext(ctx, fc)
+	if fc.Args, err = ec.field_Query_userByNameOrEmail_args(ctx, field.ArgumentMap(ec.Variables)); err != nil {
 		ec.Error(ctx, err)
 		return fc, err
 	}
@@ -9455,6 +9664,84 @@ func (ec *executionContext) _DeleteWorkspacePayload(ctx context.Context, sel ast
 	return out
 }
 
+var mFAEnrollResultImplementors = []string{"MFAEnrollResult"}
+
+func (ec *executionContext) _MFAEnrollResult(ctx context.Context, sel ast.SelectionSet, obj *gqlmodel.MFAEnrollResult) graphql.Marshaler {
+	fields := graphql.CollectFields(ec.OperationContext, sel, mFAEnrollResultImplementors)
+
+	out := graphql.NewFieldSet(fields)
+	deferred := make(map[string]*graphql.FieldSet)
+	for i, field := range fields {
+		switch field.Name {
+		case "__typename":
+			out.Values[i] = graphql.MarshalString("MFAEnrollResult")
+		case "enrollmentUrl":
+			out.Values[i] = ec._MFAEnrollResult_enrollmentUrl(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		default:
+			panic("unknown field " + strconv.Quote(field.Name))
+		}
+	}
+	out.Dispatch(ctx)
+	if out.Invalids > 0 {
+		return graphql.Null
+	}
+
+	atomic.AddInt32(&ec.deferred, int32(len(deferred)))
+
+	for label, dfs := range deferred {
+		ec.processDeferredGroup(graphql.DeferredGroup{
+			Label:    label,
+			Path:     graphql.GetPath(ctx),
+			FieldSet: dfs,
+			Context:  ctx,
+		})
+	}
+
+	return out
+}
+
+var mFAStatusImplementors = []string{"MFAStatus"}
+
+func (ec *executionContext) _MFAStatus(ctx context.Context, sel ast.SelectionSet, obj *gqlmodel.MFAStatus) graphql.Marshaler {
+	fields := graphql.CollectFields(ec.OperationContext, sel, mFAStatusImplementors)
+
+	out := graphql.NewFieldSet(fields)
+	deferred := make(map[string]*graphql.FieldSet)
+	for i, field := range fields {
+		switch field.Name {
+		case "__typename":
+			out.Values[i] = graphql.MarshalString("MFAStatus")
+		case "enrolled":
+			out.Values[i] = ec._MFAStatus_enrolled(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		default:
+			panic("unknown field " + strconv.Quote(field.Name))
+		}
+	}
+	out.Dispatch(ctx)
+	if out.Invalids > 0 {
+		return graphql.Null
+	}
+
+	atomic.AddInt32(&ec.deferred, int32(len(deferred)))
+
+	for label, dfs := range deferred {
+		ec.processDeferredGroup(graphql.DeferredGroup{
+			Label:    label,
+			Path:     graphql.GetPath(ctx),
+			FieldSet: dfs,
+			Context:  ctx,
+		})
+	}
+
+	return out
+}
+
 var meImplementors = []string{"Me"}
 
 func (ec *executionContext) _Me(ctx context.Context, sel ast.SelectionSet, obj *gqlmodel.Me) graphql.Marshaler {
@@ -9591,9 +9878,27 @@ func (ec *executionContext) _Mutation(ctx context.Context, sel ast.SelectionSet)
 			out.Values[i] = ec.OperationContext.RootResolverMiddleware(innerCtx, func(ctx context.Context) (res graphql.Marshaler) {
 				return ec._Mutation_deleteMe(ctx, field)
 			})
+		case "disableMFA":
+			out.Values[i] = ec.OperationContext.RootResolverMiddleware(innerCtx, func(ctx context.Context) (res graphql.Marshaler) {
+				return ec._Mutation_disableMFA(ctx, field)
+			})
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "enableMFA":
+			out.Values[i] = ec.OperationContext.RootResolverMiddleware(innerCtx, func(ctx context.Context) (res graphql.Marshaler) {
+				return ec._Mutation_enableMFA(ctx, field)
+			})
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
 		case "findOrCreate":
 			out.Values[i] = ec.OperationContext.RootResolverMiddleware(innerCtx, func(ctx context.Context) (res graphql.Marshaler) {
 				return ec._Mutation_findOrCreate(ctx, field)
+			})
+		case "logout":
+			out.Values[i] = ec.OperationContext.RootResolverMiddleware(innerCtx, func(ctx context.Context) (res graphql.Marshaler) {
+				return ec._Mutation_logout(ctx, field)
 			})
 		case "passwordReset":
 			out.Values[i] = ec.OperationContext.RootResolverMiddleware(innerCtx, func(ctx context.Context) (res graphql.Marshaler) {
@@ -9618,10 +9923,6 @@ func (ec *executionContext) _Mutation(ctx context.Context, sel ast.SelectionSet)
 		case "updateMe":
 			out.Values[i] = ec.OperationContext.RootResolverMiddleware(innerCtx, func(ctx context.Context) (res graphql.Marshaler) {
 				return ec._Mutation_updateMe(ctx, field)
-			})
-		case "logout":
-			out.Values[i] = ec.OperationContext.RootResolverMiddleware(innerCtx, func(ctx context.Context) (res graphql.Marshaler) {
-				return ec._Mutation_logout(ctx, field)
 			})
 		case "verifyUser":
 			out.Values[i] = ec.OperationContext.RootResolverMiddleware(innerCtx, func(ctx context.Context) (res graphql.Marshaler) {
@@ -9875,6 +10176,28 @@ func (ec *executionContext) _Query(ctx context.Context, sel ast.SelectionSet) gr
 			}
 
 			out.Concurrently(i, func(ctx context.Context) graphql.Marshaler { return rrm(innerCtx) })
+		case "mfaStatus":
+			field := field
+
+			innerFunc := func(ctx context.Context, fs *graphql.FieldSet) (res graphql.Marshaler) {
+				defer func() {
+					if r := recover(); r != nil {
+						ec.Error(ctx, ec.Recover(ctx, r))
+					}
+				}()
+				res = ec._Query_mfaStatus(ctx, field)
+				if res == graphql.Null {
+					atomic.AddUint32(&fs.Invalids, 1)
+				}
+				return res
+			}
+
+			rrm := func(ctx context.Context) graphql.Marshaler {
+				return ec.OperationContext.RootResolverMiddleware(ctx,
+					func(ctx context.Context) graphql.Marshaler { return innerFunc(ctx, out) })
+			}
+
+			out.Concurrently(i, func(ctx context.Context) graphql.Marshaler { return rrm(innerCtx) })
 		case "searchUser":
 			field := field
 
@@ -9916,25 +10239,6 @@ func (ec *executionContext) _Query(ctx context.Context, sel ast.SelectionSet) gr
 			}
 
 			out.Concurrently(i, func(ctx context.Context) graphql.Marshaler { return rrm(innerCtx) })
-		case "userByNameOrEmail":
-			field := field
-
-			innerFunc := func(ctx context.Context, _ *graphql.FieldSet) (res graphql.Marshaler) {
-				defer func() {
-					if r := recover(); r != nil {
-						ec.Error(ctx, ec.Recover(ctx, r))
-					}
-				}()
-				res = ec._Query_userByNameOrEmail(ctx, field)
-				return res
-			}
-
-			rrm := func(ctx context.Context) graphql.Marshaler {
-				return ec.OperationContext.RootResolverMiddleware(ctx,
-					func(ctx context.Context) graphql.Marshaler { return innerFunc(ctx, out) })
-			}
-
-			out.Concurrently(i, func(ctx context.Context) graphql.Marshaler { return rrm(innerCtx) })
 		case "userByNameOrAlias":
 			field := field
 
@@ -9948,6 +10252,25 @@ func (ec *executionContext) _Query(ctx context.Context, sel ast.SelectionSet) gr
 				if res == graphql.Null {
 					atomic.AddUint32(&fs.Invalids, 1)
 				}
+				return res
+			}
+
+			rrm := func(ctx context.Context) graphql.Marshaler {
+				return ec.OperationContext.RootResolverMiddleware(ctx,
+					func(ctx context.Context) graphql.Marshaler { return innerFunc(ctx, out) })
+			}
+
+			out.Concurrently(i, func(ctx context.Context) graphql.Marshaler { return rrm(innerCtx) })
+		case "userByNameOrEmail":
+			field := field
+
+			innerFunc := func(ctx context.Context, _ *graphql.FieldSet) (res graphql.Marshaler) {
+				defer func() {
+					if r := recover(); r != nil {
+						ec.Error(ctx, ec.Recover(ctx, r))
+					}
+				}()
+				res = ec._Query_userByNameOrEmail(ctx, field)
 				return res
 			}
 
@@ -11379,6 +11702,34 @@ func (ec *executionContext) marshalNLang2string(ctx context.Context, sel ast.Sel
 		}
 	}
 	return res
+}
+
+func (ec *executionContext) marshalNMFAEnrollResult2githubᚗcomᚋreearthᚋreearthᚑaccountsᚋserverᚋinternalᚋadapterᚋgqlᚋgqlmodelᚐMFAEnrollResult(ctx context.Context, sel ast.SelectionSet, v gqlmodel.MFAEnrollResult) graphql.Marshaler {
+	return ec._MFAEnrollResult(ctx, sel, &v)
+}
+
+func (ec *executionContext) marshalNMFAEnrollResult2ᚖgithubᚗcomᚋreearthᚋreearthᚑaccountsᚋserverᚋinternalᚋadapterᚋgqlᚋgqlmodelᚐMFAEnrollResult(ctx context.Context, sel ast.SelectionSet, v *gqlmodel.MFAEnrollResult) graphql.Marshaler {
+	if v == nil {
+		if !graphql.HasFieldError(ctx, graphql.GetFieldContext(ctx)) {
+			graphql.AddErrorf(ctx, "the requested element is null which the schema does not allow")
+		}
+		return graphql.Null
+	}
+	return ec._MFAEnrollResult(ctx, sel, v)
+}
+
+func (ec *executionContext) marshalNMFAStatus2githubᚗcomᚋreearthᚋreearthᚑaccountsᚋserverᚋinternalᚋadapterᚋgqlᚋgqlmodelᚐMFAStatus(ctx context.Context, sel ast.SelectionSet, v gqlmodel.MFAStatus) graphql.Marshaler {
+	return ec._MFAStatus(ctx, sel, &v)
+}
+
+func (ec *executionContext) marshalNMFAStatus2ᚖgithubᚗcomᚋreearthᚋreearthᚑaccountsᚋserverᚋinternalᚋadapterᚋgqlᚋgqlmodelᚐMFAStatus(ctx context.Context, sel ast.SelectionSet, v *gqlmodel.MFAStatus) graphql.Marshaler {
+	if v == nil {
+		if !graphql.HasFieldError(ctx, graphql.GetFieldContext(ctx)) {
+			graphql.AddErrorf(ctx, "the requested element is null which the schema does not allow")
+		}
+		return graphql.Null
+	}
+	return ec._MFAStatus(ctx, sel, v)
 }
 
 func (ec *executionContext) marshalNMe2ᚖgithubᚗcomᚋreearthᚋreearthᚑaccountsᚋserverᚋinternalᚋadapterᚋgqlᚋgqlmodelᚐMe(ctx context.Context, sel ast.SelectionSet, v *gqlmodel.Me) graphql.Marshaler {

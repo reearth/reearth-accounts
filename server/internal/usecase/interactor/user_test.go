@@ -1223,6 +1223,16 @@ func (m *mockAuthenticatorWithError) UpdateUser(_ context.Context, _ gateway.Aut
 	return gateway.AuthenticatorUser{}, nil
 }
 
+func (m *mockAuthenticatorWithError) DisableMFA(_ context.Context, _ string) error { return nil }
+
+func (m *mockAuthenticatorWithError) EnableMFA(_ context.Context, _ string) (string, error) {
+	return "", nil
+}
+
+func (m *mockAuthenticatorWithError) GetMFAStatus(_ context.Context, _ string) (gateway.MFAStatus, error) {
+	return gateway.MFAStatus{}, nil
+}
+
 func (m *mockAuthenticatorWithError) ResendVerificationEmail(_ context.Context, _ string) error {
 	return nil
 }

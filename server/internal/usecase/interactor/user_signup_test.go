@@ -782,6 +782,14 @@ func (m *mockAuthenticator) UpdateUser(ctx context.Context, p gateway.Authentica
 	}, nil
 }
 
+func (m *mockAuthenticator) DisableMFA(_ context.Context, _ string) error { return nil }
+
+func (m *mockAuthenticator) EnableMFA(_ context.Context, _ string) (string, error) { return "", nil }
+
+func (m *mockAuthenticator) GetMFAStatus(_ context.Context, _ string) (gateway.MFAStatus, error) {
+	return gateway.MFAStatus{}, nil
+}
+
 func (m *mockAuthenticator) ResendVerificationEmail(ctx context.Context, userID string) error {
 	m.resendVerificationEmailCalled = true
 	m.resendVerificationEmailUserID = userID
