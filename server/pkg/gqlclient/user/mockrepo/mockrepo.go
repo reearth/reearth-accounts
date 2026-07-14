@@ -71,6 +71,35 @@ func (mr *MockRepoMockRecorder) DeleteMe(ctx, userID any) *gomock.Call {
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "DeleteMe", reflect.TypeOf((*MockRepo)(nil).DeleteMe), ctx, userID)
 }
 
+// DisableMFA mocks base method.
+func (m *MockRepo) DisableMFA(ctx context.Context) error {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "DisableMFA", ctx)
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
+// DisableMFA indicates an expected call of DisableMFA.
+func (mr *MockRepoMockRecorder) DisableMFA(ctx any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "DisableMFA", reflect.TypeOf((*MockRepo)(nil).DisableMFA), ctx)
+}
+
+// EnableMFA mocks base method.
+func (m *MockRepo) EnableMFA(ctx context.Context) (string, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "EnableMFA", ctx)
+	ret0, _ := ret[0].(string)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// EnableMFA indicates an expected call of EnableMFA.
+func (mr *MockRepoMockRecorder) EnableMFA(ctx any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "EnableMFA", reflect.TypeOf((*MockRepo)(nil).EnableMFA), ctx)
+}
+
 // FindByAlias mocks base method.
 func (m *MockRepo) FindByAlias(ctx context.Context, alias string) (*user0.User, error) {
 	m.ctrl.T.Helper()
@@ -175,6 +204,21 @@ func (m *MockRepo) FindUsersByIDsWithPagination(ctx context.Context, id []string
 func (mr *MockRepoMockRecorder) FindUsersByIDsWithPagination(ctx, id, alias, page, size any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "FindUsersByIDsWithPagination", reflect.TypeOf((*MockRepo)(nil).FindUsersByIDsWithPagination), ctx, id, alias, page, size)
+}
+
+// GetMFAStatus mocks base method.
+func (m *MockRepo) GetMFAStatus(ctx context.Context) (user.MFAStatus, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "GetMFAStatus", ctx)
+	ret0, _ := ret[0].(user.MFAStatus)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// GetMFAStatus indicates an expected call of GetMFAStatus.
+func (mr *MockRepoMockRecorder) GetMFAStatus(ctx any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetMFAStatus", reflect.TypeOf((*MockRepo)(nil).GetMFAStatus), ctx)
 }
 
 // Logout mocks base method.
@@ -307,50 +351,6 @@ func (m *MockRepo) UpdateMe(ctx context.Context, input user.UpdateMeInput) (*use
 func (mr *MockRepoMockRecorder) UpdateMe(ctx, input any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "UpdateMe", reflect.TypeOf((*MockRepo)(nil).UpdateMe), ctx, input)
-}
-
-// DisableMFA mocks base method.
-func (m *MockRepo) DisableMFA(ctx context.Context) error {
-	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "DisableMFA", ctx)
-	ret0, _ := ret[0].(error)
-	return ret0
-}
-
-// DisableMFA indicates an expected call of DisableMFA.
-func (mr *MockRepoMockRecorder) DisableMFA(ctx any) *gomock.Call {
-	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "DisableMFA", reflect.TypeOf((*MockRepo)(nil).DisableMFA), ctx)
-}
-
-// EnableMFA mocks base method.
-func (m *MockRepo) EnableMFA(ctx context.Context) (string, error) {
-	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "EnableMFA", ctx)
-	ret0, _ := ret[0].(string)
-	ret1, _ := ret[1].(error)
-	return ret0, ret1
-}
-
-// EnableMFA indicates an expected call of EnableMFA.
-func (mr *MockRepoMockRecorder) EnableMFA(ctx any) *gomock.Call {
-	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "EnableMFA", reflect.TypeOf((*MockRepo)(nil).EnableMFA), ctx)
-}
-
-// GetMFAStatus mocks base method.
-func (m *MockRepo) GetMFAStatus(ctx context.Context) (user.MFAStatus, error) {
-	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "GetMFAStatus", ctx)
-	ret0, _ := ret[0].(user.MFAStatus)
-	ret1, _ := ret[1].(error)
-	return ret0, ret1
-}
-
-// GetMFAStatus indicates an expected call of GetMFAStatus.
-func (mr *MockRepoMockRecorder) GetMFAStatus(ctx any) *gomock.Call {
-	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetMFAStatus", reflect.TypeOf((*MockRepo)(nil).GetMFAStatus), ctx)
 }
 
 // VerifyUser mocks base method.
