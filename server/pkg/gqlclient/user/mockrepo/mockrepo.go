@@ -309,6 +309,50 @@ func (mr *MockRepoMockRecorder) UpdateMe(ctx, input any) *gomock.Call {
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "UpdateMe", reflect.TypeOf((*MockRepo)(nil).UpdateMe), ctx, input)
 }
 
+// DisableMFA mocks base method.
+func (m *MockRepo) DisableMFA(ctx context.Context) error {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "DisableMFA", ctx)
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
+// DisableMFA indicates an expected call of DisableMFA.
+func (mr *MockRepoMockRecorder) DisableMFA(ctx any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "DisableMFA", reflect.TypeOf((*MockRepo)(nil).DisableMFA), ctx)
+}
+
+// EnableMFA mocks base method.
+func (m *MockRepo) EnableMFA(ctx context.Context) (string, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "EnableMFA", ctx)
+	ret0, _ := ret[0].(string)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// EnableMFA indicates an expected call of EnableMFA.
+func (mr *MockRepoMockRecorder) EnableMFA(ctx any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "EnableMFA", reflect.TypeOf((*MockRepo)(nil).EnableMFA), ctx)
+}
+
+// GetMFAStatus mocks base method.
+func (m *MockRepo) GetMFAStatus(ctx context.Context) (user.MFAStatus, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "GetMFAStatus", ctx)
+	ret0, _ := ret[0].(user.MFAStatus)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// GetMFAStatus indicates an expected call of GetMFAStatus.
+func (mr *MockRepoMockRecorder) GetMFAStatus(ctx any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetMFAStatus", reflect.TypeOf((*MockRepo)(nil).GetMFAStatus), ctx)
+}
+
 // VerifyUser mocks base method.
 func (m *MockRepo) VerifyUser(ctx context.Context, code string) (*user0.User, error) {
 	m.ctrl.T.Helper()
