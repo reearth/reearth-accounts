@@ -19,6 +19,7 @@ var (
 // ListFilter narrows and paginates a List query.
 type ListFilter struct {
 	Status     *Status
+	Role       *Role
 	Pagination *usecasex.Pagination
 }
 

@@ -84,6 +84,43 @@ func TestAdminUser_List(t *testing.T) {
 	assert.Equal(t, int64(1), pi.TotalCount)
 }
 
+func TestAdminUser_List_RoleFilter(t *testing.T) {
+	ctx := context.Background()
+	admin := adminuser.New().NewID().Name("A").Email("a@eukarya.io").Role(adminuser.RoleSystemAdmin).Status(adminuser.StatusApproved).MustBuild()
+	viewer := adminuser.New().NewID().Name("V").Email("v@eukarya.io").Role(adminuser.RoleViewer).Status(adminuser.StatusApproved).MustBuild()
+	pendingViewer := adminuser.New().NewID().Name("PV").Email("pv@eukarya.io").Role(adminuser.RoleViewer).Status(adminuser.StatusPending).MustBuild()
+	r := NewAdminUserWith(admin, viewer, pendingViewer)
+
+	// nil role -> no role filtering (existing behavior)
+	got, pi, err := r.List(ctx, adminuser.ListFilter{})
+	assert.NoError(t, err)
+	assert.Equal(t, 3, len(got))
+	assert.Equal(t, int64(3), pi.TotalCount)
+
+	// role filter: system_admin
+	sysAdmin := adminuser.RoleSystemAdmin
+	got, pi, err = r.List(ctx, adminuser.ListFilter{Role: &sysAdmin})
+	assert.NoError(t, err)
+	assert.Equal(t, 1, len(got))
+	assert.Equal(t, admin.ID(), got[0].ID())
+	assert.Equal(t, int64(1), pi.TotalCount)
+
+	// role filter: viewer
+	viewerRole := adminuser.RoleViewer
+	got, pi, err = r.List(ctx, adminuser.ListFilter{Role: &viewerRole})
+	assert.NoError(t, err)
+	assert.Equal(t, 2, len(got))
+	assert.Equal(t, int64(2), pi.TotalCount)
+
+	// combined status + role
+	approved := adminuser.StatusApproved
+	got, pi, err = r.List(ctx, adminuser.ListFilter{Status: &approved, Role: &viewerRole})
+	assert.NoError(t, err)
+	assert.Equal(t, 1, len(got))
+	assert.Equal(t, viewer.ID(), got[0].ID())
+	assert.Equal(t, int64(1), pi.TotalCount)
+}
+
 func TestAdminUser_List_RejectsCursorPagination(t *testing.T) {
 	ctx := context.Background()
 	r := NewAdminUserWith(adminuser.New().NewID().Name("A").Email("a@eukarya.io").MustBuild())

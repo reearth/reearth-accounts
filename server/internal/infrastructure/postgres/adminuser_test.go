@@ -156,3 +156,42 @@ func TestAdminUser_ExistsApprovedSystemAdminExcept(t *testing.T) {
 	require.NoError(t, err)
 	assert.True(t, got)
 }
+
+func TestAdminUser_List_RoleFilter(t *testing.T) {
+	pool, cleanup := pgPool(t)
+	defer cleanup()
+	ctx := context.Background()
+	r := NewAdminUser(NewClient(pool))
+
+	admin := adminuser.New().NewID().Name("A").Email("a@eukarya.io").Role(adminuser.RoleSystemAdmin).Status(adminuser.StatusApproved).MustBuild()
+	viewer := adminuser.New().NewID().Name("V").Email("v@eukarya.io").Role(adminuser.RoleViewer).Status(adminuser.StatusApproved).MustBuild()
+	pendingViewer := adminuser.New().NewID().Name("PV").Email("pv@eukarya.io").Role(adminuser.RoleViewer).Status(adminuser.StatusPending).MustBuild()
+	for _, u := range []*adminuser.AdminUser{admin, viewer, pendingViewer} {
+		require.NoError(t, r.Save(ctx, u))
+	}
+
+	p := usecasex.OffsetPagination{Offset: 0, Limit: 10}.Wrap()
+
+	// role filter: system_admin
+	sysAdmin := adminuser.RoleSystemAdmin
+	got, pi, err := r.List(ctx, adminuser.ListFilter{Role: &sysAdmin, Pagination: p})
+	require.NoError(t, err)
+	assert.Equal(t, 1, len(got))
+	assert.Equal(t, admin.ID(), got[0].ID())
+	assert.Equal(t, int64(1), pi.TotalCount)
+
+	// role filter: viewer
+	viewerRole := adminuser.RoleViewer
+	got, pi, err = r.List(ctx, adminuser.ListFilter{Role: &viewerRole, Pagination: p})
+	require.NoError(t, err)
+	assert.Equal(t, 2, len(got))
+	assert.Equal(t, int64(2), pi.TotalCount)
+
+	// combined status + role
+	approved := adminuser.StatusApproved
+	got, pi, err = r.List(ctx, adminuser.ListFilter{Status: &approved, Role: &viewerRole, Pagination: p})
+	require.NoError(t, err)
+	assert.Equal(t, 1, len(got))
+	assert.Equal(t, viewer.ID(), got[0].ID())
+	assert.Equal(t, int64(1), pi.TotalCount)
+}

@@ -94,6 +94,39 @@ func TestListAdminUsers_StatusFilter(t *testing.T) {
 	assert.Equal(t, "pending", body.Items[0].Status)
 }
 
+func TestListAdminUsers_RoleFilter(t *testing.T) {
+	op := adminuser.New().NewID().Name("op").Email("op@eukarya.io").Role(adminuser.RoleSystemAdmin).Status(adminuser.StatusApproved).MustBuild()
+	viewer := adminuser.New().NewID().Name("viewer").Email("viewer@eukarya.io").Role(adminuser.RoleViewer).Status(adminuser.StatusApproved).MustBuild()
+	repo := memory.NewAdminUserWith(op, viewer)
+	sess := session.NewManager(testSecret, time.Hour)
+	e := newTestEcho(repo, sess)
+
+	req := httptest.NewRequest(http.MethodGet, "/api/v1/admin-users?role=viewer", nil)
+	req.AddCookie(cookieFor(t, sess, op.ID()))
+	rec := httptest.NewRecorder()
+	e.ServeHTTP(rec, req)
+	require.Equal(t, http.StatusOK, rec.Code)
+
+	var body adminuserhandler.ListAdminUsersResponse
+	require.NoError(t, json.Unmarshal(rec.Body.Bytes(), &body))
+	assert.Equal(t, int64(1), body.TotalCount)
+	require.Len(t, body.Items, 1)
+	assert.Equal(t, "viewer@eukarya.io", body.Items[0].Email)
+}
+
+func TestListAdminUsers_InvalidRole(t *testing.T) {
+	op := approvedUser("op@eukarya.io")
+	repo := memory.NewAdminUserWith(op)
+	sess := session.NewManager(testSecret, time.Hour)
+	e := newTestEcho(repo, sess)
+
+	req := httptest.NewRequest(http.MethodGet, "/api/v1/admin-users?role=bogus", nil)
+	req.AddCookie(cookieFor(t, sess, op.ID()))
+	rec := httptest.NewRecorder()
+	e.ServeHTTP(rec, req)
+	assert.Equal(t, http.StatusBadRequest, rec.Code)
+}
+
 func TestListAdminUsers_InvalidStatus(t *testing.T) {
 	op := approvedUser("op@eukarya.io")
 	repo := memory.NewAdminUserWith(op)

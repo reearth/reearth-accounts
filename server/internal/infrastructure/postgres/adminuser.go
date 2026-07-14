@@ -114,6 +114,10 @@ func (r *AdminUser) List(ctx context.Context, f adminuser.ListFilter) (adminuser
 		args = append(args, f.Status.String())
 		where = append(where, "status = $"+itoa(len(args)))
 	}
+	if f.Role != nil {
+		args = append(args, f.Role.String())
+		where = append(where, "role = $"+itoa(len(args)))
+	}
 	base := "FROM admin_users"
 	if len(where) > 0 {
 		base += " WHERE " + strings.Join(where, " AND ")

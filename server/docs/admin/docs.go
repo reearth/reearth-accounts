@@ -17,7 +17,7 @@ const docTemplate = `{
     "paths": {
         "/admin-users": {
             "get": {
-                "description": "Lists admin users in creation order, optionally filtered by status, with offset pagination.",
+                "description": "Lists admin users in creation order, optionally filtered by status and/or role, with offset pagination.",
                 "produces": [
                     "application/json"
                 ],
@@ -35,6 +35,16 @@ const docTemplate = `{
                         "type": "string",
                         "description": "Filter by status",
                         "name": "status",
+                        "in": "query"
+                    },
+                    {
+                        "enum": [
+                            "system_admin",
+                            "viewer"
+                        ],
+                        "type": "string",
+                        "description": "Filter by role",
+                        "name": "role",
                         "in": "query"
                     },
                     {

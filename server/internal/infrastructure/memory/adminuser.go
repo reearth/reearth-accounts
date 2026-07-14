@@ -79,6 +79,9 @@ func (r *AdminUser) List(ctx context.Context, f adminuser.ListFilter) (adminuser
 		if f.Status != nil && v.Status() != *f.Status {
 			continue
 		}
+		if f.Role != nil && v.Role() != *f.Role {
+			continue
+		}
 		all = append(all, v)
 	}
 

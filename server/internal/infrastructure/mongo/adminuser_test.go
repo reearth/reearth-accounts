@@ -9,6 +9,7 @@ import (
 	"github.com/reearth/reearthx/mongox"
 	"github.com/reearth/reearthx/usecasex"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 	"go.mongodb.org/mongo-driver/bson"
 )
 
@@ -137,4 +138,43 @@ func TestAdminUser_ExistsApprovedSystemAdminExcept(t *testing.T) {
 	got, err = r.ExistsApprovedSystemAdminExcept(ctx, viewer.ID())
 	assert.NoError(t, err)
 	assert.True(t, got)
+}
+
+func TestAdminUser_List_RoleFilter(t *testing.T) {
+	c := Connect(t)(t)
+	ctx := context.Background()
+	now := time.Now()
+
+	_, err := c.Collection("adminuser").InsertMany(ctx, []any{
+		bson.M{"id": adminuser.NewID().String(), "email": "admin@eukarya.io", "name": "A", "role": "system_admin", "status": "approved", "createdat": now.Add(-2 * time.Hour), "updatedat": now},
+		bson.M{"id": adminuser.NewID().String(), "email": "viewer@eukarya.io", "name": "V", "role": "viewer", "status": "approved", "createdat": now.Add(-1 * time.Hour), "updatedat": now},
+		bson.M{"id": adminuser.NewID().String(), "email": "pviewer@eukarya.io", "name": "PV", "role": "viewer", "status": "pending", "createdat": now, "updatedat": now},
+	})
+	require.NoError(t, err)
+
+	r := NewAdminUser(mongox.NewClientWithDatabase(c))
+	p := usecasex.OffsetPagination{Offset: 0, Limit: 10}.Wrap()
+
+	// role filter: system_admin
+	sysAdmin := adminuser.RoleSystemAdmin
+	got, pi, err := r.List(ctx, adminuser.ListFilter{Role: &sysAdmin, Pagination: p})
+	assert.NoError(t, err)
+	assert.Equal(t, 1, len(got))
+	assert.Equal(t, "admin@eukarya.io", got[0].Email())
+	assert.Equal(t, int64(1), pi.TotalCount)
+
+	// role filter: viewer
+	viewerRole := adminuser.RoleViewer
+	got, pi, err = r.List(ctx, adminuser.ListFilter{Role: &viewerRole, Pagination: p})
+	assert.NoError(t, err)
+	assert.Equal(t, 2, len(got))
+	assert.Equal(t, int64(2), pi.TotalCount)
+
+	// combined status + role
+	approved := adminuser.StatusApproved
+	got, pi, err = r.List(ctx, adminuser.ListFilter{Status: &approved, Role: &viewerRole, Pagination: p})
+	assert.NoError(t, err)
+	assert.Equal(t, 1, len(got))
+	assert.Equal(t, "viewer@eukarya.io", got[0].Email())
+	assert.Equal(t, int64(1), pi.TotalCount)
 }
