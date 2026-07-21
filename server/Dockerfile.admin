@@ -1,0 +1,28 @@
+FROM golang:1.24.10-alpine AS build
+ARG TAG=release
+ARG VERSION
+
+RUN apk add --update --no-cache git ca-certificates build-base
+
+WORKDIR /reearth-accounts-admin-api
+
+COPY go.mod go.sum main.go /reearth-accounts-admin-api/
+RUN go mod download
+
+COPY cmd/ /reearth-accounts-admin-api/cmd/
+COPY docs/ /reearth-accounts-admin-api/docs/
+COPY pkg/ /reearth-accounts-admin-api/pkg/
+COPY internal/ /reearth-accounts-admin-api/internal/
+
+RUN CGO_ENABLED=0 go build -o reearth-accounts-admin-api -tags "${TAG}" "-ldflags=-X main.version=${VERSION} -s -w -buildid=" -trimpath ./cmd/reearth-accounts-admin
+
+FROM scratch
+
+COPY --from=build /etc/ssl/certs/ca-certificates.crt /etc/ssl/certs/ca-certificates.crt
+COPY --from=build /reearth-accounts-admin-api/reearth-accounts-admin-api /reearth-accounts-admin-api/reearth-accounts-admin-api
+
+WORKDIR /reearth-accounts-admin-api
+
+EXPOSE 8091
+
+CMD ["./reearth-accounts-admin-api"]
