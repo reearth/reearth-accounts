@@ -127,3 +127,19 @@ type PasswordResetInput struct {
 type passwordResetMutation struct {
 	PasswordReset graphql.Boolean `graphql:"passwordReset(input: $input)"`
 }
+
+type mfaStatusQuery struct {
+	MfaStatus struct {
+		Enrolled graphql.Boolean `graphql:"enrolled"`
+	} `graphql:"mfaStatus"`
+}
+
+type enableMFAMutation struct {
+	EnableMFA struct {
+		EnrollmentURL graphql.String `graphql:"enrollmentUrl"`
+	} `graphql:"enableMFA"`
+}
+
+type disableMFAMutation struct {
+	DisableMFA graphql.Boolean `graphql:"disableMFA"`
+}

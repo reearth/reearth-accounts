@@ -60,9 +60,15 @@ type UpdateMeInput struct {
 	Website              *string
 }
 
+type MFAStatus struct {
+	Enrolled bool
+}
+
 type Repo interface {
 	CreateVerification(ctx context.Context, email string) (bool, error)
 	DeleteMe(ctx context.Context, userID string) error
+	DisableMFA(ctx context.Context) error
+	EnableMFA(ctx context.Context) (enrollmentURL string, err error)
 	FindByAlias(ctx context.Context, alias string) (*user.User, error)
 	FindByID(ctx context.Context, id string) (*user.User, error)
 	FindByIDs(ctx context.Context, ids []string) ([]*user.User, error)
@@ -70,6 +76,7 @@ type Repo interface {
 	FindByNameOrEmail(ctx context.Context, nameOrEmail string) (*user.User, error)
 	FindMe(ctx context.Context) (*user.User, error)
 	FindUsersByIDsWithPagination(ctx context.Context, id []string, alias string, page, size int64) (user.List, int, error)
+	GetMFAStatus(ctx context.Context) (MFAStatus, error)
 	Logout(ctx context.Context) (*user.User, error)
 	PasswordReset(ctx context.Context, password string, token string) error
 	RemoveMyAuth(ctx context.Context, auth string) (*user.User, error)
@@ -679,6 +686,30 @@ func (r *userRepo) StartPasswordReset(ctx context.Context, email string) error {
 	}
 
 	return nil
+}
+
+func (r *userRepo) DisableMFA(ctx context.Context) error {
+	var m disableMFAMutation
+	if err := r.client.Mutate(ctx, &m, nil); err != nil {
+		return gqlerror.ReturnAccountsError(ctx, err)
+	}
+	return nil
+}
+
+func (r *userRepo) EnableMFA(ctx context.Context) (string, error) {
+	var m enableMFAMutation
+	if err := r.client.Mutate(ctx, &m, nil); err != nil {
+		return "", gqlerror.ReturnAccountsError(ctx, err)
+	}
+	return string(m.EnableMFA.EnrollmentURL), nil
+}
+
+func (r *userRepo) GetMFAStatus(ctx context.Context) (MFAStatus, error) {
+	var q mfaStatusQuery
+	if err := r.client.Query(ctx, &q, nil); err != nil {
+		return MFAStatus{}, gqlerror.ReturnAccountsError(ctx, err)
+	}
+	return MFAStatus{Enrolled: bool(q.MfaStatus.Enrolled)}, nil
 }
 
 func (r *userRepo) PasswordReset(ctx context.Context, password string, token string) error {

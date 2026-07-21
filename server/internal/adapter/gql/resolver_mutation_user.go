@@ -172,6 +172,19 @@ func (r *mutationResolver) StartPasswordReset(ctx context.Context, input gqlmode
 	return lo.ToPtr(true), nil
 }
 
+func (r *mutationResolver) DisableMfa(ctx context.Context) (bool, error) {
+	err := usecases(ctx).User.DisableMFA(ctx, getOperator(ctx))
+	return err == nil, err
+}
+
+func (r *mutationResolver) EnableMfa(ctx context.Context) (*gqlmodel.MFAEnrollResult, error) {
+	enrollmentURL, err := usecases(ctx).User.EnableMFA(ctx, getOperator(ctx))
+	if err != nil {
+		return nil, err
+	}
+	return &gqlmodel.MFAEnrollResult{EnrollmentURL: enrollmentURL}, nil
+}
+
 func (r *mutationResolver) PasswordReset(ctx context.Context, input gqlmodel.PasswordResetInput) (*bool, error) {
 	err := usecases(ctx).User.PasswordReset(ctx, input.Password, input.Token)
 	if err != nil {

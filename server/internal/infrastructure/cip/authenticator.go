@@ -145,6 +145,18 @@ func (a *Authenticator) ResendVerificationEmail(ctx context.Context, userID stri
 	return nil
 }
 
+func (a *Authenticator) DisableMFA(_ context.Context, _ string) error {
+	return nil
+}
+
+func (a *Authenticator) EnableMFA(_ context.Context, _ string) (string, error) {
+	return "", nil
+}
+
+func (a *Authenticator) GetMFAStatus(_ context.Context, _ string) (gateway.MFAStatus, error) {
+	return gateway.MFAStatus{}, nil
+}
+
 func toAuthenticatorUser(rec *fbauth.UserRecord) gateway.AuthenticatorUser {
 	out := gateway.AuthenticatorUser{}
 	if rec == nil {

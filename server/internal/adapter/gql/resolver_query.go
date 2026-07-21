@@ -111,6 +111,14 @@ func (r *queryResolver) FindUserByAlias(ctx context.Context, alias string) (*gql
 	return loaders(ctx).User.FetchByAlias(ctx, alias)
 }
 
+func (r *queryResolver) MfaStatus(ctx context.Context) (*gqlmodel.MFAStatus, error) {
+	res, err := usecases(ctx).User.GetMFAStatus(ctx, getOperator(ctx))
+	if err != nil {
+		return nil, err
+	}
+	return &gqlmodel.MFAStatus{Enrolled: res.Enrolled}, nil
+}
+
 func (r *queryResolver) AuthConfig(ctx context.Context) (*gqlmodel.AuthConfig, error) {
 	cfgInterface := adapter.GetConfig(ctx)
 	if cfgInterface == nil {

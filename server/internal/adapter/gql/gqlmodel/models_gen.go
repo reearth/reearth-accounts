@@ -102,6 +102,14 @@ type FindOrCreateInput struct {
 	Token string `json:"token"`
 }
 
+type MFAEnrollResult struct {
+	EnrollmentURL string `json:"enrollmentUrl"`
+}
+
+type MFAStatus struct {
+	Enrolled bool `json:"enrolled"`
+}
+
 type Me struct {
 	ID             ID            `json:"id"`
 	Name           string        `json:"name"`
