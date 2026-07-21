@@ -312,16 +312,15 @@ func (i *User) DisableMFA(ctx context.Context, operator *workspace.Operator) err
 		if err != nil {
 			return err
 		}
-		for _, a := range u.Auths() {
-			authenticator := i.gateways.AuthenticatorFor(a.Provider)
-			if authenticator == nil {
-				continue
-			}
-			if err := authenticator.DisableMFA(ctx, a.Sub); err != nil {
-				return err
-			}
+		a := u.Auths().GetByProvider(user.ProviderAuth0)
+		if a == nil {
+			return rerror.NewE(i18n.T("no authenticator found"))
 		}
-		return nil
+		authenticator := i.gateways.AuthenticatorFor(a.Provider)
+		if authenticator == nil {
+			return rerror.NewE(i18n.T("no authenticator found"))
+		}
+		return authenticator.DisableMFA(ctx, a.Sub)
 	})
 }
 
@@ -334,20 +333,15 @@ func (i *User) EnableMFA(ctx context.Context, operator *workspace.Operator) (str
 		if err != nil {
 			return "", err
 		}
-		for _, a := range u.Auths() {
-			authenticator := i.gateways.AuthenticatorFor(a.Provider)
-			if authenticator == nil {
-				continue
-			}
-			enrollmentURL, err := authenticator.EnableMFA(ctx, a.Sub)
-			if err != nil {
-				return "", err
-			}
-			if enrollmentURL != "" {
-				return enrollmentURL, nil
-			}
+		a := u.Auths().GetByProvider(user.ProviderAuth0)
+		if a == nil {
+			return "", rerror.NewE(i18n.T("no authenticator found"))
 		}
-		return "", rerror.NewE(i18n.T("no authenticator found"))
+		authenticator := i.gateways.AuthenticatorFor(a.Provider)
+		if authenticator == nil {
+			return "", rerror.NewE(i18n.T("no authenticator found"))
+		}
+		return authenticator.EnableMFA(ctx, a.Sub)
 	})
 }
 
@@ -360,20 +354,15 @@ func (i *User) GetMFAStatus(ctx context.Context, operator *workspace.Operator) (
 		if err != nil {
 			return gateway.MFAStatus{}, err
 		}
-		for _, a := range u.Auths() {
-			authenticator := i.gateways.AuthenticatorFor(a.Provider)
-			if authenticator == nil {
-				continue
-			}
-			status, err := authenticator.GetMFAStatus(ctx, a.Sub)
-			if err != nil {
-				return gateway.MFAStatus{}, err
-			}
-			if status.Enrolled {
-				return status, nil
-			}
+		a := u.Auths().GetByProvider(user.ProviderAuth0)
+		if a == nil {
+			return gateway.MFAStatus{Enrolled: false}, nil
 		}
-		return gateway.MFAStatus{Enrolled: false}, nil
+		authenticator := i.gateways.AuthenticatorFor(a.Provider)
+		if authenticator == nil {
+			return gateway.MFAStatus{Enrolled: false}, nil
+		}
+		return authenticator.GetMFAStatus(ctx, a.Sub)
 	})
 }
 
