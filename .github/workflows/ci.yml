@@ -39,6 +39,7 @@ jobs:
             .github/workflows/ci.yml
             .github/workflows/ci_server.yml
             .github/workflows/build_server.yml
+            .github/workflows/build_admin.yml
             .github/workflows/deploy_server_nightly.yml
 
       - name: Check server output
@@ -127,6 +128,32 @@ jobs:
         inputs.force_deploy_server
       )
     uses: ./.github/workflows/build_server.yml
+    with:
+      sha_short: ${{ needs.ci-collect-info.outputs.sha_short }}
+      new_tag: ${{ needs.ci-collect-info.outputs.new_tag }}
+      new_tag_short: ${{ needs.ci-collect-info.outputs.new_tag_short }}
+      name: ${{ needs.ci-collect-info.outputs.name }}
+      sha: ${{ github.sha }}
+    secrets: inherit
+
+  build-admin:
+    needs:
+      - prepare
+      - ci
+      - ci-server
+      - ci-collect-info
+    permissions:
+      contents: read
+      id-token: write
+      packages: write
+    if: |
+      !failure() &&
+      needs.ci-server.result == 'success' &&
+      (
+        (github.event_name == 'push' && (github.ref_name == 'main' || github.ref_name == 'release' || startsWith(github.ref_name, 'release/'))) ||
+        inputs.force_deploy_server
+      )
+    uses: ./.github/workflows/build_admin.yml
     with:
       sha_short: ${{ needs.ci-collect-info.outputs.sha_short }}
       new_tag: ${{ needs.ci-collect-info.outputs.new_tag }}
