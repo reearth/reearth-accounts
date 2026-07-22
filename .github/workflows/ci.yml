@@ -163,7 +163,9 @@ jobs:
     secrets: inherit
 
   deploy-server-oss:
-    needs: build-server
+    needs:
+      - build-server
+      - build-admin
     permissions:
       contents: read
       id-token: write

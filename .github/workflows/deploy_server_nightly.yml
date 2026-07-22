@@ -50,3 +50,34 @@ jobs:
             --region ${{ env.REGION }} \
             --platform managed \
             --quiet
+
+      # The admin API image and its Google Cloud Artifact Registry path are
+      # derived from the api ones by swapping reearth-accounts-api ->
+      # reearth-accounts-admin-api, so no extra secrets are required.
+      - name: Resolve admin image references
+        run: |
+          echo "ADMIN_IMAGE=${IMAGE/reearth-accounts-api/reearth-accounts-admin-api}" >> $GITHUB_ENV
+          echo "ADMIN_IMAGE_GC=${IMAGE_GC/reearth-accounts-api/reearth-accounts-admin-api}" >> $GITHUB_ENV
+
+      - name: Mirror admin image to Google Cloud Artifact Registry
+        run: |
+          docker pull ${{ env.ADMIN_IMAGE }}
+          docker tag ${{ env.ADMIN_IMAGE }} ${{ env.ADMIN_IMAGE_GC }}
+          docker push ${{ env.ADMIN_IMAGE_GC }}
+
+      # The admin Cloud Run service is created and owned by Terraform. Only roll
+      # a new image once that service exists; on the very first run (before the
+      # Terraform apply) we skip the deploy and just leave the mirrored image in
+      # Artifact Registry so the apply can create the service.
+      - name: Deploy to Cloud Run for accounts admin api (Nightly)
+        run: |
+          if gcloud run services describe reearth-accounts-admin-api \
+            --region ${{ env.REGION }} --platform managed >/dev/null 2>&1; then
+            gcloud run deploy reearth-accounts-admin-api \
+              --image ${{ env.ADMIN_IMAGE_GC }} \
+              --region ${{ env.REGION }} \
+              --platform managed \
+              --quiet
+          else
+            echo "reearth-accounts-admin-api service not found yet (managed by Terraform); skipping deploy. Image mirrored to Artifact Registry."
+          fi
