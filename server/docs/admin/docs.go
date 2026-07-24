@@ -529,7 +529,7 @@ const docTemplate = `{
         },
         "/workspaces": {
             "get": {
-                "description": "Lists workspaces across all tenants, optionally filtered by a name/alias keyword, with offset pagination.",
+                "description": "Lists workspaces across all tenants, optionally filtered by a name/alias keyword, with offset pagination.\nWhen one or more ` + "`" + `ids` + "`" + ` query parameters are supplied, the endpoint instead resolves those workspaces by ID (existing ones only; unknown IDs are omitted) and ignores ` + "`" + `q` + "`" + `, ` + "`" + `page` + "`" + ` and ` + "`" + `per_page` + "`" + `. At most 100 ids may be supplied per request.",
                 "produces": [
                     "application/json"
                 ],
@@ -538,6 +538,16 @@ const docTemplate = `{
                 ],
                 "summary": "List workspaces",
                 "parameters": [
+                    {
+                        "type": "array",
+                        "items": {
+                            "type": "string"
+                        },
+                        "collectionFormat": "multi",
+                        "description": "Batch fetch by workspace ID (repeatable, max 100). When present, q/page/per_page are ignored.",
+                        "name": "ids",
+                        "in": "query"
+                    },
                     {
                         "type": "string",
                         "description": "Search by name or alias",

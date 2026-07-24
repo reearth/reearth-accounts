@@ -10,8 +10,8 @@ import (
 	"github.com/reearth/reearthx/usecasex"
 )
 
-// ListWorkspacesUseCase lists workspaces across all tenants, optionally filtered
-// by a name/alias keyword, with offset pagination.
+// ListWorkspacesUseCase lists admin workspaces. See ListWorkspacesInput for its
+// two modes (keyword listing vs. batch-by-IDs).
 type ListWorkspacesUseCase struct {
 	repo workspace.Repo
 }
@@ -21,7 +21,25 @@ func NewListWorkspacesUseCase(repo workspace.Repo) *ListWorkspacesUseCase {
 	return &ListWorkspacesUseCase{repo: repo}
 }
 
-// Execute returns the matching workspaces and pagination info.
-func (uc *ListWorkspacesUseCase) Execute(ctx context.Context, keyword *string, pagination *usecasex.Pagination) (workspace.List, *usecasex.PageInfo, error) {
-	return uc.repo.FindAll(ctx, keyword, pagination)
+// ListWorkspacesInput selects which workspaces to return. When IDs is non-empty
+// it is a batch-by-IDs lookup (unknown IDs omitted) and Keyword/Pagination are
+// ignored; otherwise it is a keyword-filtered, offset-paginated listing. Both
+// modes read across all tenants (the admin repo is unfiltered).
+type ListWorkspacesInput struct {
+	Keyword    *string
+	Pagination *usecasex.Pagination
+	IDs        workspace.IDList
+}
+
+// Execute returns the matching workspaces. Batch-by-IDs mode returns a nil
+// *PageInfo; callers derive counts from the list.
+func (uc *ListWorkspacesUseCase) Execute(ctx context.Context, in ListWorkspacesInput) (workspace.List, *usecasex.PageInfo, error) {
+	if len(in.IDs) > 0 {
+		list, err := uc.repo.FindByIDs(ctx, in.IDs)
+		if err != nil {
+			return nil, nil, err
+		}
+		return list, nil, nil
+	}
+	return uc.repo.FindAll(ctx, in.Keyword, in.Pagination)
 }

@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
+	"net/url"
 	"testing"
 	"time"
 
@@ -97,6 +98,95 @@ func TestListWorkspaces_Keyword(t *testing.T) {
 	assert.Equal(t, int64(1), body.TotalCount)
 	require.Len(t, body.Items, 1)
 	assert.Equal(t, "Beta", body.Items[0].Name)
+}
+
+func TestListWorkspaces_ByIDs_ReturnsMatching_OmitsUnknown(t *testing.T) {
+	op := approvedAdmin("op@eukarya.io")
+	adminRepo := memory.NewAdminUserWith(op)
+	alpha := ws("Alpha", "alpha")
+	beta := ws("Beta", "beta")
+	wsRepo := memory.NewWorkspaceWith(alpha, beta)
+	sess := session.NewManager(testSecret, time.Hour)
+	e := newTestEcho(wsRepo, adminRepo, sess)
+
+	// Request alpha + an unknown id; unknown must be silently omitted.
+	q := url.Values{"ids": {alpha.ID().String(), workspace.NewID().String()}}
+	req := httptest.NewRequest(http.MethodGet, "/api/v1/workspaces?"+q.Encode(), nil)
+	req.AddCookie(cookieFor(t, sess, op.ID()))
+	rec := httptest.NewRecorder()
+	e.ServeHTTP(rec, req)
+	require.Equal(t, http.StatusOK, rec.Code)
+
+	var body workspacehandler.ListWorkspacesResponse
+	require.NoError(t, json.Unmarshal(rec.Body.Bytes(), &body))
+	require.Len(t, body.Items, 1)
+	assert.Equal(t, alpha.ID().String(), body.Items[0].ID)
+	assert.Equal(t, int64(1), body.TotalCount)
+	assert.Equal(t, int64(1), body.Page)
+	assert.Equal(t, int64(1), body.PerPage)
+}
+
+func TestListWorkspaces_ByIDs_IgnoresKeywordAndPaging(t *testing.T) {
+	op := approvedAdmin("op@eukarya.io")
+	adminRepo := memory.NewAdminUserWith(op)
+	alpha := ws("Alpha", "alpha")
+	beta := ws("Beta", "beta")
+	wsRepo := memory.NewWorkspaceWith(alpha, beta)
+	sess := session.NewManager(testSecret, time.Hour)
+	e := newTestEcho(wsRepo, adminRepo, sess)
+
+	// q/page/per_page are present but must be ignored in batch mode.
+	q := url.Values{
+		"ids":      {alpha.ID().String()},
+		"q":        {"zzz-no-match"},
+		"page":     {"5"},
+		"per_page": {"1"},
+	}
+	req := httptest.NewRequest(http.MethodGet, "/api/v1/workspaces?"+q.Encode(), nil)
+	req.AddCookie(cookieFor(t, sess, op.ID()))
+	rec := httptest.NewRecorder()
+	e.ServeHTTP(rec, req)
+	require.Equal(t, http.StatusOK, rec.Code)
+
+	var body workspacehandler.ListWorkspacesResponse
+	require.NoError(t, json.Unmarshal(rec.Body.Bytes(), &body))
+	require.Len(t, body.Items, 1)
+	assert.Equal(t, alpha.ID().String(), body.Items[0].ID)
+	assert.Equal(t, int64(1), body.Page)
+}
+
+func TestListWorkspaces_ByIDs_TooMany_400(t *testing.T) {
+	op := approvedAdmin("op@eukarya.io")
+	adminRepo := memory.NewAdminUserWith(op)
+	wsRepo := memory.NewWorkspaceWith(ws("A", "a"))
+	sess := session.NewManager(testSecret, time.Hour)
+	e := newTestEcho(wsRepo, adminRepo, sess)
+
+	ids := make([]string, 0, 101)
+	for i := 0; i < 101; i++ {
+		ids = append(ids, workspace.NewID().String())
+	}
+	q := url.Values{"ids": ids}
+	req := httptest.NewRequest(http.MethodGet, "/api/v1/workspaces?"+q.Encode(), nil)
+	req.AddCookie(cookieFor(t, sess, op.ID()))
+	rec := httptest.NewRecorder()
+	e.ServeHTTP(rec, req)
+	assert.Equal(t, http.StatusBadRequest, rec.Code)
+}
+
+func TestListWorkspaces_ByIDs_InvalidID_400(t *testing.T) {
+	op := approvedAdmin("op@eukarya.io")
+	adminRepo := memory.NewAdminUserWith(op)
+	wsRepo := memory.NewWorkspaceWith(ws("A", "a"))
+	sess := session.NewManager(testSecret, time.Hour)
+	e := newTestEcho(wsRepo, adminRepo, sess)
+
+	q := url.Values{"ids": {"not-an-id"}}
+	req := httptest.NewRequest(http.MethodGet, "/api/v1/workspaces?"+q.Encode(), nil)
+	req.AddCookie(cookieFor(t, sess, op.ID()))
+	rec := httptest.NewRecorder()
+	e.ServeHTTP(rec, req)
+	assert.Equal(t, http.StatusBadRequest, rec.Code)
 }
 
 func TestListWorkspaces_InvalidPagination(t *testing.T) {
