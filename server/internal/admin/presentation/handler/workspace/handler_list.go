@@ -115,7 +115,7 @@ func (h *Handler) listWorkspacesByIDs(c echo.Context, rawIDs []string) error {
 // nonEmpty drops empty strings, so a blank `?ids=` falls through to the normal
 // keyword/pagination listing.
 func nonEmpty(values []string) []string {
-	out := values[:0:0]
+	out := make([]string, 0, len(values))
 	for _, v := range values {
 		if v != "" {
 			out = append(out, v)
