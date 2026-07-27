@@ -10,8 +10,8 @@ import (
 	"github.com/reearth/reearthx/usecasex"
 )
 
-// ListWorkspacesUseCase lists workspaces across all tenants, optionally filtered
-// by a name/alias keyword, with offset pagination.
+// ListWorkspacesUseCase lists admin workspaces. See ListWorkspacesInput for its
+// two modes (keyword listing vs. batch-by-IDs).
 type ListWorkspacesUseCase struct {
 	repo workspace.Repo
 }
@@ -21,7 +21,47 @@ func NewListWorkspacesUseCase(repo workspace.Repo) *ListWorkspacesUseCase {
 	return &ListWorkspacesUseCase{repo: repo}
 }
 
-// Execute returns the matching workspaces and pagination info.
-func (uc *ListWorkspacesUseCase) Execute(ctx context.Context, keyword *string, pagination *usecasex.Pagination) (workspace.List, *usecasex.PageInfo, error) {
-	return uc.repo.FindAll(ctx, keyword, pagination)
+// ListWorkspacesInput selects which workspaces to return. When IDs is non-empty
+// it is a batch-by-IDs lookup (unknown IDs omitted) and Keyword/Pagination are
+// ignored; otherwise it is a keyword-filtered, offset-paginated listing. Both
+// modes read across all tenants (the admin repo is unfiltered).
+type ListWorkspacesInput struct {
+	Keyword    *string
+	Pagination *usecasex.Pagination
+	IDs        workspace.IDList
+}
+
+// Execute returns the matching workspaces. Batch-by-IDs mode returns a nil
+// *PageInfo; callers derive counts from the list.
+func (uc *ListWorkspacesUseCase) Execute(ctx context.Context, in ListWorkspacesInput) (workspace.List, *usecasex.PageInfo, error) {
+	if len(in.IDs) == 0 {
+		return uc.repo.FindAll(ctx, in.Keyword, in.Pagination)
+	}
+
+	list, err := uc.repo.FindByIDs(ctx, in.IDs)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	// FindByIDs order is backend-dependent (Mongo matches the requested order,
+	// the memory repo sorts by ID). Re-order to match in.IDs so the API response
+	// order is stable across backends; unknown IDs are naturally omitted. Each
+	// workspace is emitted at most once, so a repeated input ID does not produce
+	// a duplicate entry even though de-duplication is normally done by the caller.
+	byID := make(map[workspace.ID]*workspace.Workspace, len(list))
+	for _, w := range list {
+		byID[w.ID()] = w
+	}
+	ordered := make(workspace.List, 0, len(in.IDs))
+	seen := make(map[workspace.ID]struct{}, len(in.IDs))
+	for _, wid := range in.IDs {
+		if _, dup := seen[wid]; dup {
+			continue
+		}
+		if w, ok := byID[wid]; ok {
+			seen[wid] = struct{}{}
+			ordered = append(ordered, w)
+		}
+	}
+	return ordered, nil, nil
 }
