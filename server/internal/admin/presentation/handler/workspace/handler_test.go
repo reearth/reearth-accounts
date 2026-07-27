@@ -123,6 +123,34 @@ func TestListWorkspaces_ByIDs_ReturnsMatching_OmitsUnknown(t *testing.T) {
 	assert.Equal(t, alpha.ID().String(), body.Items[0].ID)
 	assert.Equal(t, int64(1), body.TotalCount)
 	assert.Equal(t, int64(1), body.Page)
+	// PerPage reflects the number of requested (de-duplicated) IDs, not the
+	// number that resolved: alpha + one unknown id => 2.
+	assert.Equal(t, int64(2), body.PerPage)
+}
+
+func TestListWorkspaces_ByIDs_DeduplicatesRepeatedIDs(t *testing.T) {
+	op := approvedAdmin("op@eukarya.io")
+	adminRepo := memory.NewAdminUserWith(op)
+	alpha := ws("Alpha", "alpha")
+	beta := ws("Beta", "beta")
+	wsRepo := memory.NewWorkspaceWith(alpha, beta)
+	sess := session.NewManager(testSecret, time.Hour)
+	e := newTestEcho(wsRepo, adminRepo, sess)
+
+	// The same id repeated must resolve the workspace exactly once.
+	q := url.Values{"ids": {alpha.ID().String(), alpha.ID().String()}}
+	req := httptest.NewRequest(http.MethodGet, "/api/v1/workspaces?"+q.Encode(), nil)
+	req.AddCookie(cookieFor(t, sess, op.ID()))
+	rec := httptest.NewRecorder()
+	e.ServeHTTP(rec, req)
+	require.Equal(t, http.StatusOK, rec.Code)
+
+	var body workspacehandler.ListWorkspacesResponse
+	require.NoError(t, json.Unmarshal(rec.Body.Bytes(), &body))
+	require.Len(t, body.Items, 1)
+	assert.Equal(t, alpha.ID().String(), body.Items[0].ID)
+	assert.Equal(t, int64(1), body.TotalCount)
+	// PerPage reflects the de-duplicated request size, so 1 not 2.
 	assert.Equal(t, int64(1), body.PerPage)
 }
 

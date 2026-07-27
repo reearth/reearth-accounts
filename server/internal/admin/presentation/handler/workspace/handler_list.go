@@ -78,12 +78,20 @@ func (h *Handler) listWorkspacesByIDs(c echo.Context, rawIDs []string) error {
 		return echo.NewHTTPError(http.StatusBadRequest, "too many ids")
 	}
 
+	// De-duplicate parsed IDs while preserving first-seen order so that a
+	// repeated `?ids=a&ids=a` resolves each workspace once, matching the
+	// intended "set of IDs" semantics.
 	ids := make(workspace.IDList, 0, len(rawIDs))
+	seen := make(map[id.WorkspaceID]struct{}, len(rawIDs))
 	for _, raw := range rawIDs {
 		wid, err := id.WorkspaceIDFrom(raw)
 		if err != nil {
 			return echo.NewHTTPError(http.StatusBadRequest, "invalid id")
 		}
+		if _, ok := seen[wid]; ok {
+			continue
+		}
+		seen[wid] = struct{}{}
 		ids = append(ids, wid)
 	}
 
@@ -97,7 +105,10 @@ func (h *Handler) listWorkspacesByIDs(c echo.Context, rawIDs []string) error {
 		Items:      items,
 		TotalCount: int64(len(items)),
 		Page:       1,
-		PerPage:    int64(len(items)),
+		// PerPage reflects the number of requested (de-duplicated) IDs rather
+		// than the returned count, keeping response metadata consistent with the
+		// non-batch listing and avoiding a zero PerPage when no IDs resolve.
+		PerPage: int64(len(ids)),
 	})
 }
 
