@@ -34,12 +34,28 @@ type ListWorkspacesInput struct {
 // Execute returns the matching workspaces. Batch-by-IDs mode returns a nil
 // *PageInfo; callers derive counts from the list.
 func (uc *ListWorkspacesUseCase) Execute(ctx context.Context, in ListWorkspacesInput) (workspace.List, *usecasex.PageInfo, error) {
-	if len(in.IDs) > 0 {
-		list, err := uc.repo.FindByIDs(ctx, in.IDs)
-		if err != nil {
-			return nil, nil, err
-		}
-		return list, nil, nil
+	if len(in.IDs) == 0 {
+		return uc.repo.FindAll(ctx, in.Keyword, in.Pagination)
 	}
-	return uc.repo.FindAll(ctx, in.Keyword, in.Pagination)
+
+	list, err := uc.repo.FindByIDs(ctx, in.IDs)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	// FindByIDs order is backend-dependent (Mongo matches the requested order,
+	// the memory repo sorts by ID). Re-order to the requested (de-duplicated)
+	// IDs so the API response order is stable across backends; unknown IDs are
+	// naturally omitted.
+	byID := make(map[workspace.ID]*workspace.Workspace, len(list))
+	for _, w := range list {
+		byID[w.ID()] = w
+	}
+	ordered := make(workspace.List, 0, len(in.IDs))
+	for _, wid := range in.IDs {
+		if w, ok := byID[wid]; ok {
+			ordered = append(ordered, w)
+		}
+	}
+	return ordered, nil, nil
 }

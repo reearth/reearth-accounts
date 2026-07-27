@@ -40,6 +40,24 @@ func TestList_ByIDs_ReturnsMatching_OmitsUnknown(t *testing.T) {
 	assert.Nil(t, pi)
 }
 
+func TestList_ByIDs_PreservesRequestedOrder(t *testing.T) {
+	ctx := context.Background()
+	a := ws("Alpha", "alpha")
+	b := ws("Beta", "beta")
+	c := ws("Gamma", "gamma")
+	repo := memory.NewWorkspaceWith(a, b, c)
+	uc := NewListWorkspacesUseCase(repo)
+
+	// Request in an order that does not match the backend's natural (by-ID)
+	// order; the response must follow the requested order.
+	want := workspace.IDList{c.ID(), a.ID(), b.ID()}
+	got, _, err := uc.Execute(ctx, ListWorkspacesInput{IDs: want})
+	require.NoError(t, err)
+	require.Len(t, got, 3)
+	gotIDs := workspace.IDList{got[0].ID(), got[1].ID(), got[2].ID()}
+	assert.Equal(t, want, gotIDs)
+}
+
 func TestList_Keyword(t *testing.T) {
 	ctx := context.Background()
 	repo := memory.NewWorkspaceWith(ws("Alpha", "alpha"), ws("Beta", "beta"))
