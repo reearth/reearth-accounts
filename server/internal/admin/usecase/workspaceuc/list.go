@@ -44,16 +44,22 @@ func (uc *ListWorkspacesUseCase) Execute(ctx context.Context, in ListWorkspacesI
 	}
 
 	// FindByIDs order is backend-dependent (Mongo matches the requested order,
-	// the memory repo sorts by ID). Re-order to the requested (de-duplicated)
-	// IDs so the API response order is stable across backends; unknown IDs are
-	// naturally omitted.
+	// the memory repo sorts by ID). Re-order to match in.IDs so the API response
+	// order is stable across backends; unknown IDs are naturally omitted. Each
+	// workspace is emitted at most once, so a repeated input ID does not produce
+	// a duplicate entry even though de-duplication is normally done by the caller.
 	byID := make(map[workspace.ID]*workspace.Workspace, len(list))
 	for _, w := range list {
 		byID[w.ID()] = w
 	}
 	ordered := make(workspace.List, 0, len(in.IDs))
+	seen := make(map[workspace.ID]struct{}, len(in.IDs))
 	for _, wid := range in.IDs {
+		if _, dup := seen[wid]; dup {
+			continue
+		}
 		if w, ok := byID[wid]; ok {
+			seen[wid] = struct{}{}
 			ordered = append(ordered, w)
 		}
 	}

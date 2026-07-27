@@ -58,6 +58,21 @@ func TestList_ByIDs_PreservesRequestedOrder(t *testing.T) {
 	assert.Equal(t, want, gotIDs)
 }
 
+func TestList_ByIDs_DeduplicatesRepeatedIDs(t *testing.T) {
+	ctx := context.Background()
+	a := ws("Alpha", "alpha")
+	b := ws("Beta", "beta")
+	repo := memory.NewWorkspaceWith(a, b)
+	uc := NewListWorkspacesUseCase(repo)
+
+	// A repeated input ID must yield the workspace exactly once.
+	got, _, err := uc.Execute(ctx, ListWorkspacesInput{IDs: workspace.IDList{a.ID(), a.ID(), b.ID()}})
+	require.NoError(t, err)
+	require.Len(t, got, 2)
+	assert.Equal(t, a.ID(), got[0].ID())
+	assert.Equal(t, b.ID(), got[1].ID())
+}
+
 func TestList_Keyword(t *testing.T) {
 	ctx := context.Background()
 	repo := memory.NewWorkspaceWith(ws("Alpha", "alpha"), ws("Beta", "beta"))
