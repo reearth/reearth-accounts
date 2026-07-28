@@ -89,7 +89,7 @@ func TestAuthFlow_GoogleThenMeThenLogout(t *testing.T) {
 	// session cookie, but readable by JS (not HttpOnly).
 	require.NotNil(t, csrfCookie, "csrf cookie must be set")
 	assert.False(t, csrfCookie.HttpOnly, "csrf cookie must be readable by JS")
-	assert.False(t, csrfCookie.Secure, "csrf cookie Secure must match the handler's secure flag")
+	assert.Equal(t, sessionCookie.Secure, csrfCookie.Secure, "csrf cookie Secure must mirror the session cookie's")
 	assert.Equal(t, http.SameSiteLaxMode, csrfCookie.SameSite)
 	assert.Equal(t, "/", csrfCookie.Path)
 	assert.NotEmpty(t, csrfCookie.Value)
