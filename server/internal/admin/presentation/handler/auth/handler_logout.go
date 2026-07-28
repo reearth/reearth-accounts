@@ -16,5 +16,6 @@ import (
 //	@Router			/auth/logout [post]
 func (h *Handler) Logout(c echo.Context) error {
 	c.SetCookie(h.clearSessionCookie())
+	c.SetCookie(h.clearCSRFCookie())
 	return c.NoContent(http.StatusNoContent)
 }

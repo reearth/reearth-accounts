@@ -40,7 +40,12 @@ func (h *Handler) GoogleSignIn(c echo.Context) error {
 	if err != nil {
 		return err
 	}
+	csrf, err := newCSRFToken()
+	if err != nil {
+		return err
+	}
 	c.SetCookie(h.newSessionCookie(token, now))
+	c.SetCookie(h.newCSRFCookie(csrf, now))
 
 	return c.JSON(http.StatusOK, newGoogleSignInResponse(u))
 }
