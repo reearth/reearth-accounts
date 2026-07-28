@@ -1,5 +1,6 @@
 // Package auth implements the admin authentication endpoints: Google sign-in,
-// logout, and the current-user lookup, backed by an HttpOnly session cookie.
+// logout, and the current-user lookup, backed by an HttpOnly session cookie
+// plus a readable (non-HttpOnly) admin_csrf double-submit companion cookie.
 package auth
 
 import (
