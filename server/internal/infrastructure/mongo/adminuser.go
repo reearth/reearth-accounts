@@ -4,6 +4,7 @@ import (
 	"context"
 
 	"github.com/reearth/reearth-accounts/server/internal/infrastructure/mongo/mongodoc"
+	"github.com/reearth/reearth-accounts/server/internal/usecase/repo"
 	"github.com/reearth/reearth-accounts/server/pkg/adminuser"
 	"github.com/reearth/reearthx/mongox"
 	"github.com/reearth/reearthx/rerror"
@@ -12,12 +13,21 @@ import (
 	"go.mongodb.org/mongo-driver/mongo"
 )
 
+// adminUserSystemAdminGuardLockName is the named distributed lock (backed by
+// the same "locks" collection used for config bootstrapping) that serializes
+// SaveGuardingLastSystemAdmin's guarded saves, so the "at least one approved
+// system_admin" invariant is checked and enforced atomically instead of
+// racing another concurrent guarded save.
+const adminUserSystemAdminGuardLockName = "adminuser:system_admin_guard"
+
 type AdminUser struct {
 	client *mongox.Collection
+	lock   repo.Lock
 }
 
 func NewAdminUser(client *mongox.Client) adminuser.Repo {
-	return &AdminUser{client: client.WithCollection("adminuser")}
+	l, _ := NewLock(client.Database().Collection("locks"))
+	return &AdminUser{client: client.WithCollection("adminuser"), lock: l}
 }
 
 func (r *AdminUser) FindByEmail(ctx context.Context, email string) (*adminuser.AdminUser, error) {
@@ -92,6 +102,32 @@ func (r *AdminUser) Save(ctx context.Context, u *adminuser.AdminUser) error {
 		return err
 	}
 	return nil
+}
+
+func (r *AdminUser) SaveGuardingLastSystemAdmin(ctx context.Context, u *adminuser.AdminUser, requireOtherSystemAdmin bool) (bool, error) {
+	if u == nil {
+		return true, nil
+	}
+	if !requireOtherSystemAdmin {
+		return true, r.Save(ctx, u)
+	}
+
+	if err := r.lock.Lock(ctx, adminUserSystemAdminGuardLockName); err != nil {
+		return false, rerror.ErrInternalByWithContext(ctx, err)
+	}
+	defer func() { _ = r.lock.Unlock(ctx, adminUserSystemAdminGuardLockName) }()
+
+	exists, err := r.ExistsApprovedSystemAdminExcept(ctx, u.ID())
+	if err != nil {
+		return false, err
+	}
+	if !exists {
+		return false, nil
+	}
+	if err := r.Save(ctx, u); err != nil {
+		return false, err
+	}
+	return true, nil
 }
 
 func (r *AdminUser) find(ctx context.Context, filter any) (adminuser.List, error) {

@@ -33,4 +33,12 @@ type Repo interface {
 	// other than excludeID exists. Used to guard against demoting the last one.
 	ExistsApprovedSystemAdminExcept(ctx context.Context, excludeID ID) (bool, error)
 	Save(context.Context, *AdminUser) error
+	// SaveGuardingLastSystemAdmin saves u. When requireOtherSystemAdmin is
+	// true, the existence check for another approved system_admin (other than
+	// u) and the save happen as a single atomic operation per backend (e.g. a
+	// locked/serialized transaction), refusing the save (ok=false, nothing
+	// persisted) if none exists. This closes the check-then-act race where two
+	// concurrent demotions of the last two approved system_admins could
+	// otherwise both observe the other as "still there" and both succeed.
+	SaveGuardingLastSystemAdmin(ctx context.Context, u *AdminUser, requireOtherSystemAdmin bool) (ok bool, err error)
 }

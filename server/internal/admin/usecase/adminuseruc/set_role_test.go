@@ -2,6 +2,7 @@ package adminuseruc
 
 import (
 	"context"
+	"sync"
 	"testing"
 
 	"github.com/reearth/reearth-accounts/server/internal/infrastructure/memory"
@@ -105,6 +106,46 @@ func TestSetRole_InvalidRole_LastSystemAdmin(t *testing.T) {
 
 	_, err := uc.Execute(ctx, SetRoleInput{TargetID: operator.ID(), Role: adminuser.Role("bogus")})
 	assert.ErrorIs(t, err, adminuser.ErrInvalidRole)
+}
+
+// Two approved system_admins demoted concurrently must not both succeed: the
+// existence check and the save now happen atomically per-repo (see
+// adminuser.Repo.SaveGuardingLastSystemAdmin), so exactly one demotion must be
+// rejected with ErrLastSystemAdmin, leaving one approved system_admin behind.
+func TestSetRole_ConcurrentDemoteLastTwoSystemAdmins(t *testing.T) {
+	ctx := context.Background()
+	a := approvedWithRole("a@eukarya.io", adminuser.RoleSystemAdmin)
+	b := approvedWithRole("b@eukarya.io", adminuser.RoleSystemAdmin)
+	repo := memory.NewAdminUserWith(a, b)
+	uc := NewSetRoleUseCase(repo)
+
+	var wg sync.WaitGroup
+	errs := make([]error, 2)
+	targets := []*adminuser.AdminUser{a, b}
+	for i := range targets {
+		wg.Add(1)
+		go func(i int) {
+			defer wg.Done()
+			_, errs[i] = uc.Execute(ctx, SetRoleInput{TargetID: targets[i].ID(), Role: adminuser.RoleViewer})
+		}(i)
+	}
+	wg.Wait()
+
+	blocked, succeeded := 0, 0
+	for _, err := range errs {
+		switch {
+		case err == nil:
+			succeeded++
+		case assert.ErrorIs(t, err, ErrLastSystemAdmin):
+			blocked++
+		}
+	}
+	assert.Equal(t, 1, succeeded, "exactly one demotion must succeed")
+	assert.Equal(t, 1, blocked, "exactly one demotion must be blocked")
+
+	hasOther, err := repo.ExistsApprovedSystemAdminExcept(ctx, adminuser.NewID())
+	require.NoError(t, err)
+	assert.True(t, hasOther, "at least one approved system_admin must remain")
 }
 
 func TestSetRole_NotFound(t *testing.T) {
