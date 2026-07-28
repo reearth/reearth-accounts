@@ -9,7 +9,7 @@ import (
 // Logout godoc
 //
 //	@Summary		Log out
-//	@Description	Clears the session cookie. Public endpoint so the cookie can be cleared even with an expired/invalid token.
+//	@Description	Clears the admin session cookie and the admin_csrf double-submit cookie. Public endpoint so the cookies can be cleared even with an expired/invalid token.
 //	@Tags			auth
 //	@Produce		json
 //	@Success		204	"No Content"
