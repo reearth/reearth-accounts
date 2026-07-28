@@ -261,7 +261,7 @@ const docTemplate = `{
         },
         "/auth/google": {
             "post": {
-                "description": "Verifies the Google id_token and issues an admin session cookie. New accounts are created as pending (approved when the email is bootstrapped).",
+                "description": "Verifies the Google id_token and issues an HttpOnly admin session cookie plus a readable (non-HttpOnly) admin_csrf double-submit cookie. New accounts are created as pending (approved when the email is bootstrapped).",
                 "consumes": [
                     "application/json"
                 ],
@@ -313,7 +313,7 @@ const docTemplate = `{
         },
         "/auth/logout": {
             "post": {
-                "description": "Clears the session cookie. Public endpoint so the cookie can be cleared even with an expired/invalid token.",
+                "description": "Clears the admin session cookie and the admin_csrf double-submit cookie. Public endpoint so the cookies can be cleared even with an expired/invalid token.",
                 "produces": [
                     "application/json"
                 ],

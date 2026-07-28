@@ -71,16 +71,30 @@ func TestAuthFlow_GoogleThenMeThenLogout(t *testing.T) {
 	assert.Equal(t, "alice@eukarya.io", signInBody.Email)
 
 	cookies := rec.Result().Cookies()
-	var sessionCookie *http.Cookie
+	var sessionCookie, csrfCookie *http.Cookie
 	for _, c := range cookies {
-		if c.Name == session.CookieName {
+		switch c.Name {
+		case session.CookieName:
 			sessionCookie = c
+		case "admin_csrf":
+			csrfCookie = c
 		}
 	}
 	require.NotNil(t, sessionCookie, "session cookie must be set")
 	assert.True(t, sessionCookie.HttpOnly)
 	assert.Equal(t, http.SameSiteLaxMode, sessionCookie.SameSite)
 	assert.NotEmpty(t, sessionCookie.Value)
+
+	// The double-submit CSRF companion cookie must be set alongside the
+	// session cookie, but readable by JS (not HttpOnly).
+	require.NotNil(t, csrfCookie, "csrf cookie must be set")
+	assert.False(t, csrfCookie.HttpOnly, "csrf cookie must be readable by JS")
+	assert.Equal(t, sessionCookie.Secure, csrfCookie.Secure, "csrf cookie Secure must mirror the session cookie's")
+	assert.Equal(t, http.SameSiteLaxMode, csrfCookie.SameSite)
+	assert.Equal(t, "/", csrfCookie.Path)
+	assert.NotEmpty(t, csrfCookie.Value)
+	// Both cookies share the same lifetime basis (the session TTL).
+	assert.Equal(t, sessionCookie.MaxAge, csrfCookie.MaxAge)
 
 	// 2. /me with the cookie
 	meReq := httptest.NewRequest(http.MethodGet, "/api/v1/me", nil)
@@ -101,13 +115,17 @@ func TestAuthFlow_GoogleThenMeThenLogout(t *testing.T) {
 	e.ServeHTTP(logoutRec, logoutReq)
 	require.Equal(t, http.StatusNoContent, logoutRec.Code)
 
-	var cleared bool
+	var cleared, csrfCleared bool
 	for _, c := range logoutRec.Result().Cookies() {
 		if c.Name == session.CookieName && c.MaxAge < 0 {
 			cleared = true
 		}
+		if c.Name == "admin_csrf" && c.MaxAge < 0 {
+			csrfCleared = true
+		}
 	}
 	assert.True(t, cleared, "logout must expire the session cookie")
+	assert.True(t, csrfCleared, "logout must expire the csrf cookie")
 }
 
 func TestLogout_NoCookie_Succeeds(t *testing.T) {
@@ -118,13 +136,17 @@ func TestLogout_NoCookie_Succeeds(t *testing.T) {
 	// logout is public: it clears the cookie even with no/expired session
 	assert.Equal(t, http.StatusNoContent, rec.Code)
 
-	var cleared bool
+	var cleared, csrfCleared bool
 	for _, c := range rec.Result().Cookies() {
 		if c.Name == session.CookieName && c.MaxAge < 0 {
 			cleared = true
 		}
+		if c.Name == "admin_csrf" && c.MaxAge < 0 {
+			csrfCleared = true
+		}
 	}
 	assert.True(t, cleared, "logout must expire the session cookie")
+	assert.True(t, csrfCleared, "logout must expire the csrf cookie")
 }
 
 func TestMe_Unauthorized_NoCookie(t *testing.T) {

@@ -10,7 +10,7 @@ import (
 // GoogleSignIn godoc
 //
 //	@Summary		Sign in with a Google id_token
-//	@Description	Verifies the Google id_token and issues an admin session cookie. New accounts are created as pending (approved when the email is bootstrapped).
+//	@Description	Verifies the Google id_token and issues an HttpOnly admin session cookie plus a readable (non-HttpOnly) admin_csrf double-submit cookie. New accounts are created as pending (approved when the email is bootstrapped).
 //	@Tags			auth
 //	@Accept			json
 //	@Produce		json
@@ -40,7 +40,12 @@ func (h *Handler) GoogleSignIn(c echo.Context) error {
 	if err != nil {
 		return err
 	}
+	csrf, err := newCSRFToken()
+	if err != nil {
+		return err
+	}
 	c.SetCookie(h.newSessionCookie(token, now))
+	c.SetCookie(h.newCSRFCookie(csrf, now))
 
 	return c.JSON(http.StatusOK, newGoogleSignInResponse(u))
 }
