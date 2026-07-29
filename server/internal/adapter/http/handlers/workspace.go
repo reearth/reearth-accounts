@@ -246,6 +246,48 @@ func (h *WorkspaceHandler) Delete(c echo.Context) error {
 	return c.NoContent(http.StatusNoContent)
 }
 
+// Deactivate godoc
+// @Tags Workspace
+// @Summary Soft-delete a workspace (sets deleted_at; owner-only)
+// @Security BearerAuth
+// @Produce json
+// @Param id path string true "workspace ID"
+// @Success 200 {object} httpmodel.WorkspaceResponse
+// @Router /api/workspaces/{id}/deactivate [post]
+func (h *WorkspaceHandler) Deactivate(c echo.Context) error {
+	ctx := c.Request().Context()
+	wid, err := id.WorkspaceIDFrom(c.Param("id"))
+	if err != nil {
+		return badRequest("invalid workspace id")
+	}
+	w, err := httpinternal.Usecases(c).Workspace.Deactivate(ctx, wid, httpinternal.Operator(c))
+	if err != nil {
+		return err
+	}
+	return c.JSON(http.StatusOK, httpmodel.NewWorkspaceResponse(w))
+}
+
+// Restore godoc
+// @Tags Workspace
+// @Summary Restore a soft-deleted workspace (clears deleted_at; owner-only)
+// @Security BearerAuth
+// @Produce json
+// @Param id path string true "workspace ID"
+// @Success 200 {object} httpmodel.WorkspaceResponse
+// @Router /api/workspaces/{id}/restore [post]
+func (h *WorkspaceHandler) Restore(c echo.Context) error {
+	ctx := c.Request().Context()
+	wid, err := id.WorkspaceIDFrom(c.Param("id"))
+	if err != nil {
+		return badRequest("invalid workspace id")
+	}
+	w, err := httpinternal.Usecases(c).Workspace.Restore(ctx, wid, httpinternal.Operator(c))
+	if err != nil {
+		return err
+	}
+	return c.JSON(http.StatusOK, httpmodel.NewWorkspaceResponse(w))
+}
+
 // AddMembers godoc
 // @Tags Workspace
 // @Summary Add user members to a workspace

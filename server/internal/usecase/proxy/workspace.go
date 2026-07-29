@@ -196,6 +196,17 @@ func (w *Workspace) Remove(ctx context.Context, id workspace.ID, op *workspace.O
 	return nil
 }
 
+// Deactivate and Restore are not supported via this GraphQL proxy: there is no
+// corresponding mutation in the public GraphQL schema (REST-only, same as
+// FindAll), so this client has no remote call to make on the caller's behalf.
+func (w *Workspace) Deactivate(ctx context.Context, id workspace.ID, op *workspace.Operator) (*workspace.Workspace, error) {
+	return nil, workspace.ErrNotImplemented
+}
+
+func (w *Workspace) Restore(ctx context.Context, id workspace.ID, op *workspace.Operator) (*workspace.Workspace, error) {
+	return nil, workspace.ErrNotImplemented
+}
+
 func (w *Workspace) TransferOwnership(ctx context.Context, id workspace.ID, newOwnerID accountid.UserID, op *workspace.Operator) (*workspace.Workspace, error) {
 	res, err := TransferWorkspaceOwnership(ctx, w.gql, TransferWorkspaceOwnershipInput{WorkspaceId: id.String(), NewOwnerId: newOwnerID.String()})
 	if err != nil {

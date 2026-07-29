@@ -571,6 +571,71 @@ func (i *Workspace) Remove(ctx context.Context, id workspace.ID, operator *works
 	})
 }
 
+// Deactivate soft-deletes a workspace (sets deleted_at) instead of removing it
+// outright — members and data are left intact so it can later be Restored.
+// Owner-only (see rbac.ActionDeactivate); the same Cerbos-or-ownership check as
+// Remove, so a trusted global-owner account (e.g. LINKS-Veda) can deactivate
+// workspaces it manages without being a member.
+func (i *Workspace) Deactivate(ctx context.Context, id workspace.ID, operator *workspace.Operator) (*workspace.Workspace, error) {
+	if operator.User == nil {
+		return nil, interfaces.ErrInvalidOperator
+	}
+
+	return Run1(ctx, operator, i.repos, Usecase().Transaction(), func(ctx context.Context) (*workspace.Workspace, error) {
+		ws, err := i.repos.Workspace.FindByID(ctx, id)
+		if err != nil {
+			return nil, err
+		}
+
+		if ws.IsPersonal() {
+			return nil, workspace.ErrCannotModifyPersonalWorkspace
+		}
+
+		if err := i.checkOwnerLikePermission(ctx, ws, operator, rbac.ActionDeactivate); err != nil {
+			return nil, err
+		}
+
+		ws.Delete()
+
+		if err := i.repos.Workspace.Save(ctx, ws); err != nil {
+			return nil, err
+		}
+
+		return ws, nil
+	})
+}
+
+// Restore reverses Deactivate (clears deleted_at). Same permission model as
+// Deactivate.
+func (i *Workspace) Restore(ctx context.Context, id workspace.ID, operator *workspace.Operator) (*workspace.Workspace, error) {
+	if operator.User == nil {
+		return nil, interfaces.ErrInvalidOperator
+	}
+
+	return Run1(ctx, operator, i.repos, Usecase().Transaction(), func(ctx context.Context) (*workspace.Workspace, error) {
+		ws, err := i.repos.Workspace.FindByID(ctx, id)
+		if err != nil {
+			return nil, err
+		}
+
+		if ws.IsPersonal() {
+			return nil, workspace.ErrCannotModifyPersonalWorkspace
+		}
+
+		if err := i.checkOwnerLikePermission(ctx, ws, operator, rbac.ActionRestore); err != nil {
+			return nil, err
+		}
+
+		ws.Restore()
+
+		if err := i.repos.Workspace.Save(ctx, ws); err != nil {
+			return nil, err
+		}
+
+		return ws, nil
+	})
+}
+
 func (i *Workspace) TransferOwnership(ctx context.Context, workspaceID workspace.ID, newOwnerID workspace.UserID, operator *workspace.Operator) (*workspace.Workspace, error) {
 	if operator.User == nil {
 		return nil, interfaces.ErrInvalidOperator
@@ -790,4 +855,33 @@ func (i *Workspace) bulkUpdatePermittable(ctx context.Context, workspaceID works
 	}
 
 	return i.permittableRepo.SaveMany(ctx, toSave)
+}
+
+// checkOwnerLikePermission checks the given action via Cerbos (workspace-scoped
+// or global role — the latter lets a trusted account such as LINKS-Veda's manage
+// workspaces it created without members) or falls back to the operator's real
+// ownership when Cerbos isn't configured.
+func (i *Workspace) checkOwnerLikePermission(ctx context.Context, ws *workspace.Workspace, operator *workspace.Operator, action string) error {
+	if i.cerbos != nil {
+		result, cErr := i.cerbos.CheckPermission(ctx, *operator.User, interfaces.CheckPermissionParam{
+			Service:        rbac.ServiceName,
+			Resource:       rbac.ResourceWorkspace,
+			Action:         action,
+			WorkspaceAlias: ws.Alias(),
+		})
+		if cErr != nil {
+			return applog.ErrorWithCallerLogging(ctx, "failed to check permission", cErr)
+		}
+		if result != nil {
+			if !result.Allowed {
+				return interfaces.ErrPermissionDenied
+			}
+			return nil
+		}
+	}
+
+	if !operator.IsOwningWorkspace(ws.ID()) {
+		return interfaces.ErrOperationDenied
+	}
+	return nil
 }

@@ -107,6 +107,8 @@ func RegisterRESTRouter(e *echo.Echo, cfg RouterConfig) {
 	api.GET("/workspaces/:id", wh.Get, required)
 	api.PATCH("/workspaces/:id", wh.Update, required)
 	api.DELETE("/workspaces/:id", wh.Delete, required)
+	api.POST("/workspaces/:id/deactivate", wh.Deactivate, required) // soft delete (owner-only)
+	api.POST("/workspaces/:id/restore", wh.Restore, required)       // undo deactivate (owner-only)
 	api.POST("/workspaces/:id/members", wh.AddMembers, required)
 	api.PATCH("/workspaces/:id/members/:user_id", wh.UpdateMember, required)
 	api.DELETE("/workspaces/:id/members/:user_id", wh.RemoveMember, required)

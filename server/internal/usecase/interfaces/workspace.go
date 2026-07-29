@@ -75,5 +75,9 @@ type Workspace interface {
 	RemoveIntegration(context.Context, workspace.ID, workspace.IntegrationID, *workspace.Operator) (*workspace.Workspace, error)
 	RemoveIntegrations(context.Context, workspace.ID, workspace.IntegrationIDList, *workspace.Operator) (*workspace.Workspace, error)
 	Remove(context.Context, workspace.ID, *workspace.Operator) error
+	// Deactivate soft-deletes a workspace (sets deleted_at); Restore reverses it.
+	// Owner-only, unlike the maintainer-or-owner Update/Remove.
+	Deactivate(ctx context.Context, id workspace.ID, operator *workspace.Operator) (*workspace.Workspace, error)
+	Restore(ctx context.Context, id workspace.ID, operator *workspace.Operator) (*workspace.Workspace, error)
 	TransferOwnership(ctx context.Context, workspaceID workspace.ID, newOwnerID workspace.UserID, operator *workspace.Operator) (*workspace.Workspace, error)
 }

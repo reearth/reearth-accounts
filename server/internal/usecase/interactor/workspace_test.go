@@ -2335,3 +2335,93 @@ func TestWorkspace_FindAll(t *testing.T) {
 		assert.Len(t, res.Workspaces, 2)
 	})
 }
+
+func TestWorkspace_DeactivateAndRestore(t *testing.T) {
+	ctx := context.Background()
+
+	newOwnedWorkspace := func() (workspace.ID, user.ID, *repo.Container) {
+		db := memory.New()
+		ownerID := id.NewUserID()
+		wid := id.NewWorkspaceID()
+		ws := workspace.New().ID(wid).Name("Test").Alias("test-alias").
+			Members(map[user.ID]workspace.Member{ownerID: {Role: role.RoleOwner}}).
+			Personal(false).MustBuild()
+		assert.NoError(t, db.Workspace.Save(ctx, ws))
+		return wid, ownerID, db
+	}
+
+	t.Run("owner can deactivate then restore", func(t *testing.T) {
+		wid, ownerID, db := newOwnedWorkspace()
+		op := &workspace.Operator{User: lo.ToPtr(ownerID), OwningWorkspaces: []workspace.ID{wid}}
+		workspaceUC := NewWorkspace(db, nil, nil)
+
+		ws, err := workspaceUC.Deactivate(ctx, wid, op)
+		assert.NoError(t, err)
+		assert.NotNil(t, ws.DeletedAt())
+
+		stored, err := db.Workspace.FindByID(ctx, wid)
+		assert.NoError(t, err)
+		assert.NotNil(t, stored.DeletedAt())
+
+		ws, err = workspaceUC.Restore(ctx, wid, op)
+		assert.NoError(t, err)
+		assert.Nil(t, ws.DeletedAt())
+
+		stored, err = db.Workspace.FindByID(ctx, wid)
+		assert.NoError(t, err)
+		assert.Nil(t, stored.DeletedAt())
+	})
+
+	t.Run("non-owner cannot deactivate", func(t *testing.T) {
+		wid, _, db := newOwnedWorkspace()
+		op := &workspace.Operator{User: lo.ToPtr(id.NewUserID())}
+		workspaceUC := NewWorkspace(db, nil, nil)
+
+		_, err := workspaceUC.Deactivate(ctx, wid, op)
+		assert.ErrorIs(t, err, interfaces.ErrOperationDenied)
+	})
+
+	t.Run("cannot deactivate a personal workspace", func(t *testing.T) {
+		db := memory.New()
+		ownerID := id.NewUserID()
+		wid := id.NewWorkspaceID()
+		ws := workspace.New().ID(wid).Name("Personal").Alias("personal-alias").
+			Members(map[user.ID]workspace.Member{ownerID: {Role: role.RoleOwner}}).
+			Personal(true).MustBuild()
+		assert.NoError(t, db.Workspace.Save(ctx, ws))
+		op := &workspace.Operator{User: lo.ToPtr(ownerID), OwningWorkspaces: []workspace.ID{wid}}
+		workspaceUC := NewWorkspace(db, nil, nil)
+
+		_, err := workspaceUC.Deactivate(ctx, wid, op)
+		assert.ErrorIs(t, err, workspace.ErrCannotModifyPersonalWorkspace)
+	})
+
+	t.Run("Cerbos global owner role deactivates a memberless workspace", func(t *testing.T) {
+		db := memory.New()
+		wid := id.NewWorkspaceID()
+		ws := workspace.New().ID(wid).Name("no-owner").Alias("no-owner").Personal(false).MustBuild()
+		assert.NoError(t, db.Workspace.Save(ctx, ws))
+		op := &workspace.Operator{User: lo.ToPtr(id.NewUserID())}
+		workspaceUC := NewWorkspace(db, nil, &fakeCerbos{allowed: true})
+
+		got, err := workspaceUC.Deactivate(ctx, wid, op)
+		assert.NoError(t, err)
+		assert.NotNil(t, got.DeletedAt())
+	})
+
+	t.Run("Cerbos deny blocks restore", func(t *testing.T) {
+		wid, ownerID, db := newOwnedWorkspace()
+		op := &workspace.Operator{User: lo.ToPtr(ownerID), OwningWorkspaces: []workspace.ID{wid}}
+		// Deactivate first via the fallback path (no cerbos), then attempt to
+		// restore with cerbos configured and denying.
+		_, err := NewWorkspace(db, nil, nil).Deactivate(ctx, wid, op)
+		assert.NoError(t, err)
+
+		_, err = NewWorkspace(db, nil, &fakeCerbos{allowed: false}).Restore(ctx, wid, op)
+		assert.ErrorIs(t, err, interfaces.ErrPermissionDenied)
+
+		stored, err := db.Workspace.FindByID(ctx, wid)
+		assert.NoError(t, err)
+		assert.NotNil(t, stored.DeletedAt())
+	})
+}
