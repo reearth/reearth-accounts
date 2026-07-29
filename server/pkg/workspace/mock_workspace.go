@@ -71,9 +71,9 @@ func (mr *MockRepoMockRecorder) Filtered(arg0 any) *gomock.Call {
 }
 
 // FindAll mocks base method.
-func (m *MockRepo) FindAll(ctx context.Context, keyword *string, personal *bool, pagination *usecasex.Pagination) (List, *usecasex.PageInfo, error) {
+func (m *MockRepo) FindAll(ctx context.Context, keyword *string, personal *bool, status StatusFilter, pagination *usecasex.Pagination) (List, *usecasex.PageInfo, error) {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "FindAll", ctx, keyword, personal, pagination)
+	ret := m.ctrl.Call(m, "FindAll", ctx, keyword, personal, status, pagination)
 	ret0, _ := ret[0].(List)
 	ret1, _ := ret[1].(*usecasex.PageInfo)
 	ret2, _ := ret[2].(error)
@@ -81,9 +81,9 @@ func (m *MockRepo) FindAll(ctx context.Context, keyword *string, personal *bool,
 }
 
 // FindAll indicates an expected call of FindAll.
-func (mr *MockRepoMockRecorder) FindAll(ctx, keyword, personal, pagination any) *gomock.Call {
+func (mr *MockRepoMockRecorder) FindAll(ctx, keyword, personal, status, pagination any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "FindAll", reflect.TypeOf((*MockRepo)(nil).FindAll), ctx, keyword, personal, pagination)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "FindAll", reflect.TypeOf((*MockRepo)(nil).FindAll), ctx, keyword, personal, status, pagination)
 }
 
 // FindByAlias mocks base method.

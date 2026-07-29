@@ -2257,3 +2257,49 @@ func TestWorkspace_BulkRemovePermittable(t *testing.T) {
 		}
 	})
 }
+
+func TestWorkspace_FindAll(t *testing.T) {
+	ctx := context.Background()
+	db := memory.New()
+	workspaceUC := NewWorkspace(db, nil, nil)
+
+	wsA := workspace.New().NewID().Name("alpha").MustBuild()
+	wsB := workspace.New().NewID().Name("beta").MustBuild()
+	assert.NoError(t, db.Workspace.Create(ctx, wsA))
+	assert.NoError(t, db.Workspace.Create(ctx, wsB))
+
+	t.Run("no keyword returns everything, unfiltered by any operator", func(t *testing.T) {
+		res, err := workspaceUC.FindAll(ctx, interfaces.FindAllWorkspacesParam{Page: 1, Size: 10})
+		assert.NoError(t, err)
+		assert.Len(t, res.Workspaces, 2)
+		assert.Equal(t, 2, res.TotalCount)
+	})
+
+	t.Run("keyword filters by name", func(t *testing.T) {
+		kw := "alpha"
+		res, err := workspaceUC.FindAll(ctx, interfaces.FindAllWorkspacesParam{Keyword: &kw, Page: 1, Size: 10})
+		assert.NoError(t, err)
+		assert.Len(t, res.Workspaces, 1)
+		assert.Equal(t, wsA.ID(), res.Workspaces[0].ID())
+	})
+
+	t.Run("default status excludes soft-deleted workspaces", func(t *testing.T) {
+		wsA.Delete()
+		defer wsA.Restore()
+		assert.NoError(t, db.Workspace.Save(ctx, wsA))
+
+		res, err := workspaceUC.FindAll(ctx, interfaces.FindAllWorkspacesParam{Page: 1, Size: 10})
+		assert.NoError(t, err)
+		assert.Len(t, res.Workspaces, 1)
+		assert.Equal(t, wsB.ID(), res.Workspaces[0].ID())
+
+		res, err = workspaceUC.FindAll(ctx, interfaces.FindAllWorkspacesParam{Status: workspace.StatusDeleted, Page: 1, Size: 10})
+		assert.NoError(t, err)
+		assert.Len(t, res.Workspaces, 1)
+		assert.Equal(t, wsA.ID(), res.Workspaces[0].ID())
+
+		res, err = workspaceUC.FindAll(ctx, interfaces.FindAllWorkspacesParam{Status: workspace.StatusAll, Page: 1, Size: 10})
+		assert.NoError(t, err)
+		assert.Len(t, res.Workspaces, 2)
+	})
+}

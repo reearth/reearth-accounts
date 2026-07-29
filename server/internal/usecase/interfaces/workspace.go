@@ -29,6 +29,18 @@ type FetchByUserWithPaginationResult struct {
 	TotalCount int
 }
 
+type FindAllWorkspacesParam struct {
+	Keyword *string
+	Status  workspace.StatusFilter
+	Page    int64
+	Size    int64
+}
+
+type FindAllWorkspacesResult struct {
+	Workspaces workspace.List
+	TotalCount int
+}
+
 type UpdateWorkspaceParam struct {
 	ID          workspace.ID
 	Name        *string
@@ -44,6 +56,9 @@ type Workspace interface {
 	FetchByName(context.Context, string) (*workspace.Workspace, error)
 	FetchByAlias(context.Context, string) (*workspace.Workspace, error)
 	FetchByUserWithPagination(context.Context, user.ID, FetchByUserWithPaginationParam) (FetchByUserWithPaginationResult, error)
+	// FindAll lists workspaces across all tenants, unfiltered by any operator's
+	// readable-workspace set. Intended for service-to-service callers only.
+	FindAll(context.Context, FindAllWorkspacesParam) (FindAllWorkspacesResult, error)
 	FindByUser(context.Context, user.ID, *workspace.Operator) (workspace.List, error)
 	Create(ctx context.Context, alias, name, description string, firstUser workspace.UserID, operator *workspace.Operator) (_ *workspace.Workspace, err error)
 	Update(context.Context, UpdateWorkspaceParam, *workspace.Operator) (*workspace.Workspace, error)

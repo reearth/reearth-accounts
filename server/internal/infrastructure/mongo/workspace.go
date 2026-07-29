@@ -40,17 +40,33 @@ func (r *Workspace) Filtered(f workspace.WorkspaceFilter) workspace.Repo {
 	}
 }
 
-func (r *Workspace) FindAll(ctx context.Context, keyword *string, personal *bool, pagination *usecasex.Pagination) (workspace.List, *usecasex.PageInfo, error) {
+func (r *Workspace) FindAll(ctx context.Context, keyword *string, personal *bool, status workspace.StatusFilter, pagination *usecasex.Pagination) (workspace.List, *usecasex.PageInfo, error) {
 	if pagination != nil && pagination.Cursor != nil {
 		return nil, nil, workspace.ErrCursorPaginationUnsupported
 	}
 
-	filter := bson.M{}
+	var conds []bson.M
 	if keyword != nil && strings.TrimSpace(*keyword) != "" {
 		re := primitive.Regex{Pattern: regexp.QuoteMeta(strings.TrimSpace(*keyword)), Options: "i"}
-		filter["$or"] = []bson.M{
+		conds = append(conds, bson.M{"$or": []bson.M{
 			{"name": bson.M{"$regex": re}},
 			{"alias": bson.M{"$regex": re}},
+		}})
+	}
+	switch status {
+	case workspace.StatusActive:
+		conds = append(conds, bson.M{"deletedat": bson.M{"$exists": false}})
+	case workspace.StatusDeleted:
+		conds = append(conds, bson.M{"deletedat": bson.M{"$exists": true}})
+	}
+
+	filter := bson.M{}
+	switch len(conds) {
+	case 1:
+		filter = conds[0]
+	default:
+		if len(conds) > 1 {
+			filter = bson.M{"$and": conds}
 		}
 	}
 	// filter by workspace type when requested (nil = both types). The personal

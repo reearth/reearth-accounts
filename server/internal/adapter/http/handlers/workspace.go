@@ -9,6 +9,7 @@ import (
 	httpinternal "github.com/reearth/reearth-accounts/server/internal/adapter/http/internal"
 	"github.com/reearth/reearth-accounts/server/internal/usecase/interfaces"
 	"github.com/reearth/reearth-accounts/server/pkg/id"
+	"github.com/reearth/reearth-accounts/server/pkg/workspace"
 )
 
 type WorkspaceHandler struct{}
@@ -151,6 +152,50 @@ func (h *WorkspaceHandler) List(c echo.Context) error {
 		}
 		return c.JSON(http.StatusOK, httpmodel.NewWorkspaceResponses(ws))
 	}
+}
+
+// ListAll godoc
+// @Tags Workspace
+// @Summary List all workspaces across all tenants, for service-to-service integrations
+// @Security BearerAuth
+// @Param keyword query string false "keyword filter (matches name or alias)"
+// @Param status query string false "active (default), deleted, or all"
+// @Param page query int false "page (default 1)"
+// @Param page_size query int false "page size (default 50, max 100)"
+// @Produce json
+// @Success 200 {object} httpmodel.WorkspaceResponse
+// @Failure 400 {object} internal.ErrorResponse
+// @Router /api/workspaces/all [get]
+func (h *WorkspaceHandler) ListAll(c echo.Context) error {
+	ctx := c.Request().Context()
+	uc := httpinternal.Usecases(c).Workspace
+
+	var kw *string
+	if k := c.QueryParam("keyword"); k != "" {
+		kw = &k
+	}
+
+	status := workspace.StatusActive
+	if s := c.QueryParam("status"); s != "" {
+		switch workspace.StatusFilter(s) {
+		case workspace.StatusActive, workspace.StatusDeleted, workspace.StatusAll:
+			status = workspace.StatusFilter(s)
+		default:
+			return badRequest("status must be one of: active, deleted, all")
+		}
+	}
+
+	var pp httpinternal.PageParams
+	if err := c.Bind(&pp); err != nil {
+		return err
+	}
+	page, size := pp.Normalized()
+
+	res, err := uc.FindAll(ctx, interfaces.FindAllWorkspacesParam{Keyword: kw, Status: status, Page: int64(page), Size: int64(size)})
+	if err != nil {
+		return err
+	}
+	return c.JSON(http.StatusOK, httpinternal.NewPageResult(httpmodel.NewWorkspaceResponses(res.Workspaces), page, size, res.TotalCount))
 }
 
 // Update godoc

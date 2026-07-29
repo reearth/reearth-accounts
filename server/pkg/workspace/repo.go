@@ -14,9 +14,18 @@ var (
 	// pagination is requested. The admin cross-tenant list is offset-based only.
 	ErrCursorPaginationUnsupported = errors.New("cursor pagination is not supported")
 	// ErrNotImplemented is returned by a repository method that a given backend
-	// does not implement (e.g. FindAll on the Postgres backend, since the admin
-	// app runs on MongoDB).
+	// does not implement.
 	ErrNotImplemented = errors.New("not implemented for this backend")
+)
+
+// StatusFilter selects which workspaces FindAll returns based on soft-delete
+// state.
+type StatusFilter string
+
+const (
+	StatusAll     StatusFilter = "all"
+	StatusActive  StatusFilter = "active"
+	StatusDeleted StatusFilter = "deleted"
 )
 
 //go:generate mockgen -source=./repo.go -destination=./mock_workspace.go -package workspace
@@ -26,7 +35,7 @@ type Repo interface {
 	// (nil or blank = no keyword filter). personal filters by workspace type:
 	// nil returns both, true returns only personal workspaces, false returns only
 	// team (non-personal) workspaces.
-	FindAll(ctx context.Context, keyword *string, personal *bool, pagination *usecasex.Pagination) (List, *usecasex.PageInfo, error)
+	FindAll(ctx context.Context, keyword *string, personal *bool, status StatusFilter, pagination *usecasex.Pagination) (List, *usecasex.PageInfo, error)
 	FindByID(context.Context, ID) (*Workspace, error)
 	FindByName(context.Context, string) (*Workspace, error)
 	FindByAlias(ctx context.Context, alias string) (*Workspace, error)

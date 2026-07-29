@@ -1,6 +1,8 @@
 package httpmodel
 
 import (
+	"time"
+
 	"github.com/reearth/reearth-accounts/server/pkg/role"
 	"github.com/reearth/reearth-accounts/server/pkg/user"
 	"github.com/reearth/reearth-accounts/server/pkg/workspace"
@@ -24,12 +26,15 @@ type WorkspaceMetadataResponse struct {
 
 // WorkspaceResponse mirrors the GraphQL Workspace type.
 type WorkspaceResponse struct {
-	ID       string                     `json:"id"`
-	Name     string                     `json:"name"`
-	Alias    string                     `json:"alias"`
-	Personal bool                       `json:"personal"`
-	Members  []WorkspaceMemberResponse  `json:"members"`
-	Metadata *WorkspaceMetadataResponse `json:"metadata"`
+	ID        string                     `json:"id"`
+	Name      string                     `json:"name"`
+	Alias     string                     `json:"alias"`
+	Personal  bool                       `json:"personal"`
+	Members   []WorkspaceMemberResponse  `json:"members"`
+	Metadata  *WorkspaceMetadataResponse `json:"metadata"`
+	CreatedAt *time.Time                 `json:"created_at,omitempty"`
+	CreatedBy *string                    `json:"created_by,omitempty"`
+	DeletedAt *time.Time                 `json:"deleted_at,omitempty"`
 }
 
 // NewWorkspaceResponse converts a domain workspace (no signed-URL resolution).
@@ -54,14 +59,21 @@ func NewWorkspaceResponse(w *workspace.Workspace) *WorkspaceResponse {
 		BillingEmail: md.BillingEmail(),
 		PhotoURL:     md.PhotoURL(),
 	}
-	return &WorkspaceResponse{
-		ID:       w.ID().String(),
-		Name:     w.Name(),
-		Alias:    w.Alias(),
-		Personal: w.IsPersonal(),
-		Members:  members,
-		Metadata: meta,
+	res := &WorkspaceResponse{
+		ID:        w.ID().String(),
+		Name:      w.Name(),
+		Alias:     w.Alias(),
+		Personal:  w.IsPersonal(),
+		Members:   members,
+		Metadata:  meta,
+		CreatedAt: w.CreatedAt(),
+		DeletedAt: w.DeletedAt(),
 	}
+	if cb := w.CreatedBy(); cb != nil {
+		s := cb.String()
+		res.CreatedBy = &s
+	}
+	return res
 }
 
 // NewWorkspaceResponses converts a list.

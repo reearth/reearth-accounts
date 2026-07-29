@@ -166,6 +166,40 @@ func (q *Queries) WorkspaceFindByName(ctx context.Context, name string) (Workspa
 	return i, err
 }
 
+const workspaceIDsAll = `-- name: WorkspaceIDsAll :many
+SELECT id FROM workspaces
+WHERE ($1::text = '' OR name ILIKE '%' || $1::text || '%' OR alias ILIKE '%' || $1::text || '%')
+  AND ($2::text = 'all' OR ($2::text = 'active' AND deleted_at IS NULL) OR ($2::text = 'deleted' AND deleted_at IS NOT NULL))
+ORDER BY id
+`
+
+type WorkspaceIDsAllParams struct {
+	Keyword string
+	Status  string
+}
+
+// Cross-tenant listing (no readable-workspace filter): pass ” for no keyword
+// filter, and one of 'all'/'active'/'deleted' for the status filter.
+func (q *Queries) WorkspaceIDsAll(ctx context.Context, arg WorkspaceIDsAllParams) ([]string, error) {
+	rows, err := q.db.Query(ctx, workspaceIDsAll, arg.Keyword, arg.Status)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []string
+	for rows.Next() {
+		var id string
+		if err := rows.Scan(&id); err != nil {
+			return nil, err
+		}
+		items = append(items, id)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const workspaceIDsByIntegration = `-- name: WorkspaceIDsByIntegration :many
 SELECT DISTINCT workspace_id FROM workspace_integrations WHERE integration_id = $1
 `
@@ -386,8 +420,6 @@ type WorkspaceUpsertParams struct {
 	DeletedAt   *time.Time
 }
 
-// created_at is intentionally excluded from the ON CONFLICT SET clause: it is
-// set once on the first insert and must never be overwritten afterward.
 func (q *Queries) WorkspaceUpsert(ctx context.Context, arg WorkspaceUpsertParams) error {
 	_, err := q.db.Exec(ctx, workspaceUpsert,
 		arg.ID,

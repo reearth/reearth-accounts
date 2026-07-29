@@ -87,6 +87,14 @@ func (w *Workspace) FetchByUserWithPagination(ctx context.Context, userID accoun
 	}, nil
 }
 
+// FindAll is not supported via this GraphQL proxy: there is no cross-tenant
+// listing query in the public GraphQL schema (it's only reachable via the
+// M2M-gated REST route or the separate admin API), so this client has no
+// remote call to make on the caller's behalf.
+func (w *Workspace) FindAll(ctx context.Context, param interfaces.FindAllWorkspacesParam) (interfaces.FindAllWorkspacesResult, error) {
+	return interfaces.FindAllWorkspacesResult{}, workspace.ErrNotImplemented
+}
+
 func (w *Workspace) Create(ctx context.Context, alias, name, description string, userID accountid.UserID, op *workspace.Operator) (*workspace.Workspace, error) {
 	res, err := CreateWorkspace(ctx, w.gql, CreateWorkspaceInput{
 		Alias:       alias,

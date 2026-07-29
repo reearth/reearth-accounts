@@ -101,6 +101,9 @@ func RegisterRESTRouter(e *echo.Echo, cfg RouterConfig) {
 	wh := handlers.NewWorkspaceHandler()
 	api.POST("/workspaces", wh.Create, required)
 	api.GET("/workspaces", wh.List, required) // ?ids= | ?name= | ?alias= | ?user_id=(&page=&page_size=)
+	// Cross-tenant listing for service-to-service callers (e.g. LINKS-Veda). Any
+	// authenticated user can call this, same as GET /workspaces/:id|name|alias
+	api.GET("/workspaces/all", wh.ListAll, required) // ?keyword=&status=active|deleted|all&page=&page_size=
 	api.GET("/workspaces/:id", wh.Get, required)
 	api.PATCH("/workspaces/:id", wh.Update, required)
 	api.DELETE("/workspaces/:id", wh.Delete, required)

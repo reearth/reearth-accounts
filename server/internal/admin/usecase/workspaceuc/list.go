@@ -39,7 +39,7 @@ type ListWorkspacesInput struct {
 // *PageInfo; callers derive counts from the list.
 func (uc *ListWorkspacesUseCase) Execute(ctx context.Context, in ListWorkspacesInput) (workspace.List, *usecasex.PageInfo, error) {
 	if len(in.IDs) == 0 {
-		return uc.repo.FindAll(ctx, in.Keyword, in.Personal, in.Pagination)
+		return uc.repo.FindAll(ctx, in.Keyword, in.Personal, workspace.StatusAll, in.Pagination)
 	}
 
 	list, err := uc.repo.FindByIDs(ctx, in.IDs)

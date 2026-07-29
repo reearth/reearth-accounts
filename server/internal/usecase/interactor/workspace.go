@@ -87,6 +87,26 @@ func (i *Workspace) FetchByUserWithPagination(ctx context.Context, userID worksp
 	}, nil
 }
 
+// FindAll lists workspaces across all tenants, unfiltered by any operator's
+// readable-workspace set — mirrors how the admin app's own workspace listing
+// calls repos.Workspace.FindAll directly. Reachable by any authenticated user,
+// same as FetchByID/FetchByName/FetchByAlias (no per-workspace membership check).
+func (i *Workspace) FindAll(ctx context.Context, input interfaces.FindAllWorkspacesParam) (interfaces.FindAllWorkspacesResult, error) {
+	status := input.Status
+	if status == "" {
+		status = workspace.StatusActive
+	}
+	workspaces, pageInfo, err := i.repos.Workspace.FindAll(ctx, input.Keyword, nil, status, pagination.ToPagination(input.Page, input.Size))
+	if err != nil {
+		return interfaces.FindAllWorkspacesResult{}, err
+	}
+
+	return interfaces.FindAllWorkspacesResult{
+		Workspaces: workspaces,
+		TotalCount: int(pageInfo.TotalCount),
+	}, nil
+}
+
 func (i *Workspace) Create(ctx context.Context, alias, name, description string, firstUser workspace.UserID, operator *workspace.Operator) (_ *workspace.Workspace, err error) {
 	if operator.User == nil {
 		return nil, interfaces.ErrInvalidOperator

@@ -22,6 +22,14 @@ SELECT * FROM workspaces WHERE lower(alias) = lower($1) AND alias <> '';
 -- Case-insensitive, matching the case-insensitive unique alias index.
 SELECT * FROM workspaces WHERE lower(alias) = ANY($1::text[]) ORDER BY id;
 
+-- name: WorkspaceIDsAll :many
+-- Cross-tenant listing (no readable-workspace filter): pass '' for no keyword
+-- filter, and one of 'all'/'active'/'deleted' for the status filter.
+SELECT id FROM workspaces
+WHERE (sqlc.arg(keyword)::text = '' OR name ILIKE '%' || sqlc.arg(keyword)::text || '%' OR alias ILIKE '%' || sqlc.arg(keyword)::text || '%')
+  AND (sqlc.arg(status)::text = 'all' OR (sqlc.arg(status)::text = 'active' AND deleted_at IS NULL) OR (sqlc.arg(status)::text = 'deleted' AND deleted_at IS NOT NULL))
+ORDER BY id;
+
 -- name: WorkspaceDelete :exec
 DELETE FROM workspaces WHERE id = $1;
 
