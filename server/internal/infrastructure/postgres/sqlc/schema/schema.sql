@@ -17,7 +17,8 @@ CREATE TABLE users (
     team             text,
     lang             text,
     theme            text,
-    updated_at       timestamptz NOT NULL DEFAULT now()
+    updated_at       timestamptz NOT NULL DEFAULT now(),
+    deleted_at       timestamptz
 );
 
 CREATE TABLE workspaces (
@@ -29,7 +30,10 @@ CREATE TABLE workspaces (
     policy       text,
     members_hash text NOT NULL DEFAULT '',
     metadata     jsonb NOT NULL DEFAULT '{}',
-    updated_at   timestamptz NOT NULL DEFAULT now()
+    created_at   timestamptz,
+    created_by   text,
+    updated_at   timestamptz NOT NULL DEFAULT now(),
+    deleted_at   timestamptz
 );
 
 CREATE TABLE workspace_members (

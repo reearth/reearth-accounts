@@ -1,0 +1,4 @@
+ALTER TABLE users DROP COLUMN IF EXISTS deleted_at;
+ALTER TABLE workspaces DROP COLUMN IF EXISTS created_at;
+ALTER TABLE workspaces DROP COLUMN IF EXISTS created_by;
+ALTER TABLE workspaces DROP COLUMN IF EXISTS deleted_at;

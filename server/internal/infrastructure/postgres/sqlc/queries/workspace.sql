@@ -1,9 +1,10 @@
 -- name: WorkspaceUpsert :exec
-INSERT INTO workspaces (id, name, alias, email, personal, policy, members_hash, metadata, updated_at)
-VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9)
+INSERT INTO workspaces (id, name, alias, email, personal, policy, members_hash, metadata, created_at, created_by, updated_at, deleted_at)
+VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12)
 ON CONFLICT (id) DO UPDATE SET
   name=EXCLUDED.name, alias=EXCLUDED.alias, email=EXCLUDED.email, personal=EXCLUDED.personal,
-  policy=EXCLUDED.policy, members_hash=EXCLUDED.members_hash, metadata=EXCLUDED.metadata, updated_at=EXCLUDED.updated_at;
+  policy=EXCLUDED.policy, members_hash=EXCLUDED.members_hash, metadata=EXCLUDED.metadata, created_by=EXCLUDED.created_by,
+  updated_at=EXCLUDED.updated_at, deleted_at=EXCLUDED.deleted_at;
 
 -- name: WorkspaceFindByID :one
 SELECT * FROM workspaces WHERE id = $1;
