@@ -68,7 +68,8 @@ func (r *Workspace) hydrate(ctx context.Context, rows []gen.Workspace) (workspac
 	for _, w := range rows {
 		row := &pgdoc.WorkspaceRow{
 			ID: w.ID, Name: w.Name, Alias: w.Alias, Email: w.Email, Personal: w.Personal,
-			Policy: w.Policy, MembersHash: w.MembersHash, Metadata: w.Metadata, UpdatedAt: w.UpdatedAt,
+			Policy: w.Policy, MembersHash: w.MembersHash, Metadata: w.Metadata,
+			CreatedAt: w.CreatedAt, CreatedBy: w.CreatedBy, UpdatedAt: w.UpdatedAt, DeletedAt: w.DeletedAt,
 		}
 		m, err := pgdoc.WorkspaceModel(row, memByWS[w.ID], intByWS[w.ID])
 		if err != nil {
@@ -225,7 +226,8 @@ func (r *Workspace) save(ctx context.Context, ws *workspace.Workspace) error {
 		q := r.c.queries(ctx)
 		if err := q.WorkspaceUpsert(ctx, gen.WorkspaceUpsertParams{
 			ID: row.ID, Name: row.Name, Alias: row.Alias, Email: row.Email, Personal: row.Personal,
-			Policy: row.Policy, MembersHash: row.MembersHash, Metadata: row.Metadata, UpdatedAt: row.UpdatedAt,
+			Policy: row.Policy, MembersHash: row.MembersHash, Metadata: row.Metadata,
+			CreatedAt: row.CreatedAt, CreatedBy: row.CreatedBy, UpdatedAt: row.UpdatedAt, DeletedAt: row.DeletedAt,
 		}); err != nil {
 			if isUniqueViolation(err) {
 				return workspace.ErrDuplicateWorkspaceAlias

@@ -61,6 +61,8 @@ type Querier interface {
 	WorkspaceMemberInsert(ctx context.Context, arg WorkspaceMemberInsertParams) error
 	WorkspaceMembersByWorkspaceIDs(ctx context.Context, dollar_1 []string) ([]WorkspaceMember, error)
 	WorkspaceMembersDeleteByWorkspace(ctx context.Context, workspaceID string) error
+	// created_at is intentionally excluded from the ON CONFLICT SET clause: it is
+	// set once on the first insert and must never be overwritten afterward.
 	WorkspaceUpsert(ctx context.Context, arg WorkspaceUpsertParams) error
 }
 

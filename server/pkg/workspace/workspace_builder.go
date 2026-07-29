@@ -29,7 +29,9 @@ func (b *Builder) Build() (*Workspace, error) {
 		return nil, ErrInvalidID
 	}
 
-	// Save the explicitly set updatedAt (if any) before calling mutating methods
+	// Save the explicitly set updatedAt before calling mutating methods.
+	// createdAt has no such fallback: nil means "unknown" (e.g. historical rows
+	// predating this column) and must never be silently replaced with time.Now().
 	preservedUpdatedAt := b.w.updatedAt
 
 	if b.members == nil && b.integrations == nil {
@@ -112,6 +114,21 @@ func (b *Builder) Personal(p bool) *Builder {
 
 func (b *Builder) Policy(p *PolicyID) *Builder {
 	b.w.policy = util.CloneRef(p)
+	return b
+}
+
+func (b *Builder) CreatedAt(t *time.Time) *Builder {
+	b.w.createdAt = t
+	return b
+}
+
+func (b *Builder) CreatedBy(uid *UserID) *Builder {
+	b.w.createdBy = uid
+	return b
+}
+
+func (b *Builder) DeletedAt(t *time.Time) *Builder {
+	b.w.deletedAt = t
 	return b
 }
 

@@ -7,6 +7,7 @@ import (
 	"os"
 	"slices"
 	"strings"
+	"time"
 
 	"github.com/reearth/reearth-accounts/server/internal/rbac"
 	"github.com/reearth/reearth-accounts/server/internal/usecase/interfaces"
@@ -118,6 +119,7 @@ func (i *Workspace) Create(ctx context.Context, alias, name, description string,
 			Alias(aliasVal).
 			Name(name).
 			Metadata(metadata).
+			CreatedAt(lo.ToPtr(time.Now())).
 			Build()
 		if wErr != nil {
 			return nil, wErr

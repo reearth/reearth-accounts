@@ -14,19 +14,20 @@ var (
 )
 
 type User struct {
-	id              ID
-	name            string
-	alias           string
-	email           string
-	latestLogoutAt  time.Time
-	metadata        Metadata
-	password        EncodedPassword
-	workspace       WorkspaceID
-	auths           []Auth
-	verification    *Verification
-	passwordReset   *PasswordReset
-	host            string
-	updatedAt       time.Time
+	id             ID
+	name           string
+	alias          string
+	email          string
+	latestLogoutAt time.Time
+	metadata       Metadata
+	password       EncodedPassword
+	workspace      WorkspaceID
+	auths          []Auth
+	verification   *Verification
+	passwordReset  *PasswordReset
+	host           string
+	updatedAt      time.Time
+	deletedAt      *time.Time
 }
 
 func (u *User) ID() ID {
@@ -173,6 +174,25 @@ func (u *User) ClearAuths() {
 	u.updatedAt = time.Now()
 }
 
+func (u *User) Deactivate() {
+	now := time.Now()
+	u.deletedAt = &now
+	u.updatedAt = time.Now()
+}
+
+func (u *User) DeletedAt() *time.Time {
+	return u.deletedAt
+}
+
+func (u *User) IsDeleted() bool {
+	return u.deletedAt != nil
+}
+
+func (u *User) Reactivate() {
+	u.deletedAt = nil
+	u.updatedAt = time.Now()
+}
+
 func (u *User) SetLatestLogoutAt(t time.Time) {
 	u.latestLogoutAt = t
 	u.updatedAt = time.Now()
@@ -240,6 +260,7 @@ func (u *User) Clone() *User {
 		verification:   util.CloneRef(u.verification),
 		passwordReset:  util.CloneRef(u.passwordReset),
 		updatedAt:      time.Now(),
+		deletedAt:      u.deletedAt,
 	}
 }
 

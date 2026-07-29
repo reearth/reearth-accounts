@@ -27,6 +27,7 @@ func rowToUserRow(r gen.User) *pgdoc.UserRow {
 		Password: r.Password, Subs: r.Subs, LatestLogoutAt: r.LatestLogoutAt,
 		Metadata: r.Metadata, Verification: r.Verification, PasswordReset: r.PasswordReset,
 		Team: r.Team, Lang: r.Lang, Theme: r.Theme, UpdatedAt: r.UpdatedAt,
+		DeletedAt: r.DeletedAt,
 	}
 }
 
@@ -271,7 +272,7 @@ func likeContains(s string) string {
 
 // userColumns matches scanUsers/gen.User scan order; avoid SELECT * to keep scanning stable.
 const userColumns = "id, name, alias, email, workspace, password, subs, " +
-	"latest_logout_at, metadata, verification, password_reset, team, lang, theme, updated_at"
+	"latest_logout_at, metadata, verification, password_reset, team, lang, theme, updated_at, deleted_at"
 
 func scanUsers(rows pgx.Rows) (user.List, error) {
 	defer rows.Close()
@@ -281,7 +282,7 @@ func scanUsers(rows pgx.Rows) (user.List, error) {
 		if err := rows.Scan(
 			&g.ID, &g.Name, &g.Alias, &g.Email, &g.Workspace, &g.Password, &g.Subs,
 			&g.LatestLogoutAt, &g.Metadata, &g.Verification, &g.PasswordReset,
-			&g.Team, &g.Lang, &g.Theme, &g.UpdatedAt,
+			&g.Team, &g.Lang, &g.Theme, &g.UpdatedAt, &g.DeletedAt,
 		); err != nil {
 			return nil, err
 		}

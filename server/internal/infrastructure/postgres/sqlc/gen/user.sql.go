@@ -20,7 +20,7 @@ func (q *Queries) UserDelete(ctx context.Context, id string) error {
 }
 
 const userFindAll = `-- name: UserFindAll :many
-SELECT id, name, alias, email, workspace, password, subs, latest_logout_at, metadata, verification, password_reset, team, lang, theme, updated_at FROM users ORDER BY id
+SELECT id, name, alias, email, workspace, password, subs, latest_logout_at, metadata, verification, password_reset, team, lang, theme, updated_at, deleted_at FROM users ORDER BY id
 `
 
 func (q *Queries) UserFindAll(ctx context.Context) ([]User, error) {
@@ -48,6 +48,7 @@ func (q *Queries) UserFindAll(ctx context.Context) ([]User, error) {
 			&i.Lang,
 			&i.Theme,
 			&i.UpdatedAt,
+			&i.DeletedAt,
 		); err != nil {
 			return nil, err
 		}
@@ -60,7 +61,7 @@ func (q *Queries) UserFindAll(ctx context.Context) ([]User, error) {
 }
 
 const userFindByAlias = `-- name: UserFindByAlias :one
-SELECT id, name, alias, email, workspace, password, subs, latest_logout_at, metadata, verification, password_reset, team, lang, theme, updated_at FROM users WHERE lower(alias) = lower($1) AND alias <> ''
+SELECT id, name, alias, email, workspace, password, subs, latest_logout_at, metadata, verification, password_reset, team, lang, theme, updated_at, deleted_at FROM users WHERE lower(alias) = lower($1) AND alias <> ''
 `
 
 // Case-insensitive, matching the partial unique index on lower(alias).
@@ -83,12 +84,13 @@ func (q *Queries) UserFindByAlias(ctx context.Context, lower string) (User, erro
 		&i.Lang,
 		&i.Theme,
 		&i.UpdatedAt,
+		&i.DeletedAt,
 	)
 	return i, err
 }
 
 const userFindByEmail = `-- name: UserFindByEmail :one
-SELECT id, name, alias, email, workspace, password, subs, latest_logout_at, metadata, verification, password_reset, team, lang, theme, updated_at FROM users WHERE lower(email) = lower($1)
+SELECT id, name, alias, email, workspace, password, subs, latest_logout_at, metadata, verification, password_reset, team, lang, theme, updated_at, deleted_at FROM users WHERE lower(email) = lower($1)
 `
 
 // Case-insensitive, matching the case-insensitive unique index on lower(email).
@@ -111,12 +113,13 @@ func (q *Queries) UserFindByEmail(ctx context.Context, lower string) (User, erro
 		&i.Lang,
 		&i.Theme,
 		&i.UpdatedAt,
+		&i.DeletedAt,
 	)
 	return i, err
 }
 
 const userFindByID = `-- name: UserFindByID :one
-SELECT id, name, alias, email, workspace, password, subs, latest_logout_at, metadata, verification, password_reset, team, lang, theme, updated_at FROM users WHERE id = $1
+SELECT id, name, alias, email, workspace, password, subs, latest_logout_at, metadata, verification, password_reset, team, lang, theme, updated_at, deleted_at FROM users WHERE id = $1
 `
 
 func (q *Queries) UserFindByID(ctx context.Context, id string) (User, error) {
@@ -138,12 +141,13 @@ func (q *Queries) UserFindByID(ctx context.Context, id string) (User, error) {
 		&i.Lang,
 		&i.Theme,
 		&i.UpdatedAt,
+		&i.DeletedAt,
 	)
 	return i, err
 }
 
 const userFindByIDs = `-- name: UserFindByIDs :many
-SELECT id, name, alias, email, workspace, password, subs, latest_logout_at, metadata, verification, password_reset, team, lang, theme, updated_at FROM users WHERE id = ANY($1::text[])
+SELECT id, name, alias, email, workspace, password, subs, latest_logout_at, metadata, verification, password_reset, team, lang, theme, updated_at, deleted_at FROM users WHERE id = ANY($1::text[])
 `
 
 func (q *Queries) UserFindByIDs(ctx context.Context, dollar_1 []string) ([]User, error) {
@@ -171,6 +175,7 @@ func (q *Queries) UserFindByIDs(ctx context.Context, dollar_1 []string) ([]User,
 			&i.Lang,
 			&i.Theme,
 			&i.UpdatedAt,
+			&i.DeletedAt,
 		); err != nil {
 			return nil, err
 		}
@@ -183,7 +188,7 @@ func (q *Queries) UserFindByIDs(ctx context.Context, dollar_1 []string) ([]User,
 }
 
 const userFindByName = `-- name: UserFindByName :one
-SELECT id, name, alias, email, workspace, password, subs, latest_logout_at, metadata, verification, password_reset, team, lang, theme, updated_at FROM users WHERE name = $1
+SELECT id, name, alias, email, workspace, password, subs, latest_logout_at, metadata, verification, password_reset, team, lang, theme, updated_at, deleted_at FROM users WHERE name = $1
 `
 
 func (q *Queries) UserFindByName(ctx context.Context, name string) (User, error) {
@@ -205,12 +210,13 @@ func (q *Queries) UserFindByName(ctx context.Context, name string) (User, error)
 		&i.Lang,
 		&i.Theme,
 		&i.UpdatedAt,
+		&i.DeletedAt,
 	)
 	return i, err
 }
 
 const userFindByNameOrEmail = `-- name: UserFindByNameOrEmail :one
-SELECT id, name, alias, email, workspace, password, subs, latest_logout_at, metadata, verification, password_reset, team, lang, theme, updated_at FROM users WHERE name = $1 OR lower(email) = lower($1) LIMIT 1
+SELECT id, name, alias, email, workspace, password, subs, latest_logout_at, metadata, verification, password_reset, team, lang, theme, updated_at, deleted_at FROM users WHERE name = $1 OR lower(email) = lower($1) LIMIT 1
 `
 
 // Exact name OR case-insensitive email (email is case-insensitively unique).
@@ -233,12 +239,13 @@ func (q *Queries) UserFindByNameOrEmail(ctx context.Context, name string) (User,
 		&i.Lang,
 		&i.Theme,
 		&i.UpdatedAt,
+		&i.DeletedAt,
 	)
 	return i, err
 }
 
 const userFindByPasswordResetRequest = `-- name: UserFindByPasswordResetRequest :one
-SELECT id, name, alias, email, workspace, password, subs, latest_logout_at, metadata, verification, password_reset, team, lang, theme, updated_at FROM users WHERE password_reset ->> 'token' = $1::text LIMIT 1
+SELECT id, name, alias, email, workspace, password, subs, latest_logout_at, metadata, verification, password_reset, team, lang, theme, updated_at, deleted_at FROM users WHERE password_reset ->> 'token' = $1::text LIMIT 1
 `
 
 func (q *Queries) UserFindByPasswordResetRequest(ctx context.Context, dollar_1 string) (User, error) {
@@ -260,12 +267,13 @@ func (q *Queries) UserFindByPasswordResetRequest(ctx context.Context, dollar_1 s
 		&i.Lang,
 		&i.Theme,
 		&i.UpdatedAt,
+		&i.DeletedAt,
 	)
 	return i, err
 }
 
 const userFindBySub = `-- name: UserFindBySub :one
-SELECT id, name, alias, email, workspace, password, subs, latest_logout_at, metadata, verification, password_reset, team, lang, theme, updated_at FROM users WHERE subs @> ARRAY[$1::text] LIMIT 1
+SELECT id, name, alias, email, workspace, password, subs, latest_logout_at, metadata, verification, password_reset, team, lang, theme, updated_at, deleted_at FROM users WHERE subs @> ARRAY[$1::text] LIMIT 1
 `
 
 func (q *Queries) UserFindBySub(ctx context.Context, dollar_1 string) (User, error) {
@@ -287,12 +295,13 @@ func (q *Queries) UserFindBySub(ctx context.Context, dollar_1 string) (User, err
 		&i.Lang,
 		&i.Theme,
 		&i.UpdatedAt,
+		&i.DeletedAt,
 	)
 	return i, err
 }
 
 const userFindByVerification = `-- name: UserFindByVerification :one
-SELECT id, name, alias, email, workspace, password, subs, latest_logout_at, metadata, verification, password_reset, team, lang, theme, updated_at FROM users WHERE verification ->> 'code' = $1::text LIMIT 1
+SELECT id, name, alias, email, workspace, password, subs, latest_logout_at, metadata, verification, password_reset, team, lang, theme, updated_at, deleted_at FROM users WHERE verification ->> 'code' = $1::text LIMIT 1
 `
 
 func (q *Queries) UserFindByVerification(ctx context.Context, dollar_1 string) (User, error) {
@@ -314,6 +323,7 @@ func (q *Queries) UserFindByVerification(ctx context.Context, dollar_1 string) (
 		&i.Lang,
 		&i.Theme,
 		&i.UpdatedAt,
+		&i.DeletedAt,
 	)
 	return i, err
 }

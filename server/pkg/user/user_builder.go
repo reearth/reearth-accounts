@@ -137,6 +137,11 @@ func (b *Builder) Metadata(m Metadata) *Builder {
 	return b
 }
 
+func (b *Builder) DeletedAt(t *time.Time) *Builder {
+	b.u.deletedAt = t
+	return b
+}
+
 func (b *Builder) UpdatedAt(updatedAt time.Time) *Builder {
 	b.u.updatedAt = updatedAt
 	return b
