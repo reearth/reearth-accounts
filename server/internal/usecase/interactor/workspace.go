@@ -96,7 +96,7 @@ func (i *Workspace) FindAll(ctx context.Context, input interfaces.FindAllWorkspa
 	if status == "" {
 		status = workspace.StatusActive
 	}
-	workspaces, pageInfo, err := i.repos.Workspace.FindAll(ctx, input.Keyword, nil, status, pagination.ToPagination(input.Page, input.Size))
+	workspaces, pageInfo, err := i.repos.Workspace.FindAll(ctx, input.Keyword, nil, status, pagination.ToPagination(input.Page, input.Size), input.ExcludePersonal)
 	if err != nil {
 		return interfaces.FindAllWorkspacesResult{}, err
 	}

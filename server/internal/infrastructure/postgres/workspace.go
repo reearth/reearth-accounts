@@ -32,7 +32,7 @@ func (r *Workspace) Filtered(f workspace.WorkspaceFilter) workspace.Repo {
 // optionally keyword-matched against name/alias and filtered by soft-delete
 // status. Used by the admin app's cross-tenant listing and the
 // /workspaces/all REST route.
-func (r *Workspace) FindAll(ctx context.Context, keyword *string, _ *bool, status workspace.StatusFilter, p *usecasex.Pagination) (workspace.List, *usecasex.PageInfo, error) {
+func (r *Workspace) FindAll(ctx context.Context, keyword *string, _ *bool, status workspace.StatusFilter, p *usecasex.Pagination, excludePersonal bool) (workspace.List, *usecasex.PageInfo, error) {
 	kw := ""
 	if keyword != nil {
 		kw = strings.TrimSpace(*keyword)
@@ -40,7 +40,7 @@ func (r *Workspace) FindAll(ctx context.Context, keyword *string, _ *bool, statu
 	if status == "" {
 		status = workspace.StatusAll
 	}
-	ids, err := r.c.queries(ctx).WorkspaceIDsAll(ctx, gen.WorkspaceIDsAllParams{Keyword: kw, Status: string(status)})
+	ids, err := r.c.queries(ctx).WorkspaceIDsAll(ctx, gen.WorkspaceIDsAllParams{ExcludePersonal: excludePersonal, Keyword: kw, Status: string(status)})
 	if err != nil {
 		return nil, nil, rerror.ErrInternalByWithContext(ctx, err)
 	}

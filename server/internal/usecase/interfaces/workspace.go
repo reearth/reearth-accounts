@@ -30,10 +30,11 @@ type FetchByUserWithPaginationResult struct {
 }
 
 type FindAllWorkspacesParam struct {
-	Keyword *string
-	Status  workspace.StatusFilter
-	Page    int64
-	Size    int64
+	Keyword         *string
+	Status          workspace.StatusFilter
+	Page            int64
+	Size            int64
+	ExcludePersonal bool
 }
 
 type FindAllWorkspacesResult struct {

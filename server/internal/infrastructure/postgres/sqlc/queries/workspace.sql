@@ -25,8 +25,10 @@ SELECT * FROM workspaces WHERE lower(alias) = ANY($1::text[]) ORDER BY id;
 -- name: WorkspaceIDsAll :many
 -- Cross-tenant listing (no readable-workspace filter): pass '' for no keyword
 -- filter, and one of 'all'/'active'/'deleted' for the status filter.
+-- Set exclude_personal=true to omit per-user personal workspaces (used by /api/workspaces/all).
 SELECT id FROM workspaces
-WHERE (sqlc.arg(keyword)::text = '' OR name ILIKE '%' || sqlc.arg(keyword)::text || '%' OR alias ILIKE '%' || sqlc.arg(keyword)::text || '%')
+WHERE (NOT sqlc.arg(exclude_personal)::boolean OR personal = false)
+  AND (sqlc.arg(keyword)::text = '' OR name ILIKE '%' || sqlc.arg(keyword)::text || '%' OR alias ILIKE '%' || sqlc.arg(keyword)::text || '%')
   AND (sqlc.arg(status)::text = 'all' OR (sqlc.arg(status)::text = 'active' AND deleted_at IS NULL) OR (sqlc.arg(status)::text = 'deleted' AND deleted_at IS NOT NULL))
 ORDER BY id;
 

@@ -35,7 +35,7 @@ type Repo interface {
 	// (nil or blank = no keyword filter). personal filters by workspace type:
 	// nil returns both, true returns only personal workspaces, false returns only
 	// team (non-personal) workspaces.
-	FindAll(ctx context.Context, keyword *string, personal *bool, status StatusFilter, pagination *usecasex.Pagination) (List, *usecasex.PageInfo, error)
+	FindAll(ctx context.Context, keyword *string, personal *bool, status StatusFilter, pagination *usecasex.Pagination, excludePersonal bool) (List, *usecasex.PageInfo, error)
 	FindByID(context.Context, ID) (*Workspace, error)
 	FindByName(context.Context, string) (*Workspace, error)
 	FindByAlias(ctx context.Context, alias string) (*Workspace, error)

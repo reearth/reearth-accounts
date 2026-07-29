@@ -40,12 +40,15 @@ func (r *Workspace) Filtered(f workspace.WorkspaceFilter) workspace.Repo {
 	}
 }
 
-func (r *Workspace) FindAll(ctx context.Context, keyword *string, personal *bool, status workspace.StatusFilter, pagination *usecasex.Pagination) (workspace.List, *usecasex.PageInfo, error) {
+func (r *Workspace) FindAll(ctx context.Context, keyword *string, personal *bool, status workspace.StatusFilter, pagination *usecasex.Pagination, excludePersonal bool) (workspace.List, *usecasex.PageInfo, error) {
 	if pagination != nil && pagination.Cursor != nil {
 		return nil, nil, workspace.ErrCursorPaginationUnsupported
 	}
 
 	var conds []bson.M
+	if excludePersonal {
+		conds = append(conds, bson.M{"personal": bson.M{"$ne": true}})
+	}
 	if keyword != nil && strings.TrimSpace(*keyword) != "" {
 		re := primitive.Regex{Pattern: regexp.QuoteMeta(strings.TrimSpace(*keyword)), Options: "i"}
 		conds = append(conds, bson.M{"$or": []bson.M{

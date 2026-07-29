@@ -191,7 +191,7 @@ func (h *WorkspaceHandler) ListAll(c echo.Context) error {
 	}
 	page, size := pp.Normalized()
 
-	res, err := uc.FindAll(ctx, interfaces.FindAllWorkspacesParam{Keyword: kw, Status: status, Page: int64(page), Size: int64(size)})
+	res, err := uc.FindAll(ctx, interfaces.FindAllWorkspacesParam{Keyword: kw, Status: status, Page: int64(page), Size: int64(size), ExcludePersonal: true})
 	if err != nil {
 		return err
 	}

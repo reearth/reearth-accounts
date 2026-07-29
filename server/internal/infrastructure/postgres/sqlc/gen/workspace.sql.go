@@ -168,20 +168,22 @@ func (q *Queries) WorkspaceFindByName(ctx context.Context, name string) (Workspa
 
 const workspaceIDsAll = `-- name: WorkspaceIDsAll :many
 SELECT id FROM workspaces
-WHERE ($1::text = '' OR name ILIKE '%' || $1::text || '%' OR alias ILIKE '%' || $1::text || '%')
-  AND ($2::text = 'all' OR ($2::text = 'active' AND deleted_at IS NULL) OR ($2::text = 'deleted' AND deleted_at IS NOT NULL))
+WHERE (NOT $1::boolean OR personal = false)
+  AND ($2::text = '' OR name ILIKE '%' || $2::text || '%' OR alias ILIKE '%' || $2::text || '%')
+  AND ($3::text = 'all' OR ($3::text = 'active' AND deleted_at IS NULL) OR ($3::text = 'deleted' AND deleted_at IS NOT NULL))
 ORDER BY id
 `
 
 type WorkspaceIDsAllParams struct {
-	Keyword string
-	Status  string
+	ExcludePersonal bool
+	Keyword         string
+	Status          string
 }
 
 // Cross-tenant listing (no readable-workspace filter): pass ” for no keyword
 // filter, and one of 'all'/'active'/'deleted' for the status filter.
 func (q *Queries) WorkspaceIDsAll(ctx context.Context, arg WorkspaceIDsAllParams) ([]string, error) {
-	rows, err := q.db.Query(ctx, workspaceIDsAll, arg.Keyword, arg.Status)
+	rows, err := q.db.Query(ctx, workspaceIDsAll, arg.ExcludePersonal, arg.Keyword, arg.Status)
 	if err != nil {
 		return nil, err
 	}
