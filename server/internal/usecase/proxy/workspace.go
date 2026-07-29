@@ -95,7 +95,10 @@ func (w *Workspace) FindAll(ctx context.Context, param interfaces.FindAllWorkspa
 	return interfaces.FindAllWorkspacesResult{}, workspace.ErrNotImplemented
 }
 
-func (w *Workspace) Create(ctx context.Context, alias, name, description string, userID accountid.UserID, op *workspace.Operator) (*workspace.Workspace, error) {
+// Create proxies to the createWorkspace GraphQL mutation, which has no concept
+// of skipOwnerMembership (REST-only, deliberately not exposed via GraphQL) — the
+// caller is always joined as owner, same as before this parameter existed.
+func (w *Workspace) Create(ctx context.Context, alias, name, description string, userID accountid.UserID, skipOwnerMembership bool, op *workspace.Operator) (*workspace.Workspace, error) {
 	res, err := CreateWorkspace(ctx, w.gql, CreateWorkspaceInput{
 		Alias:       alias,
 		Name:        name,

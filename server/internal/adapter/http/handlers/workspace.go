@@ -26,7 +26,7 @@ func badRequest(msg string) error {
 // @Security BearerAuth
 // @Accept json
 // @Produce json
-// @Param body body httpmodel.CreateWorkspaceRequest true "workspace fields"
+// @Param body body httpmodel.CreateWorkspaceRequest true "workspace fields (skip_owner_membership defaults to false)"
 // @Success 200 {object} httpmodel.WorkspaceResponse
 // @Router /api/workspaces [post]
 func (h *WorkspaceHandler) Create(c echo.Context) error {
@@ -43,7 +43,7 @@ func (h *WorkspaceHandler) Create(c echo.Context) error {
 	if req.Description != nil {
 		desc = *req.Description
 	}
-	w, err := httpinternal.Usecases(c).Workspace.Create(ctx, req.Alias, req.Name, desc, u.ID(), httpinternal.Operator(c))
+	w, err := httpinternal.Usecases(c).Workspace.Create(ctx, req.Alias, req.Name, desc, u.ID(), req.SkipOwnerMembership, httpinternal.Operator(c))
 	if err != nil {
 		return err
 	}

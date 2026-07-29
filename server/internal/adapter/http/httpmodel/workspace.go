@@ -92,6 +92,11 @@ type CreateWorkspaceRequest struct {
 	Alias       string  `json:"alias" validate:"required"`
 	Name        string  `json:"name" validate:"required"`
 	Description *string `json:"description,omitempty"`
+	// SkipOwnerMembership, if true, creates the workspace without joining the
+	// caller as owner (for callers that manage membership themselves, e.g.
+	// LINKS-Veda). Defaults to false, preserving the normal create-and-own flow.
+	// REST-only; not exposed via GraphQL.
+	SkipOwnerMembership bool `json:"skip_owner_membership,omitempty"`
 }
 
 // UpdateWorkspaceRequest mirrors updateWorkspace input (id from path).

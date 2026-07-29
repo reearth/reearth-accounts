@@ -60,7 +60,10 @@ type Workspace interface {
 	// readable-workspace set. Intended for service-to-service callers only.
 	FindAll(context.Context, FindAllWorkspacesParam) (FindAllWorkspacesResult, error)
 	FindByUser(context.Context, user.ID, *workspace.Operator) (workspace.List, error)
-	Create(ctx context.Context, alias, name, description string, firstUser workspace.UserID, operator *workspace.Operator) (_ *workspace.Workspace, err error)
+	// Create creates a workspace. Unless skipOwnerMembership is true, firstUser is
+	// automatically joined as RoleOwner (the normal end-user create flow); set it
+	// to true for callers that manage membership themselves (e.g. LINKS-Veda).
+	Create(ctx context.Context, alias, name, description string, firstUser workspace.UserID, skipOwnerMembership bool, operator *workspace.Operator) (_ *workspace.Workspace, err error)
 	Update(context.Context, UpdateWorkspaceParam, *workspace.Operator) (*workspace.Workspace, error)
 	AddUserMember(context.Context, workspace.ID, map[user.ID]role.RoleType, *workspace.Operator) (*workspace.Workspace, error)
 	AddIntegrationMember(context.Context, workspace.ID, workspace.IntegrationID, role.RoleType, *workspace.Operator) (*workspace.Workspace, error)

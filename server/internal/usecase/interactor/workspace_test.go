@@ -31,7 +31,7 @@ func TestWorkspace_Create(t *testing.T) {
 	_ = db.User.Save(ctx, u)
 	workspaceUC := NewWorkspace(db, nil, nil)
 	op := &workspace.Operator{User: lo.ToPtr(u.ID())}
-	ws, err := workspaceUC.Create(ctx, "alias", "name", "description", u.ID(), op)
+	ws, err := workspaceUC.Create(ctx, "alias", "name", "description", u.ID(), false, op)
 
 	assert.NoError(t, err)
 	assert.NotNil(t, ws)
@@ -51,9 +51,41 @@ func TestWorkspace_Create(t *testing.T) {
 	// mock workspace error
 	wantErr := errors.New("test")
 	memory.SetWorkspaceError(db.Workspace, wantErr)
-	workspace2, err := workspaceUC.Create(ctx, "alias2", "name2", "description2", u.ID(), op)
+	workspace2, err := workspaceUC.Create(ctx, "alias2", "name2", "description2", u.ID(), false, op)
 	assert.Nil(t, workspace2)
 	assert.Equal(t, wantErr, err)
+}
+
+func TestWorkspace_Create_SkipOwnerMembership(t *testing.T) {
+	ctx := context.Background()
+
+	db := memory.New()
+	for _, r := range []string{"owner", "maintainer", "writer", "reader"} {
+		_ = db.Role.Save(ctx, *role.New().NewID().Name(r).MustBuild())
+	}
+
+	u := user.New().NewID().Name("veda").Email("veda@bbb.com").Workspace(id.NewWorkspaceID()).MustBuild()
+	_ = db.User.Save(ctx, u)
+	workspaceUC := NewWorkspace(db, nil, nil)
+	op := &workspace.Operator{User: lo.ToPtr(u.ID())}
+
+	ws, err := workspaceUC.Create(ctx, "no-owner", "no-owner", "", u.ID(), true, op)
+	assert.NoError(t, err)
+	assert.NotNil(t, ws)
+
+	// No member was joined, and the operator/permittable were not updated as if
+	// the caller now owns this workspace.
+	assert.Empty(t, ws.Members().Users())
+	assert.Empty(t, op.OwningWorkspaces)
+
+	p, err := db.Permittable.FindByUserID(ctx, u.ID())
+	if err == nil {
+		for _, wr := range p.WorkspaceRoles() {
+			assert.NotEqual(t, ws.ID(), wr.ID())
+		}
+	} else {
+		assert.ErrorIs(t, err, rerror.ErrNotFound)
+	}
 }
 
 func TestWorkspace_Update(t *testing.T) {

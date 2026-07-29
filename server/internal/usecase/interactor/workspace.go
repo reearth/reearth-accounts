@@ -107,7 +107,7 @@ func (i *Workspace) FindAll(ctx context.Context, input interfaces.FindAllWorkspa
 	}, nil
 }
 
-func (i *Workspace) Create(ctx context.Context, alias, name, description string, firstUser workspace.UserID, operator *workspace.Operator) (_ *workspace.Workspace, err error) {
+func (i *Workspace) Create(ctx context.Context, alias, name, description string, firstUser workspace.UserID, skipOwnerMembership bool, operator *workspace.Operator) (_ *workspace.Workspace, err error) {
 	if operator.User == nil {
 		return nil, interfaces.ErrInvalidOperator
 	}
@@ -140,13 +140,16 @@ func (i *Workspace) Create(ctx context.Context, alias, name, description string,
 			Name(name).
 			Metadata(metadata).
 			CreatedAt(lo.ToPtr(time.Now())).
+			CreatedBy(operator.User).
 			Build()
 		if wErr != nil {
 			return nil, wErr
 		}
 
-		if err = ws.Members().Join(firstUsers[0], role.RoleOwner, *operator.User); err != nil {
-			return nil, err
+		if !skipOwnerMembership {
+			if err = ws.Members().Join(firstUsers[0], role.RoleOwner, *operator.User); err != nil {
+				return nil, err
+			}
 		}
 
 		if err = i.repos.Workspace.Create(ctx, ws); err != nil {
@@ -156,11 +159,12 @@ func (i *Workspace) Create(ctx context.Context, alias, name, description string,
 			return nil, err
 		}
 
-		if err := i.updatePermittable(ctx, firstUsers[0].ID(), ws.ID(), role.RoleOwner); err != nil {
-			return nil, err
+		if !skipOwnerMembership {
+			if err := i.updatePermittable(ctx, firstUsers[0].ID(), ws.ID(), role.RoleOwner); err != nil {
+				return nil, err
+			}
+			operator.AddNewWorkspace(ws.ID())
 		}
-
-		operator.AddNewWorkspace(ws.ID())
 		i.applyDefaultPolicy(ws, operator)
 		return ws, nil
 	})
