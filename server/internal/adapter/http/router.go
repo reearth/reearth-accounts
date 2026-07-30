@@ -99,6 +99,9 @@ func RegisterRESTRouter(e *echo.Echo, cfg RouterConfig) {
 	api.POST("/users/password-reset/start", uh.StartPasswordReset)
 	api.POST("/users/password-reset", uh.PasswordReset)
 	api.POST("/users/find-or-create", uh.FindOrCreate, optional, apikeyOrAuth)
+	// PUT /api/users/by-sub/:sub/platform-roles — M2M, secret-gated (like signup-oidc).
+	// Replaces a user's platform roles by Firebase sub, accepting human-readable role names.
+	api.PUT("/users/by-sub/:sub/platform-roles", uh.SetPlatformRolesBySub, optional)
 
 	// --- Workspaces ---
 	wh := handlers.NewWorkspaceHandler()

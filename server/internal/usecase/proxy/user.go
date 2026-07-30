@@ -224,3 +224,7 @@ func (u *User) GetMFAStatus(_ context.Context, _ *workspace.Operator) (gateway.M
 func (u *User) RegenerateMFARecoveryCode(_ context.Context, _ *workspace.Operator) (string, error) {
 	return "", errors.New("RegenerateMFARecoveryCode is not supported in proxy mode")
 }
+
+func (u *User) SetPlatformRolesBySub(_ context.Context, _ string, _ []string, _ *string) error {
+	return errors.New("SetPlatformRolesBySub is not supported in proxy mode")
+}

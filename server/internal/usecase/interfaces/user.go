@@ -138,6 +138,9 @@ type User interface {
 	RemoveMyAuth(context.Context, string, *workspace.Operator) (*user.User, error)
 	UpdateMe(context.Context, UpdateMeParam, *workspace.Operator) (*user.User, error)
 
+	// platform role management (M2M, secret-gated)
+	SetPlatformRolesBySub(ctx context.Context, sub string, roleNames []string, secret *string) error
+
 	// built-in auth server
 	CreateVerification(context.Context, string) error
 	VerifyUser(context.Context, string) (*user.User, error)

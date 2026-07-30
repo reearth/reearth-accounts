@@ -11,7 +11,9 @@ import (
 	"github.com/reearth/reearth-accounts/server/internal/usecase/gateway"
 	"github.com/reearth/reearth-accounts/server/internal/usecase/interfaces"
 	"github.com/reearth/reearth-accounts/server/internal/usecase/repo"
+	"github.com/reearth/reearth-accounts/server/pkg/id"
 	"github.com/reearth/reearth-accounts/server/pkg/pagination"
+	"github.com/reearth/reearth-accounts/server/pkg/permittable"
 	"github.com/reearth/reearth-accounts/server/pkg/user"
 	"github.com/reearth/reearth-accounts/server/pkg/workspace"
 	"github.com/reearth/reearthx/i18n"
@@ -690,4 +692,43 @@ func (q *UserQuery) FetchByNameOrAlias(ctx context.Context, nameOrAlias string) 
 	}
 
 	return nil, rerror.ErrNotFound
+}
+
+// SetPlatformRolesBySub replaces a user's global platform roles, looked up by Firebase sub.
+// Authenticated by the signup secret (same mechanism as signup-oidc). An empty roleNames
+// slice clears all platform roles.
+func (i *User) SetPlatformRolesBySub(ctx context.Context, sub string, roleNames []string, secret *string) error {
+	if err := i.verifySignupSecret(secret); err != nil {
+		return err
+	}
+
+	u, err := i.repos.User.FindBySub(ctx, sub)
+	if err != nil {
+		return err
+	}
+
+	// Resolve role names → IDs
+	rids := make(id.RoleIDList, 0, len(roleNames))
+	for _, name := range roleNames {
+		r, err := i.repos.Role.FindByName(ctx, name)
+		if err != nil {
+			return err
+		}
+		rids = append(rids, r.ID())
+	}
+
+	// Find or create the permittable record for this user
+	p, err := i.repos.Permittable.FindByUserID(ctx, u.ID())
+	if err != nil && !errors.Is(err, rerror.ErrNotFound) {
+		return err
+	}
+	if p == nil {
+		p, err = permittable.New().NewID().UserID(u.ID()).Build()
+		if err != nil {
+			return err
+		}
+	}
+
+	p.EditRoleIDs(rids)
+	return i.repos.Permittable.Save(ctx, *p)
 }

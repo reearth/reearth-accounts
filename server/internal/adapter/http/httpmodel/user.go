@@ -317,6 +317,13 @@ type FindOrCreateRequest struct {
 	Token string `json:"token" validate:"required"`
 }
 
+// SetPlatformRolesBySubRequest is the request body for PUT /api/users/by-sub/:sub/platform-roles.
+// RoleNames accepts human-readable role names (e.g. "owner"). An empty slice clears all platform roles.
+type SetPlatformRolesBySubRequest struct {
+	RoleNames []string `json:"role_names"`
+	Secret    *string  `json:"secret,omitempty"`
+}
+
 // MessageResponse is a simple {success:true} body for void mutations.
 type MessageResponse struct {
 	Success bool `json:"success"`

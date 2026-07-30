@@ -591,6 +591,32 @@ func (h *UserHandler) FindOrCreate(c echo.Context) error {
 	return c.NoContent(http.StatusNoContent)
 }
 
+// SetPlatformRolesBySub godoc
+// @Tags User
+// @Summary Replace a user's global platform roles (M2M, secret-gated)
+// @Accept json
+// @Produce json
+// @Param sub path string true "Firebase auth sub"
+// @Param body body httpmodel.SetPlatformRolesBySubRequest true "role names and optional secret"
+// @Success 204 "No Content"
+// @Failure 400 {object} internal.ErrorResponse
+// @Failure 404 {object} internal.ErrorResponse
+// @Router /api/users/by-sub/{sub}/platform-roles [put]
+func (h *UserHandler) SetPlatformRolesBySub(c echo.Context) error {
+	sub := c.Param("sub")
+	if sub == "" {
+		return badRequest("sub is required")
+	}
+	req := &httpmodel.SetPlatformRolesBySubRequest{}
+	if err := httpinternal.BindValidate(c, req); err != nil {
+		return err
+	}
+	if err := httpinternal.Usecases(c).User.SetPlatformRolesBySub(c.Request().Context(), sub, req.RoleNames, req.Secret); err != nil {
+		return err
+	}
+	return c.NoContent(http.StatusNoContent)
+}
+
 // parseUserIDRef parses an optional user ID reference: (nil, nil) when omitted/empty,
 // (id, nil) when valid, and (nil, err) when a value is provided but malformed so the
 // caller can return 400 rather than silently ignoring bad input.
