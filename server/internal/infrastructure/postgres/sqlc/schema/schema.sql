@@ -18,7 +18,8 @@ CREATE TABLE users (
     lang             text,
     theme            text,
     updated_at       timestamptz NOT NULL DEFAULT now(),
-    deleted_at       timestamptz
+    deleted_at       timestamptz,
+    created_at       timestamptz
 );
 
 CREATE TABLE workspaces (

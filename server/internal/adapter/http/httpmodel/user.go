@@ -5,6 +5,7 @@ import (
 
 	"github.com/reearth/reearth-accounts/server/internal/usecase/interfaces"
 	"github.com/reearth/reearth-accounts/server/pkg/dregexp"
+	"github.com/reearth/reearth-accounts/server/pkg/permittable"
 	"github.com/reearth/reearth-accounts/server/pkg/user"
 	"github.com/reearth/reearthx/util"
 )
@@ -36,6 +37,22 @@ type UserResponse struct {
 	Auths        []string              `json:"auths"`
 	Metadata     *UserMetadataResponse `json:"metadata"`
 	Verification *VerificationResponse `json:"verification,omitempty"`
+	IsDeleted    bool                  `json:"is_deleted"`
+	DeletedAt    *time.Time            `json:"deleted_at,omitempty"`
+	CreatedAt    *time.Time            `json:"created_at,omitempty"`
+	// PlatformRoles and Workspaces are only populated by handlers that batch-fetch
+	// Permittable data (e.g. ListAll); other endpoints leave them nil.
+	PlatformRoles []string                `json:"platform_roles,omitempty"`
+	Workspaces    []UserWorkspaceResponse `json:"workspaces,omitempty"`
+}
+
+// UserWorkspaceResponse is a single workspace membership surfaced on UserResponse.Workspaces.
+// Name and Alias are populated by ApplyPermittables when a workspace map is provided.
+type UserWorkspaceResponse struct {
+	WorkspaceID string `json:"workspace_id"`
+	Name        string `json:"name,omitempty"`
+	Alias       string `json:"alias,omitempty"`
+	Role        string `json:"role"`
 }
 
 // MeResponse mirrors the GraphQL Me type.
@@ -97,6 +114,9 @@ func NewUserResponse(u *user.User) *UserResponse {
 		Auths:        util.Map(u.Auths(), func(a user.Auth) string { return a.Provider }),
 		Metadata:     metadataResponse(u),
 		Verification: v,
+		IsDeleted:    u.IsDeleted(),
+		DeletedAt:    u.DeletedAt(),
+		CreatedAt:    u.CreatedAt(),
 	}
 }
 
@@ -107,6 +127,63 @@ func NewUserResponses(ul user.List) []*UserResponse {
 		out = append(out, NewUserResponse(u))
 	}
 	return out
+}
+
+// WorkspaceInfo holds the display fields resolved from a workspace record.
+type WorkspaceInfo struct {
+	Name  string
+	Alias string
+}
+
+// ApplyPermittables enriches a batch of UserResponses with global roles and
+// workspace memberships from their Permittable records, keyed by user ID.
+// roleNames maps role ULID → role name (e.g. "owner"). wsInfo maps workspace
+// ULID → WorkspaceInfo. Both maps may be nil; absent entries fall back to raw IDs.
+func ApplyPermittables(responses []*UserResponse, perms permittable.List, roleNames map[string]string, wsInfo map[string]WorkspaceInfo) {
+	byUserID := make(map[string]*permittable.Permittable, len(perms))
+	for _, p := range perms {
+		byUserID[p.UserID().String()] = p
+	}
+
+	for _, res := range responses {
+		p, ok := byUserID[res.ID]
+		if !ok {
+			continue
+		}
+
+		roleIDs := p.RoleIDs()
+		platformRoles := make([]string, 0, len(roleIDs))
+		for _, r := range roleIDs {
+			rid := r.String()
+			if name, ok := roleNames[rid]; ok {
+				platformRoles = append(platformRoles, name)
+			} else {
+				platformRoles = append(platformRoles, rid)
+			}
+		}
+		res.PlatformRoles = platformRoles
+
+		wsRoles := p.WorkspaceRoles()
+		workspaces := make([]UserWorkspaceResponse, 0, len(wsRoles))
+		for _, wr := range wsRoles {
+			wsID := wr.ID().String()
+			roleID := wr.RoleID().String()
+			roleName := roleID
+			if name, ok := roleNames[roleID]; ok {
+				roleName = name
+			}
+			entry := UserWorkspaceResponse{
+				WorkspaceID: wsID,
+				Role:        roleName,
+			}
+			if info, ok := wsInfo[wsID]; ok {
+				entry.Name = info.Name
+				entry.Alias = info.Alias
+			}
+			workspaces = append(workspaces, entry)
+		}
+		res.Workspaces = workspaces
+	}
 }
 
 // NewMeResponse converts a domain user to a MeResponse.

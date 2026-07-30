@@ -182,6 +182,7 @@ type WorkspaceIDsAllParams struct {
 
 // Cross-tenant listing (no readable-workspace filter): pass ” for no keyword
 // filter, and one of 'all'/'active'/'deleted' for the status filter.
+// Set exclude_personal=true to omit per-user personal workspaces (used by /api/workspaces/all).
 func (q *Queries) WorkspaceIDsAll(ctx context.Context, arg WorkspaceIDsAllParams) ([]string, error) {
 	rows, err := q.db.Query(ctx, workspaceIDsAll, arg.ExcludePersonal, arg.Keyword, arg.Status)
 	if err != nil {

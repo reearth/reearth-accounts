@@ -64,6 +64,7 @@ type User struct {
 	Theme          *string
 	UpdatedAt      time.Time
 	DeletedAt      *time.Time
+	CreatedAt      *time.Time
 }
 
 type Workspace struct {

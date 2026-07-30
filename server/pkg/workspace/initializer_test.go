@@ -121,6 +121,7 @@ func TestInit(t *testing.T) {
 				assert.Equal(t, tt.ExpectedUser.Email(), user.Email())
 				assert.Equal(t, tt.ExpectedUser.Name(), user.Name())
 				assert.Equal(t, tt.ExpectedUser.Auths(), user.Auths())
+				assert.NotNil(t, user.CreatedAt())
 
 				assert.Equal(t, tt.ExpectedWorkspace.Name(), workspace.Name())
 				assert.Equal(t, tt.ExpectedWorkspace.IsPersonal(), workspace.IsPersonal())

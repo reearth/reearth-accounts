@@ -31,6 +31,7 @@ type UserDocument struct {
 	Metadata       UserMetadataDoc        `json:"metadata" bson:"metadata" jsonschema:"required,description=Extended user metadata. Default: {}"`
 	UpdatedAt      time.Time              `json:"updatedat" bson:"updatedat" jsonschema:"description=Last update timestamp"`
 	DeletedAt      *time.Time             `json:"deletedat" bson:"deletedat,omitempty" jsonschema:"description=Soft delete timestamp. Null = active, non-null = deactivated"`
+	CreatedAt      *time.Time             `json:"createdat" bson:"createdat,omitempty" jsonschema:"description=User creation timestamp. Null for users created before this field existed"`
 }
 
 type UserVerificationDoc struct {
@@ -99,6 +100,7 @@ func NewUser(user *user.User) (*UserDocument, string) {
 		Metadata:       metadataDoc,
 		UpdatedAt:      updatedAt,
 		DeletedAt:      user.DeletedAt(),
+		CreatedAt:      user.CreatedAt(),
 	}, id
 }
 
@@ -154,6 +156,7 @@ func (d *UserDocument) Model() (*user.User, error) {
 		PasswordReset(d.PasswordReset.Model()).
 		UpdatedAt(d.UpdatedAt).
 		DeletedAt(d.DeletedAt).
+		CreatedAt(d.CreatedAt).
 		Build()
 
 	if err != nil {

@@ -42,7 +42,7 @@ func (r *User) FindAll(ctx context.Context) (user.List, error) {
 	return res, nil
 }
 
-func (r *User) FindAllWithPagination(_ context.Context, keyword *string, pagination *usecasex.Pagination) (user.List, *usecasex.PageInfo, error) {
+func (r *User) FindAllWithPagination(_ context.Context, keyword *string, status user.StatusFilter, pagination *usecasex.Pagination) (user.List, *usecasex.PageInfo, error) {
 	if r.err != nil {
 		return nil, nil, r.err
 	}
@@ -55,6 +55,16 @@ func (r *User) FindAllWithPagination(_ context.Context, keyword *string, paginat
 		kw = strings.ToLower(strings.TrimSpace(*keyword))
 	}
 	all := r.data.FindAll(func(_ user.ID, v *user.User) bool {
+		switch status {
+		case user.StatusActive:
+			if v.DeletedAt() != nil {
+				return false
+			}
+		case user.StatusDeleted:
+			if v.DeletedAt() == nil {
+				return false
+			}
+		}
 		if kw == "" {
 			return true
 		}

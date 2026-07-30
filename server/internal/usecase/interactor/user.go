@@ -74,6 +74,10 @@ func (i *User) FetchByIDsWithPagination(ctx context.Context, ids user.IDList, al
 	return i.query.FetchByIDsWithPagination(ctx, ids, alias, pagination)
 }
 
+func (i *User) FindAll(ctx context.Context, param interfaces.FindAllUsersParam) (interfaces.FindAllUsersResult, error) {
+	return i.query.FindAll(ctx, param)
+}
+
 func (i *User) FetchBySub(ctx context.Context, sub string) (*user.User, error) {
 	return i.query.FetchBySub(ctx, sub)
 }
@@ -594,6 +598,22 @@ func (q *UserQuery) FetchByIDsWithPagination(ctx context.Context, ids user.IDLis
 	}
 
 	return interfaces.FetchByIDsWithPaginationResult{
+		Users:      user.List(users),
+		TotalCount: int(pageInfo.TotalCount),
+	}, nil
+}
+
+func (q *UserQuery) FindAll(ctx context.Context, param interfaces.FindAllUsersParam) (interfaces.FindAllUsersResult, error) {
+	status := param.Status
+	if status == "" {
+		status = user.StatusActive
+	}
+	users, pageInfo, err := q.repos[0].FindAllWithPagination(ctx, param.Keyword, status, pagination.ToPagination(param.Page, param.Size))
+	if err != nil {
+		return interfaces.FindAllUsersResult{}, err
+	}
+
+	return interfaces.FindAllUsersResult{
 		Users:      user.List(users),
 		TotalCount: int(pageInfo.TotalCount),
 	}, nil

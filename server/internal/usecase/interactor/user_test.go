@@ -1657,3 +1657,42 @@ func TestUser_StartPasswordReset_TokenPersistedBeforeMailSend(t *testing.T) {
 	assert.NoError(t, dbErr)
 	assert.NotNil(t, saved.PasswordReset(), "token must be persisted even when mailer fails")
 }
+
+func TestUser_FindAll(t *testing.T) {
+	ctx := context.Background()
+	db := memory.New()
+	userUC := NewUser(db, nil, "", "")
+
+	uA := user.New().NewID().Name("alpha").Email("alpha@bbb.com").MustBuild()
+	uB := user.New().NewID().Name("beta").Email("beta@bbb.com").MustBuild()
+	assert.NoError(t, db.User.Save(ctx, uA))
+	assert.NoError(t, db.User.Save(ctx, uB))
+
+	t.Run("default status excludes soft-deleted users", func(t *testing.T) {
+		uA.Deactivate()
+		defer uA.Reactivate()
+		assert.NoError(t, db.User.Save(ctx, uA))
+
+		res, err := userUC.FindAll(ctx, interfaces.FindAllUsersParam{Page: 1, Size: 10})
+		assert.NoError(t, err)
+		assert.Len(t, res.Users, 1)
+		assert.Equal(t, uB.ID(), res.Users[0].ID())
+
+		res, err = userUC.FindAll(ctx, interfaces.FindAllUsersParam{Status: user.StatusDeleted, Page: 1, Size: 10})
+		assert.NoError(t, err)
+		assert.Len(t, res.Users, 1)
+		assert.Equal(t, uA.ID(), res.Users[0].ID())
+
+		res, err = userUC.FindAll(ctx, interfaces.FindAllUsersParam{Status: user.StatusAll, Page: 1, Size: 10})
+		assert.NoError(t, err)
+		assert.Len(t, res.Users, 2)
+	})
+
+	t.Run("keyword filters by name", func(t *testing.T) {
+		kw := "alpha"
+		res, err := userUC.FindAll(ctx, interfaces.FindAllUsersParam{Keyword: &kw, Status: user.StatusAll, Page: 1, Size: 10})
+		assert.NoError(t, err)
+		assert.Len(t, res.Users, 1)
+		assert.Equal(t, uA.ID(), res.Users[0].ID())
+	})
+}

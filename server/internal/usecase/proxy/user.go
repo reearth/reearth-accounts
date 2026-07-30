@@ -42,6 +42,14 @@ func (u *User) FetchByIDsWithPagination(ctx context.Context, ids user.IDList, al
 	return interfaces.FetchByIDsWithPaginationResult{}, nil
 }
 
+// FindAll is not supported via this GraphQL proxy: there is no cross-tenant
+// listing query in the public GraphQL schema (REST-only, same as
+// workspace.FindAll), so this client has no remote call to make on the
+// caller's behalf.
+func (u *User) FindAll(ctx context.Context, param interfaces.FindAllUsersParam) (interfaces.FindAllUsersResult, error) {
+	return interfaces.FindAllUsersResult{}, user.ErrNotImplemented
+}
+
 func (u *User) Signup(ctx context.Context, param interfaces.SignupParam) (*user.User, error) {
 	input := SignupInput{
 		Id:          param.UserID.String(),

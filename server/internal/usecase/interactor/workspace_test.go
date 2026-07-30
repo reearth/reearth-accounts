@@ -859,7 +859,7 @@ func TestWorkspace_AddMember(t *testing.T) {
 	id3 := id.NewWorkspaceID()
 	w3 := workspace.New().ID(id3).Name("W3").Members(map[user.ID]workspace.Member{userID: {Role: role.RoleOwner}}).Personal(true).MustBuild()
 	id4 := id.NewWorkspaceID()
-	w4 := workspace.New().ID(id3).Name("W4").Members(map[user.ID]workspace.Member{id.NewUserID(): {Role: role.RoleOwner}}).Personal(true).MustBuild()
+	w4 := workspace.New().ID(id4).Name("W4").Members(map[user.ID]workspace.Member{id.NewUserID(): {Role: role.RoleOwner}}).Personal(false).MustBuild()
 
 	u := user.New().NewID().Name("aaa").Email("a@b.c").MustBuild()
 
@@ -2423,5 +2423,102 @@ func TestWorkspace_DeactivateAndRestore(t *testing.T) {
 		stored, err := db.Workspace.FindByID(ctx, wid)
 		assert.NoError(t, err)
 		assert.NotNil(t, stored.DeletedAt())
+	})
+}
+
+func TestWorkspace_MemberManagement_CerbosFallback(t *testing.T) {
+	ctx := context.Background()
+
+	seedRoles := func(db *repo.Container) {
+		for _, r := range []string{"owner", "maintainer", "writer", "reader"} {
+			_ = db.Role.Save(ctx, *role.New().NewID().Name(r).MustBuild())
+		}
+	}
+
+	newMemberlessWorkspace := func() (workspace.ID, *workspace.Operator, *repo.Container) {
+		db := memory.New()
+		seedRoles(db)
+		wid := id.NewWorkspaceID()
+		ws := workspace.New().ID(wid).Name("no-owner").Alias("no-owner").Personal(false).MustBuild()
+		assert.NoError(t, db.Workspace.Save(ctx, ws))
+		op := &workspace.Operator{User: lo.ToPtr(id.NewUserID())}
+		return wid, op, db
+	}
+
+	t.Run("AddUserMember: real writer membership needs no Cerbos call", func(t *testing.T) {
+		db := memory.New()
+		seedRoles(db)
+		ownerID := id.NewUserID()
+		wid := id.NewWorkspaceID()
+		ws := workspace.New().ID(wid).Name("Test").Alias("test-alias").
+			Members(map[user.ID]workspace.Member{ownerID: {Role: role.RoleOwner}}).
+			Personal(false).MustBuild()
+		assert.NoError(t, db.Workspace.Save(ctx, ws))
+		newUser := user.New().NewID().Name("bbb").Email("bbb@bbb.com").MustBuild()
+		assert.NoError(t, db.User.Save(ctx, newUser))
+
+		op := &workspace.Operator{User: lo.ToPtr(ownerID), WritableWorkspaces: []workspace.ID{wid}}
+		workspaceUC := NewWorkspace(db, nil, nil)
+
+		got, err := workspaceUC.AddUserMember(ctx, wid, map[user.ID]role.RoleType{newUser.ID(): role.RoleReader}, op)
+		assert.NoError(t, err)
+		assert.Equal(t, role.RoleReader, got.Members().UserRole(newUser.ID()))
+	})
+
+	t.Run("AddUserMember: Cerbos global role allows a non-member", func(t *testing.T) {
+		wid, op, db := newMemberlessWorkspace()
+		newUser := user.New().NewID().Name("bbb").Email("bbb@bbb.com").MustBuild()
+		assert.NoError(t, db.User.Save(ctx, newUser))
+
+		workspaceUC := NewWorkspace(db, nil, &fakeCerbos{allowed: true})
+		got, err := workspaceUC.AddUserMember(ctx, wid, map[user.ID]role.RoleType{newUser.ID(): role.RoleReader}, op)
+		assert.NoError(t, err)
+		assert.Equal(t, role.RoleReader, got.Members().UserRole(newUser.ID()))
+	})
+
+	t.Run("AddUserMember: not writable and Cerbos denies", func(t *testing.T) {
+		wid, op, db := newMemberlessWorkspace()
+		newUser := user.New().NewID().Name("bbb").Email("bbb@bbb.com").MustBuild()
+		assert.NoError(t, db.User.Save(ctx, newUser))
+
+		workspaceUC := NewWorkspace(db, nil, &fakeCerbos{allowed: false})
+		_, err := workspaceUC.AddUserMember(ctx, wid, map[user.ID]role.RoleType{newUser.ID(): role.RoleReader}, op)
+		assert.ErrorIs(t, err, interfaces.ErrPermissionDenied)
+	})
+
+	t.Run("UpdateUserMember: Cerbos global role allows updating a non-member's role", func(t *testing.T) {
+		db := memory.New()
+		seedRoles(db)
+		targetUser := id.NewUserID()
+		wid := id.NewWorkspaceID()
+		ws := workspace.New().ID(wid).Name("Test").Alias("test-alias").
+			Members(map[user.ID]workspace.Member{targetUser: {Role: role.RoleReader}}).
+			Personal(false).MustBuild()
+		assert.NoError(t, db.Workspace.Save(ctx, ws))
+		op := &workspace.Operator{User: lo.ToPtr(id.NewUserID())} // not a member at all
+
+		workspaceUC := NewWorkspace(db, nil, &fakeCerbos{allowed: true})
+		got, err := workspaceUC.UpdateUserMember(ctx, wid, targetUser, role.RoleWriter, op)
+		assert.NoError(t, err)
+		assert.Equal(t, role.RoleWriter, got.Members().UserRole(targetUser))
+	})
+
+	t.Run("RemoveMultipleUserMembers: Cerbos global role allows removal by a non-member", func(t *testing.T) {
+		db := memory.New()
+		targetUser := id.NewUserID()
+		wid := id.NewWorkspaceID()
+		ws := workspace.New().ID(wid).Name("Test").Alias("test-alias").
+			Members(map[user.ID]workspace.Member{
+				id.NewUserID(): {Role: role.RoleOwner},
+				targetUser:     {Role: role.RoleReader},
+			}).
+			Personal(false).MustBuild()
+		assert.NoError(t, db.Workspace.Save(ctx, ws))
+		op := &workspace.Operator{User: lo.ToPtr(id.NewUserID())} // not a member at all
+
+		workspaceUC := NewWorkspace(db, nil, &fakeCerbos{allowed: true})
+		got, err := workspaceUC.RemoveMultipleUserMembers(ctx, wid, workspace.UserIDList{targetUser}, op)
+		assert.NoError(t, err)
+		assert.False(t, got.Members().HasUser(targetUser))
 	})
 }

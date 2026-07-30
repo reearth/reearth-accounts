@@ -44,6 +44,8 @@ type Querier interface {
 	UserFindBySub(ctx context.Context, dollar_1 string) (User, error)
 	UserFindByVerification(ctx context.Context, dollar_1 string) (User, error)
 	UserInsert(ctx context.Context, arg UserInsertParams) error
+	// created_at is intentionally excluded from the ON CONFLICT SET clause: it is
+	// set once on the first insert and must never be overwritten afterward.
 	UserUpsert(ctx context.Context, arg UserUpsertParams) error
 	WorkspaceDelete(ctx context.Context, id string) error
 	WorkspaceFindByAlias(ctx context.Context, lower string) (Workspace, error)
@@ -54,6 +56,7 @@ type Querier interface {
 	WorkspaceFindByName(ctx context.Context, name string) (Workspace, error)
 	// Cross-tenant listing (no readable-workspace filter): pass '' for no keyword
 	// filter, and one of 'all'/'active'/'deleted' for the status filter.
+	// Set exclude_personal=true to omit per-user personal workspaces (used by /api/workspaces/all).
 	WorkspaceIDsAll(ctx context.Context, arg WorkspaceIDsAllParams) ([]string, error)
 	WorkspaceIDsByIntegration(ctx context.Context, integrationID string) ([]string, error)
 	WorkspaceIDsByIntegrations(ctx context.Context, dollar_1 []string) ([]string, error)

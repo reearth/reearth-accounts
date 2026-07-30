@@ -97,9 +97,24 @@ type FetchByIDsWithPaginationResult struct {
 	TotalCount int
 }
 
+type FindAllUsersParam struct {
+	Keyword *string
+	Status  user.StatusFilter
+	Page    int64
+	Size    int64
+}
+
+type FindAllUsersResult struct {
+	Users      user.List
+	TotalCount int
+}
+
 type UserQuery interface {
 	FetchByID(context.Context, user.IDList) (user.List, error)
 	FetchByIDsWithPagination(ctx context.Context, ids user.IDList, alias *string, pagination FetchByIDsWithPaginationParam) (FetchByIDsWithPaginationResult, error)
+	// FindAll lists users across all tenants, unfiltered by any per-workspace
+	// scoping. Reachable by any authenticated user, same as the rest of this API.
+	FindAll(context.Context, FindAllUsersParam) (FindAllUsersResult, error)
 	FetchBySub(context.Context, string) (*user.User, error)
 	FetchByNameOrAlias(context.Context, string) (user.List, error)
 	FetchByNameOrEmail(context.Context, string) (*user.Simple, error)

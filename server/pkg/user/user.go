@@ -28,6 +28,7 @@ type User struct {
 	host           string
 	updatedAt      time.Time
 	deletedAt      *time.Time
+	createdAt      *time.Time
 }
 
 func (u *User) ID() ID {
@@ -184,6 +185,10 @@ func (u *User) DeletedAt() *time.Time {
 	return u.deletedAt
 }
 
+func (u *User) CreatedAt() *time.Time {
+	return u.createdAt
+}
+
 func (u *User) IsDeleted() bool {
 	return u.deletedAt != nil
 }
@@ -261,6 +266,7 @@ func (u *User) Clone() *User {
 		passwordReset:  util.CloneRef(u.passwordReset),
 		updatedAt:      time.Now(),
 		deletedAt:      u.deletedAt,
+		createdAt:      u.createdAt,
 	}
 }
 
