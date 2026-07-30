@@ -8,14 +8,15 @@ import (
 )
 
 type Workspace struct {
-	id        ID
-	name      string
-	alias     string
-	email     string
-	metadata  Metadata
-	members   *Members
-	policy    *PolicyID
-	updatedAt time.Time
+	id         ID
+	name       string
+	alias      string
+	email      string
+	metadata   Metadata
+	members    *Members
+	policy     *PolicyID
+	scimConfig *ScimConfig
+	updatedAt  time.Time
 }
 
 func (w *Workspace) ID() ID {
@@ -77,8 +78,17 @@ func (w *Workspace) PolicytOr(def PolicyID) PolicyID {
 	return *w.policy
 }
 
+func (w *Workspace) ScimConfig() *ScimConfig {
+	return w.scimConfig.Clone()
+}
+
 func (w *Workspace) SetPolicy(policy *PolicyID) {
 	w.policy = util.CloneRef(policy)
+	w.updatedAt = time.Now()
+}
+
+func (w *Workspace) SetScimConfig(cfg *ScimConfig) {
+	w.scimConfig = cfg.Clone()
 	w.updatedAt = time.Now()
 }
 

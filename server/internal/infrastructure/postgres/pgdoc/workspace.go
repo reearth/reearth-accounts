@@ -12,39 +12,47 @@ import (
 )
 
 type WorkspaceMetadataJSON struct {
-	Description  string `json:"description"`
-	Website      string `json:"website"`
-	Location     string `json:"location"`
 	BillingEmail string `json:"billingemail"`
+	Description  string `json:"description"`
+	Location     string `json:"location"`
 	PhotoURL     string `json:"photourl"`
-}
-
-type WorkspaceMemberRow struct {
-	WorkspaceID string
-	UserID      string
-	Role        string
-	InvitedBy   string
-	Disabled    bool
+	Website      string `json:"website"`
 }
 
 type WorkspaceIntegrationRow struct {
-	WorkspaceID   string
-	IntegrationID string
-	Role          string
-	InvitedBy     string
 	Disabled      bool
+	IntegrationID string
+	InvitedBy     string
+	Role          string
+	WorkspaceID   string
+}
+
+type WorkspaceMemberRow struct {
+	Disabled    bool
+	ExternalID  string
+	InvitedBy   string
+	Role        string
+	UserID      string
+	WorkspaceID string
 }
 
 type WorkspaceRow struct {
-	ID          string
-	Name        string
 	Alias       string
 	Email       string
-	Personal    bool
-	Policy      *string
+	ID          string
 	MembersHash string
 	Metadata    []byte // jsonb
+	Name        string
+	Personal    bool
+	Policy      *string
 	UpdatedAt   time.Time
+}
+
+type WorkspaceScimConfigRow struct {
+	Enabled          bool
+	GroupRoleMapping []byte // jsonb
+	TokenHash        string
+	WorkspaceID      string
 }
 
 // NewWorkspaceRows uses mongodoc.ComputeWorkspaceMembersHash so the composite
@@ -55,18 +63,36 @@ func NewWorkspaceRows(ws *workspace.Workspace) (*WorkspaceRow, []WorkspaceMember
 	membersDoc := map[string]mongodoc.WorkspaceMemberDocument{}
 	memberRows := make([]WorkspaceMemberRow, 0)
 	for uID, m := range ws.Members().Users() {
-		membersDoc[uID.String()] = mongodoc.WorkspaceMemberDocument{Role: string(m.Role), InvitedBy: m.InvitedBy.String(), Disabled: m.Disabled}
+		membersDoc[uID.String()] = mongodoc.WorkspaceMemberDocument{
+			Disabled:   m.Disabled,
+			ExternalID: m.ExternalID,
+			InvitedBy:  m.InvitedBy.String(),
+			Role:       string(m.Role),
+		}
 		memberRows = append(memberRows, WorkspaceMemberRow{
-			WorkspaceID: wid, UserID: uID.String(), Role: string(m.Role), InvitedBy: m.InvitedBy.String(), Disabled: m.Disabled,
+			Disabled:    m.Disabled,
+			ExternalID:  m.ExternalID,
+			InvitedBy:   m.InvitedBy.String(),
+			Role:        string(m.Role),
+			UserID:      uID.String(),
+			WorkspaceID: wid,
 		})
 	}
 
 	integrationsDoc := map[string]mongodoc.WorkspaceMemberDocument{}
 	integRows := make([]WorkspaceIntegrationRow, 0)
 	for iID, m := range ws.Members().Integrations() {
-		integrationsDoc[iID.String()] = mongodoc.WorkspaceMemberDocument{Role: string(m.Role), InvitedBy: m.InvitedBy.String(), Disabled: m.Disabled}
+		integrationsDoc[iID.String()] = mongodoc.WorkspaceMemberDocument{
+			Disabled:  m.Disabled,
+			InvitedBy: m.InvitedBy.String(),
+			Role:      string(m.Role),
+		}
 		integRows = append(integRows, WorkspaceIntegrationRow{
-			WorkspaceID: wid, IntegrationID: iID.String(), Role: string(m.Role), InvitedBy: m.InvitedBy.String(), Disabled: m.Disabled,
+			Disabled:      m.Disabled,
+			IntegrationID: iID.String(),
+			InvitedBy:     m.InvitedBy.String(),
+			Role:          string(m.Role),
+			WorkspaceID:   wid,
 		})
 	}
 
@@ -76,11 +102,11 @@ func NewWorkspaceRows(ws *workspace.Workspace) (*WorkspaceRow, []WorkspaceMember
 	}
 
 	meta, _ := json.Marshal(WorkspaceMetadataJSON{
-		Description:  ws.Metadata().Description(),
-		Website:      ws.Metadata().Website(),
-		Location:     ws.Metadata().Location(),
 		BillingEmail: ws.Metadata().BillingEmail(),
+		Description:  ws.Metadata().Description(),
+		Location:     ws.Metadata().Location(),
 		PhotoURL:     ws.Metadata().PhotoURL(),
+		Website:      ws.Metadata().Website(),
 	})
 
 	var policy *string
@@ -95,12 +121,40 @@ func NewWorkspaceRows(ws *workspace.Workspace) (*WorkspaceRow, []WorkspaceMember
 	}
 
 	return &WorkspaceRow{
-		ID: wid, Name: ws.Name(), Alias: ws.Alias(), Email: ws.Email(),
-		Personal: ws.IsPersonal(), Policy: policy, MembersHash: membersHash, Metadata: meta, UpdatedAt: updatedAt,
+		Alias:       ws.Alias(),
+		Email:       ws.Email(),
+		ID:          wid,
+		MembersHash: membersHash,
+		Metadata:    meta,
+		Name:        ws.Name(),
+		Personal:    ws.IsPersonal(),
+		Policy:      policy,
+		UpdatedAt:   updatedAt,
 	}, memberRows, integRows
 }
 
-func WorkspaceModel(r *WorkspaceRow, members []WorkspaceMemberRow, integrations []WorkspaceIntegrationRow) (*workspace.Workspace, error) {
+// ScimConfigRow builds a WorkspaceScimConfigRow from the domain object. Returns
+// nil if no SCIM config is set on the workspace.
+func ScimConfigRow(ws *workspace.Workspace) *WorkspaceScimConfigRow {
+	cfg := ws.ScimConfig()
+	if cfg == nil {
+		return nil
+	}
+	grm := cfg.GroupRoleMapping()
+	grmStr := make(map[string]string, len(grm))
+	for k, v := range grm {
+		grmStr[k] = string(v)
+	}
+	b, _ := json.Marshal(grmStr)
+	return &WorkspaceScimConfigRow{
+		Enabled:          cfg.Enabled(),
+		GroupRoleMapping: b,
+		TokenHash:        cfg.TokenHash(),
+		WorkspaceID:      ws.ID().String(),
+	}
+}
+
+func WorkspaceModel(r *WorkspaceRow, members []WorkspaceMemberRow, integrations []WorkspaceIntegrationRow, scimRow *WorkspaceScimConfigRow) (*workspace.Workspace, error) {
 	tid, err := id.WorkspaceIDFrom(r.ID)
 	if err != nil {
 		return nil, err
@@ -116,7 +170,12 @@ func WorkspaceModel(r *WorkspaceRow, members []WorkspaceMemberRow, integrations 
 		if err != nil {
 			inviter = uid
 		}
-		mems[uid] = workspace.Member{Role: role.RoleType(m.Role), Disabled: m.Disabled, InvitedBy: inviter}
+		mems[uid] = workspace.Member{
+			Disabled:   m.Disabled,
+			ExternalID: m.ExternalID,
+			InvitedBy:  inviter,
+			Role:       role.RoleType(m.Role),
+		}
 	}
 
 	integs := map[id.IntegrationID]workspace.Member{}
@@ -130,7 +189,11 @@ func WorkspaceModel(r *WorkspaceRow, members []WorkspaceMemberRow, integrations 
 		if err != nil {
 			inviter = id.UserID{}
 		}
-		integs[iid] = workspace.Member{Role: role.RoleType(m.Role), Disabled: m.Disabled, InvitedBy: inviter}
+		integs[iid] = workspace.Member{
+			Disabled:  m.Disabled,
+			InvitedBy: inviter,
+			Role:      role.RoleType(m.Role),
+		}
 	}
 
 	var policy *workspace.PolicyID
@@ -146,8 +209,26 @@ func WorkspaceModel(r *WorkspaceRow, members []WorkspaceMemberRow, integrations 
 	}
 	metadata := workspace.MetadataFrom(mj.Description, mj.Website, mj.Location, mj.BillingEmail, mj.PhotoURL)
 
+	var scimConfig *workspace.ScimConfig
+	if scimRow != nil {
+		cfg := workspace.NewScimConfig()
+		cfg.SetEnabled(scimRow.Enabled)
+		cfg.SetTokenHash(scimRow.TokenHash)
+		if len(scimRow.GroupRoleMapping) > 0 {
+			var grmStr map[string]string
+			if err := json.Unmarshal(scimRow.GroupRoleMapping, &grmStr); err == nil {
+				grm := make(map[string]role.RoleType, len(grmStr))
+				for k, v := range grmStr {
+					grm[k] = role.RoleType(v)
+				}
+				cfg.SetGroupRoleMapping(grm)
+			}
+		}
+		scimConfig = cfg
+	}
+
 	return workspace.New().
 		ID(tid).Name(r.Name).Alias(r.Alias).Email(r.Email).
 		Metadata(metadata).Members(mems).Integrations(integs).
-		Personal(r.Personal).Policy(policy).UpdatedAt(r.UpdatedAt).Build()
+		Personal(r.Personal).Policy(policy).ScimConfig(scimConfig).UpdatedAt(r.UpdatedAt).Build()
 }
