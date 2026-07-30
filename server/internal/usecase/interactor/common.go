@@ -25,6 +25,7 @@ func NewContainer(
 	cerbos := NewCerbos(r, cerbosAdapter)
 	return interfaces.Container{
 		Cerbos:    cerbos,
+		Scim:      NewScim(r),
 		User:      NewUser(r, acg, config.SignupSecret, config.AuthSrvUIDomain, config.AllowedISS...),
 		Workspace: NewWorkspace(r, enforcer, cerbos),
 	}
