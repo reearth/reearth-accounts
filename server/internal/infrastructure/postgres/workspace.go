@@ -52,25 +52,55 @@ func (r *Workspace) hydrate(ctx context.Context, rows []gen.Workspace) (workspac
 	if err != nil {
 		return nil, rerror.ErrInternalByWithContext(ctx, err)
 	}
+	scimRows, err := q.WorkspaceScimConfigsByWorkspaceIDs(ctx, ids)
+	if err != nil {
+		return nil, rerror.ErrInternalByWithContext(ctx, err)
+	}
 	memByWS := map[string][]pgdoc.WorkspaceMemberRow{}
 	for _, m := range memRows {
 		memByWS[m.WorkspaceID] = append(memByWS[m.WorkspaceID], pgdoc.WorkspaceMemberRow{
-			WorkspaceID: m.WorkspaceID, UserID: m.UserID, Role: m.Role, InvitedBy: m.InvitedBy, Disabled: m.Disabled,
+			Disabled:    m.Disabled,
+			ExternalID:  m.ExternalID,
+			InvitedBy:   m.InvitedBy,
+			Role:        m.Role,
+			UserID:      m.UserID,
+			WorkspaceID: m.WorkspaceID,
 		})
 	}
 	intByWS := map[string][]pgdoc.WorkspaceIntegrationRow{}
 	for _, m := range intRows {
 		intByWS[m.WorkspaceID] = append(intByWS[m.WorkspaceID], pgdoc.WorkspaceIntegrationRow{
-			WorkspaceID: m.WorkspaceID, IntegrationID: m.IntegrationID, Role: m.Role, InvitedBy: m.InvitedBy, Disabled: m.Disabled,
+			Disabled:      m.Disabled,
+			IntegrationID: m.IntegrationID,
+			InvitedBy:     m.InvitedBy,
+			Role:          m.Role,
+			WorkspaceID:   m.WorkspaceID,
 		})
+	}
+	scimByWS := map[string]*pgdoc.WorkspaceScimConfigRow{}
+	for _, s := range scimRows {
+		row := pgdoc.WorkspaceScimConfigRow{
+			Enabled:          s.Enabled,
+			GroupRoleMapping: s.GroupRoleMapping,
+			TokenHash:        s.TokenHash,
+			WorkspaceID:      s.WorkspaceID,
+		}
+		scimByWS[s.WorkspaceID] = &row
 	}
 	out := make(workspace.List, 0, len(rows))
 	for _, w := range rows {
 		row := &pgdoc.WorkspaceRow{
-			ID: w.ID, Name: w.Name, Alias: w.Alias, Email: w.Email, Personal: w.Personal,
-			Policy: w.Policy, MembersHash: w.MembersHash, Metadata: w.Metadata, UpdatedAt: w.UpdatedAt,
+			Alias:       w.Alias,
+			Email:       w.Email,
+			ID:          w.ID,
+			MembersHash: w.MembersHash,
+			Metadata:    w.Metadata,
+			Name:        w.Name,
+			Personal:    w.Personal,
+			Policy:      w.Policy,
+			UpdatedAt:   w.UpdatedAt,
 		}
-		m, err := pgdoc.WorkspaceModel(row, memByWS[w.ID], intByWS[w.ID])
+		m, err := pgdoc.WorkspaceModel(row, memByWS[w.ID], intByWS[w.ID], scimByWS[w.ID])
 		if err != nil {
 			return nil, err
 		}
@@ -221,6 +251,7 @@ func (r *Workspace) Save(ctx context.Context, ws *workspace.Workspace) error {
 
 func (r *Workspace) save(ctx context.Context, ws *workspace.Workspace) error {
 	row, members, integrations := pgdoc.NewWorkspaceRows(ws)
+	scimRow := pgdoc.ScimConfigRow(ws)
 	return r.c.WithinTransaction(ctx, func(ctx context.Context) error {
 		q := r.c.queries(ctx)
 		if err := q.WorkspaceUpsert(ctx, gen.WorkspaceUpsertParams{
@@ -237,7 +268,8 @@ func (r *Workspace) save(ctx context.Context, ws *workspace.Workspace) error {
 		}
 		for _, m := range members {
 			if err := q.WorkspaceMemberInsert(ctx, gen.WorkspaceMemberInsertParams{
-				WorkspaceID: m.WorkspaceID, UserID: m.UserID, Role: m.Role, InvitedBy: m.InvitedBy, Disabled: m.Disabled,
+				WorkspaceID: m.WorkspaceID, UserID: m.UserID, Role: m.Role,
+				InvitedBy: m.InvitedBy, Disabled: m.Disabled, ExternalID: m.ExternalID,
 			}); err != nil {
 				return rerror.ErrInternalByWithContext(ctx, err)
 			}
@@ -248,6 +280,16 @@ func (r *Workspace) save(ctx context.Context, ws *workspace.Workspace) error {
 		for _, m := range integrations {
 			if err := q.WorkspaceIntegrationInsert(ctx, gen.WorkspaceIntegrationInsertParams{
 				WorkspaceID: m.WorkspaceID, IntegrationID: m.IntegrationID, Role: m.Role, InvitedBy: m.InvitedBy, Disabled: m.Disabled,
+			}); err != nil {
+				return rerror.ErrInternalByWithContext(ctx, err)
+			}
+		}
+		if scimRow != nil {
+			if err := q.WorkspaceScimConfigUpsert(ctx, gen.WorkspaceScimConfigUpsertParams{
+				WorkspaceID:      scimRow.WorkspaceID,
+				Enabled:          scimRow.Enabled,
+				TokenHash:        scimRow.TokenHash,
+				GroupRoleMapping: scimRow.GroupRoleMapping,
 			}); err != nil {
 				return rerror.ErrInternalByWithContext(ctx, err)
 			}

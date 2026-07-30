@@ -28,7 +28,7 @@ DELETE FROM workspaces WHERE id = $1;
 DELETE FROM workspace_members WHERE workspace_id = $1;
 
 -- name: WorkspaceMemberInsert :exec
-INSERT INTO workspace_members (workspace_id, user_id, role, invited_by, disabled) VALUES ($1,$2,$3,$4,$5);
+INSERT INTO workspace_members (workspace_id, user_id, role, invited_by, disabled, external_id) VALUES ($1,$2,$3,$4,$5,$6);
 
 -- name: WorkspaceMembersByWorkspaceIDs :many
 SELECT * FROM workspace_members WHERE workspace_id = ANY($1::text[]);
@@ -50,3 +50,23 @@ SELECT DISTINCT workspace_id FROM workspace_integrations WHERE integration_id = 
 
 -- name: WorkspaceIDsByIntegrations :many
 SELECT DISTINCT workspace_id FROM workspace_integrations WHERE integration_id = ANY($1::text[]);
+
+-- name: WorkspaceScimConfigUpsert :exec
+INSERT INTO workspace_scim_configs (workspace_id, enabled, token_hash, group_role_mapping, updated_at)
+VALUES ($1, $2, $3, $4, now())
+ON CONFLICT (workspace_id) DO UPDATE
+  SET enabled            = EXCLUDED.enabled,
+      token_hash         = EXCLUDED.token_hash,
+      group_role_mapping = EXCLUDED.group_role_mapping,
+      updated_at         = now();
+
+-- name: WorkspaceScimConfigByWorkspaceID :one
+SELECT workspace_id, enabled, token_hash, group_role_mapping, updated_at
+FROM workspace_scim_configs WHERE workspace_id = $1;
+
+-- name: WorkspaceScimConfigsByWorkspaceIDs :many
+SELECT workspace_id, enabled, token_hash, group_role_mapping, updated_at
+FROM workspace_scim_configs WHERE workspace_id = ANY($1::text[]);
+
+-- name: WorkspaceScimConfigDelete :exec
+DELETE FROM workspace_scim_configs WHERE workspace_id = $1;

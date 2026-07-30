@@ -10,9 +10,16 @@ import (
 )
 
 type WorkspaceMemberDocument struct {
-	Role      string `json:"role" jsonschema:"description=Member role (owner, maintainer, writer, reader). Default: \"\""`
-	InvitedBy string `json:"invitedby" jsonschema:"description=User ID of the inviter"`
-	Disabled  bool   `json:"disabled" jsonschema:"description=Whether the member is disabled"`
+	Disabled   bool   `json:"disabled" jsonschema:"description=Whether the member is disabled"`
+	ExternalID string `json:"externalid" bson:"externalid,omitempty" jsonschema:"description=IdP-assigned external ID for this membership. Default: \"\""`
+	InvitedBy  string `json:"invitedby" jsonschema:"description=User ID of the inviter"`
+	Role       string `json:"role" jsonschema:"description=Member role (owner, maintainer, writer, reader). Default: \"\""`
+}
+
+type WorkspaceScimConfigDocument struct {
+	Enabled          bool              `json:"enabled" bson:"enabled" jsonschema:"description=Whether SCIM provisioning is enabled for this workspace"`
+	GroupRoleMapping map[string]string `json:"grouprolemapping" bson:"grouprolemapping" jsonschema:"description=IdP group name to workspace role mapping"`
+	TokenHash        string            `json:"tokenhash" bson:"tokenhash" jsonschema:"description=bcrypt hash of the SCIM bearer token. Default: \"\""`
 }
 
 type WorkspaceMetadataDocument struct {
@@ -28,12 +35,13 @@ type WorkspaceDocument struct {
 	Name         string                             `json:"name" bson:"name" jsonschema:"required,description=Workspace name"`
 	Alias        string                             `json:"alias" bson:"alias" jsonschema:"required,description=Unique workspace handle/alias"`
 	Email        string                             `json:"email" bson:"email" jsonschema:"required,description=Workspace contact email"`
-	Metadata     WorkspaceMetadataDocument          `json:"metadata" bson:"metadata" jsonschema:"required,description=Extended workspace metadata"`
-	Members      map[string]WorkspaceMemberDocument `json:"members" bson:"members" jsonschema:"required,description=Map of user ID to member document"`
 	Integrations map[string]WorkspaceMemberDocument `json:"integrations" bson:"integrations" jsonschema:"description=Map of integration ID to member document. Default: {}"`
+	Members      map[string]WorkspaceMemberDocument `json:"members" bson:"members" jsonschema:"required,description=Map of user ID to member document"`
 	MembersHash  string                             `json:"members_hash" bson:"members_hash,omitempty" jsonschema:"description=SHA256 hash of members and integrations for uniqueness tracking. Default: \"\""`
+	Metadata     WorkspaceMetadataDocument          `json:"metadata" bson:"metadata" jsonschema:"required,description=Extended workspace metadata"`
 	Personal     bool                               `json:"personal" bson:"personal" jsonschema:"required,description=Whether this is a personal workspace. Default: false"`
 	Policy       string                             `json:"policy" bson:"policy,omitempty" jsonschema:"description=Policy ID reference. Default: \"\""`
+	ScimConfig   *WorkspaceScimConfigDocument       `json:"scimconfig" bson:"scimconfig,omitempty" jsonschema:"description=SCIM provisioning configuration. Default: null"`
 	UpdatedAt    time.Time                          `json:"updatedat" bson:"updatedat" jsonschema:"description=Last update timestamp"`
 }
 
@@ -41,18 +49,19 @@ func NewWorkspace(ws *workspace.Workspace) (*WorkspaceDocument, string) {
 	membersDoc := map[string]WorkspaceMemberDocument{}
 	for uId, m := range ws.Members().Users() {
 		membersDoc[uId.String()] = WorkspaceMemberDocument{
-			Role:      string(m.Role),
-			Disabled:  m.Disabled,
-			InvitedBy: m.InvitedBy.String(),
+			Disabled:   m.Disabled,
+			ExternalID: m.ExternalID,
+			InvitedBy:  m.InvitedBy.String(),
+			Role:       string(m.Role),
 		}
 	}
 
 	integrationsDoc := map[string]WorkspaceMemberDocument{}
 	for iId, m := range ws.Members().Integrations() {
 		integrationsDoc[iId.String()] = WorkspaceMemberDocument{
-			Role:      string(m.Role),
 			Disabled:  m.Disabled,
 			InvitedBy: m.InvitedBy.String(),
+			Role:      string(m.Role),
 		}
 	}
 
@@ -77,17 +86,32 @@ func NewWorkspace(ws *workspace.Workspace) (*WorkspaceDocument, string) {
 	if updatedAt.IsZero() {
 		updatedAt = time.Now()
 	}
+	var scimDoc *WorkspaceScimConfigDocument
+	if cfg := ws.ScimConfig(); cfg != nil {
+		grm := cfg.GroupRoleMapping()
+		grmStr := make(map[string]string, len(grm))
+		for k, v := range grm {
+			grmStr[k] = string(v)
+		}
+		scimDoc = &WorkspaceScimConfigDocument{
+			Enabled:          cfg.Enabled(),
+			GroupRoleMapping: grmStr,
+			TokenHash:        cfg.TokenHash(),
+		}
+	}
+
 	return &WorkspaceDocument{
 		ID:           wId,
 		Name:         ws.Name(),
 		Alias:        ws.Alias(),
 		Email:        ws.Email(),
-		Metadata:     metadataDoc,
-		Members:      membersDoc,
 		Integrations: integrationsDoc,
+		Members:      membersDoc,
 		MembersHash:  membersHash,
+		Metadata:     metadataDoc,
 		Personal:     ws.IsPersonal(),
 		Policy:       lo.FromPtr(ws.Policy()).String(),
+		ScimConfig:   scimDoc,
 		UpdatedAt:    updatedAt,
 	}, wId
 }
@@ -110,9 +134,10 @@ func (d *WorkspaceDocument) Model() (*workspace.Workspace, error) {
 				inviterID = uid
 			}
 			members[uid] = workspace.Member{
-				Role:      role.RoleType(member.Role),
-				Disabled:  member.Disabled,
-				InvitedBy: inviterID,
+				Disabled:   member.Disabled,
+				ExternalID: member.ExternalID,
+				InvitedBy:  inviterID,
+				Role:       role.RoleType(member.Role),
 			}
 		}
 	}
@@ -125,9 +150,9 @@ func (d *WorkspaceDocument) Model() (*workspace.Workspace, error) {
 				return nil, err
 			}
 			integrations[iId] = workspace.Member{
-				Role:      role.RoleType(integrationDoc.Role),
 				Disabled:  integrationDoc.Disabled,
 				InvitedBy: id.MustUserID(integrationDoc.InvitedBy),
+				Role:      role.RoleType(integrationDoc.Role),
 			}
 		}
 	}
@@ -135,6 +160,19 @@ func (d *WorkspaceDocument) Model() (*workspace.Workspace, error) {
 	var policy *workspace.PolicyID
 	if d.Policy != "" {
 		policy = workspace.PolicyID(d.Policy).Ref()
+	}
+
+	var scimConfig *workspace.ScimConfig
+	if d.ScimConfig != nil {
+		cfg := workspace.NewScimConfig()
+		cfg.SetEnabled(d.ScimConfig.Enabled)
+		cfg.SetTokenHash(d.ScimConfig.TokenHash)
+		grm := make(map[string]role.RoleType, len(d.ScimConfig.GroupRoleMapping))
+		for k, v := range d.ScimConfig.GroupRoleMapping {
+			grm[k] = role.RoleType(v)
+		}
+		cfg.SetGroupRoleMapping(grm)
+		scimConfig = cfg
 	}
 
 	metadata := workspace.MetadataFrom(d.Metadata.Description, d.Metadata.Website, d.Metadata.Location, d.Metadata.BillingEmail, d.Metadata.PhotoURL)
@@ -149,6 +187,7 @@ func (d *WorkspaceDocument) Model() (*workspace.Workspace, error) {
 		Integrations(integrations).
 		Personal(d.Personal).
 		Policy(policy).
+		ScimConfig(scimConfig).
 		UpdatedAt(d.UpdatedAt).
 		Build()
 }

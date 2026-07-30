@@ -51,7 +51,7 @@ func TestWorkspaceRoundTrip(t *testing.T) {
 
 	row, members, integrations := pgdoc.NewWorkspaceRows(ws)
 	require.NotEmpty(t, row.MembersHash)
-	got, err := pgdoc.WorkspaceModel(row, members, integrations)
+	got, err := pgdoc.WorkspaceModel(row, members, integrations, nil)
 	require.NoError(t, err)
 	assert.Equal(t, ws.ID(), got.ID())
 	assert.Equal(t, "team", got.Name())

@@ -38,7 +38,16 @@ CREATE TABLE workspace_members (
     role         text NOT NULL,
     invited_by   text NOT NULL DEFAULT '',
     disabled     boolean NOT NULL DEFAULT false,
+    external_id  text NOT NULL DEFAULT '',
     PRIMARY KEY (workspace_id, user_id)
+);
+
+CREATE TABLE workspace_scim_configs (
+    workspace_id       text PRIMARY KEY REFERENCES workspaces(id) ON DELETE CASCADE,
+    enabled            boolean NOT NULL DEFAULT false,
+    token_hash         text NOT NULL DEFAULT '',
+    group_role_mapping jsonb NOT NULL DEFAULT '{}',
+    updated_at         timestamptz NOT NULL DEFAULT now()
 );
 
 CREATE TABLE workspace_integrations (
