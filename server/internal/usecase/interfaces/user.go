@@ -138,7 +138,8 @@ type User interface {
 	RemoveMyAuth(context.Context, string, *workspace.Operator) (*user.User, error)
 	UpdateMe(context.Context, UpdateMeParam, *workspace.Operator) (*user.User, error)
 
-	// platform role management (M2M, secret-gated)
+	// M2M, secret-gated user mutations (no JWT required)
+	UpdateUserBySub(ctx context.Context, sub string, name *string, secret *string) error
 	SetPlatformRolesBySub(ctx context.Context, sub string, roleNames []string, secret *string) error
 
 	// built-in auth server

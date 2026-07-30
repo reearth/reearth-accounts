@@ -225,6 +225,10 @@ func (u *User) RegenerateMFARecoveryCode(_ context.Context, _ *workspace.Operato
 	return "", errors.New("RegenerateMFARecoveryCode is not supported in proxy mode")
 }
 
+func (u *User) UpdateUserBySub(_ context.Context, _ string, _ *string, _ *string) error {
+	return errors.New("UpdateUserBySub is not supported in proxy mode")
+}
+
 func (u *User) SetPlatformRolesBySub(_ context.Context, _ string, _ []string, _ *string) error {
 	return errors.New("SetPlatformRolesBySub is not supported in proxy mode")
 }

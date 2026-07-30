@@ -1738,3 +1738,69 @@ func TestUser_FindAll(t *testing.T) {
 		assert.Equal(t, uA.ID(), res.Users[0].ID())
 	})
 }
+
+func TestUser_UpdateUserBySub(t *testing.T) {
+	ctx := context.Background()
+	secret := "shh"
+
+	t.Run("updates name by sub with the correct secret", func(t *testing.T) {
+		db := memory.New()
+		uc := NewUser(db, nil, secret, "")
+
+		wid := id.NewWorkspaceID()
+		u := user.New().NewID().Workspace(wid).Name("Old Name").Email("bysub@bbb.com").
+			Auths([]user.Auth{{Provider: "", Sub: "cip-sub-1"}}).MustBuild()
+		ws := workspace.New().ID(wid).Name("Old Name").Personal(true).MustBuild()
+		assert.NoError(t, db.User.Save(ctx, u))
+		assert.NoError(t, db.Workspace.Save(ctx, ws))
+
+		assert.NoError(t, uc.UpdateUserBySub(ctx, "cip-sub-1", strPtr("New Name"), &secret))
+
+		got, err := db.User.FindBySub(ctx, "cip-sub-1")
+		assert.NoError(t, err)
+		assert.Equal(t, "New Name", got.Name())
+	})
+
+	t.Run("denies a missing or incorrect secret", func(t *testing.T) {
+		db := memory.New()
+		uc := NewUser(db, nil, secret, "")
+
+		err := uc.UpdateUserBySub(ctx, "cip-sub-1", strPtr("New Name"), nil)
+		assert.ErrorIs(t, err, interfaces.ErrSignupInvalidSecret)
+
+		wrong := "wrong"
+		err = uc.UpdateUserBySub(ctx, "cip-sub-1", strPtr("New Name"), &wrong)
+		assert.ErrorIs(t, err, interfaces.ErrSignupInvalidSecret)
+	})
+}
+
+func TestUser_SetPlatformRolesBySub(t *testing.T) {
+	ctx := context.Background()
+	secret := "shh"
+
+	t.Run("replaces platform roles by sub with the correct secret", func(t *testing.T) {
+		db := memory.New()
+		uc := NewUser(db, nil, secret, "")
+
+		targetRole := role.New().NewID().Name("custom").MustBuild()
+		assert.NoError(t, db.Role.Save(ctx, *targetRole))
+
+		u := user.New().NewID().Workspace(id.NewWorkspaceID()).Name("Sub User").Email("sub2@bbb.com").
+			Auths([]user.Auth{{Provider: "", Sub: "cip-sub-2"}}).MustBuild()
+		assert.NoError(t, db.User.Save(ctx, u))
+
+		assert.NoError(t, uc.SetPlatformRolesBySub(ctx, "cip-sub-2", []string{"custom"}, &secret))
+
+		p, err := db.Permittable.FindByUserID(ctx, u.ID())
+		assert.NoError(t, err)
+		assert.Contains(t, p.RoleIDs(), targetRole.ID())
+	})
+
+	t.Run("denies a missing or incorrect secret", func(t *testing.T) {
+		db := memory.New()
+		uc := NewUser(db, nil, secret, "")
+
+		err := uc.SetPlatformRolesBySub(ctx, "cip-sub-2", []string{"custom"}, nil)
+		assert.ErrorIs(t, err, interfaces.ErrSignupInvalidSecret)
+	})
+}

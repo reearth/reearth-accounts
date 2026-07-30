@@ -591,6 +591,32 @@ func (h *UserHandler) FindOrCreate(c echo.Context) error {
 	return c.NoContent(http.StatusNoContent)
 }
 
+// UpdateUserBySub godoc
+// @Tags User
+// @Summary Update a user's fields by Firebase sub (M2M, secret-gated)
+// @Accept json
+// @Produce json
+// @Param sub path string true "Firebase auth sub"
+// @Param body body httpmodel.UpdateUserBySubRequest true "fields to update and optional secret"
+// @Success 204 "No Content"
+// @Failure 400 {object} internal.ErrorResponse
+// @Failure 404 {object} internal.ErrorResponse
+// @Router /api/users/by-sub/{sub} [patch]
+func (h *UserHandler) UpdateUserBySub(c echo.Context) error {
+	sub := c.Param("sub")
+	if sub == "" {
+		return badRequest("sub is required")
+	}
+	req := &httpmodel.UpdateUserBySubRequest{}
+	if err := httpinternal.BindValidate(c, req); err != nil {
+		return err
+	}
+	if err := httpinternal.Usecases(c).User.UpdateUserBySub(c.Request().Context(), sub, req.Name, req.Secret); err != nil {
+		return err
+	}
+	return c.NoContent(http.StatusNoContent)
+}
+
 // SetPlatformRolesBySub godoc
 // @Tags User
 // @Summary Replace a user's global platform roles (M2M, secret-gated)

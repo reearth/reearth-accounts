@@ -317,6 +317,13 @@ type FindOrCreateRequest struct {
 	Token string `json:"token" validate:"required"`
 }
 
+// UpdateUserBySubRequest is the request body for PATCH /api/users/by-sub/:sub.
+// Accepts optional fields; omitted fields are left unchanged.
+type UpdateUserBySubRequest struct {
+	Name   *string `json:"name,omitempty"`
+	Secret *string `json:"secret,omitempty"`
+}
+
 // SetPlatformRolesBySubRequest is the request body for PUT /api/users/by-sub/:sub/platform-roles.
 // RoleNames accepts human-readable role names (e.g. "owner"). An empty slice clears all platform roles.
 type SetPlatformRolesBySubRequest struct {

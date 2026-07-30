@@ -17,6 +17,7 @@ import (
 	"github.com/reearth/reearth-accounts/server/pkg/user"
 	"github.com/reearth/reearth-accounts/server/pkg/workspace"
 	"github.com/reearth/reearthx/i18n"
+	"github.com/reearth/reearthx/log"
 	"github.com/reearth/reearthx/mailer"
 	"github.com/reearth/reearthx/rerror"
 )
@@ -697,6 +698,47 @@ func (q *UserQuery) FetchByNameOrAlias(ctx context.Context, nameOrAlias string) 
 	}
 
 	return nil, rerror.ErrNotFound
+}
+
+// UpdateUserBySub updates a user's mutable fields (currently name) looked up by Firebase sub.
+// Authenticated by the signup secret (same mechanism as signup-oidc).
+// The personal workspace is renamed in sync when its name still matches the old user name.
+func (i *User) UpdateUserBySub(ctx context.Context, sub string, name *string, secret *string) error {
+	if err := i.verifySignupSecret(secret); err != nil {
+		return err
+	}
+	if name == nil {
+		return nil
+	}
+
+	u, err := i.repos.User.FindBySub(ctx, sub)
+	if err != nil {
+		return err
+	}
+
+	oldName := u.Name()
+	u.UpdateName(*name)
+
+	if err := i.repos.User.Save(ctx, u); err != nil {
+		return err
+	}
+
+	// Keep the personal workspace name in sync when it still matched the old user name.
+	ws, err := i.repos.Workspace.FindByID(ctx, u.Workspace())
+	if err != nil && !errors.Is(err, rerror.ErrNotFound) {
+		return err
+	}
+	if ws != nil && ws.IsPersonal() {
+		tn := ws.Name()
+		if tn == "" || tn == oldName {
+			ws.Rename(*name)
+			if err := i.repos.Workspace.Save(ctx, ws); err != nil {
+				log.Warnfc(ctx, "UpdateUserBySub: workspace rename failed (non-fatal): %v", err)
+			}
+		}
+	}
+
+	return nil
 }
 
 // SetPlatformRolesBySub replaces a user's global platform roles, looked up by Firebase sub.

@@ -99,8 +99,9 @@ func RegisterRESTRouter(e *echo.Echo, cfg RouterConfig) {
 	api.POST("/users/password-reset/start", uh.StartPasswordReset)
 	api.POST("/users/password-reset", uh.PasswordReset)
 	api.POST("/users/find-or-create", uh.FindOrCreate, optional, apikeyOrAuth)
-	// PUT /api/users/by-sub/:sub/platform-roles — M2M, secret-gated (like signup-oidc).
-	// Replaces a user's platform roles by Firebase sub, accepting human-readable role names.
+	// PATCH /api/users/by-sub/:sub — M2M, secret-gated. Updates mutable user fields (name) by Firebase sub.
+	api.PATCH("/users/by-sub/:sub", uh.UpdateUserBySub, optional)
+	// PUT /api/users/by-sub/:sub/platform-roles — M2M, secret-gated. Replaces platform roles by Firebase sub.
 	api.PUT("/users/by-sub/:sub/platform-roles", uh.SetPlatformRolesBySub, optional)
 
 	// --- Workspaces ---
