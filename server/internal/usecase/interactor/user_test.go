@@ -1354,6 +1354,48 @@ func TestUser_UpdateMe_AuthenticatorUpdateUserError(t *testing.T) {
 	assert.Nil(t, result)
 }
 
+func TestUser_UpdateMe_SkipsIdPSyncForCIP(t *testing.T) {
+	user.DefaultPasswordEncoder = &user.NoopPasswordEncoder{}
+
+	ctx := context.Background()
+	r := memory.New()
+
+	mockAuth := &mockAuthenticatorWithError{updateUserErr: errors.New("cip should not be called")}
+	g := &gateway.Container{Authenticators: map[gateway.Provider]gateway.Authenticator{gateway.ProviderCIP: mockAuth}}
+	uc := NewUser(r, g, "", "")
+
+	uid := id.NewUserID()
+	wid := id.NewWorkspaceID()
+	u := user.New().
+		ID(uid).
+		Workspace(wid).
+		Name("Test User").
+		Email("test@example.com").
+		Auths([]user.Auth{{Provider: "", Sub: "cip-sub-123"}}).
+		MustBuild()
+	ws := workspace.New().
+		ID(wid).
+		Name("Test User").
+		Personal(true).
+		MustBuild()
+
+	assert.NoError(t, r.User.Save(ctx, u))
+	assert.NoError(t, r.Workspace.Save(ctx, ws))
+
+	operator := &workspace.Operator{
+		User: &uid,
+	}
+
+	// CIP auth records are skipped entirely, so the mock's error is never hit.
+	result, err := uc.UpdateMe(ctx, interfaces.UpdateMeParam{
+		Name: strPtr("New Name"),
+	}, operator)
+
+	assert.NoError(t, err)
+	assert.NotNil(t, result)
+	assert.Equal(t, "New Name", result.Name())
+}
+
 func TestUser_UpdateMe_WorkspaceSaveError(t *testing.T) {
 	user.DefaultPasswordEncoder = &user.NoopPasswordEncoder{}
 

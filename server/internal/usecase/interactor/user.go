@@ -240,9 +240,14 @@ func (i *User) UpdateMe(ctx context.Context, p interfaces.UpdateMeParam, operato
 		}
 
 		// Sync external IdP users to their provider, routed per auth record so
-		// Auth0 subs go to Auth0 and CIP subs go to Firebase when both coexist.
+		// Auth0 subs go to Auth0. CIP (Cloud Identity Platform, used by Veda) is
+		// deliberately skipped: the accounts DB record is the source of truth for
+		// display name there, and Veda manages its own IdP state independently.
 		if p.Name != nil || p.Email != nil || p.Password != nil {
 			for _, a := range u.Auths() {
+				if gateway.Provider(a.Provider) == gateway.ProviderCIP || a.Provider == "" {
+					continue
+				}
 				authenticator := i.gateways.AuthenticatorFor(a.Provider)
 				if authenticator == nil {
 					continue
