@@ -297,7 +297,7 @@ func (i *Workspace) AddUserMember(ctx context.Context, workspaceID workspace.ID,
 		return nil, applog.ErrorWithCallerLogging(ctx, "failed to fetch user", err)
 	}
 
-	return Run1(ctx, operator, i.repos, Usecase().Transaction().WithWritableWorkspaces(workspaceID), func(ctx context.Context) (*workspace.Workspace, error) {
+	return Run1(ctx, operator, i.repos, Usecase().Transaction(), func(ctx context.Context) (*workspace.Workspace, error) {
 		ws, err := i.repos.Workspace.FindByID(ctx, workspaceID)
 		if err != nil {
 			return nil, applog.ErrorWithCallerLogging(ctx, "failed to fetch workspace", err)
@@ -305,6 +305,12 @@ func (i *Workspace) AddUserMember(ctx context.Context, workspaceID workspace.ID,
 
 		if ws.IsPersonal() {
 			return nil, workspace.ErrCannotModifyPersonalWorkspace
+		}
+
+		if !operator.IsWritableWorkspace(workspaceID) {
+			if err := i.checkOwnerLikePermission(ctx, ws, operator, rbac.ActionAddMember); err != nil {
+				return nil, err
+			}
 		}
 
 		if i.enforceMemberCount != nil {
@@ -380,7 +386,7 @@ func (i *Workspace) RemoveMultipleUserMembers(ctx context.Context, id workspace.
 		return nil, workspace.ErrNoSpecifiedUsers
 	}
 
-	return Run1(ctx, operator, i.repos, Usecase().Transaction().WithWritableWorkspaces(id), func(ctx context.Context) (*workspace.Workspace, error) {
+	return Run1(ctx, operator, i.repos, Usecase().Transaction(), func(ctx context.Context) (*workspace.Workspace, error) {
 		ws, err := i.repos.Workspace.FindByID(ctx, id)
 		if err != nil {
 			return nil, err
@@ -388,6 +394,12 @@ func (i *Workspace) RemoveMultipleUserMembers(ctx context.Context, id workspace.
 
 		if ws.IsPersonal() {
 			return nil, workspace.ErrCannotModifyPersonalWorkspace
+		}
+
+		if !operator.IsWritableWorkspace(id) {
+			if err := i.checkOwnerLikePermission(ctx, ws, operator, rbac.ActionDeleteMember); err != nil {
+				return nil, err
+			}
 		}
 
 		for _, uId := range userIds {
@@ -474,7 +486,7 @@ func (i *Workspace) UpdateUserMember(ctx context.Context, id workspace.ID, u wor
 		return nil, interfaces.ErrInvalidOperator
 	}
 
-	return Run1(ctx, operator, i.repos, Usecase().Transaction().WithWritableWorkspaces(id), func(ctx context.Context) (*workspace.Workspace, error) {
+	return Run1(ctx, operator, i.repos, Usecase().Transaction(), func(ctx context.Context) (*workspace.Workspace, error) {
 		ws, err := i.repos.Workspace.FindByID(ctx, id)
 		if err != nil {
 			return nil, err
@@ -482,6 +494,12 @@ func (i *Workspace) UpdateUserMember(ctx context.Context, id workspace.ID, u wor
 
 		if ws.IsPersonal() {
 			return nil, workspace.ErrCannotModifyPersonalWorkspace
+		}
+
+		if !operator.IsWritableWorkspace(id) {
+			if err := i.checkOwnerLikePermission(ctx, ws, operator, rbac.ActionEditMember); err != nil {
+				return nil, err
+			}
 		}
 
 		if u == *operator.User {
