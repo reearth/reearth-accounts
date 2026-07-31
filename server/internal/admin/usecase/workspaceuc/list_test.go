@@ -15,6 +15,10 @@ func ws(name, alias string) *workspace.Workspace {
 	return workspace.New().NewID().Name(name).Alias(alias).MustBuild()
 }
 
+func personalWs(name, alias string) *workspace.Workspace {
+	return workspace.New().NewID().Name(name).Alias(alias).Personal(true).MustBuild()
+}
+
 func TestList_All(t *testing.T) {
 	ctx := context.Background()
 	repo := memory.NewWorkspaceWith(ws("Alpha", "alpha"), ws("Beta", "beta"))
@@ -84,6 +88,61 @@ func TestList_Keyword(t *testing.T) {
 	require.Equal(t, 1, len(got))
 	assert.Equal(t, "Alpha", got[0].Name())
 	assert.Equal(t, int64(1), pi.TotalCount)
+}
+
+func TestList_PersonalOnly(t *testing.T) {
+	ctx := context.Background()
+	repo := memory.NewWorkspaceWith(personalWs("Solo", "solo"), ws("Team", "team"))
+	uc := NewListWorkspacesUseCase(repo)
+
+	yes := true
+	got, pi, err := uc.Execute(ctx, ListWorkspacesInput{Personal: &yes})
+	require.NoError(t, err)
+	require.Equal(t, 1, len(got))
+	assert.Equal(t, "Solo", got[0].Name())
+	assert.True(t, got[0].IsPersonal())
+	assert.Equal(t, int64(1), pi.TotalCount)
+}
+
+func TestList_TeamOnly(t *testing.T) {
+	ctx := context.Background()
+	repo := memory.NewWorkspaceWith(personalWs("Solo", "solo"), ws("Team", "team"))
+	uc := NewListWorkspacesUseCase(repo)
+
+	no := false
+	got, pi, err := uc.Execute(ctx, ListWorkspacesInput{Personal: &no})
+	require.NoError(t, err)
+	require.Equal(t, 1, len(got))
+	assert.Equal(t, "Team", got[0].Name())
+	assert.False(t, got[0].IsPersonal())
+	assert.Equal(t, int64(1), pi.TotalCount)
+}
+
+func TestList_AllTypes_WhenPersonalNil(t *testing.T) {
+	ctx := context.Background()
+	repo := memory.NewWorkspaceWith(personalWs("Solo", "solo"), ws("Team", "team"))
+	uc := NewListWorkspacesUseCase(repo)
+
+	got, pi, err := uc.Execute(ctx, ListWorkspacesInput{})
+	require.NoError(t, err)
+	assert.Equal(t, 2, len(got))
+	assert.Equal(t, int64(2), pi.TotalCount)
+}
+
+func TestList_ByIDs_IgnoresPersonalFilter(t *testing.T) {
+	ctx := context.Background()
+	solo := personalWs("Solo", "solo")
+	team := ws("Team", "team")
+	repo := memory.NewWorkspaceWith(solo, team)
+	uc := NewListWorkspacesUseCase(repo)
+
+	// Personal is ignored in batch-by-IDs mode: a team workspace resolves even
+	// though Personal=true would exclude it in the keyword-listing path.
+	yes := true
+	got, _, err := uc.Execute(ctx, ListWorkspacesInput{IDs: workspace.IDList{team.ID()}, Personal: &yes})
+	require.NoError(t, err)
+	require.Len(t, got, 1)
+	assert.Equal(t, team.ID(), got[0].ID())
 }
 
 func TestList_RejectsCursorPagination(t *testing.T) {

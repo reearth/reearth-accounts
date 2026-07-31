@@ -31,7 +31,7 @@ func (r *Workspace) Filtered(f workspace.WorkspaceFilter) workspace.Repo {
 // FindAll is not implemented for the PostgreSQL backend: the admin app (which
 // is the only consumer of this cross-tenant listing) runs on MongoDB, so the
 // Postgres admin list path is intentionally left unimplemented for now.
-func (r *Workspace) FindAll(_ context.Context, _ *string, _ *usecasex.Pagination) (workspace.List, *usecasex.PageInfo, error) {
+func (r *Workspace) FindAll(_ context.Context, _ *string, _ *bool, _ *usecasex.Pagination) (workspace.List, *usecasex.PageInfo, error) {
 	return nil, nil, workspace.ErrNotImplemented
 }
 

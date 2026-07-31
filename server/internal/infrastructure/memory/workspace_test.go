@@ -231,3 +231,34 @@ func TestWorkspace_RemoveAll(t *testing.T) {
 	SetWorkspaceError(r, wantErr)
 	assert.Same(t, wantErr, r.RemoveAll(ctx, ids))
 }
+
+func TestWorkspace_FindAll_PersonalFilter(t *testing.T) {
+	ctx := context.Background()
+	solo := workspace.New().NewID().Name("Solo").Alias("solo").Personal(true).MustBuild()
+	team := workspace.New().NewID().Name("Team").Alias("team").MustBuild()
+	r := NewWorkspaceWith(solo, team)
+
+	// nil => both types
+	got, pi, err := r.FindAll(ctx, nil, nil, nil)
+	assert.NoError(t, err)
+	assert.Len(t, got, 2)
+	assert.Equal(t, int64(2), pi.TotalCount)
+
+	// true => personal only
+	yes := true
+	got, pi, err = r.FindAll(ctx, nil, &yes, nil)
+	assert.NoError(t, err)
+	assert.Len(t, got, 1)
+	assert.Equal(t, solo.ID(), got[0].ID())
+	assert.True(t, got[0].IsPersonal())
+	assert.Equal(t, int64(1), pi.TotalCount)
+
+	// false => team (non-personal) only
+	no := false
+	got, pi, err = r.FindAll(ctx, nil, &no, nil)
+	assert.NoError(t, err)
+	assert.Len(t, got, 1)
+	assert.Equal(t, team.ID(), got[0].ID())
+	assert.False(t, got[0].IsPersonal())
+	assert.Equal(t, int64(1), pi.TotalCount)
+}

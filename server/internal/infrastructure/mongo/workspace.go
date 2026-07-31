@@ -40,7 +40,7 @@ func (r *Workspace) Filtered(f workspace.WorkspaceFilter) workspace.Repo {
 	}
 }
 
-func (r *Workspace) FindAll(ctx context.Context, keyword *string, pagination *usecasex.Pagination) (workspace.List, *usecasex.PageInfo, error) {
+func (r *Workspace) FindAll(ctx context.Context, keyword *string, personal *bool, pagination *usecasex.Pagination) (workspace.List, *usecasex.PageInfo, error) {
 	if pagination != nil && pagination.Cursor != nil {
 		return nil, nil, workspace.ErrCursorPaginationUnsupported
 	}
@@ -52,6 +52,11 @@ func (r *Workspace) FindAll(ctx context.Context, keyword *string, pagination *us
 			{"name": bson.M{"$regex": re}},
 			{"alias": bson.M{"$regex": re}},
 		}
+	}
+	// filter by workspace type when requested (nil = both types). The personal
+	// flag is stored on the workspace doc as the boolean `personal` field.
+	if personal != nil {
+		filter["personal"] = *personal
 	}
 
 	// Respect the readable-workspace filter: for the admin base repo it is unset
