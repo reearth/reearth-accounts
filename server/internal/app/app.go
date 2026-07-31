@@ -11,6 +11,7 @@ import (
 	"github.com/labstack/echo/v4/middleware"
 	"github.com/reearth/reearth-accounts/server/internal/adapter"
 	adapterhttp "github.com/reearth/reearth-accounts/server/internal/adapter/http"
+	scimadapter "github.com/reearth/reearth-accounts/server/internal/adapter/scim"
 	otelapp "github.com/reearth/reearth-accounts/server/internal/app/otel"
 	"github.com/reearth/reearth-accounts/server/internal/usecase/interactor"
 	"github.com/reearth/reearth-accounts/server/pkg/user"
@@ -154,6 +155,9 @@ func initEcho(ctx context.Context, cfg *ServerConfig) *echo.Echo {
 		SwaggerPass:        cfg.Config.SwaggerBasicPass,
 		Debug:              cfg.Debug || cfg.Config.Dev,
 	})
+
+	scimUC := interactor.NewScim(cfg.Repos)
+	scimadapter.RegisterSCIMRouter(e, cfg.Repos.Workspace, scimUC, cfg.Config.Host)
 
 	return e
 }

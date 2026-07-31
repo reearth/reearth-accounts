@@ -31,6 +31,7 @@ type ScimGroupMember struct {
 
 type Scim interface {
 	DeprovisionScimUser(ctx context.Context, workspaceID workspace.ID, externalID string) error
+	DeprovisionScimUserByUserID(ctx context.Context, workspaceID workspace.ID, userID user.ID) error
 	GenerateScimToken(ctx context.Context, workspaceID workspace.ID, operator *workspace.Operator) (string, error)
 	GetScimConfig(ctx context.Context, workspaceID workspace.ID, operator *workspace.Operator) (*workspace.ScimConfig, error)
 	GetScimUser(ctx context.Context, workspaceID workspace.ID, userID user.ID) (*user.User, error)

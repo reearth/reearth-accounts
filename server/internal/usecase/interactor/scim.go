@@ -47,6 +47,29 @@ func (i *Scim) DeprovisionScimUser(ctx context.Context, workspaceID workspace.ID
 	})
 }
 
+func (i *Scim) DeprovisionScimUserByUserID(ctx context.Context, workspaceID workspace.ID, userID user.ID) error {
+	return Run0(ctx, nil, i.repos, Usecase().Transaction(), func(ctx context.Context) error {
+		ws, err := i.repos.Workspace.FindByID(ctx, workspaceID)
+		if err != nil {
+			return err
+		}
+
+		if !ws.Members().HasUser(userID) {
+			return interfaces.ErrSCIMUserNotFound
+		}
+
+		if ws.Members().IsOnlyOwner(userID) {
+			return interfaces.ErrOwnerCannotLeaveTheWorkspace
+		}
+
+		if err := ws.Members().SetUserDisabled(userID, true); err != nil {
+			return err
+		}
+
+		return i.repos.Workspace.Save(ctx, ws)
+	})
+}
+
 func (i *Scim) GenerateScimToken(ctx context.Context, workspaceID workspace.ID, operator *workspace.Operator) (string, error) {
 	return Run1(ctx, operator, i.repos, Usecase().Transaction().WithMaintainableWorkspaces(workspaceID), func(ctx context.Context) (string, error) {
 		ws, err := i.repos.Workspace.FindByID(ctx, workspaceID)
