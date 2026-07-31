@@ -203,6 +203,100 @@ func TestDeprovisionScimUser_LastOwner(t *testing.T) {
 	assert.ErrorIs(t, err, interfaces.ErrOwnerCannotLeaveTheWorkspace)
 }
 
+func TestDeprovisionScimUserByUserID_OK(t *testing.T) {
+	ctx := context.Background()
+	db := accountmemory.New()
+
+	ownerID := user.NewID()
+	owner := user.New().ID(ownerID).Name("owner").Email("owner@example.com").Workspace(user.NewWorkspaceID()).MustBuild()
+	require.NoError(t, db.User.Save(ctx, owner))
+
+	memberID := user.NewID()
+	member := user.New().ID(memberID).Name("member").Email("member@example.com").Workspace(user.NewWorkspaceID()).MustBuild()
+	require.NoError(t, db.User.Save(ctx, member))
+
+	cfg := workspace.NewScimConfig()
+	cfg.SetEnabled(true)
+	ws := workspace.New().
+		NewID().
+		Name("enterprise").
+		Alias("enterprise").
+		Members(map[user.ID]workspace.Member{
+			ownerID:  {Role: role.RoleOwner, InvitedBy: ownerID},
+			memberID: {Role: role.RoleWriter, InvitedBy: ownerID, ExternalID: "ext-member-002"},
+		}).
+		ScimConfig(cfg).
+		MustBuild()
+	require.NoError(t, db.Workspace.Save(ctx, ws))
+
+	uc := NewScim(db)
+
+	err := uc.DeprovisionScimUserByUserID(ctx, ws.ID(), memberID)
+	require.NoError(t, err)
+
+	saved, err := db.Workspace.FindByID(ctx, ws.ID())
+	require.NoError(t, err)
+
+	m := saved.Members().User(memberID)
+	require.NotNil(t, m)
+	assert.True(t, m.Disabled, "member must be soft-disabled, not removed")
+}
+
+func TestDeprovisionScimUserByUserID_LastOwner(t *testing.T) {
+	ctx := context.Background()
+	db := accountmemory.New()
+
+	ownerID := user.NewID()
+	owner := user.New().ID(ownerID).Name("owner").Email("owner@example.com").Workspace(user.NewWorkspaceID()).MustBuild()
+	require.NoError(t, db.User.Save(ctx, owner))
+
+	cfg := workspace.NewScimConfig()
+	cfg.SetEnabled(true)
+	ws := workspace.New().
+		NewID().
+		Name("enterprise").
+		Alias("enterprise").
+		Members(map[user.ID]workspace.Member{
+			ownerID: {Role: role.RoleOwner, InvitedBy: ownerID, ExternalID: "ext-owner-002"},
+		}).
+		ScimConfig(cfg).
+		MustBuild()
+	require.NoError(t, db.Workspace.Save(ctx, ws))
+
+	uc := NewScim(db)
+
+	err := uc.DeprovisionScimUserByUserID(ctx, ws.ID(), ownerID)
+	assert.ErrorIs(t, err, interfaces.ErrOwnerCannotLeaveTheWorkspace)
+}
+
+func TestDeprovisionScimUserByUserID_NotFound(t *testing.T) {
+	ctx := context.Background()
+	db := accountmemory.New()
+
+	ownerID := user.NewID()
+	owner := user.New().ID(ownerID).Name("owner").Email("owner@example.com").Workspace(user.NewWorkspaceID()).MustBuild()
+	require.NoError(t, db.User.Save(ctx, owner))
+
+	cfg := workspace.NewScimConfig()
+	cfg.SetEnabled(true)
+	ws := workspace.New().
+		NewID().
+		Name("enterprise").
+		Alias("enterprise").
+		Members(map[user.ID]workspace.Member{
+			ownerID: {Role: role.RoleOwner, InvitedBy: ownerID},
+		}).
+		ScimConfig(cfg).
+		MustBuild()
+	require.NoError(t, db.Workspace.Save(ctx, ws))
+
+	uc := NewScim(db)
+
+	unknownID := user.NewID()
+	err := uc.DeprovisionScimUserByUserID(ctx, ws.ID(), unknownID)
+	assert.ErrorIs(t, err, interfaces.ErrSCIMUserNotFound)
+}
+
 func TestSyncScimGroup_AddAndRemove(t *testing.T) {
 	ctx := context.Background()
 	db := accountmemory.New()
