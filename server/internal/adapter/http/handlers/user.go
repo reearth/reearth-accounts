@@ -99,6 +99,52 @@ func (h *UserHandler) RemoveMyAuth(c echo.Context) error {
 	return c.JSON(http.StatusOK, httpmodel.NewMeResponse(u))
 }
 
+// Deactivate godoc
+// @Tags User
+// @Summary Soft-delete a user (sets deleted_at; maintainer role required)
+// @Security BearerAuth
+// @Produce json
+// @Param id path string true "user ID"
+// @Success 200 {object} httpmodel.UserResponse
+// @Failure 403 {object} internal.ErrorResponse
+// @Failure 404 {object} internal.ErrorResponse
+// @Router /api/users/{id}/deactivate [post]
+func (h *UserHandler) Deactivate(c echo.Context) error {
+	ctx := c.Request().Context()
+	uid, err := id.UserIDFrom(c.Param("id"))
+	if err != nil {
+		return badRequest("invalid user id")
+	}
+	u, err := httpinternal.Usecases(c).User.Deactivate(ctx, uid, httpinternal.Operator(c))
+	if err != nil {
+		return err
+	}
+	return c.JSON(http.StatusOK, httpmodel.NewUserResponse(u))
+}
+
+// Restore godoc
+// @Tags User
+// @Summary Restore a soft-deleted user (clears deleted_at; maintainer role required)
+// @Security BearerAuth
+// @Produce json
+// @Param id path string true "user ID"
+// @Success 200 {object} httpmodel.UserResponse
+// @Failure 403 {object} internal.ErrorResponse
+// @Failure 404 {object} internal.ErrorResponse
+// @Router /api/users/{id}/restore [post]
+func (h *UserHandler) Restore(c echo.Context) error {
+	ctx := c.Request().Context()
+	uid, err := id.UserIDFrom(c.Param("id"))
+	if err != nil {
+		return badRequest("invalid user id")
+	}
+	u, err := httpinternal.Usecases(c).User.Restore(ctx, uid, httpinternal.Operator(c))
+	if err != nil {
+		return err
+	}
+	return c.JSON(http.StatusOK, httpmodel.NewUserResponse(u))
+}
+
 // Get godoc
 // @Tags User
 // @Summary Get a user by ID
@@ -593,13 +639,15 @@ func (h *UserHandler) FindOrCreate(c echo.Context) error {
 
 // UpdateUserBySub godoc
 // @Tags User
-// @Summary Update a user's fields by Firebase sub (M2M, secret-gated)
+// @Summary Update a user's fields by Firebase sub (maintainer role required)
+// @Security BearerAuth
 // @Accept json
 // @Produce json
 // @Param sub path string true "Firebase auth sub"
-// @Param body body httpmodel.UpdateUserBySubRequest true "fields to update and optional secret"
+// @Param body body httpmodel.UpdateUserBySubRequest true "fields to update"
 // @Success 204 "No Content"
 // @Failure 400 {object} internal.ErrorResponse
+// @Failure 403 {object} internal.ErrorResponse
 // @Failure 404 {object} internal.ErrorResponse
 // @Router /api/users/by-sub/{sub} [patch]
 func (h *UserHandler) UpdateUserBySub(c echo.Context) error {
@@ -611,7 +659,7 @@ func (h *UserHandler) UpdateUserBySub(c echo.Context) error {
 	if err := httpinternal.BindValidate(c, req); err != nil {
 		return err
 	}
-	if err := httpinternal.Usecases(c).User.UpdateUserBySub(c.Request().Context(), sub, req.Name, req.Secret); err != nil {
+	if err := httpinternal.Usecases(c).User.UpdateUserBySub(c.Request().Context(), sub, req.Name, httpinternal.Operator(c)); err != nil {
 		return err
 	}
 	return c.NoContent(http.StatusNoContent)
@@ -619,13 +667,15 @@ func (h *UserHandler) UpdateUserBySub(c echo.Context) error {
 
 // SetPlatformRolesBySub godoc
 // @Tags User
-// @Summary Replace a user's global platform roles (M2M, secret-gated)
+// @Summary Replace a user's global platform roles (maintainer role required)
+// @Security BearerAuth
 // @Accept json
 // @Produce json
 // @Param sub path string true "Firebase auth sub"
-// @Param body body httpmodel.SetPlatformRolesBySubRequest true "role names and optional secret"
+// @Param body body httpmodel.SetPlatformRolesBySubRequest true "role names"
 // @Success 204 "No Content"
 // @Failure 400 {object} internal.ErrorResponse
+// @Failure 403 {object} internal.ErrorResponse
 // @Failure 404 {object} internal.ErrorResponse
 // @Router /api/users/by-sub/{sub}/platform-roles [put]
 func (h *UserHandler) SetPlatformRolesBySub(c echo.Context) error {
@@ -637,7 +687,7 @@ func (h *UserHandler) SetPlatformRolesBySub(c echo.Context) error {
 	if err := httpinternal.BindValidate(c, req); err != nil {
 		return err
 	}
-	if err := httpinternal.Usecases(c).User.SetPlatformRolesBySub(c.Request().Context(), sub, req.RoleNames, req.Secret); err != nil {
+	if err := httpinternal.Usecases(c).User.SetPlatformRolesBySub(c.Request().Context(), sub, req.RoleNames, httpinternal.Operator(c)); err != nil {
 		return err
 	}
 	return c.NoContent(http.StatusNoContent)

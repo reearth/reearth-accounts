@@ -8,12 +8,14 @@ import (
 	htmlTmpl "html/template"
 	"time"
 
+	"github.com/reearth/reearth-accounts/server/internal/rbac"
 	"github.com/reearth/reearth-accounts/server/internal/usecase/gateway"
 	"github.com/reearth/reearth-accounts/server/internal/usecase/interfaces"
 	"github.com/reearth/reearth-accounts/server/internal/usecase/repo"
 	"github.com/reearth/reearth-accounts/server/pkg/id"
 	"github.com/reearth/reearth-accounts/server/pkg/pagination"
 	"github.com/reearth/reearth-accounts/server/pkg/permittable"
+	"github.com/reearth/reearth-accounts/server/pkg/role"
 	"github.com/reearth/reearth-accounts/server/pkg/user"
 	"github.com/reearth/reearth-accounts/server/pkg/workspace"
 	"github.com/reearth/reearthx/i18n"
@@ -25,6 +27,7 @@ import (
 type User struct {
 	repos           *repo.Container
 	gateways        *gateway.Container
+	cerbos          interfaces.Cerbos
 	signupSecret    string
 	authSrvUIDomain string
 	allowedISS      []string
@@ -39,7 +42,7 @@ var (
 	}
 )
 
-func NewUser(r *repo.Container, g *gateway.Container, signupSecret, authSrcUIDomain string, allowedISS ...string) interfaces.User {
+func NewUser(r *repo.Container, g *gateway.Container, cerbos interfaces.Cerbos, signupSecret, authSrcUIDomain string, allowedISS ...string) interfaces.User {
 	var repos []user.Repo
 	if r != nil {
 		repos = []user.Repo{r.User}
@@ -47,6 +50,7 @@ func NewUser(r *repo.Container, g *gateway.Container, signupSecret, authSrcUIDom
 	return &User{
 		repos:           r,
 		gateways:        g,
+		cerbos:          cerbos,
 		signupSecret:    signupSecret,
 		authSrvUIDomain: authSrcUIDomain,
 		allowedISS:      allowedISS,
@@ -56,10 +60,11 @@ func NewUser(r *repo.Container, g *gateway.Container, signupSecret, authSrcUIDom
 	}
 }
 
-func NewMultiUser(r *repo.Container, g *gateway.Container, signupSecret, authSrcUIDomain string, users []user.Repo, allowedISS ...string) interfaces.User {
+func NewMultiUser(r *repo.Container, g *gateway.Container, cerbos interfaces.Cerbos, signupSecret, authSrcUIDomain string, users []user.Repo, allowedISS ...string) interfaces.User {
 	return &User{
 		repos:           r,
 		gateways:        g,
+		cerbos:          cerbos,
 		signupSecret:    signupSecret,
 		authSrvUIDomain: authSrcUIDomain,
 		allowedISS:      allowedISS,
@@ -469,6 +474,103 @@ func (i *User) DeleteMe(ctx context.Context, userID user.ID, operator *workspace
 
 }
 
+// Deactivate soft-deletes a user (sets deleted_at). Same permission model as
+// workspace's Deactivate: Cerbos, falling back to a maintainer-role check.
+func (i *User) Deactivate(ctx context.Context, id user.ID, operator *workspace.Operator) (*user.User, error) {
+	if operator.User == nil {
+		return nil, interfaces.ErrInvalidOperator
+	}
+
+	return Run1(ctx, operator, i.repos, Usecase().Transaction(), func(ctx context.Context) (*user.User, error) {
+		u, err := i.repos.User.FindByID(ctx, id)
+		if err != nil {
+			return nil, err
+		}
+
+		if err := i.checkMaintainerPermission(ctx, operator, rbac.ActionDeactivate); err != nil {
+			return nil, err
+		}
+
+		u.Deactivate()
+
+		if err := i.repos.User.Save(ctx, u); err != nil {
+			return nil, err
+		}
+
+		return u, nil
+	})
+}
+
+// Restore reverses Deactivate (clears deleted_at). Same permission model as
+// Deactivate.
+func (i *User) Restore(ctx context.Context, id user.ID, operator *workspace.Operator) (*user.User, error) {
+	if operator.User == nil {
+		return nil, interfaces.ErrInvalidOperator
+	}
+
+	return Run1(ctx, operator, i.repos, Usecase().Transaction(), func(ctx context.Context) (*user.User, error) {
+		u, err := i.repos.User.FindByID(ctx, id)
+		if err != nil {
+			return nil, err
+		}
+
+		if err := i.checkMaintainerPermission(ctx, operator, rbac.ActionRestore); err != nil {
+			return nil, err
+		}
+
+		u.Reactivate()
+
+		if err := i.repos.User.Save(ctx, u); err != nil {
+			return nil, err
+		}
+
+		return u, nil
+	})
+}
+
+// checkMaintainerPermission gates admin-only user actions (Deactivate/Restore) to
+// principals holding the elevated "maintainer" role, either via Cerbos or, when
+// Cerbos isn't configured (e.g. local/mock-auth dev), by re-checking the
+// operator's own Permittable directly. Mirrors Permittable.checkManageRolesPermission.
+func (i *User) checkMaintainerPermission(ctx context.Context, operator *workspace.Operator, action string) error {
+	if i.cerbos != nil {
+		result, err := i.cerbos.CheckPermission(ctx, *operator.User, interfaces.CheckPermissionParam{
+			Service:  rbac.ServiceName,
+			Resource: rbac.ResourceUser,
+			Action:   action,
+		})
+		if err != nil {
+			return err
+		}
+		if result != nil {
+			if !result.Allowed {
+				return interfaces.ErrPermissionDenied
+			}
+			return nil
+		}
+	}
+
+	p, err := i.repos.Permittable.FindByUserID(ctx, *operator.User)
+	if err != nil && !errors.Is(err, rerror.ErrNotFound) {
+		return err
+	}
+	if p == nil {
+		return interfaces.ErrPermissionDenied
+	}
+
+	roles, err := i.repos.Role.FindByIDs(ctx, p.RoleIDs())
+	if err != nil {
+		return err
+	}
+	for _, r := range roles {
+		if r.Name() == role.RoleMaintainer.String() {
+			return nil
+		}
+	}
+
+	return interfaces.ErrPermissionDenied
+}
+
 func (i *User) VerifyUser(ctx context.Context, code string) (*user.User, error) {
 	return Run1(ctx, nil, i.repos, Usecase().Transaction(), func(ctx context.Context) (*user.User, error) {
 
@@ -701,10 +803,13 @@ func (q *UserQuery) FetchByNameOrAlias(ctx context.Context, nameOrAlias string) 
 }
 
 // UpdateUserBySub updates a user's mutable fields (currently name) looked up by Firebase sub.
-// Authenticated by the signup secret (same mechanism as signup-oidc).
+// The caller must hold the maintainer role (see checkMaintainerPermission).
 // The personal workspace is renamed in sync when its name still matches the old user name.
-func (i *User) UpdateUserBySub(ctx context.Context, sub string, name *string, secret *string) error {
-	if err := i.verifySignupSecret(secret); err != nil {
+func (i *User) UpdateUserBySub(ctx context.Context, sub string, name *string, operator *workspace.Operator) error {
+	if operator == nil || operator.User == nil {
+		return interfaces.ErrInvalidOperator
+	}
+	if err := i.checkMaintainerPermission(ctx, operator, rbac.ActionEdit); err != nil {
 		return err
 	}
 	if name == nil {
@@ -742,10 +847,13 @@ func (i *User) UpdateUserBySub(ctx context.Context, sub string, name *string, se
 }
 
 // SetPlatformRolesBySub replaces a user's global platform roles, looked up by Firebase sub.
-// Authenticated by the signup secret (same mechanism as signup-oidc). An empty roleNames
-// slice clears all platform roles.
-func (i *User) SetPlatformRolesBySub(ctx context.Context, sub string, roleNames []string, secret *string) error {
-	if err := i.verifySignupSecret(secret); err != nil {
+// The caller must hold the maintainer role (see checkMaintainerPermission). An empty
+// roleNames slice clears all platform roles.
+func (i *User) SetPlatformRolesBySub(ctx context.Context, sub string, roleNames []string, operator *workspace.Operator) error {
+	if operator == nil || operator.User == nil {
+		return interfaces.ErrInvalidOperator
+	}
+	if err := i.checkMaintainerPermission(ctx, operator, rbac.ActionEdit); err != nil {
 		return err
 	}
 

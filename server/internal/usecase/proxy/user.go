@@ -176,6 +176,14 @@ func (u *User) DeleteMe(ctx context.Context, id user.ID, op *workspace.Operator)
 	return nil
 }
 
+func (u *User) Deactivate(ctx context.Context, id user.ID, op *workspace.Operator) (*user.User, error) {
+	return nil, user.ErrNotImplemented
+}
+
+func (u *User) Restore(ctx context.Context, id user.ID, op *workspace.Operator) (*user.User, error) {
+	return nil, user.ErrNotImplemented
+}
+
 func (u *User) CreateVerification(ctx context.Context, email string) error {
 	_, err := CreateVerification(ctx, u.gql, CreateVerificationInput{Email: email})
 	if err != nil {
@@ -225,10 +233,10 @@ func (u *User) RegenerateMFARecoveryCode(_ context.Context, _ *workspace.Operato
 	return "", errors.New("RegenerateMFARecoveryCode is not supported in proxy mode")
 }
 
-func (u *User) UpdateUserBySub(_ context.Context, _ string, _ *string, _ *string) error {
+func (u *User) UpdateUserBySub(_ context.Context, _ string, _ *string, _ *workspace.Operator) error {
 	return errors.New("UpdateUserBySub is not supported in proxy mode")
 }
 
-func (u *User) SetPlatformRolesBySub(_ context.Context, _ string, _ []string, _ *string) error {
+func (u *User) SetPlatformRolesBySub(_ context.Context, _ string, _ []string, _ *workspace.Operator) error {
 	return errors.New("SetPlatformRolesBySub is not supported in proxy mode")
 }

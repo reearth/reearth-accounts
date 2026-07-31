@@ -91,6 +91,8 @@ func RegisterRESTRouter(e *echo.Echo, cfg RouterConfig) {
 	// authenticated user can call this, same rationale as GET /workspaces/all.
 	api.GET("/users/all", uh.ListAll, required) // ?keyword=&status=active|deleted|all&page=&page_size=
 	api.GET("/users/:id", uh.Get, required)
+	api.POST("/users/:id/deactivate", uh.Deactivate, required) // soft delete (maintainer-only)
+	api.POST("/users/:id/restore", uh.Restore, required)       // undo deactivate (maintainer-only)
 	api.POST("/users/signup", uh.Signup, optional)
 	api.POST("/users/signup-oidc", uh.SignupOIDC, optional)
 	api.POST("/users/sync-sso", uh.SyncSSOUser, optional, syncSSOApikeyOrAuth)
@@ -99,10 +101,13 @@ func RegisterRESTRouter(e *echo.Echo, cfg RouterConfig) {
 	api.POST("/users/password-reset/start", uh.StartPasswordReset)
 	api.POST("/users/password-reset", uh.PasswordReset)
 	api.POST("/users/find-or-create", uh.FindOrCreate, optional, apikeyOrAuth)
-	// PATCH /api/users/by-sub/:sub — M2M, secret-gated. Updates mutable user fields (name) by Firebase sub.
-	api.PATCH("/users/by-sub/:sub", uh.UpdateUserBySub, optional)
-	// PUT /api/users/by-sub/:sub/platform-roles — M2M, secret-gated. Replaces platform roles by Firebase sub.
-	api.PUT("/users/by-sub/:sub/platform-roles", uh.SetPlatformRolesBySub, optional)
+	// PATCH /api/users/by-sub/:sub — JWT required; caller must hold the maintainer
+	// role (Cerbos, falling back to a direct Permittable check). Updates mutable
+	// user fields (name) by Firebase sub.
+	api.PATCH("/users/by-sub/:sub", uh.UpdateUserBySub, required)
+	// PUT /api/users/by-sub/:sub/platform-roles — JWT required; same maintainer-role
+	// gate as above. Replaces platform roles by Firebase sub.
+	api.PUT("/users/by-sub/:sub/platform-roles", uh.SetPlatformRolesBySub, required)
 
 	// --- Workspaces ---
 	wh := handlers.NewWorkspaceHandler()

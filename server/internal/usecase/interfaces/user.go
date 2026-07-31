@@ -138,9 +138,16 @@ type User interface {
 	RemoveMyAuth(context.Context, string, *workspace.Operator) (*user.User, error)
 	UpdateMe(context.Context, UpdateMeParam, *workspace.Operator) (*user.User, error)
 
-	// M2M, secret-gated user mutations (no JWT required)
-	UpdateUserBySub(ctx context.Context, sub string, name *string, secret *string) error
-	SetPlatformRolesBySub(ctx context.Context, sub string, roleNames []string, secret *string) error
+	// admin: deactivate soft-deletes a user (sets deleted_at); restore reverses it.
+	// Same permission model as workspace's Deactivate/Restore (Cerbos, falling back
+	// to a maintainer-role check).
+	Deactivate(ctx context.Context, id user.ID, operator *workspace.Operator) (*user.User, error)
+	Restore(ctx context.Context, id user.ID, operator *workspace.Operator) (*user.User, error)
+
+	// User mutations by Firebase sub, gated on the caller holding the maintainer
+	// role (JWT required; see checkMaintainerPermission).
+	UpdateUserBySub(ctx context.Context, sub string, name *string, operator *workspace.Operator) error
+	SetPlatformRolesBySub(ctx context.Context, sub string, roleNames []string, operator *workspace.Operator) error
 
 	// built-in auth server
 	CreateVerification(context.Context, string) error
