@@ -33,6 +33,10 @@ func ws(name, alias string) *workspace.Workspace {
 	return workspace.New().NewID().Name(name).Alias(alias).MustBuild()
 }
 
+func personalWs(name, alias string) *workspace.Workspace {
+	return workspace.New().NewID().Name(name).Alias(alias).Personal(true).MustBuild()
+}
+
 func newTestEcho(wsRepo workspace.Repo, adminRepo adminuser.Repo, sess *session.Manager) *echo.Echo {
 	return newTestEchoWithUsers(wsRepo, memory.NewUserWith(), adminRepo, sess)
 }
@@ -98,6 +102,83 @@ func TestListWorkspaces_Keyword(t *testing.T) {
 	assert.Equal(t, int64(1), body.TotalCount)
 	require.Len(t, body.Items, 1)
 	assert.Equal(t, "Beta", body.Items[0].Name)
+}
+
+func TestListWorkspaces_TypePersonal(t *testing.T) {
+	op := approvedAdmin("op@eukarya.io")
+	adminRepo := memory.NewAdminUserWith(op)
+	wsRepo := memory.NewWorkspaceWith(personalWs("Solo", "solo"), ws("Team", "team"))
+	sess := session.NewManager(testSecret, time.Hour)
+	e := newTestEcho(wsRepo, adminRepo, sess)
+
+	req := httptest.NewRequest(http.MethodGet, "/api/v1/workspaces?type=personal", nil)
+	req.AddCookie(cookieFor(t, sess, op.ID()))
+	rec := httptest.NewRecorder()
+	e.ServeHTTP(rec, req)
+	require.Equal(t, http.StatusOK, rec.Code)
+
+	var body workspacehandler.ListWorkspacesResponse
+	require.NoError(t, json.Unmarshal(rec.Body.Bytes(), &body))
+	assert.Equal(t, int64(1), body.TotalCount)
+	require.Len(t, body.Items, 1)
+	assert.Equal(t, "Solo", body.Items[0].Name)
+}
+
+func TestListWorkspaces_TypeTeam(t *testing.T) {
+	op := approvedAdmin("op@eukarya.io")
+	adminRepo := memory.NewAdminUserWith(op)
+	wsRepo := memory.NewWorkspaceWith(personalWs("Solo", "solo"), ws("Team", "team"))
+	sess := session.NewManager(testSecret, time.Hour)
+	e := newTestEcho(wsRepo, adminRepo, sess)
+
+	req := httptest.NewRequest(http.MethodGet, "/api/v1/workspaces?type=team", nil)
+	req.AddCookie(cookieFor(t, sess, op.ID()))
+	rec := httptest.NewRecorder()
+	e.ServeHTTP(rec, req)
+	require.Equal(t, http.StatusOK, rec.Code)
+
+	var body workspacehandler.ListWorkspacesResponse
+	require.NoError(t, json.Unmarshal(rec.Body.Bytes(), &body))
+	assert.Equal(t, int64(1), body.TotalCount)
+	require.Len(t, body.Items, 1)
+	assert.Equal(t, "Team", body.Items[0].Name)
+}
+
+func TestListWorkspaces_TypeInvalid_400(t *testing.T) {
+	op := approvedAdmin("op@eukarya.io")
+	adminRepo := memory.NewAdminUserWith(op)
+	wsRepo := memory.NewWorkspaceWith(ws("A", "a"))
+	sess := session.NewManager(testSecret, time.Hour)
+	e := newTestEcho(wsRepo, adminRepo, sess)
+
+	req := httptest.NewRequest(http.MethodGet, "/api/v1/workspaces?type=bogus", nil)
+	req.AddCookie(cookieFor(t, sess, op.ID()))
+	rec := httptest.NewRecorder()
+	e.ServeHTTP(rec, req)
+	assert.Equal(t, http.StatusBadRequest, rec.Code)
+}
+
+func TestListWorkspaces_ByIDs_IgnoresType(t *testing.T) {
+	op := approvedAdmin("op@eukarya.io")
+	adminRepo := memory.NewAdminUserWith(op)
+	team := ws("Team", "team")
+	wsRepo := memory.NewWorkspaceWith(team)
+	sess := session.NewManager(testSecret, time.Hour)
+	e := newTestEcho(wsRepo, adminRepo, sess)
+
+	// type=personal would exclude the team workspace in the listing path, but in
+	// batch-by-IDs mode type is ignored, so the workspace still resolves.
+	q := url.Values{"ids": {team.ID().String()}, "type": {"personal"}}
+	req := httptest.NewRequest(http.MethodGet, "/api/v1/workspaces?"+q.Encode(), nil)
+	req.AddCookie(cookieFor(t, sess, op.ID()))
+	rec := httptest.NewRecorder()
+	e.ServeHTTP(rec, req)
+	require.Equal(t, http.StatusOK, rec.Code)
+
+	var body workspacehandler.ListWorkspacesResponse
+	require.NoError(t, json.Unmarshal(rec.Body.Bytes(), &body))
+	require.Len(t, body.Items, 1)
+	assert.Equal(t, team.ID().String(), body.Items[0].ID)
 }
 
 func TestListWorkspaces_ByIDs_ReturnsMatching_OmitsUnknown(t *testing.T) {

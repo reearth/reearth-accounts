@@ -22,7 +22,11 @@ var (
 //go:generate mockgen -source=./repo.go -destination=./mock_workspace.go -package workspace
 type Repo interface {
 	Filtered(WorkspaceFilter) Repo
-	FindAll(ctx context.Context, keyword *string, pagination *usecasex.Pagination) (List, *usecasex.PageInfo, error)
+	// FindAll lists workspaces across all tenants. keyword filters by name/alias
+	// (nil or blank = no keyword filter). personal filters by workspace type:
+	// nil returns both, true returns only personal workspaces, false returns only
+	// team (non-personal) workspaces.
+	FindAll(ctx context.Context, keyword *string, personal *bool, pagination *usecasex.Pagination) (List, *usecasex.PageInfo, error)
 	FindByID(context.Context, ID) (*Workspace, error)
 	FindByName(context.Context, string) (*Workspace, error)
 	FindByAlias(ctx context.Context, alias string) (*Workspace, error)

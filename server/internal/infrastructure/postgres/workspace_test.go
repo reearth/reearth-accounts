@@ -19,6 +19,6 @@ func TestWorkspace_FindAll_NotImplemented(t *testing.T) {
 
 	// FindAll (admin cross-tenant listing) is intentionally not implemented on
 	// the Postgres backend; the admin app runs on MongoDB.
-	_, _, err := r.FindAll(ctx, nil, usecasex.OffsetPagination{Offset: 0, Limit: 10}.Wrap())
+	_, _, err := r.FindAll(ctx, nil, nil, usecasex.OffsetPagination{Offset: 0, Limit: 10}.Wrap())
 	assert.ErrorIs(t, err, workspace.ErrNotImplemented)
 }

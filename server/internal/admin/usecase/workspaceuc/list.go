@@ -22,11 +22,15 @@ func NewListWorkspacesUseCase(repo workspace.Repo) *ListWorkspacesUseCase {
 }
 
 // ListWorkspacesInput selects which workspaces to return. When IDs is non-empty
-// it is a batch-by-IDs lookup (unknown IDs omitted) and Keyword/Pagination are
-// ignored; otherwise it is a keyword-filtered, offset-paginated listing. Both
+// it is a batch-by-IDs lookup (unknown IDs omitted) and Keyword/Personal/Pagination
+// are ignored; otherwise it is a keyword-filtered, offset-paginated listing. Both
 // modes read across all tenants (the admin repo is unfiltered).
+//
+// Personal filters by workspace type: nil returns both types, true returns only
+// personal workspaces, false returns only team (non-personal) workspaces.
 type ListWorkspacesInput struct {
 	Keyword    *string
+	Personal   *bool
 	Pagination *usecasex.Pagination
 	IDs        workspace.IDList
 }
@@ -35,7 +39,7 @@ type ListWorkspacesInput struct {
 // *PageInfo; callers derive counts from the list.
 func (uc *ListWorkspacesUseCase) Execute(ctx context.Context, in ListWorkspacesInput) (workspace.List, *usecasex.PageInfo, error) {
 	if len(in.IDs) == 0 {
-		return uc.repo.FindAll(ctx, in.Keyword, in.Pagination)
+		return uc.repo.FindAll(ctx, in.Keyword, in.Personal, in.Pagination)
 	}
 
 	list, err := uc.repo.FindByIDs(ctx, in.IDs)

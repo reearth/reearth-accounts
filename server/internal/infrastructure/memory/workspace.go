@@ -43,7 +43,7 @@ func (r *Workspace) Filtered(f workspace.WorkspaceFilter) workspace.Repo {
 	}
 }
 
-func (r *Workspace) FindAll(_ context.Context, keyword *string, pagination *usecasex.Pagination) (workspace.List, *usecasex.PageInfo, error) {
+func (r *Workspace) FindAll(_ context.Context, keyword *string, personal *bool, pagination *usecasex.Pagination) (workspace.List, *usecasex.PageInfo, error) {
 	if r.err != nil {
 		return nil, nil, r.err
 	}
@@ -58,6 +58,10 @@ func (r *Workspace) FindAll(_ context.Context, keyword *string, pagination *usec
 	all := workspace.List(r.data.FindAll(func(id workspace.ID, v *workspace.Workspace) bool {
 		// respect the readable-workspace filter (unset for the admin base repo)
 		if !r.f.CanRead(id) {
+			return false
+		}
+		// filter by workspace type when requested (nil = both types)
+		if personal != nil && v.IsPersonal() != *personal {
 			return false
 		}
 		if kw == "" {
