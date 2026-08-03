@@ -1233,8 +1233,82 @@ func (m *mockAuthenticatorWithError) GetMFAStatus(_ context.Context, _ string) (
 	return gateway.MFAStatus{}, nil
 }
 
+func (m *mockAuthenticatorWithError) RegenerateMFARecoveryCode(_ context.Context, _ string) (string, error) {
+	return "new-recovery-code", nil
+}
+
 func (m *mockAuthenticatorWithError) ResendVerificationEmail(_ context.Context, _ string) error {
 	return nil
+}
+
+func TestUser_RegenerateMFARecoveryCode(t *testing.T) {
+	ctx := context.Background()
+
+	uid := id.NewUserID()
+	wid := id.NewWorkspaceID()
+	u := user.New().
+		ID(uid).
+		Workspace(wid).
+		Name("Test User").
+		Email("test@example.com").
+		Auths([]user.Auth{{Provider: "auth0", Sub: "auth0|123456"}}).
+		MustBuild()
+	ws := workspace.New().
+		ID(wid).
+		Name("Test User").
+		Personal(true).
+		MustBuild()
+
+	newUC := func() (interfaces.User, *workspace.Operator) {
+		r := memory.New()
+		assert.NoError(t, r.User.Save(ctx, u))
+		assert.NoError(t, r.Workspace.Save(ctx, ws))
+
+		mockAuth := &mockAuthenticatorWithError{}
+		g := &gateway.Container{Authenticators: map[gateway.Provider]gateway.Authenticator{gateway.ProviderAuth0: mockAuth}}
+
+		return NewUser(r, g, "", ""), &workspace.Operator{User: &uid}
+	}
+
+	t.Run("ok", func(t *testing.T) {
+		uc, operator := newUC()
+		code, err := uc.RegenerateMFARecoveryCode(ctx, operator)
+		assert.NoError(t, err)
+		assert.Equal(t, "new-recovery-code", code)
+	})
+
+	t.Run("nil operator", func(t *testing.T) {
+		uc, _ := newUC()
+		code, err := uc.RegenerateMFARecoveryCode(ctx, nil)
+		assert.ErrorIs(t, err, interfaces.ErrInvalidOperator)
+		assert.Empty(t, code)
+	})
+
+	t.Run("no auth0 auth record", func(t *testing.T) {
+		r := memory.New()
+		noAuthUID := id.NewUserID()
+		noAuthWID := id.NewWorkspaceID()
+		noAuthUser := user.New().
+			ID(noAuthUID).
+			Workspace(noAuthWID).
+			Name("No Auth User").
+			Email("noauth@example.com").
+			MustBuild()
+		noAuthWs := workspace.New().
+			ID(noAuthWID).
+			Name("No Auth User").
+			Personal(true).
+			MustBuild()
+		assert.NoError(t, r.User.Save(ctx, noAuthUser))
+		assert.NoError(t, r.Workspace.Save(ctx, noAuthWs))
+
+		g := &gateway.Container{Authenticators: map[gateway.Provider]gateway.Authenticator{}}
+		uc := NewUser(r, g, "", "")
+
+		code, err := uc.RegenerateMFARecoveryCode(ctx, &workspace.Operator{User: &noAuthUID})
+		assert.Error(t, err)
+		assert.Empty(t, code)
+	})
 }
 
 func TestUser_UpdateMe_AuthenticatorUpdateUserError(t *testing.T) {

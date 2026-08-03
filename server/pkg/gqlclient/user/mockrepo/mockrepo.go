@@ -250,6 +250,21 @@ func (mr *MockRepoMockRecorder) PasswordReset(ctx, password, token any) *gomock.
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "PasswordReset", reflect.TypeOf((*MockRepo)(nil).PasswordReset), ctx, password, token)
 }
 
+// RegenerateMFARecoveryCode mocks base method.
+func (m *MockRepo) RegenerateMFARecoveryCode(ctx context.Context) (string, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "RegenerateMFARecoveryCode", ctx)
+	ret0, _ := ret[0].(string)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// RegenerateMFARecoveryCode indicates an expected call of RegenerateMFARecoveryCode.
+func (mr *MockRepoMockRecorder) RegenerateMFARecoveryCode(ctx any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "RegenerateMFARecoveryCode", reflect.TypeOf((*MockRepo)(nil).RegenerateMFARecoveryCode), ctx)
+}
+
 // RemoveMyAuth mocks base method.
 func (m *MockRepo) RemoveMyAuth(ctx context.Context, auth string) (*user0.User, error) {
 	m.ctrl.T.Helper()

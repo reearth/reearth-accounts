@@ -79,6 +79,7 @@ type Repo interface {
 	GetMFAStatus(ctx context.Context) (MFAStatus, error)
 	Logout(ctx context.Context) (*user.User, error)
 	PasswordReset(ctx context.Context, password string, token string) error
+	RegenerateMFARecoveryCode(ctx context.Context) (recoveryCode string, err error)
 	RemoveMyAuth(ctx context.Context, auth string) (*user.User, error)
 	Signup(ctx context.Context, userID, name, email, password, secret, workspaceID string, mockAuth bool) (*user.User, error)
 	SignupNoID(ctx context.Context, name, email, password, secret string, mockAuth bool) (*user.User, error)
@@ -710,6 +711,14 @@ func (r *userRepo) GetMFAStatus(ctx context.Context) (MFAStatus, error) {
 		return MFAStatus{}, gqlerror.ReturnAccountsError(ctx, err)
 	}
 	return MFAStatus{Enrolled: bool(q.MfaStatus.Enrolled)}, nil
+}
+
+func (r *userRepo) RegenerateMFARecoveryCode(ctx context.Context) (string, error) {
+	var m regenerateMFARecoveryCodeMutation
+	if err := r.client.Mutate(ctx, &m, nil); err != nil {
+		return "", gqlerror.ReturnAccountsError(ctx, err)
+	}
+	return string(m.RegenerateMFARecoveryCode.RecoveryCode), nil
 }
 
 func (r *userRepo) PasswordReset(ctx context.Context, password string, token string) error {

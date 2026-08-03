@@ -133,4 +133,5 @@ type User interface {
 	DisableMFA(context.Context, *workspace.Operator) error
 	EnableMFA(context.Context, *workspace.Operator) (enrollmentURL string, err error)
 	GetMFAStatus(context.Context, *workspace.Operator) (gateway.MFAStatus, error)
+	RegenerateMFARecoveryCode(context.Context, *workspace.Operator) (recoveryCode string, err error)
 }

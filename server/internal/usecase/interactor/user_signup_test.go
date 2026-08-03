@@ -790,6 +790,10 @@ func (m *mockAuthenticator) GetMFAStatus(_ context.Context, _ string) (gateway.M
 	return gateway.MFAStatus{}, nil
 }
 
+func (m *mockAuthenticator) RegenerateMFARecoveryCode(_ context.Context, _ string) (string, error) {
+	return "", nil
+}
+
 func (m *mockAuthenticator) ResendVerificationEmail(ctx context.Context, userID string) error {
 	m.resendVerificationEmailCalled = true
 	m.resendVerificationEmailUserID = userID

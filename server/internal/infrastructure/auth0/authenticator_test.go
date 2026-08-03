@@ -25,6 +25,7 @@ const (
 	expiresIn    = 24 * 60 * 60
 	userName     = "d"
 	userEmail    = "e"
+	recoveryCode = "recovery-code-123"
 )
 
 var (
@@ -67,6 +68,28 @@ func TestAuth0(t *testing.T) {
 	}, r)
 
 	a.current = func() time.Time { return current2 }
+}
+
+func TestAuth0_RegenerateMFARecoveryCode(t *testing.T) {
+	a := New(domain, clientID, clientSecret, 0)
+	a.client = client(t)
+	a.current = func() time.Time { return current }
+	a.disableLogging = true
+
+	got, err := a.RegenerateMFARecoveryCode(context.Background(), userID)
+	assert.NoError(t, err)
+	assert.Equal(t, recoveryCode, got)
+}
+
+func TestAuth0_RegenerateMFARecoveryCode_NoEnrollment(t *testing.T) {
+	a := New(domain, clientID, clientSecret, 0)
+	a.client = client(t)
+	a.current = func() time.Time { return current }
+	a.disableLogging = true
+
+	got, err := a.RegenerateMFARecoveryCode(context.Background(), "no-enrollment")
+	assert.Error(t, err)
+	assert.Empty(t, got)
 }
 
 func res(i interface{}) io.ReadCloser {
@@ -120,6 +143,37 @@ func client(t *testing.T) *http.Client {
 						"username":       userName,
 						"email":          userEmail,
 						"email_verified": true,
+					}),
+					Header: make(http.Header),
+				}
+			}
+
+			if req.Method == http.MethodPost && p == "/api/v2/users/"+userID+"/recovery-code-regeneration" {
+				tok := strings.TrimPrefix(req.Header.Get("Authorization"), "Bearer ")
+				if token != tok {
+					return &http.Response{
+						StatusCode: http.StatusUnauthorized,
+						Body: res(map[string]interface{}{
+							"message": "Unauthorized",
+						}),
+						Header: make(http.Header),
+					}
+				}
+
+				return &http.Response{
+					StatusCode: http.StatusOK,
+					Body: res(map[string]interface{}{
+						"recovery_code": recoveryCode,
+					}),
+					Header: make(http.Header),
+				}
+			}
+
+			if req.Method == http.MethodPost && p == "/api/v2/users/no-enrollment/recovery-code-regeneration" {
+				return &http.Response{
+					StatusCode: http.StatusNotFound,
+					Body: res(map[string]interface{}{
+						"error_description": "Enrollment not found",
 					}),
 					Header: make(http.Header),
 				}

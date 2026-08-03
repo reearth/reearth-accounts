@@ -106,6 +106,10 @@ type MFAEnrollResult struct {
 	EnrollmentURL string `json:"enrollmentUrl"`
 }
 
+type MFARecoveryCodeResult struct {
+	RecoveryCode string `json:"recoveryCode"`
+}
+
 type MFAStatus struct {
 	Enrolled bool `json:"enrolled"`
 }
