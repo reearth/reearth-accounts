@@ -44,4 +44,5 @@ var migrations = migration.Migrations[DBClient]{
 	260701120001: AddAdminUserEmailIndex,
 	260701120002: AddAdminUserStatusCreatedAtIndex,
 	260708123739: BackfillAdminUserRole,
+	260803120000: AddWorkspaceMembersWildcardIndex,
 }
