@@ -12,6 +12,8 @@ import (
 	"github.com/reearth/reearthx/mongox/mongotest"
 	"github.com/reearth/reearthx/rerror"
 	"github.com/stretchr/testify/assert"
+	"go.mongodb.org/mongo-driver/bson"
+	mongodriver "go.mongodb.org/mongo-driver/mongo"
 )
 
 func TestWorkspace_FindByID(t *testing.T) {
@@ -322,6 +324,43 @@ func TestWorkspace_FindByUserWithPagination(t *testing.T) {
 			}
 		})
 	}
+}
+
+// TestWorkspace_FindByUser_WithWildcardIndex applies the same wildcard index
+// the AddWorkspaceMembersWildcardIndex migration creates on workspace.members
+// (see internal/infrastructure/mongo/migration) and verifies FindByUser /
+// FindByUserWithPagination still return the correct workspaces once it's in
+// place, so the SCA-01 fix doesn't just create an index but actually keeps
+// the by-user lookup functionally correct.
+func TestWorkspace_FindByUser_WithWildcardIndex(t *testing.T) {
+	u := user.New().Name("aaa").NewID().Email("aaa@bbb.com").MustBuild()
+	other := user.New().Name("bbb").NewID().Email("bbb@ccc.com").MustBuild()
+	ws1 := workspace.New().NewID().Name("hoge").Members(map[user.ID]workspace.Member{u.ID(): {Role: role.RoleOwner, InvitedBy: u.ID()}}).MustBuild()
+	ws2 := workspace.New().NewID().Name("foo").Members(map[user.ID]workspace.Member{u.ID(): {Role: role.RoleOwner, InvitedBy: u.ID()}}).MustBuild()
+
+	init := mongotest.Connect(t)
+	db := init(t)
+	client := mongox.NewClientWithDatabase(db)
+
+	indexModel := mongodriver.IndexModel{Keys: bson.D{{Key: "members.$**", Value: 1}}}
+	_, err := db.Collection("workspace").Indexes().CreateOne(context.Background(), indexModel)
+	assert.NoError(t, err)
+
+	repo := NewWorkspace(client)
+	ctx := context.Background()
+	assert.NoError(t, repo.SaveAll(ctx, workspace.List{ws1, ws2}))
+
+	got, err := repo.FindByUser(ctx, u.ID())
+	assert.NoError(t, err)
+	assert.ElementsMatch(t, workspace.List{ws1, ws2}.IDs(), got.IDs())
+
+	got, err = repo.FindByUser(ctx, other.ID())
+	assert.NoError(t, err)
+	assert.Empty(t, got)
+
+	gotPage, _, err := repo.FindByUserWithPagination(ctx, u.ID(), nil)
+	assert.NoError(t, err)
+	assert.ElementsMatch(t, workspace.List{ws1, ws2}.IDs(), gotPage.IDs())
 }
 
 func TestWorkspace_Remove(t *testing.T) {
