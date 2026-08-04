@@ -355,7 +355,7 @@ func (a *Auth0) exec(ctx context.Context, method, path, token string, b interfac
 	}
 
 	if !a.disableLogging {
-		log.Infof("auth0: path: %s, status: %d, resp: %s", path, resp.StatusCode, respb)
+		log.Infof("auth0: path: %s, status: %d", path, resp.StatusCode)
 	}
 
 	if err = json.Unmarshal(respb, &r); err != nil {
@@ -411,7 +411,7 @@ func (a *Auth0) execInto(ctx context.Context, method, path, token string, b, tar
 	}
 
 	if !a.disableLogging {
-		log.Infof("auth0: path: %s, status: %d, resp: %s", path, resp.StatusCode, respb)
+		log.Infof("auth0: path: %s, status: %d", path, resp.StatusCode)
 	}
 
 	if resp.StatusCode >= 300 {
