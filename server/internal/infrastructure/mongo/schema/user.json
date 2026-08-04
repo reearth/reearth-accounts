@@ -12,6 +12,20 @@
         "bsonType": "string",
         "description": "Unique user handle/alias. Default: \"\""
       },
+      "createdat": {
+        "bsonType": [
+          "date",
+          "null"
+        ],
+        "description": "User creation timestamp. Null for users created before this field existed"
+      },
+      "deletedat": {
+        "bsonType": [
+          "date",
+          "null"
+        ],
+        "description": "Soft delete timestamp. Null = active, non-null = deactivated"
+      },
       "email": {
         "bsonType": "string",
         "description": "User email address"

@@ -45,6 +45,8 @@ erDiagram
         objectId _id PK
         string id UK
         string alias
+        date createdat "optional"
+        date deletedat "optional"
         string email
         string lang "optional"
         date latestlogoutat "optional"
@@ -64,6 +66,9 @@ erDiagram
         objectId _id PK
         string id UK
         string alias
+        date createdat "optional"
+        string createdby "optional"
+        date deletedat "optional"
         string email
         object integrations "optional"
         object members
