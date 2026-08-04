@@ -223,6 +223,10 @@ func (i *User) UpdateMe(ctx context.Context, p interfaces.UpdateMeParam, operato
 			}
 		}
 
+		// SEC-03: this sets a new password from the session alone, with no
+		// current-password or step-up MFA check. Re-authentication for
+		// sensitive account mutations is planned to be covered by MFA
+		// confirmation in a future change, not now.
 		if p.Password != nil && u.HasAuthProvider("reearth") {
 			if err := u.SetPassword(*p.Password); err != nil {
 				return nil, err
@@ -303,6 +307,11 @@ func (i *User) RemoveMyAuth(ctx context.Context, authProvider string, operator *
 	})
 }
 
+// SEC-03: disabling MFA here only requires a valid operator/session, with no
+// password confirmation, current-MFA challenge, or recent-auth check guarding
+// this privilege-lowering operation. Re-authentication for sensitive account
+// mutations like this is planned to be covered by MFA confirmation in a
+// future change, not now.
 func (i *User) DisableMFA(ctx context.Context, operator *workspace.Operator) error {
 	if operator == nil || operator.User == nil {
 		return interfaces.ErrInvalidOperator
