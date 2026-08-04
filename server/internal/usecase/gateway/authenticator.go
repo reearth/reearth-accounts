@@ -24,6 +24,7 @@ type Authenticator interface {
 	DisableMFA(ctx context.Context, sub string) error
 	EnableMFA(ctx context.Context, sub string) (enrollmentURL string, err error)
 	GetMFAStatus(ctx context.Context, sub string) (MFAStatus, error)
+	RegenerateMFARecoveryCode(ctx context.Context, sub string) (recoveryCode string, err error)
 	ResendVerificationEmail(ctx context.Context, userID string) error
 	UpdateUser(context.Context, AuthenticatorUpdateUserParam) (AuthenticatorUser, error)
 }

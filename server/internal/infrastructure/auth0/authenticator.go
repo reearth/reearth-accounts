@@ -235,6 +235,24 @@ func (a *Auth0) GetMFAStatus(ctx context.Context, sub string) (gateway.MFAStatus
 	return gateway.MFAStatus{Enrolled: false}, nil
 }
 
+func (a *Auth0) RegenerateMFARecoveryCode(ctx context.Context, sub string) (string, error) {
+	if err := a.updateToken(ctx); err != nil {
+		return "", err
+	}
+
+	var r struct {
+		RecoveryCode string `json:"recovery_code"`
+	}
+	if err := a.execInto(ctx, http.MethodPost, "api/v2/users/"+sub+"/recovery-code-regeneration", a.token, nil, &r); err != nil {
+		if !a.disableLogging {
+			log.Errorf("auth0: regenerate mfa recovery code: %+v", err)
+		}
+		return "", rerror.NewE(i18n.T("failed to regenerate mfa recovery code"))
+	}
+
+	return r.RecoveryCode, nil
+}
+
 func (a *Auth0) needsFetchToken() bool {
 	if a == nil {
 		return false

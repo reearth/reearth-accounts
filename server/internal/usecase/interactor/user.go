@@ -366,6 +366,27 @@ func (i *User) GetMFAStatus(ctx context.Context, operator *workspace.Operator) (
 	})
 }
 
+func (i *User) RegenerateMFARecoveryCode(ctx context.Context, operator *workspace.Operator) (string, error) {
+	if operator == nil || operator.User == nil {
+		return "", interfaces.ErrInvalidOperator
+	}
+	return Run1(ctx, operator, i.repos, Usecase().Transaction(), func(ctx context.Context) (string, error) {
+		u, err := i.repos.User.FindByID(ctx, *operator.User)
+		if err != nil {
+			return "", err
+		}
+		a := u.Auths().GetByProvider(user.ProviderAuth0)
+		if a == nil {
+			return "", rerror.NewE(i18n.T("no authenticator found"))
+		}
+		authenticator := i.gateways.AuthenticatorFor(a.Provider)
+		if authenticator == nil {
+			return "", rerror.NewE(i18n.T("no authenticator found"))
+		}
+		return authenticator.RegenerateMFARecoveryCode(ctx, a.Sub)
+	})
+}
+
 func (i *User) DeleteMe(ctx context.Context, userID user.ID, operator *workspace.Operator) (err error) {
 	if operator.User == nil {
 		return interfaces.ErrInvalidOperator

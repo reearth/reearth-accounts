@@ -45,6 +45,10 @@ type MFAStatus {
   enrolled: Boolean!
 }
 
+type MFARecoveryCodeResult {
+  recoveryCode: String!
+}
+
 type UsersWithPagination {
   users: [User!]!
   totalCount: Int!
@@ -149,6 +153,7 @@ extend type Mutation {
   findOrCreate(input: FindOrCreateInput!): UserPayload
   logout: Me
   passwordReset(input: PasswordResetInput!): Boolean
+  regenerateMFARecoveryCode: MFARecoveryCodeResult!
   removeMyAuth(input: RemoveMyAuthInput!): UpdateMePayload
   signup(input: SignupInput!): UserPayload
   signupOIDC(input: SignupOIDCInput!): UserPayload

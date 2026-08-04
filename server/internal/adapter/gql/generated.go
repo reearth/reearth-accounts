@@ -84,6 +84,10 @@ type ComplexityRoot struct {
 		EnrollmentURL func(childComplexity int) int
 	}
 
+	MFARecoveryCodeResult struct {
+		RecoveryCode func(childComplexity int) int
+	}
+
 	MFAStatus struct {
 		Enrolled func(childComplexity int) int
 	}
@@ -113,6 +117,7 @@ type ComplexityRoot struct {
 		FindOrCreate                     func(childComplexity int, input gqlmodel.FindOrCreateInput) int
 		Logout                           func(childComplexity int) int
 		PasswordReset                    func(childComplexity int, input gqlmodel.PasswordResetInput) int
+		RegenerateMFARecoveryCode        func(childComplexity int) int
 		RemoveIntegrationFromWorkspace   func(childComplexity int, input gqlmodel.RemoveIntegrationFromWorkspaceInput) int
 		RemoveIntegrationsFromWorkspace  func(childComplexity int, input gqlmodel.RemoveIntegrationsFromWorkspaceInput) int
 		RemoveMultipleUsersFromWorkspace func(childComplexity int, input gqlmodel.RemoveMultipleUsersFromWorkspaceInput) int
@@ -259,6 +264,7 @@ type MutationResolver interface {
 	FindOrCreate(ctx context.Context, input gqlmodel.FindOrCreateInput) (*gqlmodel.UserPayload, error)
 	Logout(ctx context.Context) (*gqlmodel.Me, error)
 	PasswordReset(ctx context.Context, input gqlmodel.PasswordResetInput) (*bool, error)
+	RegenerateMFARecoveryCode(ctx context.Context) (*gqlmodel.MFARecoveryCodeResult, error)
 	RemoveMyAuth(ctx context.Context, input gqlmodel.RemoveMyAuthInput) (*gqlmodel.UpdateMePayload, error)
 	Signup(ctx context.Context, input gqlmodel.SignupInput) (*gqlmodel.UserPayload, error)
 	SignupOidc(ctx context.Context, input gqlmodel.SignupOIDCInput) (*gqlmodel.UserPayload, error)
@@ -412,6 +418,13 @@ func (e *executableSchema) Complexity(ctx context.Context, typeName, field strin
 		}
 
 		return e.complexity.MFAEnrollResult.EnrollmentURL(childComplexity), true
+
+	case "MFARecoveryCodeResult.recoveryCode":
+		if e.complexity.MFARecoveryCodeResult.RecoveryCode == nil {
+			break
+		}
+
+		return e.complexity.MFARecoveryCodeResult.RecoveryCode(childComplexity), true
 
 	case "MFAStatus.enrolled":
 		if e.complexity.MFAStatus.Enrolled == nil {
@@ -587,6 +600,12 @@ func (e *executableSchema) Complexity(ctx context.Context, typeName, field strin
 		}
 
 		return e.complexity.Mutation.PasswordReset(childComplexity, args["input"].(gqlmodel.PasswordResetInput)), true
+	case "Mutation.regenerateMFARecoveryCode":
+		if e.complexity.Mutation.RegenerateMFARecoveryCode == nil {
+			break
+		}
+
+		return e.complexity.Mutation.RegenerateMFARecoveryCode(childComplexity), true
 	case "Mutation.removeIntegrationFromWorkspace":
 		if e.complexity.Mutation.RemoveIntegrationFromWorkspace == nil {
 			break
@@ -1503,6 +1522,10 @@ type MFAStatus {
   enrolled: Boolean!
 }
 
+type MFARecoveryCodeResult {
+  recoveryCode: String!
+}
+
 type UsersWithPagination {
   users: [User!]!
   totalCount: Int!
@@ -1607,6 +1630,7 @@ extend type Mutation {
   findOrCreate(input: FindOrCreateInput!): UserPayload
   logout: Me
   passwordReset(input: PasswordResetInput!): Boolean
+  regenerateMFARecoveryCode: MFARecoveryCodeResult!
   removeMyAuth(input: RemoveMyAuthInput!): UpdateMePayload
   signup(input: SignupInput!): UserPayload
   signupOIDC(input: SignupOIDCInput!): UserPayload
@@ -2747,6 +2771,35 @@ func (ec *executionContext) fieldContext_MFAEnrollResult_enrollmentUrl(_ context
 	return fc, nil
 }
 
+func (ec *executionContext) _MFARecoveryCodeResult_recoveryCode(ctx context.Context, field graphql.CollectedField, obj *gqlmodel.MFARecoveryCodeResult) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		ec.fieldContext_MFARecoveryCodeResult_recoveryCode,
+		func(ctx context.Context) (any, error) {
+			return obj.RecoveryCode, nil
+		},
+		nil,
+		ec.marshalNString2string,
+		true,
+		true,
+	)
+}
+
+func (ec *executionContext) fieldContext_MFARecoveryCodeResult_recoveryCode(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "MFARecoveryCodeResult",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type String does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
 func (ec *executionContext) _MFAStatus_enrolled(ctx context.Context, field graphql.CollectedField, obj *gqlmodel.MFAStatus) (ret graphql.Marshaler) {
 	return graphql.ResolveField(
 		ctx,
@@ -3373,6 +3426,39 @@ func (ec *executionContext) fieldContext_Mutation_passwordReset(ctx context.Cont
 	if fc.Args, err = ec.field_Mutation_passwordReset_args(ctx, field.ArgumentMap(ec.Variables)); err != nil {
 		ec.Error(ctx, err)
 		return fc, err
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _Mutation_regenerateMFARecoveryCode(ctx context.Context, field graphql.CollectedField) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		ec.fieldContext_Mutation_regenerateMFARecoveryCode,
+		func(ctx context.Context) (any, error) {
+			return ec.resolvers.Mutation().RegenerateMFARecoveryCode(ctx)
+		},
+		nil,
+		ec.marshalNMFARecoveryCodeResult2ᚖgithubᚗcomᚋreearthᚋreearthᚑaccountsᚋserverᚋinternalᚋadapterᚋgqlᚋgqlmodelᚐMFARecoveryCodeResult,
+		true,
+		true,
+	)
+}
+
+func (ec *executionContext) fieldContext_Mutation_regenerateMFARecoveryCode(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "Mutation",
+		Field:      field,
+		IsMethod:   true,
+		IsResolver: true,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			switch field.Name {
+			case "recoveryCode":
+				return ec.fieldContext_MFARecoveryCodeResult_recoveryCode(ctx, field)
+			}
+			return nil, fmt.Errorf("no field named %q was found under type MFARecoveryCodeResult", field.Name)
+		},
 	}
 	return fc, nil
 }
@@ -9703,6 +9789,45 @@ func (ec *executionContext) _MFAEnrollResult(ctx context.Context, sel ast.Select
 	return out
 }
 
+var mFARecoveryCodeResultImplementors = []string{"MFARecoveryCodeResult"}
+
+func (ec *executionContext) _MFARecoveryCodeResult(ctx context.Context, sel ast.SelectionSet, obj *gqlmodel.MFARecoveryCodeResult) graphql.Marshaler {
+	fields := graphql.CollectFields(ec.OperationContext, sel, mFARecoveryCodeResultImplementors)
+
+	out := graphql.NewFieldSet(fields)
+	deferred := make(map[string]*graphql.FieldSet)
+	for i, field := range fields {
+		switch field.Name {
+		case "__typename":
+			out.Values[i] = graphql.MarshalString("MFARecoveryCodeResult")
+		case "recoveryCode":
+			out.Values[i] = ec._MFARecoveryCodeResult_recoveryCode(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		default:
+			panic("unknown field " + strconv.Quote(field.Name))
+		}
+	}
+	out.Dispatch(ctx)
+	if out.Invalids > 0 {
+		return graphql.Null
+	}
+
+	atomic.AddInt32(&ec.deferred, int32(len(deferred)))
+
+	for label, dfs := range deferred {
+		ec.processDeferredGroup(graphql.DeferredGroup{
+			Label:    label,
+			Path:     graphql.GetPath(ctx),
+			FieldSet: dfs,
+			Context:  ctx,
+		})
+	}
+
+	return out
+}
+
 var mFAStatusImplementors = []string{"MFAStatus"}
 
 func (ec *executionContext) _MFAStatus(ctx context.Context, sel ast.SelectionSet, obj *gqlmodel.MFAStatus) graphql.Marshaler {
@@ -9904,6 +10029,13 @@ func (ec *executionContext) _Mutation(ctx context.Context, sel ast.SelectionSet)
 			out.Values[i] = ec.OperationContext.RootResolverMiddleware(innerCtx, func(ctx context.Context) (res graphql.Marshaler) {
 				return ec._Mutation_passwordReset(ctx, field)
 			})
+		case "regenerateMFARecoveryCode":
+			out.Values[i] = ec.OperationContext.RootResolverMiddleware(innerCtx, func(ctx context.Context) (res graphql.Marshaler) {
+				return ec._Mutation_regenerateMFARecoveryCode(ctx, field)
+			})
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
 		case "removeMyAuth":
 			out.Values[i] = ec.OperationContext.RootResolverMiddleware(innerCtx, func(ctx context.Context) (res graphql.Marshaler) {
 				return ec._Mutation_removeMyAuth(ctx, field)
@@ -11716,6 +11848,20 @@ func (ec *executionContext) marshalNMFAEnrollResult2ᚖgithubᚗcomᚋreearthᚋ
 		return graphql.Null
 	}
 	return ec._MFAEnrollResult(ctx, sel, v)
+}
+
+func (ec *executionContext) marshalNMFARecoveryCodeResult2githubᚗcomᚋreearthᚋreearthᚑaccountsᚋserverᚋinternalᚋadapterᚋgqlᚋgqlmodelᚐMFARecoveryCodeResult(ctx context.Context, sel ast.SelectionSet, v gqlmodel.MFARecoveryCodeResult) graphql.Marshaler {
+	return ec._MFARecoveryCodeResult(ctx, sel, &v)
+}
+
+func (ec *executionContext) marshalNMFARecoveryCodeResult2ᚖgithubᚗcomᚋreearthᚋreearthᚑaccountsᚋserverᚋinternalᚋadapterᚋgqlᚋgqlmodelᚐMFARecoveryCodeResult(ctx context.Context, sel ast.SelectionSet, v *gqlmodel.MFARecoveryCodeResult) graphql.Marshaler {
+	if v == nil {
+		if !graphql.HasFieldError(ctx, graphql.GetFieldContext(ctx)) {
+			graphql.AddErrorf(ctx, "the requested element is null which the schema does not allow")
+		}
+		return graphql.Null
+	}
+	return ec._MFARecoveryCodeResult(ctx, sel, v)
 }
 
 func (ec *executionContext) marshalNMFAStatus2githubᚗcomᚋreearthᚋreearthᚑaccountsᚋserverᚋinternalᚋadapterᚋgqlᚋgqlmodelᚐMFAStatus(ctx context.Context, sel ast.SelectionSet, v gqlmodel.MFAStatus) graphql.Marshaler {

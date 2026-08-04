@@ -185,6 +185,14 @@ func (r *mutationResolver) EnableMfa(ctx context.Context) (*gqlmodel.MFAEnrollRe
 	return &gqlmodel.MFAEnrollResult{EnrollmentURL: enrollmentURL}, nil
 }
 
+func (r *mutationResolver) RegenerateMFARecoveryCode(ctx context.Context) (*gqlmodel.MFARecoveryCodeResult, error) {
+	recoveryCode, err := usecases(ctx).User.RegenerateMFARecoveryCode(ctx, getOperator(ctx))
+	if err != nil {
+		return nil, err
+	}
+	return &gqlmodel.MFARecoveryCodeResult{RecoveryCode: recoveryCode}, nil
+}
+
 func (r *mutationResolver) PasswordReset(ctx context.Context, input gqlmodel.PasswordResetInput) (*bool, error) {
 	err := usecases(ctx).User.PasswordReset(ctx, input.Password, input.Token)
 	if err != nil {
