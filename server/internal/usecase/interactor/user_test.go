@@ -1211,7 +1211,8 @@ func TestUser_UpdateMe_SetPasswordError(t *testing.T) {
 	assert.Nil(t, result)
 }
 
-// mockAuthenticatorWithError is a mock implementation of the Authenticator interface that returns errors
+// mockAuthenticatorWithError is a mock implementation of the Authenticator interface.
+// All methods succeed by default; set updateUserErr to make UpdateUser fail.
 type mockAuthenticatorWithError struct {
 	updateUserErr error
 }
