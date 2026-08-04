@@ -21,7 +21,6 @@ const (
 const (
 	ActionAddMember         = "add_member"
 	ActionCreate            = "create"
-	ActionDeactivate        = "deactivate"
 	ActionDelete            = "delete"
 	ActionDeleteMember      = "delete_member"
 	ActionEdit              = "edit"
@@ -30,7 +29,6 @@ const (
 	ActionList              = "list"
 	ActionRead              = "read"
 	ActionReadMember        = "read_member"
-	ActionRestore           = "restore"
 	ActionSearch            = "search"
 	ActionTransferOwnership = "transfer_ownership"
 	ActionValidate          = "validate"
@@ -112,13 +110,11 @@ var resourceRules = []ResourceRule{
 					},
 				},
 			},
-			ActionDeactivate:        {Roles: []string{roleOwner}},
 			ActionDelete:            {Roles: []string{roleOwner}},
 			ActionEdit:              {Roles: []string{roleMaintainer, roleOwner}},
 			ActionEditAlias:         {Roles: []string{roleOwner}},
 			ActionList:              {Roles: []string{roleSelf, roleReader, roleWriter, roleMaintainer, roleOwner}},
 			ActionRead:              {Roles: []string{roleReader, roleWriter, roleMaintainer, roleOwner}},
-			ActionRestore:           {Roles: []string{roleOwner}},
 			ActionTransferOwnership: {Roles: []string{roleOwner}},
 			ActionValidate:          {Roles: []string{roleReader, roleWriter, roleMaintainer, roleOwner}},
 

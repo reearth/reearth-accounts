@@ -487,7 +487,7 @@ func (i *User) Deactivate(ctx context.Context, id user.ID, operator *workspace.O
 			return nil, err
 		}
 
-		if err := i.checkMaintainerPermission(ctx, operator, rbac.ActionDeactivate); err != nil {
+		if err := i.checkMaintainerPermission(ctx, operator, rbac.ActionEdit); err != nil {
 			return nil, err
 		}
 
@@ -514,7 +514,7 @@ func (i *User) Restore(ctx context.Context, id user.ID, operator *workspace.Oper
 			return nil, err
 		}
 
-		if err := i.checkMaintainerPermission(ctx, operator, rbac.ActionRestore); err != nil {
+		if err := i.checkMaintainerPermission(ctx, operator, rbac.ActionEdit); err != nil {
 			return nil, err
 		}
 

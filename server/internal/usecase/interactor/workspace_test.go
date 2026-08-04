@@ -19,6 +19,20 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
+// fakeCerbos is a hand-rolled interfaces.Cerbos double so tests can exercise the
+// Cerbos-configured branch of permission checks without a gRPC gateway.
+type fakeCerbos struct {
+	allowed bool
+	err     error
+}
+
+func (f *fakeCerbos) CheckPermission(context.Context, user.ID, interfaces.CheckPermissionParam) (*interfaces.CheckPermissionResult, error) {
+	if f.err != nil {
+		return nil, f.err
+	}
+	return &interfaces.CheckPermissionResult{Allowed: f.allowed}, nil
+}
+
 func TestWorkspace_Create(t *testing.T) {
 	ctx := context.Background()
 

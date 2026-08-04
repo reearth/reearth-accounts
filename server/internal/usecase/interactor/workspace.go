@@ -609,7 +609,7 @@ func (i *Workspace) Deactivate(ctx context.Context, id workspace.ID, operator *w
 			return nil, workspace.ErrCannotModifyPersonalWorkspace
 		}
 
-		if err := i.checkOwnerLikePermission(ctx, ws, operator, rbac.ActionDeactivate); err != nil {
+		if err := i.checkOwnerLikePermission(ctx, ws, operator, rbac.ActionEdit); err != nil {
 			return nil, err
 		}
 
@@ -640,7 +640,7 @@ func (i *Workspace) Restore(ctx context.Context, id workspace.ID, operator *work
 			return nil, workspace.ErrCannotModifyPersonalWorkspace
 		}
 
-		if err := i.checkOwnerLikePermission(ctx, ws, operator, rbac.ActionRestore); err != nil {
+		if err := i.checkOwnerLikePermission(ctx, ws, operator, rbac.ActionEdit); err != nil {
 			return nil, err
 		}
 
