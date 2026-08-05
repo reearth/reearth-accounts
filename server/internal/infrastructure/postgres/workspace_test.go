@@ -28,14 +28,14 @@ func TestWorkspace_FindAll(t *testing.T) {
 	require.NoError(t, r.Save(ctx, wsBeta))
 
 	t.Run("status all returns everything regardless of soft-delete", func(t *testing.T) {
-		list, pageInfo, err := r.FindAll(ctx, nil, workspace.StatusAll, usecasex.OffsetPagination{Offset: 0, Limit: 10}.Wrap())
+		list, pageInfo, err := r.FindAll(ctx, nil, nil, workspace.StatusAll, usecasex.OffsetPagination{Offset: 0, Limit: 10}.Wrap(), false)
 		assert.NoError(t, err)
 		assert.Len(t, list, 2)
 		assert.EqualValues(t, 2, pageInfo.TotalCount)
 	})
 
 	t.Run("status active excludes soft-deleted workspaces", func(t *testing.T) {
-		list, pageInfo, err := r.FindAll(ctx, nil, workspace.StatusActive, usecasex.OffsetPagination{Offset: 0, Limit: 10}.Wrap())
+		list, pageInfo, err := r.FindAll(ctx, nil, nil, workspace.StatusActive, usecasex.OffsetPagination{Offset: 0, Limit: 10}.Wrap(), false)
 		assert.NoError(t, err)
 		assert.Len(t, list, 1)
 		assert.Equal(t, wsAlpha.ID(), list[0].ID())
@@ -43,7 +43,7 @@ func TestWorkspace_FindAll(t *testing.T) {
 	})
 
 	t.Run("status deleted returns only soft-deleted workspaces", func(t *testing.T) {
-		list, pageInfo, err := r.FindAll(ctx, nil, workspace.StatusDeleted, usecasex.OffsetPagination{Offset: 0, Limit: 10}.Wrap())
+		list, pageInfo, err := r.FindAll(ctx, nil, nil, workspace.StatusDeleted, usecasex.OffsetPagination{Offset: 0, Limit: 10}.Wrap(), false)
 		assert.NoError(t, err)
 		assert.Len(t, list, 1)
 		assert.Equal(t, wsBeta.ID(), list[0].ID())
@@ -51,21 +51,21 @@ func TestWorkspace_FindAll(t *testing.T) {
 	})
 
 	t.Run("keyword matches name case-insensitively", func(t *testing.T) {
-		list, _, err := r.FindAll(ctx, lo.ToPtr("ALPHA"), workspace.StatusAll, usecasex.OffsetPagination{Offset: 0, Limit: 10}.Wrap())
+		list, _, err := r.FindAll(ctx, lo.ToPtr("ALPHA"), nil, workspace.StatusAll, usecasex.OffsetPagination{Offset: 0, Limit: 10}.Wrap(), false)
 		assert.NoError(t, err)
 		assert.Len(t, list, 1)
 		assert.Equal(t, wsAlpha.ID(), list[0].ID())
 	})
 
 	t.Run("keyword matches alias", func(t *testing.T) {
-		list, _, err := r.FindAll(ctx, lo.ToPtr("beta-inc"), workspace.StatusAll, usecasex.OffsetPagination{Offset: 0, Limit: 10}.Wrap())
+		list, _, err := r.FindAll(ctx, lo.ToPtr("beta-inc"), nil, workspace.StatusAll, usecasex.OffsetPagination{Offset: 0, Limit: 10}.Wrap(), false)
 		assert.NoError(t, err)
 		assert.Len(t, list, 1)
 		assert.Equal(t, wsBeta.ID(), list[0].ID())
 	})
 
 	t.Run("pagination limits the page size", func(t *testing.T) {
-		list, pageInfo, err := r.FindAll(ctx, nil, workspace.StatusAll, usecasex.OffsetPagination{Offset: 0, Limit: 1}.Wrap())
+		list, pageInfo, err := r.FindAll(ctx, nil, nil, workspace.StatusAll, usecasex.OffsetPagination{Offset: 0, Limit: 1}.Wrap(), false)
 		assert.NoError(t, err)
 		assert.Len(t, list, 1)
 		assert.EqualValues(t, 2, pageInfo.TotalCount)

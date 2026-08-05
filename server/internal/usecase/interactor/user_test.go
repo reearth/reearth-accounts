@@ -1287,7 +1287,7 @@ func TestUser_RegenerateMFARecoveryCode(t *testing.T) {
 		mockAuth := &mockAuthenticatorWithError{}
 		g := &gateway.Container{Authenticators: map[gateway.Provider]gateway.Authenticator{gateway.ProviderAuth0: mockAuth}}
 
-		return NewUser(r, g, "", ""), &workspace.Operator{User: &uid}
+		return NewUser(r, g, nil, "", ""), &workspace.Operator{User: &uid}
 	}
 
 	t.Run("ok", func(t *testing.T) {
@@ -1323,7 +1323,7 @@ func TestUser_RegenerateMFARecoveryCode(t *testing.T) {
 		assert.NoError(t, r.Workspace.Save(ctx, noAuthWs))
 
 		g := &gateway.Container{Authenticators: map[gateway.Provider]gateway.Authenticator{}}
-		uc := NewUser(r, g, "", "")
+		uc := NewUser(r, g, nil, "", "")
 
 		code, err := uc.RegenerateMFARecoveryCode(ctx, &workspace.Operator{User: &noAuthUID})
 		assert.Error(t, err)

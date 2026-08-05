@@ -239,14 +239,14 @@ func TestWorkspace_FindAll_PersonalFilter(t *testing.T) {
 	r := NewWorkspaceWith(solo, team)
 
 	// nil => both types
-	got, pi, err := r.FindAll(ctx, nil, nil, nil)
+	got, pi, err := r.FindAll(ctx, nil, nil, "", nil, false)
 	assert.NoError(t, err)
 	assert.Len(t, got, 2)
 	assert.Equal(t, int64(2), pi.TotalCount)
 
 	// true => personal only
 	yes := true
-	got, pi, err = r.FindAll(ctx, nil, &yes, nil)
+	got, pi, err = r.FindAll(ctx, nil, &yes, "", nil, false)
 	assert.NoError(t, err)
 	assert.Len(t, got, 1)
 	assert.Equal(t, solo.ID(), got[0].ID())
@@ -255,7 +255,7 @@ func TestWorkspace_FindAll_PersonalFilter(t *testing.T) {
 
 	// false => team (non-personal) only
 	no := false
-	got, pi, err = r.FindAll(ctx, nil, &no, nil)
+	got, pi, err = r.FindAll(ctx, nil, &no, "", nil, false)
 	assert.NoError(t, err)
 	assert.Len(t, got, 1)
 	assert.Equal(t, team.ID(), got[0].ID())
