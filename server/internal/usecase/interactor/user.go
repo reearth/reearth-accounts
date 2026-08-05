@@ -316,7 +316,7 @@ func (i *User) DisableMFA(ctx context.Context, operator *workspace.Operator) err
 	if operator == nil || operator.User == nil {
 		return interfaces.ErrInvalidOperator
 	}
-	return Run0(ctx, operator, i.repos, Usecase().Transaction(), func(ctx context.Context) error {
+	return Run0(ctx, operator, i.repos, Usecase(), func(ctx context.Context) error {
 		u, err := i.repos.User.FindByID(ctx, *operator.User)
 		if err != nil {
 			return err
@@ -337,7 +337,7 @@ func (i *User) EnableMFA(ctx context.Context, operator *workspace.Operator) (str
 	if operator == nil || operator.User == nil {
 		return "", interfaces.ErrInvalidOperator
 	}
-	return Run1(ctx, operator, i.repos, Usecase().Transaction(), func(ctx context.Context) (string, error) {
+	return Run1(ctx, operator, i.repos, Usecase(), func(ctx context.Context) (string, error) {
 		u, err := i.repos.User.FindByID(ctx, *operator.User)
 		if err != nil {
 			return "", err
@@ -358,7 +358,7 @@ func (i *User) GetMFAStatus(ctx context.Context, operator *workspace.Operator) (
 	if operator == nil || operator.User == nil {
 		return gateway.MFAStatus{}, interfaces.ErrInvalidOperator
 	}
-	return Run1(ctx, operator, i.repos, Usecase().Transaction(), func(ctx context.Context) (gateway.MFAStatus, error) {
+	return Run1(ctx, operator, i.repos, Usecase(), func(ctx context.Context) (gateway.MFAStatus, error) {
 		u, err := i.repos.User.FindByID(ctx, *operator.User)
 		if err != nil {
 			return gateway.MFAStatus{}, err
