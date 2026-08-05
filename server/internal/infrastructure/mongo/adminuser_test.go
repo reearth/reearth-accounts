@@ -2,6 +2,7 @@ package mongo
 
 import (
 	"context"
+	"sync"
 	"testing"
 	"time"
 
@@ -138,6 +139,80 @@ func TestAdminUser_ExistsApprovedSystemAdminExcept(t *testing.T) {
 	got, err = r.ExistsApprovedSystemAdminExcept(ctx, viewer.ID())
 	assert.NoError(t, err)
 	assert.True(t, got)
+}
+
+func TestAdminUser_SaveGuardingLastSystemAdmin(t *testing.T) {
+	c := Connect(t)(t)
+	ctx := context.Background()
+	r := NewAdminUser(mongox.NewClientWithDatabase(c))
+
+	sysAdmin := adminuser.New().NewID().Name("sys").Email("sys-guard@eukarya.io").
+		Status(adminuser.StatusApproved).Role(adminuser.RoleSystemAdmin).MustBuild()
+	require.NoError(t, r.Save(ctx, sysAdmin))
+
+	// the only approved system_admin -> refused, nothing persisted
+	require.NoError(t, sysAdmin.SetRole(adminuser.RoleViewer))
+	ok, err := r.SaveGuardingLastSystemAdmin(ctx, sysAdmin, true)
+	require.NoError(t, err)
+	assert.False(t, ok)
+
+	got, err := r.FindByID(ctx, sysAdmin.ID())
+	require.NoError(t, err)
+	assert.Equal(t, adminuser.RoleSystemAdmin, got.Role(), "refused save must not persist the demotion")
+
+	// a second approved system_admin now exists -> allowed
+	other := adminuser.New().NewID().Name("other").Email("other-guard@eukarya.io").
+		Status(adminuser.StatusApproved).Role(adminuser.RoleSystemAdmin).MustBuild()
+	require.NoError(t, r.Save(ctx, other))
+
+	ok, err = r.SaveGuardingLastSystemAdmin(ctx, sysAdmin, true)
+	require.NoError(t, err)
+	assert.True(t, ok)
+
+	got, err = r.FindByID(ctx, sysAdmin.ID())
+	require.NoError(t, err)
+	assert.Equal(t, adminuser.RoleViewer, got.Role())
+}
+
+// Reproduces the REL-01 race directly against MongoDB: two approved
+// system_admins demoted concurrently must not both succeed, since the
+// existence check and the save are now serialized via the shared
+// "locks" collection (see SaveGuardingLastSystemAdmin).
+func TestAdminUser_SaveGuardingLastSystemAdmin_ConcurrentDemote(t *testing.T) {
+	c := Connect(t)(t)
+	ctx := context.Background()
+	r := NewAdminUser(mongox.NewClientWithDatabase(c))
+
+	a := adminuser.New().NewID().Name("a").Email("a-guard@eukarya.io").
+		Status(adminuser.StatusApproved).Role(adminuser.RoleSystemAdmin).MustBuild()
+	b := adminuser.New().NewID().Name("b").Email("b-guard@eukarya.io").
+		Status(adminuser.StatusApproved).Role(adminuser.RoleSystemAdmin).MustBuild()
+	require.NoError(t, r.Save(ctx, a))
+	require.NoError(t, r.Save(ctx, b))
+
+	require.NoError(t, a.SetRole(adminuser.RoleViewer))
+	require.NoError(t, b.SetRole(adminuser.RoleViewer))
+
+	var wg sync.WaitGroup
+	oks := make([]bool, 2)
+	errs := make([]error, 2)
+	targets := []*adminuser.AdminUser{a, b}
+	for i := range targets {
+		wg.Add(1)
+		go func(i int) {
+			defer wg.Done()
+			oks[i], errs[i] = r.SaveGuardingLastSystemAdmin(ctx, targets[i], true)
+		}(i)
+	}
+	wg.Wait()
+
+	require.NoError(t, errs[0])
+	require.NoError(t, errs[1])
+	assert.NotEqual(t, oks[0], oks[1], "exactly one of the two concurrent demotions must succeed")
+
+	hasOther, err := r.ExistsApprovedSystemAdminExcept(ctx, adminuser.NewID())
+	require.NoError(t, err)
+	assert.True(t, hasOther, "at least one approved system_admin must remain")
 }
 
 func TestAdminUser_List_RoleFilter(t *testing.T) {
