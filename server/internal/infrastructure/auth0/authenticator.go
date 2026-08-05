@@ -161,15 +161,31 @@ func (a *Auth0) DisableMFA(ctx context.Context, sub string) error {
 		return rerror.NewE(i18n.T("failed to list mfa enrollments"))
 	}
 
+	var confirmed []enrollment
 	for _, e := range enrollments {
-		if e.Status != "confirmed" {
-			continue
+		if e.Status == "confirmed" {
+			confirmed = append(confirmed, e)
 		}
-		if err := a.execInto(ctx, http.MethodDelete, "api/v2/guardian/enrollments/"+e.ID, a.token, nil, nil); err != nil {
-			if !a.disableLogging {
-				log.Errorf("auth0: disable mfa: delete enrollment %s: %+v", e.ID, err)
+	}
+
+	if len(confirmed) > 0 {
+		errs := make([]error, len(confirmed))
+		var wg sync.WaitGroup
+		wg.Add(len(confirmed))
+		for i, e := range confirmed {
+			go func() {
+				defer wg.Done()
+				errs[i] = a.execInto(ctx, http.MethodDelete, "api/v2/guardian/enrollments/"+e.ID, a.token, nil, nil)
+			}()
+		}
+		wg.Wait()
+		for i, err := range errs {
+			if err != nil {
+				if !a.disableLogging {
+					log.Errorf("auth0: disable mfa: delete enrollment %s: %+v", confirmed[i].ID, err)
+				}
+				return rerror.NewE(i18n.T("failed to delete mfa enrollment"))
 			}
-			return rerror.NewE(i18n.T("failed to delete mfa enrollment"))
 		}
 	}
 
