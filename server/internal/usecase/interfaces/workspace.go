@@ -58,8 +58,9 @@ type Workspace interface {
 	FetchByAlias(context.Context, string) (*workspace.Workspace, error)
 	FetchByUserWithPagination(context.Context, user.ID, FetchByUserWithPaginationParam) (FetchByUserWithPaginationResult, error)
 	// FindAll lists workspaces across all tenants, unfiltered by any operator's
-	// readable-workspace set. Intended for service-to-service callers only.
-	FindAll(context.Context, FindAllWorkspacesParam) (FindAllWorkspacesResult, error)
+	// readable-workspace set. Restricted to the maintainer role (see
+	// checkMaintainerPermission) since it exposes every workspace across every tenant.
+	FindAll(context.Context, FindAllWorkspacesParam, *workspace.Operator) (FindAllWorkspacesResult, error)
 	FindByUser(context.Context, user.ID, *workspace.Operator) (workspace.List, error)
 	// Create creates a workspace. Unless skipOwnerMembership is true, firstUser is
 	// automatically joined as RoleOwner (the normal end-user create flow); set it

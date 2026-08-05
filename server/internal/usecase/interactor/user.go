@@ -82,7 +82,15 @@ func (i *User) FetchByIDsWithPagination(ctx context.Context, ids user.IDList, al
 	return i.query.FetchByIDsWithPagination(ctx, ids, alias, pagination)
 }
 
+// FindAll lists users across all tenants. Restricted to the owner
+// role (see checkOwnerPermission) since it exposes every user across every tenant.
 func (i *User) FindAll(ctx context.Context, param interfaces.FindAllUsersParam) (interfaces.FindAllUsersResult, error) {
+	if param.Operator == nil || param.Operator.User == nil {
+		return interfaces.FindAllUsersResult{}, interfaces.ErrInvalidOperator
+	}
+	if err := i.checkMaintainerPermission(ctx, param.Operator, rbac.ActionList); err != nil {
+		return interfaces.FindAllUsersResult{}, err
+	}
 	return i.query.FindAll(ctx, param)
 }
 
@@ -528,10 +536,12 @@ func (i *User) Restore(ctx context.Context, id user.ID, operator *workspace.Oper
 	})
 }
 
-// checkMaintainerPermission gates admin-only user actions (Deactivate/Restore) to
-// principals holding the elevated "maintainer" role, either via Cerbos or, when
-// Cerbos isn't configured (e.g. local/mock-auth dev), by re-checking the
-// operator's own Permittable directly. Mirrors Permittable.checkManageRolesPermission.
+// checkMaintainerPermission gates admin-only user actions (Deactivate/Restore,
+// FindAll, by-sub mutations) to principals holding the elevated "maintainer" or
+// "owner" global role, either via Cerbos or, when Cerbos isn't configured (e.g.
+// local/mock-auth dev), by re-checking the operator's own Permittable directly.
+// "owner" here is a global Permittable role (LINKS-Veda's admin account), not a
+// per-workspace role. Mirrors Permittable.checkManageRolesPermission.
 func (i *User) checkMaintainerPermission(ctx context.Context, operator *workspace.Operator, action string) error {
 	if i.cerbos != nil {
 		result, err := i.cerbos.CheckPermission(ctx, *operator.User, interfaces.CheckPermissionParam{
@@ -563,7 +573,7 @@ func (i *User) checkMaintainerPermission(ctx context.Context, operator *workspac
 		return err
 	}
 	for _, r := range roles {
-		if r.Name() == role.RoleMaintainer.String() {
+		if r.Name() == role.RoleMaintainer.String() || r.Name() == role.RoleOwner.String() {
 			return nil
 		}
 	}

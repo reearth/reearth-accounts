@@ -88,10 +88,16 @@ func (i *Workspace) FetchByUserWithPagination(ctx context.Context, userID worksp
 }
 
 // FindAll lists workspaces across all tenants, unfiltered by any operator's
-// readable-workspace set — mirrors how the admin app's own workspace listing
-// calls repos.Workspace.FindAll directly. Reachable by any authenticated user,
-// same as FetchByID/FetchByName/FetchByAlias (no per-workspace membership check).
-func (i *Workspace) FindAll(ctx context.Context, input interfaces.FindAllWorkspacesParam) (interfaces.FindAllWorkspacesResult, error) {
+// readable-workspace set. Restricted to the owner role (see
+// checkMaintainerPermission) since it exposes every workspace across every tenant.
+func (i *Workspace) FindAll(ctx context.Context, input interfaces.FindAllWorkspacesParam, operator *workspace.Operator) (interfaces.FindAllWorkspacesResult, error) {
+	if operator == nil || operator.User == nil {
+		return interfaces.FindAllWorkspacesResult{}, interfaces.ErrInvalidOperator
+	}
+	if err := i.checkMaintainerPermission(ctx, operator, rbac.ActionList); err != nil {
+		return interfaces.FindAllWorkspacesResult{}, err
+	}
+
 	status := input.Status
 	if status == "" {
 		status = workspace.StatusActive
@@ -902,4 +908,51 @@ func (i *Workspace) checkOwnerLikePermission(ctx context.Context, ws *workspace.
 		return interfaces.ErrOperationDenied
 	}
 	return nil
+}
+
+// checkMaintainerPermission gates admin-only, cross-tenant workspace actions
+// (currently FindAll) to principals holding the elevated "maintainer" or "owner"
+// global role, either via Cerbos or, when Cerbos isn't configured (e.g.
+// local/mock-auth dev), by re-checking the operator's own Permittable directly.
+// "owner" here is a global Permittable role (LINKS-Veda's admin account), not a
+// per-workspace role. Unlike checkOwnerLikePermission, this is not scoped to a
+// single workspace, so there is no per-workspace ownership fallback. Mirrors
+// User.checkMaintainerPermission.
+func (i *Workspace) checkMaintainerPermission(ctx context.Context, operator *workspace.Operator, action string) error {
+	if i.cerbos != nil {
+		result, err := i.cerbos.CheckPermission(ctx, *operator.User, interfaces.CheckPermissionParam{
+			Service:  rbac.ServiceName,
+			Resource: rbac.ResourceWorkspace,
+			Action:   action,
+		})
+		if err != nil {
+			return err
+		}
+		if result != nil {
+			if !result.Allowed {
+				return interfaces.ErrPermissionDenied
+			}
+			return nil
+		}
+	}
+
+	p, err := i.permittableRepo.FindByUserID(ctx, *operator.User)
+	if err != nil && !errors.Is(err, rerror.ErrNotFound) {
+		return err
+	}
+	if p == nil {
+		return interfaces.ErrPermissionDenied
+	}
+
+	roles, err := i.roleRepo.FindByIDs(ctx, p.RoleIDs())
+	if err != nil {
+		return err
+	}
+	for _, r := range roles {
+		if r.Name() == role.RoleMaintainer.String() || r.Name() == role.RoleOwner.String() {
+			return nil
+		}
+	}
+
+	return interfaces.ErrPermissionDenied
 }

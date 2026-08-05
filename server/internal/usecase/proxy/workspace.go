@@ -91,7 +91,7 @@ func (w *Workspace) FetchByUserWithPagination(ctx context.Context, userID accoun
 // listing query in the public GraphQL schema (it's only reachable via the
 // M2M-gated REST route or the separate admin API), so this client has no
 // remote call to make on the caller's behalf.
-func (w *Workspace) FindAll(ctx context.Context, param interfaces.FindAllWorkspacesParam) (interfaces.FindAllWorkspacesResult, error) {
+func (w *Workspace) FindAll(ctx context.Context, param interfaces.FindAllWorkspacesParam, operator *workspace.Operator) (interfaces.FindAllWorkspacesResult, error) {
 	return interfaces.FindAllWorkspacesResult{}, workspace.ErrNotImplemented
 }
 

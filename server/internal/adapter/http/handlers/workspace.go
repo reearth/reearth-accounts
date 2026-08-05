@@ -156,7 +156,7 @@ func (h *WorkspaceHandler) List(c echo.Context) error {
 
 // ListAll godoc
 // @Tags Workspace
-// @Summary List all workspaces across all tenants, for service-to-service integrations
+// @Summary List all workspaces across all tenants (owner role required)
 // @Security BearerAuth
 // @Param keyword query string false "keyword filter (matches name or alias)"
 // @Param status query string false "active (default), deleted, or all"
@@ -165,6 +165,7 @@ func (h *WorkspaceHandler) List(c echo.Context) error {
 // @Produce json
 // @Success 200 {object} httpmodel.WorkspaceResponse
 // @Failure 400 {object} internal.ErrorResponse
+// @Failure 403 {object} internal.ErrorResponse
 // @Router /api/workspaces/all [get]
 func (h *WorkspaceHandler) ListAll(c echo.Context) error {
 	ctx := c.Request().Context()
@@ -191,7 +192,7 @@ func (h *WorkspaceHandler) ListAll(c echo.Context) error {
 	}
 	page, size := pp.Normalized()
 
-	res, err := uc.FindAll(ctx, interfaces.FindAllWorkspacesParam{Keyword: kw, Status: status, Page: int64(page), Size: int64(size), ExcludePersonal: true})
+	res, err := uc.FindAll(ctx, interfaces.FindAllWorkspacesParam{Keyword: kw, Status: status, Page: int64(page), Size: int64(size), ExcludePersonal: true}, httpinternal.Operator(c))
 	if err != nil {
 		return err
 	}

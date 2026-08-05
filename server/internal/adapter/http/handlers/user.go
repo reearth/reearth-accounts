@@ -223,7 +223,7 @@ func (h *UserHandler) List(c echo.Context) error {
 
 // ListAll godoc
 // @Tags User
-// @Summary List all users across all tenants, for service-to-service integrations
+// @Summary List all users across all tenants (owner role required)
 // @Security BearerAuth
 // @Param keyword query string false "keyword filter (matches name, alias, or email)"
 // @Param status query string false "active (default), deleted, or all"
@@ -232,6 +232,7 @@ func (h *UserHandler) List(c echo.Context) error {
 // @Produce json
 // @Success 200 {object} httpmodel.UserResponse
 // @Failure 400 {object} internal.ErrorResponse
+// @Failure 403 {object} internal.ErrorResponse
 // @Router /api/users/all [get]
 func (h *UserHandler) ListAll(c echo.Context) error {
 	ctx := c.Request().Context()
@@ -258,7 +259,7 @@ func (h *UserHandler) ListAll(c echo.Context) error {
 	}
 	page, size := pp.Normalized()
 
-	res, err := uc.FindAll(ctx, interfaces.FindAllUsersParam{Keyword: kw, Status: status, Page: int64(page), Size: int64(size)})
+	res, err := uc.FindAll(ctx, interfaces.FindAllUsersParam{Keyword: kw, Status: status, Page: int64(page), Size: int64(size), Operator: httpinternal.Operator(c)})
 	if err != nil {
 		return err
 	}

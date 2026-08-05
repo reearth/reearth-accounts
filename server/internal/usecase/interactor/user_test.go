@@ -41,6 +41,25 @@ func maintainerOperator(ctx context.Context, t *testing.T, db *repo.Container) *
 	return &workspace.Operator{User: lo.ToPtr(uid)}
 }
 
+// ownerOperator returns an operator holding the global Permittable "owner" role
+// (e.g. LINKS-Veda's admin account), distinct from a per-workspace owner role.
+func ownerOperator(ctx context.Context, t *testing.T, db *repo.Container) *workspace.Operator {
+	t.Helper()
+
+	uid := user.NewID()
+	ownerRole := role.New().NewID().Name(role.RoleOwner.String()).MustBuild()
+	require.NoError(t, db.Role.Save(ctx, *ownerRole))
+
+	p := permittable.New().
+		NewID().
+		UserID(uid).
+		RoleIDs(id.RoleIDList{ownerRole.ID()}).
+		MustBuild()
+	require.NoError(t, db.Permittable.Save(ctx, *p))
+
+	return &workspace.Operator{User: lo.ToPtr(uid)}
+}
+
 func TestUser_VerifyUser(t *testing.T) {
 	user.DefaultPasswordEncoder = &user.NoopPasswordEncoder{}
 
@@ -1722,6 +1741,7 @@ func TestUser_StartPasswordReset_TokenPersistedBeforeMailSend(t *testing.T) {
 func TestUser_FindAll(t *testing.T) {
 	ctx := context.Background()
 	db := memory.New()
+	op := maintainerOperator(ctx, t, db)
 	userUC := NewUser(db, nil, nil, "", "")
 
 	uA := user.New().NewID().Name("alpha").Email("alpha@bbb.com").MustBuild()
@@ -1734,27 +1754,49 @@ func TestUser_FindAll(t *testing.T) {
 		defer uA.Reactivate()
 		assert.NoError(t, db.User.Save(ctx, uA))
 
-		res, err := userUC.FindAll(ctx, interfaces.FindAllUsersParam{Page: 1, Size: 10})
+		res, err := userUC.FindAll(ctx, interfaces.FindAllUsersParam{Page: 1, Size: 10, Operator: op})
 		assert.NoError(t, err)
 		assert.Len(t, res.Users, 1)
 		assert.Equal(t, uB.ID(), res.Users[0].ID())
 
-		res, err = userUC.FindAll(ctx, interfaces.FindAllUsersParam{Status: user.StatusDeleted, Page: 1, Size: 10})
+		res, err = userUC.FindAll(ctx, interfaces.FindAllUsersParam{Status: user.StatusDeleted, Page: 1, Size: 10, Operator: op})
 		assert.NoError(t, err)
 		assert.Len(t, res.Users, 1)
 		assert.Equal(t, uA.ID(), res.Users[0].ID())
 
-		res, err = userUC.FindAll(ctx, interfaces.FindAllUsersParam{Status: user.StatusAll, Page: 1, Size: 10})
+		res, err = userUC.FindAll(ctx, interfaces.FindAllUsersParam{Status: user.StatusAll, Page: 1, Size: 10, Operator: op})
 		assert.NoError(t, err)
 		assert.Len(t, res.Users, 2)
 	})
 
 	t.Run("keyword filters by name", func(t *testing.T) {
 		kw := "alpha"
-		res, err := userUC.FindAll(ctx, interfaces.FindAllUsersParam{Keyword: &kw, Status: user.StatusAll, Page: 1, Size: 10})
+		res, err := userUC.FindAll(ctx, interfaces.FindAllUsersParam{Keyword: &kw, Status: user.StatusAll, Page: 1, Size: 10, Operator: op})
 		assert.NoError(t, err)
 		assert.Len(t, res.Users, 1)
 		assert.Equal(t, uA.ID(), res.Users[0].ID())
+	})
+
+	t.Run("global owner role (e.g. LINKS-Veda's admin account) can also list", func(t *testing.T) {
+		ownerOp := ownerOperator(ctx, t, db)
+		res, err := userUC.FindAll(ctx, interfaces.FindAllUsersParam{Status: user.StatusAll, Page: 1, Size: 10, Operator: ownerOp})
+		assert.NoError(t, err)
+		assert.Len(t, res.Users, 2)
+	})
+
+	t.Run("denies a nil operator", func(t *testing.T) {
+		_, err := userUC.FindAll(ctx, interfaces.FindAllUsersParam{Page: 1, Size: 10})
+		assert.ErrorIs(t, err, interfaces.ErrInvalidOperator)
+	})
+
+	t.Run("denies an operator without the maintainer role", func(t *testing.T) {
+		nonMaintainer := user.NewID()
+		p := permittable.New().NewID().UserID(nonMaintainer).MustBuild()
+		assert.NoError(t, db.Permittable.Save(ctx, *p))
+		nonMaintainerOp := &workspace.Operator{User: lo.ToPtr(nonMaintainer)}
+
+		_, err := userUC.FindAll(ctx, interfaces.FindAllUsersParam{Page: 1, Size: 10, Operator: nonMaintainerOp})
+		assert.ErrorIs(t, err, interfaces.ErrPermissionDenied)
 	})
 }
 

@@ -2307,6 +2307,7 @@ func TestWorkspace_BulkRemovePermittable(t *testing.T) {
 func TestWorkspace_FindAll(t *testing.T) {
 	ctx := context.Background()
 	db := memory.New()
+	op := maintainerOperator(ctx, t, db)
 	workspaceUC := NewWorkspace(db, nil, nil)
 
 	wsA := workspace.New().NewID().Name("alpha").MustBuild()
@@ -2315,7 +2316,7 @@ func TestWorkspace_FindAll(t *testing.T) {
 	assert.NoError(t, db.Workspace.Create(ctx, wsB))
 
 	t.Run("no keyword returns everything, unfiltered by any operator", func(t *testing.T) {
-		res, err := workspaceUC.FindAll(ctx, interfaces.FindAllWorkspacesParam{Page: 1, Size: 10})
+		res, err := workspaceUC.FindAll(ctx, interfaces.FindAllWorkspacesParam{Page: 1, Size: 10}, op)
 		assert.NoError(t, err)
 		assert.Len(t, res.Workspaces, 2)
 		assert.Equal(t, 2, res.TotalCount)
@@ -2323,7 +2324,7 @@ func TestWorkspace_FindAll(t *testing.T) {
 
 	t.Run("keyword filters by name", func(t *testing.T) {
 		kw := "alpha"
-		res, err := workspaceUC.FindAll(ctx, interfaces.FindAllWorkspacesParam{Keyword: &kw, Page: 1, Size: 10})
+		res, err := workspaceUC.FindAll(ctx, interfaces.FindAllWorkspacesParam{Keyword: &kw, Page: 1, Size: 10}, op)
 		assert.NoError(t, err)
 		assert.Len(t, res.Workspaces, 1)
 		assert.Equal(t, wsA.ID(), res.Workspaces[0].ID())
@@ -2334,19 +2335,41 @@ func TestWorkspace_FindAll(t *testing.T) {
 		defer wsA.Restore()
 		assert.NoError(t, db.Workspace.Save(ctx, wsA))
 
-		res, err := workspaceUC.FindAll(ctx, interfaces.FindAllWorkspacesParam{Page: 1, Size: 10})
+		res, err := workspaceUC.FindAll(ctx, interfaces.FindAllWorkspacesParam{Page: 1, Size: 10}, op)
 		assert.NoError(t, err)
 		assert.Len(t, res.Workspaces, 1)
 		assert.Equal(t, wsB.ID(), res.Workspaces[0].ID())
 
-		res, err = workspaceUC.FindAll(ctx, interfaces.FindAllWorkspacesParam{Status: workspace.StatusDeleted, Page: 1, Size: 10})
+		res, err = workspaceUC.FindAll(ctx, interfaces.FindAllWorkspacesParam{Status: workspace.StatusDeleted, Page: 1, Size: 10}, op)
 		assert.NoError(t, err)
 		assert.Len(t, res.Workspaces, 1)
 		assert.Equal(t, wsA.ID(), res.Workspaces[0].ID())
 
-		res, err = workspaceUC.FindAll(ctx, interfaces.FindAllWorkspacesParam{Status: workspace.StatusAll, Page: 1, Size: 10})
+		res, err = workspaceUC.FindAll(ctx, interfaces.FindAllWorkspacesParam{Status: workspace.StatusAll, Page: 1, Size: 10}, op)
 		assert.NoError(t, err)
 		assert.Len(t, res.Workspaces, 2)
+	})
+
+	t.Run("global owner role (e.g. LINKS-Veda's admin account) can also list", func(t *testing.T) {
+		ownerOp := ownerOperator(ctx, t, db)
+		res, err := workspaceUC.FindAll(ctx, interfaces.FindAllWorkspacesParam{Status: workspace.StatusAll, Page: 1, Size: 10}, ownerOp)
+		assert.NoError(t, err)
+		assert.Len(t, res.Workspaces, 2)
+	})
+
+	t.Run("denies a nil operator", func(t *testing.T) {
+		_, err := workspaceUC.FindAll(ctx, interfaces.FindAllWorkspacesParam{Page: 1, Size: 10}, nil)
+		assert.ErrorIs(t, err, interfaces.ErrInvalidOperator)
+	})
+
+	t.Run("denies an operator without the maintainer role", func(t *testing.T) {
+		nonMaintainer := user.NewID()
+		p := permittable.New().NewID().UserID(nonMaintainer).MustBuild()
+		assert.NoError(t, db.Permittable.Save(ctx, *p))
+		nonMaintainerOp := &workspace.Operator{User: lo.ToPtr(nonMaintainer)}
+
+		_, err := workspaceUC.FindAll(ctx, interfaces.FindAllWorkspacesParam{Page: 1, Size: 10}, nonMaintainerOp)
+		assert.ErrorIs(t, err, interfaces.ErrPermissionDenied)
 	})
 }
 

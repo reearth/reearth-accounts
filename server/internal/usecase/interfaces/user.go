@@ -102,6 +102,9 @@ type FindAllUsersParam struct {
 	Status  user.StatusFilter
 	Page    int64
 	Size    int64
+	// Operator identifies the caller for the maintainer-role permission check in
+	// (*User).FindAll. Required; requests without an operator are rejected.
+	Operator *workspace.Operator
 }
 
 type FindAllUsersResult struct {
@@ -113,7 +116,8 @@ type UserQuery interface {
 	FetchByID(context.Context, user.IDList) (user.List, error)
 	FetchByIDsWithPagination(ctx context.Context, ids user.IDList, alias *string, pagination FetchByIDsWithPaginationParam) (FetchByIDsWithPaginationResult, error)
 	// FindAll lists users across all tenants, unfiltered by any per-workspace
-	// scoping. Reachable by any authenticated user, same as the rest of this API.
+	// scoping. Restricted to the maintainer role (see (*User).FindAll /
+	// checkMaintainerPermission) since it exposes every user across every tenant.
 	FindAll(context.Context, FindAllUsersParam) (FindAllUsersResult, error)
 	FetchBySub(context.Context, string) (*user.User, error)
 	FetchByNameOrAlias(context.Context, string) (user.List, error)
