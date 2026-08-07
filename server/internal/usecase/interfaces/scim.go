@@ -30,6 +30,7 @@ type ScimGroupMember struct {
 }
 
 type Scim interface {
+	DeleteScimGroup(ctx context.Context, workspaceID workspace.ID, groupName string) error
 	DeprovisionScimUser(ctx context.Context, workspaceID workspace.ID, externalID string) error
 	DeprovisionScimUserByUserID(ctx context.Context, workspaceID workspace.ID, userID user.ID) error
 	GenerateScimToken(ctx context.Context, workspaceID workspace.ID, operator *workspace.Operator) (string, error)
@@ -37,6 +38,7 @@ type Scim interface {
 	GetScimUser(ctx context.Context, workspaceID workspace.ID, userID user.ID) (*user.User, error)
 	ListScimUsers(ctx context.Context, workspaceID workspace.ID, filter string) ([]*user.User, error)
 	ProvisionScimUser(ctx context.Context, param ProvisionScimUserParam) (*user.User, error)
+	RevokeScimToken(ctx context.Context, workspaceID workspace.ID, operator *workspace.Operator) error
 	SyncScimGroup(ctx context.Context, workspaceID workspace.ID, groupID, groupName string, members []ScimGroupMember) error
 	UpdateScimConfig(ctx context.Context, workspaceID workspace.ID, enabled bool, groupRoleMapping map[string]role.RoleType, operator *workspace.Operator) (*workspace.ScimConfig, error)
 }

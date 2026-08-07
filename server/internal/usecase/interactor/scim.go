@@ -103,22 +103,64 @@ func (i *Scim) GenerateScimToken(ctx context.Context, workspaceID workspace.ID, 
 	})
 }
 
+func (i *Scim) DeleteScimGroup(ctx context.Context, workspaceID workspace.ID, groupName string) error {
+	return Run0(ctx, nil, i.repos, Usecase().Transaction(), func(ctx context.Context) error {
+		ws, err := i.repos.Workspace.FindByID(ctx, workspaceID)
+		if err != nil {
+			return err
+		}
+
+		cfg := ws.ScimConfig()
+		if cfg == nil {
+			return nil
+		}
+
+		mapping := cfg.GroupRoleMapping()
+		delete(mapping, groupName)
+		cfg.SetGroupRoleMapping(mapping)
+		ws.SetScimConfig(cfg)
+
+		return i.repos.Workspace.Save(ctx, ws)
+	})
+}
+
 func (i *Scim) GetScimConfig(ctx context.Context, workspaceID workspace.ID, operator *workspace.Operator) (*workspace.ScimConfig, error) {
-	ws, err := i.repos.Workspace.FindByID(ctx, workspaceID)
-	if err != nil {
-		return nil, err
-	}
+	return Run1(ctx, operator, i.repos, Usecase().WithMaintainableWorkspaces(workspaceID), func(ctx context.Context) (*workspace.ScimConfig, error) {
+		ws, err := i.repos.Workspace.FindByID(ctx, workspaceID)
+		if err != nil {
+			return nil, err
+		}
 
-	cfg := ws.ScimConfig()
-	if cfg == nil {
-		return nil, nil
-	}
+		cfg := ws.ScimConfig()
+		if cfg == nil {
+			return nil, nil
+		}
 
-	if cfg.TokenHash() != "" {
-		cfg.SetTokenHash("***")
-	}
+		if cfg.TokenHash() != "" {
+			cfg.SetTokenHash("***")
+		}
 
-	return cfg, nil
+		return cfg, nil
+	})
+}
+
+func (i *Scim) RevokeScimToken(ctx context.Context, workspaceID workspace.ID, operator *workspace.Operator) error {
+	return Run0(ctx, operator, i.repos, Usecase().Transaction().WithMaintainableWorkspaces(workspaceID), func(ctx context.Context) error {
+		ws, err := i.repos.Workspace.FindByID(ctx, workspaceID)
+		if err != nil {
+			return err
+		}
+
+		cfg := ws.ScimConfig()
+		if cfg == nil {
+			return nil
+		}
+		cfg.SetEnabled(false)
+		cfg.SetTokenHash("")
+		ws.SetScimConfig(cfg)
+
+		return i.repos.Workspace.Save(ctx, ws)
+	})
 }
 
 func (i *Scim) GetScimUser(ctx context.Context, workspaceID workspace.ID, userID user.ID) (*user.User, error) {
