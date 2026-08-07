@@ -114,6 +114,13 @@ func RegisterRESTRouter(e *echo.Echo, cfg RouterConfig) {
 	api.DELETE("/workspaces/:id/integrations", wh.RemoveIntegrations, required)
 	api.POST("/workspaces/:id/transfer-ownership", wh.TransferOwnership, required)
 
+	// --- Workspace SCIM admin ---
+	sh := handlers.NewWorkspaceScimHandler()
+	api.POST("/workspaces/:id/scim/token", sh.GenerateToken, required)
+	api.DELETE("/workspaces/:id/scim/token", sh.RevokeToken, required)
+	api.PUT("/workspaces/:id/scim/config", sh.UpdateConfig, required)
+	api.GET("/workspaces/:id/scim/config", sh.GetConfig, required)
+
 	// --- Permission ---
 	ph := handlers.NewPermissionHandler()
 	// OptionalAuth resolves a JWT/mock user (attaching it for APIKeyOrAuth and the

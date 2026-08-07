@@ -358,6 +358,9 @@ func (m *Members) SetUserExternalID(u UserID, externalID string) error {
 }
 
 func (m *Members) UserByExternalID(externalID string) (UserID, bool) {
+	if externalID == "" {
+		return UserID{}, false
+	}
 	m.mu.RLock()
 	defer m.mu.RUnlock()
 
