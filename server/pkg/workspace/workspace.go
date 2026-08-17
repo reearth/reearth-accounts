@@ -15,7 +15,10 @@ type Workspace struct {
 	metadata  Metadata
 	members   *Members
 	policy    *PolicyID
+	createdAt *time.Time
+	createdBy *UserID
 	updatedAt time.Time
+	deletedAt *time.Time
 }
 
 func (w *Workspace) ID() ID {
@@ -82,6 +85,24 @@ func (w *Workspace) SetPolicy(policy *PolicyID) {
 	w.updatedAt = time.Now()
 }
 
+func (w *Workspace) CreatedAt() *time.Time {
+	return w.createdAt
+}
+
+func (w *Workspace) CreatedBy() *UserID {
+	return w.createdBy
+}
+
+func (w *Workspace) Delete() {
+	now := time.Now()
+	w.deletedAt = &now
+	w.updatedAt = time.Now()
+}
+
+func (w *Workspace) DeletedAt() *time.Time {
+	return w.deletedAt
+}
+
 func (w *Workspace) DeleteIntegrations(iids IntegrationIDList) error {
 	err := w.members.DeleteIntegrations(iids)
 	if err != nil {
@@ -89,6 +110,15 @@ func (w *Workspace) DeleteIntegrations(iids IntegrationIDList) error {
 	}
 	w.updatedAt = time.Now()
 	return nil
+}
+
+func (w *Workspace) IsDeleted() bool {
+	return w.deletedAt != nil
+}
+
+func (w *Workspace) Restore() {
+	w.deletedAt = nil
+	w.updatedAt = time.Now()
 }
 
 func (w *Workspace) UpdatedAt() time.Time {

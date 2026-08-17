@@ -9,6 +9,7 @@ import (
 	httpinternal "github.com/reearth/reearth-accounts/server/internal/adapter/http/internal"
 	"github.com/reearth/reearth-accounts/server/internal/usecase/interfaces"
 	"github.com/reearth/reearth-accounts/server/pkg/id"
+	"github.com/reearth/reearth-accounts/server/pkg/workspace"
 )
 
 type WorkspaceHandler struct{}
@@ -25,7 +26,7 @@ func badRequest(msg string) error {
 // @Security BearerAuth
 // @Accept json
 // @Produce json
-// @Param body body httpmodel.CreateWorkspaceRequest true "workspace fields"
+// @Param body body httpmodel.CreateWorkspaceRequest true "workspace fields (skip_owner_membership defaults to false)"
 // @Success 200 {object} httpmodel.WorkspaceResponse
 // @Router /api/workspaces [post]
 func (h *WorkspaceHandler) Create(c echo.Context) error {
@@ -42,7 +43,7 @@ func (h *WorkspaceHandler) Create(c echo.Context) error {
 	if req.Description != nil {
 		desc = *req.Description
 	}
-	w, err := httpinternal.Usecases(c).Workspace.Create(ctx, req.Alias, req.Name, desc, u.ID(), httpinternal.Operator(c))
+	w, err := httpinternal.Usecases(c).Workspace.Create(ctx, req.Alias, req.Name, desc, u.ID(), req.SkipOwnerMembership, httpinternal.Operator(c))
 	if err != nil {
 		return err
 	}
@@ -153,6 +154,51 @@ func (h *WorkspaceHandler) List(c echo.Context) error {
 	}
 }
 
+// ListAll godoc
+// @Tags Workspace
+// @Summary List all workspaces across all tenants (owner role required)
+// @Security BearerAuth
+// @Param keyword query string false "keyword filter (matches name or alias)"
+// @Param status query string false "active (default), deleted, or all"
+// @Param page query int false "page (default 1)"
+// @Param page_size query int false "page size (default 50, max 100)"
+// @Produce json
+// @Success 200 {object} httpmodel.WorkspaceResponse
+// @Failure 400 {object} internal.ErrorResponse
+// @Failure 403 {object} internal.ErrorResponse
+// @Router /api/workspaces/all [get]
+func (h *WorkspaceHandler) ListAll(c echo.Context) error {
+	ctx := c.Request().Context()
+	uc := httpinternal.Usecases(c).Workspace
+
+	var kw *string
+	if k := c.QueryParam("keyword"); k != "" {
+		kw = &k
+	}
+
+	status := workspace.StatusActive
+	if s := c.QueryParam("status"); s != "" {
+		switch workspace.StatusFilter(s) {
+		case workspace.StatusActive, workspace.StatusDeleted, workspace.StatusAll:
+			status = workspace.StatusFilter(s)
+		default:
+			return badRequest("status must be one of: active, deleted, all")
+		}
+	}
+
+	var pp httpinternal.PageParams
+	if err := c.Bind(&pp); err != nil {
+		return err
+	}
+	page, size := pp.Normalized()
+
+	res, err := uc.FindAll(ctx, interfaces.FindAllWorkspacesParam{Keyword: kw, Status: status, Page: int64(page), Size: int64(size), ExcludePersonal: true}, httpinternal.Operator(c))
+	if err != nil {
+		return err
+	}
+	return c.JSON(http.StatusOK, httpinternal.NewPageResult(httpmodel.NewWorkspaceResponses(res.Workspaces), page, size, res.TotalCount))
+}
+
 // Update godoc
 // @Tags Workspace
 // @Summary Update a workspace
@@ -199,6 +245,48 @@ func (h *WorkspaceHandler) Delete(c echo.Context) error {
 		return err
 	}
 	return c.NoContent(http.StatusNoContent)
+}
+
+// Deactivate godoc
+// @Tags Workspace
+// @Summary Soft-delete a workspace (sets deleted_at; owner-only)
+// @Security BearerAuth
+// @Produce json
+// @Param id path string true "workspace ID"
+// @Success 200 {object} httpmodel.WorkspaceResponse
+// @Router /api/workspaces/{id}/deactivate [post]
+func (h *WorkspaceHandler) Deactivate(c echo.Context) error {
+	ctx := c.Request().Context()
+	wid, err := id.WorkspaceIDFrom(c.Param("id"))
+	if err != nil {
+		return badRequest("invalid workspace id")
+	}
+	w, err := httpinternal.Usecases(c).Workspace.Deactivate(ctx, wid, httpinternal.Operator(c))
+	if err != nil {
+		return err
+	}
+	return c.JSON(http.StatusOK, httpmodel.NewWorkspaceResponse(w))
+}
+
+// Restore godoc
+// @Tags Workspace
+// @Summary Restore a soft-deleted workspace (clears deleted_at; owner-only)
+// @Security BearerAuth
+// @Produce json
+// @Param id path string true "workspace ID"
+// @Success 200 {object} httpmodel.WorkspaceResponse
+// @Router /api/workspaces/{id}/restore [post]
+func (h *WorkspaceHandler) Restore(c echo.Context) error {
+	ctx := c.Request().Context()
+	wid, err := id.WorkspaceIDFrom(c.Param("id"))
+	if err != nil {
+		return badRequest("invalid workspace id")
+	}
+	w, err := httpinternal.Usecases(c).Workspace.Restore(ctx, wid, httpinternal.Operator(c))
+	if err != nil {
+		return err
+	}
+	return c.JSON(http.StatusOK, httpmodel.NewWorkspaceResponse(w))
 }
 
 // AddMembers godoc

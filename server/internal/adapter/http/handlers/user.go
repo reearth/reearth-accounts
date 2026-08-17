@@ -10,6 +10,8 @@ import (
 	httpinternal "github.com/reearth/reearth-accounts/server/internal/adapter/http/internal"
 	"github.com/reearth/reearth-accounts/server/internal/usecase/interfaces"
 	"github.com/reearth/reearth-accounts/server/pkg/id"
+	"github.com/reearth/reearth-accounts/server/pkg/user"
+	"github.com/reearth/reearth-accounts/server/pkg/workspace"
 	"github.com/reearth/reearthx/appx"
 	"github.com/reearth/reearthx/rerror"
 	"github.com/samber/lo"
@@ -97,6 +99,52 @@ func (h *UserHandler) RemoveMyAuth(c echo.Context) error {
 	return c.JSON(http.StatusOK, httpmodel.NewMeResponse(u))
 }
 
+// Deactivate godoc
+// @Tags User
+// @Summary Soft-delete a user (sets deleted_at; maintainer role required)
+// @Security BearerAuth
+// @Produce json
+// @Param id path string true "user ID"
+// @Success 200 {object} httpmodel.UserResponse
+// @Failure 403 {object} internal.ErrorResponse
+// @Failure 404 {object} internal.ErrorResponse
+// @Router /api/users/{id}/deactivate [post]
+func (h *UserHandler) Deactivate(c echo.Context) error {
+	ctx := c.Request().Context()
+	uid, err := id.UserIDFrom(c.Param("id"))
+	if err != nil {
+		return badRequest("invalid user id")
+	}
+	u, err := httpinternal.Usecases(c).User.Deactivate(ctx, uid, httpinternal.Operator(c))
+	if err != nil {
+		return err
+	}
+	return c.JSON(http.StatusOK, httpmodel.NewUserResponse(u))
+}
+
+// Restore godoc
+// @Tags User
+// @Summary Restore a soft-deleted user (clears deleted_at; maintainer role required)
+// @Security BearerAuth
+// @Produce json
+// @Param id path string true "user ID"
+// @Success 200 {object} httpmodel.UserResponse
+// @Failure 403 {object} internal.ErrorResponse
+// @Failure 404 {object} internal.ErrorResponse
+// @Router /api/users/{id}/restore [post]
+func (h *UserHandler) Restore(c echo.Context) error {
+	ctx := c.Request().Context()
+	uid, err := id.UserIDFrom(c.Param("id"))
+	if err != nil {
+		return badRequest("invalid user id")
+	}
+	u, err := httpinternal.Usecases(c).User.Restore(ctx, uid, httpinternal.Operator(c))
+	if err != nil {
+		return err
+	}
+	return c.JSON(http.StatusOK, httpmodel.NewUserResponse(u))
+}
+
 // Get godoc
 // @Tags User
 // @Summary Get a user by ID
@@ -171,6 +219,104 @@ func (h *UserHandler) List(c echo.Context) error {
 		return err
 	}
 	return c.JSON(http.StatusOK, httpmodel.NewUserResponses(res))
+}
+
+// ListAll godoc
+// @Tags User
+// @Summary List all users across all tenants (owner role required)
+// @Security BearerAuth
+// @Param keyword query string false "keyword filter (matches name, alias, or email)"
+// @Param status query string false "active (default), deleted, or all"
+// @Param page query int false "page (default 1)"
+// @Param page_size query int false "page size (default 50, max 100)"
+// @Produce json
+// @Success 200 {object} httpmodel.UserResponse
+// @Failure 400 {object} internal.ErrorResponse
+// @Failure 403 {object} internal.ErrorResponse
+// @Router /api/users/all [get]
+func (h *UserHandler) ListAll(c echo.Context) error {
+	ctx := c.Request().Context()
+	uc := httpinternal.Usecases(c).User
+
+	var kw *string
+	if k := c.QueryParam("keyword"); k != "" {
+		kw = &k
+	}
+
+	status := user.StatusActive
+	if s := c.QueryParam("status"); s != "" {
+		switch user.StatusFilter(s) {
+		case user.StatusActive, user.StatusDeleted, user.StatusAll:
+			status = user.StatusFilter(s)
+		default:
+			return httpinternal.NewError(http.StatusBadRequest, "status must be one of: active, deleted, all", nil)
+		}
+	}
+
+	var pp httpinternal.PageParams
+	if err := c.Bind(&pp); err != nil {
+		return err
+	}
+	page, size := pp.Normalized()
+
+	res, err := uc.FindAll(ctx, interfaces.FindAllUsersParam{Keyword: kw, Status: status, Page: int64(page), Size: int64(size), Operator: httpinternal.Operator(c)})
+	if err != nil {
+		return err
+	}
+
+	userResponses := httpmodel.NewUserResponses(res.Users)
+
+	if len(res.Users) > 0 {
+		userIDs := make(user.IDList, 0, len(res.Users))
+		for _, u := range res.Users {
+			userIDs = append(userIDs, u.ID())
+		}
+		perms, err := httpinternal.Usecases(c).Permittable.FindByUserIDs(ctx, userIDs)
+		if err != nil {
+			return err
+		}
+
+		// Build role name map (ULID → name) for resolving platform roles and workspace roles.
+		roleNames := map[string]string{}
+		if uc := httpinternal.Usecases(c); uc.Role != nil {
+			if roles, err := uc.Role.FindAll(ctx); err == nil {
+				for _, r := range roles {
+					roleNames[r.ID().String()] = r.Name()
+				}
+			}
+		}
+
+		// Build workspace info map (ULID → {Name, Alias}) for all workspaces referenced
+		// in the permittable workspace roles.
+		wsInfo := map[string]httpmodel.WorkspaceInfo{}
+		wsIDSet := map[string]bool{}
+		for _, p := range perms {
+			for _, wr := range p.WorkspaceRoles() {
+				wsIDSet[wr.ID().String()] = true
+			}
+		}
+		if len(wsIDSet) > 0 {
+			wsIDs := make(workspace.IDList, 0, len(wsIDSet))
+			for sid := range wsIDSet {
+				wid, err := id.WorkspaceIDFrom(sid)
+				if err == nil {
+					wsIDs = append(wsIDs, wid)
+				}
+			}
+			if wsList, err := httpinternal.Usecases(c).Workspace.Fetch(ctx, wsIDs, nil); err == nil {
+				for _, ws := range wsList {
+					wsInfo[ws.ID().String()] = httpmodel.WorkspaceInfo{
+						Name:  ws.Name(),
+						Alias: ws.Alias(),
+					}
+				}
+			}
+		}
+
+		httpmodel.ApplyPermittables(userResponses, perms, roleNames, wsInfo)
+	}
+
+	return c.JSON(http.StatusOK, httpinternal.NewPageResult(userResponses, page, size, res.TotalCount))
 }
 
 // Search godoc
@@ -487,6 +633,62 @@ func (h *UserHandler) FindOrCreate(c echo.Context) error {
 	// 204 until the interactor method is promoted to the interface.
 	req := &httpmodel.FindOrCreateRequest{}
 	if err := httpinternal.BindValidate(c, req); err != nil {
+		return err
+	}
+	return c.NoContent(http.StatusNoContent)
+}
+
+// UpdateUserBySub godoc
+// @Tags User
+// @Summary Update a user's fields by Firebase sub (maintainer role required)
+// @Security BearerAuth
+// @Accept json
+// @Produce json
+// @Param sub path string true "Firebase auth sub"
+// @Param body body httpmodel.UpdateUserBySubRequest true "fields to update"
+// @Success 204 "No Content"
+// @Failure 400 {object} internal.ErrorResponse
+// @Failure 403 {object} internal.ErrorResponse
+// @Failure 404 {object} internal.ErrorResponse
+// @Router /api/users/by-sub/{sub} [patch]
+func (h *UserHandler) UpdateUserBySub(c echo.Context) error {
+	sub := c.Param("sub")
+	if sub == "" {
+		return badRequest("sub is required")
+	}
+	req := &httpmodel.UpdateUserBySubRequest{}
+	if err := httpinternal.BindValidate(c, req); err != nil {
+		return err
+	}
+	if err := httpinternal.Usecases(c).User.UpdateUserBySub(c.Request().Context(), sub, req.Name, httpinternal.Operator(c)); err != nil {
+		return err
+	}
+	return c.NoContent(http.StatusNoContent)
+}
+
+// SetPlatformRolesBySub godoc
+// @Tags User
+// @Summary Replace a user's global platform roles (maintainer role required)
+// @Security BearerAuth
+// @Accept json
+// @Produce json
+// @Param sub path string true "Firebase auth sub"
+// @Param body body httpmodel.SetPlatformRolesBySubRequest true "role names"
+// @Success 204 "No Content"
+// @Failure 400 {object} internal.ErrorResponse
+// @Failure 403 {object} internal.ErrorResponse
+// @Failure 404 {object} internal.ErrorResponse
+// @Router /api/users/by-sub/{sub}/platform-roles [put]
+func (h *UserHandler) SetPlatformRolesBySub(c echo.Context) error {
+	sub := c.Param("sub")
+	if sub == "" {
+		return badRequest("sub is required")
+	}
+	req := &httpmodel.SetPlatformRolesBySubRequest{}
+	if err := httpinternal.BindValidate(c, req); err != nil {
+		return err
+	}
+	if err := httpinternal.Usecases(c).User.SetPlatformRolesBySub(c.Request().Context(), sub, req.RoleNames, httpinternal.Operator(c)); err != nil {
 		return err
 	}
 	return c.NoContent(http.StatusNoContent)

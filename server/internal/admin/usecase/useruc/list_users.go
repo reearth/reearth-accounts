@@ -21,7 +21,9 @@ func NewListUsersUseCase(userRepo user.Repo) *ListUsersUseCase {
 	return &ListUsersUseCase{userRepo: userRepo}
 }
 
-// Execute returns the matching users and pagination info.
+// Execute returns the matching users and pagination info. StatusAll preserves
+// this usecase's existing behavior: active and soft-deleted users mixed
+// together, unfiltered by status.
 func (uc *ListUsersUseCase) Execute(ctx context.Context, keyword *string, pagination *usecasex.Pagination) (user.List, *usecasex.PageInfo, error) {
-	return uc.userRepo.FindAllWithPagination(ctx, keyword, pagination)
+	return uc.userRepo.FindAllWithPagination(ctx, keyword, user.StatusAll, pagination)
 }

@@ -87,7 +87,12 @@ func RegisterRESTRouter(e *echo.Echo, cfg RouterConfig) {
 	api.GET("/users/by-name-or-email", uh.FindByNameOrEmail, required)
 	api.GET("/users/by-name-or-alias", uh.FindByNameOrAlias, required)
 	api.GET("/users", uh.List, required) // ?ids= | ?ids=&alias=&page=&page_size=
+	// Cross-tenant listing for service-to-service callers (e.g. LINKS-Veda). Any
+	// authenticated user can call this, same rationale as GET /workspaces/all.
+	api.GET("/users/all", uh.ListAll, required) // ?keyword=&status=active|deleted|all&page=&page_size=
 	api.GET("/users/:id", uh.Get, required)
+	api.POST("/users/:id/deactivate", uh.Deactivate, required) // soft delete (maintainer-only)
+	api.POST("/users/:id/restore", uh.Restore, required)       // undo deactivate (maintainer-only)
 	api.POST("/users/signup", uh.Signup, optional)
 	api.POST("/users/signup-oidc", uh.SignupOIDC, optional)
 	api.POST("/users/sync-sso", uh.SyncSSOUser, optional, syncSSOApikeyOrAuth)
@@ -96,14 +101,26 @@ func RegisterRESTRouter(e *echo.Echo, cfg RouterConfig) {
 	api.POST("/users/password-reset/start", uh.StartPasswordReset)
 	api.POST("/users/password-reset", uh.PasswordReset)
 	api.POST("/users/find-or-create", uh.FindOrCreate, optional, apikeyOrAuth)
+	// PATCH /api/users/by-sub/:sub — JWT required; caller must hold the maintainer
+	// role (Cerbos, falling back to a direct Permittable check). Updates mutable
+	// user fields (name) by Firebase sub.
+	api.PATCH("/users/by-sub/:sub", uh.UpdateUserBySub, required)
+	// PUT /api/users/by-sub/:sub/platform-roles — JWT required; same maintainer-role
+	// gate as above. Replaces platform roles by Firebase sub.
+	api.PUT("/users/by-sub/:sub/platform-roles", uh.SetPlatformRolesBySub, required)
 
 	// --- Workspaces ---
 	wh := handlers.NewWorkspaceHandler()
 	api.POST("/workspaces", wh.Create, required)
 	api.GET("/workspaces", wh.List, required) // ?ids= | ?name= | ?alias= | ?user_id=(&page=&page_size=)
+	// Cross-tenant listing for service-to-service callers (e.g. LINKS-Veda). Any
+	// authenticated user can call this, same as GET /workspaces/:id|name|alias
+	api.GET("/workspaces/all", wh.ListAll, required) // ?keyword=&status=active|deleted|all&page=&page_size=
 	api.GET("/workspaces/:id", wh.Get, required)
 	api.PATCH("/workspaces/:id", wh.Update, required)
 	api.DELETE("/workspaces/:id", wh.Delete, required)
+	api.POST("/workspaces/:id/deactivate", wh.Deactivate, required) // soft delete (owner-only)
+	api.POST("/workspaces/:id/restore", wh.Restore, required)       // undo deactivate (owner-only)
 	api.POST("/workspaces/:id/members", wh.AddMembers, required)
 	api.PATCH("/workspaces/:id/members/:user_id", wh.UpdateMember, required)
 	api.DELETE("/workspaces/:id/members/:user_id", wh.RemoveMember, required)

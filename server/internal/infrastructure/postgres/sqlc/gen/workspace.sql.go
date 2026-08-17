@@ -20,7 +20,7 @@ func (q *Queries) WorkspaceDelete(ctx context.Context, id string) error {
 }
 
 const workspaceFindByAlias = `-- name: WorkspaceFindByAlias :one
-SELECT id, name, alias, email, personal, policy, members_hash, metadata, updated_at FROM workspaces WHERE lower(alias) = lower($1) AND alias <> ''
+SELECT id, name, alias, email, personal, policy, members_hash, metadata, created_at, created_by, updated_at, deleted_at FROM workspaces WHERE lower(alias) = lower($1) AND alias <> ''
 `
 
 func (q *Queries) WorkspaceFindByAlias(ctx context.Context, lower string) (Workspace, error) {
@@ -35,13 +35,16 @@ func (q *Queries) WorkspaceFindByAlias(ctx context.Context, lower string) (Works
 		&i.Policy,
 		&i.MembersHash,
 		&i.Metadata,
+		&i.CreatedAt,
+		&i.CreatedBy,
 		&i.UpdatedAt,
+		&i.DeletedAt,
 	)
 	return i, err
 }
 
 const workspaceFindByAliases = `-- name: WorkspaceFindByAliases :many
-SELECT id, name, alias, email, personal, policy, members_hash, metadata, updated_at FROM workspaces WHERE lower(alias) = ANY($1::text[]) ORDER BY id
+SELECT id, name, alias, email, personal, policy, members_hash, metadata, created_at, created_by, updated_at, deleted_at FROM workspaces WHERE lower(alias) = ANY($1::text[]) ORDER BY id
 `
 
 // Case-insensitive, matching the case-insensitive unique alias index.
@@ -63,7 +66,10 @@ func (q *Queries) WorkspaceFindByAliases(ctx context.Context, dollar_1 []string)
 			&i.Policy,
 			&i.MembersHash,
 			&i.Metadata,
+			&i.CreatedAt,
+			&i.CreatedBy,
 			&i.UpdatedAt,
+			&i.DeletedAt,
 		); err != nil {
 			return nil, err
 		}
@@ -76,7 +82,7 @@ func (q *Queries) WorkspaceFindByAliases(ctx context.Context, dollar_1 []string)
 }
 
 const workspaceFindByID = `-- name: WorkspaceFindByID :one
-SELECT id, name, alias, email, personal, policy, members_hash, metadata, updated_at FROM workspaces WHERE id = $1
+SELECT id, name, alias, email, personal, policy, members_hash, metadata, created_at, created_by, updated_at, deleted_at FROM workspaces WHERE id = $1
 `
 
 func (q *Queries) WorkspaceFindByID(ctx context.Context, id string) (Workspace, error) {
@@ -91,13 +97,16 @@ func (q *Queries) WorkspaceFindByID(ctx context.Context, id string) (Workspace, 
 		&i.Policy,
 		&i.MembersHash,
 		&i.Metadata,
+		&i.CreatedAt,
+		&i.CreatedBy,
 		&i.UpdatedAt,
+		&i.DeletedAt,
 	)
 	return i, err
 }
 
 const workspaceFindByIDs = `-- name: WorkspaceFindByIDs :many
-SELECT id, name, alias, email, personal, policy, members_hash, metadata, updated_at FROM workspaces WHERE id = ANY($1::text[]) ORDER BY id
+SELECT id, name, alias, email, personal, policy, members_hash, metadata, created_at, created_by, updated_at, deleted_at FROM workspaces WHERE id = ANY($1::text[]) ORDER BY id
 `
 
 func (q *Queries) WorkspaceFindByIDs(ctx context.Context, dollar_1 []string) ([]Workspace, error) {
@@ -118,7 +127,10 @@ func (q *Queries) WorkspaceFindByIDs(ctx context.Context, dollar_1 []string) ([]
 			&i.Policy,
 			&i.MembersHash,
 			&i.Metadata,
+			&i.CreatedAt,
+			&i.CreatedBy,
 			&i.UpdatedAt,
+			&i.DeletedAt,
 		); err != nil {
 			return nil, err
 		}
@@ -131,7 +143,7 @@ func (q *Queries) WorkspaceFindByIDs(ctx context.Context, dollar_1 []string) ([]
 }
 
 const workspaceFindByName = `-- name: WorkspaceFindByName :one
-SELECT id, name, alias, email, personal, policy, members_hash, metadata, updated_at FROM workspaces WHERE name = $1
+SELECT id, name, alias, email, personal, policy, members_hash, metadata, created_at, created_by, updated_at, deleted_at FROM workspaces WHERE name = $1
 `
 
 func (q *Queries) WorkspaceFindByName(ctx context.Context, name string) (Workspace, error) {
@@ -146,9 +158,49 @@ func (q *Queries) WorkspaceFindByName(ctx context.Context, name string) (Workspa
 		&i.Policy,
 		&i.MembersHash,
 		&i.Metadata,
+		&i.CreatedAt,
+		&i.CreatedBy,
 		&i.UpdatedAt,
+		&i.DeletedAt,
 	)
 	return i, err
+}
+
+const workspaceIDsAll = `-- name: WorkspaceIDsAll :many
+SELECT id FROM workspaces
+WHERE (NOT $1::boolean OR personal = false)
+  AND ($2::text = '' OR name ILIKE '%' || $2::text || '%' OR alias ILIKE '%' || $2::text || '%')
+  AND ($3::text = 'all' OR ($3::text = 'active' AND deleted_at IS NULL) OR ($3::text = 'deleted' AND deleted_at IS NOT NULL))
+ORDER BY id
+`
+
+type WorkspaceIDsAllParams struct {
+	ExcludePersonal bool
+	Keyword         string
+	Status          string
+}
+
+// Cross-tenant listing (no readable-workspace filter): pass ” for no keyword
+// filter, and one of 'all'/'active'/'deleted' for the status filter.
+// Set exclude_personal=true to omit per-user personal workspaces (used by /api/workspaces/all).
+func (q *Queries) WorkspaceIDsAll(ctx context.Context, arg WorkspaceIDsAllParams) ([]string, error) {
+	rows, err := q.db.Query(ctx, workspaceIDsAll, arg.ExcludePersonal, arg.Keyword, arg.Status)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []string
+	for rows.Next() {
+		var id string
+		if err := rows.Scan(&id); err != nil {
+			return nil, err
+		}
+		items = append(items, id)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
 }
 
 const workspaceIDsByIntegration = `-- name: WorkspaceIDsByIntegration :many
@@ -348,11 +400,12 @@ func (q *Queries) WorkspaceMembersDeleteByWorkspace(ctx context.Context, workspa
 }
 
 const workspaceUpsert = `-- name: WorkspaceUpsert :exec
-INSERT INTO workspaces (id, name, alias, email, personal, policy, members_hash, metadata, updated_at)
-VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9)
+INSERT INTO workspaces (id, name, alias, email, personal, policy, members_hash, metadata, created_at, created_by, updated_at, deleted_at)
+VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12)
 ON CONFLICT (id) DO UPDATE SET
   name=EXCLUDED.name, alias=EXCLUDED.alias, email=EXCLUDED.email, personal=EXCLUDED.personal,
-  policy=EXCLUDED.policy, members_hash=EXCLUDED.members_hash, metadata=EXCLUDED.metadata, updated_at=EXCLUDED.updated_at
+  policy=EXCLUDED.policy, members_hash=EXCLUDED.members_hash, metadata=EXCLUDED.metadata, created_by=EXCLUDED.created_by,
+  updated_at=EXCLUDED.updated_at, deleted_at=EXCLUDED.deleted_at
 `
 
 type WorkspaceUpsertParams struct {
@@ -364,7 +417,10 @@ type WorkspaceUpsertParams struct {
 	Policy      *string
 	MembersHash string
 	Metadata    []byte
+	CreatedAt   *time.Time
+	CreatedBy   *string
 	UpdatedAt   time.Time
+	DeletedAt   *time.Time
 }
 
 func (q *Queries) WorkspaceUpsert(ctx context.Context, arg WorkspaceUpsertParams) error {
@@ -377,7 +433,10 @@ func (q *Queries) WorkspaceUpsert(ctx context.Context, arg WorkspaceUpsertParams
 		arg.Policy,
 		arg.MembersHash,
 		arg.Metadata,
+		arg.CreatedAt,
+		arg.CreatedBy,
 		arg.UpdatedAt,
+		arg.DeletedAt,
 	)
 	return err
 }

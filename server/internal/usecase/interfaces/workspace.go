@@ -29,6 +29,19 @@ type FetchByUserWithPaginationResult struct {
 	TotalCount int
 }
 
+type FindAllWorkspacesParam struct {
+	Keyword         *string
+	Status          workspace.StatusFilter
+	Page            int64
+	Size            int64
+	ExcludePersonal bool
+}
+
+type FindAllWorkspacesResult struct {
+	Workspaces workspace.List
+	TotalCount int
+}
+
 type UpdateWorkspaceParam struct {
 	ID          workspace.ID
 	Name        *string
@@ -44,8 +57,15 @@ type Workspace interface {
 	FetchByName(context.Context, string) (*workspace.Workspace, error)
 	FetchByAlias(context.Context, string) (*workspace.Workspace, error)
 	FetchByUserWithPagination(context.Context, user.ID, FetchByUserWithPaginationParam) (FetchByUserWithPaginationResult, error)
+	// FindAll lists workspaces across all tenants, unfiltered by any operator's
+	// readable-workspace set. Restricted to the maintainer role (see
+	// checkMaintainerPermission) since it exposes every workspace across every tenant.
+	FindAll(context.Context, FindAllWorkspacesParam, *workspace.Operator) (FindAllWorkspacesResult, error)
 	FindByUser(context.Context, user.ID, *workspace.Operator) (workspace.List, error)
-	Create(ctx context.Context, alias, name, description string, firstUser workspace.UserID, operator *workspace.Operator) (_ *workspace.Workspace, err error)
+	// Create creates a workspace. Unless skipOwnerMembership is true, firstUser is
+	// automatically joined as RoleOwner (the normal end-user create flow); set it
+	// to true for callers that manage membership themselves (e.g. LINKS-Veda).
+	Create(ctx context.Context, alias, name, description string, firstUser workspace.UserID, skipOwnerMembership bool, operator *workspace.Operator) (_ *workspace.Workspace, err error)
 	Update(context.Context, UpdateWorkspaceParam, *workspace.Operator) (*workspace.Workspace, error)
 	AddUserMember(context.Context, workspace.ID, map[user.ID]role.RoleType, *workspace.Operator) (*workspace.Workspace, error)
 	AddIntegrationMember(context.Context, workspace.ID, workspace.IntegrationID, role.RoleType, *workspace.Operator) (*workspace.Workspace, error)
@@ -56,5 +76,9 @@ type Workspace interface {
 	RemoveIntegration(context.Context, workspace.ID, workspace.IntegrationID, *workspace.Operator) (*workspace.Workspace, error)
 	RemoveIntegrations(context.Context, workspace.ID, workspace.IntegrationIDList, *workspace.Operator) (*workspace.Workspace, error)
 	Remove(context.Context, workspace.ID, *workspace.Operator) error
+	// Deactivate soft-deletes a workspace (sets deleted_at); Restore reverses it.
+	// Owner-only, unlike the maintainer-or-owner Update/Remove.
+	Deactivate(ctx context.Context, id workspace.ID, operator *workspace.Operator) (*workspace.Workspace, error)
+	Restore(ctx context.Context, id workspace.ID, operator *workspace.Operator) (*workspace.Workspace, error)
 	TransferOwnership(ctx context.Context, workspaceID workspace.ID, newOwnerID workspace.UserID, operator *workspace.Operator) (*workspace.Workspace, error)
 }

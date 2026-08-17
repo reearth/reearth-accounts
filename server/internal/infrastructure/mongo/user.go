@@ -236,17 +236,34 @@ func filterUsers(ids []user.ID, rows []*user.User) []*user.User {
 	return res
 }
 
-func (r *User) FindAllWithPagination(ctx context.Context, keyword *string, pagination *usecasex.Pagination) (user.List, *usecasex.PageInfo, error) {
+func (r *User) FindAllWithPagination(ctx context.Context, keyword *string, status user.StatusFilter, pagination *usecasex.Pagination) (user.List, *usecasex.PageInfo, error) {
 	if pagination != nil && pagination.Cursor != nil {
 		return nil, nil, user.ErrCursorPaginationUnsupported
 	}
-	filter := bson.M{}
+
+	var conds []bson.M
 	if keyword != nil && strings.TrimSpace(*keyword) != "" {
 		re := primitive.Regex{Pattern: regexp.QuoteMeta(strings.TrimSpace(*keyword)), Options: "i"}
-		filter["$or"] = []bson.M{
+		conds = append(conds, bson.M{"$or": []bson.M{
 			{"name": bson.M{"$regex": re}},
 			{"alias": bson.M{"$regex": re}},
 			{"email": bson.M{"$regex": re}},
+		}})
+	}
+	switch status {
+	case user.StatusActive:
+		conds = append(conds, bson.M{"deletedat": bson.M{"$exists": false}})
+	case user.StatusDeleted:
+		conds = append(conds, bson.M{"deletedat": bson.M{"$exists": true}})
+	}
+
+	filter := bson.M{}
+	switch len(conds) {
+	case 1:
+		filter = conds[0]
+	default:
+		if len(conds) > 1 {
+			filter = bson.M{"$and": conds}
 		}
 	}
 	return r.paginate(ctx, filter, pagination)

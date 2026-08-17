@@ -63,6 +63,8 @@ type User struct {
 	Lang           *string
 	Theme          *string
 	UpdatedAt      time.Time
+	DeletedAt      *time.Time
+	CreatedAt      *time.Time
 }
 
 type Workspace struct {
@@ -74,7 +76,10 @@ type Workspace struct {
 	Policy      *string
 	MembersHash string
 	Metadata    []byte
+	CreatedAt   *time.Time
+	CreatedBy   *string
 	UpdatedAt   time.Time
+	DeletedAt   *time.Time
 }
 
 type WorkspaceIntegration struct {

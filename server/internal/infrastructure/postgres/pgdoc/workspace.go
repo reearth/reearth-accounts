@@ -44,7 +44,10 @@ type WorkspaceRow struct {
 	Policy      *string
 	MembersHash string
 	Metadata    []byte // jsonb
+	CreatedAt   *time.Time
+	CreatedBy   *string
 	UpdatedAt   time.Time
+	DeletedAt   *time.Time
 }
 
 // NewWorkspaceRows uses mongodoc.ComputeWorkspaceMembersHash so the composite
@@ -94,9 +97,16 @@ func NewWorkspaceRows(ws *workspace.Workspace) (*WorkspaceRow, []WorkspaceMember
 		updatedAt = time.Now()
 	}
 
+	var createdBy *string
+	if cb := ws.CreatedBy(); cb != nil {
+		s := cb.String()
+		createdBy = &s
+	}
+
 	return &WorkspaceRow{
 		ID: wid, Name: ws.Name(), Alias: ws.Alias(), Email: ws.Email(),
-		Personal: ws.IsPersonal(), Policy: policy, MembersHash: membersHash, Metadata: meta, UpdatedAt: updatedAt,
+		Personal: ws.IsPersonal(), Policy: policy, MembersHash: membersHash, Metadata: meta,
+		CreatedAt: ws.CreatedAt(), CreatedBy: createdBy, UpdatedAt: updatedAt, DeletedAt: ws.DeletedAt(),
 	}, memberRows, integRows
 }
 
@@ -138,6 +148,14 @@ func WorkspaceModel(r *WorkspaceRow, members []WorkspaceMemberRow, integrations 
 		policy = workspace.PolicyID(*r.Policy).Ref()
 	}
 
+	var createdBy *workspace.UserID
+	if r.CreatedBy != nil && *r.CreatedBy != "" {
+		uid, err := id.UserIDFrom(*r.CreatedBy)
+		if err == nil {
+			createdBy = &uid
+		}
+	}
+
 	var mj WorkspaceMetadataJSON
 	if len(r.Metadata) > 0 {
 		if err := json.Unmarshal(r.Metadata, &mj); err != nil {
@@ -149,5 +167,6 @@ func WorkspaceModel(r *WorkspaceRow, members []WorkspaceMemberRow, integrations 
 	return workspace.New().
 		ID(tid).Name(r.Name).Alias(r.Alias).Email(r.Email).
 		Metadata(metadata).Members(mems).Integrations(integs).
-		Personal(r.Personal).Policy(policy).UpdatedAt(r.UpdatedAt).Build()
+		Personal(r.Personal).Policy(policy).
+		CreatedAt(r.CreatedAt).CreatedBy(createdBy).UpdatedAt(r.UpdatedAt).DeletedAt(r.DeletedAt).Build()
 }

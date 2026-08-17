@@ -29,7 +29,7 @@ func TestUser_SignupOIDC_CIP(t *testing.T) {
 	assert.NoError(t, r.Role.Save(ctx, *ownerRole))
 
 	g := &gateway.Container{Mailer: mailer.NewMock()}
-	uc := NewUser(r, g, "", "")
+	uc := NewUser(r, g, nil, "", "")
 
 	param := interfaces.SignupOIDCParam{
 		Issuer: "https://securetoken.google.com/my-proj",

@@ -8,13 +8,18 @@ import (
 	htmlTmpl "html/template"
 	"time"
 
+	"github.com/reearth/reearth-accounts/server/internal/rbac"
 	"github.com/reearth/reearth-accounts/server/internal/usecase/gateway"
 	"github.com/reearth/reearth-accounts/server/internal/usecase/interfaces"
 	"github.com/reearth/reearth-accounts/server/internal/usecase/repo"
+	"github.com/reearth/reearth-accounts/server/pkg/id"
 	"github.com/reearth/reearth-accounts/server/pkg/pagination"
+	"github.com/reearth/reearth-accounts/server/pkg/permittable"
+	"github.com/reearth/reearth-accounts/server/pkg/role"
 	"github.com/reearth/reearth-accounts/server/pkg/user"
 	"github.com/reearth/reearth-accounts/server/pkg/workspace"
 	"github.com/reearth/reearthx/i18n"
+	"github.com/reearth/reearthx/log"
 	"github.com/reearth/reearthx/mailer"
 	"github.com/reearth/reearthx/rerror"
 )
@@ -22,6 +27,7 @@ import (
 type User struct {
 	repos           *repo.Container
 	gateways        *gateway.Container
+	cerbos          interfaces.Cerbos
 	signupSecret    string
 	authSrvUIDomain string
 	allowedISS      []string
@@ -36,7 +42,7 @@ var (
 	}
 )
 
-func NewUser(r *repo.Container, g *gateway.Container, signupSecret, authSrcUIDomain string, allowedISS ...string) interfaces.User {
+func NewUser(r *repo.Container, g *gateway.Container, cerbos interfaces.Cerbos, signupSecret, authSrcUIDomain string, allowedISS ...string) interfaces.User {
 	var repos []user.Repo
 	if r != nil {
 		repos = []user.Repo{r.User}
@@ -44,6 +50,7 @@ func NewUser(r *repo.Container, g *gateway.Container, signupSecret, authSrcUIDom
 	return &User{
 		repos:           r,
 		gateways:        g,
+		cerbos:          cerbos,
 		signupSecret:    signupSecret,
 		authSrvUIDomain: authSrcUIDomain,
 		allowedISS:      allowedISS,
@@ -53,10 +60,11 @@ func NewUser(r *repo.Container, g *gateway.Container, signupSecret, authSrcUIDom
 	}
 }
 
-func NewMultiUser(r *repo.Container, g *gateway.Container, signupSecret, authSrcUIDomain string, users []user.Repo, allowedISS ...string) interfaces.User {
+func NewMultiUser(r *repo.Container, g *gateway.Container, cerbos interfaces.Cerbos, signupSecret, authSrcUIDomain string, users []user.Repo, allowedISS ...string) interfaces.User {
 	return &User{
 		repos:           r,
 		gateways:        g,
+		cerbos:          cerbos,
 		signupSecret:    signupSecret,
 		authSrvUIDomain: authSrcUIDomain,
 		allowedISS:      allowedISS,
@@ -72,6 +80,18 @@ func (i *User) FetchByID(ctx context.Context, ids user.IDList) (user.List, error
 
 func (i *User) FetchByIDsWithPagination(ctx context.Context, ids user.IDList, alias *string, pagination interfaces.FetchByIDsWithPaginationParam) (interfaces.FetchByIDsWithPaginationResult, error) {
 	return i.query.FetchByIDsWithPagination(ctx, ids, alias, pagination)
+}
+
+// FindAll lists users across all tenants. Restricted to the owner
+// role (see checkOwnerPermission) since it exposes every user across every tenant.
+func (i *User) FindAll(ctx context.Context, param interfaces.FindAllUsersParam) (interfaces.FindAllUsersResult, error) {
+	if param.Operator == nil || param.Operator.User == nil {
+		return interfaces.FindAllUsersResult{}, interfaces.ErrInvalidOperator
+	}
+	if err := i.checkMaintainerPermission(ctx, param.Operator, rbac.ActionList); err != nil {
+		return interfaces.FindAllUsersResult{}, err
+	}
+	return i.query.FindAll(ctx, param)
 }
 
 func (i *User) FetchBySub(ctx context.Context, sub string) (*user.User, error) {
@@ -234,9 +254,14 @@ func (i *User) UpdateMe(ctx context.Context, p interfaces.UpdateMeParam, operato
 		}
 
 		// Sync external IdP users to their provider, routed per auth record so
-		// Auth0 subs go to Auth0 and CIP subs go to Firebase when both coexist.
+		// Auth0 subs go to Auth0. CIP (Cloud Identity Platform, used by Veda) is
+		// deliberately skipped: the accounts DB record is the source of truth for
+		// display name there, and Veda manages its own IdP state independently.
 		if p.Name != nil || p.Email != nil || p.Password != nil {
 			for _, a := range u.Auths() {
+				if gateway.Provider(a.Provider) == gateway.ProviderCIP || a.Provider == "" {
+					continue
+				}
 				authenticator := i.gateways.AuthenticatorFor(a.Provider)
 				if authenticator == nil {
 					continue
@@ -457,6 +482,105 @@ func (i *User) DeleteMe(ctx context.Context, userID user.ID, operator *workspace
 
 }
 
+// Deactivate soft-deletes a user (sets deleted_at). Same permission model as
+// workspace's Deactivate: Cerbos, falling back to a maintainer-role check.
+func (i *User) Deactivate(ctx context.Context, id user.ID, operator *workspace.Operator) (*user.User, error) {
+	if operator.User == nil {
+		return nil, interfaces.ErrInvalidOperator
+	}
+
+	return Run1(ctx, operator, i.repos, Usecase().Transaction(), func(ctx context.Context) (*user.User, error) {
+		u, err := i.repos.User.FindByID(ctx, id)
+		if err != nil {
+			return nil, err
+		}
+
+		if err := i.checkMaintainerPermission(ctx, operator, rbac.ActionEdit); err != nil {
+			return nil, err
+		}
+
+		u.Deactivate()
+
+		if err := i.repos.User.Save(ctx, u); err != nil {
+			return nil, err
+		}
+
+		return u, nil
+	})
+}
+
+// Restore reverses Deactivate (clears deleted_at). Same permission model as
+// Deactivate.
+func (i *User) Restore(ctx context.Context, id user.ID, operator *workspace.Operator) (*user.User, error) {
+	if operator.User == nil {
+		return nil, interfaces.ErrInvalidOperator
+	}
+
+	return Run1(ctx, operator, i.repos, Usecase().Transaction(), func(ctx context.Context) (*user.User, error) {
+		u, err := i.repos.User.FindByID(ctx, id)
+		if err != nil {
+			return nil, err
+		}
+
+		if err := i.checkMaintainerPermission(ctx, operator, rbac.ActionEdit); err != nil {
+			return nil, err
+		}
+
+		u.Reactivate()
+
+		if err := i.repos.User.Save(ctx, u); err != nil {
+			return nil, err
+		}
+
+		return u, nil
+	})
+}
+
+// checkMaintainerPermission gates admin-only user actions (Deactivate/Restore,
+// FindAll, by-sub mutations) to principals holding the elevated "maintainer" or
+// "owner" global role, either via Cerbos or, when Cerbos isn't configured (e.g.
+// local/mock-auth dev), by re-checking the operator's own Permittable directly.
+// "owner" here is a global Permittable role (LINKS-Veda's admin account), not a
+// per-workspace role. Mirrors Permittable.checkManageRolesPermission.
+func (i *User) checkMaintainerPermission(ctx context.Context, operator *workspace.Operator, action string) error {
+	if i.cerbos != nil {
+		result, err := i.cerbos.CheckPermission(ctx, *operator.User, interfaces.CheckPermissionParam{
+			Service:  rbac.ServiceName,
+			Resource: rbac.ResourceUser,
+			Action:   action,
+		})
+		if err != nil {
+			return err
+		}
+		if result != nil {
+			if !result.Allowed {
+				return interfaces.ErrPermissionDenied
+			}
+			return nil
+		}
+	}
+
+	p, err := i.repos.Permittable.FindByUserID(ctx, *operator.User)
+	if err != nil && !errors.Is(err, rerror.ErrNotFound) {
+		return err
+	}
+	if p == nil {
+		return interfaces.ErrPermissionDenied
+	}
+
+	roles, err := i.repos.Role.FindByIDs(ctx, p.RoleIDs())
+	if err != nil {
+		return err
+	}
+	for _, r := range roles {
+		if r.Name() == role.RoleMaintainer.String() || r.Name() == role.RoleOwner.String() {
+			return nil
+		}
+	}
+
+	return interfaces.ErrPermissionDenied
+}
+
 func (i *User) VerifyUser(ctx context.Context, code string) (*user.User, error) {
 	return Run1(ctx, nil, i.repos, Usecase().Transaction(), func(ctx context.Context) (*user.User, error) {
 
@@ -599,6 +723,22 @@ func (q *UserQuery) FetchByIDsWithPagination(ctx context.Context, ids user.IDLis
 	}, nil
 }
 
+func (q *UserQuery) FindAll(ctx context.Context, param interfaces.FindAllUsersParam) (interfaces.FindAllUsersResult, error) {
+	status := param.Status
+	if status == "" {
+		status = user.StatusActive
+	}
+	users, pageInfo, err := q.repos[0].FindAllWithPagination(ctx, param.Keyword, status, pagination.ToPagination(param.Page, param.Size))
+	if err != nil {
+		return interfaces.FindAllUsersResult{}, err
+	}
+
+	return interfaces.FindAllUsersResult{
+		Users:      user.List(users),
+		TotalCount: int(pageInfo.TotalCount),
+	}, nil
+}
+
 func (q *UserQuery) FetchBySub(ctx context.Context, sub string) (*user.User, error) {
 	for _, r := range q.repos {
 		u, err := r.FindBySub(ctx, sub)
@@ -670,4 +810,90 @@ func (q *UserQuery) FetchByNameOrAlias(ctx context.Context, nameOrAlias string) 
 	}
 
 	return nil, rerror.ErrNotFound
+}
+
+// UpdateUserBySub updates a user's mutable fields (currently name) looked up by Firebase sub.
+// The caller must hold the maintainer role (see checkMaintainerPermission).
+// The personal workspace is renamed in sync when its name still matches the old user name.
+func (i *User) UpdateUserBySub(ctx context.Context, sub string, name *string, operator *workspace.Operator) error {
+	if operator == nil || operator.User == nil {
+		return interfaces.ErrInvalidOperator
+	}
+	if err := i.checkMaintainerPermission(ctx, operator, rbac.ActionEdit); err != nil {
+		return err
+	}
+	if name == nil {
+		return nil
+	}
+
+	u, err := i.repos.User.FindBySub(ctx, sub)
+	if err != nil {
+		return err
+	}
+
+	oldName := u.Name()
+	u.UpdateName(*name)
+
+	if err := i.repos.User.Save(ctx, u); err != nil {
+		return err
+	}
+
+	// Keep the personal workspace name in sync when it still matched the old user name.
+	ws, err := i.repos.Workspace.FindByID(ctx, u.Workspace())
+	if err != nil && !errors.Is(err, rerror.ErrNotFound) {
+		return err
+	}
+	if ws != nil && ws.IsPersonal() {
+		tn := ws.Name()
+		if tn == "" || tn == oldName {
+			ws.Rename(*name)
+			if err := i.repos.Workspace.Save(ctx, ws); err != nil {
+				log.Warnfc(ctx, "UpdateUserBySub: workspace rename failed (non-fatal): %v", err)
+			}
+		}
+	}
+
+	return nil
+}
+
+// SetPlatformRolesBySub replaces a user's global platform roles, looked up by Firebase sub.
+// The caller must hold the maintainer role (see checkMaintainerPermission). An empty
+// roleNames slice clears all platform roles.
+func (i *User) SetPlatformRolesBySub(ctx context.Context, sub string, roleNames []string, operator *workspace.Operator) error {
+	if operator == nil || operator.User == nil {
+		return interfaces.ErrInvalidOperator
+	}
+	if err := i.checkMaintainerPermission(ctx, operator, rbac.ActionEdit); err != nil {
+		return err
+	}
+
+	u, err := i.repos.User.FindBySub(ctx, sub)
+	if err != nil {
+		return err
+	}
+
+	// Resolve role names → IDs
+	rids := make(id.RoleIDList, 0, len(roleNames))
+	for _, name := range roleNames {
+		r, err := i.repos.Role.FindByName(ctx, name)
+		if err != nil {
+			return err
+		}
+		rids = append(rids, r.ID())
+	}
+
+	// Find or create the permittable record for this user
+	p, err := i.repos.Permittable.FindByUserID(ctx, u.ID())
+	if err != nil && !errors.Is(err, rerror.ErrNotFound) {
+		return err
+	}
+	if p == nil {
+		p, err = permittable.New().NewID().UserID(u.ID()).Build()
+		if err != nil {
+			return err
+		}
+	}
+
+	p.EditRoleIDs(rids)
+	return i.repos.Permittable.Save(ctx, *p)
 }

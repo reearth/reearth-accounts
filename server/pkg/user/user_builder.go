@@ -137,6 +137,20 @@ func (b *Builder) Metadata(m Metadata) *Builder {
 	return b
 }
 
+func (b *Builder) DeletedAt(t *time.Time) *Builder {
+	b.u.deletedAt = t
+	return b
+}
+
+// CreatedAt sets the creation timestamp explicitly. Unlike UpdatedAt, there is
+// no auto-default fallback in Build(): nil means "unknown" (e.g. historical
+// users predating this field) and must never be silently replaced with
+// time.Now(). New-user creation flows must call this explicitly.
+func (b *Builder) CreatedAt(t *time.Time) *Builder {
+	b.u.createdAt = t
+	return b
+}
+
 func (b *Builder) UpdatedAt(updatedAt time.Time) *Builder {
 	b.u.updatedAt = updatedAt
 	return b

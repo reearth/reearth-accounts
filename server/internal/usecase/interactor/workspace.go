@@ -7,6 +7,7 @@ import (
 	"os"
 	"slices"
 	"strings"
+	"time"
 
 	"github.com/reearth/reearth-accounts/server/internal/rbac"
 	"github.com/reearth/reearth-accounts/server/internal/usecase/interfaces"
@@ -86,7 +87,33 @@ func (i *Workspace) FetchByUserWithPagination(ctx context.Context, userID worksp
 	}, nil
 }
 
-func (i *Workspace) Create(ctx context.Context, alias, name, description string, firstUser workspace.UserID, operator *workspace.Operator) (_ *workspace.Workspace, err error) {
+// FindAll lists workspaces across all tenants, unfiltered by any operator's
+// readable-workspace set. Restricted to the owner role (see
+// checkMaintainerPermission) since it exposes every workspace across every tenant.
+func (i *Workspace) FindAll(ctx context.Context, input interfaces.FindAllWorkspacesParam, operator *workspace.Operator) (interfaces.FindAllWorkspacesResult, error) {
+	if operator == nil || operator.User == nil {
+		return interfaces.FindAllWorkspacesResult{}, interfaces.ErrInvalidOperator
+	}
+	if err := i.checkMaintainerPermission(ctx, operator, rbac.ActionList); err != nil {
+		return interfaces.FindAllWorkspacesResult{}, err
+	}
+
+	status := input.Status
+	if status == "" {
+		status = workspace.StatusActive
+	}
+	workspaces, pageInfo, err := i.repos.Workspace.FindAll(ctx, input.Keyword, nil, status, pagination.ToPagination(input.Page, input.Size), input.ExcludePersonal)
+	if err != nil {
+		return interfaces.FindAllWorkspacesResult{}, err
+	}
+
+	return interfaces.FindAllWorkspacesResult{
+		Workspaces: workspaces,
+		TotalCount: int(pageInfo.TotalCount),
+	}, nil
+}
+
+func (i *Workspace) Create(ctx context.Context, alias, name, description string, firstUser workspace.UserID, skipOwnerMembership bool, operator *workspace.Operator) (_ *workspace.Workspace, err error) {
 	if operator.User == nil {
 		return nil, interfaces.ErrInvalidOperator
 	}
@@ -118,13 +145,17 @@ func (i *Workspace) Create(ctx context.Context, alias, name, description string,
 			Alias(aliasVal).
 			Name(name).
 			Metadata(metadata).
+			CreatedAt(lo.ToPtr(time.Now())).
+			CreatedBy(operator.User).
 			Build()
 		if wErr != nil {
 			return nil, wErr
 		}
 
-		if err = ws.Members().Join(firstUsers[0], role.RoleOwner, *operator.User); err != nil {
-			return nil, err
+		if !skipOwnerMembership {
+			if err = ws.Members().Join(firstUsers[0], role.RoleOwner, *operator.User); err != nil {
+				return nil, err
+			}
 		}
 
 		if err = i.repos.Workspace.Create(ctx, ws); err != nil {
@@ -134,11 +165,12 @@ func (i *Workspace) Create(ctx context.Context, alias, name, description string,
 			return nil, err
 		}
 
-		if err := i.updatePermittable(ctx, firstUsers[0].ID(), ws.ID(), role.RoleOwner); err != nil {
-			return nil, err
+		if !skipOwnerMembership {
+			if err := i.updatePermittable(ctx, firstUsers[0].ID(), ws.ID(), role.RoleOwner); err != nil {
+				return nil, err
+			}
+			operator.AddNewWorkspace(ws.ID())
 		}
-
-		operator.AddNewWorkspace(ws.ID())
 		i.applyDefaultPolicy(ws, operator)
 		return ws, nil
 	})
@@ -271,7 +303,7 @@ func (i *Workspace) AddUserMember(ctx context.Context, workspaceID workspace.ID,
 		return nil, applog.ErrorWithCallerLogging(ctx, "failed to fetch user", err)
 	}
 
-	return Run1(ctx, operator, i.repos, Usecase().Transaction().WithWritableWorkspaces(workspaceID), func(ctx context.Context) (*workspace.Workspace, error) {
+	return Run1(ctx, operator, i.repos, Usecase().Transaction(), func(ctx context.Context) (*workspace.Workspace, error) {
 		ws, err := i.repos.Workspace.FindByID(ctx, workspaceID)
 		if err != nil {
 			return nil, applog.ErrorWithCallerLogging(ctx, "failed to fetch workspace", err)
@@ -279,6 +311,12 @@ func (i *Workspace) AddUserMember(ctx context.Context, workspaceID workspace.ID,
 
 		if ws.IsPersonal() {
 			return nil, workspace.ErrCannotModifyPersonalWorkspace
+		}
+
+		if !operator.IsWritableWorkspace(workspaceID) {
+			if err := i.checkOwnerLikePermission(ctx, ws, operator, rbac.ActionAddMember); err != nil {
+				return nil, err
+			}
 		}
 
 		if i.enforceMemberCount != nil {
@@ -354,7 +392,7 @@ func (i *Workspace) RemoveMultipleUserMembers(ctx context.Context, id workspace.
 		return nil, workspace.ErrNoSpecifiedUsers
 	}
 
-	return Run1(ctx, operator, i.repos, Usecase().Transaction().WithWritableWorkspaces(id), func(ctx context.Context) (*workspace.Workspace, error) {
+	return Run1(ctx, operator, i.repos, Usecase().Transaction(), func(ctx context.Context) (*workspace.Workspace, error) {
 		ws, err := i.repos.Workspace.FindByID(ctx, id)
 		if err != nil {
 			return nil, err
@@ -362,6 +400,12 @@ func (i *Workspace) RemoveMultipleUserMembers(ctx context.Context, id workspace.
 
 		if ws.IsPersonal() {
 			return nil, workspace.ErrCannotModifyPersonalWorkspace
+		}
+
+		if !operator.IsWritableWorkspace(id) {
+			if err := i.checkOwnerLikePermission(ctx, ws, operator, rbac.ActionDeleteMember); err != nil {
+				return nil, err
+			}
 		}
 
 		for _, uId := range userIds {
@@ -448,7 +492,7 @@ func (i *Workspace) UpdateUserMember(ctx context.Context, id workspace.ID, u wor
 		return nil, interfaces.ErrInvalidOperator
 	}
 
-	return Run1(ctx, operator, i.repos, Usecase().Transaction().WithWritableWorkspaces(id), func(ctx context.Context) (*workspace.Workspace, error) {
+	return Run1(ctx, operator, i.repos, Usecase().Transaction(), func(ctx context.Context) (*workspace.Workspace, error) {
 		ws, err := i.repos.Workspace.FindByID(ctx, id)
 		if err != nil {
 			return nil, err
@@ -456,6 +500,12 @@ func (i *Workspace) UpdateUserMember(ctx context.Context, id workspace.ID, u wor
 
 		if ws.IsPersonal() {
 			return nil, workspace.ErrCannotModifyPersonalWorkspace
+		}
+
+		if !operator.IsWritableWorkspace(id) {
+			if err := i.checkOwnerLikePermission(ctx, ws, operator, rbac.ActionEditMember); err != nil {
+				return nil, err
+			}
 		}
 
 		if u == *operator.User {
@@ -542,6 +592,71 @@ func (i *Workspace) Remove(ctx context.Context, id workspace.ID, operator *works
 		}
 
 		return nil
+	})
+}
+
+// Deactivate soft-deletes a workspace (sets deleted_at) instead of removing it
+// outright — members and data are left intact so it can later be Restored.
+// Owner-only (see rbac.ActionDeactivate); the same Cerbos-or-ownership check as
+// Remove, so a trusted global-owner account (e.g. LINKS-Veda) can deactivate
+// workspaces it manages without being a member.
+func (i *Workspace) Deactivate(ctx context.Context, id workspace.ID, operator *workspace.Operator) (*workspace.Workspace, error) {
+	if operator.User == nil {
+		return nil, interfaces.ErrInvalidOperator
+	}
+
+	return Run1(ctx, operator, i.repos, Usecase().Transaction(), func(ctx context.Context) (*workspace.Workspace, error) {
+		ws, err := i.repos.Workspace.FindByID(ctx, id)
+		if err != nil {
+			return nil, err
+		}
+
+		if ws.IsPersonal() {
+			return nil, workspace.ErrCannotModifyPersonalWorkspace
+		}
+
+		if err := i.checkOwnerLikePermission(ctx, ws, operator, rbac.ActionEdit); err != nil {
+			return nil, err
+		}
+
+		ws.Delete()
+
+		if err := i.repos.Workspace.Save(ctx, ws); err != nil {
+			return nil, err
+		}
+
+		return ws, nil
+	})
+}
+
+// Restore reverses Deactivate (clears deleted_at). Same permission model as
+// Deactivate.
+func (i *Workspace) Restore(ctx context.Context, id workspace.ID, operator *workspace.Operator) (*workspace.Workspace, error) {
+	if operator.User == nil {
+		return nil, interfaces.ErrInvalidOperator
+	}
+
+	return Run1(ctx, operator, i.repos, Usecase().Transaction(), func(ctx context.Context) (*workspace.Workspace, error) {
+		ws, err := i.repos.Workspace.FindByID(ctx, id)
+		if err != nil {
+			return nil, err
+		}
+
+		if ws.IsPersonal() {
+			return nil, workspace.ErrCannotModifyPersonalWorkspace
+		}
+
+		if err := i.checkOwnerLikePermission(ctx, ws, operator, rbac.ActionEdit); err != nil {
+			return nil, err
+		}
+
+		ws.Restore()
+
+		if err := i.repos.Workspace.Save(ctx, ws); err != nil {
+			return nil, err
+		}
+
+		return ws, nil
 	})
 }
 
@@ -764,4 +879,80 @@ func (i *Workspace) bulkUpdatePermittable(ctx context.Context, workspaceID works
 	}
 
 	return i.permittableRepo.SaveMany(ctx, toSave)
+}
+
+// checkOwnerLikePermission checks the given action via Cerbos (workspace-scoped
+// or global role — the latter lets a trusted account such as LINKS-Veda's manage
+// workspaces it created without members) or falls back to the operator's real
+// ownership when Cerbos isn't configured.
+func (i *Workspace) checkOwnerLikePermission(ctx context.Context, ws *workspace.Workspace, operator *workspace.Operator, action string) error {
+	if i.cerbos != nil {
+		result, cErr := i.cerbos.CheckPermission(ctx, *operator.User, interfaces.CheckPermissionParam{
+			Service:        rbac.ServiceName,
+			Resource:       rbac.ResourceWorkspace,
+			Action:         action,
+			WorkspaceAlias: ws.Alias(),
+		})
+		if cErr != nil {
+			return applog.ErrorWithCallerLogging(ctx, "failed to check permission", cErr)
+		}
+		if result != nil {
+			if !result.Allowed {
+				return interfaces.ErrPermissionDenied
+			}
+			return nil
+		}
+	}
+
+	if !operator.IsOwningWorkspace(ws.ID()) {
+		return interfaces.ErrOperationDenied
+	}
+	return nil
+}
+
+// checkMaintainerPermission gates admin-only, cross-tenant workspace actions
+// (currently FindAll) to principals holding the elevated "maintainer" or "owner"
+// global role, either via Cerbos or, when Cerbos isn't configured (e.g.
+// local/mock-auth dev), by re-checking the operator's own Permittable directly.
+// "owner" here is a global Permittable role (LINKS-Veda's admin account), not a
+// per-workspace role. Unlike checkOwnerLikePermission, this is not scoped to a
+// single workspace, so there is no per-workspace ownership fallback. Mirrors
+// User.checkMaintainerPermission.
+func (i *Workspace) checkMaintainerPermission(ctx context.Context, operator *workspace.Operator, action string) error {
+	if i.cerbos != nil {
+		result, err := i.cerbos.CheckPermission(ctx, *operator.User, interfaces.CheckPermissionParam{
+			Service:  rbac.ServiceName,
+			Resource: rbac.ResourceWorkspace,
+			Action:   action,
+		})
+		if err != nil {
+			return err
+		}
+		if result != nil {
+			if !result.Allowed {
+				return interfaces.ErrPermissionDenied
+			}
+			return nil
+		}
+	}
+
+	p, err := i.permittableRepo.FindByUserID(ctx, *operator.User)
+	if err != nil && !errors.Is(err, rerror.ErrNotFound) {
+		return err
+	}
+	if p == nil {
+		return interfaces.ErrPermissionDenied
+	}
+
+	roles, err := i.roleRepo.FindByIDs(ctx, p.RoleIDs())
+	if err != nil {
+		return err
+	}
+	for _, r := range roles {
+		if r.Name() == role.RoleMaintainer.String() || r.Name() == role.RoleOwner.String() {
+			return nil
+		}
+	}
+
+	return interfaces.ErrPermissionDenied
 }

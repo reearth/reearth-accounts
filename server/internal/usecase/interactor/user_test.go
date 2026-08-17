@@ -11,6 +11,7 @@ import (
 	"github.com/reearth/reearth-accounts/server/internal/usecase/interfaces"
 	"github.com/reearth/reearth-accounts/server/internal/usecase/repo"
 	"github.com/reearth/reearth-accounts/server/pkg/id"
+	"github.com/reearth/reearth-accounts/server/pkg/permittable"
 	"github.com/reearth/reearth-accounts/server/pkg/role"
 	"github.com/reearth/reearth-accounts/server/pkg/user"
 	"github.com/reearth/reearth-accounts/server/pkg/workspace"
@@ -20,7 +21,44 @@ import (
 	"golang.org/x/text/language"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
+
+func maintainerOperator(ctx context.Context, t *testing.T, db *repo.Container) *workspace.Operator {
+	t.Helper()
+
+	uid := user.NewID()
+	maintainerRole := role.New().NewID().Name(role.RoleMaintainer.String()).MustBuild()
+	require.NoError(t, db.Role.Save(ctx, *maintainerRole))
+
+	p := permittable.New().
+		NewID().
+		UserID(uid).
+		RoleIDs(id.RoleIDList{maintainerRole.ID()}).
+		MustBuild()
+	require.NoError(t, db.Permittable.Save(ctx, *p))
+
+	return &workspace.Operator{User: lo.ToPtr(uid)}
+}
+
+// ownerOperator returns an operator holding the global Permittable "owner" role
+// (e.g. LINKS-Veda's admin account), distinct from a per-workspace owner role.
+func ownerOperator(ctx context.Context, t *testing.T, db *repo.Container) *workspace.Operator {
+	t.Helper()
+
+	uid := user.NewID()
+	ownerRole := role.New().NewID().Name(role.RoleOwner.String()).MustBuild()
+	require.NoError(t, db.Role.Save(ctx, *ownerRole))
+
+	p := permittable.New().
+		NewID().
+		UserID(uid).
+		RoleIDs(id.RoleIDList{ownerRole.ID()}).
+		MustBuild()
+	require.NoError(t, db.Permittable.Save(ctx, *p))
+
+	return &workspace.Operator{User: lo.ToPtr(uid)}
+}
 
 func TestUser_VerifyUser(t *testing.T) {
 	user.DefaultPasswordEncoder = &user.NoopPasswordEncoder{}
@@ -106,7 +144,7 @@ func TestUser_VerifyUser(t *testing.T) {
 
 			// Create a new repository instance for each subtest to avoid race conditions
 			r := memory.New()
-			uc := NewUser(r, nil, "", "")
+			uc := NewUser(r, nil, nil, "", "")
 
 			var createdUser *user.User
 			if tt.createUserBefore != nil {
@@ -142,7 +180,7 @@ func TestUser_StartPasswordReset(t *testing.T) {
 
 	m := mailer.NewMock()
 	g := &gateway.Container{Mailer: m}
-	uc := NewUser(r, g, "", "")
+	uc := NewUser(r, g, nil, "", "")
 	tests := []struct {
 		name             string
 		createUserBefore *user.User
@@ -247,7 +285,7 @@ func TestUser_PasswordReset(t *testing.T) {
 	uid := id.NewUserID()
 	tid := id.NewWorkspaceID()
 	r := memory.New()
-	uc := NewUser(r, nil, "", "")
+	uc := NewUser(r, nil, nil, "", "")
 	pr := user.NewPasswordReset()
 	expired := time.Now().Add(24 * time.Hour)
 	tests := []struct {
@@ -340,7 +378,7 @@ func TestUser_Logout(t *testing.T) {
 		t.Parallel()
 		ctx := context.Background()
 		r := memory.New()
-		uc := NewUser(r, nil, "", "")
+		uc := NewUser(r, nil, nil, "", "")
 
 		uid := id.NewUserID()
 		tid := id.NewWorkspaceID()
@@ -371,7 +409,7 @@ func TestUser_Logout(t *testing.T) {
 		t.Parallel()
 		ctx := context.Background()
 		r := memory.New()
-		uc := NewUser(r, nil, "", "")
+		uc := NewUser(r, nil, nil, "", "")
 
 		op := &workspace.Operator{}
 		result, err := uc.Logout(ctx, op)
@@ -1046,7 +1084,7 @@ func TestUser_UpdateMe(t *testing.T) {
 			ctx := context.Background()
 
 			r := memory.New()
-			uc := NewUser(r, nil, "", "")
+			uc := NewUser(r, nil, nil, "", "")
 
 			u, ws := tt.setupUser()
 			assert.NoError(t, r.User.Save(ctx, u))
@@ -1095,7 +1133,7 @@ func TestUser_UpdateMe_NilOperatorUser(t *testing.T) {
 
 	ctx := context.Background()
 	r := memory.New()
-	uc := NewUser(r, nil, "", "")
+	uc := NewUser(r, nil, nil, "", "")
 
 	// Test with operator that has nil User
 	operator := &workspace.Operator{
@@ -1114,7 +1152,7 @@ func TestUser_UpdateMe_UserNotFound(t *testing.T) {
 
 	ctx := context.Background()
 	r := memory.New()
-	uc := NewUser(r, nil, "", "")
+	uc := NewUser(r, nil, nil, "", "")
 
 	// Create operator with non-existent user ID
 	nonExistentUID := id.NewUserID()
@@ -1135,7 +1173,7 @@ func TestUser_UpdateMe_FindByAliasError(t *testing.T) {
 
 	ctx := context.Background()
 	r := memory.New()
-	uc := NewUser(r, nil, "", "")
+	uc := NewUser(r, nil, nil, "", "")
 
 	uid := id.NewUserID()
 	wid := id.NewWorkspaceID()
@@ -1176,7 +1214,7 @@ func TestUser_UpdateMe_SetPasswordError(t *testing.T) {
 
 	ctx := context.Background()
 	r := memory.New()
-	uc := NewUser(r, nil, "", "")
+	uc := NewUser(r, nil, nil, "", "")
 
 	uid := id.NewUserID()
 	wid := id.NewWorkspaceID()
@@ -1268,7 +1306,7 @@ func TestUser_RegenerateMFARecoveryCode(t *testing.T) {
 		mockAuth := &mockAuthenticatorWithError{}
 		g := &gateway.Container{Authenticators: map[gateway.Provider]gateway.Authenticator{gateway.ProviderAuth0: mockAuth}}
 
-		return NewUser(r, g, "", ""), &workspace.Operator{User: &uid}
+		return NewUser(r, g, nil, "", ""), &workspace.Operator{User: &uid}
 	}
 
 	t.Run("ok", func(t *testing.T) {
@@ -1304,7 +1342,7 @@ func TestUser_RegenerateMFARecoveryCode(t *testing.T) {
 		assert.NoError(t, r.Workspace.Save(ctx, noAuthWs))
 
 		g := &gateway.Container{Authenticators: map[gateway.Provider]gateway.Authenticator{}}
-		uc := NewUser(r, g, "", "")
+		uc := NewUser(r, g, nil, "", "")
 
 		code, err := uc.RegenerateMFARecoveryCode(ctx, &workspace.Operator{User: &noAuthUID})
 		assert.Error(t, err)
@@ -1321,7 +1359,7 @@ func TestUser_UpdateMe_AuthenticatorUpdateUserError(t *testing.T) {
 	authError := errors.New("auth0 api error")
 	mockAuth := &mockAuthenticatorWithError{updateUserErr: authError}
 	g := &gateway.Container{Authenticators: map[gateway.Provider]gateway.Authenticator{gateway.ProviderAuth0: mockAuth}}
-	uc := NewUser(r, g, "", "")
+	uc := NewUser(r, g, nil, "", "")
 
 	uid := id.NewUserID()
 	wid := id.NewWorkspaceID()
@@ -1354,12 +1392,54 @@ func TestUser_UpdateMe_AuthenticatorUpdateUserError(t *testing.T) {
 	assert.Nil(t, result)
 }
 
+func TestUser_UpdateMe_SkipsIdPSyncForCIP(t *testing.T) {
+	user.DefaultPasswordEncoder = &user.NoopPasswordEncoder{}
+
+	ctx := context.Background()
+	r := memory.New()
+
+	mockAuth := &mockAuthenticatorWithError{updateUserErr: errors.New("cip should not be called")}
+	g := &gateway.Container{Authenticators: map[gateway.Provider]gateway.Authenticator{gateway.ProviderCIP: mockAuth}}
+	uc := NewUser(r, g, nil, "", "")
+
+	uid := id.NewUserID()
+	wid := id.NewWorkspaceID()
+	u := user.New().
+		ID(uid).
+		Workspace(wid).
+		Name("Test User").
+		Email("test@example.com").
+		Auths([]user.Auth{{Provider: "", Sub: "cip-sub-123"}}).
+		MustBuild()
+	ws := workspace.New().
+		ID(wid).
+		Name("Test User").
+		Personal(true).
+		MustBuild()
+
+	assert.NoError(t, r.User.Save(ctx, u))
+	assert.NoError(t, r.Workspace.Save(ctx, ws))
+
+	operator := &workspace.Operator{
+		User: &uid,
+	}
+
+	// CIP auth records are skipped entirely, so the mock's error is never hit.
+	result, err := uc.UpdateMe(ctx, interfaces.UpdateMeParam{
+		Name: strPtr("New Name"),
+	}, operator)
+
+	assert.NoError(t, err)
+	assert.NotNil(t, result)
+	assert.Equal(t, "New Name", result.Name())
+}
+
 func TestUser_UpdateMe_WorkspaceSaveError(t *testing.T) {
 	user.DefaultPasswordEncoder = &user.NoopPasswordEncoder{}
 
 	ctx := context.Background()
 	r := memory.New()
-	uc := NewUser(r, nil, "", "")
+	uc := NewUser(r, nil, nil, "", "")
 
 	uid := id.NewUserID()
 	wid := id.NewWorkspaceID()
@@ -1400,7 +1480,7 @@ func TestUser_UpdateMe_UserSaveError(t *testing.T) {
 
 	ctx := context.Background()
 	r := memory.New()
-	uc := NewUser(r, nil, "", "")
+	uc := NewUser(r, nil, nil, "", "")
 
 	uid := id.NewUserID()
 	wid := id.NewWorkspaceID()
@@ -1441,7 +1521,7 @@ func TestUser_UpdateMe_WorkspaceFindByIDError(t *testing.T) {
 
 	ctx := context.Background()
 	r := memory.New()
-	uc := NewUser(r, nil, "", "")
+	uc := NewUser(r, nil, nil, "", "")
 
 	uid := id.NewUserID()
 	wid := id.NewWorkspaceID()
@@ -1482,7 +1562,7 @@ func TestUser_UpdateMe_WorkspaceMetadataFindByIDError(t *testing.T) {
 
 	ctx := context.Background()
 	r := memory.New()
-	uc := NewUser(r, nil, "", "")
+	uc := NewUser(r, nil, nil, "", "")
 
 	uid := id.NewUserID()
 	wid := id.NewWorkspaceID()
@@ -1521,7 +1601,7 @@ func TestUser_UpdateMe_WorkspaceMetadataFindByIDError(t *testing.T) {
 func TestUser_DeleteMe_DeletesUserAndPersonalWorkspace(t *testing.T) {
 	ctx := context.Background()
 	r := memory.New()
-	uc := NewUser(r, nil, "", "")
+	uc := NewUser(r, nil, nil, "", "")
 
 	uid := id.NewUserID()
 	wid := id.NewWorkspaceID()
@@ -1546,7 +1626,7 @@ func TestUser_DeleteMe_DeletesUserAndPersonalWorkspace(t *testing.T) {
 func TestUser_DeleteMe_LeavesSharedWorkspaceAndDeletesUser(t *testing.T) {
 	ctx := context.Background()
 	r := memory.New()
-	uc := NewUser(r, nil, "", "")
+	uc := NewUser(r, nil, nil, "", "")
 
 	uid := id.NewUserID()
 	wid := id.NewWorkspaceID()
@@ -1585,7 +1665,7 @@ func TestUser_DeleteMe_LeavesSharedWorkspaceAndDeletesUser(t *testing.T) {
 func TestUser_DeleteMe_SoleOwnerOfSharedWorkspaceDeleted(t *testing.T) {
 	ctx := context.Background()
 	r := memory.New()
-	uc := NewUser(r, nil, "", "")
+	uc := NewUser(r, nil, nil, "", "")
 
 	uid := id.NewUserID()
 	wid := id.NewWorkspaceID()
@@ -1631,7 +1711,7 @@ func TestUser_StartPasswordReset_TokenPersistedBeforeMailSend(t *testing.T) {
 	r := memory.New()
 	mailerErr := errors.New("smtp unavailable")
 	g := &gateway.Container{Mailer: &failingMailer{err: mailerErr}}
-	uc := NewUser(r, g, "", "")
+	uc := NewUser(r, g, nil, "", "")
 
 	uid := id.NewUserID()
 	tid := id.NewWorkspaceID()
@@ -1656,4 +1736,203 @@ func TestUser_StartPasswordReset_TokenPersistedBeforeMailSend(t *testing.T) {
 	saved, dbErr := r.User.FindByEmail(ctx, "reset@bbb.com")
 	assert.NoError(t, dbErr)
 	assert.NotNil(t, saved.PasswordReset(), "token must be persisted even when mailer fails")
+}
+
+func TestUser_FindAll(t *testing.T) {
+	ctx := context.Background()
+	db := memory.New()
+	op := maintainerOperator(ctx, t, db)
+	userUC := NewUser(db, nil, nil, "", "")
+
+	uA := user.New().NewID().Name("alpha").Email("alpha@bbb.com").MustBuild()
+	uB := user.New().NewID().Name("beta").Email("beta@bbb.com").MustBuild()
+	assert.NoError(t, db.User.Save(ctx, uA))
+	assert.NoError(t, db.User.Save(ctx, uB))
+
+	t.Run("default status excludes soft-deleted users", func(t *testing.T) {
+		uA.Deactivate()
+		defer uA.Reactivate()
+		assert.NoError(t, db.User.Save(ctx, uA))
+
+		res, err := userUC.FindAll(ctx, interfaces.FindAllUsersParam{Page: 1, Size: 10, Operator: op})
+		assert.NoError(t, err)
+		assert.Len(t, res.Users, 1)
+		assert.Equal(t, uB.ID(), res.Users[0].ID())
+
+		res, err = userUC.FindAll(ctx, interfaces.FindAllUsersParam{Status: user.StatusDeleted, Page: 1, Size: 10, Operator: op})
+		assert.NoError(t, err)
+		assert.Len(t, res.Users, 1)
+		assert.Equal(t, uA.ID(), res.Users[0].ID())
+
+		res, err = userUC.FindAll(ctx, interfaces.FindAllUsersParam{Status: user.StatusAll, Page: 1, Size: 10, Operator: op})
+		assert.NoError(t, err)
+		assert.Len(t, res.Users, 2)
+	})
+
+	t.Run("keyword filters by name", func(t *testing.T) {
+		kw := "alpha"
+		res, err := userUC.FindAll(ctx, interfaces.FindAllUsersParam{Keyword: &kw, Status: user.StatusAll, Page: 1, Size: 10, Operator: op})
+		assert.NoError(t, err)
+		assert.Len(t, res.Users, 1)
+		assert.Equal(t, uA.ID(), res.Users[0].ID())
+	})
+
+	t.Run("global owner role (e.g. LINKS-Veda's admin account) can also list", func(t *testing.T) {
+		ownerOp := ownerOperator(ctx, t, db)
+		res, err := userUC.FindAll(ctx, interfaces.FindAllUsersParam{Status: user.StatusAll, Page: 1, Size: 10, Operator: ownerOp})
+		assert.NoError(t, err)
+		assert.Len(t, res.Users, 2)
+	})
+
+	t.Run("denies a nil operator", func(t *testing.T) {
+		_, err := userUC.FindAll(ctx, interfaces.FindAllUsersParam{Page: 1, Size: 10})
+		assert.ErrorIs(t, err, interfaces.ErrInvalidOperator)
+	})
+
+	t.Run("denies an operator without the maintainer role", func(t *testing.T) {
+		nonMaintainer := user.NewID()
+		p := permittable.New().NewID().UserID(nonMaintainer).MustBuild()
+		assert.NoError(t, db.Permittable.Save(ctx, *p))
+		nonMaintainerOp := &workspace.Operator{User: lo.ToPtr(nonMaintainer)}
+
+		_, err := userUC.FindAll(ctx, interfaces.FindAllUsersParam{Page: 1, Size: 10, Operator: nonMaintainerOp})
+		assert.ErrorIs(t, err, interfaces.ErrPermissionDenied)
+	})
+}
+
+func TestUser_UpdateUserBySub(t *testing.T) {
+	ctx := context.Background()
+
+	t.Run("maintainer can update name by sub", func(t *testing.T) {
+		db := memory.New()
+		op := maintainerOperator(ctx, t, db)
+
+		wid := id.NewWorkspaceID()
+		u := user.New().NewID().Workspace(wid).Name("Old Name").Email("bysub@bbb.com").
+			Auths([]user.Auth{{Provider: "", Sub: "cip-sub-1"}}).MustBuild()
+		ws := workspace.New().ID(wid).Name("Old Name").Personal(true).MustBuild()
+		assert.NoError(t, db.User.Save(ctx, u))
+		assert.NoError(t, db.Workspace.Save(ctx, ws))
+
+		uc := NewUser(db, nil, nil, "", "")
+		assert.NoError(t, uc.UpdateUserBySub(ctx, "cip-sub-1", strPtr("New Name"), op))
+
+		got, err := db.User.FindBySub(ctx, "cip-sub-1")
+		assert.NoError(t, err)
+		assert.Equal(t, "New Name", got.Name())
+	})
+
+	t.Run("denies a nil operator", func(t *testing.T) {
+		db := memory.New()
+		uc := NewUser(db, nil, nil, "", "")
+		err := uc.UpdateUserBySub(ctx, "cip-sub-1", strPtr("New Name"), nil)
+		assert.ErrorIs(t, err, interfaces.ErrInvalidOperator)
+	})
+
+	t.Run("denies an operator without the maintainer role", func(t *testing.T) {
+		db := memory.New()
+		nonMaintainer := user.NewID()
+		p := permittable.New().NewID().UserID(nonMaintainer).MustBuild()
+		assert.NoError(t, db.Permittable.Save(ctx, *p))
+		op := &workspace.Operator{User: lo.ToPtr(nonMaintainer)}
+
+		uc := NewUser(db, nil, nil, "", "")
+		err := uc.UpdateUserBySub(ctx, "cip-sub-1", strPtr("New Name"), op)
+		assert.ErrorIs(t, err, interfaces.ErrPermissionDenied)
+	})
+}
+
+func TestUser_SetPlatformRolesBySub(t *testing.T) {
+	ctx := context.Background()
+
+	t.Run("maintainer can replace platform roles by sub", func(t *testing.T) {
+		db := memory.New()
+		op := maintainerOperator(ctx, t, db)
+
+		targetRole := role.New().NewID().Name("custom").MustBuild()
+		assert.NoError(t, db.Role.Save(ctx, *targetRole))
+
+		u := user.New().NewID().Workspace(id.NewWorkspaceID()).Name("Sub User").Email("sub2@bbb.com").
+			Auths([]user.Auth{{Provider: "", Sub: "cip-sub-2"}}).MustBuild()
+		assert.NoError(t, db.User.Save(ctx, u))
+
+		uc := NewUser(db, nil, nil, "", "")
+		assert.NoError(t, uc.SetPlatformRolesBySub(ctx, "cip-sub-2", []string{"custom"}, op))
+
+		p, err := db.Permittable.FindByUserID(ctx, u.ID())
+		assert.NoError(t, err)
+		assert.Contains(t, p.RoleIDs(), targetRole.ID())
+	})
+
+	t.Run("denies an operator without the maintainer role", func(t *testing.T) {
+		db := memory.New()
+		nonMaintainer := user.NewID()
+		p := permittable.New().NewID().UserID(nonMaintainer).MustBuild()
+		assert.NoError(t, db.Permittable.Save(ctx, *p))
+		op := &workspace.Operator{User: lo.ToPtr(nonMaintainer)}
+
+		uc := NewUser(db, nil, nil, "", "")
+		err := uc.SetPlatformRolesBySub(ctx, "cip-sub-2", []string{"custom"}, op)
+		assert.ErrorIs(t, err, interfaces.ErrPermissionDenied)
+	})
+}
+
+func TestUser_DeactivateAndRestore(t *testing.T) {
+	ctx := context.Background()
+
+	newTargetUser := func() (user.ID, *repo.Container) {
+		db := memory.New()
+		uid := id.NewUserID()
+		u := user.New().ID(uid).Workspace(id.NewWorkspaceID()).Name("Target").Email("target@bbb.com").MustBuild()
+		assert.NoError(t, db.User.Save(ctx, u))
+		return uid, db
+	}
+
+	t.Run("maintainer can deactivate then restore", func(t *testing.T) {
+		uid, db := newTargetUser()
+		op := maintainerOperator(ctx, t, db)
+		uc := NewUser(db, nil, nil, "", "")
+
+		u, err := uc.Deactivate(ctx, uid, op)
+		assert.NoError(t, err)
+		assert.NotNil(t, u.DeletedAt())
+
+		stored, err := db.User.FindByID(ctx, uid)
+		assert.NoError(t, err)
+		assert.NotNil(t, stored.DeletedAt())
+
+		u, err = uc.Restore(ctx, uid, op)
+		assert.NoError(t, err)
+		assert.Nil(t, u.DeletedAt())
+
+		stored, err = db.User.FindByID(ctx, uid)
+		assert.NoError(t, err)
+		assert.Nil(t, stored.DeletedAt())
+	})
+
+	t.Run("denies an operator without the maintainer role", func(t *testing.T) {
+		uid, db := newTargetUser()
+		nonMaintainer := user.NewID()
+		p := permittable.New().NewID().UserID(nonMaintainer).MustBuild()
+		assert.NoError(t, db.Permittable.Save(ctx, *p))
+		op := &workspace.Operator{User: lo.ToPtr(nonMaintainer)}
+		uc := NewUser(db, nil, nil, "", "")
+
+		_, err := uc.Deactivate(ctx, uid, op)
+		assert.ErrorIs(t, err, interfaces.ErrPermissionDenied)
+
+		_, err = uc.Restore(ctx, uid, op)
+		assert.ErrorIs(t, err, interfaces.ErrPermissionDenied)
+	})
+
+	t.Run("denies a nil operator", func(t *testing.T) {
+		uid, db := newTargetUser()
+		uc := NewUser(db, nil, nil, "", "")
+
+		_, err := uc.Deactivate(ctx, uid, &workspace.Operator{})
+		assert.ErrorIs(t, err, interfaces.ErrInvalidOperator)
+
+		_, err = uc.Restore(ctx, uid, &workspace.Operator{})
+		assert.ErrorIs(t, err, interfaces.ErrInvalidOperator)
+	})
 }

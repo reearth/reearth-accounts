@@ -16,7 +16,9 @@ func (r *mutationResolver) CreateWorkspace(ctx context.Context, input gqlmodel.C
 		description = *input.Description
 	}
 
-	w, err := usecases(ctx).Workspace.Create(ctx, input.Alias, input.Name, description, getUser(ctx).ID(), getOperator(ctx))
+	// skipOwnerMembership is REST-only (e.g. LINKS-Veda); GraphQL always joins the
+	// caller as owner.
+	w, err := usecases(ctx).Workspace.Create(ctx, input.Alias, input.Name, description, getUser(ctx).ID(), false, getOperator(ctx))
 	if err != nil {
 		return nil, err
 	}

@@ -43,7 +43,7 @@ func (r *Workspace) Filtered(f workspace.WorkspaceFilter) workspace.Repo {
 	}
 }
 
-func (r *Workspace) FindAll(_ context.Context, keyword *string, personal *bool, pagination *usecasex.Pagination) (workspace.List, *usecasex.PageInfo, error) {
+func (r *Workspace) FindAll(_ context.Context, keyword *string, personal *bool, status workspace.StatusFilter, pagination *usecasex.Pagination, excludePersonal bool) (workspace.List, *usecasex.PageInfo, error) {
 	if r.err != nil {
 		return nil, nil, r.err
 	}
@@ -63,6 +63,16 @@ func (r *Workspace) FindAll(_ context.Context, keyword *string, personal *bool, 
 		// filter by workspace type when requested (nil = both types)
 		if personal != nil && v.IsPersonal() != *personal {
 			return false
+		}
+		switch status {
+		case workspace.StatusActive:
+			if v.DeletedAt() != nil {
+				return false
+			}
+		case workspace.StatusDeleted:
+			if v.DeletedAt() == nil {
+				return false
+			}
 		}
 		if kw == "" {
 			return true

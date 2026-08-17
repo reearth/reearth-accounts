@@ -42,6 +42,14 @@ func (u *User) FetchByIDsWithPagination(ctx context.Context, ids user.IDList, al
 	return interfaces.FetchByIDsWithPaginationResult{}, nil
 }
 
+// FindAll is not supported via this GraphQL proxy: there is no cross-tenant
+// listing query in the public GraphQL schema (REST-only, same as
+// workspace.FindAll), so this client has no remote call to make on the
+// caller's behalf.
+func (u *User) FindAll(ctx context.Context, param interfaces.FindAllUsersParam) (interfaces.FindAllUsersResult, error) {
+	return interfaces.FindAllUsersResult{}, user.ErrNotImplemented
+}
+
 func (u *User) Signup(ctx context.Context, param interfaces.SignupParam) (*user.User, error) {
 	input := SignupInput{
 		Id:          param.UserID.String(),
@@ -168,6 +176,14 @@ func (u *User) DeleteMe(ctx context.Context, id user.ID, op *workspace.Operator)
 	return nil
 }
 
+func (u *User) Deactivate(ctx context.Context, id user.ID, op *workspace.Operator) (*user.User, error) {
+	return nil, user.ErrNotImplemented
+}
+
+func (u *User) Restore(ctx context.Context, id user.ID, op *workspace.Operator) (*user.User, error) {
+	return nil, user.ErrNotImplemented
+}
+
 func (u *User) CreateVerification(ctx context.Context, email string) error {
 	_, err := CreateVerification(ctx, u.gql, CreateVerificationInput{Email: email})
 	if err != nil {
@@ -215,4 +231,12 @@ func (u *User) GetMFAStatus(_ context.Context, _ *workspace.Operator) (gateway.M
 
 func (u *User) RegenerateMFARecoveryCode(_ context.Context, _ *workspace.Operator) (string, error) {
 	return "", errors.New("RegenerateMFARecoveryCode is not supported in proxy mode")
+}
+
+func (u *User) UpdateUserBySub(_ context.Context, _ string, _ *string, _ *workspace.Operator) error {
+	return errors.New("UpdateUserBySub is not supported in proxy mode")
+}
+
+func (u *User) SetPlatformRolesBySub(_ context.Context, _ string, _ []string, _ *workspace.Operator) error {
+	return errors.New("SetPlatformRolesBySub is not supported in proxy mode")
 }

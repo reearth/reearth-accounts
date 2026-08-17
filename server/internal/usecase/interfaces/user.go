@@ -97,9 +97,28 @@ type FetchByIDsWithPaginationResult struct {
 	TotalCount int
 }
 
+type FindAllUsersParam struct {
+	Keyword *string
+	Status  user.StatusFilter
+	Page    int64
+	Size    int64
+	// Operator identifies the caller for the maintainer-role permission check in
+	// (*User).FindAll. Required; requests without an operator are rejected.
+	Operator *workspace.Operator
+}
+
+type FindAllUsersResult struct {
+	Users      user.List
+	TotalCount int
+}
+
 type UserQuery interface {
 	FetchByID(context.Context, user.IDList) (user.List, error)
 	FetchByIDsWithPagination(ctx context.Context, ids user.IDList, alias *string, pagination FetchByIDsWithPaginationParam) (FetchByIDsWithPaginationResult, error)
+	// FindAll lists users across all tenants, unfiltered by any per-workspace
+	// scoping. Restricted to the maintainer role (see (*User).FindAll /
+	// checkMaintainerPermission) since it exposes every user across every tenant.
+	FindAll(context.Context, FindAllUsersParam) (FindAllUsersResult, error)
 	FetchBySub(context.Context, string) (*user.User, error)
 	FetchByNameOrAlias(context.Context, string) (user.List, error)
 	FetchByNameOrEmail(context.Context, string) (*user.Simple, error)
@@ -122,6 +141,17 @@ type User interface {
 	DeleteMe(context.Context, user.ID, *workspace.Operator) error
 	RemoveMyAuth(context.Context, string, *workspace.Operator) (*user.User, error)
 	UpdateMe(context.Context, UpdateMeParam, *workspace.Operator) (*user.User, error)
+
+	// admin: deactivate soft-deletes a user (sets deleted_at); restore reverses it.
+	// Same permission model as workspace's Deactivate/Restore (Cerbos, falling back
+	// to a maintainer-role check).
+	Deactivate(ctx context.Context, id user.ID, operator *workspace.Operator) (*user.User, error)
+	Restore(ctx context.Context, id user.ID, operator *workspace.Operator) (*user.User, error)
+
+	// User mutations by Firebase sub, gated on the caller holding the maintainer
+	// role (JWT required; see checkMaintainerPermission).
+	UpdateUserBySub(ctx context.Context, sub string, name *string, operator *workspace.Operator) error
+	SetPlatformRolesBySub(ctx context.Context, sub string, roleNames []string, operator *workspace.Operator) error
 
 	// built-in auth server
 	CreateVerification(context.Context, string) error
