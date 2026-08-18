@@ -2556,15 +2556,33 @@ func TestWorkspace_MemberManagement_CerbosFallback(t *testing.T) {
 		}
 
 		// A real maintainer already has edit_member, so nothing (Cerbos included)
-		// should let them grant themselves Owner through UpdateUserMember; that
-		// privilege escalation path only exists via UpdateUserMemberViaService,
-		// which every real Maintainer/Owner can reach — see the tests below.
+		// should let them grant themselves Owner through UpdateUserMember.
 		workspaceUC := NewWorkspace(db, nil, &fakeCerbos{allowed: true})
 		_, err := workspaceUC.UpdateUserMember(ctx, wid, operatorID, role.RoleOwner, op)
 		assert.ErrorIs(t, err, interfaces.ErrCannotSelfPromote)
 	})
 
-	t.Run("UpdateUserMemberViaService: a Maintainer can set their own role, bypassing the self-promotion guard", func(t *testing.T) {
+	t.Run("UpdateUserMemberViaService: a Maintainer can set their own role (below Owner), bypassing the self-promotion guard", func(t *testing.T) {
+		db := memory.New()
+		seedRoles(db)
+		wid := id.NewWorkspaceID()
+		operatorID := id.NewUserID()
+		ws := workspace.New().ID(wid).Name("Test").Alias("test-alias").
+			Members(map[user.ID]workspace.Member{operatorID: {Role: role.RoleWriter}}).
+			Personal(false).MustBuild()
+		assert.NoError(t, db.Workspace.Save(ctx, ws))
+		// MaintainableWorkspaces reflects a real Maintainer elsewhere but Writer
+		// here is enough to exercise the bypass; IsMaintainingWorkspace is what
+		// actually gates this call (see the Writer-denied test below).
+		op := &workspace.Operator{User: lo.ToPtr(operatorID), MaintainableWorkspaces: []workspace.ID{wid}}
+
+		workspaceUC := NewWorkspace(db, nil, nil)
+		got, err := workspaceUC.UpdateUserMemberViaService(ctx, wid, operatorID, role.RoleMaintainer, op)
+		assert.NoError(t, err)
+		assert.Equal(t, role.RoleMaintainer, got.Members().UserRole(operatorID))
+	})
+
+	t.Run("UpdateUserMemberViaService: never grants Owner, even to a real Maintainer changing their own role", func(t *testing.T) {
 		db := memory.New()
 		seedRoles(db)
 		wid := id.NewWorkspaceID()
@@ -2575,10 +2593,11 @@ func TestWorkspace_MemberManagement_CerbosFallback(t *testing.T) {
 		assert.NoError(t, db.Workspace.Save(ctx, ws))
 		op := &workspace.Operator{User: lo.ToPtr(operatorID), MaintainableWorkspaces: []workspace.ID{wid}}
 
-		workspaceUC := NewWorkspace(db, nil, nil)
-		got, err := workspaceUC.UpdateUserMemberViaService(ctx, wid, operatorID, role.RoleOwner, op)
-		assert.NoError(t, err)
-		assert.Equal(t, role.RoleOwner, got.Members().UserRole(operatorID))
+		// Cerbos would even allow it (global role), but Owner is blocked
+		// unconditionally — TransferOwnership is the only path to Owner.
+		workspaceUC := NewWorkspace(db, nil, &fakeCerbos{allowed: true})
+		_, err := workspaceUC.UpdateUserMemberViaService(ctx, wid, operatorID, role.RoleOwner, op)
+		assert.ErrorIs(t, err, workspace.ErrCannotChangeRoleToOwner)
 	})
 
 	t.Run("UpdateUserMemberViaService: also allowed for a non-self target", func(t *testing.T) {
@@ -2631,9 +2650,9 @@ func TestWorkspace_MemberManagement_CerbosFallback(t *testing.T) {
 		op := &workspace.Operator{User: lo.ToPtr(id.NewUserID())} // not a member at all
 
 		workspaceUC := NewWorkspace(db, nil, &fakeCerbos{allowed: true})
-		got, err := workspaceUC.UpdateUserMemberViaService(ctx, wid, targetUser, role.RoleOwner, op)
+		got, err := workspaceUC.UpdateUserMemberViaService(ctx, wid, targetUser, role.RoleMaintainer, op)
 		assert.NoError(t, err)
-		assert.Equal(t, role.RoleOwner, got.Members().UserRole(targetUser))
+		assert.Equal(t, role.RoleMaintainer, got.Members().UserRole(targetUser))
 	})
 
 	t.Run("RemoveMultipleUserMembers: Cerbos global role allows removal by a non-member", func(t *testing.T) {

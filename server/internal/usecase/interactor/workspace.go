@@ -542,6 +542,9 @@ func (i *Workspace) UpdateUserMemberViaService(ctx context.Context, id workspace
 	if operator.User == nil {
 		return nil, interfaces.ErrInvalidOperator
 	}
+	if newRole == role.RoleOwner {
+		return nil, workspace.ErrCannotChangeRoleToOwner
+	}
 
 	return Run1(ctx, operator, i.repos, Usecase().Transaction(), func(ctx context.Context) (*workspace.Workspace, error) {
 		ws, err := i.repos.Workspace.FindByID(ctx, id)
