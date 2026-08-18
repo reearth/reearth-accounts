@@ -1,6 +1,7 @@
 package handlers
 
 import (
+	"context"
 	"net/http"
 	"strings"
 
@@ -167,7 +168,13 @@ func (h *UserHandler) Get(c echo.Context) error {
 	if len(res) == 0 {
 		return rerror.ErrNotFound
 	}
-	return c.JSON(http.StatusOK, httpmodel.NewUserResponse(res[0]))
+
+	userResponses := httpmodel.NewUserResponses(res)
+	if err := applyPermittablesToResponses(ctx, c, userResponses, res); err != nil {
+		return err
+	}
+
+	return c.JSON(http.StatusOK, userResponses[0])
 }
 
 // List godoc
@@ -265,58 +272,70 @@ func (h *UserHandler) ListAll(c echo.Context) error {
 	}
 
 	userResponses := httpmodel.NewUserResponses(res.Users)
-
-	if len(res.Users) > 0 {
-		userIDs := make(user.IDList, 0, len(res.Users))
-		for _, u := range res.Users {
-			userIDs = append(userIDs, u.ID())
-		}
-		perms, err := httpinternal.Usecases(c).Permittable.FindByUserIDs(ctx, userIDs)
-		if err != nil {
-			return err
-		}
-
-		// Build role name map (ULID → name) for resolving platform roles and workspace roles.
-		roleNames := map[string]string{}
-		if uc := httpinternal.Usecases(c); uc.Role != nil {
-			if roles, err := uc.Role.FindAll(ctx); err == nil {
-				for _, r := range roles {
-					roleNames[r.ID().String()] = r.Name()
-				}
-			}
-		}
-
-		// Build workspace info map (ULID → {Name, Alias}) for all workspaces referenced
-		// in the permittable workspace roles.
-		wsInfo := map[string]httpmodel.WorkspaceInfo{}
-		wsIDSet := map[string]bool{}
-		for _, p := range perms {
-			for _, wr := range p.WorkspaceRoles() {
-				wsIDSet[wr.ID().String()] = true
-			}
-		}
-		if len(wsIDSet) > 0 {
-			wsIDs := make(workspace.IDList, 0, len(wsIDSet))
-			for sid := range wsIDSet {
-				wid, err := id.WorkspaceIDFrom(sid)
-				if err == nil {
-					wsIDs = append(wsIDs, wid)
-				}
-			}
-			if wsList, err := httpinternal.Usecases(c).Workspace.Fetch(ctx, wsIDs, nil); err == nil {
-				for _, ws := range wsList {
-					wsInfo[ws.ID().String()] = httpmodel.WorkspaceInfo{
-						Name:  ws.Name(),
-						Alias: ws.Alias(),
-					}
-				}
-			}
-		}
-
-		httpmodel.ApplyPermittables(userResponses, perms, roleNames, wsInfo)
+	if err := applyPermittablesToResponses(ctx, c, userResponses, res.Users); err != nil {
+		return err
 	}
 
 	return c.JSON(http.StatusOK, httpinternal.NewPageResult(userResponses, page, size, res.TotalCount))
+}
+
+// applyPermittablesToResponses enriches user responses with platform_roles/workspaces,
+// batch-fetching Permittable records (and resolving role/workspace names) for however
+// many users are passed in. Shared by ListAll (many users) and Get (a single user) so
+// both expose the same fields.
+func applyPermittablesToResponses(ctx context.Context, c echo.Context, userResponses []*httpmodel.UserResponse, users user.List) error {
+	if len(users) == 0 {
+		return nil
+	}
+
+	userIDs := make(user.IDList, 0, len(users))
+	for _, u := range users {
+		userIDs = append(userIDs, u.ID())
+	}
+	perms, err := httpinternal.Usecases(c).Permittable.FindByUserIDs(ctx, userIDs)
+	if err != nil {
+		return err
+	}
+
+	// Build role name map (ULID → name) for resolving platform roles and workspace roles.
+	roleNames := map[string]string{}
+	if uc := httpinternal.Usecases(c); uc.Role != nil {
+		if roles, err := uc.Role.FindAll(ctx); err == nil {
+			for _, r := range roles {
+				roleNames[r.ID().String()] = r.Name()
+			}
+		}
+	}
+
+	// Build workspace info map (ULID → {Name, Alias}) for all workspaces referenced
+	// in the permittable workspace roles.
+	wsInfo := map[string]httpmodel.WorkspaceInfo{}
+	wsIDSet := map[string]bool{}
+	for _, p := range perms {
+		for _, wr := range p.WorkspaceRoles() {
+			wsIDSet[wr.ID().String()] = true
+		}
+	}
+	if len(wsIDSet) > 0 {
+		wsIDs := make(workspace.IDList, 0, len(wsIDSet))
+		for sid := range wsIDSet {
+			wid, err := id.WorkspaceIDFrom(sid)
+			if err == nil {
+				wsIDs = append(wsIDs, wid)
+			}
+		}
+		if wsList, err := httpinternal.Usecases(c).Workspace.Fetch(ctx, wsIDs, nil); err == nil {
+			for _, ws := range wsList {
+				wsInfo[ws.ID().String()] = httpmodel.WorkspaceInfo{
+					Name:  ws.Name(),
+					Alias: ws.Alias(),
+				}
+			}
+		}
+	}
+
+	httpmodel.ApplyPermittables(userResponses, perms, roleNames, wsInfo)
+	return nil
 }
 
 // Search godoc
