@@ -70,6 +70,8 @@ type Workspace interface {
 	AddUserMember(context.Context, workspace.ID, map[user.ID]role.RoleType, *workspace.Operator) (*workspace.Workspace, error)
 	AddIntegrationMember(context.Context, workspace.ID, workspace.IntegrationID, role.RoleType, *workspace.Operator) (*workspace.Workspace, error)
 	UpdateUserMember(context.Context, workspace.ID, user.ID, role.RoleType, *workspace.Operator) (*workspace.Workspace, error)
+	// UpdateUserMemberViaService sets a member's role without the self-promotion guard in UpdateUserMember
+	UpdateUserMemberViaService(context.Context, workspace.ID, user.ID, role.RoleType, *workspace.Operator) (*workspace.Workspace, error)
 	UpdateIntegration(context.Context, workspace.ID, workspace.IntegrationID, role.RoleType, *workspace.Operator) (*workspace.Workspace, error)
 	RemoveUserMember(context.Context, workspace.ID, user.ID, *workspace.Operator) (*workspace.Workspace, error)
 	RemoveMultipleUserMembers(context.Context, workspace.ID, user.IDList, *workspace.Operator) (*workspace.Workspace, error)

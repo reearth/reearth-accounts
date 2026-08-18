@@ -5,6 +5,7 @@ import (
 	"testing"
 
 	"github.com/reearth/reearth-accounts/server/internal/app"
+	"github.com/stretchr/testify/assert"
 )
 
 func TestREST_WorkspaceCRUD(t *testing.T) {
@@ -20,7 +21,7 @@ func TestREST_WorkspaceCRUD(t *testing.T) {
 	wid := wsObj.Value("id").String().Raw()
 
 	// Get
-	exp.GET("/api/workspaces/" + wid).
+	exp.GET("/api/workspaces/"+wid).
 		Expect().Status(http.StatusOK).JSON().Object().HasValue("id", wid)
 
 	// Add a second seeded user as writer.
@@ -81,7 +82,7 @@ func TestREST_RealJWT_WorkspaceCRUD(t *testing.T) {
 	wid := wsObj.Value("id").String().Raw()
 
 	// Get
-	exp.GET("/api/workspaces/" + wid).
+	exp.GET("/api/workspaces/"+wid).
 		WithHeader("Authorization", bearer).
 		Expect().Status(http.StatusOK).JSON().Object().HasValue("id", wid)
 
@@ -95,12 +96,12 @@ func TestREST_RealJWT_WorkspaceCRUD(t *testing.T) {
 		Value("members").Array().Length().IsEqual(2)
 
 	// Delete
-	exp.DELETE("/api/workspaces/" + wid).
+	exp.DELETE("/api/workspaces/"+wid).
 		WithHeader("Authorization", bearer).
 		Expect().Status(http.StatusNoContent)
 
 	// Confirm gone
-	exp.GET("/api/workspaces/" + wid).
+	exp.GET("/api/workspaces/"+wid).
 		WithHeader("Authorization", bearer).
 		Expect().Status(http.StatusNotFound)
 }
@@ -115,4 +116,54 @@ func TestREST_RealJWT_WorkspaceListByUser(t *testing.T) {
 	exp.GET("/api/workspaces").WithQuery("user_id", jwtPrimaryUID.String()).
 		WithHeader("Authorization", "Bearer "+token).
 		Expect().Status(http.StatusOK).JSON().Array().NotEmpty()
+}
+
+// TestREST_RealJWT_ServiceMemberUpdate_BypassesSelfPromotionGuard covers PATCH
+// /api/service/workspaces/:id/members/:user_id: JWT-authenticated like the
+// regular member route, but a Maintainer/Owner may use it to change their own
+// role (including to Owner), unlike the self-demote guard on
+// PATCH /api/workspaces/:id/members/:user_id.
+func TestREST_RealJWT_ServiceMemberUpdate_BypassesSelfPromotionGuard(t *testing.T) {
+	key, cleanup := installRealJWT(t)
+	defer cleanup()
+
+	exp, _ := StartServer(t, realAuthConfig(), false, seedJWTUsers(realJWTWorkspaceSub))
+	token := signTestToken(t, key, realJWTWorkspaceSub)
+	bearer := "Bearer " + token
+
+	wsObj := exp.POST("/api/workspaces").
+		WithHeader("Authorization", bearer).
+		WithJSON(map[string]any{"alias": "service-role-team", "name": "Service Role Team"}).
+		Expect().Status(http.StatusOK).JSON().Object()
+	wid := wsObj.Value("id").String().Raw()
+
+	// No JWT at all is rejected, same as any other JWT-required route.
+	exp.PATCH("/api/service/workspaces/" + wid + "/members/" + jwtPrimaryUID.String()).
+		WithJSON(map[string]any{"role": "maintainer"}).
+		Expect().Status(http.StatusUnauthorized)
+
+	// jwtPrimaryUID is this workspace's Owner; on the regular member route this
+	// exact change (Owner -> Maintainer, self) is blocked by the self-demote guard.
+	exp.PATCH("/api/workspaces/"+wid+"/members/"+jwtPrimaryUID.String()).
+		WithHeader("Authorization", bearer).
+		WithJSON(map[string]any{"role": "maintainer"}).
+		Expect().Status(http.StatusForbidden)
+
+	// The service route has no such guard for a Maintainer/Owner acting on
+	// their own role, so the identical change succeeds here.
+	members := exp.PATCH("/api/service/workspaces/"+wid+"/members/"+jwtPrimaryUID.String()).
+		WithHeader("Authorization", bearer).
+		WithJSON(map[string]any{"role": "maintainer"}).
+		Expect().Status(http.StatusOK).JSON().Object().
+		Value("members").Array().Raw()
+
+	found := false
+	for _, m := range members {
+		member, ok := m.(map[string]any)
+		if ok && member["user_id"] == jwtPrimaryUID.String() {
+			found = true
+			assert.Equal(t, "maintainer", member["role"])
+		}
+	}
+	assert.True(t, found, "expected jwtPrimaryUID in members")
 }

@@ -2540,6 +2540,102 @@ func TestWorkspace_MemberManagement_CerbosFallback(t *testing.T) {
 		assert.Equal(t, role.RoleWriter, got.Members().UserRole(targetUser))
 	})
 
+	t.Run("UpdateUserMember: self-promotion is blocked even for a real workspace-local maintainer", func(t *testing.T) {
+		db := memory.New()
+		seedRoles(db)
+		wid := id.NewWorkspaceID()
+		operatorID := id.NewUserID()
+		ws := workspace.New().ID(wid).Name("Test").Alias("test-alias").
+			Members(map[user.ID]workspace.Member{operatorID: {Role: role.RoleMaintainer}}).
+			Personal(false).MustBuild()
+		assert.NoError(t, db.Workspace.Save(ctx, ws))
+		op := &workspace.Operator{
+			User:                   lo.ToPtr(operatorID),
+			WritableWorkspaces:     []workspace.ID{wid},
+			MaintainableWorkspaces: []workspace.ID{wid},
+		}
+
+		// A real maintainer already has edit_member, so nothing (Cerbos included)
+		// should let them grant themselves Owner through UpdateUserMember; that
+		// privilege escalation path only exists via UpdateUserMemberViaService,
+		// which every real Maintainer/Owner can reach — see the tests below.
+		workspaceUC := NewWorkspace(db, nil, &fakeCerbos{allowed: true})
+		_, err := workspaceUC.UpdateUserMember(ctx, wid, operatorID, role.RoleOwner, op)
+		assert.ErrorIs(t, err, interfaces.ErrCannotSelfPromote)
+	})
+
+	t.Run("UpdateUserMemberViaService: a Maintainer can set their own role, bypassing the self-promotion guard", func(t *testing.T) {
+		db := memory.New()
+		seedRoles(db)
+		wid := id.NewWorkspaceID()
+		operatorID := id.NewUserID()
+		ws := workspace.New().ID(wid).Name("Test").Alias("test-alias").
+			Members(map[user.ID]workspace.Member{operatorID: {Role: role.RoleMaintainer}}).
+			Personal(false).MustBuild()
+		assert.NoError(t, db.Workspace.Save(ctx, ws))
+		op := &workspace.Operator{User: lo.ToPtr(operatorID), MaintainableWorkspaces: []workspace.ID{wid}}
+
+		workspaceUC := NewWorkspace(db, nil, nil)
+		got, err := workspaceUC.UpdateUserMemberViaService(ctx, wid, operatorID, role.RoleOwner, op)
+		assert.NoError(t, err)
+		assert.Equal(t, role.RoleOwner, got.Members().UserRole(operatorID))
+	})
+
+	t.Run("UpdateUserMemberViaService: also allowed for a non-self target", func(t *testing.T) {
+		db := memory.New()
+		seedRoles(db)
+		wid := id.NewWorkspaceID()
+		operatorID := id.NewUserID()
+		targetUser := id.NewUserID()
+		ws := workspace.New().ID(wid).Name("Test").Alias("test-alias").
+			Members(map[user.ID]workspace.Member{
+				operatorID: {Role: role.RoleMaintainer},
+				targetUser: {Role: role.RoleReader},
+			}).
+			Personal(false).MustBuild()
+		assert.NoError(t, db.Workspace.Save(ctx, ws))
+		op := &workspace.Operator{User: lo.ToPtr(operatorID), MaintainableWorkspaces: []workspace.ID{wid}}
+
+		workspaceUC := NewWorkspace(db, nil, nil)
+		got, err := workspaceUC.UpdateUserMemberViaService(ctx, wid, targetUser, role.RoleMaintainer, op)
+		assert.NoError(t, err)
+		assert.Equal(t, role.RoleMaintainer, got.Members().UserRole(targetUser))
+	})
+
+	t.Run("UpdateUserMemberViaService: a Writer is denied (Maintainer/Owner only)", func(t *testing.T) {
+		db := memory.New()
+		seedRoles(db)
+		wid := id.NewWorkspaceID()
+		operatorID := id.NewUserID()
+		ws := workspace.New().ID(wid).Name("Test").Alias("test-alias").
+			Members(map[user.ID]workspace.Member{operatorID: {Role: role.RoleWriter}}).
+			Personal(false).MustBuild()
+		assert.NoError(t, db.Workspace.Save(ctx, ws))
+		// Writer counts as writable but not maintaining, so this must still be denied.
+		op := &workspace.Operator{User: lo.ToPtr(operatorID), WritableWorkspaces: []workspace.ID{wid}}
+
+		workspaceUC := NewWorkspace(db, nil, nil)
+		_, err := workspaceUC.UpdateUserMemberViaService(ctx, wid, operatorID, role.RoleMaintainer, op)
+		assert.ErrorIs(t, err, interfaces.ErrOperationDenied)
+	})
+
+	t.Run("UpdateUserMemberViaService: Cerbos global role allows a non-member (e.g. LINKS-Veda's admin account)", func(t *testing.T) {
+		db := memory.New()
+		seedRoles(db)
+		wid := id.NewWorkspaceID()
+		targetUser := id.NewUserID()
+		ws := workspace.New().ID(wid).Name("Test").Alias("test-alias").
+			Members(map[user.ID]workspace.Member{targetUser: {Role: role.RoleReader}}).
+			Personal(false).MustBuild()
+		assert.NoError(t, db.Workspace.Save(ctx, ws))
+		op := &workspace.Operator{User: lo.ToPtr(id.NewUserID())} // not a member at all
+
+		workspaceUC := NewWorkspace(db, nil, &fakeCerbos{allowed: true})
+		got, err := workspaceUC.UpdateUserMemberViaService(ctx, wid, targetUser, role.RoleOwner, op)
+		assert.NoError(t, err)
+		assert.Equal(t, role.RoleOwner, got.Members().UserRole(targetUser))
+	})
+
 	t.Run("RemoveMultipleUserMembers: Cerbos global role allows removal by a non-member", func(t *testing.T) {
 		db := memory.New()
 		targetUser := id.NewUserID()

@@ -148,6 +148,10 @@ func (w *Workspace) UpdateUserMember(ctx context.Context, id workspace.ID, userI
 	return ToWorkspace(res.UpdateUserOfWorkspace.Workspace.FragmentWorkspace)
 }
 
+func (w *Workspace) UpdateUserMemberViaService(ctx context.Context, id workspace.ID, userID accountid.UserID, role role.RoleType, op *workspace.Operator) (*workspace.Workspace, error) {
+	return nil, interfaces.ErrOperationDenied
+}
+
 func (w *Workspace) UpdateIntegration(ctx context.Context, id workspace.ID, integrationID workspace.IntegrationID, role role.RoleType, op *workspace.Operator) (*workspace.Workspace, error) {
 	res, err := UpdateIntegrationOfWorkspace(ctx, w.gql, UpdateIntegrationOfWorkspaceInput{WorkspaceId: id.String(), IntegrationId: integrationID.String(), Role: Role(string(role))})
 	if err != nil {
