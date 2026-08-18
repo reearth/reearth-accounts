@@ -121,8 +121,10 @@ func TestREST_RealJWT_WorkspaceListByUser(t *testing.T) {
 // TestREST_RealJWT_ServiceMemberUpdate_BypassesSelfPromotionGuard covers PATCH
 // /api/service/workspaces/:id/members/:user_id: JWT-authenticated like the
 // regular member route, but a Maintainer/Owner may use it to change their own
-// role (including to Owner), unlike the self-demote guard on
-// PATCH /api/workspaces/:id/members/:user_id.
+// role, unlike the self-demote guard on PATCH /api/workspaces/:id/members/:user_id
+// — as long as it isn't the workspace's last remaining Owner (that's still
+// blocked unconditionally, on both routes) and doesn't grant Owner (only
+// TransferOwnership can do that).
 func TestREST_RealJWT_ServiceMemberUpdate_BypassesSelfPromotionGuard(t *testing.T) {
 	key, cleanup := installRealJWT(t)
 	defer cleanup()
@@ -142,15 +144,33 @@ func TestREST_RealJWT_ServiceMemberUpdate_BypassesSelfPromotionGuard(t *testing.
 		WithJSON(map[string]any{"role": "maintainer"}).
 		Expect().Status(http.StatusUnauthorized)
 
-	// jwtPrimaryUID is this workspace's Owner; on the regular member route this
-	// exact change (Owner -> Maintainer, self) is blocked by the self-demote guard.
+	// jwtPrimaryUID is currently the sole Owner: demoting them (self or via the
+	// service route) is blocked everywhere, since it would leave the workspace
+	// ownerless.
+	exp.PATCH("/api/service/workspaces/"+wid+"/members/"+jwtPrimaryUID.String()).
+		WithHeader("Authorization", bearer).
+		WithJSON(map[string]any{"role": "maintainer"}).
+		Expect().Status(http.StatusForbidden)
+
+	// Add jwtSecondUID as a co-owner, so jwtPrimaryUID is no longer the sole Owner.
+	exp.POST("/api/workspaces/"+wid+"/members").
+		WithHeader("Authorization", bearer).
+		WithJSON(map[string]any{"users": []map[string]any{
+			{"user_id": jwtSecondUID.String(), "role": "owner"},
+		}}).
+		Expect().Status(http.StatusOK)
+
+	// Now jwtPrimaryUID is one of two owners; on the regular member route,
+	// stepping down (self, Owner -> Maintainer) is still blocked by the
+	// self-demote guard regardless of co-owners.
 	exp.PATCH("/api/workspaces/"+wid+"/members/"+jwtPrimaryUID.String()).
 		WithHeader("Authorization", bearer).
 		WithJSON(map[string]any{"role": "maintainer"}).
 		Expect().Status(http.StatusForbidden)
 
 	// The service route has no such guard for a Maintainer/Owner acting on
-	// their own role, so the identical change succeeds here.
+	// their own role (and jwtSecondUID remains Owner, so this is safe), so the
+	// identical change succeeds here.
 	members := exp.PATCH("/api/service/workspaces/"+wid+"/members/"+jwtPrimaryUID.String()).
 		WithHeader("Authorization", bearer).
 		WithJSON(map[string]any{"role": "maintainer"}).

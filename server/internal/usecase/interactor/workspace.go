@@ -556,6 +556,11 @@ func (i *Workspace) UpdateUserMemberViaService(ctx context.Context, id workspace
 			return nil, workspace.ErrCannotModifyPersonalWorkspace
 		}
 
+		// Prevent leaving the workspace without any owners.
+		if ws.Members().IsOnlyOwner(u) {
+			return nil, interfaces.ErrCannotChangeOwnerRole
+		}
+
 		if !operator.IsMaintainingWorkspace(id) {
 			if err := i.checkOwnerLikePermission(ctx, ws, operator, rbac.ActionEditMember); err != nil {
 				return nil, err

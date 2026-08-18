@@ -2600,6 +2600,24 @@ func TestWorkspace_MemberManagement_CerbosFallback(t *testing.T) {
 		assert.ErrorIs(t, err, workspace.ErrCannotChangeRoleToOwner)
 	})
 
+	t.Run("UpdateUserMemberViaService: cannot demote the sole owner, leaving the workspace ownerless", func(t *testing.T) {
+		db := memory.New()
+		seedRoles(db)
+		wid := id.NewWorkspaceID()
+		ownerID := id.NewUserID()
+		ws := workspace.New().ID(wid).Name("Test").Alias("test-alias").
+			Members(map[user.ID]workspace.Member{ownerID: {Role: role.RoleOwner}}).
+			Personal(false).MustBuild()
+		assert.NoError(t, db.Workspace.Save(ctx, ws))
+		// The owner is also maintaining (owner implies maintaining), so the
+		// permission gate alone wouldn't have blocked this without the guard.
+		op := &workspace.Operator{User: lo.ToPtr(ownerID), OwningWorkspaces: []workspace.ID{wid}}
+
+		workspaceUC := NewWorkspace(db, nil, nil)
+		_, err := workspaceUC.UpdateUserMemberViaService(ctx, wid, ownerID, role.RoleMaintainer, op)
+		assert.ErrorIs(t, err, interfaces.ErrCannotChangeOwnerRole)
+	})
+
 	t.Run("UpdateUserMemberViaService: also allowed for a non-self target", func(t *testing.T) {
 		db := memory.New()
 		seedRoles(db)
