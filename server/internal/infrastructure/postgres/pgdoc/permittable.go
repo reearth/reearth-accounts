@@ -7,10 +7,13 @@ import (
 	"github.com/reearth/reearth-accounts/server/pkg/permittable"
 )
 
+// json tags match the column names in the PermittableWorkspaceRolesInsertBulk
+// sqlc query's jsonb_to_recordset(...) AS t(...) clause, which are matched
+// case-sensitively against these keys.
 type PermittableWorkspaceRoleRow struct {
-	PermittableID string
-	WorkspaceID   string
-	RoleID        string
+	PermittableID string `json:"permittable_id"`
+	WorkspaceID   string `json:"workspace_id"`
+	RoleID        string `json:"role_id"`
 }
 
 type PermittableRow struct {
