@@ -7,6 +7,32 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
+func TestConfig_Print_MasksSecrets(t *testing.T) {
+	c := Config{
+		DB:               "mongodb://user:pass@localhost/db",
+		RestAPIKey:       "rest-api-key-value",
+		SwaggerBasicPass: "swagger-pass-value",
+		SignupSecret:     "signup-secret-value",
+		SyncSSOAPIKey:    "sync-sso-api-key-value",
+		Auth0: Auth0Config{
+			ClientSecret: "auth0-client-secret-value",
+		},
+	}
+
+	got := c.Print()
+
+	for _, secret := range []string{
+		"mongodb://user:pass@localhost/db",
+		"rest-api-key-value",
+		"swagger-pass-value",
+		"signup-secret-value",
+		"sync-sso-api-key-value",
+		"auth0-client-secret-value",
+	} {
+		assert.NotContains(t, got, secret)
+	}
+}
+
 func TestCIPConfig_AuthConfig(t *testing.T) {
 	// Unset project => nil (no provider added)
 	assert.Nil(t, CIPConfig{}.AuthConfig())
