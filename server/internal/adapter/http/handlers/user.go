@@ -171,8 +171,13 @@ func (h *UserHandler) Get(c echo.Context) error {
 	}
 
 	userResponses := httpmodel.NewUserResponses(res)
-	if err := applyPermittablesToResponses(ctx, c, userResponses, res); err != nil {
-		return err
+
+	// platform_roles/workspaces expose cross-tenant role and membership info, so
+	// only enrich when the caller is requesting their own record.
+	if me := httpinternal.User(c); me != nil && me.ID() == uid {
+		if err := applyPermittablesToResponses(ctx, c, userResponses, res); err != nil {
+			return err
+		}
 	}
 
 	return c.JSON(http.StatusOK, userResponses[0])
