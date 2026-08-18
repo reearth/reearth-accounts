@@ -165,7 +165,7 @@ func (h *UserHandler) Get(c echo.Context) error {
 	if err != nil {
 		return err
 	}
-	if len(res) == 0 {
+	if len(res) == 0 || res[0] == nil {
 		return rerror.ErrNotFound
 	}
 
