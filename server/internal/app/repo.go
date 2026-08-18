@@ -2,6 +2,7 @@ package app
 
 import (
 	"context"
+	"net/url"
 
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/reearth/reearth-accounts/server/internal/infrastructure/auth0"
@@ -70,7 +71,10 @@ func initPostgresReposAndGateways(ctx context.Context, pool *pgxpool.Pool, conf 
 }
 
 func initReposAndGateways(ctx context.Context, client *mongo.Client, conf *Config) (*repo.Container, *gateway.Container) {
-	txAvailable := mongox.IsTransactionAvailable(conf.DB)
+	txAvailable := mongoTransactionsAvailable(conf.DB)
+	if !txAvailable {
+		log.Warnf("mongo: multi-document transactions are unavailable for %s; multi-step writes such as signup will not be rolled back atomically on a mid-sequence failure", redactMongoURI(conf.DB))
+	}
 
 	repos, err := mongorepo.New(ctx, client.Database(conf.DBName), txAvailable, false, []user.Repo{})
 	if err != nil {
@@ -78,4 +82,36 @@ func initReposAndGateways(ctx context.Context, client *mongo.Client, conf *Confi
 	}
 
 	return repos, initGateways(ctx, conf)
+}
+
+// mongoTransactionsAvailable reports whether the driver can start real
+// multi-document transactions against dbURI. mongox.IsTransactionAvailable
+// only recognizes mongodb+srv:// or a mongodb:// URI with a comma-separated
+// host list, so it misclassifies a single-host mongodb:// URI that carries a
+// replicaSet query parameter -- a legitimate transaction-capable topology,
+// since the driver discovers the other replica set members on connect. We OR
+// that case in here rather than changing the vendored predicate.
+func mongoTransactionsAvailable(dbURI string) bool {
+	// Parse first and bail out on failure: mongox.IsTransactionAvailable
+	// ignores its own url.Parse error and dereferences the nil *url.URL,
+	// panicking on unparseable input.
+	u, err := url.Parse(dbURI)
+	if err != nil {
+		return false
+	}
+	if mongox.IsTransactionAvailable(dbURI) {
+		return true
+	}
+	return u.Query().Get("replicaSet") != ""
+}
+
+// redactMongoURI strips userinfo (username/password) from a Mongo connection
+// string before it's put in a log line.
+func redactMongoURI(dbURI string) string {
+	u, err := url.Parse(dbURI)
+	if err != nil {
+		return "(unparseable)"
+	}
+	u.User = nil
+	return u.String()
 }
