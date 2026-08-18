@@ -320,7 +320,12 @@ func (i *Workspace) AddUserMember(ctx context.Context, workspaceID workspace.ID,
 			return nil, workspace.ErrCannotModifyPersonalWorkspace
 		}
 
-		if !operator.IsWritableWorkspace(workspaceID) {
+		// Granting the owner role is an owner-level action even for a caller who
+		// otherwise has plain write access to the workspace: without this, a
+		// writer could add an accomplice account as owner and escalate through
+		// it (SEC-02).
+		grantsOwner := slices.Contains(slices.Collect(maps.Values(users)), role.RoleOwner)
+		if grantsOwner || !operator.IsWritableWorkspace(workspaceID) {
 			if err := i.checkOwnerLikePermission(ctx, ws, operator, rbac.ActionAddMember); err != nil {
 				return nil, err
 			}
@@ -509,14 +514,20 @@ func (i *Workspace) UpdateUserMember(ctx context.Context, id workspace.ID, u wor
 			return nil, workspace.ErrCannotModifyPersonalWorkspace
 		}
 
-		if !operator.IsWritableWorkspace(id) {
+		currentRole := ws.Members().UserRole(u)
+
+		// Granting the owner role, or changing the role of an existing owner
+		// (e.g. demoting them), is an owner-level action even for a caller who
+		// otherwise has plain write access to the workspace: without this, a
+		// writer could promote an accomplice to owner or strip the legitimate
+		// owner's role (SEC-02).
+		if newRole == role.RoleOwner || currentRole == role.RoleOwner || !operator.IsWritableWorkspace(id) {
 			if err := i.checkOwnerLikePermission(ctx, ws, operator, rbac.ActionEditMember); err != nil {
 				return nil, err
 			}
 		}
 
 		if u == *operator.User {
-			currentRole := ws.Members().UserRole(u)
 			if !currentRole.Includes(newRole) {
 				return nil, interfaces.ErrCannotSelfPromote
 			}
