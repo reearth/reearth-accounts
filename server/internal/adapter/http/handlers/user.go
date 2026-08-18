@@ -2,6 +2,7 @@ package handlers
 
 import (
 	"context"
+	"errors"
 	"net/http"
 	"strings"
 
@@ -165,7 +166,7 @@ func (h *UserHandler) Get(c echo.Context) error {
 	if err != nil {
 		return err
 	}
-	if len(res) == 0 {
+	if len(res) == 0 || res[0] == nil {
 		return rerror.ErrNotFound
 	}
 
@@ -293,7 +294,7 @@ func applyPermittablesToResponses(ctx context.Context, c echo.Context, userRespo
 		userIDs = append(userIDs, u.ID())
 	}
 	perms, err := httpinternal.Usecases(c).Permittable.FindByUserIDs(ctx, userIDs)
-	if err != nil {
+	if err != nil && !errors.Is(err, rerror.ErrNotFound) {
 		return err
 	}
 
