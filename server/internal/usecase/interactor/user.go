@@ -400,6 +400,18 @@ func (i *User) GetMFAStatus(ctx context.Context, operator *workspace.Operator) (
 	})
 }
 
+// SEC-04: regenerating the MFA recovery code here only requires a valid
+// operator/session, with no password confirmation, current-MFA challenge, or
+// recent-auth check. This is worse than the SEC-03 gap on UpdateMe/DisableMFA
+// above: those merely lower protection, whereas this mints and returns a
+// long-lived credential that bypasses MFA on future logins, so a hijacked
+// session/access token alone is enough to walk away with persistent
+// second-factor bypass. A password-based re-auth check was tried (#322) and
+// rejected: it can only gate accounts with a "reearth" (password) auth
+// record, and password-based auth is being phased out and is no longer
+// present on most accounts, so it wouldn't meaningfully close this gap going
+// forward. The real fix needs a step-up mechanism through the identity
+// provider (Auth0), which is planned separately and not covered here.
 func (i *User) RegenerateMFARecoveryCode(ctx context.Context, operator *workspace.Operator) (string, error) {
 	if operator == nil || operator.User == nil {
 		return "", interfaces.ErrInvalidOperator
