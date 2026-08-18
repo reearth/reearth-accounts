@@ -19,6 +19,7 @@ var (
 	ErrInvalidUserEmail                = rerror.NewE(i18n.T("invalid email"))
 	ErrNotVerifiedUser                 = rerror.NewE(i18n.T("not verified user"))
 	ErrInvalidEmailOrPassword          = rerror.NewE(i18n.T("invalid email or password"))
+	ErrInvalidCurrentPassword          = rerror.NewE(i18n.T("current password is required or incorrect"))
 	ErrUserAlreadyExists               = rerror.NewE(i18n.T("user already exists"))
 	ErrUserAliasAlreadyExists          = rerror.NewE(i18n.T("user alias already exists"))
 	ErrWorkspaceAliasAlreadyExists     = rerror.NewE(i18n.T("workspace alias already exists"))
@@ -163,5 +164,9 @@ type User interface {
 	DisableMFA(context.Context, *workspace.Operator) error
 	EnableMFA(context.Context, *workspace.Operator) (enrollmentURL string, err error)
 	GetMFAStatus(context.Context, *workspace.Operator) (gateway.MFAStatus, error)
-	RegenerateMFARecoveryCode(context.Context, *workspace.Operator) (recoveryCode string, err error)
+	// RegenerateMFARecoveryCode mints a fresh MFA recovery code, invalidating
+	// the previous one. currentPassword is required and verified when the
+	// account has a "reearth" (password) auth record, since this credential
+	// can bypass MFA on future logins; ignored for SSO-only accounts.
+	RegenerateMFARecoveryCode(ctx context.Context, operator *workspace.Operator, currentPassword string) (recoveryCode string, err error)
 }

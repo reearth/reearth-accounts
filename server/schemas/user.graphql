@@ -153,7 +153,10 @@ extend type Mutation {
   findOrCreate(input: FindOrCreateInput!): UserPayload
   logout: Me
   passwordReset(input: PasswordResetInput!): Boolean
-  regenerateMFARecoveryCode: MFARecoveryCodeResult!
+  # currentPassword is required and verified when the account has a "reearth"
+  # (password) auth record; omitted/ignored for SSO-only accounts, which have
+  # no local password to check.
+  regenerateMFARecoveryCode(currentPassword: String): MFARecoveryCodeResult!
   removeMyAuth(input: RemoveMyAuthInput!): UpdateMePayload
   signup(input: SignupInput!): UserPayload
   signupOIDC(input: SignupOIDCInput!): UserPayload

@@ -400,7 +400,7 @@ func (i *User) GetMFAStatus(ctx context.Context, operator *workspace.Operator) (
 	})
 }
 
-func (i *User) RegenerateMFARecoveryCode(ctx context.Context, operator *workspace.Operator) (string, error) {
+func (i *User) RegenerateMFARecoveryCode(ctx context.Context, operator *workspace.Operator, currentPassword string) (string, error) {
 	if operator == nil || operator.User == nil {
 		return "", interfaces.ErrInvalidOperator
 	}
@@ -409,6 +409,17 @@ func (i *User) RegenerateMFARecoveryCode(ctx context.Context, operator *workspac
 		if err != nil {
 			return "", err
 		}
+
+		// This mints a credential that can bypass MFA on future logins, so
+		// require and verify the current password first for accounts that have
+		// one; SSO-only accounts have no local password to check.
+		if u.HasAuthProvider("reearth") {
+			matched, mErr := u.MatchPassword(currentPassword)
+			if mErr != nil || !matched {
+				return "", interfaces.ErrInvalidCurrentPassword
+			}
+		}
+
 		a := u.Auths().GetByProvider(user.ProviderAuth0)
 		if a == nil {
 			return "", rerror.NewE(i18n.T("no authenticator found"))

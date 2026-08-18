@@ -1311,14 +1311,14 @@ func TestUser_RegenerateMFARecoveryCode(t *testing.T) {
 
 	t.Run("ok", func(t *testing.T) {
 		uc, operator := newUC()
-		code, err := uc.RegenerateMFARecoveryCode(ctx, operator)
+		code, err := uc.RegenerateMFARecoveryCode(ctx, operator, "")
 		assert.NoError(t, err)
 		assert.Equal(t, "new-recovery-code", code)
 	})
 
 	t.Run("nil operator", func(t *testing.T) {
 		uc, _ := newUC()
-		code, err := uc.RegenerateMFARecoveryCode(ctx, nil)
+		code, err := uc.RegenerateMFARecoveryCode(ctx, nil, "")
 		assert.ErrorIs(t, err, interfaces.ErrInvalidOperator)
 		assert.Empty(t, code)
 	})
@@ -1344,9 +1344,60 @@ func TestUser_RegenerateMFARecoveryCode(t *testing.T) {
 		g := &gateway.Container{Authenticators: map[gateway.Provider]gateway.Authenticator{}}
 		uc := NewUser(r, g, nil, "", "")
 
-		code, err := uc.RegenerateMFARecoveryCode(ctx, &workspace.Operator{User: &noAuthUID})
+		code, err := uc.RegenerateMFARecoveryCode(ctx, &workspace.Operator{User: &noAuthUID}, "")
 		assert.Error(t, err)
 		assert.Empty(t, code)
+	})
+
+	newPasswordUC := func() (interfaces.User, *workspace.Operator, id.UserID) {
+		pwUID := id.NewUserID()
+		pwWID := id.NewWorkspaceID()
+		pwUser := user.New().
+			ID(pwUID).
+			Workspace(pwWID).
+			Name("Password User").
+			Email("password-user@example.com").
+			PasswordPlainText("CurrentPass123!").
+			Auths([]user.Auth{
+				{Provider: user.ProviderReearth, Sub: "reearth|" + pwUID.String()},
+				{Provider: "auth0", Sub: "auth0|password-user"},
+			}).
+			MustBuild()
+		pwWs := workspace.New().
+			ID(pwWID).
+			Name("Password User").
+			Personal(true).
+			MustBuild()
+
+		r := memory.New()
+		assert.NoError(t, r.User.Save(ctx, pwUser))
+		assert.NoError(t, r.Workspace.Save(ctx, pwWs))
+
+		mockAuth := &mockAuthenticatorWithError{}
+		g := &gateway.Container{Authenticators: map[gateway.Provider]gateway.Authenticator{gateway.ProviderAuth0: mockAuth}}
+
+		return NewUser(r, g, nil, "", ""), &workspace.Operator{User: &pwUID}, pwUID
+	}
+
+	t.Run("password account requires current password", func(t *testing.T) {
+		uc, operator, _ := newPasswordUC()
+		code, err := uc.RegenerateMFARecoveryCode(ctx, operator, "")
+		assert.ErrorIs(t, err, interfaces.ErrInvalidCurrentPassword)
+		assert.Empty(t, code)
+	})
+
+	t.Run("password account rejects wrong current password", func(t *testing.T) {
+		uc, operator, _ := newPasswordUC()
+		code, err := uc.RegenerateMFARecoveryCode(ctx, operator, "WrongPass123!")
+		assert.ErrorIs(t, err, interfaces.ErrInvalidCurrentPassword)
+		assert.Empty(t, code)
+	})
+
+	t.Run("password account succeeds with correct current password", func(t *testing.T) {
+		uc, operator, _ := newPasswordUC()
+		code, err := uc.RegenerateMFARecoveryCode(ctx, operator, "CurrentPass123!")
+		assert.NoError(t, err)
+		assert.Equal(t, "new-recovery-code", code)
 	})
 }
 

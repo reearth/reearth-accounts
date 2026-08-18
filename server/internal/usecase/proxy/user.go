@@ -229,7 +229,7 @@ func (u *User) GetMFAStatus(_ context.Context, _ *workspace.Operator) (gateway.M
 	return gateway.MFAStatus{}, errors.New("GetMFAStatus is not supported in proxy mode")
 }
 
-func (u *User) RegenerateMFARecoveryCode(_ context.Context, _ *workspace.Operator) (string, error) {
+func (u *User) RegenerateMFARecoveryCode(_ context.Context, _ *workspace.Operator, _ string) (string, error) {
 	return "", errors.New("RegenerateMFARecoveryCode is not supported in proxy mode")
 }
 
