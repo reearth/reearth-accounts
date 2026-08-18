@@ -67,6 +67,75 @@ var bypassedFields = map[string]struct{}{
 	"startpasswordreset":           {},
 }
 
+// workspaceSafeFields and userSafeFields are the only fields an
+// unauthenticated (bypassed) caller may select on a Workspace/User returned
+// by findByID/findByAlias/findByIDs/findUsersByIDsWithPagination. These
+// bypasses exist so other Re:Earth services can resolve a workspace/user by
+// id/alias without a user token, but the resolvers behind them run without an
+// operator, so any field is otherwise reachable -- including workspace
+// members (with each member's email and, for password accounts, their live
+// email-verification code), the workspace billing email, and user email. All
+// of that is scalar-only on purpose: none of these fields have their own
+// selection set worth recursing into, so a request selecting anything with a
+// sub-selection here is also rejected.
+var (
+	workspaceSafeFields = map[string]struct{}{"id": {}, "name": {}, "alias": {}, "personal": {}, "__typename": {}}
+	userSafeFields      = map[string]struct{}{"id": {}, "name": {}, "alias": {}, "__typename": {}}
+)
+
+// bypassSubtreeAllowed reports whether every field selected under a bypassed
+// root field's selection set is safe for an unauthenticated caller. Root
+// fields not handled explicitly (signup, createVerification, authConfig, ...)
+// return payload types carrying no other-user PII, so their full selection
+// sets are inherently safe.
+func bypassSubtreeAllowed(rootField string, sel ast.SelectionSet) bool {
+	switch rootField {
+	case "findbyid", "findbyalias", "findbyids":
+		return allSelectionsIn(sel, workspaceSafeFields)
+	case "findusersbyidswithpagination":
+		for _, s := range sel {
+			f, ok := s.(*ast.Field)
+			if !ok {
+				return false
+			}
+			switch strings.ToLower(f.Name) {
+			case "totalcount", "__typename":
+				if len(f.SelectionSet) > 0 {
+					return false
+				}
+			case "users":
+				if !allSelectionsIn(f.SelectionSet, userSafeFields) {
+					return false
+				}
+			default:
+				return false
+			}
+		}
+		return true
+	default:
+		return true
+	}
+}
+
+// allSelectionsIn reports whether every selection in sel is a plain field
+// (no fragments) whose name is in allowed and which has no sub-selection of
+// its own.
+func allSelectionsIn(sel ast.SelectionSet, allowed map[string]struct{}) bool {
+	for _, s := range sel {
+		f, ok := s.(*ast.Field)
+		if !ok {
+			return false
+		}
+		if _, ok := allowed[strings.ToLower(f.Name)]; !ok {
+			return false
+		}
+		if len(f.SelectionSet) > 0 {
+			return false
+		}
+	}
+	return true
+}
+
 func isBypassed(req *http.Request) bool {
 	if req.Method != http.MethodPost {
 		return false
@@ -142,7 +211,8 @@ func isBypassed(req *http.Request) bool {
 	}
 
 	// Require every top-level field in the selected operation to be in the
-	// bypass allowlist.
+	// bypass allowlist, and its own selection set to stay within the fields
+	// safe for an unauthenticated caller (see bypassSubtreeAllowed).
 	if len(targetOp.SelectionSet) == 0 {
 		return false
 	}
@@ -151,7 +221,11 @@ func isBypassed(req *http.Request) bool {
 		if !ok {
 			return false
 		}
-		if _, allowed := bypassedFields[strings.ToLower(field.Name)]; !allowed {
+		name := strings.ToLower(field.Name)
+		if _, allowed := bypassedFields[name]; !allowed {
+			return false
+		}
+		if !bypassSubtreeAllowed(name, field.SelectionSet) {
 			return false
 		}
 	}

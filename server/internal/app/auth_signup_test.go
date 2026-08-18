@@ -76,7 +76,7 @@ func TestIsBypassed(t *testing.T) {
 		})
 
 		t.Run("findUsersByIdsWithPagination query", func(t *testing.T) {
-			body := `{"query":"query { findUsersByIdsWithPagination(ids: [\"id1\"]) { nodes { id } } }"}`
+			body := `{"query":"query { findUsersByIdsWithPagination(ids: [\"id1\"]) { users { id name alias } totalCount } }"}`
 			req, err := http.NewRequest(http.MethodPost, "/api/graphql", io.NopCloser(bytes.NewBufferString(body)))
 			assert.NoError(t, err)
 
@@ -91,6 +91,72 @@ func TestIsBypassed(t *testing.T) {
 
 			result := isBypassed(req)
 			assert.True(t, result)
+		})
+	})
+
+	t.Run("should reject sensitive sub-fields on bypassed lookups (SEC-01)", func(t *testing.T) {
+		t.Run("findByAlias selecting members is rejected", func(t *testing.T) {
+			body := `{"query":"{findByAlias(alias:\"acme\"){id name metadata{billingEmail} members{... on WorkspaceUserMember{userId role user{name email verification{code}}}}}}"}`
+			req, err := http.NewRequest(http.MethodPost, "/api/graphql", io.NopCloser(bytes.NewBufferString(body)))
+			assert.NoError(t, err)
+
+			assert.False(t, isBypassed(req))
+		})
+
+		t.Run("findByAlias selecting metadata is rejected", func(t *testing.T) {
+			body := `{"query":"query { findByAlias(alias: \"acme\") { id name metadata { billingEmail } } }"}`
+			req, err := http.NewRequest(http.MethodPost, "/api/graphql", io.NopCloser(bytes.NewBufferString(body)))
+			assert.NoError(t, err)
+
+			assert.False(t, isBypassed(req))
+		})
+
+		t.Run("findByAlias selecting only safe fields is allowed", func(t *testing.T) {
+			body := `{"query":"query { findByAlias(alias: \"acme\") { id name alias personal } }"}`
+			req, err := http.NewRequest(http.MethodPost, "/api/graphql", io.NopCloser(bytes.NewBufferString(body)))
+			assert.NoError(t, err)
+
+			assert.True(t, isBypassed(req))
+		})
+
+		t.Run("findByID selecting members is rejected", func(t *testing.T) {
+			body := `{"query":"query { findByID(id: \"x\") { id members { userId } } }"}`
+			req, err := http.NewRequest(http.MethodPost, "/api/graphql", io.NopCloser(bytes.NewBufferString(body)))
+			assert.NoError(t, err)
+
+			assert.False(t, isBypassed(req))
+		})
+
+		t.Run("findByIDs selecting members is rejected", func(t *testing.T) {
+			body := `{"query":"query { findByIDs(ids: [\"x\"]) { id members { userId } } }"}`
+			req, err := http.NewRequest(http.MethodPost, "/api/graphql", io.NopCloser(bytes.NewBufferString(body)))
+			assert.NoError(t, err)
+
+			assert.False(t, isBypassed(req))
+		})
+
+		t.Run("findUsersByIDsWithPagination selecting email is rejected", func(t *testing.T) {
+			body := `{"query":"query { findUsersByIDsWithPagination(ids: [\"x\"], pagination: {}) { users { id name email verification { code } } totalCount } }"}`
+			req, err := http.NewRequest(http.MethodPost, "/api/graphql", io.NopCloser(bytes.NewBufferString(body)))
+			assert.NoError(t, err)
+
+			assert.False(t, isBypassed(req))
+		})
+
+		t.Run("findUsersByIDsWithPagination selecting only safe fields is allowed", func(t *testing.T) {
+			body := `{"query":"query { findUsersByIDsWithPagination(ids: [\"x\"], pagination: {}) { users { id name alias } totalCount } }"}`
+			req, err := http.NewRequest(http.MethodPost, "/api/graphql", io.NopCloser(bytes.NewBufferString(body)))
+			assert.NoError(t, err)
+
+			assert.True(t, isBypassed(req))
+		})
+
+		t.Run("chaining findByAlias id harvest into findByIDs member selection is still rejected", func(t *testing.T) {
+			body := `{"query":"query { findByAlias(alias: \"acme\") { id } findByIDs(ids: [\"x\"]) { members { userId } } }"}`
+			req, err := http.NewRequest(http.MethodPost, "/api/graphql", io.NopCloser(bytes.NewBufferString(body)))
+			assert.NoError(t, err)
+
+			assert.False(t, isBypassed(req))
 		})
 	})
 
