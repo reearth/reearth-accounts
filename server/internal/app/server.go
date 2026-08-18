@@ -2,10 +2,13 @@ package app
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"net"
+	"net/http"
 	"os"
 	"os/signal"
+	"syscall"
 	"time"
 
 	"github.com/cerbos/cerbos-sdk-go/cerbos"
@@ -216,13 +219,20 @@ func (w *WebServer) Run(ctx context.Context) {
 	log.Infof("server started%s at http://%s\n", debugLog, w.address)
 
 	go func() {
-		err := w.appServer.StartH2CServer(w.address, &http2.Server{})
-		log.Fatalc(ctx, err.Error())
+		if err := w.appServer.StartH2CServer(w.address, &http2.Server{}); err != nil && !errors.Is(err, http.ErrServerClosed) {
+			log.Fatalc(ctx, err.Error())
+		}
 	}()
 
 	quit := make(chan os.Signal, 1)
-	signal.Notify(quit, os.Interrupt)
+	signal.Notify(quit, os.Interrupt, syscall.SIGTERM)
 	<-quit
+
+	shutdownCtx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+	if err := w.Shutdown(shutdownCtx); err != nil {
+		log.Errorf("server shutdown: %v", err)
+	}
 }
 
 func (w *WebServer) Serve(l net.Listener) error {
