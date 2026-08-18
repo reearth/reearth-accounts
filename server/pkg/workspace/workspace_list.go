@@ -9,17 +9,15 @@ func (l List) FilterByID(ids ...ID) List {
 		return nil
 	}
 
-	res := make(List, 0, len(l))
+	byID := make(map[ID]*Workspace, len(l))
+	for _, t := range l {
+		byID[t.ID()] = t
+	}
+
+	res := make(List, 0, len(ids))
 	for _, id := range ids {
-		var t2 *Workspace
-		for _, t := range l {
-			if t.ID() == id {
-				t2 = t
-				break
-			}
-		}
-		if t2 != nil {
-			res = append(res, t2)
+		if t, ok := byID[id]; ok {
+			res = append(res, t)
 		}
 	}
 	return res

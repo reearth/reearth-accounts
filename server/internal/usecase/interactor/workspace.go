@@ -23,6 +23,10 @@ import (
 	"github.com/samber/lo"
 )
 
+// maxFetchWorkspaceIDs caps a single Fetch-by-IDs call, matching the admin
+// API's existing per-request ID limit (internal/admin/.../handler_list.go).
+const maxFetchWorkspaceIDs = 100
+
 type WorkspaceMemberCountEnforcer func(context.Context, *workspace.Workspace, user.List, *workspace.Operator) error
 
 type Workspace struct {
@@ -55,6 +59,9 @@ func NewWorkspace(r *repo.Container, enforceMemberCount WorkspaceMemberCountEnfo
 // layer must not require operator-based filtering. Any unauthenticated usage
 // must ensure that only the intended workspace fields are exposed by a higher layer.
 func (i *Workspace) Fetch(ctx context.Context, ids workspace.IDList, operator *workspace.Operator) (workspace.List, error) {
+	if len(ids) > maxFetchWorkspaceIDs {
+		return nil, interfaces.ErrTooManyWorkspaceIDs
+	}
 	return i.repos.Workspace.FindByIDs(ctx, ids)
 }
 

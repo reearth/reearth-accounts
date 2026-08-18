@@ -119,7 +119,8 @@ func mapError(err error) *ErrorResponse {
 		errors.Is(err, interfaces.ErrUserInvalidLang),
 		errors.Is(err, interfaces.ErrSignupInvalidSecret),
 		errors.Is(err, interfaces.ErrInvalidPhotoURL),
-		errors.Is(err, interfaces.ErrNotVerifiedUser):
+		errors.Is(err, interfaces.ErrNotVerifiedUser),
+		errors.Is(err, interfaces.ErrTooManyWorkspaceIDs):
 		return &ErrorResponse{Status: http.StatusBadRequest, Message: "bad request", Description: err.Error(), Err: err}
 	default:
 		return &ErrorResponse{Status: http.StatusInternalServerError, Message: "internal server error", Description: "an unexpected error occurred", Err: err}
