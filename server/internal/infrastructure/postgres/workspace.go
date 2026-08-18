@@ -2,6 +2,7 @@ package postgres
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"sort"
 	"strings"
@@ -249,20 +250,24 @@ func (r *Workspace) save(ctx context.Context, ws *workspace.Workspace) error {
 		if err := q.WorkspaceMembersDeleteByWorkspace(ctx, row.ID); err != nil {
 			return rerror.ErrInternalByWithContext(ctx, err)
 		}
-		for _, m := range members {
-			if err := q.WorkspaceMemberInsert(ctx, gen.WorkspaceMemberInsertParams{
-				WorkspaceID: m.WorkspaceID, UserID: m.UserID, Role: m.Role, InvitedBy: m.InvitedBy, Disabled: m.Disabled,
-			}); err != nil {
+		if len(members) > 0 {
+			payload, err := json.Marshal(members)
+			if err != nil {
+				return rerror.ErrInternalByWithContext(ctx, err)
+			}
+			if err := q.WorkspaceMembersInsertBulk(ctx, payload); err != nil {
 				return rerror.ErrInternalByWithContext(ctx, err)
 			}
 		}
 		if err := q.WorkspaceIntegrationsDeleteByWorkspace(ctx, row.ID); err != nil {
 			return rerror.ErrInternalByWithContext(ctx, err)
 		}
-		for _, m := range integrations {
-			if err := q.WorkspaceIntegrationInsert(ctx, gen.WorkspaceIntegrationInsertParams{
-				WorkspaceID: m.WorkspaceID, IntegrationID: m.IntegrationID, Role: m.Role, InvitedBy: m.InvitedBy, Disabled: m.Disabled,
-			}); err != nil {
+		if len(integrations) > 0 {
+			payload, err := json.Marshal(integrations)
+			if err != nil {
+				return rerror.ErrInternalByWithContext(ctx, err)
+			}
+			if err := q.WorkspaceIntegrationsInsertBulk(ctx, payload); err != nil {
 				return rerror.ErrInternalByWithContext(ctx, err)
 			}
 		}

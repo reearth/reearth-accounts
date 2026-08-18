@@ -64,9 +64,18 @@ type Querier interface {
 	WorkspaceIntegrationInsert(ctx context.Context, arg WorkspaceIntegrationInsertParams) error
 	WorkspaceIntegrationsByWorkspaceIDs(ctx context.Context, dollar_1 []string) ([]WorkspaceIntegration, error)
 	WorkspaceIntegrationsDeleteByWorkspace(ctx context.Context, workspaceID string) error
+	// One round-trip for any number of integration members, instead of one
+	// WorkspaceIntegrationInsert per integration. See WorkspaceMembersInsertBulk
+	// for why jsonb_to_recordset is used over a multi-arg unnest.
+	WorkspaceIntegrationsInsertBulk(ctx context.Context, dollar_1 []byte) error
 	WorkspaceMemberInsert(ctx context.Context, arg WorkspaceMemberInsertParams) error
 	WorkspaceMembersByWorkspaceIDs(ctx context.Context, dollar_1 []string) ([]WorkspaceMember, error)
 	WorkspaceMembersDeleteByWorkspace(ctx context.Context, workspaceID string) error
+	// One round-trip for any number of members, instead of one
+	// WorkspaceMemberInsert per member. jsonb_to_recordset takes a single
+	// parameter (rather than one array per column, as a multi-arg unnest would),
+	// which sqlc's static catalog can type-check without a live database.
+	WorkspaceMembersInsertBulk(ctx context.Context, dollar_1 []byte) error
 	WorkspaceUpsert(ctx context.Context, arg WorkspaceUpsertParams) error
 }
 
