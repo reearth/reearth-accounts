@@ -537,6 +537,53 @@ func (i *Workspace) UpdateUserMember(ctx context.Context, id workspace.ID, u wor
 	})
 }
 
+// UpdateUserMemberViaService sets a member's role without the self-promotion guard applied in UpdateUserMember
+func (i *Workspace) UpdateUserMemberViaService(ctx context.Context, id workspace.ID, u workspace.UserID, newRole role.RoleType, operator *workspace.Operator) (_ *workspace.Workspace, err error) {
+	if operator.User == nil {
+		return nil, interfaces.ErrInvalidOperator
+	}
+	if newRole == role.RoleOwner {
+		return nil, workspace.ErrCannotChangeRoleToOwner
+	}
+
+	return Run1(ctx, operator, i.repos, Usecase().Transaction(), func(ctx context.Context) (*workspace.Workspace, error) {
+		ws, err := i.repos.Workspace.FindByID(ctx, id)
+		if err != nil {
+			return nil, err
+		}
+
+		if ws.IsPersonal() {
+			return nil, workspace.ErrCannotModifyPersonalWorkspace
+		}
+
+		// Prevent leaving the workspace without any owners.
+		if ws.Members().IsOnlyOwner(u) {
+			return nil, interfaces.ErrCannotChangeOwnerRole
+		}
+
+		if !operator.IsMaintainingWorkspace(id) {
+			if err := i.checkOwnerLikePermission(ctx, ws, operator, rbac.ActionEditMember); err != nil {
+				return nil, err
+			}
+		}
+
+		if err := ws.Members().UpdateUserRole(u, newRole); err != nil {
+			return nil, err
+		}
+
+		if err := i.updatePermittable(ctx, u, ws.ID(), newRole); err != nil {
+			return nil, err
+		}
+
+		if err := i.repos.Workspace.Save(ctx, ws); err != nil {
+			return nil, err
+		}
+
+		i.applyDefaultPolicy(ws, operator)
+		return ws, nil
+	})
+}
+
 func (i *Workspace) UpdateIntegration(ctx context.Context, wId workspace.ID, iId workspace.IntegrationID, role role.RoleType, operator *workspace.Operator) (_ *workspace.Workspace, err error) {
 	if operator.User == nil {
 		return nil, interfaces.ErrInvalidOperator

@@ -131,6 +131,11 @@ func RegisterRESTRouter(e *echo.Echo, cfg RouterConfig) {
 	api.DELETE("/workspaces/:id/integrations", wh.RemoveIntegrations, required)
 	api.POST("/workspaces/:id/transfer-ownership", wh.TransferOwnership, required)
 
+	// --- Service routes ---
+	// JWT required; the caller must hold Maintainer or Owner in the target workspace
+	// This can bypass the self-promotion guard that PATCH .../members/:user_id enforces.
+	api.PATCH("/service/workspaces/:id/members/:user_id", wh.UpdateMemberViaService, required)
+
 	// --- Permission ---
 	ph := handlers.NewPermissionHandler()
 	// OptionalAuth resolves a JWT/mock user (attaching it for APIKeyOrAuth and the

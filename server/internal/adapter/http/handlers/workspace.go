@@ -352,6 +352,38 @@ func (h *WorkspaceHandler) UpdateMember(c echo.Context) error {
 	return c.JSON(http.StatusOK, httpmodel.NewWorkspaceResponse(w))
 }
 
+// UpdateMemberViaService godoc
+// @Tags Workspace
+// @Summary Update a member's role, bypassing the self-promotion guard
+// @Security BearerAuth
+// @Accept json
+// @Produce json
+// @Param id path string true "workspace ID"
+// @Param user_id path string true "user ID"
+// @Param body body httpmodel.UpdateMemberRequest true "new role"
+// @Success 200 {object} httpmodel.WorkspaceResponse
+// @Router /api/service/workspaces/{id}/members/{user_id} [patch]
+func (h *WorkspaceHandler) UpdateMemberViaService(c echo.Context) error {
+	ctx := c.Request().Context()
+	wid, err := id.WorkspaceIDFrom(c.Param("id"))
+	if err != nil {
+		return badRequest("invalid workspace id")
+	}
+	uid, err := id.UserIDFrom(c.Param("user_id"))
+	if err != nil {
+		return badRequest("invalid user id")
+	}
+	req := &httpmodel.UpdateMemberRequest{}
+	if err := httpinternal.BindValidate(c, req); err != nil {
+		return err
+	}
+	w, err := httpinternal.Usecases(c).Workspace.UpdateUserMemberViaService(ctx, wid, uid, httpmodel.ParseRole(req.Role), httpinternal.Operator(c))
+	if err != nil {
+		return err
+	}
+	return c.JSON(http.StatusOK, httpmodel.NewWorkspaceResponse(w))
+}
+
 // RemoveMember godoc
 // @Tags Workspace
 // @Summary Remove a user member
