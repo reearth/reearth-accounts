@@ -263,7 +263,12 @@ type GraphQLConfig struct {
 func (c Config) Print() string {
 	s := fmt.Sprintf("%+v", c)
 	// Mask credential-like values so the startup log line doesn't leak them.
-	for _, secret := range []string{c.DB, c.RestAPIKey, c.SwaggerBasicPass} {
+	// fmt's "%+v" ignores the `pp:",omitempty"` tags used elsewhere in this
+	// struct, so every secret field must be listed here explicitly.
+	for _, secret := range []string{
+		c.DB, c.RestAPIKey, c.SwaggerBasicPass,
+		c.Auth0.ClientSecret, c.SignupSecret, c.SyncSSOAPIKey,
+	} {
 		if secret == "" {
 			continue
 		}
