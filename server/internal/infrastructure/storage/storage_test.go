@@ -3,8 +3,14 @@ package storage
 import (
 	"bytes"
 	"context"
+	"crypto/rand"
+	"crypto/rsa"
+	"crypto/x509"
+	"encoding/json"
+	"encoding/pem"
 	"io"
 	"os"
+	"path/filepath"
 	"strings"
 	"sync"
 	"testing"
@@ -460,9 +466,61 @@ func TestStorage_bucket(t *testing.T) {
 		assert.NoError(t, err2)
 		assert.NotNil(t, bucket2)
 
-		// The GCS client should be reused (sync.Once guarantees single initialization)
+		// The GCS client should be reused once initialization succeeds.
 		assert.Same(t, firstClient, s.gcsClient)
 	})
+
+	t.Run("should retry initialization after a transient failure instead of latching it", func(t *testing.T) {
+		// An earlier subtest sets STORAGE_EMULATOR_HOST via os.Setenv without
+		// clearing it, which would otherwise let the client construct
+		// successfully against the emulator regardless of credentials.
+		t.Setenv("STORAGE_EMULATOR_HOST", "")
+
+		credPath := filepath.Join(t.TempDir(), "adc.json")
+		t.Setenv("GOOGLE_APPLICATION_CREDENTIALS", credPath)
+
+		cfg := &Config{BucketName: "test-bucket"}
+		s := &Storage{cfg: cfg}
+
+		// First call: no credentials file yet, so client init fails.
+		bucket, err := s.bucket(context.Background())
+		assert.Error(t, err)
+		assert.Nil(t, bucket)
+		assert.Nil(t, s.gcsClient)
+
+		// Second call: the transient condition has cleared, so init must be
+		// retried (not fail forever because of the earlier attempt).
+		require.NoError(t, os.WriteFile(credPath, fakeServiceAccountJSON(t), 0o600))
+		bucket, err = s.bucket(context.Background())
+		assert.NoError(t, err)
+		assert.NotNil(t, bucket)
+		assert.NotNil(t, s.gcsClient)
+	})
+}
+
+// fakeServiceAccountJSON returns a syntactically valid GCP service-account
+// key so storage.NewClient can parse credentials locally without any network
+// access.
+func fakeServiceAccountJSON(t *testing.T) []byte {
+	t.Helper()
+
+	key, err := rsa.GenerateKey(rand.Reader, 2048)
+	require.NoError(t, err)
+
+	pemKey := pem.EncodeToMemory(&pem.Block{
+		Type:  "RSA PRIVATE KEY",
+		Bytes: x509.MarshalPKCS1PrivateKey(key),
+	})
+
+	b, err := json.Marshal(map[string]string{
+		"type":         "service_account",
+		"project_id":   "test-project",
+		"private_key":  string(pemKey),
+		"client_email": "test@test-project.iam.gserviceaccount.com",
+		"token_uri":    "https://oauth2.googleapis.com/token",
+	})
+	require.NoError(t, err)
+	return b
 }
 
 func newTestStorage(cfg *Config) *Storage {
