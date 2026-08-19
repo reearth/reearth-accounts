@@ -32,6 +32,10 @@ func (r *Config) LockAndLoad(ctx context.Context) (cfg *config.Config, err error
 	cfgd := &mongodoc.ConfigDocument{}
 	if err := r.client.FindOne(ctx, bson.M{}).Decode(cfgd); err != nil {
 		if !errors.Is(err, mongo.ErrNilDocument) && !errors.Is(err, mongo.ErrNoDocuments) {
+			// Release the lock on load failure so a transient read error (e.g. a
+			// primary stepdown) doesn't leave it held for its full TTL with no
+			// caller left to release it.
+			_ = r.lock.Unlock(ctx, configLockName)
 			return nil, rerror.ErrInternalByWithContext(ctx, err)
 		}
 	}
