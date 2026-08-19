@@ -416,7 +416,7 @@ func (i *User) RegenerateMFARecoveryCode(ctx context.Context, operator *workspac
 	if operator == nil || operator.User == nil {
 		return "", interfaces.ErrInvalidOperator
 	}
-	return Run1(ctx, operator, i.repos, Usecase().Transaction(), func(ctx context.Context) (string, error) {
+	return Run1(ctx, operator, i.repos, Usecase(), func(ctx context.Context) (string, error) {
 		u, err := i.repos.User.FindByID(ctx, *operator.User)
 		if err != nil {
 			return "", err
