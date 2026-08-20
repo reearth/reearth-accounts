@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"sort"
 	"strings"
 	"time"
 
@@ -92,6 +93,13 @@ func SyncPersonalWorkspaceAlias(ctx context.Context, c DBClient) error {
 				if doc.Workspace == "" || doc.Alias == "" {
 					continue
 				}
+				// A personal workspace should have exactly one owner. If the
+				// data disagrees, keep the lowest user ID rather than whoever
+				// happened to be scanned last: Find has no sort, so scan order
+				// is not guaranteed.
+				if prev, exists := owners[doc.Workspace]; exists && prev.userID <= doc.ID {
+					continue
+				}
 				owners[doc.Workspace] = aliasSyncOwner{userID: doc.ID, alias: doc.Alias}
 			}
 			return nil
@@ -115,7 +123,14 @@ func SyncPersonalWorkspaceAlias(ctx context.Context, c DBClient) error {
 					return err
 				}
 				if doc.Alias != "" {
-					taken[strings.ToLower(doc.Alias)] = doc.ID
+					key := strings.ToLower(doc.Alias)
+					// alias_case_insensitive_unique makes this key unique
+					// wherever the index exists. Where it does not yet,
+					// duplicates are possible, so keep the lowest workspace ID
+					// to keep the reported conflict stable across runs.
+					if prev, exists := taken[key]; !exists || doc.ID < prev {
+						taken[key] = doc.ID
+					}
 				}
 				if doc.Personal {
 					candidates = append(candidates, aliasSyncCandidate{workspaceID: doc.ID, alias: doc.Alias})
@@ -127,10 +142,18 @@ func SyncPersonalWorkspaceAlias(ctx context.Context, c DBClient) error {
 		return fmt.Errorf("failed to scan workspaces: %w", err)
 	}
 
-	// Decide everything up front, before any write, so the outcome does not
-	// depend on a cursor running concurrently with updates to the same
-	// collection. candidates is a slice, so the order — and therefore which
-	// workspace wins a contested alias — is deterministic.
+	// Sort by workspace ID before deciding anything. The decision loop below
+	// mutates taken as it goes, releasing and claiming aliases, so the order it
+	// visits candidates in determines which workspace wins a contested alias.
+	// Find is issued without a sort and Mongo guarantees no particular order,
+	// so an explicit sort is what makes the outcome reproducible.
+	sort.Slice(candidates, func(i, j int) bool {
+		return candidates[i].workspaceID < candidates[j].workspaceID
+	})
+
+	// Decide everything up front, before any write, so the outcome also does
+	// not depend on a cursor running concurrently with updates to the same
+	// collection.
 	updates := map[string]string{}
 	updateOrder := make([]string, 0)
 	skips := make([]AliasSyncSkipRecord, 0)
@@ -163,9 +186,10 @@ func SyncPersonalWorkspaceAlias(ctx context.Context, c DBClient) error {
 			continue
 		}
 
-		// Releasing the old alias is safe because decisions are applied in the
-		// order they are made, so a workspace claiming this alias later is
-		// always written after this one.
+		// Releasing the old alias lets a later candidate claim it. That is only
+		// safe because applyAliasSyncUpdates replays updateOrder in order, so
+		// the write that frees the alias is always queued ahead of the write
+		// that takes it.
 		if cand.alias != "" {
 			delete(taken, strings.ToLower(cand.alias))
 		}
@@ -189,9 +213,15 @@ func SyncPersonalWorkspaceAlias(ctx context.Context, c DBClient) error {
 	return nil
 }
 
-// applyAliasSyncUpdates writes the new aliases in chunks. Each chunk is read
-// fully into memory before it is written, so no cursor is open on the
-// workspace collection while it is being modified.
+// applyAliasSyncUpdates writes the new aliases in chunks, following the order
+// the updates were decided in. That order matters: one workspace may claim an
+// alias another one is releasing, and SaveAll issues an ordered BulkWrite, so
+// the releasing write has to be queued first or the claim hits E11000. The
+// documents are therefore re-keyed by ID and replayed in `order` rather than in
+// the order the cursor returns them.
+//
+// Each chunk is also read fully into memory before it is written, so no cursor
+// is open on the workspace collection while it is being modified.
 func applyAliasSyncUpdates(ctx context.Context, col *mongox.Collection, order []string, updates map[string]string) error {
 	for start := 0; start < len(order); start += aliasSyncWriteChunkSize {
 		end := start + aliasSyncWriteChunkSize
@@ -200,8 +230,7 @@ func applyAliasSyncUpdates(ctx context.Context, col *mongox.Collection, order []
 		}
 		chunk := order[start:end]
 
-		ids := make([]string, 0, len(chunk))
-		newRows := make([]interface{}, 0, len(chunk))
+		docs := make(map[string]mongodoc.WorkspaceDocument, len(chunk))
 		if err := col.Find(ctx, bson.M{"id": bson.M{"$in": chunk}}, &mongox.BatchConsumer{
 			Size: aliasSyncWriteChunkSize,
 			Callback: func(rows []bson.Raw) error {
@@ -210,28 +239,40 @@ func applyAliasSyncUpdates(ctx context.Context, col *mongox.Collection, order []
 					if err := bson.Unmarshal(row, &doc); err != nil {
 						return err
 					}
-					newAlias, ok := updates[doc.ID]
-					if !ok {
-						continue
-					}
-					b, err := json.Marshal(map[string]string{
-						"workspaceId": doc.ID,
-						"fromAlias":   doc.Alias,
-						"toAlias":     newAlias,
-					})
-					if err != nil {
-						return err
-					}
-					fmt.Printf("%s %s\n", aliasSyncUpdateMarker, b)
-
-					doc.Alias = newAlias
-					ids = append(ids, doc.ID)
-					newRows = append(newRows, doc)
+					docs[doc.ID] = doc
 				}
 				return nil
 			},
 		}); err != nil {
 			return fmt.Errorf("failed to load workspaces for alias sync: %w", err)
+		}
+
+		ids := make([]string, 0, len(chunk))
+		newRows := make([]interface{}, 0, len(chunk))
+		for _, id := range chunk {
+			doc, ok := docs[id]
+			if !ok {
+				// Deleted between the scan and now; nothing to update.
+				continue
+			}
+			newAlias, ok := updates[id]
+			if !ok {
+				continue
+			}
+
+			b, err := json.Marshal(map[string]string{
+				"workspaceId": id,
+				"fromAlias":   doc.Alias,
+				"toAlias":     newAlias,
+			})
+			if err != nil {
+				return fmt.Errorf("failed to marshal alias sync update for workspace %s: %w", id, err)
+			}
+			fmt.Printf("%s %s\n", aliasSyncUpdateMarker, b)
+
+			doc.Alias = newAlias
+			ids = append(ids, id)
+			newRows = append(newRows, doc)
 		}
 
 		if len(ids) == 0 {
