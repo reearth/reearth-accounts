@@ -344,6 +344,78 @@ func TestSyncPersonalWorkspaceAlias(t *testing.T) {
 		assert.Empty(t, fetchAliasSyncSkips(t, ctx, db))
 	})
 
+	t.Run("ClaimsAnAliasReleasedByALowerNumberedWorkspace", func(t *testing.T) {
+		ctx := context.Background()
+		db := mongotest.Connect(t)(t)
+		createWorkspaceAliasUniqueIndex(t, ctx, db)
+
+		client := mongox.NewClientWithDatabase(db)
+		userCol := client.WithCollection("user")
+		workspaceCol := client.WithCollection("workspace")
+
+		// ws-a gives up "aliasone", which is exactly what ws-b wants. ws-a
+		// sorts first, so it is decided first and ws-b can take the released
+		// alias. Both rows are inserted in the opposite order on purpose: if
+		// the decision pass followed scan order instead of workspace ID, ws-b
+		// would be decided while ws-a still held "aliasone" and get skipped.
+		users := []mongodoc.UserDocument{
+			{ID: "user-b", Name: "B", Email: "b@example.com", Alias: "aliasone", Workspace: "ws-b"},
+			{ID: "user-a", Name: "A", Email: "a@example.com", Alias: "freshalias", Workspace: "ws-a"},
+		}
+		for _, u := range users {
+			_, err := userCol.Client().InsertOne(ctx, u)
+			assert.NoError(t, err)
+		}
+
+		workspaces := []mongodoc.WorkspaceDocument{
+			{ID: "ws-b", Name: "B WS", Alias: "aliastwo", Personal: true},
+			{ID: "ws-a", Name: "A WS", Alias: "aliasone", Personal: true},
+		}
+		for _, ws := range workspaces {
+			_, err := workspaceCol.Client().InsertOne(ctx, ws)
+			assert.NoError(t, err)
+		}
+
+		require.NoError(t, SyncPersonalWorkspaceAlias(ctx, client))
+
+		assert.Equal(t, "freshalias", workspaceAlias(t, ctx, db, "ws-a"))
+		assert.Equal(t, "aliasone", workspaceAlias(t, ctx, db, "ws-b"))
+		assert.Empty(t, fetchAliasSyncSkips(t, ctx, db))
+	})
+
+	t.Run("PicksTheLowestUserIDWhenAWorkspaceHasSeveralOwners", func(t *testing.T) {
+		ctx := context.Background()
+		db := mongotest.Connect(t)(t)
+		createWorkspaceAliasUniqueIndex(t, ctx, db)
+
+		client := mongox.NewClientWithDatabase(db)
+		userCol := client.WithCollection("user")
+		workspaceCol := client.WithCollection("workspace")
+
+		// Two users claim the same personal workspace. The higher ID is
+		// inserted first, so last-writer-wins would pick it.
+		users := []mongodoc.UserDocument{
+			{ID: "user-2", Name: "Two", Email: "two@example.com", Alias: "secondalias", Workspace: "sharedws"},
+			{ID: "user-1", Name: "One", Email: "one@example.com", Alias: "firstalias", Workspace: "sharedws"},
+		}
+		for _, u := range users {
+			_, err := userCol.Client().InsertOne(ctx, u)
+			assert.NoError(t, err)
+		}
+
+		_, err := workspaceCol.Client().InsertOne(ctx, mongodoc.WorkspaceDocument{
+			ID:       "sharedws",
+			Name:     "Shared WS",
+			Alias:    "oldshared",
+			Personal: true,
+		})
+		assert.NoError(t, err)
+
+		require.NoError(t, SyncPersonalWorkspaceAlias(ctx, client))
+
+		assert.Equal(t, "firstalias", workspaceAlias(t, ctx, db, "sharedws"))
+	})
+
 	t.Run("SkipRecordsDoNotDuplicateOnRerun", func(t *testing.T) {
 		ctx := context.Background()
 		db := mongotest.Connect(t)(t)
