@@ -203,6 +203,13 @@ func (i *User) UpdateMe(ctx context.Context, p interfaces.UpdateMeParam, operato
 			if existingUser != nil && existingUser.ID() != u.ID() {
 				return nil, interfaces.ErrUserAliasAlreadyExists
 			}
+			existingWs, err := i.repos.Workspace.FindByAlias(ctx, *p.Alias)
+			if err != nil && !errors.Is(err, rerror.ErrNotFound) {
+				return nil, err
+			}
+			if existingWs != nil && existingWs.ID() != u.Workspace() {
+				return nil, interfaces.ErrWorkspaceAliasAlreadyExists
+			}
 			u.UpdateAlias(*p.Alias)
 			ws.UpdateAlias(*p.Alias)
 		}
