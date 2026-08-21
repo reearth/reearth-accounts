@@ -635,6 +635,21 @@ func TestWorkspace_Fetch(t *testing.T) {
 	}
 }
 
+func TestWorkspace_Fetch_TooManyIDs(t *testing.T) {
+	ctx := context.Background()
+	db := memory.New()
+	workspaceUC := NewWorkspace(db, nil, nil)
+
+	ids := make([]workspace.ID, maxFetchWorkspaceIDs+1)
+	for i := range ids {
+		ids[i] = id.NewWorkspaceID()
+	}
+
+	got, err := workspaceUC.Fetch(ctx, ids, &workspace.Operator{})
+	assert.Nil(t, got)
+	assert.ErrorIs(t, err, interfaces.ErrTooManyWorkspaceIDs)
+}
+
 func TestWorkspace_FindByUser(t *testing.T) {
 	userID := id.NewUserID()
 	id1 := id.NewWorkspaceID()
