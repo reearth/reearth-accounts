@@ -934,6 +934,23 @@ func TestWorkspace_AddMember(t *testing.T) {
 			}, nil, false),
 		},
 		{
+			name:       "owner cannot add a member directly as owner; must use TransferOwnership",
+			seeds:      workspace.List{w2},
+			usersSeeds: []*user.User{u},
+			args: struct {
+				wId      workspace.ID
+				users    map[user.ID]role.RoleType
+				operator *workspace.Operator
+			}{
+				wId: w2.ID(),
+				users: map[user.ID]role.RoleType{
+					u.ID(): role.RoleOwner,
+				},
+				operator: op,
+			},
+			wantErr: workspace.ErrCannotChangeRoleToOwner,
+		},
+		{
 			name:       "add a non existing member",
 			seeds:      workspace.List{w1},
 			usersSeeds: []*user.User{u},
@@ -1681,7 +1698,7 @@ func TestWorkspace_UpdateMember(t *testing.T) {
 			want:    workspace.NewMembersWith(map[user.ID]workspace.Member{userID: {Role: role.RoleOwner}, u.ID(): {Role: role.RoleReader}}, nil, false),
 		},
 		{
-			name:       "Owner can set own role to owner",
+			name:       "Cannot set role to owner even for own already-owned role",
 			seeds:      workspace.List{w5},
 			usersSeeds: []*user.User{u},
 			args: struct {
@@ -1695,8 +1712,24 @@ func TestWorkspace_UpdateMember(t *testing.T) {
 				role:     role.RoleOwner,
 				operator: op,
 			},
-			wantErr: nil,
-			want:    workspace.NewMembersWith(map[user.ID]workspace.Member{userID: {Role: role.RoleOwner}, u.ID(): {Role: role.RoleReader}}, nil, false),
+			wantErr: workspace.ErrCannotChangeRoleToOwner,
+		},
+		{
+			name:       "Owner cannot grant owner role to another member; must use TransferOwnership",
+			seeds:      workspace.List{w2},
+			usersSeeds: []*user.User{u},
+			args: struct {
+				wId      workspace.ID
+				uId      user.ID
+				role     role.RoleType
+				operator *workspace.Operator
+			}{
+				wId:      id2,
+				uId:      u.ID(),
+				role:     role.RoleOwner,
+				operator: op,
+			},
+			wantErr: workspace.ErrCannotChangeRoleToOwner,
 		},
 		{
 			name:       "Non-owner cannot self-promote to higher role",
@@ -2571,10 +2604,11 @@ func TestWorkspace_MemberManagement_CerbosFallback(t *testing.T) {
 		}
 
 		// A real maintainer already has edit_member, so nothing (Cerbos included)
-		// should let them grant themselves Owner through UpdateUserMember.
+		// should let them grant themselves Owner through UpdateUserMember: the
+		// owner role can only be granted via TransferOwnership.
 		workspaceUC := NewWorkspace(db, nil, &fakeCerbos{allowed: true})
 		_, err := workspaceUC.UpdateUserMember(ctx, wid, operatorID, role.RoleOwner, op)
-		assert.ErrorIs(t, err, interfaces.ErrCannotSelfPromote)
+		assert.ErrorIs(t, err, workspace.ErrCannotChangeRoleToOwner)
 	})
 
 	t.Run("UpdateUserMemberViaService: a Maintainer can set their own role (below Owner), bypassing the self-promotion guard", func(t *testing.T) {

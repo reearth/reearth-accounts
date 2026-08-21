@@ -1,10 +1,13 @@
 package e2e
 
 import (
+	"context"
 	"net/http"
 	"testing"
 
 	"github.com/reearth/reearth-accounts/server/internal/app"
+	"github.com/reearth/reearth-accounts/server/pkg/role"
+	"github.com/reearth/reearth-accounts/server/pkg/workspace"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -129,7 +132,7 @@ func TestREST_RealJWT_ServiceMemberUpdate_BypassesSelfPromotionGuard(t *testing.
 	key, cleanup := installRealJWT(t)
 	defer cleanup()
 
-	exp, _ := StartServer(t, realAuthConfig(), false, seedJWTUsers(realJWTWorkspaceSub))
+	exp, r := StartServer(t, realAuthConfig(), false, seedJWTUsers(realJWTWorkspaceSub))
 	token := signTestToken(t, key, realJWTWorkspaceSub)
 	bearer := "Bearer " + token
 
@@ -152,13 +155,26 @@ func TestREST_RealJWT_ServiceMemberUpdate_BypassesSelfPromotionGuard(t *testing.
 		WithJSON(map[string]any{"role": "maintainer"}).
 		Expect().Status(http.StatusForbidden)
 
-	// Add jwtSecondUID as a co-owner, so jwtPrimaryUID is no longer the sole Owner.
+	// Granting the owner role through the regular member route is rejected
+	// unconditionally: only TransferOwnership can make someone an owner.
 	exp.POST("/api/workspaces/"+wid+"/members").
 		WithHeader("Authorization", bearer).
 		WithJSON(map[string]any{"users": []map[string]any{
 			{"user_id": jwtSecondUID.String(), "role": "owner"},
 		}}).
-		Expect().Status(http.StatusOK)
+		Expect().Status(http.StatusBadRequest)
+
+	// So make jwtSecondUID a co-owner directly via the repo, bypassing HTTP,
+	// to get jwtPrimaryUID off being the sole Owner for the checks below.
+	ctx := context.Background()
+	wsID, err := workspace.IDFrom(wid)
+	assert.NoError(t, err)
+	ws, err := r.Workspace.FindByID(ctx, wsID)
+	assert.NoError(t, err)
+	secondUser, err := r.User.FindByID(ctx, jwtSecondUID)
+	assert.NoError(t, err)
+	assert.NoError(t, ws.Members().Join(secondUser, role.RoleOwner, jwtPrimaryUID))
+	assert.NoError(t, r.Workspace.Save(ctx, ws))
 
 	// Now jwtPrimaryUID is one of two owners; on the regular member route,
 	// stepping down (self, Owner -> Maintainer) is still blocked by the
