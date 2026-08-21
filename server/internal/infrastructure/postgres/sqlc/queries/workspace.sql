@@ -41,6 +41,16 @@ DELETE FROM workspace_members WHERE workspace_id = $1;
 -- name: WorkspaceMemberInsert :exec
 INSERT INTO workspace_members (workspace_id, user_id, role, invited_by, disabled) VALUES ($1,$2,$3,$4,$5);
 
+-- name: WorkspaceMembersInsertBulk :exec
+-- One round-trip for any number of members, instead of one
+-- WorkspaceMemberInsert per member. jsonb_to_recordset takes a single
+-- parameter (rather than one array per column, as a multi-arg unnest would),
+-- which sqlc's static catalog can type-check without a live database.
+INSERT INTO workspace_members (workspace_id, user_id, role, invited_by, disabled)
+SELECT workspace_id, user_id, role, invited_by, disabled
+  FROM jsonb_to_recordset($1::jsonb)
+  AS t(workspace_id text, user_id text, role text, invited_by text, disabled bool);
+
 -- name: WorkspaceMembersByWorkspaceIDs :many
 SELECT * FROM workspace_members WHERE workspace_id = ANY($1::text[]);
 
@@ -49,6 +59,15 @@ DELETE FROM workspace_integrations WHERE workspace_id = $1;
 
 -- name: WorkspaceIntegrationInsert :exec
 INSERT INTO workspace_integrations (workspace_id, integration_id, role, invited_by, disabled) VALUES ($1,$2,$3,$4,$5);
+
+-- name: WorkspaceIntegrationsInsertBulk :exec
+-- One round-trip for any number of integration members, instead of one
+-- WorkspaceIntegrationInsert per integration. See WorkspaceMembersInsertBulk
+-- for why jsonb_to_recordset is used over a multi-arg unnest.
+INSERT INTO workspace_integrations (workspace_id, integration_id, role, invited_by, disabled)
+SELECT workspace_id, integration_id, role, invited_by, disabled
+  FROM jsonb_to_recordset($1::jsonb)
+  AS t(workspace_id text, integration_id text, role text, invited_by text, disabled bool);
 
 -- name: WorkspaceIntegrationsByWorkspaceIDs :many
 SELECT * FROM workspace_integrations WHERE workspace_id = ANY($1::text[]);
