@@ -1209,6 +1209,88 @@ func TestUser_UpdateMe_FindByAliasError(t *testing.T) {
 	assert.Nil(t, result)
 }
 
+func TestUser_UpdateMe_WorkspaceAliasTaken(t *testing.T) {
+	user.DefaultPasswordEncoder = &user.NoopPasswordEncoder{}
+
+	ctx := context.Background()
+	r := memory.New()
+	uc := NewUser(r, nil, nil, "", "")
+
+	uid := id.NewUserID()
+	wid := id.NewWorkspaceID()
+	u := user.New().
+		ID(uid).
+		Workspace(wid).
+		Name("Alice").
+		Alias("alice").
+		Email("alice@example.com").
+		MustBuild()
+	personalWS := workspace.New().
+		ID(wid).
+		Name("Alice").
+		Alias("alice").
+		Personal(true).
+		MustBuild()
+
+	orgWID := id.NewWorkspaceID()
+	orgWS := workspace.New().
+		ID(orgWID).
+		Name("Org").
+		Alias("orgalias").
+		Personal(false).
+		MustBuild()
+
+	assert.NoError(t, r.User.Save(ctx, u))
+	assert.NoError(t, r.Workspace.Save(ctx, personalWS))
+	assert.NoError(t, r.Workspace.Save(ctx, orgWS))
+
+	operator := &workspace.Operator{User: &uid}
+	result, err := uc.UpdateMe(ctx, interfaces.UpdateMeParam{
+		Alias: strPtr("orgalias"),
+	}, operator)
+
+	assert.ErrorIs(t, err, interfaces.ErrWorkspaceAliasAlreadyExists)
+	assert.Nil(t, result)
+}
+
+func TestUser_UpdateMe_OwnPersonalWorkspaceAliasSameAsTarget(t *testing.T) {
+	user.DefaultPasswordEncoder = &user.NoopPasswordEncoder{}
+
+	ctx := context.Background()
+	r := memory.New()
+	uc := NewUser(r, nil, nil, "", "")
+
+	uid := id.NewUserID()
+	wid := id.NewWorkspaceID()
+	// User alias is empty, but personal workspace already has "wsalias".
+	// Updating the user alias to "wsalias" should succeed: the workspace that
+	// holds the alias is the user's own personal workspace.
+	u := user.New().
+		ID(uid).
+		Workspace(wid).
+		Name("Bob").
+		Email("bob@example.com").
+		MustBuild()
+	personalWS := workspace.New().
+		ID(wid).
+		Name("Bob").
+		Alias("wsalias").
+		Personal(true).
+		MustBuild()
+
+	assert.NoError(t, r.User.Save(ctx, u))
+	assert.NoError(t, r.Workspace.Save(ctx, personalWS))
+
+	operator := &workspace.Operator{User: &uid}
+	result, err := uc.UpdateMe(ctx, interfaces.UpdateMeParam{
+		Alias: strPtr("wsalias"),
+	}, operator)
+
+	assert.NoError(t, err)
+	assert.NotNil(t, result)
+	assert.Equal(t, "wsalias", result.Alias())
+}
+
 func TestUser_UpdateMe_SetPasswordError(t *testing.T) {
 	user.DefaultPasswordEncoder = &user.NoopPasswordEncoder{}
 

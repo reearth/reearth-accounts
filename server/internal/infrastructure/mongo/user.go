@@ -130,7 +130,12 @@ func (r *User) FindByNameOrEmail(ctx context.Context, nameOrEmail string) (*user
 }
 
 func (r *User) FindByAlias(ctx context.Context, alias string) (*user.User, error) {
-	return r.findOne(ctx, bson.M{"alias": alias})
+	c := mongodoc.NewUserConsumer(r.host)
+	opt := options.FindOne().SetCollation(&options.Collation{Locale: "en", Strength: 2})
+	if err := r.client.FindOne(ctx, bson.M{"alias": alias}, c, opt); err != nil {
+		return nil, err
+	}
+	return c.Result[0], nil
 }
 
 func (r *User) SearchByKeyword(ctx context.Context, keyword string) (user.List, error) {

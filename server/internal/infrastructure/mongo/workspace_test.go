@@ -174,6 +174,7 @@ func TestWorkspace_FindByAlias(t *testing.T) {
 	ws1 := workspace.New().NewID().Name("hoge").Alias("alias").MustBuild()
 	ws2 := workspace.New().NewID().Name("foo").Alias("alias2").MustBuild()
 	ws3 := workspace.New().NewID().Name("xxx").Alias("alias3").MustBuild()
+	wsMixed := workspace.New().NewID().Name("mixed").Alias("MixedCase").MustBuild()
 
 	tests := []struct {
 		Name          string
@@ -195,6 +196,20 @@ func TestWorkspace_FindByAlias(t *testing.T) {
 			Input:         "notfound",
 			Expected:      nil,
 			ExpectedError: rerror.ErrNotFoundRaw,
+		},
+		{
+			Name:          "must find workspace by alias case-insensitively (lowercase query)",
+			RepoData:      workspace.List{wsMixed},
+			Input:         "mixedcase",
+			Expected:      wsMixed,
+			ExpectedError: nil,
+		},
+		{
+			Name:          "must find workspace by alias case-insensitively (uppercase query)",
+			RepoData:      workspace.List{wsMixed},
+			Input:         "MIXEDCASE",
+			Expected:      wsMixed,
+			ExpectedError: nil,
 		},
 	}
 
@@ -470,4 +485,32 @@ func TestWorkspace_FindByIntegrations(t *testing.T) {
 			assert.NoError(t, err)
 		})
 	}
+}
+
+func TestWorkspace_FindByAlias_CaseInsensitive(t *testing.T) {
+	db := Connect(t)(t)
+	client := mongox.NewClientWithDatabase(db)
+	repo := NewWorkspace(client)
+	ctx := context.Background()
+
+	ws := workspace.New().NewID().Name("casei").Alias("MixedAlias").MustBuild()
+	assert.NoError(t, repo.SaveAll(ctx, workspace.List{ws}))
+
+	t.Run("lowercase query finds mixed-case stored alias", func(t *testing.T) {
+		got, err := repo.FindByAlias(ctx, "mixedalias")
+		assert.NoError(t, err)
+		assert.Equal(t, ws.ID(), got.ID())
+	})
+
+	t.Run("uppercase query finds mixed-case stored alias", func(t *testing.T) {
+		got, err := repo.FindByAlias(ctx, "MIXEDALIAS")
+		assert.NoError(t, err)
+		assert.Equal(t, ws.ID(), got.ID())
+	})
+
+	t.Run("exact match still works", func(t *testing.T) {
+		got, err := repo.FindByAlias(ctx, "MixedAlias")
+		assert.NoError(t, err)
+		assert.Equal(t, ws.ID(), got.ID())
+	})
 }
