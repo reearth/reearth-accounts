@@ -7,6 +7,7 @@ import (
 	"github.com/go-playground/validator/v10"
 	"github.com/labstack/echo/v4"
 	"github.com/reearth/reearth-accounts/server/internal/usecase/interfaces"
+	"github.com/reearth/reearth-accounts/server/pkg/workspace"
 	"github.com/reearth/reearthx/log"
 	"github.com/reearth/reearthx/rerror"
 )
@@ -120,7 +121,8 @@ func mapError(err error) *ErrorResponse {
 		errors.Is(err, interfaces.ErrSignupInvalidSecret),
 		errors.Is(err, interfaces.ErrInvalidPhotoURL),
 		errors.Is(err, interfaces.ErrNotVerifiedUser),
-		errors.Is(err, interfaces.ErrTooManyWorkspaceIDs):
+		errors.Is(err, interfaces.ErrTooManyWorkspaceIDs),
+		errors.Is(err, workspace.ErrCannotChangeRoleToOwner):
 		return &ErrorResponse{Status: http.StatusBadRequest, Message: "bad request", Description: err.Error(), Err: err}
 	default:
 		return &ErrorResponse{Status: http.StatusInternalServerError, Message: "internal server error", Description: "an unexpected error occurred", Err: err}

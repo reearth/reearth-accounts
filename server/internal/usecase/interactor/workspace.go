@@ -320,6 +320,10 @@ func (i *Workspace) AddUserMember(ctx context.Context, workspaceID workspace.ID,
 			return nil, workspace.ErrCannotModifyPersonalWorkspace
 		}
 
+		if slices.Contains(slices.Collect(maps.Values(users)), role.RoleOwner) {
+			return nil, workspace.ErrCannotChangeRoleToOwner
+		}
+
 		if !operator.IsWritableWorkspace(workspaceID) {
 			if err := i.checkOwnerLikePermission(ctx, ws, operator, rbac.ActionAddMember); err != nil {
 				return nil, err
@@ -509,18 +513,23 @@ func (i *Workspace) UpdateUserMember(ctx context.Context, id workspace.ID, u wor
 			return nil, workspace.ErrCannotModifyPersonalWorkspace
 		}
 
-		if !operator.IsWritableWorkspace(id) {
+		if newRole == role.RoleOwner {
+			return nil, workspace.ErrCannotChangeRoleToOwner
+		}
+
+		currentRole := ws.Members().UserRole(u)
+
+		if currentRole == role.RoleOwner || !operator.IsWritableWorkspace(id) {
 			if err := i.checkOwnerLikePermission(ctx, ws, operator, rbac.ActionEditMember); err != nil {
 				return nil, err
 			}
 		}
 
 		if u == *operator.User {
-			currentRole := ws.Members().UserRole(u)
 			if !currentRole.Includes(newRole) {
 				return nil, interfaces.ErrCannotSelfPromote
 			}
-			if currentRole == role.RoleOwner && newRole != role.RoleOwner {
+			if currentRole == role.RoleOwner {
 				return nil, interfaces.ErrCannotChangeOwnerRole
 			}
 		}
