@@ -74,7 +74,7 @@ var resourceRules = []ResourceRule{
 				},
 			},
 			ActionManage: {
-				Roles: []string{roleOwner},
+				Roles: []string{roleMaintainer, roleOwner},
 			},
 			ActionRead: {
 				Roles: []string{roleSelf},
@@ -118,7 +118,7 @@ var resourceRules = []ResourceRule{
 			ActionEdit:              {Roles: []string{roleMaintainer, roleOwner}},
 			ActionEditAlias:         {Roles: []string{roleOwner}},
 			ActionList:              {Roles: []string{roleSelf, roleReader, roleWriter, roleMaintainer, roleOwner}},
-			ActionManage:            {Roles: []string{roleOwner}},
+			ActionManage:            {Roles: []string{roleMaintainer, roleOwner}},
 			ActionRead:              {Roles: []string{roleReader, roleWriter, roleMaintainer, roleOwner}},
 			ActionTransferOwnership: {Roles: []string{roleOwner}},
 			ActionValidate:          {Roles: []string{roleReader, roleWriter, roleMaintainer, roleOwner}},
