@@ -7,6 +7,7 @@ import (
 	"testing"
 
 	"github.com/reearth/reearth-accounts/server/internal/infrastructure/memory"
+	"github.com/reearth/reearth-accounts/server/internal/rbac"
 	"github.com/reearth/reearth-accounts/server/internal/usecase/interfaces"
 	"github.com/reearth/reearth-accounts/server/internal/usecase/repo"
 	"github.com/reearth/reearth-accounts/server/pkg/id"
@@ -31,6 +32,19 @@ func (f *fakeCerbos) CheckPermission(context.Context, user.ID, interfaces.CheckP
 		return nil, f.err
 	}
 	return &interfaces.CheckPermissionResult{Allowed: f.allowed}, nil
+}
+
+// recordingCerbos is a fakeCerbos variant that records the params it was
+// called with, so tests can assert *what* was asked (e.g. the exact action
+// requested), not just the outcome.
+type recordingCerbos struct {
+	allowed bool
+	calls   []interfaces.CheckPermissionParam
+}
+
+func (r *recordingCerbos) CheckPermission(_ context.Context, _ user.ID, p interfaces.CheckPermissionParam) (*interfaces.CheckPermissionResult, error) {
+	r.calls = append(r.calls, p)
+	return &interfaces.CheckPermissionResult{Allowed: r.allowed}, nil
 }
 
 func TestWorkspace_Create(t *testing.T) {
@@ -2417,6 +2431,31 @@ func TestWorkspace_FindAll(t *testing.T) {
 		nonMaintainerOp := &workspace.Operator{User: lo.ToPtr(nonMaintainer)}
 
 		_, err := workspaceUC.FindAll(ctx, interfaces.FindAllWorkspacesParam{Page: 1, Size: 10}, nonMaintainerOp)
+		assert.ErrorIs(t, err, interfaces.ErrPermissionDenied)
+	})
+}
+
+func TestWorkspace_FindAll_CerbosActionManage(t *testing.T) {
+	ctx := context.Background()
+
+	t.Run("Cerbos allow permits it, and asks about ActionManage", func(t *testing.T) {
+		db := memory.New()
+		cerbos := &recordingCerbos{allowed: true}
+		workspaceUC := NewWorkspace(db, nil, cerbos)
+
+		_, err := workspaceUC.FindAll(ctx, interfaces.FindAllWorkspacesParam{Page: 1, Size: 10}, &workspace.Operator{User: lo.ToPtr(user.NewID())})
+		assert.NoError(t, err)
+		if assert.Len(t, cerbos.calls, 1) {
+			assert.Equal(t, rbac.ActionManage, cerbos.calls[0].Action)
+			assert.Equal(t, rbac.ResourceWorkspace, cerbos.calls[0].Resource)
+		}
+	})
+
+	t.Run("Cerbos deny blocks it — an ordinary self-scoped member must not pass an admin-only gate", func(t *testing.T) {
+		db := memory.New()
+		workspaceUC := NewWorkspace(db, nil, &fakeCerbos{allowed: false})
+
+		_, err := workspaceUC.FindAll(ctx, interfaces.FindAllWorkspacesParam{Page: 1, Size: 10}, &workspace.Operator{User: lo.ToPtr(user.NewID())})
 		assert.ErrorIs(t, err, interfaces.ErrPermissionDenied)
 	})
 }
