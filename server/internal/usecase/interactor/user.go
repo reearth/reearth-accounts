@@ -88,7 +88,7 @@ func (i *User) FindAll(ctx context.Context, param interfaces.FindAllUsersParam) 
 	if param.Operator == nil || param.Operator.User == nil {
 		return interfaces.FindAllUsersResult{}, interfaces.ErrInvalidOperator
 	}
-	if err := i.checkMaintainerPermission(ctx, param.Operator, rbac.ActionList); err != nil {
+	if err := i.checkMaintainerPermission(ctx, param.Operator, rbac.ActionManage); err != nil {
 		return interfaces.FindAllUsersResult{}, err
 	}
 	return i.query.FindAll(ctx, param)
@@ -507,7 +507,7 @@ func (i *User) Deactivate(ctx context.Context, id user.ID, operator *workspace.O
 			return nil, err
 		}
 
-		if err := i.checkMaintainerPermission(ctx, operator, rbac.ActionEdit); err != nil {
+		if err := i.checkMaintainerPermission(ctx, operator, rbac.ActionManage); err != nil {
 			return nil, err
 		}
 
@@ -534,7 +534,7 @@ func (i *User) Restore(ctx context.Context, id user.ID, operator *workspace.Oper
 			return nil, err
 		}
 
-		if err := i.checkMaintainerPermission(ctx, operator, rbac.ActionEdit); err != nil {
+		if err := i.checkMaintainerPermission(ctx, operator, rbac.ActionManage); err != nil {
 			return nil, err
 		}
 
@@ -831,7 +831,7 @@ func (i *User) UpdateUserBySub(ctx context.Context, sub string, name *string, op
 	if operator == nil || operator.User == nil {
 		return interfaces.ErrInvalidOperator
 	}
-	if err := i.checkMaintainerPermission(ctx, operator, rbac.ActionEdit); err != nil {
+	if err := i.checkMaintainerPermission(ctx, operator, rbac.ActionManage); err != nil {
 		return err
 	}
 	if name == nil {
@@ -875,7 +875,7 @@ func (i *User) SetPlatformRolesBySub(ctx context.Context, sub string, roleNames 
 	if operator == nil || operator.User == nil {
 		return interfaces.ErrInvalidOperator
 	}
-	if err := i.checkMaintainerPermission(ctx, operator, rbac.ActionEdit); err != nil {
+	if err := i.checkMaintainerPermission(ctx, operator, rbac.ActionManage); err != nil {
 		return err
 	}
 

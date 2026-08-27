@@ -27,6 +27,7 @@ const (
 	ActionEditAlias         = "edit_alias"
 	ActionEditMember        = "edit_member"
 	ActionList              = "list"
+	ActionManage            = "manage"
 	ActionRead              = "read"
 	ActionReadMember        = "read_member"
 	ActionSearch            = "search"
@@ -72,6 +73,9 @@ var resourceRules = []ResourceRule{
 					},
 				},
 			},
+			ActionManage: {
+				Roles: []string{roleOwner},
+			},
 			ActionRead: {
 				Roles: []string{roleSelf},
 				Condition: &generator.Condition{
@@ -114,6 +118,7 @@ var resourceRules = []ResourceRule{
 			ActionEdit:              {Roles: []string{roleMaintainer, roleOwner}},
 			ActionEditAlias:         {Roles: []string{roleOwner}},
 			ActionList:              {Roles: []string{roleSelf, roleReader, roleWriter, roleMaintainer, roleOwner}},
+			ActionManage:            {Roles: []string{roleOwner}},
 			ActionRead:              {Roles: []string{roleReader, roleWriter, roleMaintainer, roleOwner}},
 			ActionTransferOwnership: {Roles: []string{roleOwner}},
 			ActionValidate:          {Roles: []string{roleReader, roleWriter, roleMaintainer, roleOwner}},
