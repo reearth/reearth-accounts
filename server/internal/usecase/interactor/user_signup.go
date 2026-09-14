@@ -541,11 +541,8 @@ func (i *User) findOrCreateRole(ctx context.Context, roleName string, mockAuth b
 }
 
 func (i *User) CreateVerification(ctx context.Context, email string) error {
-	type idpTarget struct {
-		authenticator gateway.Authenticator
-		sub           string
-	}
-	var target *idpTarget
+	var idpAuth gateway.Authenticator
+	var idpSub string
 
 	if err := Run0(ctx, nil, i.repos, Usecase().Transaction(), func(ctx context.Context) error {
 		u, err := i.repos.User.FindByEmail(ctx, email)
@@ -575,7 +572,8 @@ func (i *User) CreateVerification(ctx context.Context, email string) error {
 			if auth == nil {
 				continue
 			}
-			target = &idpTarget{authenticator: auth, sub: a.Sub}
+			idpAuth = auth
+			idpSub = a.Sub
 			break
 		}
 
@@ -584,8 +582,8 @@ func (i *User) CreateVerification(ctx context.Context, email string) error {
 		return err
 	}
 
-	if target != nil {
-		if err := target.authenticator.ResendVerificationEmail(ctx, target.sub); err != nil {
+	if idpAuth != nil {
+		if err := idpAuth.ResendVerificationEmail(ctx, idpSub); err != nil {
 			return err
 		}
 	}
