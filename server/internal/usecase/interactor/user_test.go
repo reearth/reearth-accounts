@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/reearth/reearth-accounts/server/internal/infrastructure/memory"
+	"github.com/reearth/reearth-accounts/server/internal/rbac"
 	"github.com/reearth/reearth-accounts/server/internal/usecase/gateway"
 	"github.com/reearth/reearth-accounts/server/internal/usecase/interfaces"
 	"github.com/reearth/reearth-accounts/server/internal/usecase/repo"
@@ -1873,6 +1874,123 @@ func TestUser_SetPlatformRolesBySub(t *testing.T) {
 
 		uc := NewUser(db, nil, nil, "", "")
 		err := uc.SetPlatformRolesBySub(ctx, "cip-sub-2", []string{"custom"}, op)
+		assert.ErrorIs(t, err, interfaces.ErrPermissionDenied)
+	})
+}
+
+func TestUser_CheckMaintainerPermission_CerbosActionManage(t *testing.T) {
+	ctx := context.Background()
+
+	setupTargetUser := func(t *testing.T) (user.ID, string, *repo.Container) {
+		t.Helper()
+		db := memory.New()
+		uid := id.NewUserID()
+		u := user.New().ID(uid).Workspace(id.NewWorkspaceID()).Name("Target").Email("cerbos-target@bbb.com").
+			Auths([]user.Auth{{Provider: "", Sub: "cerbos-action-manage-sub"}}).MustBuild()
+		require.NoError(t, db.User.Save(ctx, u))
+		return uid, "cerbos-action-manage-sub", db
+	}
+
+	t.Run("Deactivate: Cerbos allow permits it, and asks about ActionManage", func(t *testing.T) {
+		uid, _, db := setupTargetUser(t)
+		cerbos := &recordingCerbos{allowed: true}
+		uc := NewUser(db, nil, cerbos, "", "")
+
+		_, err := uc.Deactivate(ctx, uid, &workspace.Operator{User: lo.ToPtr(user.NewID())})
+		assert.NoError(t, err)
+		if assert.Len(t, cerbos.calls, 1) {
+			assert.Equal(t, rbac.ActionManage, cerbos.calls[0].Action)
+			assert.Equal(t, rbac.ResourceUser, cerbos.calls[0].Resource)
+		}
+	})
+
+	t.Run("Deactivate: Cerbos deny blocks it", func(t *testing.T) {
+		uid, _, db := setupTargetUser(t)
+		uc := NewUser(db, nil, &fakeCerbos{allowed: false}, "", "")
+
+		_, err := uc.Deactivate(ctx, uid, &workspace.Operator{User: lo.ToPtr(user.NewID())})
+		assert.ErrorIs(t, err, interfaces.ErrPermissionDenied)
+	})
+
+	t.Run("Restore: Cerbos allow permits it, and asks about ActionManage", func(t *testing.T) {
+		uid, _, db := setupTargetUser(t)
+		cerbos := &recordingCerbos{allowed: true}
+		uc := NewUser(db, nil, cerbos, "", "")
+
+		_, err := uc.Restore(ctx, uid, &workspace.Operator{User: lo.ToPtr(user.NewID())})
+		assert.NoError(t, err)
+		if assert.Len(t, cerbos.calls, 1) {
+			assert.Equal(t, rbac.ActionManage, cerbos.calls[0].Action)
+		}
+	})
+
+	t.Run("Restore: Cerbos deny blocks it", func(t *testing.T) {
+		uid, _, db := setupTargetUser(t)
+		uc := NewUser(db, nil, &fakeCerbos{allowed: false}, "", "")
+
+		_, err := uc.Restore(ctx, uid, &workspace.Operator{User: lo.ToPtr(user.NewID())})
+		assert.ErrorIs(t, err, interfaces.ErrPermissionDenied)
+	})
+
+	t.Run("UpdateUserBySub: Cerbos allow permits it, and asks about ActionManage", func(t *testing.T) {
+		_, sub, db := setupTargetUser(t)
+		cerbos := &recordingCerbos{allowed: true}
+		uc := NewUser(db, nil, cerbos, "", "")
+
+		err := uc.UpdateUserBySub(ctx, sub, strPtr("New Name"), &workspace.Operator{User: lo.ToPtr(user.NewID())})
+		assert.NoError(t, err)
+		if assert.Len(t, cerbos.calls, 1) {
+			assert.Equal(t, rbac.ActionManage, cerbos.calls[0].Action)
+		}
+	})
+
+	t.Run("UpdateUserBySub: Cerbos deny blocks it — a self-editing user must not pass an admin-only gate", func(t *testing.T) {
+		_, sub, db := setupTargetUser(t)
+		uc := NewUser(db, nil, &fakeCerbos{allowed: false}, "", "")
+
+		err := uc.UpdateUserBySub(ctx, sub, strPtr("New Name"), &workspace.Operator{User: lo.ToPtr(user.NewID())})
+		assert.ErrorIs(t, err, interfaces.ErrPermissionDenied)
+	})
+
+	t.Run("SetPlatformRolesBySub: Cerbos allow permits granting a role, and asks about ActionManage", func(t *testing.T) {
+		_, sub, db := setupTargetUser(t)
+		targetRole := role.New().NewID().Name("custom").MustBuild()
+		require.NoError(t, db.Role.Save(ctx, *targetRole))
+		cerbos := &recordingCerbos{allowed: true}
+		uc := NewUser(db, nil, cerbos, "", "")
+
+		err := uc.SetPlatformRolesBySub(ctx, sub, []string{"custom"}, &workspace.Operator{User: lo.ToPtr(user.NewID())})
+		assert.NoError(t, err)
+		if assert.Len(t, cerbos.calls, 1) {
+			assert.Equal(t, rbac.ActionManage, cerbos.calls[0].Action)
+		}
+	})
+
+	t.Run("SetPlatformRolesBySub: Cerbos deny blocks self-granting the owner role", func(t *testing.T) {
+		_, sub, db := setupTargetUser(t)
+		uc := NewUser(db, nil, &fakeCerbos{allowed: false}, "", "")
+
+		err := uc.SetPlatformRolesBySub(ctx, sub, []string{"owner"}, &workspace.Operator{User: lo.ToPtr(user.NewID())})
+		assert.ErrorIs(t, err, interfaces.ErrPermissionDenied)
+	})
+
+	t.Run("FindAll: Cerbos allow permits it, and asks about ActionManage", func(t *testing.T) {
+		db := memory.New()
+		cerbos := &recordingCerbos{allowed: true}
+		uc := NewUser(db, nil, cerbos, "", "")
+
+		_, err := uc.FindAll(ctx, interfaces.FindAllUsersParam{Page: 1, Size: 10, Operator: &workspace.Operator{User: lo.ToPtr(user.NewID())}})
+		assert.NoError(t, err)
+		if assert.Len(t, cerbos.calls, 1) {
+			assert.Equal(t, rbac.ActionManage, cerbos.calls[0].Action)
+		}
+	})
+
+	t.Run("FindAll: Cerbos deny blocks it", func(t *testing.T) {
+		db := memory.New()
+		uc := NewUser(db, nil, &fakeCerbos{allowed: false}, "", "")
+
+		_, err := uc.FindAll(ctx, interfaces.FindAllUsersParam{Page: 1, Size: 10, Operator: &workspace.Operator{User: lo.ToPtr(user.NewID())}})
 		assert.ErrorIs(t, err, interfaces.ErrPermissionDenied)
 	})
 }

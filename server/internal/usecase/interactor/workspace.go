@@ -101,7 +101,7 @@ func (i *Workspace) FindAll(ctx context.Context, input interfaces.FindAllWorkspa
 	if operator == nil || operator.User == nil {
 		return interfaces.FindAllWorkspacesResult{}, interfaces.ErrInvalidOperator
 	}
-	if err := i.checkMaintainerPermission(ctx, operator, rbac.ActionList); err != nil {
+	if err := i.checkMaintainerPermission(ctx, operator, rbac.ActionManage); err != nil {
 		return interfaces.FindAllWorkspacesResult{}, err
 	}
 
