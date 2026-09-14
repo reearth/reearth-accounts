@@ -16,6 +16,7 @@ import (
 	textTmpl "text/template"
 	"time"
 
+	"github.com/reearth/reearth-accounts/server/internal/usecase/gateway"
 	"github.com/reearth/reearth-accounts/server/internal/usecase/interfaces"
 	"github.com/reearth/reearth-accounts/server/pkg/id"
 	"github.com/reearth/reearth-accounts/server/pkg/permittable"
@@ -540,7 +541,13 @@ func (i *User) findOrCreateRole(ctx context.Context, roleName string, mockAuth b
 }
 
 func (i *User) CreateVerification(ctx context.Context, email string) error {
-	return Run0(ctx, nil, i.repos, Usecase().Transaction(), func(ctx context.Context) error {
+	type idpTarget struct {
+		authenticator gateway.Authenticator
+		sub           string
+	}
+	var target *idpTarget
+
+	if err := Run0(ctx, nil, i.repos, Usecase().Transaction(), func(ctx context.Context) error {
 		u, err := i.repos.User.FindByEmail(ctx, email)
 		if err != nil {
 			return err
@@ -563,18 +570,25 @@ func (i *User) CreateVerification(ctx context.Context, email string) error {
 			return err
 		}
 
-		// Resend through the user's external IdP, routed by auth record provider.
 		for _, a := range u.Auths() {
-			authenticator := i.gateways.AuthenticatorFor(a.Provider)
-			if authenticator == nil {
+			auth := i.gateways.AuthenticatorFor(a.Provider)
+			if auth == nil {
 				continue
 			}
-			if err = authenticator.ResendVerificationEmail(ctx, a.Sub); err != nil {
-				return err
-			}
+			target = &idpTarget{authenticator: auth, sub: a.Sub}
 			break
 		}
 
 		return nil
-	})
+	}); err != nil {
+		return err
+	}
+
+	if target != nil {
+		if err := target.authenticator.ResendVerificationEmail(ctx, target.sub); err != nil {
+			return err
+		}
+	}
+
+	return nil
 }
