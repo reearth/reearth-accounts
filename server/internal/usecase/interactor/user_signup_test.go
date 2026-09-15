@@ -981,6 +981,40 @@ func TestUser_CreateVerification(t *testing.T) {
 	}
 }
 
+func TestUser_CreateVerification_IdPErrorDoesNotRollBackVerification(t *testing.T) {
+	user.DefaultPasswordEncoder = &user.NoopPasswordEncoder{}
+	mocktime := time.Time{}
+	mockcode := "CODECODE"
+
+	ctx := context.Background()
+	r := accountmemory.New()
+
+	u := user.New().
+		ID(id.NewUserID()).
+		Workspace(id.NewWorkspaceID()).
+		Email("idperr@bbb.com").
+		Name("IDPERR").
+		Auths([]user.Auth{{Provider: "auth0", Sub: "auth0|idperr"}}).
+		Verification(user.VerificationFrom(mockcode, mocktime, false)).
+		MustBuild()
+	assert.NoError(t, r.User.Save(ctx, u))
+
+	idpErr := rerror.NewE(i18n.T("idp unavailable"))
+	auth := &mockAuthenticator{resendVerificationEmailError: idpErr}
+	g := &gateway.Container{
+		Authenticators: map[gateway.Provider]gateway.Authenticator{gateway.ProviderAuth0: auth},
+	}
+	uc := NewUser(r, g, nil, "", "")
+
+	err := uc.CreateVerification(ctx, "idperr@bbb.com")
+	assert.Error(t, err)
+
+	saved, fetchErr := r.User.FindByEmail(ctx, "idperr@bbb.com")
+	assert.NoError(t, fetchErr)
+	assert.NotNil(t, saved.Verification())
+	assert.NotEqual(t, mockcode, saved.Verification().Code(), "verification code must be refreshed in DB")
+}
+
 func TestUser_SyncSSOUser(t *testing.T) {
 	uid := id.NewUserID()
 	wid := id.NewWorkspaceID()
