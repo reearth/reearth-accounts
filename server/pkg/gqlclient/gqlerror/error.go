@@ -25,8 +25,8 @@ func IsUnauthorized(err error) bool {
 var warnExpected atomic.Bool
 
 // SetWarnExpected controls whether ReturnAccountsWarn logs at WARN. It is off
-// unless a consumer turns it on, in which case those call sites keep logging at
-// ERROR exactly as they do today.
+// by default, and while it is off those call sites keep logging at ERROR
+// exactly as they do today.
 //
 // Only the severity changes: the error returned to the caller is the same
 // either way, so this is safe to turn on without auditing call sites. Call it
