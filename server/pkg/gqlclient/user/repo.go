@@ -228,7 +228,7 @@ func (r *userRepo) FindByAlias(ctx context.Context, alias string) (*user.User, e
 		"alias": graphql.String(alias),
 	}
 	if err := r.client.Query(ctx, &q, vars); err != nil {
-		return nil, gqlerror.ReturnAccountsError(ctx, err)
+		return nil, gqlerror.ReturnAccountsWarn(ctx, err)
 	}
 
 	uid, err := user.IDFrom(string(q.User.ID))
@@ -521,7 +521,7 @@ func (r *userRepo) Signup(ctx context.Context, userID, name, email, password, se
 	vars["mockAuth"] = graphql.Boolean(mockAuth)
 
 	if err := r.client.Mutate(ctx, &m, vars); err != nil {
-		return nil, gqlerror.ReturnAccountsError(ctx, err)
+		return nil, gqlerror.ReturnAccountsWarn(ctx, err)
 	}
 
 	uid, err := user.IDFrom(string(m.Signup.User.ID))
@@ -548,7 +548,7 @@ func (r *userRepo) SignupNoID(ctx context.Context, name, email, password, secret
 	vars["mockAuth"] = graphql.Boolean(mockAuth)
 
 	if err := r.client.Mutate(ctx, &m, vars); err != nil {
-		return nil, gqlerror.ReturnAccountsError(ctx, err)
+		return nil, gqlerror.ReturnAccountsWarn(ctx, err)
 	}
 
 	uid, err := user.IDFrom(string(m.Signup.User.ID))

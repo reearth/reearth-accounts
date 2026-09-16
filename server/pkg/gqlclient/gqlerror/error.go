@@ -7,7 +7,6 @@ import (
 	"strings"
 	"sync/atomic"
 
-	graphql "github.com/hasura/go-graphql-client"
 	"github.com/reearth/reearthx/log"
 )
 
@@ -19,127 +18,26 @@ func IsUnauthorized(err error) bool {
 	return strings.Contains(err.Error(), ErrUnauthorized.Error())
 }
 
-// expectedMessages are the business rejections a caller causes and can correct:
-// the request reached a resolver and was refused on its merits. They are logged
-// at WARN so that a caller mistake does not read as a server defect.
-//
-// The client only ever sees a flattened message, because the schema attaches no
-// error code to these, so the match is on text. Each entry is the message of an
-// error value this module exports, listed beside it:
-//
-//	"not found"                                  rerror.ErrNotFound and the resolvers that wrap it
-//	"already exists"                             interfaces.ErrUserAlreadyExists
-//	"invalid email"                              user.ErrInvalidEmail, interfaces.ErrInvalidUserEmail
-//	"invalid user name"                          user.ErrInvalidName
-//	"invalid workspace name"                     workspace.ErrInvalidWorkspaceName
-//	"invalid password"                           user.ErrInvalidPassword
-//	"invalid secret"                             interfaces.ErrSignupInvalidSecret
-//	"invalid params"                             rerror.ErrInvalidParams
-//	"password at least 8 characters"             user.ErrPasswordLength
-//	"password should have ..."                   user.ErrPasswordUpper/Lower/Number
-//	"operation denied"                           the authorization layer
-//	"personal workspace cannot be modified"      the workspace resolvers
-//	"owner user cannot leave from the workspace" the workspace resolvers
-//	"user already joined"                        matched by workspace.ErrMemberAlreadyJoined
-//	"target user does not exist in the workspace" matched by workspace.ErrUserIsNotMember
-//
-// interfaces.ErrPermissionDenied ("permission denied") is deliberately absent:
-// an authorization denial is kept at ERROR so a burst of them stays visible.
-var expectedMessages = []string{
-	"not found",
-	"already exists",
-	"invalid email",
-	"invalid user name",
-	"invalid workspace name",
-	"invalid password",
-	"invalid secret",
-	"invalid params",
-	"password at least 8 characters",
-	"password should have",
-	"operation denied",
-	"personal workspace cannot be modified",
-	"owner user cannot leave from the workspace",
-	"user already joined",
-	"target user does not exist in the workspace",
-}
+// warnExpected is off by default so that adopting a new version of this module
+// changes nothing for a service that has not asked for it. A consumer that
+// wants expected failures at WARN opts in once during start up, before serving
+// traffic.
+var warnExpected atomic.Bool
 
-// isExpected reports whether err is a business rejection rather than a defect.
-//
-// A transport or encoding failure is never expected, even when its message
-// happens to contain one of the phrases above: those signal that the request
-// never reached a resolver, which is the shape a malformed query takes, and
-// keeping them at ERROR is what makes a broken client visible.
-func isExpected(err error) bool {
-	var (
-		list graphql.Errors
-		one  graphql.Error
-	)
-
-	switch {
-	case errors.As(err, &list):
-		if len(list) == 0 {
-			return false
-		}
-		for _, e := range list {
-			if !isExpectedOne(e) {
-				return false
-			}
-		}
-		return true
-	case errors.As(err, &one):
-		return isExpectedOne(one)
-	}
-
-	return false
-}
-
-func isExpectedOne(e graphql.Error) bool {
-	// Transport-level failures carry a code; server detail arrives in
-	// "internal". Either means this is not a caller mistake.
-	if code, ok := e.Extensions["code"].(string); ok && code == graphql.ErrRequestError {
-		return false
-	}
-	if _, ok := e.Extensions["internal"]; ok {
-		return false
-	}
-
-	message := strings.ToLower(e.Message)
-	// A message match cannot tell "not found" from "internal error: ... not
-	// found", so anything announcing itself as internal is excluded first.
-	if strings.Contains(message, "internal") {
-		return false
-	}
-
-	for _, m := range expectedMessages {
-		if strings.Contains(message, m) {
-			return true
-		}
-	}
-
-	return false
-}
-
-// classifyExpected is off by default so that adopting a new version of this
-// module changes nothing for a service that has not asked for it. A consumer
-// that wants expected failures at WARN opts in once during start up, before
-// serving traffic.
-var classifyExpected atomic.Bool
-
-// SetClassifyExpected controls whether a business rejection is logged at WARN
-// instead of ERROR. It is off unless a consumer turns it on.
+// SetWarnExpected controls whether ReturnAccountsWarn logs at WARN. It is off
+// unless a consumer turns it on, in which case those call sites keep logging at
+// ERROR exactly as they do today.
 //
 // Only the severity changes: the error returned to the caller is the same
 // either way, so this is safe to turn on without auditing call sites. Call it
 // during start up; it is not meant to be flipped while requests are in flight.
-func SetClassifyExpected(v bool) { classifyExpected.Store(v) }
+func SetWarnExpected(v bool) { warnExpected.Store(v) }
 
-// ClassifyExpected reports whether expected failures are logged at WARN.
-func ClassifyExpected() bool { return classifyExpected.Load() }
+// WarnExpected reports whether expected failures are logged at WARN.
+func WarnExpected() bool { return warnExpected.Load() }
 
-// ReturnAccountsError logs err and returns it for the caller to handle. Only the
-// log severity depends on the kind of error: the value returned is unchanged
-// apart from an unauthorized response, so a consumer's behaviour does not
-// change with it.
+// ReturnAccountsError logs err at ERROR and returns it for the caller to
+// handle. Use it wherever a failure means the server got something wrong.
 func ReturnAccountsError(ctx context.Context, err error) AccountsError {
 	_, file, line, _ := runtime.Caller(1)
 
@@ -148,7 +46,32 @@ func ReturnAccountsError(ctx context.Context, err error) AccountsError {
 		return ErrUnauthorized
 	}
 
-	if classifyExpected.Load() && isExpected(err) {
+	log.Errorfc(ctx, "[Error] error with caller logging at %s:%d %+v", file, line, err)
+	return err
+}
+
+// ReturnAccountsWarn is for the calls whose failures are usually a rejection
+// the caller caused and can correct: a workspace that does not exist, a name
+// that fails validation, a member who has already joined. Those are not
+// defects, and logging them at ERROR makes every consumer's alerting treat a
+// user mistake as a server fault.
+//
+// The severity is chosen by the call site rather than by the error, so a
+// genuine failure of the accounts service on one of these calls is logged at
+// WARN too. That is a deliberate trade: an outage or a rejected token is
+// visible at the many call sites that still use ReturnAccountsError, notably
+// the user lookup on the authentication path. A call that hangs until it times
+// out is the case this does not cover, so prefer ReturnAccountsError wherever a
+// failure would not show up anywhere else.
+func ReturnAccountsWarn(ctx context.Context, err error) AccountsError {
+	_, file, line, _ := runtime.Caller(1)
+
+	if strings.Contains(err.Error(), "401") {
+		log.Warnfc(ctx, "[Warn] unauthorized at %s:%d %+v", file, line, err)
+		return ErrUnauthorized
+	}
+
+	if warnExpected.Load() {
 		log.Warnfc(ctx, "[Warn] expected failure at %s:%d %+v", file, line, err)
 		return err
 	}
