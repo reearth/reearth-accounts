@@ -337,6 +337,21 @@ func (q *Queries) WorkspaceIntegrationsDeleteByWorkspace(ctx context.Context, wo
 	return err
 }
 
+const workspaceIntegrationsInsertBulk = `-- name: WorkspaceIntegrationsInsertBulk :exec
+INSERT INTO workspace_integrations (workspace_id, integration_id, role, invited_by, disabled)
+SELECT workspace_id, integration_id, role, invited_by, disabled
+  FROM jsonb_to_recordset($1::jsonb)
+  AS t(workspace_id text, integration_id text, role text, invited_by text, disabled bool)
+`
+
+// One round-trip for any number of integration members, instead of one
+// WorkspaceIntegrationInsert per integration. See WorkspaceMembersInsertBulk
+// for why jsonb_to_recordset is used over a multi-arg unnest.
+func (q *Queries) WorkspaceIntegrationsInsertBulk(ctx context.Context, dollar_1 []byte) error {
+	_, err := q.db.Exec(ctx, workspaceIntegrationsInsertBulk, dollar_1)
+	return err
+}
+
 const workspaceMemberInsert = `-- name: WorkspaceMemberInsert :exec
 INSERT INTO workspace_members (workspace_id, user_id, role, invited_by, disabled) VALUES ($1,$2,$3,$4,$5)
 `
@@ -396,6 +411,22 @@ DELETE FROM workspace_members WHERE workspace_id = $1
 
 func (q *Queries) WorkspaceMembersDeleteByWorkspace(ctx context.Context, workspaceID string) error {
 	_, err := q.db.Exec(ctx, workspaceMembersDeleteByWorkspace, workspaceID)
+	return err
+}
+
+const workspaceMembersInsertBulk = `-- name: WorkspaceMembersInsertBulk :exec
+INSERT INTO workspace_members (workspace_id, user_id, role, invited_by, disabled)
+SELECT workspace_id, user_id, role, invited_by, disabled
+  FROM jsonb_to_recordset($1::jsonb)
+  AS t(workspace_id text, user_id text, role text, invited_by text, disabled bool)
+`
+
+// One round-trip for any number of members, instead of one
+// WorkspaceMemberInsert per member. jsonb_to_recordset takes a single
+// parameter (rather than one array per column, as a multi-arg unnest would),
+// which sqlc's static catalog can type-check without a live database.
+func (q *Queries) WorkspaceMembersInsertBulk(ctx context.Context, dollar_1 []byte) error {
+	_, err := q.db.Exec(ctx, workspaceMembersInsertBulk, dollar_1)
 	return err
 }
 

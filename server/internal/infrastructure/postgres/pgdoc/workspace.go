@@ -19,20 +19,25 @@ type WorkspaceMetadataJSON struct {
 	PhotoURL     string `json:"photourl"`
 }
 
+// json tags match the column names in the WorkspaceMembersInsertBulk sqlc
+// query's jsonb_to_recordset(...) AS t(...) clause, which are matched
+// case-sensitively against these keys.
 type WorkspaceMemberRow struct {
-	WorkspaceID string
-	UserID      string
-	Role        string
-	InvitedBy   string
-	Disabled    bool
+	WorkspaceID string `json:"workspace_id"`
+	UserID      string `json:"user_id"`
+	Role        string `json:"role"`
+	InvitedBy   string `json:"invited_by"`
+	Disabled    bool   `json:"disabled"`
 }
 
+// json tags match WorkspaceIntegrationsInsertBulk's jsonb_to_recordset(...)
+// AS t(...) clause; see WorkspaceMemberRow.
 type WorkspaceIntegrationRow struct {
-	WorkspaceID   string
-	IntegrationID string
-	Role          string
-	InvitedBy     string
-	Disabled      bool
+	WorkspaceID   string `json:"workspace_id"`
+	IntegrationID string `json:"integration_id"`
+	Role          string `json:"role"`
+	InvitedBy     string `json:"invited_by"`
+	Disabled      bool   `json:"disabled"`
 }
 
 type WorkspaceRow struct {
