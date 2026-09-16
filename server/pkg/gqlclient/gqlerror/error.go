@@ -31,6 +31,7 @@ func IsUnauthorized(err error) bool {
 //	"already exists"                             interfaces.ErrUserAlreadyExists
 //	"invalid email"                              user.ErrInvalidEmail, interfaces.ErrInvalidUserEmail
 //	"invalid user name"                          user.ErrInvalidName
+//	"invalid workspace name"                     workspace.ErrInvalidWorkspaceName
 //	"invalid password"                           user.ErrInvalidPassword
 //	"invalid secret"                             interfaces.ErrSignupInvalidSecret
 //	"invalid params"                             rerror.ErrInvalidParams
@@ -39,11 +40,17 @@ func IsUnauthorized(err error) bool {
 //	"operation denied"                           the authorization layer
 //	"personal workspace cannot be modified"      the workspace resolvers
 //	"owner user cannot leave from the workspace" the workspace resolvers
+//	"user already joined"                        matched by workspace.ErrMemberAlreadyJoined
+//	"target user does not exist in the workspace" matched by workspace.ErrUserIsNotMember
+//
+// interfaces.ErrPermissionDenied ("permission denied") is deliberately absent:
+// an authorization denial is kept at ERROR so a burst of them stays visible.
 var expectedMessages = []string{
 	"not found",
 	"already exists",
 	"invalid email",
 	"invalid user name",
+	"invalid workspace name",
 	"invalid password",
 	"invalid secret",
 	"invalid params",
@@ -52,6 +59,8 @@ var expectedMessages = []string{
 	"operation denied",
 	"personal workspace cannot be modified",
 	"owner user cannot leave from the workspace",
+	"user already joined",
+	"target user does not exist in the workspace",
 }
 
 // isExpected reports whether err is a business rejection rather than a defect.

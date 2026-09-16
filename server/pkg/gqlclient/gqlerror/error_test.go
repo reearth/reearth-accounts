@@ -37,6 +37,13 @@ func TestIsExpected(t *testing.T) {
 		{"password policy", gqlErr("input: signup password should have numbers", nil), true},
 		{"password length", gqlErr("input: signup password at least 8 characters", nil), true},
 		{"already exists", gqlErr("input: signup user already exists", nil), true},
+		{"invalid workspace name", gqlErr("input: createWorkspace invalid workspace name", nil), true},
+		{"already joined", gqlErr("input: addUsersToWorkspace user already joined", nil), true},
+		{"not a member", gqlErr("input: removeUserFromWorkspace target user does not exist in the workspace", nil), true},
+
+		// An authorization denial is deliberately kept at ERROR so that a burst
+		// of them stays visible.
+		{"permission denied", gqlErr("input: createWorkspace permission denied", nil), false},
 
 		// A malformed query never reaches a resolver. This is the shape the
 		// signup document bug took, and it has to stay visible.
@@ -98,17 +105,25 @@ func TestClassifyExpectedIsOffByDefault(t *testing.T) {
 	assert.Equal(t, "ERROR", severityOf(t, gqlErr("input: updateProject transaction error", nil)))
 }
 
+// logBuf captures what the package logs. The logger is global and reearthx
+// exposes no way to read the current destination, so it is redirected once here
+// rather than per call, where restoring it would mean guessing what it was.
+var logBuf bytes.Buffer
+
+func TestMain(m *testing.M) {
+	log.SetOutput(&logBuf)
+	os.Exit(m.Run())
+}
+
 // severityOf captures the level ReturnAccountsError logs err at.
 func severityOf(t *testing.T, err error) string {
 	t.Helper()
 
-	var buf bytes.Buffer
-	log.SetOutput(&buf)
-	t.Cleanup(func() { log.SetOutput(os.Stderr) })
+	logBuf.Reset()
 
 	_ = ReturnAccountsError(context.Background(), err)
 
-	out := buf.String()
+	out := logBuf.String()
 	switch {
 	case strings.Contains(out, "ERROR"):
 		return "ERROR"
