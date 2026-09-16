@@ -72,7 +72,10 @@ func ReturnAccountsWarn(ctx context.Context, err error) AccountsError {
 	}
 
 	if warnExpected.Load() {
-		log.Warnfc(ctx, "[Warn] expected failure at %s:%d %+v", file, line, err)
+		// Same message as the ERROR path on purpose: the severity is the only
+		// thing that differs, so a log query matching on the text keeps working
+		// whichever way a consumer has this set.
+		log.Warnfc(ctx, "[Error] error with caller logging at %s:%d %+v", file, line, err)
 		return err
 	}
 

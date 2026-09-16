@@ -89,3 +89,26 @@ func TestReturnedValueIsPreserved(t *testing.T) {
 	assert.Equal(t, ErrUnauthorized, ReturnAccountsError(ctx, errors.New("401 Unauthorized")))
 	assert.Equal(t, ErrUnauthorized, ReturnAccountsWarn(ctx, errors.New("401 Unauthorized")))
 }
+
+// The message must not change with the severity, or a log query matching on the
+// text would silently stop finding these once a consumer opts in.
+func TestMessageIsTheSameAtBothSeverities(t *testing.T) {
+	ctx := context.Background()
+	e := errors.New("input: deleteWorkspace operation denied")
+
+	logBuf.Reset()
+	_ = ReturnAccountsError(ctx, e)
+	atError := logBuf.String()
+
+	SetWarnExpected(true)
+	t.Cleanup(func() { SetWarnExpected(false) })
+
+	logBuf.Reset()
+	_ = ReturnAccountsWarn(ctx, e)
+	atWarn := logBuf.String()
+
+	assert.Contains(t, atError, "error with caller logging")
+	assert.Contains(t, atWarn, "error with caller logging")
+	assert.Contains(t, atError, "ERROR")
+	assert.Contains(t, atWarn, "WARN")
+}
