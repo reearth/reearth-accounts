@@ -43,15 +43,12 @@ func severityOf(t *testing.T, f func(context.Context, error) AccountsError, err 
 // the behaviour it had before, so ReturnAccountsWarn still reaches ERROR until
 // the consumer opts in.
 func TestWarnExpectedIsOffByDefault(t *testing.T) {
-	assert.False(t, WarnExpected())
-
 	rejection := errors.New("input: deleteWorkspace operation denied")
 	assert.Equal(t, "ERROR", severityOf(t, ReturnAccountsWarn, rejection))
 
 	SetWarnExpected(true)
 	t.Cleanup(func() { SetWarnExpected(false) })
 
-	assert.True(t, WarnExpected())
 	assert.Equal(t, "WARN", severityOf(t, ReturnAccountsWarn, rejection))
 }
 

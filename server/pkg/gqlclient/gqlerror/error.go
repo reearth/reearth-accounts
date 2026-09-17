@@ -33,9 +33,6 @@ var warnExpected atomic.Bool
 // during start up; it is not meant to be flipped while requests are in flight.
 func SetWarnExpected(v bool) { warnExpected.Store(v) }
 
-// WarnExpected reports whether expected failures are logged at WARN.
-func WarnExpected() bool { return warnExpected.Load() }
-
 func ReturnAccountsError(ctx context.Context, err error) AccountsError {
 	_, file, line, _ := runtime.Caller(1)
 	if strings.Contains(err.Error(), "401") {
