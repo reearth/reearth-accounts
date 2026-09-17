@@ -268,6 +268,13 @@ func TestUserRepo_FindByAlias(t *testing.T) {
 		Email("foo@bar.com").
 		Workspace(wsid).
 		MustBuild()
+	userMixed := user.New().
+		NewID().
+		Name("bar").
+		Alias("MixedCase").
+		Email("bar@bar.com").
+		Workspace(wsid).
+		MustBuild()
 	tests := []struct {
 		Name               string
 		Input              string
@@ -285,6 +292,18 @@ func TestUserRepo_FindByAlias(t *testing.T) {
 			Input:    "xxx",
 			RepoData: user1,
 			WantErr:  true,
+		},
+		{
+			Name:     "must find user by alias case-insensitively",
+			Input:    "mixedcase",
+			RepoData: userMixed,
+			Expected: userMixed,
+		},
+		{
+			Name:     "must find user by alias with uppercase query",
+			Input:    "MIXEDCASE",
+			RepoData: userMixed,
+			Expected: userMixed,
 		},
 	}
 
@@ -650,4 +669,39 @@ func TestUserRepo_Remove(t *testing.T) {
 
 	err = repo.Remove(ctx, user1.ID())
 	assert.NoError(t, err)
+}
+
+func TestUserRepo_FindByAlias_CaseInsensitive(t *testing.T) {
+	db := Connect(t)(t)
+	client := mongox.NewClientWithDatabase(db)
+	repo := NewUser(client)
+	ctx := context.Background()
+
+	wsid := user.NewWorkspaceID()
+	u := user.New().
+		NewID().
+		Name("casei").
+		Alias("MixedAlias").
+		Email("casei@bar.com").
+		Workspace(wsid).
+		MustBuild()
+	assert.NoError(t, repo.Save(ctx, u))
+
+	t.Run("lowercase query finds mixed-case stored alias", func(t *testing.T) {
+		got, err := repo.FindByAlias(ctx, "mixedalias")
+		assert.NoError(t, err)
+		assert.Equal(t, u.ID(), got.ID())
+	})
+
+	t.Run("uppercase query finds mixed-case stored alias", func(t *testing.T) {
+		got, err := repo.FindByAlias(ctx, "MIXEDALIAS")
+		assert.NoError(t, err)
+		assert.Equal(t, u.ID(), got.ID())
+	})
+
+	t.Run("exact match still works", func(t *testing.T) {
+		got, err := repo.FindByAlias(ctx, "MixedAlias")
+		assert.NoError(t, err)
+		assert.Equal(t, u.ID(), got.ID())
+	})
 }

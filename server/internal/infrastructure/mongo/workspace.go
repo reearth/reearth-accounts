@@ -18,6 +18,7 @@ import (
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/bson/primitive"
 	"go.mongodb.org/mongo-driver/mongo"
+	"go.mongodb.org/mongo-driver/mongo/options"
 )
 
 type Workspace struct {
@@ -180,11 +181,12 @@ func (r *Workspace) FindByAlias(ctx context.Context, alias string) (*workspace.W
 		return nil, rerror.ErrNotFound
 	}
 
-	w, err := r.findOne(ctx, bson.M{"alias": alias})
-	if err != nil {
+	c := mongodoc.NewWorkspaceConsumer()
+	opt := options.FindOne().SetCollation(&options.Collation{Locale: "en", Strength: 2})
+	if err := r.client.FindOne(ctx, bson.M{"alias": alias}, c, opt); err != nil {
 		return nil, err
 	}
-	return w, nil
+	return c.Result[0], nil
 }
 
 func (r *Workspace) FindByAliases(ctx context.Context, aliases []string) (workspace.List, error) {
