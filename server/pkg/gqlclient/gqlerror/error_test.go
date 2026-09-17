@@ -39,42 +39,43 @@ func severityOf(t *testing.T, f func(context.Context, error) AccountsError, err 
 	}
 }
 
-// The default has to leave a service that merely bumps this module on exactly
-// the behaviour it had before, so ReturnAccountsWarn still reaches ERROR until
-// the consumer opts in.
-func TestWarnExpectedIsOffByDefault(t *testing.T) {
+func TestSeverityFollowsTheFunction(t *testing.T) {
 	rejection := errors.New("input: deleteWorkspace operation denied")
-	assert.Equal(t, "ERROR", severityOf(t, ReturnAccountsWarn, rejection))
 
-	SetWarnExpected(true)
-	t.Cleanup(func() { SetWarnExpected(false) })
-
+	assert.Equal(t, "ERROR", severityOf(t, ReturnAccountsError, rejection))
 	assert.Equal(t, "WARN", severityOf(t, ReturnAccountsWarn, rejection))
 }
 
-// ReturnAccountsError is unaffected by the option: it is the choice made at
-// call sites whose failures always mean the server got something wrong.
-func TestReturnAccountsErrorIsAlwaysError(t *testing.T) {
-	SetWarnExpected(true)
-	t.Cleanup(func() { SetWarnExpected(false) })
-
-	assert.Equal(t, "ERROR", severityOf(t, ReturnAccountsError, errors.New("input: updateProject transaction error")))
-	assert.Equal(t, "ERROR", severityOf(t, ReturnAccountsError, errors.New("dial tcp: connection refused")))
-}
-
-// Severity is chosen by the call site, so a genuine failure on one of the
-// opted-in calls is logged at WARN as well. This pins that known trade rather
-// than leaving it to be discovered.
-func TestWarnSiteAlsoDownGradesRealFailures(t *testing.T) {
-	SetWarnExpected(true)
-	t.Cleanup(func() { SetWarnExpected(false) })
-
+// Severity is chosen by the call site, so a genuine failure on one of the calls
+// that warns is logged at WARN as well. This pins that known trade rather than
+// leaving it to be discovered.
+func TestWarnAlsoDownGradesRealFailures(t *testing.T) {
 	assert.Equal(t, "WARN", severityOf(t, ReturnAccountsWarn, errors.New("dial tcp: connection refused")))
 	assert.Equal(t, "WARN", severityOf(t, ReturnAccountsWarn, errors.New("net/http: request canceled (Client.Timeout exceeded while awaiting headers)")))
 }
 
+// The message must not change with the severity, or a log query matching on the
+// text would silently stop finding these.
+func TestMessageIsTheSameAtBothSeverities(t *testing.T) {
+	ctx := context.Background()
+	e := errors.New("input: deleteWorkspace operation denied")
+
+	logBuf.Reset()
+	_ = ReturnAccountsError(ctx, e)
+	atError := logBuf.String()
+
+	logBuf.Reset()
+	_ = ReturnAccountsWarn(ctx, e)
+	atWarn := logBuf.String()
+
+	assert.Contains(t, atError, "error with caller logging")
+	assert.Contains(t, atWarn, "error with caller logging")
+	assert.Contains(t, atError, "ERROR")
+	assert.Contains(t, atWarn, "WARN")
+}
+
 // The value returned must not change with severity, or a consumer that switches
-// on it would behave differently after this change.
+// on it would behave differently depending on which function a call site uses.
 func TestReturnedValueIsPreserved(t *testing.T) {
 	ctx := context.Background()
 	e := errors.New("input: deleteWorkspace operation denied")
@@ -85,27 +86,4 @@ func TestReturnedValueIsPreserved(t *testing.T) {
 	// Unauthorized is the one documented exception, for both.
 	assert.Equal(t, ErrUnauthorized, ReturnAccountsError(ctx, errors.New("401 Unauthorized")))
 	assert.Equal(t, ErrUnauthorized, ReturnAccountsWarn(ctx, errors.New("401 Unauthorized")))
-}
-
-// The message must not change with the severity, or a log query matching on the
-// text would silently stop finding these once a consumer opts in.
-func TestMessageIsTheSameAtBothSeverities(t *testing.T) {
-	ctx := context.Background()
-	e := errors.New("input: deleteWorkspace operation denied")
-
-	logBuf.Reset()
-	_ = ReturnAccountsError(ctx, e)
-	atError := logBuf.String()
-
-	SetWarnExpected(true)
-	t.Cleanup(func() { SetWarnExpected(false) })
-
-	logBuf.Reset()
-	_ = ReturnAccountsWarn(ctx, e)
-	atWarn := logBuf.String()
-
-	assert.Contains(t, atError, "error with caller logging")
-	assert.Contains(t, atWarn, "error with caller logging")
-	assert.Contains(t, atError, "ERROR")
-	assert.Contains(t, atWarn, "WARN")
 }
