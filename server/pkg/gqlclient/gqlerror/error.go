@@ -36,16 +36,12 @@ func SetWarnExpected(v bool) { warnExpected.Store(v) }
 // WarnExpected reports whether expected failures are logged at WARN.
 func WarnExpected() bool { return warnExpected.Load() }
 
-// ReturnAccountsError logs err at ERROR and returns it for the caller to
-// handle. Use it wherever a failure means the server got something wrong.
 func ReturnAccountsError(ctx context.Context, err error) AccountsError {
 	_, file, line, _ := runtime.Caller(1)
-
 	if strings.Contains(err.Error(), "401") {
 		log.Warnfc(ctx, "[Warn] unauthorized at %s:%d %+v", file, line, err)
 		return ErrUnauthorized
 	}
-
 	log.Errorfc(ctx, "[Error] error with caller logging at %s:%d %+v", file, line, err)
 	return err
 }
