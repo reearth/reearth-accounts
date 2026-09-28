@@ -236,13 +236,14 @@ func WorkspaceModel(r *WorkspaceRow, members []WorkspaceMemberRow, integrations 
 		cfg.SetTokenHash(scimRow.TokenHash)
 		if len(scimRow.GroupRoleMapping) > 0 {
 			var grmStr map[string]string
-			if err := json.Unmarshal(scimRow.GroupRoleMapping, &grmStr); err == nil {
-				grm := make(map[string]role.RoleType, len(grmStr))
-				for k, v := range grmStr {
-					grm[k] = role.RoleType(v)
-				}
-				cfg.SetGroupRoleMapping(grm)
+			if err := json.Unmarshal(scimRow.GroupRoleMapping, &grmStr); err != nil {
+				return nil, err
 			}
+			grm := make(map[string]role.RoleType, len(grmStr))
+			for k, v := range grmStr {
+				grm[k] = role.RoleType(v)
+			}
+			cfg.SetGroupRoleMapping(grm)
 		}
 		scimConfig = cfg
 	}
