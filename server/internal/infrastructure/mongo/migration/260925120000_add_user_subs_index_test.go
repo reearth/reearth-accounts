@@ -44,7 +44,6 @@ func TestUserSubsIndexModels(t *testing.T) {
 	}
 }
 
-// findBySubFilter mirrors the filter used by mongo.User.FindBySub.
 func findBySubFilter(sub string) bson.M {
 	return bson.M{
 		"$or": []bson.M{
@@ -55,7 +54,6 @@ func findBySubFilter(sub string) bson.M {
 	}
 }
 
-// containsStage reports whether the explain plan tree contains the given stage.
 func containsStage(v any, stage string) bool {
 	switch x := v.(type) {
 	case bson.M:
@@ -110,7 +108,6 @@ func TestAddUserSubsIndexes(t *testing.T) {
 	c := mongox.NewClientWithDatabase(db)
 	require.NoError(t, AddUserSubsIndexes(ctx, c))
 
-	// indexes exist with the expected spec
 	cursor, err := col.Indexes().List(ctx)
 	require.NoError(t, err)
 	var indexes []bson.M
@@ -129,10 +126,8 @@ func TestAddUserSubsIndexes(t *testing.T) {
 	assert.Equal(t, true, byName["auth0sub_sparse"]["sparse"])
 	assert.Equal(t, true, byName["auth0sublist_sparse"]["sparse"])
 
-	// idempotent
 	require.NoError(t, AddUserSubsIndexes(ctx, c))
 
-	// the exact FindBySub filter finds each user
 	for sub, wantID := range map[string]string{
 		"auth0|subs-1":  "u-subs",
 		"google|subs-2": "u-subs",
@@ -146,7 +141,6 @@ func TestAddUserSubsIndexes(t *testing.T) {
 	var result bson.M
 	assert.ErrorIs(t, col.FindOne(ctx, findBySubFilter("nonexistent")).Decode(&result), mongo.ErrNoDocuments)
 
-	// the query plan uses the indexes instead of a collection scan
 	var explain bson.M
 	err = db.RunCommand(ctx, bson.D{
 		{Key: "explain", Value: bson.D{

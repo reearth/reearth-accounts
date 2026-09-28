@@ -9,25 +9,6 @@ import (
 	"go.mongodb.org/mongo-driver/mongo/options"
 )
 
-// AddUserSubsIndexes creates the indexes backing User.FindBySub.
-//
-// FindBySub runs on every authenticated request and filters the user
-// collection with
-//
-//	$or: [{subs: {$elemMatch: {$eq: sub}}}, {auth0sub: sub}, {auth0sublist: {$elemMatch: {$eq: sub}}}]
-//
-// MongoDB can only use indexes for an $or query when every clause is backed
-// by an index; if any clause is unindexed the whole query falls back to a full
-// collection scan. None of these fields were indexed, so every auth lookup
-// scanned the entire user collection.
-//
-// subs gets a plain (multikey) ascending index. It is intentionally not
-// unique because existing data may already contain duplicate subs.
-// auth0sub and auth0sublist are legacy compat fields that are absent from most
-// documents, so they get sparse indexes to keep them small.
-//
-// CreateIndexes is a no-op for indexes that already exist with an identical
-// spec, so this migration is safe to re-run.
 func AddUserSubsIndexes(ctx context.Context, c DBClient) error {
 	col := c.Database().Collection("user")
 
