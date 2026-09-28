@@ -36,23 +36,22 @@ func (uc *SetRoleUseCase) Execute(ctx context.Context, in SetRoleInput) (*adminu
 		return nil, err
 	}
 
-	// Demoting an approved system_admin is blocked if it is the last one
-	// (check-then-act, not atomic; acceptable for the tiny closed admin set).
-	if target.IsApproved() && target.Role() == adminuser.RoleSystemAdmin && in.Role != adminuser.RoleSystemAdmin {
-		hasOther, err := uc.adminUserRepo.ExistsApprovedSystemAdminExcept(ctx, target.ID())
-		if err != nil {
-			return nil, err
-		}
-		if !hasOther {
-			return nil, ErrLastSystemAdmin
-		}
-	}
+	// Demoting an approved system_admin must be blocked if it is the last one.
+	// The existence check and the save are performed as a single atomic
+	// operation by the repo (SaveGuardingLastSystemAdmin) so two concurrent
+	// demotions of the last two admins can't both pass an independent check.
+	demotingLastSystemAdmin := target.IsApproved() && target.Role() == adminuser.RoleSystemAdmin && in.Role != adminuser.RoleSystemAdmin
 
 	if err := target.SetRole(in.Role); err != nil {
 		return nil, err
 	}
-	if err := uc.adminUserRepo.Save(ctx, target); err != nil {
+
+	ok, err := uc.adminUserRepo.SaveGuardingLastSystemAdmin(ctx, target, demotingLastSystemAdmin)
+	if err != nil {
 		return nil, err
+	}
+	if !ok {
+		return nil, ErrLastSystemAdmin
 	}
 	return target, nil
 }

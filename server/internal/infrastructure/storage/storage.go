@@ -39,9 +39,8 @@ type Config struct {
 
 type Storage struct {
 	cfg       *Config
-	once      sync.Once
+	mu        sync.Mutex
 	gcsClient *storage.Client
-	initErr   error
 	cache     *lruexpirable.LRU[string, string]
 }
 
@@ -114,27 +113,36 @@ func (s *Storage) GetSignedURL(ctx context.Context, name string) (string, error)
 }
 
 func (s *Storage) bucket(ctx context.Context) (*storage.BucketHandle, error) {
-	s.once.Do(func() {
-		_, span := otel.Tracer("reearth-accounts").Start(ctx, "storage.initGCSClient")
-		defer span.End()
+	s.mu.Lock()
+	defer s.mu.Unlock()
 
-		var opts []option.ClientOption
-		if s.cfg.EmulatorEnabled {
-			_ = os.Setenv("STORAGE_EMULATOR_HOST", s.cfg.EmulatorEndpoint)
-		}
-		if s.cfg.IsLocal {
-			opts = append(opts, option.WithoutAuthentication())
-		}
-		// Use a non-cancelable context so a canceled caller doesn't permanently latch initErr.
-		s.gcsClient, s.initErr = storage.NewClient(context.WithoutCancel(ctx), opts...)
-		if s.initErr != nil {
-			span.RecordError(s.initErr)
-			span.SetStatus(codes.Error, "GCS client initialization failed")
-		}
-	})
-	if s.initErr != nil {
-		return nil, s.initErr
+	if s.gcsClient != nil {
+		return s.gcsClient.Bucket(s.cfg.BucketName), nil
 	}
+
+	_, span := otel.Tracer("reearth-accounts").Start(ctx, "storage.initGCSClient")
+	defer span.End()
+
+	var opts []option.ClientOption
+	if s.cfg.EmulatorEnabled {
+		_ = os.Setenv("STORAGE_EMULATOR_HOST", s.cfg.EmulatorEndpoint)
+	}
+	if s.cfg.IsLocal {
+		opts = append(opts, option.WithoutAuthentication())
+	}
+	// Use a non-cancelable context so a canceled caller doesn't abort init on
+	// behalf of other callers waiting on s.mu.
+	client, err := storage.NewClient(context.WithoutCancel(ctx), opts...)
+	if err != nil {
+		span.RecordError(err)
+		span.SetStatus(codes.Error, "GCS client initialization failed")
+		// Deliberately not cached: an unset s.gcsClient makes the next call
+		// retry init instead of failing forever on a transient error (e.g. a
+		// metadata-server blip during ADC lookup).
+		return nil, err
+	}
+
+	s.gcsClient = client
 	return s.gcsClient.Bucket(s.cfg.BucketName), nil
 }
 

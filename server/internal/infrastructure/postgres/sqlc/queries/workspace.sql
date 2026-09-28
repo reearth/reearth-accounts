@@ -1,9 +1,10 @@
 -- name: WorkspaceUpsert :exec
-INSERT INTO workspaces (id, name, alias, email, personal, policy, members_hash, metadata, updated_at)
-VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9)
+INSERT INTO workspaces (id, name, alias, email, personal, policy, members_hash, metadata, created_at, created_by, updated_at, deleted_at)
+VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12)
 ON CONFLICT (id) DO UPDATE SET
   name=EXCLUDED.name, alias=EXCLUDED.alias, email=EXCLUDED.email, personal=EXCLUDED.personal,
-  policy=EXCLUDED.policy, members_hash=EXCLUDED.members_hash, metadata=EXCLUDED.metadata, updated_at=EXCLUDED.updated_at;
+  policy=EXCLUDED.policy, members_hash=EXCLUDED.members_hash, metadata=EXCLUDED.metadata, created_by=EXCLUDED.created_by,
+  updated_at=EXCLUDED.updated_at, deleted_at=EXCLUDED.deleted_at;
 
 -- name: WorkspaceFindByID :one
 SELECT * FROM workspaces WHERE id = $1;
@@ -20,6 +21,16 @@ SELECT * FROM workspaces WHERE lower(alias) = lower($1) AND alias <> '';
 -- name: WorkspaceFindByAliases :many
 -- Case-insensitive, matching the case-insensitive unique alias index.
 SELECT * FROM workspaces WHERE lower(alias) = ANY($1::text[]) ORDER BY id;
+
+-- name: WorkspaceIDsAll :many
+-- Cross-tenant listing (no readable-workspace filter): pass '' for no keyword
+-- filter, and one of 'all'/'active'/'deleted' for the status filter.
+-- Set exclude_personal=true to omit per-user personal workspaces (used by /api/workspaces/all).
+SELECT id FROM workspaces
+WHERE (NOT sqlc.arg(exclude_personal)::boolean OR personal = false)
+  AND (sqlc.arg(keyword)::text = '' OR name ILIKE '%' || sqlc.arg(keyword)::text || '%' OR alias ILIKE '%' || sqlc.arg(keyword)::text || '%')
+  AND (sqlc.arg(status)::text = 'all' OR (sqlc.arg(status)::text = 'active' AND deleted_at IS NULL) OR (sqlc.arg(status)::text = 'deleted' AND deleted_at IS NOT NULL))
+ORDER BY id;
 
 -- name: WorkspaceDelete :exec
 DELETE FROM workspaces WHERE id = $1;

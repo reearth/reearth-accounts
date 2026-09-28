@@ -45,7 +45,10 @@ type WorkspaceRow struct {
 	Name        string
 	Personal    bool
 	Policy      *string
+	CreatedAt   *time.Time
+	CreatedBy   *string
 	UpdatedAt   time.Time
+	DeletedAt   *time.Time
 }
 
 type WorkspaceScimConfigRow struct {
@@ -120,6 +123,12 @@ func NewWorkspaceRows(ws *workspace.Workspace) (*WorkspaceRow, []WorkspaceMember
 		updatedAt = time.Now()
 	}
 
+	var createdBy *string
+	if cb := ws.CreatedBy(); cb != nil {
+		s := cb.String()
+		createdBy = &s
+	}
+
 	return &WorkspaceRow{
 		Alias:       ws.Alias(),
 		Email:       ws.Email(),
@@ -129,7 +138,10 @@ func NewWorkspaceRows(ws *workspace.Workspace) (*WorkspaceRow, []WorkspaceMember
 		Name:        ws.Name(),
 		Personal:    ws.IsPersonal(),
 		Policy:      policy,
+		CreatedAt:   ws.CreatedAt(),
+		CreatedBy:   createdBy,
 		UpdatedAt:   updatedAt,
+		DeletedAt:   ws.DeletedAt(),
 	}, memberRows, integRows
 }
 
@@ -201,6 +213,14 @@ func WorkspaceModel(r *WorkspaceRow, members []WorkspaceMemberRow, integrations 
 		policy = workspace.PolicyID(*r.Policy).Ref()
 	}
 
+	var createdBy *workspace.UserID
+	if r.CreatedBy != nil && *r.CreatedBy != "" {
+		uid, err := id.UserIDFrom(*r.CreatedBy)
+		if err == nil {
+			createdBy = &uid
+		}
+	}
+
 	var mj WorkspaceMetadataJSON
 	if len(r.Metadata) > 0 {
 		if err := json.Unmarshal(r.Metadata, &mj); err != nil {
@@ -230,5 +250,6 @@ func WorkspaceModel(r *WorkspaceRow, members []WorkspaceMemberRow, integrations 
 	return workspace.New().
 		ID(tid).Name(r.Name).Alias(r.Alias).Email(r.Email).
 		Metadata(metadata).Members(mems).Integrations(integs).
-		Personal(r.Personal).Policy(policy).ScimConfig(scimConfig).UpdatedAt(r.UpdatedAt).Build()
+		Personal(r.Personal).Policy(policy).ScimConfig(scimConfig).
+		CreatedAt(r.CreatedAt).CreatedBy(createdBy).UpdatedAt(r.UpdatedAt).DeletedAt(r.DeletedAt).Build()
 }

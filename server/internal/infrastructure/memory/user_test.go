@@ -467,6 +467,6 @@ func TestUser_FindAllWithPagination_RejectsCursor(t *testing.T) {
 	first := int64(10)
 	pagination := &usecasex.Pagination{Cursor: &usecasex.CursorPagination{First: &first}}
 
-	_, _, err := r.FindAllWithPagination(ctx, nil, pagination)
+	_, _, err := r.FindAllWithPagination(ctx, nil, user.StatusAll, pagination)
 	assert.ErrorIs(t, err, user.ErrCursorPaginationUnsupported)
 }

@@ -98,6 +98,16 @@ func (u *AdminUser) UpdatedAt() time.Time {
 	return u.updatedAt
 }
 
+// Clone returns a copy of u. All fields are plain values, so a shallow copy
+// is sufficient — mutating the clone never affects u.
+func (u *AdminUser) Clone() *AdminUser {
+	if u == nil {
+		return nil
+	}
+	c := *u
+	return &c
+}
+
 func (u *AdminUser) IsApproved() bool {
 	return u != nil && u.status == StatusApproved
 }

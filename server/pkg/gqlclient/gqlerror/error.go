@@ -26,3 +26,13 @@ func ReturnAccountsError(ctx context.Context, err error) AccountsError {
 	log.Errorfc(ctx, "[Error] error with caller logging at %s:%d %+v", file, line, err)
 	return err
 }
+
+func ReturnAccountsWarn(ctx context.Context, err error) AccountsError {
+	_, file, line, _ := runtime.Caller(1)
+	if strings.Contains(err.Error(), "401") {
+		log.Warnfc(ctx, "[Warn] unauthorized at %s:%d %+v", file, line, err)
+		return ErrUnauthorized
+	}
+	log.Warnfc(ctx, "[Error] error with caller logging at %s:%d %+v", file, line, err)
+	return err
+}

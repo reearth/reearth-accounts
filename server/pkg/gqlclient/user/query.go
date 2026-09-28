@@ -143,3 +143,9 @@ type enableMFAMutation struct {
 type disableMFAMutation struct {
 	DisableMFA graphql.Boolean `graphql:"disableMFA"`
 }
+
+type regenerateMFARecoveryCodeMutation struct {
+	RegenerateMFARecoveryCode struct {
+		RecoveryCode graphql.String `graphql:"recoveryCode"`
+	} `graphql:"regenerateMFARecoveryCode"`
+}

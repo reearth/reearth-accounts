@@ -58,11 +58,19 @@ func (r *Lock) Unlock(ctx context.Context, name string) error {
 		return repo.ErrNotLocked
 	}
 
-	if _, err := r.l.Unlock(ctx, lockID); err != nil {
+	// Always release the in-process guard, even if the remote unlock below
+	// fails, so a canceled caller context or a transient Mongo error doesn't
+	// leave this process permanently unable to (re)acquire name: the actual
+	// mutual-exclusion guarantee is the Mongo lock document and its TTL, not
+	// this local cache. Use a non-cancelable context for the remote call so
+	// an already-canceled ctx (e.g. an aborted HTTP request) doesn't turn a
+	// routine deferred unlock into a spurious failure.
+	defer r.deleteLockID(name)
+
+	if _, err := r.l.Unlock(context.WithoutCancel(ctx), lockID); err != nil {
 		return rerror.ErrInternalByWithContext(ctx, err)
 	}
 
-	r.deleteLockID(name)
 	log.Debugfc(ctx, "lock: unlocked: name=%s, id=%s, host=%s", name, lockID, r.hostid)
 	return nil
 }
