@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"net/http"
+	"strconv"
 	"strings"
 
 	"github.com/labstack/echo/v4"
@@ -38,32 +39,39 @@ func (h *UserHandler) Create(c echo.Context) error {
 		return scimErrorResponse(c, http.StatusUnauthorized, "workspace not resolved", "")
 	}
 
-	var body ScimUser
-	if err := c.Bind(&body); err != nil {
+	var req ScimUserWriteRequest
+	if err := c.Bind(&req); err != nil {
 		return scimErrorResponse(c, http.StatusBadRequest, "invalid request body", "invalidValue")
 	}
 
-	email := body.UserName
-	if email == "" && len(body.Emails) > 0 {
-		email = body.Emails[0].Value
+	email := req.UserName
+	if email == "" && len(req.Emails) > 0 {
+		email = req.Emails[0].Value
 	}
 	if email == "" {
 		return scimErrorResponse(c, http.StatusBadRequest, "userName is required", "invalidValue")
 	}
-	name := body.Name.Formatted
+	name := req.Name.Formatted
 	if name == "" {
 		name = email
 	}
 
 	u, err := h.scimUC.ProvisionScimUser(ctx, interfaces.ProvisionScimUserParam{
 		Email:       email,
-		ExternalID:  body.ExternalID,
+		ExternalID:  req.ExternalID,
 		Name:        name,
 		Role:        role.RoleReader,
 		WorkspaceID: wsID,
 	})
 	if err != nil {
 		return h.mapError(c, err)
+	}
+
+	// If the IdP explicitly created the account as inactive, deprovision immediately.
+	if req.Active != nil && !*req.Active {
+		if err := h.scimUC.DeprovisionScimUserByUserID(ctx, wsID, u.ID()); err != nil {
+			return h.mapError(c, err)
+		}
 	}
 
 	member, err := h.memberForUser(ctx, wsID, u.ID())
@@ -73,7 +81,7 @@ func (h *UserHandler) Create(c echo.Context) error {
 	resp := DomainUserToScimUser(u, member, requestBaseURL(c))
 
 	c.Response().Header().Set("Location", resp.Meta.Location)
-	return c.JSON(http.StatusCreated, resp)
+	return scimJSON(c, http.StatusCreated, resp)
 }
 
 // Delete handles DELETE /scim/v2/Users/:id — soft-deprovision (204 No Content per RFC 7644).
@@ -120,10 +128,10 @@ func (h *UserHandler) Get(c echo.Context) error {
 	if err != nil {
 		return h.mapError(c, err)
 	}
-	return c.JSON(http.StatusOK, DomainUserToScimUser(u, member, requestBaseURL(c)))
+	return scimJSON(c, http.StatusOK, DomainUserToScimUser(u, member, requestBaseURL(c)))
 }
 
-// List handles GET /scim/v2/Users with optional ?filter= query param.
+// List handles GET /scim/v2/Users with optional ?filter=, ?startIndex=, ?count= params.
 func (h *UserHandler) List(c echo.Context) error {
 	ctx := c.Request().Context()
 
@@ -170,19 +178,43 @@ func (h *UserHandler) List(c echo.Context) error {
 		}
 	}
 
+	// SCIM pagination: startIndex is 1-based, count is the max items to return.
+	totalResults := len(filtered)
+	startIndex := 1
+	pageCount := totalResults
+	if s := c.QueryParam("startIndex"); s != "" {
+		if v, err := strconv.Atoi(s); err == nil && v >= 1 {
+			startIndex = v
+		}
+	}
+	if cnt := c.QueryParam("count"); cnt != "" {
+		if v, err := strconv.Atoi(cnt); err == nil && v >= 0 {
+			pageCount = v
+		}
+	}
+	offset := startIndex - 1
+	if offset > totalResults {
+		offset = totalResults
+	}
+	end := offset + pageCount
+	if end > totalResults {
+		end = totalResults
+	}
+	paged := filtered[offset:end]
+
 	baseURL := requestBaseURL(c)
-	resources := make([]ScimUser, 0, len(filtered))
-	for _, u := range filtered {
+	resources := make([]ScimUser, 0, len(paged))
+	for _, u := range paged {
 		member := members[u.ID()]
 		resources = append(resources, DomainUserToScimUser(u, member, baseURL))
 	}
 
-	return c.JSON(http.StatusOK, ScimListResponse{
+	return scimJSON(c, http.StatusOK, ScimListResponse{
 		ItemsPerPage: len(resources),
 		Resources:    resources,
 		Schemas:      []string{ScimSchemaListResponse},
-		StartIndex:   1,
-		TotalResults: len(resources),
+		StartIndex:   startIndex,
+		TotalResults: totalResults,
 	})
 }
 
@@ -260,10 +292,11 @@ func (h *UserHandler) Patch(c echo.Context) error {
 	if err != nil {
 		return h.mapError(c, err)
 	}
-	return c.JSON(http.StatusOK, DomainUserToScimUser(u, member, requestBaseURL(c)))
+	return scimJSON(c, http.StatusOK, DomainUserToScimUser(u, member, requestBaseURL(c)))
 }
 
-// Replace handles PUT /scim/v2/Users/:id — full replace (returns current state).
+// Replace handles PUT /scim/v2/Users/:id — full replace.
+// Applies the active state from the request body; other attributes are not yet mutable.
 func (h *UserHandler) Replace(c echo.Context) error {
 	ctx := c.Request().Context()
 
@@ -277,6 +310,24 @@ func (h *UserHandler) Replace(c echo.Context) error {
 		return scimErrorResponse(c, http.StatusNotFound, "user not found", "")
 	}
 
+	var req ScimUserWriteRequest
+	if err := c.Bind(&req); err != nil {
+		return scimErrorResponse(c, http.StatusBadRequest, "invalid request body", "invalidValue")
+	}
+
+	// Apply active state if explicitly specified in the replacement.
+	if req.Active != nil {
+		if !*req.Active {
+			if err := h.scimUC.DeprovisionScimUserByUserID(ctx, wsID, uid); err != nil {
+				return h.mapError(c, err)
+			}
+		} else {
+			if err := h.scimUC.ReactivateScimUserByUserID(ctx, wsID, uid); err != nil {
+				return h.mapError(c, err)
+			}
+		}
+	}
+
 	u, err := h.scimUC.GetScimUser(ctx, wsID, uid)
 	if err != nil {
 		return h.mapError(c, err)
@@ -286,7 +337,7 @@ func (h *UserHandler) Replace(c echo.Context) error {
 	if err != nil {
 		return h.mapError(c, err)
 	}
-	return c.JSON(http.StatusOK, DomainUserToScimUser(u, member, requestBaseURL(c)))
+	return scimJSON(c, http.StatusOK, DomainUserToScimUser(u, member, requestBaseURL(c)))
 }
 
 // --- helpers ---

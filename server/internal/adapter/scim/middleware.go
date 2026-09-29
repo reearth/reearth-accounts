@@ -2,6 +2,7 @@ package scim
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"net/http"
 	"strings"
@@ -10,6 +11,8 @@ import (
 	"github.com/reearth/reearth-accounts/server/pkg/workspace"
 	"golang.org/x/crypto/bcrypt"
 )
+
+const scimMediaType = "application/scim+json"
 
 type scimWorkspaceKey struct{}
 
@@ -70,13 +73,22 @@ func WorkspaceIDFromContext(ctx context.Context) (workspace.ID, bool) {
 	return id, ok
 }
 
-// scimErrorResponse writes a JSON ScimError response body and returns nil (the response is
-// already committed). Callers should return the result of this function.
+// scimErrorResponse writes a SCIM error body with Content-Type: application/scim+json.
 func scimErrorResponse(c echo.Context, status int, detail, scimType string) error {
-	return c.JSON(status, ScimError{
+	b, _ := json.Marshal(ScimError{
 		Detail:   detail,
 		Schemas:  []string{ScimSchemaError},
 		ScimType: scimType,
 		Status:   fmt.Sprintf("%d", status),
 	})
+	return c.Blob(status, scimMediaType, b)
+}
+
+// scimJSON writes a SCIM response body with Content-Type: application/scim+json.
+func scimJSON(c echo.Context, status int, v interface{}) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return scimErrorResponse(c, http.StatusInternalServerError, "internal server error", "")
+	}
+	return c.Blob(status, scimMediaType, b)
 }

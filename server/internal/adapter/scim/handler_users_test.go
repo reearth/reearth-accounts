@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
+	"strconv"
 	"strings"
 	"testing"
 
@@ -426,6 +427,94 @@ func TestUserHandler_Patch_ReactivateAlreadyActive(t *testing.T) {
 	m := saved.Members().User(u.ID())
 	require.NotNil(t, m)
 	assert.False(t, m.Disabled, "user should remain active")
+}
+
+// --- Content-Type ---
+
+func TestUserHandler_ResponseContentType(t *testing.T) {
+	_, ws, _, handler := setupHandlerTest(t)
+
+	e := echo.New()
+	req := httptest.NewRequest(http.MethodGet, "/scim/v2/Users", nil)
+	req = contextWithWorkspace(req, ws.ID())
+	rec := httptest.NewRecorder()
+	c := e.NewContext(req, rec)
+
+	err := handler.List(c)
+	require.NoError(t, err)
+	assert.Equal(t, http.StatusOK, rec.Code)
+	assert.Equal(t, "application/scim+json", rec.Header().Get("Content-Type"))
+}
+
+// --- Create active:false ---
+
+func TestUserHandler_Create_InactiveUser(t *testing.T) {
+	db, ws, _, handler := setupHandlerTest(t)
+
+	body := `{"schemas":["urn:ietf:params:scim:schemas:core:2.0:User"],"userName":"inactive@example.com","externalId":"ext-inactive-001","active":false}`
+	e := echo.New()
+	req := httptest.NewRequest(http.MethodPost, "/scim/v2/Users", strings.NewReader(body))
+	req.Header.Set(echo.HeaderContentType, echo.MIMEApplicationJSON)
+	req = contextWithWorkspace(req, ws.ID())
+	rec := httptest.NewRecorder()
+	c := e.NewContext(req, rec)
+
+	err := handler.Create(c)
+	require.NoError(t, err)
+	assert.Equal(t, http.StatusCreated, rec.Code)
+
+	var resp ScimUser
+	require.NoError(t, json.Unmarshal(rec.Body.Bytes(), &resp))
+	assert.False(t, resp.Active, "user created with active:false must be inactive")
+
+	// Verify the member is soft-disabled in the workspace.
+	saved, err := db.Workspace.FindByID(t.Context(), ws.ID())
+	require.NoError(t, err)
+	uid, ok := saved.Members().UserByExternalID("ext-inactive-001")
+	require.True(t, ok)
+	m := saved.Members().User(uid)
+	require.NotNil(t, m)
+	assert.True(t, m.Disabled)
+}
+
+// --- Pagination ---
+
+func TestUserHandler_List_Pagination(t *testing.T) {
+	db, ws, _, handler := setupHandlerTest(t)
+
+	// Provision 3 users so we have owner + 3 = 4 total members.
+	for i := 0; i < 3; i++ {
+		scimUC := NewUserHandler(handler.scimUC, db.Workspace)
+		_ = scimUC // just provision via the usecase directly
+	}
+	// Use the usecase directly to provision users.
+	for i, email := range []string{"u1@example.com", "u2@example.com", "u3@example.com"} {
+		_, err := handler.scimUC.ProvisionScimUser(t.Context(), interfaces.ProvisionScimUserParam{
+			Email: email, ExternalID: "ext-" + strconv.Itoa(i+1),
+			Name: email, Role: role.RoleWriter, WorkspaceID: ws.ID(),
+		})
+		require.NoError(t, err)
+	}
+
+	e := echo.New()
+
+	// Request count=2, startIndex=1 → first 2 of 4.
+	req := httptest.NewRequest(http.MethodGet, "/scim/v2/Users?startIndex=1&count=2", nil)
+	req = contextWithWorkspace(req, ws.ID())
+	rec := httptest.NewRecorder()
+	c := e.NewContext(req, rec)
+	c.QueryParams().Set("startIndex", "1")
+	c.QueryParams().Set("count", "2")
+
+	err := handler.List(c)
+	require.NoError(t, err)
+	assert.Equal(t, http.StatusOK, rec.Code)
+
+	var resp ScimListResponse
+	require.NoError(t, json.Unmarshal(rec.Body.Bytes(), &resp))
+	assert.Equal(t, 4, resp.TotalResults, "totalResults must reflect the full set")
+	assert.Equal(t, 2, resp.ItemsPerPage)
+	assert.Equal(t, 1, resp.StartIndex)
 }
 
 // --- parseFilter helper ---
