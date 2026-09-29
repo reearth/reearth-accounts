@@ -188,7 +188,13 @@ func (m *Members) IsOnlyOwner(u UserID) bool {
 	m.mu.RLock()
 	defer m.mu.RUnlock()
 
-	return len(m.UsersByRole(role.RoleOwner)) == 1 && m.users[u].Role == role.RoleOwner
+	activeOwners := 0
+	for _, mem := range m.users {
+		if mem.Role == role.RoleOwner && !mem.Disabled {
+			activeOwners++
+		}
+	}
+	return activeOwners == 1 && m.users[u].Role == role.RoleOwner && !m.users[u].Disabled
 }
 
 func (m *Members) IsOwnerOrMaintainer(u UserID) bool {

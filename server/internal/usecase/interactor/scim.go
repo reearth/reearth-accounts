@@ -178,7 +178,8 @@ func (i *Scim) GetScimUser(ctx context.Context, workspaceID workspace.ID, userID
 		return nil, err
 	}
 
-	if !ws.Members().HasUser(userID) {
+	m := ws.Members().User(userID)
+	if m == nil || m.Disabled {
 		return nil, interfaces.ErrSCIMUserNotFound
 	}
 
@@ -300,6 +301,12 @@ func (i *Scim) ProvisionScimUser(ctx context.Context, param interfaces.Provision
 				mem := ws.Members().User(existingUser.ID())
 				if mem != nil && mem.Disabled {
 					if err := ws.Members().SetUserDisabled(existingUser.ID(), false); err != nil {
+						return nil, err
+					}
+				}
+				// Reconcile role unless demoting the sole active owner.
+				if ws.Members().UserRole(existingUser.ID()) != roleType && !ws.Members().IsOnlyOwner(existingUser.ID()) {
+					if err := ws.Members().UpdateUserRole(existingUser.ID(), roleType); err != nil {
 						return nil, err
 					}
 				}

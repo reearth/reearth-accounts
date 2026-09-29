@@ -30,7 +30,7 @@ func (l List) FilterByUserRole(u UserID, r role.RoleType) List {
 
 	res := make(List, 0, len(l))
 	for _, t := range l {
-		if m := t.Members().User(u); m != nil && m.Role == r {
+		if m := t.Members().User(u); m != nil && m.Role == r && !m.Disabled {
 			res = append(res, t)
 		}
 	}
@@ -58,7 +58,7 @@ func (l List) FilterByUserRoleIncluding(u UserID, r role.RoleType) List {
 
 	res := make(List, 0, len(l))
 	for _, t := range l {
-		if m := t.Members().User(u); m != nil && m.Role.Includes(r) {
+		if m := t.Members().User(u); m != nil && m.Role.Includes(r) && !m.Disabled {
 			res = append(res, t)
 		}
 	}
