@@ -117,6 +117,11 @@ func (b *Builder) Policy(p *PolicyID) *Builder {
 	return b
 }
 
+func (b *Builder) ScimConfig(cfg *ScimConfig) *Builder {
+	b.w.scimConfig = cfg.Clone()
+	return b
+}
+
 func (b *Builder) CreatedAt(t *time.Time) *Builder {
 	b.w.createdAt = t
 	return b

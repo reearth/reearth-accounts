@@ -49,6 +49,13 @@
               "bsonType": "bool",
               "description": "Whether the member is disabled"
             },
+            "externalid": {
+              "bsonType": [
+                "string",
+                "null"
+              ],
+              "description": "IdP-assigned external ID for this membership. Default: \"\""
+            },
             "invitedby": {
               "bsonType": "string",
               "description": "User ID of the inviter"
@@ -69,6 +76,13 @@
             "disabled": {
               "bsonType": "bool",
               "description": "Whether the member is disabled"
+            },
+            "externalid": {
+              "bsonType": [
+                "string",
+                "null"
+              ],
+              "description": "IdP-assigned external ID for this membership. Default: \"\""
             },
             "invitedby": {
               "bsonType": "string",
@@ -131,6 +145,30 @@
         ],
         "description": "Policy ID reference. Default: \"\""
       },
+      "scimconfig": {
+        "bsonType": [
+          "object",
+          "null"
+        ],
+        "description": "SCIM provisioning configuration. Default: null",
+        "properties": {
+          "enabled": {
+            "bsonType": "bool",
+            "description": "Whether SCIM provisioning is enabled for this workspace"
+          },
+          "grouprolemapping": {
+            "additionalProperties": {
+              "bsonType": "string"
+            },
+            "bsonType": "object",
+            "description": "IdP group name to workspace role mapping"
+          },
+          "tokenhash": {
+            "bsonType": "string",
+            "description": "bcrypt hash of the SCIM bearer token. Default: \"\""
+          }
+        }
+      },
       "updatedat": {
         "bsonType": "date",
         "description": "Last update timestamp"
@@ -141,8 +179,8 @@
       "name",
       "alias",
       "email",
-      "metadata",
       "members",
+      "metadata",
       "personal"
     ],
     "title": "Workspace Collection Schema"

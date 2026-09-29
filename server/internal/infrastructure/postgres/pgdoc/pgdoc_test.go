@@ -44,20 +44,46 @@ func TestWorkspaceRoundTrip(t *testing.T) {
 	uid := id.NewUserID()
 	iid := id.NewIntegrationID()
 	ws, err := workspace.New().NewID().Name("team").Alias("team").Email("t@example.com").
-		Members(map[id.UserID]workspace.Member{uid: {Role: role.RoleOwner, InvitedBy: uid}}).
+		Members(map[id.UserID]workspace.Member{uid: {Role: role.RoleOwner, InvitedBy: uid, ExternalID: "ext-123"}}).
 		Integrations(map[id.IntegrationID]workspace.Member{iid: {Role: role.RoleOwner, InvitedBy: uid}}).
 		Build()
 	require.NoError(t, err)
 
 	row, members, integrations := pgdoc.NewWorkspaceRows(ws)
 	require.NotEmpty(t, row.MembersHash)
-	got, err := pgdoc.WorkspaceModel(row, members, integrations)
+	got, err := pgdoc.WorkspaceModel(row, members, integrations, nil)
 	require.NoError(t, err)
 	assert.Equal(t, ws.ID(), got.ID())
 	assert.Equal(t, "team", got.Name())
 	assert.Equal(t, "team", got.Alias())
 	assert.Contains(t, got.Members().Users(), uid)
+	assert.Equal(t, "ext-123", got.Members().Users()[uid].ExternalID)
 	assert.Contains(t, got.Members().Integrations(), iid)
+}
+
+func TestWorkspaceRoundTrip_ScimConfig(t *testing.T) {
+	uid := id.NewUserID()
+	cfg := workspace.NewScimConfig()
+	cfg.SetEnabled(true)
+	cfg.SetTokenHash("hash-abc")
+	cfg.SetGroupRoleMapping(map[string]role.RoleType{"admins": role.RoleOwner})
+	ws, err := workspace.New().NewID().Name("scim-team").Alias("scim-team").Email("s@example.com").
+		Members(map[id.UserID]workspace.Member{uid: {Role: role.RoleOwner, InvitedBy: uid}}).
+		ScimConfig(cfg).
+		Build()
+	require.NoError(t, err)
+
+	row, members, integrations := pgdoc.NewWorkspaceRows(ws)
+	scimRow := pgdoc.ScimConfigRow(ws)
+	require.NotNil(t, scimRow)
+
+	got, err := pgdoc.WorkspaceModel(row, members, integrations, scimRow)
+	require.NoError(t, err)
+	gotCfg := got.ScimConfig()
+	require.NotNil(t, gotCfg)
+	assert.True(t, gotCfg.Enabled())
+	assert.Equal(t, "hash-abc", gotCfg.TokenHash())
+	assert.Equal(t, map[string]role.RoleType{"admins": role.RoleOwner}, gotCfg.GroupRoleMapping())
 }
 
 func TestRoleRoundTrip(t *testing.T) {

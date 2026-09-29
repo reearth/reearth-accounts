@@ -23,10 +23,11 @@ var (
 )
 
 type Member struct {
-	Role      role.RoleType
-	Disabled  bool
-	InvitedBy UserID
-	Host      string
+	Disabled   bool
+	ExternalID string
+	Host       string
+	InvitedBy  UserID
+	Role       role.RoleType
 }
 
 type Members struct {

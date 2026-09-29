@@ -77,6 +77,7 @@ erDiagram
         string name
         bool personal
         string policy "optional"
+        object scimconfig "optional"
         date updatedat "optional"
     }
 
