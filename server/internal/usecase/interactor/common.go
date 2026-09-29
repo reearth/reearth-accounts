@@ -26,10 +26,10 @@ func NewContainer(
 	return interfaces.Container{
 		Cerbos:      cerbos,
 		Permittable: NewPermittable(r),
+		Role:        r.Role,
 		Scim:        NewScim(r),
 		User:        NewUser(r, acg, cerbos, config.SignupSecret, config.AuthSrvUIDomain, config.AllowedISS...),
 		Workspace:   NewWorkspace(r, enforcer, cerbos),
-		Role:        r.Role,
 	}
 }
 

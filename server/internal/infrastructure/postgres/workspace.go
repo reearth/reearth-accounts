@@ -309,6 +309,10 @@ func (r *Workspace) save(ctx context.Context, ws *workspace.Workspace) error {
 			}); err != nil {
 				return rerror.ErrInternalByWithContext(ctx, err)
 			}
+		} else {
+			if err := q.WorkspaceScimConfigDelete(ctx, row.ID); err != nil {
+				return rerror.ErrInternalByWithContext(ctx, err)
+			}
 		}
 		return nil
 	})
