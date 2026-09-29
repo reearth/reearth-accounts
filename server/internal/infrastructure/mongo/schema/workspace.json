@@ -12,6 +12,27 @@
         "bsonType": "string",
         "description": "Unique workspace handle/alias"
       },
+      "createdat": {
+        "bsonType": [
+          "date",
+          "null"
+        ],
+        "description": "Workspace creation timestamp. Null for workspaces created before this field existed"
+      },
+      "createdby": {
+        "bsonType": [
+          "string",
+          "null"
+        ],
+        "description": "User ID of workspace creator (ULID format). Default: \"\""
+      },
+      "deletedat": {
+        "bsonType": [
+          "date",
+          "null"
+        ],
+        "description": "Soft delete timestamp. Null = active, non-null = deleted"
+      },
       "email": {
         "bsonType": "string",
         "description": "Workspace contact email"

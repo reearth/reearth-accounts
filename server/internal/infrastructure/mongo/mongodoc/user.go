@@ -15,21 +15,23 @@ type PasswordResetDocument struct {
 }
 
 type UserDocument struct {
-	ID            string                 `json:"id" bson:"id" jsonschema:"required,description=User ID (ULID format)"`
-	Name          string                 `json:"name" bson:"name" jsonschema:"required,description=User display name"`
-	Alias         string                 `json:"alias" bson:"alias" jsonschema:"required,description=Unique user handle/alias. Default: \"\""`
+	ID             string                 `json:"id" bson:"id" jsonschema:"required,description=User ID (ULID format)"`
+	Name           string                 `json:"name" bson:"name" jsonschema:"required,description=User display name"`
+	Alias          string                 `json:"alias" bson:"alias" jsonschema:"required,description=Unique user handle/alias. Default: \"\""`
 	Email          string                 `json:"email" bson:"email" jsonschema:"required,description=User email address"`
 	LatestLogoutAt time.Time              `json:"latestlogoutat" bson:"latestlogoutat" jsonschema:"description=Timestamp (datetime) of user's latest logout in UTC. Default: zero value"`
 	Subs           []string               `json:"subs" bson:"subs" jsonschema:"required,description=OAuth subject identifiers for authentication providers. Default: []"`
-	Workspace     string                 `json:"workspace" bson:"workspace" jsonschema:"required,foreignkey=workspace,description=Personal workspace ID (ULID format)"`
-	Team          string                 `json:"team" bson:",omitempty" jsonschema:"description=Legacy team field (deprecated, use workspace)"`
-	Lang          string                 `json:"lang" bson:"lang" jsonschema:"description=User language preference. Default: \"\" (deprecated, move to metadata)"`
-	Theme         string                 `json:"theme" bson:"theme" jsonschema:"description=User UI theme preference. Default: \"\" (deprecated, move to metadata)"`
-	Password      []byte                 `json:"password" bson:"password,omitempty" jsonschema:"description=Hashed password (bcrypt). Null for OIDC-only users"`
-	PasswordReset *PasswordResetDocument `json:"passwordreset" bson:"passwordreset" jsonschema:"description=Password reset token information"`
-	Verification  *UserVerificationDoc   `json:"verification" bson:"verification" jsonschema:"description=Email verification state. Default: null"`
-	Metadata      UserMetadataDoc        `json:"metadata" bson:"metadata" jsonschema:"required,description=Extended user metadata. Default: {}"`
-	UpdatedAt     time.Time              `json:"updatedat" bson:"updatedat" jsonschema:"description=Last update timestamp"`
+	Workspace      string                 `json:"workspace" bson:"workspace" jsonschema:"required,foreignkey=workspace,description=Personal workspace ID (ULID format)"`
+	Team           string                 `json:"team" bson:",omitempty" jsonschema:"description=Legacy team field (deprecated, use workspace)"`
+	Lang           string                 `json:"lang" bson:"lang" jsonschema:"description=User language preference. Default: \"\" (deprecated, move to metadata)"`
+	Theme          string                 `json:"theme" bson:"theme" jsonschema:"description=User UI theme preference. Default: \"\" (deprecated, move to metadata)"`
+	Password       []byte                 `json:"password" bson:"password,omitempty" jsonschema:"description=Hashed password (bcrypt). Null for OIDC-only users"`
+	PasswordReset  *PasswordResetDocument `json:"passwordreset" bson:"passwordreset" jsonschema:"description=Password reset token information"`
+	Verification   *UserVerificationDoc   `json:"verification" bson:"verification" jsonschema:"description=Email verification state. Default: null"`
+	Metadata       UserMetadataDoc        `json:"metadata" bson:"metadata" jsonschema:"required,description=Extended user metadata. Default: {}"`
+	UpdatedAt      time.Time              `json:"updatedat" bson:"updatedat" jsonschema:"description=Last update timestamp"`
+	DeletedAt      *time.Time             `json:"deletedat" bson:"deletedat,omitempty" jsonschema:"description=Soft delete timestamp. Null = active, non-null = deactivated"`
+	CreatedAt      *time.Time             `json:"createdat" bson:"createdat,omitempty" jsonschema:"description=User creation timestamp. Null for users created before this field existed"`
 }
 
 type UserVerificationDoc struct {
@@ -97,6 +99,8 @@ func NewUser(user *user.User) (*UserDocument, string) {
 		PasswordReset:  pwdResetDoc,
 		Metadata:       metadataDoc,
 		UpdatedAt:      updatedAt,
+		DeletedAt:      user.DeletedAt(),
+		CreatedAt:      user.CreatedAt(),
 	}, id
 }
 
@@ -151,6 +155,8 @@ func (d *UserDocument) Model() (*user.User, error) {
 		EncodedPassword(d.Password).
 		PasswordReset(d.PasswordReset.Model()).
 		UpdatedAt(d.UpdatedAt).
+		DeletedAt(d.DeletedAt).
+		CreatedAt(d.CreatedAt).
 		Build()
 
 	if err != nil {

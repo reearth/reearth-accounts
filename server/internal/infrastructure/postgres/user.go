@@ -27,6 +27,7 @@ func rowToUserRow(r gen.User) *pgdoc.UserRow {
 		Password: r.Password, Subs: r.Subs, LatestLogoutAt: r.LatestLogoutAt,
 		Metadata: r.Metadata, Verification: r.Verification, PasswordReset: r.PasswordReset,
 		Team: r.Team, Lang: r.Lang, Theme: r.Theme, UpdatedAt: r.UpdatedAt,
+		DeletedAt: r.DeletedAt, CreatedAt: r.CreatedAt,
 	}
 }
 
@@ -54,7 +55,8 @@ func (r *User) insertParams(u *user.User) gen.UserUpsertParams {
 	return gen.UserUpsertParams{
 		ID: d.ID, Name: d.Name, Alias: d.Alias, Email: d.Email, Workspace: d.Workspace,
 		Password: d.Password, Subs: d.Subs, LatestLogoutAt: d.LatestLogoutAt,
-		Metadata: d.Metadata, Verification: d.Verification, PasswordReset: d.PasswordReset, UpdatedAt: d.UpdatedAt,
+		Metadata: d.Metadata, Verification: d.Verification, PasswordReset: d.PasswordReset,
+		CreatedAt: d.CreatedAt, UpdatedAt: d.UpdatedAt, DeletedAt: d.DeletedAt,
 	}
 }
 
@@ -63,7 +65,8 @@ func (r *User) Create(ctx context.Context, u *user.User) error {
 	err := r.c.queries(ctx).UserInsert(ctx, gen.UserInsertParams{
 		ID: d.ID, Name: d.Name, Alias: d.Alias, Email: d.Email, Workspace: d.Workspace,
 		Password: d.Password, Subs: d.Subs, LatestLogoutAt: d.LatestLogoutAt,
-		Metadata: d.Metadata, Verification: d.Verification, PasswordReset: d.PasswordReset, UpdatedAt: d.UpdatedAt,
+		Metadata: d.Metadata, Verification: d.Verification, PasswordReset: d.PasswordReset,
+		CreatedAt: d.CreatedAt, UpdatedAt: d.UpdatedAt, DeletedAt: d.DeletedAt,
 	})
 	if isUniqueViolation(err) {
 		return user.ErrDuplicatedUser
@@ -138,7 +141,7 @@ func (r *User) FindAll(ctx context.Context) (user.List, error) {
 	return userModels(rows)
 }
 
-func (r *User) FindAllWithPagination(ctx context.Context, keyword *string, p *usecasex.Pagination) (user.List, *usecasex.PageInfo, error) {
+func (r *User) FindAllWithPagination(ctx context.Context, keyword *string, status user.StatusFilter, p *usecasex.Pagination) (user.List, *usecasex.PageInfo, error) {
 	if p != nil && p.Cursor != nil {
 		return nil, nil, user.ErrCursorPaginationUnsupported
 	}
@@ -148,6 +151,12 @@ func (r *User) FindAllWithPagination(ctx context.Context, keyword *string, p *us
 		args = append(args, likeContains(strings.TrimSpace(*keyword)))
 		i := itoa(len(args))
 		where = append(where, "(name ILIKE $"+i+" OR alias ILIKE $"+i+" OR email ILIKE $"+i+")")
+	}
+	switch status {
+	case user.StatusActive:
+		where = append(where, "deleted_at IS NULL")
+	case user.StatusDeleted:
+		where = append(where, "deleted_at IS NOT NULL")
 	}
 	base := "FROM users"
 	if len(where) > 0 {
@@ -271,7 +280,7 @@ func likeContains(s string) string {
 
 // userColumns matches scanUsers/gen.User scan order; avoid SELECT * to keep scanning stable.
 const userColumns = "id, name, alias, email, workspace, password, subs, " +
-	"latest_logout_at, metadata, verification, password_reset, team, lang, theme, updated_at"
+	"latest_logout_at, metadata, verification, password_reset, team, lang, theme, updated_at, deleted_at, created_at"
 
 func scanUsers(rows pgx.Rows) (user.List, error) {
 	defer rows.Close()
@@ -281,7 +290,7 @@ func scanUsers(rows pgx.Rows) (user.List, error) {
 		if err := rows.Scan(
 			&g.ID, &g.Name, &g.Alias, &g.Email, &g.Workspace, &g.Password, &g.Subs,
 			&g.LatestLogoutAt, &g.Metadata, &g.Verification, &g.PasswordReset,
-			&g.Team, &g.Lang, &g.Theme, &g.UpdatedAt,
+			&g.Team, &g.Lang, &g.Theme, &g.UpdatedAt, &g.DeletedAt, &g.CreatedAt,
 		); err != nil {
 			return nil, err
 		}

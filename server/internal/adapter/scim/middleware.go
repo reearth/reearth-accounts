@@ -31,7 +31,7 @@ func ScimBearerAuth(workspaceRepo workspace.Repo) echo.MiddlewareFunc {
 
 			// 2. Scan all workspaces with SCIM enabled to find the matching token.
 			ctx := c.Request().Context()
-			allWS, _, err := workspaceRepo.FindAll(ctx, nil, nil)
+			allWS, _, err := workspaceRepo.FindAll(ctx, nil, nil, workspace.StatusActive, nil, false)
 			if err != nil {
 				return scimErrorResponse(c, http.StatusUnauthorized, "internal error", "")
 			}

@@ -27,6 +27,19 @@ type Auth0 struct {
 	lock           sync.Mutex
 	current        func() time.Time
 	disableLogging bool
+
+	mfaStatusLock  sync.Mutex
+	mfaStatusCache map[string]mfaStatusCacheEntry
+}
+
+// mfaStatusCacheTTL bounds how often GetMFAStatus hits the Auth0 Management
+// API per user, since that quota is shared with UpdateUser and
+// ResendVerificationEmail across the whole tenant.
+const mfaStatusCacheTTL = 30 * time.Second
+
+type mfaStatusCacheEntry struct {
+	status    gateway.MFAStatus
+	expiresAt time.Time
 }
 
 func currentTime() time.Time {
@@ -161,15 +174,31 @@ func (a *Auth0) DisableMFA(ctx context.Context, sub string) error {
 		return rerror.NewE(i18n.T("failed to list mfa enrollments"))
 	}
 
+	var confirmed []enrollment
 	for _, e := range enrollments {
-		if e.Status != "confirmed" {
-			continue
+		if e.Status == "confirmed" {
+			confirmed = append(confirmed, e)
 		}
-		if err := a.execInto(ctx, http.MethodDelete, "api/v2/guardian/enrollments/"+e.ID, a.token, nil, nil); err != nil {
-			if !a.disableLogging {
-				log.Errorf("auth0: disable mfa: delete enrollment %s: %+v", e.ID, err)
+	}
+
+	if len(confirmed) > 0 {
+		errs := make([]error, len(confirmed))
+		var wg sync.WaitGroup
+		wg.Add(len(confirmed))
+		for i, e := range confirmed {
+			go func() {
+				defer wg.Done()
+				errs[i] = a.execInto(ctx, http.MethodDelete, "api/v2/guardian/enrollments/"+e.ID, a.token, nil, nil)
+			}()
+		}
+		wg.Wait()
+		for i, err := range errs {
+			if err != nil {
+				if !a.disableLogging {
+					log.Errorf("auth0: disable mfa: delete enrollment %s: %+v", confirmed[i].ID, err)
+				}
+				return rerror.NewE(i18n.T("failed to delete mfa enrollment"))
 			}
-			return rerror.NewE(i18n.T("failed to delete mfa enrollment"))
 		}
 	}
 
@@ -182,6 +211,7 @@ func (a *Auth0) DisableMFA(ctx context.Context, sub string) error {
 		return rerror.NewE(i18n.T("failed to update mfa status"))
 	}
 
+	a.setCachedMFAStatus(sub, gateway.MFAStatus{Enrolled: false})
 	return nil
 }
 
@@ -210,10 +240,17 @@ func (a *Auth0) EnableMFA(ctx context.Context, sub string) (string, error) {
 		return "", rerror.NewE(i18n.T("failed to create mfa enrollment ticket"))
 	}
 
+	// Enrollment stays "pending" until the user completes the ticket flow, so
+	// the cached status (if any) is now stale rather than known-true.
+	a.invalidateMFAStatusCache(sub)
 	return r.TicketURL, nil
 }
 
 func (a *Auth0) GetMFAStatus(ctx context.Context, sub string) (gateway.MFAStatus, error) {
+	if status, ok := a.cachedMFAStatus(sub); ok {
+		return status, nil
+	}
+
 	if err := a.updateToken(ctx); err != nil {
 		return gateway.MFAStatus{}, err
 	}
@@ -226,13 +263,69 @@ func (a *Auth0) GetMFAStatus(ctx context.Context, sub string) (gateway.MFAStatus
 		return gateway.MFAStatus{}, rerror.NewE(i18n.T("failed to get mfa status"))
 	}
 
+	status := gateway.MFAStatus{}
 	for _, e := range enrollments {
 		if e.Status == "confirmed" {
-			return gateway.MFAStatus{Enrolled: true}, nil
+			status.Enrolled = true
+			break
 		}
 	}
 
-	return gateway.MFAStatus{Enrolled: false}, nil
+	a.setCachedMFAStatus(sub, status)
+	return status, nil
+}
+
+func (a *Auth0) now() time.Time {
+	if a.current == nil {
+		a.current = currentTime
+	}
+	return a.current()
+}
+
+func (a *Auth0) cachedMFAStatus(sub string) (gateway.MFAStatus, bool) {
+	a.mfaStatusLock.Lock()
+	defer a.mfaStatusLock.Unlock()
+
+	entry, ok := a.mfaStatusCache[sub]
+	if !ok || !a.now().Before(entry.expiresAt) {
+		return gateway.MFAStatus{}, false
+	}
+	return entry.status, true
+}
+
+func (a *Auth0) setCachedMFAStatus(sub string, status gateway.MFAStatus) {
+	a.mfaStatusLock.Lock()
+	defer a.mfaStatusLock.Unlock()
+
+	if a.mfaStatusCache == nil {
+		a.mfaStatusCache = map[string]mfaStatusCacheEntry{}
+	}
+	a.mfaStatusCache[sub] = mfaStatusCacheEntry{status: status, expiresAt: a.now().Add(mfaStatusCacheTTL)}
+}
+
+func (a *Auth0) invalidateMFAStatusCache(sub string) {
+	a.mfaStatusLock.Lock()
+	defer a.mfaStatusLock.Unlock()
+
+	delete(a.mfaStatusCache, sub)
+}
+
+func (a *Auth0) RegenerateMFARecoveryCode(ctx context.Context, sub string) (string, error) {
+	if err := a.updateToken(ctx); err != nil {
+		return "", err
+	}
+
+	var r struct {
+		RecoveryCode string `json:"recovery_code"`
+	}
+	if err := a.execInto(ctx, http.MethodPost, "api/v2/users/"+sub+"/recovery-code-regeneration", a.token, nil, &r); err != nil {
+		if !a.disableLogging {
+			log.Errorf("auth0: regenerate mfa recovery code: %+v", err)
+		}
+		return "", rerror.NewE(i18n.T("failed to regenerate mfa recovery code"))
+	}
+
+	return r.RecoveryCode, nil
 }
 
 func (a *Auth0) needsFetchToken() bool {
@@ -337,7 +430,7 @@ func (a *Auth0) exec(ctx context.Context, method, path, token string, b interfac
 	}
 
 	if !a.disableLogging {
-		log.Infof("auth0: path: %s, status: %d, resp: %s", path, resp.StatusCode, respb)
+		log.Infof("auth0: path: %s, status: %d", path, resp.StatusCode)
 	}
 
 	if err = json.Unmarshal(respb, &r); err != nil {
@@ -393,7 +486,7 @@ func (a *Auth0) execInto(ctx context.Context, method, path, token string, b, tar
 	}
 
 	if !a.disableLogging {
-		log.Infof("auth0: path: %s, status: %d, resp: %s", path, resp.StatusCode, respb)
+		log.Infof("auth0: path: %s, status: %d", path, resp.StatusCode)
 	}
 
 	if resp.StatusCode >= 300 {

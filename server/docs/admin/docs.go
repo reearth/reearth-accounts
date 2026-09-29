@@ -529,7 +529,7 @@ const docTemplate = `{
         },
         "/workspaces": {
             "get": {
-                "description": "Lists workspaces across all tenants, optionally filtered by a name/alias keyword, with offset pagination.\nWhen one or more ` + "`" + `ids` + "`" + ` query parameters are supplied, the endpoint instead resolves those workspaces by ID (existing ones only; unknown IDs are omitted) and ignores ` + "`" + `q` + "`" + `, ` + "`" + `page` + "`" + ` and ` + "`" + `per_page` + "`" + `. At most 100 ids may be supplied per request.",
+                "description": "Lists workspaces across all tenants, optionally filtered by a name/alias keyword, with offset pagination.\nUse ` + "`" + `type` + "`" + ` to filter by workspace type: ` + "`" + `personal` + "`" + ` returns only personal workspaces, ` + "`" + `team` + "`" + ` returns only team (non-personal) workspaces; when absent, both types are returned.\nWhen one or more ` + "`" + `ids` + "`" + ` query parameters are supplied, the endpoint instead resolves those workspaces by ID (existing ones only; unknown IDs are omitted) and ignores ` + "`" + `q` + "`" + `, ` + "`" + `type` + "`" + `, ` + "`" + `page` + "`" + ` and ` + "`" + `per_page` + "`" + `. At most 100 ids may be supplied per request.",
                 "produces": [
                     "application/json"
                 ],
@@ -544,7 +544,7 @@ const docTemplate = `{
                             "type": "string"
                         },
                         "collectionFormat": "multi",
-                        "description": "Batch fetch by workspace ID (repeatable, max 100). When present, q/page/per_page are ignored.",
+                        "description": "Batch fetch by workspace ID (repeatable, max 100). When present, q/type/page/per_page are ignored.",
                         "name": "ids",
                         "in": "query"
                     },
@@ -552,6 +552,16 @@ const docTemplate = `{
                         "type": "string",
                         "description": "Search by name or alias",
                         "name": "q",
+                        "in": "query"
+                    },
+                    {
+                        "enum": [
+                            "personal",
+                            "team"
+                        ],
+                        "type": "string",
+                        "description": "Filter by workspace type",
+                        "name": "type",
                         "in": "query"
                     },
                     {

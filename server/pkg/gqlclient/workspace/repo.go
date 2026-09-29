@@ -196,7 +196,7 @@ func (r *workspaceRepo) CreateWorkspace(ctx context.Context, input CreateWorkspa
 	}
 
 	if err := r.client.Mutate(ctx, &m, vars); err != nil {
-		return nil, gqlerror.ReturnAccountsError(ctx, err)
+		return nil, gqlerror.ReturnAccountsWarn(ctx, err)
 	}
 
 	return toWorkspace(ctx, m.CreateWorkspace.Workspace.ID, m.CreateWorkspace.Workspace.Name, m.CreateWorkspace.Workspace.Alias, m.CreateWorkspace.Workspace.Personal)
@@ -230,7 +230,7 @@ func (r *workspaceRepo) UpdateWorkspace(ctx context.Context, input UpdateWorkspa
 	}
 
 	if err := r.client.Mutate(ctx, &m, vars); err != nil {
-		return nil, gqlerror.ReturnAccountsError(ctx, err)
+		return nil, gqlerror.ReturnAccountsWarn(ctx, err)
 	}
 
 	return toWorkspace(ctx, m.UpdateWorkspace.Workspace.ID, m.UpdateWorkspace.Workspace.Name, m.UpdateWorkspace.Workspace.Alias, m.UpdateWorkspace.Workspace.Personal)
@@ -242,7 +242,7 @@ func (r *workspaceRepo) DeleteWorkspace(ctx context.Context, workspaceID string)
 		"workspaceId": graphql.ID(workspaceID),
 	}
 	if err := r.client.Mutate(ctx, &m, vars); err != nil {
-		return gqlerror.ReturnAccountsError(ctx, err)
+		return gqlerror.ReturnAccountsWarn(ctx, err)
 	}
 
 	return nil
@@ -264,7 +264,7 @@ func (r *workspaceRepo) AddUsersToWorkspace(ctx context.Context, input AddUsersT
 		"users":       users,
 	}
 	if err := r.client.Mutate(ctx, &m, vars); err != nil {
-		return nil, gqlerror.ReturnAccountsError(ctx, err)
+		return nil, gqlerror.ReturnAccountsWarn(ctx, err)
 	}
 
 	return toWorkspace(ctx, m.AddUsersToWorkspace.Workspace.ID, m.AddUsersToWorkspace.Workspace.Name, m.AddUsersToWorkspace.Workspace.Alias, m.AddUsersToWorkspace.Workspace.Personal)
@@ -277,7 +277,7 @@ func (r *workspaceRepo) RemoveUserFromWorkspace(ctx context.Context, workspaceID
 		"userId":      graphql.ID(userID),
 	}
 	if err := r.client.Mutate(ctx, &m, vars); err != nil {
-		return nil, gqlerror.ReturnAccountsError(ctx, err)
+		return nil, gqlerror.ReturnAccountsWarn(ctx, err)
 	}
 
 	return toWorkspace(ctx, m.RemoveUserFromWorkspace.Workspace.ID, m.RemoveUserFromWorkspace.Workspace.Name, m.RemoveUserFromWorkspace.Workspace.Alias, m.RemoveUserFromWorkspace.Workspace.Personal)

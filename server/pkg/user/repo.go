@@ -15,7 +15,21 @@ var ErrDuplicatedUser = rerror.NewE(i18n.T("duplicated user"))
 // cursor-based pagination is requested; the admin list endpoints are offset-only.
 var ErrCursorPaginationUnsupported = errors.New("cursor pagination is not supported")
 
-//go:generate mockgen -source=./user.go -destination=./mock_user.go -package user
+// ErrNotImplemented is returned by a repository or interactor method that a
+// given backend/path does not implement.
+var ErrNotImplemented = errors.New("not implemented for this backend")
+
+// StatusFilter selects which users FindAllWithPagination returns based on
+// soft-delete state.
+type StatusFilter string
+
+const (
+	StatusAll     StatusFilter = "all"
+	StatusActive  StatusFilter = "active"
+	StatusDeleted StatusFilter = "deleted"
+)
+
+//go:generate mockgen -source=./repo.go -destination=./mock_user.go -package user
 type Repo interface {
 	Query
 	FindByVerification(context.Context, string) (*User, error)
@@ -28,7 +42,7 @@ type Repo interface {
 
 type Query interface {
 	FindAll(context.Context) (List, error)
-	FindAllWithPagination(ctx context.Context, keyword *string, pagination *usecasex.Pagination) (List, *usecasex.PageInfo, error)
+	FindAllWithPagination(ctx context.Context, keyword *string, status StatusFilter, pagination *usecasex.Pagination) (List, *usecasex.PageInfo, error)
 	FindByAlias(context.Context, string) (*User, error)
 	FindByEmail(context.Context, string) (*User, error)
 	FindByID(context.Context, ID) (*User, error)

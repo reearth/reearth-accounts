@@ -144,6 +144,9 @@ func (r *raceRepo) Save(_ context.Context, u *adminuser.AdminUser) error {
 	r.existing = u
 	return adminuser.ErrDuplicatedAdminUser
 }
+func (r *raceRepo) SaveGuardingLastSystemAdmin(ctx context.Context, u *adminuser.AdminUser, _ bool) (bool, error) {
+	return true, r.Save(ctx, u)
+}
 
 func TestGoogleSignIn_NewUser_DuplicateRaceReturnsExisting(t *testing.T) {
 	repo := &raceRepo{}

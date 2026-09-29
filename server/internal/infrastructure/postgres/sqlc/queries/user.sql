@@ -1,15 +1,17 @@
 -- name: UserInsert :exec
-INSERT INTO users (id, name, alias, email, workspace, password, subs, latest_logout_at, metadata, verification, password_reset, updated_at)
-VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12);
+INSERT INTO users (id, name, alias, email, workspace, password, subs, latest_logout_at, metadata, verification, password_reset, created_at, updated_at, deleted_at)
+VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14);
 
 -- name: UserUpsert :exec
-INSERT INTO users (id, name, alias, email, workspace, password, subs, latest_logout_at, metadata, verification, password_reset, updated_at)
-VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12)
+-- created_at is intentionally excluded from the ON CONFLICT SET clause: it is
+-- set once on the first insert and must never be overwritten afterward.
+INSERT INTO users (id, name, alias, email, workspace, password, subs, latest_logout_at, metadata, verification, password_reset, created_at, updated_at, deleted_at)
+VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14)
 ON CONFLICT (id) DO UPDATE SET
   name=EXCLUDED.name, alias=EXCLUDED.alias, email=EXCLUDED.email, workspace=EXCLUDED.workspace,
   password=EXCLUDED.password, subs=EXCLUDED.subs, latest_logout_at=EXCLUDED.latest_logout_at,
   metadata=EXCLUDED.metadata, verification=EXCLUDED.verification, password_reset=EXCLUDED.password_reset,
-  updated_at=EXCLUDED.updated_at;
+  updated_at=EXCLUDED.updated_at, deleted_at=EXCLUDED.deleted_at;
 
 -- name: UserFindByID :one
 SELECT * FROM users WHERE id = $1;
