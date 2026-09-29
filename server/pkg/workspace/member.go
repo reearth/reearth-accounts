@@ -188,7 +188,13 @@ func (m *Members) IsOnlyOwner(u UserID) bool {
 	m.mu.RLock()
 	defer m.mu.RUnlock()
 
-	return len(m.UsersByRole(role.RoleOwner)) == 1 && m.users[u].Role == role.RoleOwner
+	activeOwners := 0
+	for _, mem := range m.users {
+		if mem.Role == role.RoleOwner && !mem.Disabled {
+			activeOwners++
+		}
+	}
+	return activeOwners == 1 && m.users[u].Role == role.RoleOwner && !m.users[u].Disabled
 }
 
 func (m *Members) IsOwnerOrMaintainer(u UserID) bool {
@@ -329,6 +335,48 @@ func (m *Members) DeleteIntegrations(iids IntegrationIDList) error {
 		delete(m.integrations, iid)
 	}
 	return nil
+}
+
+func (m *Members) SetUserDisabled(u UserID, disabled bool) error {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+
+	mem, ok := m.users[u]
+	if !ok {
+		return ErrTargetUserNotInTheWorkspace
+	}
+	mem.Disabled = disabled
+	m.users[u] = mem
+	return nil
+}
+
+func (m *Members) SetUserExternalID(u UserID, externalID string) error {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+
+	mem, ok := m.users[u]
+	if !ok {
+		return ErrTargetUserNotInTheWorkspace
+	}
+	mem.ExternalID = externalID
+	m.users[u] = mem
+	return nil
+}
+
+func (m *Members) UserByExternalID(externalID string) (UserID, bool) {
+	if externalID == "" {
+		return UserID{}, false
+	}
+
+	m.mu.RLock()
+	defer m.mu.RUnlock()
+
+	for uid, mem := range m.users {
+		if mem.ExternalID == externalID {
+			return uid, true
+		}
+	}
+	return UserID{}, false
 }
 
 func (m *Members) UsersByRole(role role.RoleType) []UserID {

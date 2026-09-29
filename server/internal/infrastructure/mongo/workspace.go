@@ -89,20 +89,19 @@ func (r *Workspace) FindAll(ctx context.Context, keyword *string, personal *bool
 }
 
 func (r *Workspace) FindByUser(ctx context.Context, id user.ID) (workspace.List, error) {
+	uid := strings.ReplaceAll(id.String(), ".", "")
 	return r.find(ctx, bson.M{
-		"members." + strings.ReplaceAll(id.String(), ".", ""): bson.M{
-			"$exists": true,
-		},
+		"members." + uid:              bson.M{"$exists": true},
+		"members." + uid + ".disabled": bson.M{"$ne": true},
 	})
 }
 
 func (r *Workspace) FindByUserWithPagination(ctx context.Context, id user.ID, pagination *usecasex.Pagination) (workspace.List, *usecasex.PageInfo, error) {
+	uid := strings.ReplaceAll(id.String(), ".", "")
 	filter := bson.M{
-		"members." + strings.ReplaceAll(id.String(), ".", ""): bson.M{
-			"$exists": true,
-		},
+		"members." + uid:              bson.M{"$exists": true},
+		"members." + uid + ".disabled": bson.M{"$ne": true},
 	}
-
 	return r.paginate(ctx, filter, pagination)
 }
 

@@ -15,7 +15,8 @@ var (
 type Container struct {
 	Cerbos      Cerbos
 	Permittable Permittable
+	Role        role.Repo
+	Scim        Scim
 	User        User
 	Workspace   Workspace
-	Role        role.Repo
 }

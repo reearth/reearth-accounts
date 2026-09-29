@@ -252,7 +252,7 @@ func (q *Queries) WorkspaceIDsByIntegrations(ctx context.Context, dollar_1 []str
 }
 
 const workspaceIDsByUser = `-- name: WorkspaceIDsByUser :many
-SELECT DISTINCT workspace_id FROM workspace_members WHERE user_id = $1
+SELECT DISTINCT workspace_id FROM workspace_members WHERE user_id = $1 AND disabled = false
 `
 
 func (q *Queries) WorkspaceIDsByUser(ctx context.Context, userID string) ([]string, error) {
