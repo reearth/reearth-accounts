@@ -267,6 +267,9 @@ func (i *Scim) ProvisionScimUser(ctx context.Context, param interfaces.Provision
 		if roleType == "" {
 			roleType = role.RoleReader
 		}
+		if !roleType.Valid() || roleType == role.RoleSelf {
+			return nil, fmt.Errorf("%w: invalid workspace role %q", interfaces.ErrOperationDenied, roleType)
+		}
 
 		// Idempotent: already provisioned by this ExternalID — re-enable if disabled.
 		if uid, ok := ws.Members().UserByExternalID(param.ExternalID); ok {
