@@ -106,7 +106,8 @@ func (r *Workspace) FindByUser(_ context.Context, i id.UserID) (workspace.List, 
 	}
 
 	return rerror.ErrIfNil(r.data.FindAll(func(key workspace.ID, value *workspace.Workspace) bool {
-		return value.Members().HasUser(i)
+		m := value.Members().User(i)
+		return m != nil && !m.Disabled
 	}), rerror.ErrNotFound)
 }
 
@@ -116,7 +117,8 @@ func (r *Workspace) FindByUserWithPagination(ctx context.Context, id user.ID, pa
 	}
 
 	workspaces := workspace.List(r.data.FindAll(func(key workspace.ID, value *workspace.Workspace) bool {
-		return value.Members().HasUser(id)
+		m := value.Members().User(id)
+		return m != nil && !m.Disabled
 	}))
 
 	if len(workspaces) == 0 {

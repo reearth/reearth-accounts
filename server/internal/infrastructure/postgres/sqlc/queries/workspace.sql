@@ -54,7 +54,7 @@ INSERT INTO workspace_integrations (workspace_id, integration_id, role, invited_
 SELECT * FROM workspace_integrations WHERE workspace_id = ANY($1::text[]);
 
 -- name: WorkspaceIDsByUser :many
-SELECT DISTINCT workspace_id FROM workspace_members WHERE user_id = $1;
+SELECT DISTINCT workspace_id FROM workspace_members WHERE user_id = $1 AND disabled = false;
 
 -- name: WorkspaceIDsByIntegration :many
 SELECT DISTINCT workspace_id FROM workspace_integrations WHERE integration_id = $1;
