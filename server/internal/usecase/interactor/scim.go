@@ -206,7 +206,7 @@ func (i *Scim) GetScimUser(ctx context.Context, workspaceID workspace.ID, userID
 	}
 
 	m := ws.Members().User(userID)
-	if m == nil || m.Disabled {
+	if m == nil {
 		return nil, interfaces.ErrSCIMUserNotFound
 	}
 
@@ -242,12 +242,9 @@ func (i *Scim) ListScimUsers(ctx context.Context, workspaceID workspace.ID, filt
 		}
 	}
 
-	// Collect active user IDs, applying any externalId filter immediately
+	// Collect all user IDs (including disabled — SCIM needs them for reconciliation).
 	userIDs := make(user.IDList, 0, len(members))
 	for uid, m := range members {
-		if m.Disabled {
-			continue
-		}
 		if filterAttr == "externalid" {
 			if m.ExternalID == filterVal {
 				userIDs = append(userIDs, uid)
@@ -403,6 +400,34 @@ func (i *Scim) ProvisionScimUser(ctx context.Context, param interfaces.Provision
 		}
 
 		return newUser, nil
+	})
+}
+
+func (i *Scim) ReactivateScimUserByUserID(ctx context.Context, workspaceID workspace.ID, userID user.ID) error {
+	return Run0(ctx, nil, i.repos, Usecase().Transaction(), func(ctx context.Context) error {
+		ws, err := i.repos.Workspace.FindByID(ctx, workspaceID)
+		if err != nil {
+			return err
+		}
+
+		m := ws.Members().User(userID)
+		if m == nil {
+			return interfaces.ErrSCIMUserNotFound
+		}
+
+		if !m.Disabled {
+			return nil
+		}
+
+		if err := ws.Members().SetUserDisabled(userID, false); err != nil {
+			return err
+		}
+
+		if err := i.repos.Workspace.Save(ctx, ws); err != nil {
+			return err
+		}
+
+		return i.updatePermittable(ctx, userID, workspaceID, ws.Members().UserRole(userID))
 	})
 }
 

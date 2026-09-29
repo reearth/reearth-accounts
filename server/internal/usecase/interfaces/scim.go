@@ -37,6 +37,7 @@ type Scim interface {
 	GetScimUser(ctx context.Context, workspaceID workspace.ID, userID user.ID) (*user.User, error)
 	ListScimUsers(ctx context.Context, workspaceID workspace.ID, filter string) ([]*user.User, error)
 	ProvisionScimUser(ctx context.Context, param ProvisionScimUserParam) (*user.User, error)
+	ReactivateScimUserByUserID(ctx context.Context, workspaceID workspace.ID, userID user.ID) error
 	SyncScimGroup(ctx context.Context, workspaceID workspace.ID, groupID, groupName string, members []ScimGroupMember) error
 	UpdateScimConfig(ctx context.Context, workspaceID workspace.ID, enabled bool, groupRoleMapping map[string]role.RoleType, operator *workspace.Operator) (*workspace.ScimConfig, error)
 }

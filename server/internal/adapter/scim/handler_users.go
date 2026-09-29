@@ -17,15 +17,13 @@ import (
 
 // UserHandler handles SCIM 2.0 /scim/v2/Users routes.
 type UserHandler struct {
-	baseURL       string
 	scimUC        interfaces.Scim
 	workspaceRepo workspace.Repo
 }
 
 // NewUserHandler constructs a UserHandler.
-func NewUserHandler(scimUC interfaces.Scim, workspaceRepo workspace.Repo, baseURL string) *UserHandler {
+func NewUserHandler(scimUC interfaces.Scim, workspaceRepo workspace.Repo) *UserHandler {
 	return &UserHandler{
-		baseURL:       baseURL,
 		scimUC:        scimUC,
 		workspaceRepo: workspaceRepo,
 	}
@@ -49,6 +47,9 @@ func (h *UserHandler) Create(c echo.Context) error {
 	if email == "" && len(body.Emails) > 0 {
 		email = body.Emails[0].Value
 	}
+	if email == "" {
+		return scimErrorResponse(c, http.StatusBadRequest, "userName is required", "invalidValue")
+	}
 	name := body.Name.Formatted
 	if name == "" {
 		name = email
@@ -65,14 +66,17 @@ func (h *UserHandler) Create(c echo.Context) error {
 		return h.mapError(c, err)
 	}
 
-	member := h.memberForUser(ctx, wsID, u.ID())
-	resp := DomainUserToScimUser(u, member, h.baseURL)
+	member, err := h.memberForUser(ctx, wsID, u.ID())
+	if err != nil {
+		return h.mapError(c, err)
+	}
+	resp := DomainUserToScimUser(u, member, requestBaseURL(c))
 
 	c.Response().Header().Set("Location", resp.Meta.Location)
 	return c.JSON(http.StatusCreated, resp)
 }
 
-// Delete handles DELETE /scim/v2/Users/:id — soft-deprovision (200 OK with active:false).
+// Delete handles DELETE /scim/v2/Users/:id — soft-deprovision (204 No Content per RFC 7644).
 func (h *UserHandler) Delete(c echo.Context) error {
 	ctx := c.Request().Context()
 
@@ -86,23 +90,11 @@ func (h *UserHandler) Delete(c echo.Context) error {
 		return scimErrorResponse(c, http.StatusNotFound, "user not found", "")
 	}
 
-	// Retrieve user first to build the response.
-	u, err := h.scimUC.GetScimUser(ctx, wsID, uid)
-	if err != nil {
-		return h.mapError(c, err)
-	}
-
-	memberBefore := h.memberForUser(ctx, wsID, uid)
-
 	if err := h.scimUC.DeprovisionScimUserByUserID(ctx, wsID, uid); err != nil {
 		return h.mapError(c, err)
 	}
 
-	// Build disabled member for the response to reflect active:false.
-	disabledMember := memberBefore
-	disabledMember.Disabled = true
-	resp := DomainUserToScimUser(u, disabledMember, h.baseURL)
-	return c.JSON(http.StatusOK, resp)
+	return c.NoContent(http.StatusNoContent)
 }
 
 // Get handles GET /scim/v2/Users/:id.
@@ -124,8 +116,11 @@ func (h *UserHandler) Get(c echo.Context) error {
 		return h.mapError(c, err)
 	}
 
-	member := h.memberForUser(ctx, wsID, uid)
-	return c.JSON(http.StatusOK, DomainUserToScimUser(u, member, h.baseURL))
+	member, err := h.memberForUser(ctx, wsID, uid)
+	if err != nil {
+		return h.mapError(c, err)
+	}
+	return c.JSON(http.StatusOK, DomainUserToScimUser(u, member, requestBaseURL(c)))
 }
 
 // List handles GET /scim/v2/Users with optional ?filter= query param.
@@ -144,7 +139,11 @@ func (h *UserHandler) List(c echo.Context) error {
 		return h.mapError(c, err)
 	}
 
-	// Apply in-memory filter if provided.
+	members, err := h.membersForWorkspace(ctx, wsID)
+	if err != nil {
+		return h.mapError(c, err)
+	}
+
 	var filtered []*user.User
 	if filterParam == "" {
 		filtered = users
@@ -161,7 +160,6 @@ func (h *UserHandler) List(c echo.Context) error {
 				}
 			}
 		case attr == "externalid" && op == "eq":
-			members := h.membersForWorkspace(ctx, wsID)
 			for _, u := range users {
 				if m, ok := members[u.ID()]; ok && m.ExternalID == val {
 					filtered = append(filtered, u)
@@ -172,11 +170,11 @@ func (h *UserHandler) List(c echo.Context) error {
 		}
 	}
 
+	baseURL := requestBaseURL(c)
 	resources := make([]ScimUser, 0, len(filtered))
-	members := h.membersForWorkspace(ctx, wsID)
 	for _, u := range filtered {
 		member := members[u.ID()]
-		resources = append(resources, DomainUserToScimUser(u, member, h.baseURL))
+		resources = append(resources, DomainUserToScimUser(u, member, baseURL))
 	}
 
 	return c.JSON(http.StatusOK, ScimListResponse{
@@ -188,7 +186,7 @@ func (h *UserHandler) List(c echo.Context) error {
 	})
 }
 
-// Patch handles PATCH /scim/v2/Users/:id — partial update (handles deprovisioning).
+// Patch handles PATCH /scim/v2/Users/:id — partial update (handles active flag changes).
 func (h *UserHandler) Patch(c echo.Context) error {
 	ctx := c.Request().Context()
 
@@ -207,13 +205,13 @@ func (h *UserHandler) Patch(c echo.Context) error {
 		return scimErrorResponse(c, http.StatusBadRequest, "invalid request body", "invalidValue")
 	}
 
-	// Retrieve user to confirm existence.
-	u, err := h.scimUC.GetScimUser(ctx, wsID, uid)
-	if err != nil {
+	// Confirm user exists in workspace.
+	if _, err := h.scimUC.GetScimUser(ctx, wsID, uid); err != nil {
 		return h.mapError(c, err)
 	}
 
 	deprovisioned := false
+	reactivated := false
 	for _, op := range patchOp.Operations {
 		if !strings.EqualFold(op.Op, "replace") {
 			continue
@@ -221,16 +219,24 @@ func (h *UserHandler) Patch(c echo.Context) error {
 
 		// Okta format: {"op":"replace","path":"active","value":false}
 		if strings.EqualFold(op.Path, "active") {
-			if active, ok := parseBoolValue(op.Value); ok && !active {
-				deprovisioned = true
+			if active, ok := parseBoolValue(op.Value); ok {
+				if active {
+					reactivated = true
+				} else {
+					deprovisioned = true
+				}
 			}
 			continue
 		}
 
 		// Azure AD format: {"op":"replace","value":{"active":false}}
 		if op.Path == "" {
-			if active, ok := extractActiveBool(op.Value); ok && !active {
-				deprovisioned = true
+			if active, ok := extractActiveBool(op.Value); ok {
+				if active {
+					reactivated = true
+				} else {
+					deprovisioned = true
+				}
 			}
 		}
 	}
@@ -239,10 +245,22 @@ func (h *UserHandler) Patch(c echo.Context) error {
 		if err := h.scimUC.DeprovisionScimUserByUserID(ctx, wsID, uid); err != nil {
 			return h.mapError(c, err)
 		}
+	} else if reactivated {
+		if err := h.scimUC.ReactivateScimUserByUserID(ctx, wsID, uid); err != nil {
+			return h.mapError(c, err)
+		}
 	}
 
-	member := h.memberForUser(ctx, wsID, uid)
-	return c.JSON(http.StatusOK, DomainUserToScimUser(u, member, h.baseURL))
+	// Re-fetch user and member to reflect the updated state.
+	u, err := h.scimUC.GetScimUser(ctx, wsID, uid)
+	if err != nil {
+		return h.mapError(c, err)
+	}
+	member, err := h.memberForUser(ctx, wsID, uid)
+	if err != nil {
+		return h.mapError(c, err)
+	}
+	return c.JSON(http.StatusOK, DomainUserToScimUser(u, member, requestBaseURL(c)))
 }
 
 // Replace handles PUT /scim/v2/Users/:id — full replace (returns current state).
@@ -264,33 +282,34 @@ func (h *UserHandler) Replace(c echo.Context) error {
 		return h.mapError(c, err)
 	}
 
-	member := h.memberForUser(ctx, wsID, uid)
-	return c.JSON(http.StatusOK, DomainUserToScimUser(u, member, h.baseURL))
+	member, err := h.memberForUser(ctx, wsID, uid)
+	if err != nil {
+		return h.mapError(c, err)
+	}
+	return c.JSON(http.StatusOK, DomainUserToScimUser(u, member, requestBaseURL(c)))
 }
 
 // --- helpers ---
 
 // memberForUser retrieves the workspace.Member for a given user within a workspace.
-// Returns an empty Member on any error (graceful degradation).
-func (h *UserHandler) memberForUser(ctx context.Context, wsID workspace.ID, uid user.ID) workspace.Member {
+func (h *UserHandler) memberForUser(ctx context.Context, wsID workspace.ID, uid user.ID) (workspace.Member, error) {
 	ws, err := h.workspaceRepo.FindByID(ctx, wsID)
 	if err != nil {
-		return workspace.Member{}
+		return workspace.Member{}, err
 	}
 	if m := ws.Members().User(uid); m != nil {
-		return *m
+		return *m, nil
 	}
-	return workspace.Member{}
+	return workspace.Member{}, nil
 }
 
 // membersForWorkspace returns all members of a workspace as a map.
-// Returns an empty map on error.
-func (h *UserHandler) membersForWorkspace(ctx context.Context, wsID workspace.ID) map[workspace.UserID]workspace.Member {
+func (h *UserHandler) membersForWorkspace(ctx context.Context, wsID workspace.ID) (map[workspace.UserID]workspace.Member, error) {
 	ws, err := h.workspaceRepo.FindByID(ctx, wsID)
 	if err != nil {
-		return map[workspace.UserID]workspace.Member{}
+		return nil, err
 	}
-	return ws.Members().Users()
+	return ws.Members().Users(), nil
 }
 
 // mapError converts domain errors to appropriate SCIM HTTP responses.
@@ -304,7 +323,22 @@ func (h *UserHandler) mapError(c echo.Context, err error) error {
 	if errors.Is(err, interfaces.ErrSCIMNotEnabled) {
 		return scimErrorResponse(c, http.StatusForbidden, "SCIM is not enabled for this workspace", "")
 	}
+	if errors.Is(err, interfaces.ErrOperationDenied) {
+		return scimErrorResponse(c, http.StatusBadRequest, "operation denied", "invalidFilter")
+	}
 	return scimErrorResponse(c, http.StatusInternalServerError, "internal server error", "")
+}
+
+// requestBaseURL derives the public-facing base URL from the incoming request,
+// respecting X-Forwarded-Proto for reverse-proxy deployments.
+func requestBaseURL(c echo.Context) string {
+	scheme := "https"
+	if proto := c.Request().Header.Get("X-Forwarded-Proto"); proto != "" {
+		scheme = proto
+	} else if c.Request().TLS == nil {
+		scheme = "http"
+	}
+	return scheme + "://" + c.Request().Host
 }
 
 // parseFilter parses a simple SCIM filter of the form `attr eq "value"`.
