@@ -5,12 +5,14 @@ import (
 	"crypto/rand"
 	"encoding/base64"
 	"errors"
+	"fmt"
 	"os"
 	"strings"
 
 	"github.com/reearth/reearth-accounts/server/internal/usecase/interfaces"
 	"github.com/reearth/reearth-accounts/server/internal/usecase/repo"
 	"github.com/reearth/reearth-accounts/server/pkg/applog"
+	"github.com/reearth/reearth-accounts/server/pkg/id"
 	"github.com/reearth/reearth-accounts/server/pkg/permittable"
 	"github.com/reearth/reearth-accounts/server/pkg/role"
 	"github.com/reearth/reearth-accounts/server/pkg/user"
@@ -34,20 +36,28 @@ func NewScim(repos *repo.Container) *Scim {
 	}
 }
 
-// updatePermittable syncs a user's workspace role into the Permittable store.
-func (i *Scim) updatePermittable(ctx context.Context, userID user.ID, workspaceID workspace.ID, roleName role.RoleType) error {
-	r, err := i.roleRepo.FindByName(ctx, string(roleName))
+// findRole looks up a role by name, auto-creating it when REEARTH_MOCK_AUTH is set.
+func (i *Scim) findRole(ctx context.Context, roleName string) (*role.Role, error) {
+	r, err := i.roleRepo.FindByName(ctx, roleName)
 	if err != nil {
 		if errors.Is(err, rerror.ErrNotFound) && os.Getenv("REEARTH_MOCK_AUTH") == "true" {
-			log.Infof("[MockAuth] Auto-creating role for workspace: %s", roleName)
-			newRole := role.New().NewID().Name(string(roleName)).MustBuild()
+			log.Infof("[MockAuth] Auto-creating role: %s", roleName)
+			newRole := role.New().NewID().Name(roleName).MustBuild()
 			if saveErr := i.roleRepo.Save(ctx, *newRole); saveErr != nil {
-				return applog.ErrorWithCallerLogging(ctx, "failed to auto-create role", saveErr)
+				return nil, applog.ErrorWithCallerLogging(ctx, "failed to auto-create role", saveErr)
 			}
-			r = newRole
-		} else {
-			return err
+			return newRole, nil
 		}
+		return nil, err
+	}
+	return r, nil
+}
+
+// updatePermittable syncs a user's workspace role into the Permittable store.
+func (i *Scim) updatePermittable(ctx context.Context, userID user.ID, workspaceID workspace.ID, roleName role.RoleType) error {
+	r, err := i.findRole(ctx, string(roleName))
+	if err != nil {
+		return err
 	}
 
 	p, err := i.permittableRepo.FindByUserID(ctx, userID)
@@ -321,6 +331,27 @@ func (i *Scim) ProvisionScimUser(ctx context.Context, param interfaces.Provision
 			return nil, err
 		}
 
+		// Bootstrap permittable with the self role and personal workspace owner
+		// role, mirroring what normal signup paths do so the user can access
+		// their own personal workspace through Cerbos.
+		roleSelf, err := i.findRole(ctx, role.RoleSelf.String())
+		if err != nil {
+			return nil, err
+		}
+		roleOwner, err := i.findRole(ctx, role.RoleOwner.String())
+		if err != nil {
+			return nil, err
+		}
+		personalWsRole := permittable.NewWorkspaceRole(personalWS.ID(), roleOwner.ID())
+		perm := permittable.New().NewID().
+			RoleIDs([]id.RoleID{roleSelf.ID()}).
+			UserID(newUser.ID()).
+			WorkspaceRoles([]permittable.WorkspaceRole{personalWsRole}).
+			MustBuild()
+		if err := i.permittableRepo.Save(ctx, *perm); err != nil {
+			return nil, err
+		}
+
 		if err := ws.Members().Join(newUser, roleType, newUser.ID()); err != nil {
 			return nil, err
 		}
@@ -422,19 +453,22 @@ func (i *Scim) SyncScimGroup(ctx context.Context, workspaceID workspace.ID, _, g
 					}
 				}
 				if ws.Members().UserRole(targetUser.ID()) != groupRole {
-					// Guard against demoting the sole owner.
-					if ws.Members().IsOnlyOwner(targetUser.ID()) {
-						continue
-					}
-					if err := ws.Members().UpdateUserRole(targetUser.ID(), groupRole); err != nil {
-						return err
+					// Guard against demoting the sole owner: skip the role update
+					// but still link the ExternalID and sync Permittable with the
+					// retained role so the user can be reconciled on later syncs.
+					if !ws.Members().IsOnlyOwner(targetUser.ID()) {
+						if err := ws.Members().UpdateUserRole(targetUser.ID(), groupRole); err != nil {
+							return err
+						}
 					}
 				}
 			}
 			if err := ws.Members().SetUserExternalID(targetUser.ID(), m.ExternalID); err != nil {
 				return err
 			}
-			if err := i.updatePermittable(ctx, targetUser.ID(), workspaceID, groupRole); err != nil {
+			// Use the member's effective role (may differ from groupRole when the
+			// sole-owner guard prevented demotion).
+			if err := i.updatePermittable(ctx, targetUser.ID(), workspaceID, ws.Members().UserRole(targetUser.ID())); err != nil {
 				return err
 			}
 		}
@@ -467,6 +501,12 @@ func (i *Scim) UpdateScimConfig(ctx context.Context, workspaceID workspace.ID, e
 		ws, err := i.repos.Workspace.FindByID(ctx, workspaceID)
 		if err != nil {
 			return nil, err
+		}
+
+		for grp, r := range groupRoleMapping {
+			if !r.Valid() || r == role.RoleSelf {
+				return nil, fmt.Errorf("%w: invalid role %q for group %q", interfaces.ErrOperationDenied, r, grp)
+			}
 		}
 
 		cfg := ws.ScimConfig()

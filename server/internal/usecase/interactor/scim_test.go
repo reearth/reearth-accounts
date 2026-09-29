@@ -23,6 +23,7 @@ func seedRoles(ctx context.Context, t *testing.T, db *repo.Container) {
 		string(role.RoleMaintainer),
 		string(role.RoleWriter),
 		string(role.RoleReader),
+		string(role.RoleSelf),
 	} {
 		r := role.New().NewID().Name(name).MustBuild()
 		require.NoError(t, db.Role.Save(ctx, *r))
