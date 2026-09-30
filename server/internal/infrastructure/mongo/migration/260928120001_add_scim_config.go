@@ -6,5 +6,5 @@ import "context"
 // up the new optional scimconfig embedded document and the externalid field on
 // member sub-documents.
 func AddScimConfig(ctx context.Context, c DBClient) error {
-	return ApplyCollectionSchemas(ctx, []string{"workspaces"}, c)
+	return ApplyCollectionSchemas(ctx, []string{"workspace"}, c)
 }

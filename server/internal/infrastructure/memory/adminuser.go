@@ -37,7 +37,7 @@ func (r *AdminUser) FindByEmail(ctx context.Context, email string) (*adminuser.A
 	e := adminuser.NormalizeEmail(email)
 	for _, v := range r.data {
 		if v.Email() == e {
-			return v, nil
+			return v.Clone(), nil
 		}
 	}
 	return nil, rerror.ErrNotFound
@@ -48,7 +48,7 @@ func (r *AdminUser) FindByID(ctx context.Context, id adminuser.ID) (*adminuser.A
 	defer r.lock.Unlock()
 
 	if v, ok := r.data[id]; ok {
-		return v, nil
+		return v.Clone(), nil
 	}
 	return nil, rerror.ErrNotFound
 }
@@ -60,7 +60,7 @@ func (r *AdminUser) FindByIDs(ctx context.Context, ids adminuser.IDList) (adminu
 	res := make(adminuser.List, 0, len(ids))
 	for _, id := range ids {
 		if v, ok := r.data[id]; ok {
-			res = append(res, v)
+			res = append(res, v.Clone())
 		}
 	}
 	return res, nil
@@ -82,7 +82,7 @@ func (r *AdminUser) List(ctx context.Context, f adminuser.ListFilter) (adminuser
 		if f.Role != nil && v.Role() != *f.Role {
 			continue
 		}
-		all = append(all, v)
+		all = append(all, v.Clone())
 	}
 
 	// sort by creation time (ascending), then by ID for stable ordering
@@ -137,6 +137,13 @@ func (r *AdminUser) Save(ctx context.Context, u *adminuser.AdminUser) error {
 	r.lock.Lock()
 	defer r.lock.Unlock()
 
+	return r.saveLocked(u)
+}
+
+// saveLocked applies the unique-email invariant and stores a clone of u, so
+// the caller mutating its own copy afterwards can't silently change what's
+// stored without going through Save again. Callers must hold r.lock.
+func (r *AdminUser) saveLocked(u *adminuser.AdminUser) error {
 	// enforce the same unique-email invariant as the Mongo unique index
 	for id, v := range r.data {
 		if id != u.ID() && v.Email() == u.Email() {
@@ -144,6 +151,37 @@ func (r *AdminUser) Save(ctx context.Context, u *adminuser.AdminUser) error {
 		}
 	}
 
-	r.data[u.ID()] = u
+	r.data[u.ID()] = u.Clone()
 	return nil
+}
+
+func (r *AdminUser) SaveGuardingLastSystemAdmin(ctx context.Context, u *adminuser.AdminUser, requireOtherSystemAdmin bool) (bool, error) {
+	if u == nil {
+		return true, nil
+	}
+	if !requireOtherSystemAdmin {
+		return true, r.Save(ctx, u)
+	}
+
+	r.lock.Lock()
+	defer r.lock.Unlock()
+
+	hasOther := false
+	for id, v := range r.data {
+		if id == u.ID() {
+			continue
+		}
+		if v.Status() == adminuser.StatusApproved && v.Role() == adminuser.RoleSystemAdmin {
+			hasOther = true
+			break
+		}
+	}
+	if !hasOther {
+		return false, nil
+	}
+
+	if err := r.saveLocked(u); err != nil {
+		return false, err
+	}
+	return true, nil
 }

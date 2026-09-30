@@ -1,6 +1,8 @@
 package workspace
 
 import (
+	"time"
+
 	"github.com/reearth/reearth-accounts/server/pkg/role"
 	"github.com/reearth/reearth-accounts/server/pkg/user"
 	"golang.org/x/text/language"
@@ -39,6 +41,7 @@ func Init(p InitParams) (*user.User, *Workspace, error) {
 	metadata.LangFrom(p.Lang.String())
 	metadata.SetTheme(*p.Theme)
 
+	now := time.Now()
 	alias := p.Name
 	b := user.New().
 		ID(*p.UserID).
@@ -46,7 +49,8 @@ func Init(p InitParams) (*user.User, *Workspace, error) {
 		Alias(alias).
 		Email(p.Email).
 		Metadata(metadata).
-		Auths([]user.Auth{*p.Sub})
+		Auths([]user.Auth{*p.Sub}).
+		CreatedAt(&now)
 	if p.Password != nil {
 		b = b.PasswordPlainText(*p.Password)
 	}

@@ -42,7 +42,10 @@ type WorkspaceDocument struct {
 	Personal     bool                               `json:"personal" bson:"personal" jsonschema:"required,description=Whether this is a personal workspace. Default: false"`
 	Policy       string                             `json:"policy" bson:"policy,omitempty" jsonschema:"description=Policy ID reference. Default: \"\""`
 	ScimConfig   *WorkspaceScimConfigDocument       `json:"scimconfig" bson:"scimconfig,omitempty" jsonschema:"description=SCIM provisioning configuration. Default: null"`
+	CreatedAt    *time.Time                         `json:"createdat" bson:"createdat,omitempty" jsonschema:"description=Workspace creation timestamp. Null for workspaces created before this field existed"`
+	CreatedBy    string                             `json:"createdby" bson:"createdby,omitempty" jsonschema:"description=User ID of workspace creator (ULID format). Default: \"\""`
 	UpdatedAt    time.Time                          `json:"updatedat" bson:"updatedat" jsonschema:"description=Last update timestamp"`
+	DeletedAt    *time.Time                         `json:"deletedat" bson:"deletedat,omitempty" jsonschema:"description=Soft delete timestamp. Null = active, non-null = deleted"`
 }
 
 func NewWorkspace(ws *workspace.Workspace) (*WorkspaceDocument, string) {
@@ -112,7 +115,10 @@ func NewWorkspace(ws *workspace.Workspace) (*WorkspaceDocument, string) {
 		Personal:     ws.IsPersonal(),
 		Policy:       lo.FromPtr(ws.Policy()).String(),
 		ScimConfig:   scimDoc,
+		CreatedAt:    ws.CreatedAt(),
+		CreatedBy:    lo.FromPtr(ws.CreatedBy()).String(),
 		UpdatedAt:    updatedAt,
+		DeletedAt:    ws.DeletedAt(),
 	}, wId
 }
 
@@ -175,6 +181,14 @@ func (d *WorkspaceDocument) Model() (*workspace.Workspace, error) {
 		scimConfig = cfg
 	}
 
+	var createdBy *workspace.UserID
+	if d.CreatedBy != "" {
+		uid, err := id.UserIDFrom(d.CreatedBy)
+		if err == nil {
+			createdBy = &uid
+		}
+	}
+
 	metadata := workspace.MetadataFrom(d.Metadata.Description, d.Metadata.Website, d.Metadata.Location, d.Metadata.BillingEmail, d.Metadata.PhotoURL)
 
 	return workspace.New().
@@ -188,7 +202,10 @@ func (d *WorkspaceDocument) Model() (*workspace.Workspace, error) {
 		Personal(d.Personal).
 		Policy(policy).
 		ScimConfig(scimConfig).
+		CreatedAt(d.CreatedAt).
+		CreatedBy(createdBy).
 		UpdatedAt(d.UpdatedAt).
+		DeletedAt(d.DeletedAt).
 		Build()
 }
 

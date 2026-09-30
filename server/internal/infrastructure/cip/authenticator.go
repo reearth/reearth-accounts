@@ -157,6 +157,10 @@ func (a *Authenticator) GetMFAStatus(_ context.Context, _ string) (gateway.MFASt
 	return gateway.MFAStatus{}, nil
 }
 
+func (a *Authenticator) RegenerateMFARecoveryCode(_ context.Context, _ string) (string, error) {
+	return "", nil
+}
+
 func toAuthenticatorUser(rec *fbauth.UserRecord) gateway.AuthenticatorUser {
 	out := gateway.AuthenticatorUser{}
 	if rec == nil {

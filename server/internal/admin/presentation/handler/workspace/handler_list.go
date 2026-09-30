@@ -18,11 +18,13 @@ const maxWorkspaceIDsPerRequest = 100
 //
 //	@Summary		List workspaces
 //	@Description	Lists workspaces across all tenants, optionally filtered by a name/alias keyword, with offset pagination.
-//	@Description	When one or more `ids` query parameters are supplied, the endpoint instead resolves those workspaces by ID (existing ones only; unknown IDs are omitted) and ignores `q`, `page` and `per_page`. At most 100 ids may be supplied per request.
+//	@Description	Use `type` to filter by workspace type: `personal` returns only personal workspaces, `team` returns only team (non-personal) workspaces; when absent, both types are returned.
+//	@Description	When one or more `ids` query parameters are supplied, the endpoint instead resolves those workspaces by ID (existing ones only; unknown IDs are omitted) and ignores `q`, `type`, `page` and `per_page`. At most 100 ids may be supplied per request.
 //	@Tags			workspaces
 //	@Produce		json
-//	@Param			ids			query		[]string	false	"Batch fetch by workspace ID (repeatable, max 100). When present, q/page/per_page are ignored."	collectionFormat(multi)
+//	@Param			ids			query		[]string	false	"Batch fetch by workspace ID (repeatable, max 100). When present, q/type/page/per_page are ignored."	collectionFormat(multi)
 //	@Param			q			query		string		false	"Search by name or alias"
+//	@Param			type		query		string		false	"Filter by workspace type"	Enums(personal, team)
 //	@Param			page		query		int			false	"Page number (1-based)"
 //	@Param			per_page	query		int			false	"Items per page (max 100)"
 //	@Success		200			{object}	ListWorkspacesResponse
@@ -41,6 +43,22 @@ func (h *Handler) ListWorkspaces(c echo.Context) error {
 		keyword = &q
 	}
 
+	// type filters by workspace type: "personal" or "team". Absent/empty means no
+	// filter; any other value is rejected with 400 (mirrors the page-param errors).
+	var personal *bool
+	switch c.QueryParam("type") {
+	case "":
+		// no filter
+	case "personal":
+		v := true
+		personal = &v
+	case "team":
+		v := false
+		personal = &v
+	default:
+		return echo.NewHTTPError(http.StatusBadRequest, "invalid type")
+	}
+
 	page, err := internal.ParsePageParam(c.QueryParam("page"))
 	if err != nil {
 		return echo.NewHTTPError(http.StatusBadRequest, "invalid page")
@@ -53,6 +71,7 @@ func (h *Handler) ListWorkspaces(c echo.Context) error {
 
 	list, pi, err := h.list.Execute(c.Request().Context(), workspaceuc.ListWorkspacesInput{
 		Keyword:    keyword,
+		Personal:   personal,
 		Pagination: p,
 	})
 	if err != nil {

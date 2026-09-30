@@ -15,6 +15,13 @@ import (
 
 const adminUserColumns = "id, email, name, picture_url, role, status, approved_by, approved_at, created_at, updated_at"
 
+// adminUserSystemAdminGuardLockKey is a pg_advisory_xact_lock key that
+// serializes SaveGuardingLastSystemAdmin's guarded saves, so the "at least one
+// approved system_admin" invariant is checked and enforced atomically instead
+// of racing another transaction's check-then-act on the same invariant.
+// Distinct from configAdvisoryLockKey.
+const adminUserSystemAdminGuardLockKey int64 = 0x41444d4e // "ADMN"
+
 type AdminUser struct {
 	c *Client
 }
@@ -183,6 +190,35 @@ func (r *AdminUser) Save(ctx context.Context, u *adminuser.AdminUser) error {
 		return rerror.ErrInternalByWithContext(ctx, err)
 	}
 	return nil
+}
+
+func (r *AdminUser) SaveGuardingLastSystemAdmin(ctx context.Context, u *adminuser.AdminUser, requireOtherSystemAdmin bool) (bool, error) {
+	if u == nil {
+		return true, nil
+	}
+	if !requireOtherSystemAdmin {
+		return true, r.Save(ctx, u)
+	}
+
+	ok := true
+	err := r.c.WithinTransaction(ctx, func(ctx context.Context) error {
+		if _, err := r.c.db(ctx).Exec(ctx, `SELECT pg_advisory_xact_lock($1)`, adminUserSystemAdminGuardLockKey); err != nil {
+			return rerror.ErrInternalByWithContext(ctx, err)
+		}
+		exists, err := r.ExistsApprovedSystemAdminExcept(ctx, u.ID())
+		if err != nil {
+			return err
+		}
+		if !exists {
+			ok = false
+			return nil
+		}
+		return r.Save(ctx, u)
+	})
+	if err != nil {
+		return false, err
+	}
+	return ok, nil
 }
 
 func scanAdminUsers(rows pgx.Rows) (adminuser.List, error) {

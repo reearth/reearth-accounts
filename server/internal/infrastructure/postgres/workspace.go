@@ -28,11 +28,23 @@ func (r *Workspace) Filtered(f workspace.WorkspaceFilter) workspace.Repo {
 	return &Workspace{c: r.c, f: r.f.Merge(f)}
 }
 
-// FindAll is not implemented for the PostgreSQL backend: the admin app (which
-// is the only consumer of this cross-tenant listing) runs on MongoDB, so the
-// Postgres admin list path is intentionally left unimplemented for now.
-func (r *Workspace) FindAll(_ context.Context, _ *string, _ *usecasex.Pagination) (workspace.List, *usecasex.PageInfo, error) {
-	return nil, nil, workspace.ErrNotImplemented
+// FindAll lists workspaces across all tenants (no readable-workspace filter),
+// optionally keyword-matched against name/alias and filtered by soft-delete
+// status. Used by the admin app's cross-tenant listing and the
+// /workspaces/all REST route.
+func (r *Workspace) FindAll(ctx context.Context, keyword *string, _ *bool, status workspace.StatusFilter, p *usecasex.Pagination, excludePersonal bool) (workspace.List, *usecasex.PageInfo, error) {
+	kw := ""
+	if keyword != nil {
+		kw = strings.TrimSpace(*keyword)
+	}
+	if status == "" {
+		status = workspace.StatusAll
+	}
+	ids, err := r.c.queries(ctx).WorkspaceIDsAll(ctx, gen.WorkspaceIDsAllParams{ExcludePersonal: excludePersonal, Keyword: kw, Status: string(status)})
+	if err != nil {
+		return nil, nil, rerror.ErrInternalByWithContext(ctx, err)
+	}
+	return paginateWorkspaces(ctx, r, ids, p)
 }
 
 func (r *Workspace) hydrate(ctx context.Context, rows []gen.Workspace) (workspace.List, error) {
@@ -98,7 +110,10 @@ func (r *Workspace) hydrate(ctx context.Context, rows []gen.Workspace) (workspac
 			Name:        w.Name,
 			Personal:    w.Personal,
 			Policy:      w.Policy,
+			CreatedAt:   w.CreatedAt,
+			CreatedBy:   w.CreatedBy,
 			UpdatedAt:   w.UpdatedAt,
+			DeletedAt:   w.DeletedAt,
 		}
 		m, err := pgdoc.WorkspaceModel(row, memByWS[w.ID], intByWS[w.ID], scimByWS[w.ID])
 		if err != nil {
@@ -256,7 +271,8 @@ func (r *Workspace) save(ctx context.Context, ws *workspace.Workspace) error {
 		q := r.c.queries(ctx)
 		if err := q.WorkspaceUpsert(ctx, gen.WorkspaceUpsertParams{
 			ID: row.ID, Name: row.Name, Alias: row.Alias, Email: row.Email, Personal: row.Personal,
-			Policy: row.Policy, MembersHash: row.MembersHash, Metadata: row.Metadata, UpdatedAt: row.UpdatedAt,
+			Policy: row.Policy, MembersHash: row.MembersHash, Metadata: row.Metadata,
+			CreatedAt: row.CreatedAt, CreatedBy: row.CreatedBy, UpdatedAt: row.UpdatedAt, DeletedAt: row.DeletedAt,
 		}); err != nil {
 			if isUniqueViolation(err) {
 				return workspace.ErrDuplicateWorkspaceAlias
@@ -291,6 +307,10 @@ func (r *Workspace) save(ctx context.Context, ws *workspace.Workspace) error {
 				TokenHash:        scimRow.TokenHash,
 				GroupRoleMapping: scimRow.GroupRoleMapping,
 			}); err != nil {
+				return rerror.ErrInternalByWithContext(ctx, err)
+			}
+		} else {
+			if err := q.WorkspaceScimConfigDelete(ctx, row.ID); err != nil {
 				return rerror.ErrInternalByWithContext(ctx, err)
 			}
 		}

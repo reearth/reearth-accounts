@@ -40,18 +40,42 @@ func (r *Workspace) Filtered(f workspace.WorkspaceFilter) workspace.Repo {
 	}
 }
 
-func (r *Workspace) FindAll(ctx context.Context, keyword *string, pagination *usecasex.Pagination) (workspace.List, *usecasex.PageInfo, error) {
+func (r *Workspace) FindAll(ctx context.Context, keyword *string, personal *bool, status workspace.StatusFilter, pagination *usecasex.Pagination, excludePersonal bool) (workspace.List, *usecasex.PageInfo, error) {
 	if pagination != nil && pagination.Cursor != nil {
 		return nil, nil, workspace.ErrCursorPaginationUnsupported
 	}
 
-	filter := bson.M{}
+	var conds []bson.M
+	if excludePersonal {
+		conds = append(conds, bson.M{"personal": bson.M{"$ne": true}})
+	}
 	if keyword != nil && strings.TrimSpace(*keyword) != "" {
 		re := primitive.Regex{Pattern: regexp.QuoteMeta(strings.TrimSpace(*keyword)), Options: "i"}
-		filter["$or"] = []bson.M{
+		conds = append(conds, bson.M{"$or": []bson.M{
 			{"name": bson.M{"$regex": re}},
 			{"alias": bson.M{"$regex": re}},
+		}})
+	}
+	switch status {
+	case workspace.StatusActive:
+		conds = append(conds, bson.M{"deletedat": bson.M{"$exists": false}})
+	case workspace.StatusDeleted:
+		conds = append(conds, bson.M{"deletedat": bson.M{"$exists": true}})
+	}
+
+	filter := bson.M{}
+	switch len(conds) {
+	case 1:
+		filter = conds[0]
+	default:
+		if len(conds) > 1 {
+			filter = bson.M{"$and": conds}
 		}
+	}
+	// filter by workspace type when requested (nil = both types). The personal
+	// flag is stored on the workspace doc as the boolean `personal` field.
+	if personal != nil {
+		filter["personal"] = *personal
 	}
 
 	// Respect the readable-workspace filter: for the admin base repo it is unset
@@ -65,20 +89,19 @@ func (r *Workspace) FindAll(ctx context.Context, keyword *string, pagination *us
 }
 
 func (r *Workspace) FindByUser(ctx context.Context, id user.ID) (workspace.List, error) {
+	uid := strings.ReplaceAll(id.String(), ".", "")
 	return r.find(ctx, bson.M{
-		"members." + strings.ReplaceAll(id.String(), ".", ""): bson.M{
-			"$exists": true,
-		},
+		"members." + uid:              bson.M{"$exists": true},
+		"members." + uid + ".disabled": bson.M{"$ne": true},
 	})
 }
 
 func (r *Workspace) FindByUserWithPagination(ctx context.Context, id user.ID, pagination *usecasex.Pagination) (workspace.List, *usecasex.PageInfo, error) {
+	uid := strings.ReplaceAll(id.String(), ".", "")
 	filter := bson.M{
-		"members." + strings.ReplaceAll(id.String(), ".", ""): bson.M{
-			"$exists": true,
-		},
+		"members." + uid:              bson.M{"$exists": true},
+		"members." + uid + ".disabled": bson.M{"$ne": true},
 	}
-
 	return r.paginate(ctx, filter, pagination)
 }
 

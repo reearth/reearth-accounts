@@ -18,6 +18,12 @@ func TestWorkspaceList_FilterByID(t *testing.T) {
 	assert.Equal(t, List{t1, t2}, List{t1, t2}.FilterByID(tid1, tid2))
 	assert.Equal(t, List{}, List{t1, t2}.FilterByID(NewID()))
 	assert.Equal(t, List(nil), List(nil).FilterByID(tid1))
+
+	// Result order follows the requested id order, not list order.
+	assert.Equal(t, List{t2, t1}, List{t1, t2}.FilterByID(tid2, tid1))
+
+	// A repeated id in the request repeats in the result.
+	assert.Equal(t, List{t1, t1}, List{t1, t2}.FilterByID(tid1, tid1))
 }
 
 func TestWorkspaceList_FilterByUserRole(t *testing.T) {

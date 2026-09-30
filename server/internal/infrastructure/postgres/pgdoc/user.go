@@ -43,6 +43,8 @@ type UserRow struct {
 	Lang           *string
 	Theme          *string
 	UpdatedAt      time.Time
+	DeletedAt      *time.Time
+	CreatedAt      *time.Time
 }
 
 func NewUserRow(u *user.User) *UserRow {
@@ -103,6 +105,8 @@ func NewUserRow(u *user.User) *UserRow {
 		Verification:   verification,
 		PasswordReset:  pwReset,
 		UpdatedAt:      updatedAt,
+		DeletedAt:      u.DeletedAt(),
+		CreatedAt:      u.CreatedAt(),
 	}
 }
 
@@ -174,5 +178,7 @@ func (r *UserRow) Model() (*user.User, error) {
 		EncodedPassword(r.Password).
 		PasswordReset(pwReset).
 		UpdatedAt(r.UpdatedAt).
+		DeletedAt(r.DeletedAt).
+		CreatedAt(r.CreatedAt).
 		Build()
 }

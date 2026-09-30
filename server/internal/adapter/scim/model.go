@@ -85,6 +85,18 @@ type ScimUser struct {
 	UserName   string      `json:"userName"`
 }
 
+// ScimUserWriteRequest is the inbound representation for Create and Replace
+// requests. Active uses a pointer so we can distinguish "omitted" (nil) from
+// an explicit false, which tells us to deprovision immediately after creation.
+type ScimUserWriteRequest struct {
+	Active     *bool       `json:"active"`
+	Emails     []ScimEmail `json:"emails,omitempty"`
+	ExternalID string      `json:"externalId,omitempty"`
+	Name       ScimName    `json:"name,omitempty"`
+	Schemas    []string    `json:"schemas"`
+	UserName   string      `json:"userName"`
+}
+
 // DomainUserToScimUser converts a domain User and its workspace Member to a SCIM 2.0 User resource.
 func DomainUserToScimUser(u *user.User, member workspace.Member, baseURL string) ScimUser {
 	return ScimUser{

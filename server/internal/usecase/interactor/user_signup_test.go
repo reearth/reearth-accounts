@@ -332,7 +332,7 @@ func TestUser_Signup(t *testing.T) {
 
 			m := mailer.NewMock()
 			g := &gateway.Container{Mailer: m}
-			uc := NewUser(r, g, tt.signupSecret, tt.authSrvUIDomain)
+			uc := NewUser(r, g, nil, tt.signupSecret, tt.authSrvUIDomain)
 			u, err := uc.Signup(ctx, tt.args)
 
 			if tt.wantUser != nil {
@@ -687,7 +687,7 @@ func TestUser_SignupOIDC_AllowlistRejectsUnknownISS(t *testing.T) {
 	ctx := context.Background()
 	r := accountmemory.New()
 
-	uc := NewUser(r, nil, "", "", "https://trusted.example.com")
+	uc := NewUser(r, nil, nil, "", "", "https://trusted.example.com")
 
 	_, err := uc.SignupOIDC(ctx, interfaces.SignupOIDCParam{
 		Issuer:      "https://evil.example.com",
@@ -730,7 +730,7 @@ func TestUser_SignupOIDC_AllowlistPermitsKnownISS(t *testing.T) {
 	assert.NoError(t, r.Role.Save(ctx, *selfRole))
 	assert.NoError(t, r.Role.Save(ctx, *ownerRole))
 
-	uc := NewUser(r, nil, "", "", srv.URL)
+	uc := NewUser(r, nil, nil, "", "", srv.URL)
 
 	u, err := uc.SignupOIDC(ctx, interfaces.SignupOIDCParam{
 		Issuer:      srv.URL,
@@ -746,7 +746,7 @@ func TestUser_FindOrCreate_AllowlistRejectsUnknownISS(t *testing.T) {
 	ctx := context.Background()
 	r := accountmemory.New()
 
-	uc := NewUser(r, nil, "", "", "https://trusted.example.com").(*User)
+	uc := NewUser(r, nil, nil, "", "", "https://trusted.example.com").(*User)
 
 	_, err := uc.FindOrCreate(ctx, interfaces.UserFindOrCreateParam{
 		Sub:   "sub123",
@@ -788,6 +788,10 @@ func (m *mockAuthenticator) EnableMFA(_ context.Context, _ string) (string, erro
 
 func (m *mockAuthenticator) GetMFAStatus(_ context.Context, _ string) (gateway.MFAStatus, error) {
 	return gateway.MFAStatus{}, nil
+}
+
+func (m *mockAuthenticator) RegenerateMFARecoveryCode(_ context.Context, _ string) (string, error) {
+	return "", nil
 }
 
 func (m *mockAuthenticator) ResendVerificationEmail(ctx context.Context, userID string) error {
@@ -956,7 +960,7 @@ func TestUser_CreateVerification(t *testing.T) {
 				Mailer:         m,
 				Authenticators: map[gateway.Provider]gateway.Authenticator{gateway.ProviderAuth0: auth},
 			}
-			uc := NewUser(r, g, "", "")
+			uc := NewUser(r, g, nil, "", "")
 
 			err := uc.CreateVerification(ctx, tt.email)
 
@@ -977,6 +981,40 @@ func TestUser_CreateVerification(t *testing.T) {
 	}
 }
 
+func TestUser_CreateVerification_IdPErrorDoesNotRollBackVerification(t *testing.T) {
+	user.DefaultPasswordEncoder = &user.NoopPasswordEncoder{}
+	mocktime := time.Time{}
+	mockcode := "CODECODE"
+
+	ctx := context.Background()
+	r := accountmemory.New()
+
+	u := user.New().
+		ID(id.NewUserID()).
+		Workspace(id.NewWorkspaceID()).
+		Email("idperr@bbb.com").
+		Name("IDPERR").
+		Auths([]user.Auth{{Provider: "auth0", Sub: "auth0|idperr"}}).
+		Verification(user.VerificationFrom(mockcode, mocktime, false)).
+		MustBuild()
+	assert.NoError(t, r.User.Save(ctx, u))
+
+	idpErr := rerror.NewE(i18n.T("idp unavailable"))
+	auth := &mockAuthenticator{resendVerificationEmailError: idpErr}
+	g := &gateway.Container{
+		Authenticators: map[gateway.Provider]gateway.Authenticator{gateway.ProviderAuth0: auth},
+	}
+	uc := NewUser(r, g, nil, "", "")
+
+	err := uc.CreateVerification(ctx, "idperr@bbb.com")
+	assert.Error(t, err)
+
+	saved, fetchErr := r.User.FindByEmail(ctx, "idperr@bbb.com")
+	assert.NoError(t, fetchErr)
+	assert.NotNil(t, saved.Verification())
+	assert.NotEqual(t, mockcode, saved.Verification().Code(), "verification code must be refreshed in DB")
+}
+
 func TestUser_SyncSSOUser(t *testing.T) {
 	uid := id.NewUserID()
 	wid := id.NewWorkspaceID()
@@ -994,7 +1032,7 @@ func TestUser_SyncSSOUser(t *testing.T) {
 		r := accountmemory.New()
 		setupRoles(ctx, r)
 
-		uc := NewUser(r, nil, "", "")
+		uc := NewUser(r, nil, nil, "", "")
 		u, err := uc.SyncSSOUser(ctx, interfaces.SyncSSOUserParam{
 			Email:       "sso@example.com",
 			Name:        "SSO User",
@@ -1014,7 +1052,7 @@ func TestUser_SyncSSOUser(t *testing.T) {
 		r := accountmemory.New()
 		setupRoles(ctx, r)
 
-		uc := NewUser(r, nil, "", "")
+		uc := NewUser(r, nil, nil, "", "")
 		first, err := uc.SyncSSOUser(ctx, interfaces.SyncSSOUserParam{
 			Email:       "sso@example.com",
 			Name:        "SSO User",
@@ -1042,7 +1080,7 @@ func TestUser_SyncSSOUser(t *testing.T) {
 		existing := user.New().NewID().Workspace(wid).Name("Existing").Email("taken@example.com").MustBuild()
 		assert.NoError(t, r.User.Save(ctx, existing))
 
-		uc := NewUser(r, nil, "", "")
+		uc := NewUser(r, nil, nil, "", "")
 		_, err := uc.SyncSSOUser(ctx, interfaces.SyncSSOUserParam{
 			Email: "taken@example.com",
 			Name:  "SSO User",
@@ -1057,7 +1095,7 @@ func TestUser_SyncSSOUser(t *testing.T) {
 		r := accountmemory.New()
 		setupRoles(ctx, r)
 
-		uc := NewUser(r, nil, "", "")
+		uc := NewUser(r, nil, nil, "", "")
 		u, err := uc.SyncSSOUser(ctx, interfaces.SyncSSOUserParam{
 			Email: "sso2@example.com",
 			Name:  "SSO User 2",

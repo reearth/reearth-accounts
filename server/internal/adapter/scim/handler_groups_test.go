@@ -29,6 +29,11 @@ func setupGroupHandlerTest(t *testing.T) (
 	t.Helper()
 	db = accountmemory.New()
 
+	for _, name := range []string{"owner", "maintainer", "writer", "reader", "self"} {
+		r := role.New().NewID().Name(name).MustBuild()
+		require.NoError(t, db.Role.Save(t.Context(), *r))
+	}
+
 	ownerID = user.NewID()
 	owner := user.New().ID(ownerID).Name("Owner").Email("owner@example.com").Workspace(user.NewWorkspaceID()).MustBuild()
 	require.NoError(t, db.User.Save(t.Context(), owner))
@@ -52,7 +57,7 @@ func setupGroupHandlerTest(t *testing.T) (
 	require.NoError(t, db.Workspace.Save(t.Context(), ws))
 
 	scimUC := interactor.NewScim(db)
-	handler = NewGroupHandler(scimUC, db.Workspace, testBaseURL)
+	handler = NewGroupHandler(scimUC, db.Workspace)
 	return
 }
 
@@ -100,7 +105,7 @@ func TestListGroups_Empty(t *testing.T) {
 		ScimConfig(cfg).MustBuild()
 	require.NoError(t, db.Workspace.Save(t.Context(), ws))
 
-	handler := NewGroupHandler(interactor.NewScim(db), db.Workspace, testBaseURL)
+	handler := NewGroupHandler(interactor.NewScim(db), db.Workspace)
 
 	e := echo.New()
 	req := httptest.NewRequest(http.MethodGet, "/scim/v2/Groups", nil)

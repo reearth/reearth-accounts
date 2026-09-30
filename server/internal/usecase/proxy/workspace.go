@@ -87,7 +87,18 @@ func (w *Workspace) FetchByUserWithPagination(ctx context.Context, userID accoun
 	}, nil
 }
 
-func (w *Workspace) Create(ctx context.Context, alias, name, description string, userID accountid.UserID, op *workspace.Operator) (*workspace.Workspace, error) {
+// FindAll is not supported via this GraphQL proxy: there is no cross-tenant
+// listing query in the public GraphQL schema (it's only reachable via the
+// M2M-gated REST route or the separate admin API), so this client has no
+// remote call to make on the caller's behalf.
+func (w *Workspace) FindAll(ctx context.Context, param interfaces.FindAllWorkspacesParam, operator *workspace.Operator) (interfaces.FindAllWorkspacesResult, error) {
+	return interfaces.FindAllWorkspacesResult{}, workspace.ErrNotImplemented
+}
+
+// Create proxies to the createWorkspace GraphQL mutation, which has no concept
+// of skipOwnerMembership (REST-only, deliberately not exposed via GraphQL) — the
+// caller is always joined as owner, same as before this parameter existed.
+func (w *Workspace) Create(ctx context.Context, alias, name, description string, userID accountid.UserID, skipOwnerMembership bool, op *workspace.Operator) (*workspace.Workspace, error) {
 	res, err := CreateWorkspace(ctx, w.gql, CreateWorkspaceInput{
 		Alias:       alias,
 		Name:        name,
@@ -137,6 +148,10 @@ func (w *Workspace) UpdateUserMember(ctx context.Context, id workspace.ID, userI
 	return ToWorkspace(res.UpdateUserOfWorkspace.Workspace.FragmentWorkspace)
 }
 
+func (w *Workspace) UpdateUserMemberViaService(ctx context.Context, id workspace.ID, userID accountid.UserID, role role.RoleType, op *workspace.Operator) (*workspace.Workspace, error) {
+	return nil, interfaces.ErrOperationDenied
+}
+
 func (w *Workspace) UpdateIntegration(ctx context.Context, id workspace.ID, integrationID workspace.IntegrationID, role role.RoleType, op *workspace.Operator) (*workspace.Workspace, error) {
 	res, err := UpdateIntegrationOfWorkspace(ctx, w.gql, UpdateIntegrationOfWorkspaceInput{WorkspaceId: id.String(), IntegrationId: integrationID.String(), Role: Role(string(role))})
 	if err != nil {
@@ -183,6 +198,17 @@ func (w *Workspace) Remove(ctx context.Context, id workspace.ID, op *workspace.O
 		return err
 	}
 	return nil
+}
+
+// Deactivate and Restore are not supported via this GraphQL proxy: there is no
+// corresponding mutation in the public GraphQL schema (REST-only, same as
+// FindAll), so this client has no remote call to make on the caller's behalf.
+func (w *Workspace) Deactivate(ctx context.Context, id workspace.ID, op *workspace.Operator) (*workspace.Workspace, error) {
+	return nil, workspace.ErrNotImplemented
+}
+
+func (w *Workspace) Restore(ctx context.Context, id workspace.ID, op *workspace.Operator) (*workspace.Workspace, error) {
+	return nil, workspace.ErrNotImplemented
 }
 
 func (w *Workspace) TransferOwnership(ctx context.Context, id workspace.ID, newOwnerID accountid.UserID, op *workspace.Operator) (*workspace.Workspace, error) {

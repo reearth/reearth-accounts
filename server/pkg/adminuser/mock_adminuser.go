@@ -130,3 +130,18 @@ func (mr *MockRepoMockRecorder) Save(arg0, arg1 any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Save", reflect.TypeOf((*MockRepo)(nil).Save), arg0, arg1)
 }
+
+// SaveGuardingLastSystemAdmin mocks base method.
+func (m *MockRepo) SaveGuardingLastSystemAdmin(ctx context.Context, u *AdminUser, requireOtherSystemAdmin bool) (bool, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "SaveGuardingLastSystemAdmin", ctx, u, requireOtherSystemAdmin)
+	ret0, _ := ret[0].(bool)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// SaveGuardingLastSystemAdmin indicates an expected call of SaveGuardingLastSystemAdmin.
+func (mr *MockRepoMockRecorder) SaveGuardingLastSystemAdmin(ctx, u, requireOtherSystemAdmin any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "SaveGuardingLastSystemAdmin", reflect.TypeOf((*MockRepo)(nil).SaveGuardingLastSystemAdmin), ctx, u, requireOtherSystemAdmin)
+}

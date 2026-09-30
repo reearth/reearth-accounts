@@ -15,15 +15,13 @@ import (
 
 // GroupHandler handles SCIM 2.0 /scim/v2/Groups routes.
 type GroupHandler struct {
-	baseURL       string
 	scimUC        interfaces.Scim
 	workspaceRepo workspace.Repo
 }
 
 // NewGroupHandler constructs a GroupHandler.
-func NewGroupHandler(scimUC interfaces.Scim, workspaceRepo workspace.Repo, baseURL string) *GroupHandler {
+func NewGroupHandler(scimUC interfaces.Scim, workspaceRepo workspace.Repo) *GroupHandler {
 	return &GroupHandler{
-		baseURL:       baseURL,
 		scimUC:        scimUC,
 		workspaceRepo: workspaceRepo,
 	}
@@ -52,7 +50,7 @@ func (h *GroupHandler) Create(c echo.Context) error {
 		return scimErrorResponse(c, http.StatusInternalServerError, "internal server error", "")
 	}
 
-	group := h.buildGroup(ws, wsID, body.DisplayName)
+	group := h.buildGroup(ws, wsID, body.DisplayName, requestBaseURL(c))
 	c.Response().Header().Set("Location", group.Meta.Location)
 	return c.JSON(http.StatusCreated, group)
 }
@@ -97,7 +95,7 @@ func (h *GroupHandler) Get(c echo.Context) error {
 		return scimErrorResponse(c, http.StatusInternalServerError, "internal server error", "")
 	}
 
-	return c.JSON(http.StatusOK, h.buildGroup(ws, wsID, groupName))
+	return c.JSON(http.StatusOK, h.buildGroup(ws, wsID, groupName, requestBaseURL(c)))
 }
 
 // List handles GET /scim/v2/Groups — returns one group per occupied role bucket.
@@ -113,7 +111,7 @@ func (h *GroupHandler) List(c echo.Context) error {
 		return scimErrorResponse(c, http.StatusInternalServerError, "internal server error", "")
 	}
 
-	groups := h.buildGroupList(ws)
+	groups := h.buildGroupList(ws, requestBaseURL(c))
 	return c.JSON(http.StatusOK, ScimListResponse{
 		ItemsPerPage: len(groups),
 		Resources:    groups,
@@ -179,7 +177,7 @@ func (h *GroupHandler) Patch(c echo.Context) error {
 		return scimErrorResponse(c, http.StatusInternalServerError, "internal server error", "")
 	}
 
-	return c.JSON(http.StatusOK, h.buildGroup(ws, wsID, groupName))
+	return c.JSON(http.StatusOK, h.buildGroup(ws, wsID, groupName, requestBaseURL(c)))
 }
 
 // Replace handles PUT /scim/v2/Groups/:id — full replace of all group members.
@@ -211,13 +209,13 @@ func (h *GroupHandler) Replace(c echo.Context) error {
 		return scimErrorResponse(c, http.StatusInternalServerError, "internal server error", "")
 	}
 
-	return c.JSON(http.StatusOK, h.buildGroup(ws, wsID, groupName))
+	return c.JSON(http.StatusOK, h.buildGroup(ws, wsID, groupName, requestBaseURL(c)))
 }
 
 // --- helpers ---
 
 // buildGroupList returns one ScimGroup per role bucket that has at least one active member.
-func (h *GroupHandler) buildGroupList(ws *workspace.Workspace) []ScimGroup {
+func (h *GroupHandler) buildGroupList(ws *workspace.Workspace, baseURL string) []ScimGroup {
 	members := ws.Members().Users()
 	if len(members) == 0 {
 		return []ScimGroup{}
@@ -262,7 +260,7 @@ func (h *GroupHandler) buildGroupList(ws *workspace.Workspace) []ScimGroup {
 			ID:          gid,
 			Members:     b.members,
 			Meta: ScimMeta{
-				Location:     h.baseURL + "/scim/v2/Groups/" + gid,
+				Location:     baseURL + "/scim/v2/Groups/" + gid,
 				ResourceType: "Group",
 			},
 			Schemas: []string{ScimSchemaGroup},
@@ -273,7 +271,7 @@ func (h *GroupHandler) buildGroupList(ws *workspace.Workspace) []ScimGroup {
 
 // buildGroup constructs a ScimGroup for the given group name within a workspace.
 // The group's role is resolved via GroupRoleMapping; unmapped names default to RoleReader.
-func (h *GroupHandler) buildGroup(ws *workspace.Workspace, wsID workspace.ID, groupName string) ScimGroup {
+func (h *GroupHandler) buildGroup(ws *workspace.Workspace, wsID workspace.ID, groupName, baseURL string) ScimGroup {
 	groupRole := role.RoleReader
 	if cfg := ws.ScimConfig(); cfg != nil {
 		if mapping := cfg.GroupRoleMapping(); mapping != nil {
@@ -296,7 +294,7 @@ func (h *GroupHandler) buildGroup(ws *workspace.Workspace, wsID workspace.ID, gr
 		ID:          gid,
 		Members:     scimMembers,
 		Meta: ScimMeta{
-			Location:     h.baseURL + "/scim/v2/Groups/" + gid,
+			Location:     baseURL + "/scim/v2/Groups/" + gid,
 			ResourceType: "Group",
 		},
 		Schemas: []string{ScimSchemaGroup},
