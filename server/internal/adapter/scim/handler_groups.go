@@ -2,7 +2,9 @@ package scim
 
 import (
 	"errors"
+	"fmt"
 	"net/http"
+	"strconv"
 	"strings"
 
 	"github.com/labstack/echo/v4"
@@ -40,19 +42,37 @@ func (h *GroupHandler) Create(c echo.Context) error {
 		return scimErrorResponse(c, http.StatusBadRequest, "invalid request body", "invalidValue")
 	}
 
-	members := h.wireToInterfaceMembers(body.Members)
+	if body.DisplayName == "" {
+		return scimErrorResponse(c, http.StatusBadRequest, "displayName is required", "invalidValue")
+	}
+
+	// Verify a role mapping exists for this group name before syncing.
+	ws, err := h.workspaceRepo.FindByID(ctx, wsID)
+	if err != nil {
+		return scimErrorResponse(c, http.StatusInternalServerError, "internal server error", "")
+	}
+	if cfg := ws.ScimConfig(); cfg == nil {
+		return scimErrorResponse(c, http.StatusBadRequest, "no role mapping configured for group: "+body.DisplayName, "invalidValue")
+	} else if _, ok := cfg.GroupRoleMapping()[body.DisplayName]; !ok {
+		return scimErrorResponse(c, http.StatusBadRequest, "no role mapping configured for group: "+body.DisplayName, "invalidValue")
+	}
+
+	members, err := h.wireToInterfaceMembers(body.Members)
+	if err != nil {
+		return scimErrorResponse(c, http.StatusBadRequest, err.Error(), "invalidValue")
+	}
 	if err := h.scimUC.SyncScimGroup(ctx, wsID, "", body.DisplayName, members); err != nil {
 		return h.mapError(c, err)
 	}
 
-	ws, err := h.workspaceRepo.FindByID(ctx, wsID)
+	ws, err = h.workspaceRepo.FindByID(ctx, wsID)
 	if err != nil {
 		return scimErrorResponse(c, http.StatusInternalServerError, "internal server error", "")
 	}
 
 	group := h.buildGroup(ws, wsID, body.DisplayName, requestBaseURL(c))
 	c.Response().Header().Set("Location", group.Meta.Location)
-	return c.JSON(http.StatusCreated, group)
+	return scimJSON(c, http.StatusCreated, group)
 }
 
 // Delete handles DELETE /scim/v2/Groups/:id — remove the group mapping (no deprovisioning).
@@ -64,8 +84,8 @@ func (h *GroupHandler) Delete(c echo.Context) error {
 	}
 
 	groupID := c.Param("id")
-	_, groupName, err := parseGroupID(groupID)
-	if err != nil {
+	workspaceIDStr, groupName, err := parseGroupID(groupID)
+	if err != nil || workspaceIDStr != wsID.String() {
 		return scimErrorResponse(c, http.StatusNotFound, "group not found", "")
 	}
 
@@ -85,8 +105,8 @@ func (h *GroupHandler) Get(c echo.Context) error {
 	}
 
 	groupID := c.Param("id")
-	_, groupName, err := parseGroupID(groupID)
-	if err != nil {
+	workspaceIDStr, groupName, err := parseGroupID(groupID)
+	if err != nil || workspaceIDStr != wsID.String() {
 		return scimErrorResponse(c, http.StatusNotFound, "group not found", "")
 	}
 
@@ -95,10 +115,17 @@ func (h *GroupHandler) Get(c echo.Context) error {
 		return scimErrorResponse(c, http.StatusInternalServerError, "internal server error", "")
 	}
 
-	return c.JSON(http.StatusOK, h.buildGroup(ws, wsID, groupName, requestBaseURL(c)))
+	// Verify the group exists in the role mapping.
+	if cfg := ws.ScimConfig(); cfg == nil {
+		return scimErrorResponse(c, http.StatusNotFound, "group not found", "")
+	} else if _, ok := cfg.GroupRoleMapping()[groupName]; !ok {
+		return scimErrorResponse(c, http.StatusNotFound, "group not found", "")
+	}
+
+	return scimJSON(c, http.StatusOK, h.buildGroup(ws, wsID, groupName, requestBaseURL(c)))
 }
 
-// List handles GET /scim/v2/Groups — returns one group per occupied role bucket.
+// List handles GET /scim/v2/Groups with optional filter, startIndex, count params.
 func (h *GroupHandler) List(c echo.Context) error {
 	ctx := c.Request().Context()
 	wsID, ok := WorkspaceIDFromContext(ctx)
@@ -112,12 +139,55 @@ func (h *GroupHandler) List(c echo.Context) error {
 	}
 
 	groups := h.buildGroupList(ws, requestBaseURL(c))
-	return c.JSON(http.StatusOK, ScimListResponse{
-		ItemsPerPage: len(groups),
-		Resources:    groups,
+
+	// Apply optional filter (only displayName eq supported).
+	if filterParam := c.QueryParam("filter"); filterParam != "" {
+		attr, op, val, parseErr := parseFilter(filterParam)
+		if parseErr != nil || attr != "displayname" || op != "eq" {
+			return scimErrorResponse(c, http.StatusBadRequest, "unsupported filter expression", "invalidFilter")
+		}
+		var filtered []ScimGroup
+		for _, g := range groups {
+			if strings.EqualFold(g.DisplayName, val) {
+				filtered = append(filtered, g)
+			}
+		}
+		groups = filtered
+	}
+
+	// Apply SCIM pagination.
+	totalResults := len(groups)
+	startIndex := 1
+	pageCount := scimMaxResults
+	if s := c.QueryParam("startIndex"); s != "" {
+		if v, err := strconv.Atoi(s); err == nil && v >= 1 {
+			startIndex = v
+		}
+	}
+	if cnt := c.QueryParam("count"); cnt != "" {
+		if v, err := strconv.Atoi(cnt); err == nil && v >= 0 {
+			pageCount = v
+		}
+	}
+	if pageCount > scimMaxResults {
+		pageCount = scimMaxResults
+	}
+	offset := startIndex - 1
+	if offset > totalResults {
+		offset = totalResults
+	}
+	remaining := totalResults - offset
+	if pageCount > remaining {
+		pageCount = remaining
+	}
+	paged := groups[offset : offset+pageCount]
+
+	return scimJSON(c, http.StatusOK, ScimListResponse{
+		ItemsPerPage: len(paged),
+		Resources:    paged,
 		Schemas:      []string{ScimSchemaListResponse},
-		StartIndex:   1,
-		TotalResults: len(groups),
+		StartIndex:   startIndex,
+		TotalResults: totalResults,
 	})
 }
 
@@ -132,8 +202,8 @@ func (h *GroupHandler) Patch(c echo.Context) error {
 	}
 
 	groupID := c.Param("id")
-	_, groupName, err := parseGroupID(groupID)
-	if err != nil {
+	workspaceIDStr, groupName, err := parseGroupID(groupID)
+	if err != nil || workspaceIDStr != wsID.String() {
 		return scimErrorResponse(c, http.StatusNotFound, "group not found", "")
 	}
 
@@ -177,7 +247,7 @@ func (h *GroupHandler) Patch(c echo.Context) error {
 		return scimErrorResponse(c, http.StatusInternalServerError, "internal server error", "")
 	}
 
-	return c.JSON(http.StatusOK, h.buildGroup(ws, wsID, groupName, requestBaseURL(c)))
+	return scimJSON(c, http.StatusOK, h.buildGroup(ws, wsID, groupName, requestBaseURL(c)))
 }
 
 // Replace handles PUT /scim/v2/Groups/:id — full replace of all group members.
@@ -189,8 +259,8 @@ func (h *GroupHandler) Replace(c echo.Context) error {
 	}
 
 	groupID := c.Param("id")
-	_, groupName, err := parseGroupID(groupID)
-	if err != nil {
+	workspaceIDStr, groupName, err := parseGroupID(groupID)
+	if err != nil || workspaceIDStr != wsID.String() {
 		return scimErrorResponse(c, http.StatusNotFound, "group not found", "")
 	}
 
@@ -199,7 +269,10 @@ func (h *GroupHandler) Replace(c echo.Context) error {
 		return scimErrorResponse(c, http.StatusBadRequest, "invalid request body", "invalidValue")
 	}
 
-	members := h.wireToInterfaceMembers(body.Members)
+	members, err := h.wireToInterfaceMembers(body.Members)
+	if err != nil {
+		return scimErrorResponse(c, http.StatusBadRequest, err.Error(), "invalidValue")
+	}
 	if err := h.scimUC.SyncScimGroup(ctx, wsID, groupID, groupName, members); err != nil {
 		return h.mapError(c, err)
 	}
@@ -209,7 +282,7 @@ func (h *GroupHandler) Replace(c echo.Context) error {
 		return scimErrorResponse(c, http.StatusInternalServerError, "internal server error", "")
 	}
 
-	return c.JSON(http.StatusOK, h.buildGroup(ws, wsID, groupName, requestBaseURL(c)))
+	return scimJSON(c, http.StatusOK, h.buildGroup(ws, wsID, groupName, requestBaseURL(c)))
 }
 
 // --- helpers ---
@@ -326,20 +399,22 @@ func (h *GroupHandler) currentGroupMembers(ws *workspace.Workspace, groupName st
 }
 
 // wireToInterfaceMembers converts SCIM wire members (Value = user ID string) to usecase members.
-func (h *GroupHandler) wireToInterfaceMembers(wire []ScimGroupMember) []interfaces.ScimGroupMember {
+// Returns an error if any member value is not a valid user ID.
+func (h *GroupHandler) wireToInterfaceMembers(wire []ScimGroupMember) ([]interfaces.ScimGroupMember, error) {
 	out := make([]interfaces.ScimGroupMember, 0, len(wire))
 	for _, m := range wire {
 		uid, err := user.IDFrom(m.Value)
 		if err != nil {
-			continue
+			return nil, fmt.Errorf("invalid member value %q: %w", m.Value, err)
 		}
 		out = append(out, interfaces.ScimGroupMember{UserID: &uid})
 	}
-	return out
+	return out, nil
 }
 
 // extractInterfaceMembers parses a PATCH op value into usecase members.
 // Supports []interface{} where each item is map[string]interface{} with a "value" key.
+// Malformed entries are silently dropped since PATCH is an incremental operation.
 func (h *GroupHandler) extractInterfaceMembers(v interface{}) []interfaces.ScimGroupMember {
 	list, ok := v.([]interface{})
 	if !ok {

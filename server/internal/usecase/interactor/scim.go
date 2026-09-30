@@ -608,8 +608,12 @@ func (i *Scim) SyncScimGroup(ctx context.Context, workspaceID workspace.ID, _, g
 					}
 				}
 			}
-			if err := ws.Members().SetUserExternalID(targetUser.ID(), m.ExternalID); err != nil {
-				return err
+			// Only update ExternalID when the incoming member provides one;
+			// otherwise preserve the ID already set by the user provisioner.
+			if m.ExternalID != "" {
+				if err := ws.Members().SetUserExternalID(targetUser.ID(), m.ExternalID); err != nil {
+					return err
+				}
 			}
 			// Use the member's effective role (may differ from groupRole when the
 			// sole-owner guard prevented demotion).

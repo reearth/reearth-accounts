@@ -30,6 +30,7 @@ func (h *WorkspaceScimHandler) GenerateToken(c echo.Context) error {
 		return err
 	}
 
+	c.Response().Header().Set("Cache-Control", "no-store")
 	return c.JSON(http.StatusOK, httpmodel.GenerateScimTokenResponse{
 		Token:   plaintext,
 		Warning: "This token will not be shown again. Store it immediately.",
@@ -88,7 +89,7 @@ func (h *WorkspaceScimHandler) UpdateConfig(c echo.Context) error {
 	mapping := make(map[string]role.RoleType, len(req.GroupRoleMapping))
 	for groupName, roleStr := range req.GroupRoleMapping {
 		r := role.RoleType(roleStr)
-		if !r.Valid() {
+		if !r.Valid() || r == role.RoleSelf {
 			return httpinternal.NewError(http.StatusBadRequest, "invalid role: "+roleStr, nil)
 		}
 		mapping[groupName] = r
