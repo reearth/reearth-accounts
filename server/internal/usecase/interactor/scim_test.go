@@ -338,6 +338,9 @@ func TestSyncScimGroup_AddAndRemove(t *testing.T) {
 
 	cfg := workspace.NewScimConfig()
 	cfg.SetEnabled(true)
+	cfg.SetGroupRoleMapping(map[string]role.RoleType{
+		"engineers": role.RoleWriter,
+	})
 	ws := workspace.New().
 		NewID().
 		Name("enterprise").

@@ -233,6 +233,9 @@ func (h *GroupHandler) Patch(c echo.Context) error {
 		switch {
 		case opLower == "add" && pathLower == "members":
 			added := h.extractInterfaceMembers(op.Value)
+			if err := h.validateMemberUsers(c, added); err != nil {
+				return err
+			}
 			currentMembers = h.mergeMembers(currentMembers, added)
 		case opLower == "remove" && pathLower == "members":
 			removed := h.extractInterfaceMembers(op.Value)

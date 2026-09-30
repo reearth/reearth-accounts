@@ -631,9 +631,16 @@ func (i *Scim) SyncScimGroup(ctx context.Context, workspaceID workspace.ID, _, g
 		}
 
 		// Soft-disable members no longer in the group.
+		// Scoped to groupRole so members of other role buckets are never touched.
 		// A member is still present if matched by ExternalID or by UserID
 		// (wire group members arrive with UserID only, no ExternalID).
 		for uid, mem := range ws.Members().Users() {
+			if mem.Role != groupRole {
+				continue
+			}
+			if mem.Disabled {
+				continue
+			}
 			if _, ok := incomingUserIDs[uid]; ok {
 				continue
 			}
