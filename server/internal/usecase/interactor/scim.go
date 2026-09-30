@@ -306,14 +306,25 @@ func (i *Scim) ProvisionScimUser(ctx context.Context, param interfaces.Provision
 		if uid, ok := ws.Members().UserByExternalID(param.ExternalID); ok {
 			mem := ws.Members().User(uid)
 			if mem != nil && mem.Disabled != param.Disabled {
+				if param.Disabled && ws.Members().IsOnlyOwner(uid) {
+					return nil, interfaces.ErrOwnerCannotLeaveTheWorkspace
+				}
 				if err := ws.Members().SetUserDisabled(uid, param.Disabled); err != nil {
 					return nil, err
 				}
 				if err := i.repos.Workspace.Save(ctx, ws); err != nil {
 					return nil, err
 				}
-			}
-			if !param.Disabled {
+				if param.Disabled {
+					if err := i.removePermittable(ctx, param.WorkspaceID, uid); err != nil {
+						return nil, err
+					}
+				} else {
+					if err := i.updatePermittable(ctx, uid, param.WorkspaceID, ws.Members().UserRole(uid)); err != nil {
+						return nil, err
+					}
+				}
+			} else if !param.Disabled {
 				if err := i.updatePermittable(ctx, uid, param.WorkspaceID, ws.Members().UserRole(uid)); err != nil {
 					return nil, err
 				}
@@ -328,12 +339,16 @@ func (i *Scim) ProvisionScimUser(ctx context.Context, param interfaces.Provision
 		}
 
 		if existingUser != nil {
-			if !ws.Members().HasUser(existingUser.ID()) {
+			alreadyMember := ws.Members().HasUser(existingUser.ID())
+			if !alreadyMember {
 				if err := ws.Members().Join(existingUser, roleType, existingUser.ID()); err != nil {
 					return nil, err
 				}
 			} else {
-				// Existing workspace member: sync disabled state to the requested value.
+				// Existing workspace member: guard sole-owner before disabling.
+				if param.Disabled && ws.Members().IsOnlyOwner(existingUser.ID()) {
+					return nil, interfaces.ErrOwnerCannotLeaveTheWorkspace
+				}
 				mem := ws.Members().User(existingUser.ID())
 				if mem != nil && mem.Disabled != param.Disabled {
 					if err := ws.Members().SetUserDisabled(existingUser.ID(), param.Disabled); err != nil {
@@ -350,7 +365,8 @@ func (i *Scim) ProvisionScimUser(ctx context.Context, param interfaces.Provision
 			if err := ws.Members().SetUserExternalID(existingUser.ID(), param.ExternalID); err != nil {
 				return nil, err
 			}
-			if param.Disabled {
+			// For new joins with param.Disabled, set the disabled flag before persisting.
+			if !alreadyMember && param.Disabled {
 				if err := ws.Members().SetUserDisabled(existingUser.ID(), true); err != nil {
 					return nil, err
 				}
@@ -358,7 +374,11 @@ func (i *Scim) ProvisionScimUser(ctx context.Context, param interfaces.Provision
 			if err := i.repos.Workspace.Save(ctx, ws); err != nil {
 				return nil, err
 			}
-			if !param.Disabled {
+			if param.Disabled {
+				if err := i.removePermittable(ctx, param.WorkspaceID, existingUser.ID()); err != nil {
+					return nil, err
+				}
+			} else {
 				if err := i.updatePermittable(ctx, existingUser.ID(), param.WorkspaceID, ws.Members().UserRole(existingUser.ID())); err != nil {
 					return nil, err
 				}
