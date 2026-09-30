@@ -243,8 +243,9 @@ func (h *UserHandler) Patch(c echo.Context) error {
 		return h.mapError(c, err)
 	}
 
-	deprovisioned := false
-	reactivated := false
+	// Track the last active value seen across all operations so that a sequence
+	// like [active:false, active:true] correctly resolves to active (last wins).
+	var lastActive *bool
 	for _, op := range patchOp.Operations {
 		if !strings.EqualFold(op.Op, "replace") {
 			continue
@@ -253,11 +254,7 @@ func (h *UserHandler) Patch(c echo.Context) error {
 		// Okta format: {"op":"replace","path":"active","value":false}
 		if strings.EqualFold(op.Path, "active") {
 			if active, ok := parseBoolValue(op.Value); ok {
-				if active {
-					reactivated = true
-				} else {
-					deprovisioned = true
-				}
+				lastActive = &active
 			}
 			continue
 		}
@@ -265,22 +262,20 @@ func (h *UserHandler) Patch(c echo.Context) error {
 		// Azure AD format: {"op":"replace","value":{"active":false}}
 		if op.Path == "" {
 			if active, ok := extractActiveBool(op.Value); ok {
-				if active {
-					reactivated = true
-				} else {
-					deprovisioned = true
-				}
+				lastActive = &active
 			}
 		}
 	}
 
-	if deprovisioned {
-		if err := h.scimUC.DeprovisionScimUserByUserID(ctx, wsID, uid); err != nil {
-			return h.mapError(c, err)
+	if lastActive != nil {
+		var ucErr error
+		if !*lastActive {
+			ucErr = h.scimUC.DeprovisionScimUserByUserID(ctx, wsID, uid)
+		} else {
+			ucErr = h.scimUC.ReactivateScimUserByUserID(ctx, wsID, uid)
 		}
-	} else if reactivated {
-		if err := h.scimUC.ReactivateScimUserByUserID(ctx, wsID, uid); err != nil {
-			return h.mapError(c, err)
+		if ucErr != nil {
+			return h.mapError(c, ucErr)
 		}
 	}
 
