@@ -17,6 +17,7 @@ var (
 )
 
 type ProvisionScimUserParam struct {
+	Disabled    bool
 	Email       string
 	ExternalID  string
 	Name        string

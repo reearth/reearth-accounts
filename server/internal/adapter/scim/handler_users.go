@@ -60,6 +60,7 @@ func (h *UserHandler) Create(c echo.Context) error {
 	}
 
 	u, err := h.scimUC.ProvisionScimUser(ctx, interfaces.ProvisionScimUserParam{
+		Disabled:    req.Active != nil && !*req.Active,
 		Email:       email,
 		ExternalID:  req.ExternalID,
 		Name:        name,
@@ -68,13 +69,6 @@ func (h *UserHandler) Create(c echo.Context) error {
 	})
 	if err != nil {
 		return h.mapError(c, err)
-	}
-
-	// If the IdP explicitly created the account as inactive, deprovision immediately.
-	if req.Active != nil && !*req.Active {
-		if err := h.scimUC.DeprovisionScimUserByUserID(ctx, wsID, u.ID()); err != nil {
-			return h.mapError(c, err)
-		}
 	}
 
 	member, err := h.memberForUser(ctx, wsID, u.ID())
