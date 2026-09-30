@@ -86,8 +86,9 @@ func TestListGroups(t *testing.T) {
 
 	var resp ScimListResponse
 	require.NoError(t, json.Unmarshal(rec.Body.Bytes(), &resp))
-	// Owner (role.RoleOwner) has 1 bucket; maintainer (Engineering) has 1 bucket → 2 total.
-	assert.Equal(t, 2, resp.TotalResults)
+	// Owner (role.RoleOwner) is not in the GroupRoleMapping → excluded.
+	// Maintainer (Engineering) is mapped → 1 group total.
+	assert.Equal(t, 1, resp.TotalResults)
 }
 
 // TestListGroups_Empty verifies that an empty workspace returns an empty group list.

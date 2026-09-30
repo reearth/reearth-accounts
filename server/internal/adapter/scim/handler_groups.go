@@ -4,6 +4,7 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
+	"sort"
 	"strconv"
 	"strings"
 
@@ -232,9 +233,7 @@ func (h *GroupHandler) Patch(c echo.Context) error {
 			removed := h.extractInterfaceMembers(op.Value)
 			currentMembers = h.subtractMembers(currentMembers, removed)
 		case opLower == "replace" && pathLower == "displayname":
-			if name, ok := op.Value.(string); ok && name != "" {
-				groupName = name
-			}
+			return scimErrorResponse(c, http.StatusBadRequest, "displayName is immutable", "mutability")
 		}
 	}
 
@@ -317,7 +316,7 @@ func (h *GroupHandler) buildGroupList(ws *workspace.Workspace, baseURL string) [
 		if !exists {
 			gName, ok := roleToGroup[m.Role]
 			if !ok {
-				gName = string(m.Role)
+				continue
 			}
 			b = &entry{name: gName}
 			buckets[m.Role] = b
@@ -339,6 +338,9 @@ func (h *GroupHandler) buildGroupList(ws *workspace.Workspace, baseURL string) [
 			Schemas: []string{ScimSchemaGroup},
 		})
 	}
+	sort.Slice(groups, func(i, j int) bool {
+		return groups[i].DisplayName < groups[j].DisplayName
+	})
 	return groups
 }
 
@@ -387,7 +389,7 @@ func (h *GroupHandler) currentGroupMembers(ws *workspace.Workspace, groupName st
 
 	var out []interfaces.ScimGroupMember
 	for uid, m := range ws.Members().Users() {
-		if m.Role == groupRole {
+		if !m.Disabled && m.Role == groupRole {
 			uid := uid
 			out = append(out, interfaces.ScimGroupMember{
 				ExternalID: m.ExternalID,

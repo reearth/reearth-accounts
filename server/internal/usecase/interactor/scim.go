@@ -538,10 +538,18 @@ func (i *Scim) SyncScimGroup(ctx context.Context, workspaceID workspace.ID, _, g
 			}
 		}
 
-		// Index incoming members by ExternalID
+		// Index incoming members by ExternalID and UserID.
+		// Wire members from group sync carry UserID but no ExternalID, so we
+		// must check both sets to avoid incorrectly deprovisioning them.
 		incomingExtIDs := make(map[string]struct{}, len(members))
+		incomingUserIDs := make(map[user.ID]struct{}, len(members))
 		for _, m := range members {
-			incomingExtIDs[m.ExternalID] = struct{}{}
+			if m.ExternalID != "" {
+				incomingExtIDs[m.ExternalID] = struct{}{}
+			}
+			if m.UserID != nil {
+				incomingUserIDs[*m.UserID] = struct{}{}
+			}
 		}
 
 		// Provision or update role for each incoming member
@@ -622,8 +630,13 @@ func (i *Scim) SyncScimGroup(ctx context.Context, workspaceID workspace.ID, _, g
 			}
 		}
 
-		// Soft-disable members no longer in the group
+		// Soft-disable members no longer in the group.
+		// A member is still present if matched by ExternalID or by UserID
+		// (wire group members arrive with UserID only, no ExternalID).
 		for uid, mem := range ws.Members().Users() {
+			if _, ok := incomingUserIDs[uid]; ok {
+				continue
+			}
 			if mem.ExternalID == "" {
 				continue
 			}
