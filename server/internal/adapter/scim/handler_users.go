@@ -16,6 +16,9 @@ import (
 	"github.com/reearth/reearthx/rerror"
 )
 
+// scimMaxResults matches the maxResults advertised in ServiceProviderConfig.
+const scimMaxResults = 200
+
 // UserHandler handles SCIM 2.0 /scim/v2/Users routes.
 type UserHandler struct {
 	scimUC        interfaces.Scim
@@ -178,10 +181,10 @@ func (h *UserHandler) List(c echo.Context) error {
 		}
 	}
 
-	// SCIM pagination: startIndex is 1-based, count is the max items to return.
+	// SCIM pagination: startIndex is 1-based, count capped at scimMaxResults.
 	totalResults := len(filtered)
 	startIndex := 1
-	pageCount := totalResults
+	pageCount := scimMaxResults
 	if s := c.QueryParam("startIndex"); s != "" {
 		if v, err := strconv.Atoi(s); err == nil && v >= 1 {
 			startIndex = v
@@ -192,15 +195,19 @@ func (h *UserHandler) List(c echo.Context) error {
 			pageCount = v
 		}
 	}
+	if pageCount > scimMaxResults {
+		pageCount = scimMaxResults
+	}
 	offset := startIndex - 1
 	if offset > totalResults {
 		offset = totalResults
 	}
-	end := offset + pageCount
-	if end > totalResults {
-		end = totalResults
+	// Cap to remaining items before adding to avoid integer overflow.
+	remaining := totalResults - offset
+	if pageCount > remaining {
+		pageCount = remaining
 	}
-	paged := filtered[offset:end]
+	paged := filtered[offset : offset+pageCount]
 
 	baseURL := requestBaseURL(c)
 	resources := make([]ScimUser, 0, len(paged))

@@ -7,6 +7,7 @@ import (
 	"errors"
 	"fmt"
 	"os"
+	"sort"
 	"strings"
 
 	"github.com/reearth/reearth-accounts/server/internal/usecase/interfaces"
@@ -253,6 +254,12 @@ func (i *Scim) ListScimUsers(ctx context.Context, workspaceID workspace.ID, filt
 		}
 		userIDs = append(userIDs, uid)
 	}
+	// Sort for stable ordering across calls — map iteration is non-deterministic,
+	// and the repositories preserve the requested-ID order, so pagination would
+	// otherwise produce duplicates or gaps on consecutive pages.
+	sort.Slice(userIDs, func(i, j int) bool {
+		return userIDs[i].String() < userIDs[j].String()
+	})
 
 	if len(userIDs) == 0 {
 		return nil, nil
