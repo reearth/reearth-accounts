@@ -57,7 +57,7 @@ func setupGroupHandlerTest(t *testing.T) (
 	require.NoError(t, db.Workspace.Save(t.Context(), ws))
 
 	scimUC := interactor.NewScim(db)
-	handler = NewGroupHandler(scimUC, db.Workspace)
+	handler = NewGroupHandler(scimUC, db.Workspace, db.User)
 	return
 }
 
@@ -106,7 +106,7 @@ func TestListGroups_Empty(t *testing.T) {
 		ScimConfig(cfg).MustBuild()
 	require.NoError(t, db.Workspace.Save(t.Context(), ws))
 
-	handler := NewGroupHandler(interactor.NewScim(db), db.Workspace)
+	handler := NewGroupHandler(interactor.NewScim(db), db.Workspace, db.User)
 
 	e := echo.New()
 	req := httptest.NewRequest(http.MethodGet, "/scim/v2/Groups", nil)
@@ -240,16 +240,20 @@ func TestPatchGroup_RemoveMembers(t *testing.T) {
 func TestPatchGroup_RemoveLastOwner(t *testing.T) {
 	db, ws, ownerID, handler := setupGroupHandlerTest(t)
 
-	// Give the owner an ExternalID so the soft-disable path runs.
+	// Add "Owners" → RoleOwner mapping and set ExternalID on the owner.
 	updatedWS, err := db.Workspace.FindByID(t.Context(), ws.ID())
 	require.NoError(t, err)
+	cfg := updatedWS.ScimConfig()
+	mapping := cfg.GroupRoleMapping()
+	mapping["Owners"] = role.RoleOwner
+	cfg.SetGroupRoleMapping(mapping)
+	updatedWS.SetScimConfig(cfg)
 	require.NoError(t, updatedWS.Members().SetUserExternalID(ownerID, "ext-owner"))
 	require.NoError(t, db.Workspace.Save(t.Context(), updatedWS))
 
-	// The owner is in the "owner" role bucket (no mapping — falls back to role name).
-	ownerGroupName := string(role.RoleOwner)
+	ownerGroupName := "Owners"
 	gid := makeGroupID(ws.ID(), ownerGroupName)
-	// Send an empty member list to try to remove all members.
+	// Send a remove op to try to remove the owner from the group.
 	body := `{"schemas":["urn:ietf:params:scim:api:messages:2.0:PatchOp"],"Operations":[{"op":"remove","path":"members","value":[{"value":"` + ownerID.String() + `"}]}]}`
 
 	e := echo.New()

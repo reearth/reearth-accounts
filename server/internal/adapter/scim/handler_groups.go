@@ -19,13 +19,15 @@ import (
 // GroupHandler handles SCIM 2.0 /scim/v2/Groups routes.
 type GroupHandler struct {
 	scimUC        interfaces.Scim
+	userRepo      user.Repo
 	workspaceRepo workspace.Repo
 }
 
 // NewGroupHandler constructs a GroupHandler.
-func NewGroupHandler(scimUC interfaces.Scim, workspaceRepo workspace.Repo) *GroupHandler {
+func NewGroupHandler(scimUC interfaces.Scim, workspaceRepo workspace.Repo, userRepo user.Repo) *GroupHandler {
 	return &GroupHandler{
 		scimUC:        scimUC,
+		userRepo:      userRepo,
 		workspaceRepo: workspaceRepo,
 	}
 }
@@ -61,6 +63,9 @@ func (h *GroupHandler) Create(c echo.Context) error {
 	members, err := h.wireToInterfaceMembers(body.Members)
 	if err != nil {
 		return scimErrorResponse(c, http.StatusBadRequest, err.Error(), "invalidValue")
+	}
+	if err := h.validateMemberUsers(c, members); err != nil {
+		return err
 	}
 	if err := h.scimUC.SyncScimGroup(ctx, wsID, "", body.DisplayName, members); err != nil {
 		return h.mapError(c, err)
@@ -232,8 +237,22 @@ func (h *GroupHandler) Patch(c echo.Context) error {
 		case opLower == "remove" && pathLower == "members":
 			removed := h.extractInterfaceMembers(op.Value)
 			currentMembers = h.subtractMembers(currentMembers, removed)
+		case opLower == "remove" && strings.HasPrefix(pathLower, "members["):
+			// RFC 7644 §3.5.2.2: remove with a filtered path, e.g. members[value eq "uid"].
+			uidStr, ok := parseMembersFilterPath(op.Path)
+			if !ok {
+				return scimErrorResponse(c, http.StatusBadRequest, "unsupported filter path: "+op.Path, "invalidFilter")
+			}
+			uid, err := user.IDFrom(uidStr)
+			if err != nil {
+				return scimErrorResponse(c, http.StatusBadRequest, "invalid member value in filter", "invalidValue")
+			}
+			uidCopy := uid
+			currentMembers = h.subtractMembers(currentMembers, []interfaces.ScimGroupMember{{UserID: &uidCopy}})
 		case opLower == "replace" && pathLower == "displayname":
 			return scimErrorResponse(c, http.StatusBadRequest, "displayName is immutable", "mutability")
+		default:
+			return scimErrorResponse(c, http.StatusBadRequest, "unsupported PATCH operation: "+op.Op+" "+op.Path, "invalidValue")
 		}
 	}
 
@@ -271,6 +290,9 @@ func (h *GroupHandler) Replace(c echo.Context) error {
 	members, err := h.wireToInterfaceMembers(body.Members)
 	if err != nil {
 		return scimErrorResponse(c, http.StatusBadRequest, err.Error(), "invalidValue")
+	}
+	if err := h.validateMemberUsers(c, members); err != nil {
+		return err
 	}
 	if err := h.scimUC.SyncScimGroup(ctx, wsID, groupID, groupName, members); err != nil {
 		return h.mapError(c, err)
@@ -480,6 +502,40 @@ func (h *GroupHandler) subtractMembers(existing, toRemove []interfaces.ScimGroup
 		result = append(result, m)
 	}
 	return result
+}
+
+// validateMemberUsers verifies that every UserID in members exists in the user repository.
+// Returns a SCIM 400 response for any missing user.
+func (h *GroupHandler) validateMemberUsers(c echo.Context, members []interfaces.ScimGroupMember) error {
+	ctx := c.Request().Context()
+	for _, m := range members {
+		if m.UserID == nil {
+			continue
+		}
+		if _, err := h.userRepo.FindByID(ctx, *m.UserID); err != nil {
+			if errors.Is(err, rerror.ErrNotFound) {
+				return scimErrorResponse(c, http.StatusBadRequest, "referenced user not found: "+m.UserID.String(), "invalidValue")
+			}
+			return scimErrorResponse(c, http.StatusInternalServerError, "internal server error", "")
+		}
+	}
+	return nil
+}
+
+// parseMembersFilterPath parses a SCIM filter path of the form members[value eq "uid"]
+// and returns the extracted uid string. Returns ("", false) on parse failure.
+func parseMembersFilterPath(path string) (string, bool) {
+	lower := strings.ToLower(path)
+	if !strings.HasPrefix(lower, "members[") || !strings.HasSuffix(lower, "]") {
+		return "", false
+	}
+	inner := path[len("members[") : len(path)-1]
+	parts := strings.Fields(inner)
+	if len(parts) != 3 || strings.ToLower(parts[0]) != "value" || strings.ToLower(parts[1]) != "eq" {
+		return "", false
+	}
+	uid := strings.Trim(parts[2], `"`)
+	return uid, uid != ""
 }
 
 // mapError converts domain errors to SCIM HTTP error responses.

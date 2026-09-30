@@ -5,15 +5,16 @@ import (
 
 	"github.com/labstack/echo/v4"
 	"github.com/reearth/reearth-accounts/server/internal/usecase/interfaces"
+	"github.com/reearth/reearth-accounts/server/pkg/user"
 	"github.com/reearth/reearth-accounts/server/pkg/workspace"
 )
 
 // RegisterSCIMRouter mounts all SCIM 2.0 routes on the given Echo instance.
 // Discovery endpoints are public; user-management and group routes require a valid SCIM Bearer token.
-func RegisterSCIMRouter(e *echo.Echo, workspaceRepo workspace.Repo, scimUC interfaces.Scim) {
+func RegisterSCIMRouter(e *echo.Echo, workspaceRepo workspace.Repo, userRepo user.Repo, scimUC interfaces.Scim) {
 	discovery := NewDiscoveryHandler()
 	users := NewUserHandler(scimUC, workspaceRepo)
-	groups := NewGroupHandler(scimUC, workspaceRepo)
+	groups := NewGroupHandler(scimUC, workspaceRepo, userRepo)
 
 	// Public discovery endpoints (no auth).
 	e.GET("/scim/v2/ServiceProviderConfig", discovery.ServiceProviderConfig)
