@@ -7,6 +7,7 @@ import (
 	"errors"
 	"fmt"
 	"os"
+	"sort"
 	"strings"
 
 	"github.com/reearth/reearth-accounts/server/internal/usecase/interfaces"
@@ -119,6 +120,33 @@ func (i *Scim) DeprovisionScimUser(ctx context.Context, workspaceID workspace.ID
 	})
 }
 
+func (i *Scim) DeprovisionScimUserByUserID(ctx context.Context, workspaceID workspace.ID, userID user.ID) error {
+	return Run0(ctx, nil, i.repos, Usecase().Transaction(), func(ctx context.Context) error {
+		ws, err := i.repos.Workspace.FindByID(ctx, workspaceID)
+		if err != nil {
+			return err
+		}
+
+		if !ws.Members().HasUser(userID) {
+			return interfaces.ErrSCIMUserNotFound
+		}
+
+		if ws.Members().IsOnlyOwner(userID) {
+			return interfaces.ErrOwnerCannotLeaveTheWorkspace
+		}
+
+		if err := ws.Members().SetUserDisabled(userID, true); err != nil {
+			return err
+		}
+
+		if err := i.repos.Workspace.Save(ctx, ws); err != nil {
+			return err
+		}
+
+		return i.removePermittable(ctx, workspaceID, userID)
+	})
+}
+
 func (i *Scim) GenerateScimToken(ctx context.Context, workspaceID workspace.ID, operator *workspace.Operator) (string, error) {
 	return Run1(ctx, operator, i.repos, Usecase().Transaction().WithMaintainableWorkspaces(workspaceID), func(ctx context.Context) (string, error) {
 		ws, err := i.repos.Workspace.FindByID(ctx, workspaceID)
@@ -179,7 +207,7 @@ func (i *Scim) GetScimUser(ctx context.Context, workspaceID workspace.ID, userID
 	}
 
 	m := ws.Members().User(userID)
-	if m == nil || m.Disabled {
+	if m == nil {
 		return nil, interfaces.ErrSCIMUserNotFound
 	}
 
@@ -215,12 +243,9 @@ func (i *Scim) ListScimUsers(ctx context.Context, workspaceID workspace.ID, filt
 		}
 	}
 
-	// Collect active user IDs, applying any externalId filter immediately
+	// Collect all user IDs (including disabled — SCIM needs them for reconciliation).
 	userIDs := make(user.IDList, 0, len(members))
 	for uid, m := range members {
-		if m.Disabled {
-			continue
-		}
 		if filterAttr == "externalid" {
 			if m.ExternalID == filterVal {
 				userIDs = append(userIDs, uid)
@@ -229,6 +254,12 @@ func (i *Scim) ListScimUsers(ctx context.Context, workspaceID workspace.ID, filt
 		}
 		userIDs = append(userIDs, uid)
 	}
+	// Sort for stable ordering across calls — map iteration is non-deterministic,
+	// and the repositories preserve the requested-ID order, so pagination would
+	// otherwise produce duplicates or gaps on consecutive pages.
+	sort.Slice(userIDs, func(i, j int) bool {
+		return userIDs[i].String() < userIDs[j].String()
+	})
 
 	if len(userIDs) == 0 {
 		return nil, nil
@@ -271,16 +302,29 @@ func (i *Scim) ProvisionScimUser(ctx context.Context, param interfaces.Provision
 			return nil, fmt.Errorf("%w: invalid workspace role %q", interfaces.ErrOperationDenied, roleType)
 		}
 
-		// Idempotent: already provisioned by this ExternalID — re-enable if disabled.
+		// Idempotent: already provisioned by this ExternalID — sync disabled state.
 		if uid, ok := ws.Members().UserByExternalID(param.ExternalID); ok {
 			mem := ws.Members().User(uid)
-			if mem != nil && mem.Disabled {
-				if err := ws.Members().SetUserDisabled(uid, false); err != nil {
+			if mem != nil && mem.Disabled != param.Disabled {
+				if param.Disabled && ws.Members().IsOnlyOwner(uid) {
+					return nil, interfaces.ErrOwnerCannotLeaveTheWorkspace
+				}
+				if err := ws.Members().SetUserDisabled(uid, param.Disabled); err != nil {
 					return nil, err
 				}
 				if err := i.repos.Workspace.Save(ctx, ws); err != nil {
 					return nil, err
 				}
+				if param.Disabled {
+					if err := i.removePermittable(ctx, param.WorkspaceID, uid); err != nil {
+						return nil, err
+					}
+				} else {
+					if err := i.updatePermittable(ctx, uid, param.WorkspaceID, ws.Members().UserRole(uid)); err != nil {
+						return nil, err
+					}
+				}
+			} else if !param.Disabled {
 				if err := i.updatePermittable(ctx, uid, param.WorkspaceID, ws.Members().UserRole(uid)); err != nil {
 					return nil, err
 				}
@@ -295,15 +339,19 @@ func (i *Scim) ProvisionScimUser(ctx context.Context, param interfaces.Provision
 		}
 
 		if existingUser != nil {
-			if !ws.Members().HasUser(existingUser.ID()) {
+			alreadyMember := ws.Members().HasUser(existingUser.ID())
+			if !alreadyMember {
 				if err := ws.Members().Join(existingUser, roleType, existingUser.ID()); err != nil {
 					return nil, err
 				}
 			} else {
-				// Existing workspace member: re-enable if disabled.
+				// Existing workspace member: guard sole-owner before disabling.
+				if param.Disabled && ws.Members().IsOnlyOwner(existingUser.ID()) {
+					return nil, interfaces.ErrOwnerCannotLeaveTheWorkspace
+				}
 				mem := ws.Members().User(existingUser.ID())
-				if mem != nil && mem.Disabled {
-					if err := ws.Members().SetUserDisabled(existingUser.ID(), false); err != nil {
+				if mem != nil && mem.Disabled != param.Disabled {
+					if err := ws.Members().SetUserDisabled(existingUser.ID(), param.Disabled); err != nil {
 						return nil, err
 					}
 				}
@@ -317,11 +365,23 @@ func (i *Scim) ProvisionScimUser(ctx context.Context, param interfaces.Provision
 			if err := ws.Members().SetUserExternalID(existingUser.ID(), param.ExternalID); err != nil {
 				return nil, err
 			}
+			// For new joins with param.Disabled, set the disabled flag before persisting.
+			if !alreadyMember && param.Disabled {
+				if err := ws.Members().SetUserDisabled(existingUser.ID(), true); err != nil {
+					return nil, err
+				}
+			}
 			if err := i.repos.Workspace.Save(ctx, ws); err != nil {
 				return nil, err
 			}
-			if err := i.updatePermittable(ctx, existingUser.ID(), param.WorkspaceID, ws.Members().UserRole(existingUser.ID())); err != nil {
-				return nil, err
+			if param.Disabled {
+				if err := i.removePermittable(ctx, param.WorkspaceID, existingUser.ID()); err != nil {
+					return nil, err
+				}
+			} else {
+				if err := i.updatePermittable(ctx, existingUser.ID(), param.WorkspaceID, ws.Members().UserRole(existingUser.ID())); err != nil {
+					return nil, err
+				}
 			}
 			return existingUser, nil
 		}
@@ -368,14 +428,49 @@ func (i *Scim) ProvisionScimUser(ctx context.Context, param interfaces.Provision
 		if err := ws.Members().SetUserExternalID(newUser.ID(), param.ExternalID); err != nil {
 			return nil, err
 		}
+		if param.Disabled {
+			if err := ws.Members().SetUserDisabled(newUser.ID(), true); err != nil {
+				return nil, err
+			}
+		}
 		if err := i.repos.Workspace.Save(ctx, ws); err != nil {
 			return nil, err
 		}
-		if err := i.updatePermittable(ctx, newUser.ID(), param.WorkspaceID, roleType); err != nil {
-			return nil, err
+		if !param.Disabled {
+			if err := i.updatePermittable(ctx, newUser.ID(), param.WorkspaceID, roleType); err != nil {
+				return nil, err
+			}
 		}
 
 		return newUser, nil
+	})
+}
+
+func (i *Scim) ReactivateScimUserByUserID(ctx context.Context, workspaceID workspace.ID, userID user.ID) error {
+	return Run0(ctx, nil, i.repos, Usecase().Transaction(), func(ctx context.Context) error {
+		ws, err := i.repos.Workspace.FindByID(ctx, workspaceID)
+		if err != nil {
+			return err
+		}
+
+		m := ws.Members().User(userID)
+		if m == nil {
+			return interfaces.ErrSCIMUserNotFound
+		}
+
+		if !m.Disabled {
+			return nil
+		}
+
+		if err := ws.Members().SetUserDisabled(userID, false); err != nil {
+			return err
+		}
+
+		if err := i.repos.Workspace.Save(ctx, ws); err != nil {
+			return err
+		}
+
+		return i.updatePermittable(ctx, userID, workspaceID, ws.Members().UserRole(userID))
 	})
 }
 
