@@ -82,21 +82,9 @@ func (r *User) FindByIDsWithPagination(ctx context.Context, ids user.IDList, ali
 
 func (r *User) FindBySub(ctx context.Context, auth0sub string) (*user.User, error) {
 	return r.findOne(ctx, bson.M{
-		"$or": []bson.M{
-			{
-				"subs": bson.M{
-					"$elemMatch": bson.M{
-						"$eq": auth0sub,
-					},
-				},
-			},
-			{"auth0sub": auth0sub},
-			{
-				"auth0sublist": bson.M{ //compat
-					"$elemMatch": bson.M{
-						"$eq": auth0sub,
-					},
-				},
+		"subs": bson.M{
+			"$elemMatch": bson.M{
+				"$eq": auth0sub,
 			},
 		},
 	})
