@@ -23,6 +23,11 @@ type Querier interface {
 	PermittableWorkspaceRoleInsert(ctx context.Context, arg PermittableWorkspaceRoleInsertParams) error
 	PermittableWorkspaceRolesByPermittableIDs(ctx context.Context, dollar_1 []string) ([]PermittableWorkspaceRole, error)
 	PermittableWorkspaceRolesDeleteByPermittable(ctx context.Context, permittableID string) error
+	// One round-trip for any number of workspace roles, instead of one
+	// PermittableWorkspaceRoleInsert per role. See
+	// WorkspaceMembersInsertBulk (workspace.sql) for why jsonb_to_recordset is
+	// used over a multi-arg unnest.
+	PermittableWorkspaceRolesInsertBulk(ctx context.Context, dollar_1 []byte) error
 	RoleDelete(ctx context.Context, id string) error
 	RoleFindAll(ctx context.Context) ([]Role, error)
 	RoleFindByID(ctx context.Context, id string) (Role, error)
