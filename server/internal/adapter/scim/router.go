@@ -5,21 +5,23 @@ import (
 
 	"github.com/labstack/echo/v4"
 	"github.com/reearth/reearth-accounts/server/internal/usecase/interfaces"
+	"github.com/reearth/reearth-accounts/server/pkg/user"
 	"github.com/reearth/reearth-accounts/server/pkg/workspace"
 )
 
 // RegisterSCIMRouter mounts all SCIM 2.0 routes on the given Echo instance.
-// Discovery endpoints are public; user-management routes require a valid SCIM Bearer token.
-func RegisterSCIMRouter(e *echo.Echo, workspaceRepo workspace.Repo, scimUC interfaces.Scim) {
+// Discovery endpoints are public; user-management and group routes require a valid SCIM Bearer token.
+func RegisterSCIMRouter(e *echo.Echo, workspaceRepo workspace.Repo, userRepo user.Repo, scimUC interfaces.Scim) {
 	discovery := NewDiscoveryHandler()
 	users := NewUserHandler(scimUC, workspaceRepo)
+	groups := NewGroupHandler(scimUC, workspaceRepo, userRepo)
 
 	// Public discovery endpoints (no auth).
 	e.GET("/scim/v2/ServiceProviderConfig", discovery.ServiceProviderConfig)
 	e.GET("/scim/v2/ResourceTypes", discovery.ResourceTypes)
 	e.GET("/scim/v2/Schemas", discovery.Schemas)
 
-	// Authenticated user-management endpoints.
+	// Authenticated user-management and group endpoints.
 	// scimContentType normalises application/scim+json to application/json so
 	// Echo's JSON binder can decode request bodies from SCIM clients.
 	scim := e.Group("/scim/v2", scimContentType(), ScimBearerAuth(workspaceRepo))
@@ -29,6 +31,13 @@ func RegisterSCIMRouter(e *echo.Echo, workspaceRepo workspace.Repo, scimUC inter
 	scim.PUT("/Users/:id", users.Replace)
 	scim.PATCH("/Users/:id", users.Patch)
 	scim.DELETE("/Users/:id", users.Delete)
+
+	scim.GET("/Groups", groups.List)
+	scim.POST("/Groups", groups.Create)
+	scim.GET("/Groups/:id", groups.Get)
+	scim.PUT("/Groups/:id", groups.Replace)
+	scim.PATCH("/Groups/:id", groups.Patch)
+	scim.DELETE("/Groups/:id", groups.Delete)
 }
 
 // scimContentType normalises the Content-Type header: if a request arrives with

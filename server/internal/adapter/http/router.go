@@ -131,6 +131,13 @@ func RegisterRESTRouter(e *echo.Echo, cfg RouterConfig) {
 	api.DELETE("/workspaces/:id/integrations", wh.RemoveIntegrations, required)
 	api.POST("/workspaces/:id/transfer-ownership", wh.TransferOwnership, required)
 
+	// --- Workspace SCIM admin ---
+	sh := handlers.NewWorkspaceScimHandler()
+	api.POST("/workspaces/:id/scim/token", sh.GenerateToken, required)
+	api.DELETE("/workspaces/:id/scim/token", sh.RevokeToken, required)
+	api.PUT("/workspaces/:id/scim/config", sh.UpdateConfig, required)
+	api.GET("/workspaces/:id/scim/config", sh.GetConfig, required)
+
 	// --- Service routes ---
 	// JWT required; the caller must hold Maintainer or Owner in the target workspace
 	// This can bypass the self-promotion guard that PATCH .../members/:user_id enforces.

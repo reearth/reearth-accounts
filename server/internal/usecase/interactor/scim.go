@@ -92,6 +92,27 @@ func (i *Scim) removePermittable(ctx context.Context, workspaceID workspace.ID, 
 	return i.permittableRepo.Save(ctx, *p)
 }
 
+func (i *Scim) DeleteScimGroup(ctx context.Context, workspaceID workspace.ID, groupName string) error {
+	return Run0(ctx, nil, i.repos, Usecase().Transaction(), func(ctx context.Context) error {
+		ws, err := i.repos.Workspace.FindByID(ctx, workspaceID)
+		if err != nil {
+			return err
+		}
+
+		cfg := ws.ScimConfig()
+		if cfg == nil {
+			return nil
+		}
+
+		mapping := cfg.GroupRoleMapping()
+		delete(mapping, groupName)
+		cfg.SetGroupRoleMapping(mapping)
+		ws.SetScimConfig(cfg)
+
+		return i.repos.Workspace.Save(ctx, ws)
+	})
+}
+
 func (i *Scim) DeprovisionScimUser(ctx context.Context, workspaceID workspace.ID, externalID string) error {
 	return Run0(ctx, nil, i.repos, Usecase().Transaction(), func(ctx context.Context) error {
 		ws, err := i.repos.Workspace.FindByID(ctx, workspaceID)
@@ -474,6 +495,25 @@ func (i *Scim) ReactivateScimUserByUserID(ctx context.Context, workspaceID works
 	})
 }
 
+func (i *Scim) RevokeScimToken(ctx context.Context, workspaceID workspace.ID, operator *workspace.Operator) error {
+	return Run0(ctx, operator, i.repos, Usecase().Transaction().WithMaintainableWorkspaces(workspaceID), func(ctx context.Context) error {
+		ws, err := i.repos.Workspace.FindByID(ctx, workspaceID)
+		if err != nil {
+			return err
+		}
+
+		cfg := ws.ScimConfig()
+		if cfg == nil {
+			return nil
+		}
+		cfg.SetEnabled(false)
+		cfg.SetTokenHash("")
+		ws.SetScimConfig(cfg)
+
+		return i.repos.Workspace.Save(ctx, ws)
+	})
+}
+
 // SyncScimGroup reconciles workspace membership for one IdP group.
 //
 // NOTE: Group isolation — members from group A are not tracked separately from
@@ -498,10 +538,18 @@ func (i *Scim) SyncScimGroup(ctx context.Context, workspaceID workspace.ID, _, g
 			}
 		}
 
-		// Index incoming members by ExternalID
+		// Index incoming members by ExternalID and UserID.
+		// Wire members from group sync carry UserID but no ExternalID, so we
+		// must check both sets to avoid incorrectly deprovisioning them.
 		incomingExtIDs := make(map[string]struct{}, len(members))
+		incomingUserIDs := make(map[user.ID]struct{}, len(members))
 		for _, m := range members {
-			incomingExtIDs[m.ExternalID] = struct{}{}
+			if m.ExternalID != "" {
+				incomingExtIDs[m.ExternalID] = struct{}{}
+			}
+			if m.UserID != nil {
+				incomingUserIDs[*m.UserID] = struct{}{}
+			}
 		}
 
 		// Provision or update role for each incoming member
@@ -568,8 +616,12 @@ func (i *Scim) SyncScimGroup(ctx context.Context, workspaceID workspace.ID, _, g
 					}
 				}
 			}
-			if err := ws.Members().SetUserExternalID(targetUser.ID(), m.ExternalID); err != nil {
-				return err
+			// Only update ExternalID when the incoming member provides one;
+			// otherwise preserve the ID already set by the user provisioner.
+			if m.ExternalID != "" {
+				if err := ws.Members().SetUserExternalID(targetUser.ID(), m.ExternalID); err != nil {
+					return err
+				}
 			}
 			// Use the member's effective role (may differ from groupRole when the
 			// sole-owner guard prevented demotion).
@@ -578,8 +630,20 @@ func (i *Scim) SyncScimGroup(ctx context.Context, workspaceID workspace.ID, _, g
 			}
 		}
 
-		// Soft-disable members no longer in the group
+		// Soft-disable members no longer in the group.
+		// Scoped to groupRole so members of other role buckets are never touched.
+		// A member is still present if matched by ExternalID or by UserID
+		// (wire group members arrive with UserID only, no ExternalID).
 		for uid, mem := range ws.Members().Users() {
+			if mem.Role != groupRole {
+				continue
+			}
+			if mem.Disabled {
+				continue
+			}
+			if _, ok := incomingUserIDs[uid]; ok {
+				continue
+			}
 			if mem.ExternalID == "" {
 				continue
 			}

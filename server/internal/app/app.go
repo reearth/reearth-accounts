@@ -157,7 +157,7 @@ func initEcho(ctx context.Context, cfg *ServerConfig) *echo.Echo {
 	})
 
 	scimUC := interactor.NewScim(cfg.Repos)
-	scimadapter.RegisterSCIMRouter(e, cfg.Repos.Workspace, scimUC)
+	scimadapter.RegisterSCIMRouter(e, cfg.Repos.Workspace, cfg.Repos.User, scimUC)
 
 	return e
 }
