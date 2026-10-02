@@ -116,6 +116,50 @@ func TestWorkspace_Create_SkipOwnerMembership(t *testing.T) {
 	}
 }
 
+func TestWorkspace_Create_AliasValidation(t *testing.T) {
+	ctx := context.Background()
+
+	db := memory.New()
+	for _, r := range []string{"owner", "maintainer", "writer", "reader"} {
+		_ = db.Role.Save(ctx, *role.New().NewID().Name(r).MustBuild())
+	}
+	u := user.New().NewID().Name("aaa").Email("aaa@bbb.com").Workspace(id.NewWorkspaceID()).MustBuild()
+	_ = db.User.Save(ctx, u)
+	workspaceUC := NewWorkspace(db, nil, nil)
+	op := &workspace.Operator{User: lo.ToPtr(u.ID())}
+
+	tests := []struct {
+		name    string
+		alias   string
+		wantErr error
+	}{
+		{name: "empty alias", alias: "", wantErr: user.ErrInvalidAlias},
+		{name: "too short (4 chars)", alias: "abcd", wantErr: user.ErrInvalidAlias},
+		{name: "too long (33 chars)", alias: "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa", wantErr: user.ErrInvalidAlias},
+		{name: "leading hyphen", alias: "-myalias", wantErr: user.ErrInvalidAlias},
+		{name: "trailing hyphen", alias: "myalias-", wantErr: user.ErrInvalidAlias},
+		{name: "consecutive hyphens", alias: "my--alias", wantErr: user.ErrInvalidAlias},
+		{name: "special characters", alias: "my_alias!", wantErr: user.ErrInvalidAlias},
+		{name: "uppercase letters", alias: "MyAlias", wantErr: nil},
+		{name: "valid lowercase with hyphens", alias: "my-valid-alias", wantErr: nil},
+		{name: "minimum length (5 chars)", alias: "abcde", wantErr: nil},
+		{name: "numbers only", alias: "12345", wantErr: nil},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			ws, err := workspaceUC.Create(ctx, tc.alias, "workspace name", "", u.ID(), false, op)
+			if tc.wantErr != nil {
+				assert.ErrorIs(t, err, tc.wantErr)
+				assert.Nil(t, ws)
+			} else {
+				assert.NoError(t, err)
+				assert.NotNil(t, ws)
+			}
+		})
+	}
+}
+
 func TestWorkspace_Update(t *testing.T) {
 	ctx := context.Background()
 

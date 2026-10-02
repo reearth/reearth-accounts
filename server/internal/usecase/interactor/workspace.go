@@ -20,6 +20,7 @@ import (
 	"github.com/reearth/reearth-accounts/server/pkg/workspace"
 	"github.com/reearth/reearthx/log"
 	"github.com/reearth/reearthx/rerror"
+	"github.com/reearth/reearthx/util"
 	"github.com/samber/lo"
 )
 
@@ -127,6 +128,10 @@ func (i *Workspace) Create(ctx context.Context, alias, name, description string,
 
 	if len(strings.TrimSpace(name)) == 0 {
 		return nil, user.ErrInvalidName
+	}
+
+	if !util.IsSafePathName(alias) {
+		return nil, user.ErrInvalidAlias
 	}
 
 	firstUsers, err := i.userquery.FetchByID(ctx, []user.ID{firstUser})
