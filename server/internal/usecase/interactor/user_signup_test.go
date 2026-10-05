@@ -1108,4 +1108,88 @@ func TestUser_SyncSSOUser(t *testing.T) {
 		assert.NotNil(t, u)
 		assert.Equal(t, "sso2@example.com", u.Email())
 	})
+
+	t.Run("marks new user as locally verified", func(t *testing.T) {
+		ctx := context.Background()
+		r := accountmemory.New()
+		setupRoles(ctx, r)
+
+		uc := NewUser(r, nil, nil, "", "")
+		u, err := uc.SyncSSOUser(ctx, interfaces.SyncSSOUserParam{
+			Email: "sso3@example.com",
+			Name:  "SSO User 3",
+			Sub:   "samlp|org123|idp999",
+		})
+
+		assert.NoError(t, err)
+		assert.NotNil(t, u)
+		assert.True(t, u.Verification().IsVerified())
+	})
+
+	t.Run("calls auth0 UpdateUser with email_verified for new user", func(t *testing.T) {
+		ctx := context.Background()
+		r := accountmemory.New()
+		setupRoles(ctx, r)
+
+		auth0Mock := &mockAuthenticator{}
+		g := &gateway.Container{
+			Authenticators: map[gateway.Provider]gateway.Authenticator{
+				gateway.ProviderAuth0: auth0Mock,
+			},
+		}
+
+		uc := NewUser(r, g, nil, "", "")
+		u, err := uc.SyncSSOUser(ctx, interfaces.SyncSSOUserParam{
+			Email: "sso4@example.com",
+			Name:  "SSO User 4",
+			Sub:   "samlp|org123|idp111",
+		})
+
+		assert.NoError(t, err)
+		assert.NotNil(t, u)
+		assert.True(t, auth0Mock.updateUserCalled)
+		assert.Equal(t, "samlp|org123|idp111", auth0Mock.updateUserParam.ID)
+		assert.NotNil(t, auth0Mock.updateUserParam.EmailVerified)
+		assert.True(t, *auth0Mock.updateUserParam.EmailVerified)
+	})
+
+	t.Run("returns error when auth0 UpdateUser fails", func(t *testing.T) {
+		ctx := context.Background()
+		r := accountmemory.New()
+		setupRoles(ctx, r)
+
+		auth0Mock := &mockAuthenticator{updateUserError: rerror.NewE(i18n.T("failed to update user"))}
+		g := &gateway.Container{
+			Authenticators: map[gateway.Provider]gateway.Authenticator{
+				gateway.ProviderAuth0: auth0Mock,
+			},
+		}
+
+		uc := NewUser(r, g, nil, "", "")
+		u, err := uc.SyncSSOUser(ctx, interfaces.SyncSSOUserParam{
+			Email: "sso-fail@example.com",
+			Name:  "SSO Fail",
+			Sub:   "samlp|org123|idp-fail",
+		})
+
+		assert.Error(t, err)
+		assert.Nil(t, u)
+	})
+
+	t.Run("skips auth0 call when no gateway configured", func(t *testing.T) {
+		ctx := context.Background()
+		r := accountmemory.New()
+		setupRoles(ctx, r)
+
+		uc := NewUser(r, nil, nil, "", "")
+		u, err := uc.SyncSSOUser(ctx, interfaces.SyncSSOUserParam{
+			Email: "sso5@example.com",
+			Name:  "SSO User 5",
+			Sub:   "samlp|org123|idp222",
+		})
+
+		assert.NoError(t, err)
+		assert.NotNil(t, u)
+		assert.True(t, u.Verification().IsVerified())
+	})
 }

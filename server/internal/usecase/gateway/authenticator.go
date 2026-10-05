@@ -3,10 +3,11 @@ package gateway
 import "context"
 
 type AuthenticatorUpdateUserParam struct {
-	ID       string
-	Name     *string
-	Email    *string
-	Password *string
+	Email         *string
+	EmailVerified *bool
+	ID            string
+	Name          *string
+	Password      *string
 }
 
 type AuthenticatorUser struct {

@@ -245,6 +245,48 @@ func TestAuth0_ExecRespectsContextTimeout(t *testing.T) {
 	assert.ErrorIs(t, err, context.DeadlineExceeded)
 }
 
+func TestAuth0_UpdateUser_EmailVerified(t *testing.T) {
+	var capturedBody map[string]interface{}
+
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		if r.Method == http.MethodPost && r.URL.Path == "/oauth/token" {
+			_ = json.NewEncoder(w).Encode(map[string]interface{}{
+				"access_token": token,
+				"expires_in":   expiresIn,
+			})
+			return
+		}
+		if r.Method == http.MethodPatch && r.URL.Path == "/api/v2/users/"+userID {
+			_ = json.NewDecoder(r.Body).Decode(&capturedBody)
+			_ = json.NewEncoder(w).Encode(map[string]interface{}{
+				"user_id":        userID,
+				"email":          userEmail,
+				"email_verified": true,
+			})
+			return
+		}
+		w.WriteHeader(http.StatusNotFound)
+	}))
+	defer srv.Close()
+
+	a := New(srv.URL+"/", clientID, clientSecret, 0)
+	a.current = func() time.Time { return current }
+	a.disableLogging = true
+
+	emailVerified := true
+	_, err := a.UpdateUser(context.Background(), gateway.AuthenticatorUpdateUserParam{
+		ID:            userID,
+		EmailVerified: &emailVerified,
+	})
+	assert.NoError(t, err)
+	assert.Equal(t, true, capturedBody["email_verified"])
+	_, hasName := capturedBody["name"]
+	_, hasEmail := capturedBody["email"]
+	assert.False(t, hasName, "name should not be sent when not set")
+	assert.False(t, hasEmail, "email should not be sent when not set")
+}
+
 type RoundTripFunc func(req *http.Request) *http.Response
 
 func (f RoundTripFunc) RoundTrip(req *http.Request) (*http.Response, error) {

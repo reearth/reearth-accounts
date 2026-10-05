@@ -260,6 +260,10 @@ func (i *User) SyncSSOUser(ctx context.Context, param interfaces.SyncSSOUserPara
 			return nil, err
 		}
 
+		vr := user.NewVerification()
+		vr.SetVerified(true)
+		u.SetVerification(vr)
+
 		if err = i.repos.User.Create(ctx, u); err != nil {
 			if errors.Is(err, user.ErrDuplicatedUser) {
 				return nil, interfaces.ErrUserAlreadyExists
@@ -287,6 +291,15 @@ func (i *User) SyncSSOUser(ctx context.Context, param interfaces.SyncSSOUserPara
 		perm := permittable.New().NewID().RoleIDs([]id.RoleID{roleSelf.ID()}).UserID(u.ID()).WorkspaceRoles([]permittable.WorkspaceRole{wsRole}).MustBuild()
 		if err = i.repos.Permittable.Save(ctx, lo.FromPtr(perm)); err != nil {
 			return nil, err
+		}
+
+		if authenticator := i.gateways.AuthenticatorFor(string(gateway.ProviderAuth0)); authenticator != nil {
+			if _, authErr := authenticator.UpdateUser(ctx, gateway.AuthenticatorUpdateUserParam{
+				EmailVerified: lo.ToPtr(true),
+				ID:            param.Sub,
+			}); authErr != nil {
+				return nil, authErr
+			}
 		}
 
 		return u, nil
