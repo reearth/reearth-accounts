@@ -1153,6 +1153,29 @@ func TestUser_SyncSSOUser(t *testing.T) {
 		assert.True(t, *auth0Mock.updateUserParam.EmailVerified)
 	})
 
+	t.Run("returns error when auth0 UpdateUser fails", func(t *testing.T) {
+		ctx := context.Background()
+		r := accountmemory.New()
+		setupRoles(ctx, r)
+
+		auth0Mock := &mockAuthenticator{updateUserError: rerror.NewE(i18n.T("failed to update user"))}
+		g := &gateway.Container{
+			Authenticators: map[gateway.Provider]gateway.Authenticator{
+				gateway.ProviderAuth0: auth0Mock,
+			},
+		}
+
+		uc := NewUser(r, g, nil, "", "")
+		u, err := uc.SyncSSOUser(ctx, interfaces.SyncSSOUserParam{
+			Email: "sso-fail@example.com",
+			Name:  "SSO Fail",
+			Sub:   "samlp|org123|idp-fail",
+		})
+
+		assert.Error(t, err)
+		assert.Nil(t, u)
+	})
+
 	t.Run("skips auth0 call when no gateway configured", func(t *testing.T) {
 		ctx := context.Background()
 		r := accountmemory.New()

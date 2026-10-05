@@ -298,7 +298,7 @@ func (i *User) SyncSSOUser(ctx context.Context, param interfaces.SyncSSOUserPara
 				EmailVerified: lo.ToPtr(true),
 				ID:            param.Sub,
 			}); authErr != nil {
-				log.Warnfc(ctx, "sso: mark email verified in auth0: %v", authErr)
+				return nil, authErr
 			}
 		}
 
