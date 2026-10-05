@@ -106,12 +106,15 @@ func (a *Auth0) UpdateUser(ctx context.Context, p gateway.AuthenticatorUpdateUse
 		return
 	}
 
-	payload := map[string]string{}
-	if p.Name != nil {
-		payload["name"] = *p.Name
-	}
+	payload := map[string]any{}
 	if p.Email != nil {
 		payload["email"] = *p.Email
+	}
+	if p.EmailVerified != nil {
+		payload["email_verified"] = *p.EmailVerified
+	}
+	if p.Name != nil {
+		payload["name"] = *p.Name
 	}
 	if p.Password != nil {
 		payload["password"] = *p.Password
