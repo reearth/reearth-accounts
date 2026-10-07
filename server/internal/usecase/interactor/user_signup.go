@@ -231,7 +231,9 @@ func (i *User) SignupOIDC(ctx context.Context, param interfaces.SignupOIDCParam)
 
 func (i *User) SyncSSOUser(ctx context.Context, param interfaces.SyncSSOUserParam) (*user.User, error) {
 	return Run1(ctx, nil, i.repos, Usecase().Transaction(), func(ctx context.Context) (*user.User, error) {
-		log.Debugf("debugging user id: %s", param.UserID)
+		if param.UserID != nil {
+			log.Debugf("debugging user id: %s", param.UserID)
+		}
 		eu, err := i.repos.User.FindBySub(ctx, param.Sub)
 		if err != nil && !errors.Is(err, rerror.ErrNotFound) {
 			return nil, err
