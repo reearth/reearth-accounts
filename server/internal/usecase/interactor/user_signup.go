@@ -231,6 +231,7 @@ func (i *User) SignupOIDC(ctx context.Context, param interfaces.SignupOIDCParam)
 
 func (i *User) SyncSSOUser(ctx context.Context, param interfaces.SyncSSOUserParam) (*user.User, error) {
 	return Run1(ctx, nil, i.repos, Usecase().Transaction(), func(ctx context.Context) (*user.User, error) {
+		log.Debugf("debugging user id: %s", param.UserID)
 		eu, err := i.repos.User.FindBySub(ctx, param.Sub)
 		if err != nil && !errors.Is(err, rerror.ErrNotFound) {
 			return nil, err
@@ -244,6 +245,7 @@ func (i *User) SyncSSOUser(ctx context.Context, param interfaces.SyncSSOUserPara
 			return nil, err
 		}
 		if eu != nil {
+			log.Debugf("email already exists: %s, entity: %+v", param.Email, eu)
 			return nil, interfaces.ErrUserAlreadyExists
 		}
 
@@ -266,12 +268,14 @@ func (i *User) SyncSSOUser(ctx context.Context, param interfaces.SyncSSOUserPara
 
 		if err = i.repos.User.Create(ctx, u); err != nil {
 			if errors.Is(err, user.ErrDuplicatedUser) {
+				log.Debugf("user already exists: %s, user: %+v", param.Email, u)
 				return nil, interfaces.ErrUserAlreadyExists
 			}
 			return nil, err
 		}
 		if err = i.repos.Workspace.Save(ctx, ws); err != nil {
 			if errors.Is(err, workspace.ErrDuplicateWorkspaceAlias) {
+				log.Debugf("workspace already exists: %s, user: %+v", param.Email, ws)
 				return nil, interfaces.ErrWorkspaceAliasAlreadyExists
 			}
 			return nil, err
@@ -298,6 +302,7 @@ func (i *User) SyncSSOUser(ctx context.Context, param interfaces.SyncSSOUserPara
 				EmailVerified: lo.ToPtr(true),
 				ID:            param.Sub,
 			}); authErr != nil {
+				log.Debugf("auth0 error on: %s, user id: %+v", param.Sub, ws)
 				return nil, authErr
 			}
 		}
