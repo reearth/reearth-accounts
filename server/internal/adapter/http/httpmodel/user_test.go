@@ -1,6 +1,7 @@
 package httpmodel
 
 import (
+	"strings"
 	"testing"
 
 	"github.com/reearth/reearth-accounts/server/pkg/id"
@@ -9,6 +10,29 @@ import (
 	"github.com/reearth/reearth-accounts/server/pkg/workspace"
 	"github.com/stretchr/testify/assert"
 )
+
+func TestSanitizeUsername(t *testing.T) {
+	t.Run("email input is replaced with user- prefixed unique string", func(t *testing.T) {
+		got := SanitizeUsername("user@example.com")
+		assert.True(t, strings.HasPrefix(got, "user-"), "expected 'user-' prefix, got %q", got)
+		assert.Greater(t, len(got), len("user-"), "expected non-empty ULID suffix after prefix")
+	})
+
+	t.Run("non-email input is returned unchanged", func(t *testing.T) {
+		assert.Equal(t, "alice", SanitizeUsername("alice"))
+		assert.Equal(t, "user-", SanitizeUsername("user-"))
+	})
+
+	t.Run("two calls with the same email produce different values", func(t *testing.T) {
+		a := SanitizeUsername("same@example.com")
+		b := SanitizeUsername("same@example.com")
+		assert.NotEqual(t, a, b, "each call must generate a fresh unique ULID to avoid workspace alias collisions")
+	})
+
+	t.Run("empty string is returned unchanged", func(t *testing.T) {
+		assert.Equal(t, "", SanitizeUsername(""))
+	})
+}
 
 func TestApplyPermittables(t *testing.T) {
 	userA := user.NewID()

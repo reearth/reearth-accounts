@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"net/url"
+	"strings"
 	"testing"
 	"time"
 
@@ -1063,9 +1064,9 @@ func TestUser_SyncSSOUser(t *testing.T) {
 		assert.NoError(t, err)
 
 		second, err := uc.SyncSSOUser(ctx, interfaces.SyncSSOUserParam{
-			Email:       "sso@example.com",
-			Name:        "SSO User",
-			Sub:         sub,
+			Email: "sso@example.com",
+			Name:  "SSO User",
+			Sub:   sub,
 		})
 		assert.NoError(t, err)
 		assert.NotNil(t, second)
@@ -1191,5 +1192,42 @@ func TestUser_SyncSSOUser(t *testing.T) {
 		assert.NoError(t, err)
 		assert.NotNil(t, u)
 		assert.True(t, u.Verification().IsVerified())
+	})
+
+	t.Run("two users with user-prefixed placeholder names both succeed", func(t *testing.T) {
+		ctx := context.Background()
+		r := accountmemory.New()
+		setupRoles(ctx, r)
+
+		uid1, wid1 := id.NewUserID(), id.NewWorkspaceID()
+		uid2, wid2 := id.NewUserID(), id.NewWorkspaceID()
+		name1 := "user-" + id.NewUserID().String()
+		name2 := "user-" + id.NewUserID().String()
+
+		uc := NewUser(r, nil, nil, "", "")
+		u1, err := uc.SyncSSOUser(ctx, interfaces.SyncSSOUserParam{
+			Email:       "alice@example.com",
+			Name:        name1,
+			Sub:         "samlp|org|alice",
+			UserID:      &uid1,
+			WorkspaceID: &wid1,
+		})
+		assert.NoError(t, err)
+		assert.NotNil(t, u1)
+
+		u2, err := uc.SyncSSOUser(ctx, interfaces.SyncSSOUserParam{
+			Email:       "bob@example.com",
+			Name:        name2,
+			Sub:         "oidc|org|bob", // distinct provider prefix avoids in-memory ContainAuth collision
+			UserID:      &uid2,
+			WorkspaceID: &wid2,
+		})
+		assert.NoError(t, err)
+		assert.NotNil(t, u2)
+
+		assert.NotEqual(t, u1.ID(), u2.ID())
+		assert.True(t, strings.HasPrefix(u1.Name(), "user-"))
+		assert.True(t, strings.HasPrefix(u2.Name(), "user-"))
+		assert.NotEqual(t, u1.Name(), u2.Name(), "each user must get a distinct placeholder name to avoid workspace alias collisions")
 	})
 }
