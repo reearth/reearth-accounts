@@ -49,7 +49,7 @@ func TestUserHandler_SyncSSOUser_NamePrefix(t *testing.T) {
 	h := handlers.NewUserHandler()
 	e := echo.New()
 
-	body := `{"name":"ignored","email":"alice@example.com","sub":"samlp|org|alice"}`
+	body := `{"name":"alice@example.com","email":"alice@example.com","sub":"samlp|org|alice"}`
 	c, rec := newSyncSSOEchoCtx(t, e, body, uc)
 
 	require.NoError(t, h.SyncSSOUser(c))
@@ -71,7 +71,7 @@ func TestUserHandler_SyncSSOUser_UniqueNames(t *testing.T) {
 
 	provision := func(email, sub string) httpmodel.UserResponse {
 		t.Helper()
-		body := `{"name":"ignored","email":"` + email + `","sub":"` + sub + `"}`
+		body := `{"name":"` + email + `","email":"` + email + `","sub":"` + sub + `"}`
 		c, rec := newSyncSSOEchoCtx(t, e, body, uc)
 		require.NoError(t, h.SyncSSOUser(c))
 		require.Equal(t, http.StatusOK, rec.Code)
