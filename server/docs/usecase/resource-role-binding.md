@@ -5,6 +5,8 @@
 > express per-resource membership such as *project members* **without
 > reearth-accounts learning what a project is**. The first consumer is
 > `dashboard:project`.
+>
+> Japanese version: [resource-role-binding.ja.md](resource-role-binding.ja.md)
 
 ## Document Signature
 
