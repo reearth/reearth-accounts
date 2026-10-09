@@ -157,3 +157,19 @@ func (q *Queries) PermittableWorkspaceRolesDeleteByPermittable(ctx context.Conte
 	_, err := q.db.Exec(ctx, permittableWorkspaceRolesDeleteByPermittable, permittableID)
 	return err
 }
+
+const permittableWorkspaceRolesInsertBulk = `-- name: PermittableWorkspaceRolesInsertBulk :exec
+INSERT INTO permittable_workspace_roles (permittable_id, workspace_id, role_id)
+SELECT permittable_id, workspace_id, role_id
+  FROM jsonb_to_recordset($1::jsonb)
+  AS t(permittable_id text, workspace_id text, role_id text)
+`
+
+// One round-trip for any number of workspace roles, instead of one
+// PermittableWorkspaceRoleInsert per role. See
+// WorkspaceMembersInsertBulk (workspace.sql) for why jsonb_to_recordset is
+// used over a multi-arg unnest.
+func (q *Queries) PermittableWorkspaceRolesInsertBulk(ctx context.Context, dollar_1 []byte) error {
+	_, err := q.db.Exec(ctx, permittableWorkspaceRolesInsertBulk, dollar_1)
+	return err
+}
