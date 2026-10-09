@@ -230,7 +230,6 @@ func (i *User) SignupOIDC(ctx context.Context, param interfaces.SignupOIDCParam)
 }
 
 func (i *User) SyncSSOUser(ctx context.Context, param interfaces.SyncSSOUserParam) (*user.User, error) {
-	var isNewUser bool
 	u, err := Run1(ctx, nil, i.repos, Usecase().Transaction(), func(ctx context.Context) (*user.User, error) {
 		eu, err := i.repos.User.FindBySub(ctx, param.Sub)
 		if err != nil && !errors.Is(err, rerror.ErrNotFound) {
@@ -261,20 +260,19 @@ func (i *User) SyncSSOUser(ctx context.Context, param interfaces.SyncSSOUserPara
 			return nil, err
 		}
 
-		vr := user.NewVerification()
-		vr.SetVerified(true)
-		u.SetVerification(vr)
+		// Verification is intentionally left unverified here. It is promoted to
+		// verified only after ResendVerificationEmail succeeds (post-tx), so that
+		// a transient Auth0 failure is retried on the next SyncSSOUser call.
+		u.SetVerification(user.NewVerification())
 
 		if err = i.repos.User.Create(ctx, u); err != nil {
 			if errors.Is(err, user.ErrDuplicatedUser) {
-				log.Debugf("user already exists: %s, user: %+v", param.Email, u)
 				return nil, interfaces.ErrUserAlreadyExists
 			}
 			return nil, err
 		}
 		if err = i.repos.Workspace.Save(ctx, ws); err != nil {
 			if errors.Is(err, workspace.ErrDuplicateWorkspaceAlias) {
-				log.Debugf("workspace already exists: %s, user: %+v", param.Email, ws)
 				return nil, interfaces.ErrWorkspaceAliasAlreadyExists
 			}
 			return nil, err
@@ -296,23 +294,23 @@ func (i *User) SyncSSOUser(ctx context.Context, param interfaces.SyncSSOUserPara
 			return nil, err
 		}
 
-		isNewUser = true
 		return u, nil
 	})
 	if err != nil {
 		return nil, err
 	}
 
-	// Send the verification email after the transaction commits so the email is
-	// only dispatched when the user is actually persisted.
+	// Send the verification email after the transaction commits. Using
+	// IsVerified() as a durable pending-delivery flag: if a previous attempt
+	// failed the user remains unverified, so the next SyncSSOUser call retries.
 	authenticator := i.gateways.AuthenticatorFor(string(gateway.ProviderAuth0))
-	if !isNewUser || authenticator == nil {
+	if authenticator == nil || u.Verification().IsVerified() {
 		return u, nil
 	}
 	if err = authenticator.ResendVerificationEmail(ctx, param.Sub); err != nil {
-		log.Warnf("SyncSSOUser: user persisted but verification email failed (sub=%s): %v", param.Sub, err)
+		log.Warnf("SyncSSOUser: verification email failed, will retry on next login (sub=%s): %v", param.Sub, err)
+		return u, nil
 	}
-
 	return u, nil
 }
 
