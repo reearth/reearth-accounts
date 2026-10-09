@@ -230,7 +230,8 @@ func (i *User) SignupOIDC(ctx context.Context, param interfaces.SignupOIDCParam)
 }
 
 func (i *User) SyncSSOUser(ctx context.Context, param interfaces.SyncSSOUserParam) (*user.User, error) {
-	return Run1(ctx, nil, i.repos, Usecase().Transaction(), func(ctx context.Context) (*user.User, error) {
+	var isNewUser bool
+	u, err := Run1(ctx, nil, i.repos, Usecase().Transaction(), func(ctx context.Context) (*user.User, error) {
 		eu, err := i.repos.User.FindBySub(ctx, param.Sub)
 		if err != nil && !errors.Is(err, rerror.ErrNotFound) {
 			return nil, err
@@ -295,14 +296,24 @@ func (i *User) SyncSSOUser(ctx context.Context, param interfaces.SyncSSOUserPara
 			return nil, err
 		}
 
-		if authenticator := i.gateways.AuthenticatorFor(string(gateway.ProviderAuth0)); authenticator != nil {
-			if authErr := authenticator.ResendVerificationEmail(ctx, param.Sub); authErr != nil {
-				return nil, authErr
-			}
-		}
-
+		isNewUser = true
 		return u, nil
 	})
+	if err != nil {
+		return nil, err
+	}
+
+	// Send the verification email after the transaction commits so the email is
+	// only dispatched when the user is actually persisted.
+	authenticator := i.gateways.AuthenticatorFor(string(gateway.ProviderAuth0))
+	if !isNewUser || authenticator == nil {
+		return u, nil
+	}
+	if err = authenticator.ResendVerificationEmail(ctx, param.Sub); err != nil {
+		return nil, err
+	}
+
+	return u, nil
 }
 
 func (i *User) FindOrCreate(ctx context.Context, param interfaces.UserFindOrCreateParam) (u *user.User, err error) {

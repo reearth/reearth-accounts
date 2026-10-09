@@ -1228,4 +1228,40 @@ func TestUser_SyncSSOUser(t *testing.T) {
 		assert.True(t, strings.HasPrefix(u2.Name(), "user-"))
 		assert.NotEqual(t, u1.Name(), u2.Name(), "each user must get a distinct placeholder name to avoid workspace alias collisions")
 	})
+
+	t.Run("skips ResendVerificationEmail for existing user returned by sub lookup", func(t *testing.T) {
+		ctx := context.Background()
+		r := accountmemory.New()
+		setupRoles(ctx, r)
+
+		auth0Mock := &mockAuthenticator{}
+		g := &gateway.Container{
+			Authenticators: map[gateway.Provider]gateway.Authenticator{
+				gateway.ProviderAuth0: auth0Mock,
+			},
+		}
+
+		uc := NewUser(r, g, nil, "", "")
+		// First call: creates the user.
+		_, err := uc.SyncSSOUser(ctx, interfaces.SyncSSOUserParam{
+			Email: "returning@example.com",
+			Name:  "Returning User",
+			Sub:   "samlp|org123|returning",
+		})
+		assert.NoError(t, err)
+		assert.True(t, auth0Mock.resendVerificationEmailCalled)
+
+		// Reset the mock to detect a second call.
+		auth0Mock.resendVerificationEmailCalled = false
+
+		// Second call: user already exists; must not trigger another email.
+		u, err := uc.SyncSSOUser(ctx, interfaces.SyncSSOUserParam{
+			Email: "returning@example.com",
+			Name:  "Returning User",
+			Sub:   "samlp|org123|returning",
+		})
+		assert.NoError(t, err)
+		assert.NotNil(t, u)
+		assert.False(t, auth0Mock.resendVerificationEmailCalled, "ResendVerificationEmail must not be called for existing users")
+	})
 }
