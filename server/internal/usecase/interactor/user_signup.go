@@ -299,7 +299,7 @@ func (i *User) SyncSSOUser(ctx context.Context, param interfaces.SyncSSOUserPara
 			return nil, err
 		}
 
-		if authenticator := i.gateways.AuthenticatorFor(string(gateway.ProviderAuth0)); authenticator != nil {
+		/*if authenticator := i.gateways.AuthenticatorFor(string(gateway.ProviderAuth0)); authenticator != nil {
 			if _, authErr := authenticator.UpdateUser(ctx, gateway.AuthenticatorUpdateUserParam{
 				EmailVerified: lo.ToPtr(true),
 				ID:            param.Sub,
@@ -307,7 +307,7 @@ func (i *User) SyncSSOUser(ctx context.Context, param interfaces.SyncSSOUserPara
 				log.Debugf("auth0 error on: %s, user id: %+v", param.Sub, ws)
 				return nil, authErr
 			}
-		}
+		}*/
 
 		return u, nil
 	})
