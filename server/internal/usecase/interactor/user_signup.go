@@ -310,7 +310,7 @@ func (i *User) SyncSSOUser(ctx context.Context, param interfaces.SyncSSOUserPara
 		return u, nil
 	}
 	if err = authenticator.ResendVerificationEmail(ctx, param.Sub); err != nil {
-		return nil, err
+		log.Warnf("SyncSSOUser: user persisted but verification email failed (sub=%s): %v", param.Sub, err)
 	}
 
 	return u, nil

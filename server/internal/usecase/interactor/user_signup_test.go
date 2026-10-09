@@ -1152,7 +1152,7 @@ func TestUser_SyncSSOUser(t *testing.T) {
 		assert.Equal(t, "samlp|org123|idp111", auth0Mock.resendVerificationEmailUserID)
 	})
 
-	t.Run("returns error when auth0 ResendVerificationEmail fails", func(t *testing.T) {
+	t.Run("succeeds even when auth0 ResendVerificationEmail fails (best-effort)", func(t *testing.T) {
 		ctx := context.Background()
 		r := accountmemory.New()
 		setupRoles(ctx, r)
@@ -1171,8 +1171,10 @@ func TestUser_SyncSSOUser(t *testing.T) {
 			Sub:   "samlp|org123|idp-fail",
 		})
 
-		assert.Error(t, err)
-		assert.Nil(t, u)
+		// User is persisted; the email failure is best-effort and must not surface as an error.
+		assert.NoError(t, err)
+		assert.NotNil(t, u)
+		assert.True(t, auth0Mock.resendVerificationEmailCalled)
 	})
 
 	t.Run("skips auth0 call when no gateway configured", func(t *testing.T) {

@@ -154,7 +154,7 @@ func (a *Auth0) ResendVerificationEmail(ctx context.Context, userID string) erro
 		"client_id": a.clientID,
 		"identity": map[string]string{
 			"user_id":  parts[1],
-			"provider": "auth0",
+			"provider": parts[0],
 		},
 	}
 
