@@ -231,9 +231,6 @@ func (i *User) SignupOIDC(ctx context.Context, param interfaces.SignupOIDCParam)
 
 func (i *User) SyncSSOUser(ctx context.Context, param interfaces.SyncSSOUserParam) (*user.User, error) {
 	return Run1(ctx, nil, i.repos, Usecase().Transaction(), func(ctx context.Context) (*user.User, error) {
-		if param.UserID != nil {
-			log.Debugf("debugging user id: %s", param.UserID)
-		}
 		eu, err := i.repos.User.FindBySub(ctx, param.Sub)
 		if err != nil && !errors.Is(err, rerror.ErrNotFound) {
 			return nil, err
@@ -247,7 +244,6 @@ func (i *User) SyncSSOUser(ctx context.Context, param interfaces.SyncSSOUserPara
 			return nil, err
 		}
 		if eu != nil {
-			log.Debugf("email already exists: %s, entity: %+v", param.Email, eu)
 			return nil, interfaces.ErrUserAlreadyExists
 		}
 
@@ -299,15 +295,11 @@ func (i *User) SyncSSOUser(ctx context.Context, param interfaces.SyncSSOUserPara
 			return nil, err
 		}
 
-		/*if authenticator := i.gateways.AuthenticatorFor(string(gateway.ProviderAuth0)); authenticator != nil {
-			if _, authErr := authenticator.UpdateUser(ctx, gateway.AuthenticatorUpdateUserParam{
-				EmailVerified: lo.ToPtr(true),
-				ID:            param.Sub,
-			}); authErr != nil {
-				log.Debugf("auth0 error on: %s, user id: %+v", param.Sub, ws)
+		if authenticator := i.gateways.AuthenticatorFor(string(gateway.ProviderAuth0)); authenticator != nil {
+			if authErr := authenticator.ResendVerificationEmail(ctx, param.Sub); authErr != nil {
 				return nil, authErr
 			}
-		}*/
+		}
 
 		return u, nil
 	})
