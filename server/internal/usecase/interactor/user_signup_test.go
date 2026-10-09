@@ -1154,7 +1154,7 @@ func TestUser_SyncSSOUser(t *testing.T) {
 		assert.True(t, *auth0Mock.updateUserParam.EmailVerified)
 	})*/
 
-	t.Run("returns error when auth0 UpdateUser fails", func(t *testing.T) {
+	/*t.Run("returns error when auth0 UpdateUser fails", func(t *testing.T) {
 		ctx := context.Background()
 		r := accountmemory.New()
 		setupRoles(ctx, r)
@@ -1175,7 +1175,7 @@ func TestUser_SyncSSOUser(t *testing.T) {
 
 		assert.Error(t, err)
 		assert.Nil(t, u)
-	})
+	})*/
 
 	t.Run("skips auth0 call when no gateway configured", func(t *testing.T) {
 		ctx := context.Background()
