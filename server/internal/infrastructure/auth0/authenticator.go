@@ -139,6 +139,11 @@ func (a *Auth0) UpdateUser(ctx context.Context, p gateway.AuthenticatorUpdateUse
 }
 
 func (a *Auth0) ResendVerificationEmail(ctx context.Context, userID string) error {
+	parts := strings.SplitN(userID, "|", 2)
+	if len(parts) < 2 {
+		return rerror.NewE(i18n.T("invalid Auth0 subject format"))
+	}
+
 	err := a.updateToken(ctx)
 	if err != nil {
 		return err
@@ -148,8 +153,8 @@ func (a *Auth0) ResendVerificationEmail(ctx context.Context, userID string) erro
 		"user_id":   userID,
 		"client_id": a.clientID,
 		"identity": map[string]string{
-			"user_id":  strings.Split(userID, "|")[1],
-			"provider": "auth0",
+			"user_id":  parts[1],
+			"provider": parts[0],
 		},
 	}
 
