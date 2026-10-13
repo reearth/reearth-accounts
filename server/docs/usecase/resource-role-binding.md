@@ -34,6 +34,10 @@
   organization. This is a separate feature from SSO / SCIM, but we want to make
   it implementable early so it is ready when workspace creation can be
   restricted.
+- The intended model is close to GitHub's: a workspace relates to its projects
+  the way a GitHub organization relates to its repositories. Just as GitHub has
+  both organization members and repository members, Re:Earth would have both
+  workspace members and project members.
 
 ### Current situation
 

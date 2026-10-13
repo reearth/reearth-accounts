@@ -33,6 +33,10 @@
 - project ごとにメンバーと権限を割り当てられるようにすることで、workspace を
   組織として機能させられます。SSO / SCIM とは別の機能ですが、ワークスペースの作成を
   制限できるようになった時点で使えるよう、早めに実装できる状態にしたいと考えています。
+- 目指すモデルは GitHub に近いものです。workspace と project の関係は、GitHub の
+  organization と repository の関係に相当します。GitHub に organization member と
+  repository member の両方があるのと同様に、Re:Earth にも workspace member と
+  project member の両方を持たせます。
 
 ### 現状
 
