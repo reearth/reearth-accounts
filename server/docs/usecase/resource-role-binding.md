@@ -52,9 +52,10 @@
 
 ### Problem
 
-Products need **project-level membership**: "user A is an editor of project P,
-user B (same workspace) cannot see P". Today the finest granularity accounts
-can express is the workspace.
+Products need **project-level membership**: "user A, a reader of the workspace,
+is an editor of project P", and "user B, added only to project P (not to the
+whole workspace), cannot see the other projects in the workspace". Today the
+finest granularity accounts can express is the workspace.
 
 If each service implements project membership on its own:
 
@@ -77,9 +78,15 @@ workspace, and this user has this role on it".
 
 ## Goals
 
-1. **Members and roles can be set per project.** A workspace member can be given
-   a role on a specific project (for example, editor on project P but no access
-   to project Q), not only on the whole workspace.
+1. **Members and roles can be set per project.** A person can be given a role on
+   a specific project, not only on the whole workspace. The model is:
+   - **Regular workspace members** (owner / maintainer / writer / reader) see
+     **every** project in the workspace, as today, through their workspace role.
+     A project role can **raise** their access on that project (for example, a
+     workspace reader who is a writer on project P can edit P), but never lower
+     it.
+   - **Limited members** (people added only to specific projects, see Goal 7)
+     see **only** the projects where they have a project role.
 2. **Permission checks look at the specific project.** When a service asks
    accounts "may this user do this?", the answer can take the user's role on
    that particular project into account. The check always uses the workspace
@@ -96,6 +103,14 @@ workspace, and this user has this role on it".
    model) just by adding a permission policy, with no change to accounts.
 6. **Nothing existing breaks.** Current permission checks and policies keep
    working exactly as they do today.
+7. **Access to only some projects can be given in one step.** From the UI, an
+   admin can either add a person directly to a project — adding them to the
+   workspace at the same time if they are not in it yet — or, while adding a
+   person to the workspace, choose which projects they can see. Either way it is
+   one step that either fully succeeds or changes nothing. A person added this
+   way belongs to the workspace as a *limited member* who sees only the projects
+   they were given a role on, while regular workspace members keep seeing every
+   project (see *Design → Adding people from the UI*).
 
 ## Non-Goals
 
@@ -184,6 +199,18 @@ anywhere in accounts.
 Roles reuse the existing `roles` table (`owner` / `maintainer` / `writer` /
 `reader`). Their meaning per resource kind is defined solely by that kind's
 Cerbos policy.
+
+**Limited workspace role (name tentative: `limited`).** A new workspace role
+value (added to the GraphQL `Role` enum and `role.RoleType`) for people who
+belong to the workspace but should see only the resources they hold a resource
+role on. It is an ordinary workspace role: it is stored in the workspace's
+member list and in `Permittable.workspaceRoles` like the others, counts toward
+the workspace's member (seat) limit, and satisfies both the "target must be a
+workspace member" check and the read-time guard. It grants nothing by itself
+(see the policy note under *Authorization check*). It is valid only as a
+workspace role: `setResourceMember` and `addWorkspaceMemberWithResourceRoles`
+reject it as a resource role. The existing `updateUserOfWorkspace` can change it
+to or from other non-owner roles; such a change never touches resource roles.
 
 #### Storage
 
@@ -301,29 +328,49 @@ When `resourceId` is **present**:
 Policies stay in each service's `definition.go`, using the conditions the
 reearthx generator already supports. Example for `dashboard:project`:
 
+**Default model: effective role = max(workspace role, resource role).** For
+regular workspace roles (`owner` / `maintainer` / `writer` / `reader`) the
+workspace role grants its access on every resource of the workspace, as today,
+and the resource role can only add to it. For `limited`, only the resource role
+counts. Each role means the same at both levels (`owner` / `maintainer`: full
+control and member management; `writer`: read and edit; `reader`: read), so a
+policy implements "max" as the union of a workspace-role rule and a
+`resourceRole`-condition rule per action — Cerbos allows if either matches.
+
 ```go
 // dashboard: definition.go
 resourceRole := func(expr string) *generator.Condition { return generator.SimpleExpr(expr) }
-any := []string{"*"} // any principal role; the condition does the gating
+any := []string{"*"} // any principal role (including limited); the condition does the gating
 
 builder.AddResource("project", []generator.ActionDefinition{
-    // workspace admins keep full access to every project in their workspace
-    generator.NewActionDefinition("read", []string{"owner", "maintainer"}),
-    generator.NewActionDefinition("edit", []string{"owner", "maintainer"}),
+    // regular workspace members: access to every project of the workspace via the workspace role
+    // ("limited" is never listed here)
+    generator.NewActionDefinition("read", []string{"owner", "maintainer", "writer", "reader"}),
+    generator.NewActionDefinition("edit", []string{"owner", "maintainer", "writer"}),
     generator.NewActionDefinition("delete", []string{"owner", "maintainer"}),
     generator.NewActionDefinition("manage_members", []string{"owner", "maintainer"}),
-    // project members
+    // project roles: add on top of the workspace role; the only source of access for limited members
     generator.NewActionDefinitionWithCondition("read", any, resourceRole(`P.attr.resourceRole != ""`)),
-    generator.NewActionDefinitionWithCondition("edit", any, resourceRole(`P.attr.resourceRole in ["owner", "writer"]`)),
-    generator.NewActionDefinitionWithCondition("delete", any, resourceRole(`P.attr.resourceRole == "owner"`)),
-    generator.NewActionDefinitionWithCondition("manage_members", any, resourceRole(`P.attr.resourceRole == "owner"`)),
+    generator.NewActionDefinitionWithCondition("edit", any, resourceRole(`P.attr.resourceRole in ["owner", "maintainer", "writer"]`)),
+    generator.NewActionDefinitionWithCondition("delete", any, resourceRole(`P.attr.resourceRole in ["owner", "maintainer"]`)),
+    generator.NewActionDefinitionWithCondition("manage_members", any, resourceRole(`P.attr.resourceRole in ["owner", "maintainer"]`)),
 })
 ```
 
 Because resource roles arrive as a principal **attribute**, not as principal
-roles, a project `owner` is never mistaken for a workspace `owner`. Whether
-workspace roles *add to* or are *restricted by* project membership is a
-per-product policy decision.
+roles, a project `owner` is never mistaken for a workspace `owner`: a project
+role counts only for the resource named in the check. Whether a product may
+apply stricter rules than this default (e.g. private projects that regular
+workspace members cannot see) is Open Question 1.
+
+**Policy note for the limited workspace role.** Every service's policies must
+grant `limited` nothing except through `P.attr.resourceRole` conditions. Rules
+keyed to explicit role lists (as in the example above) already exclude it, so it
+is denied by default (fail-closed). Rules that grant on `*` without a
+`resourceRole` condition, and workspace-level resources (e.g.
+`dashboard:workspace`) must be reviewed per service. Which workspace-level
+actions a limited member needs (e.g. reading the workspace name for a workspace
+switcher) is Open Question 7.
 
 #### Membership management API
 
@@ -374,7 +421,8 @@ extend type Mutation {
 ```
 
 Guards (generic, no kind-specific code). Every mutation runs in one transaction
-that starts with `LockForUpdate` on the registration:
+that starts with `LockForUpdate` on the registration (the combined operation
+below serializes on the workspace first, then locks its registrations):
 
 | Operation | Guard (evaluated after the lock) |
 |---|---|
@@ -382,6 +430,62 @@ that starts with `LockForUpdate` on the registration:
 | `removeResourceMember` | Cerbos `manage_members`, or operator == target (self-leave); if it removes the last `owner`, reject |
 | `resourceMembers` | Cerbos `read` on `(kind, id)`; result filtered by the read-time guard |
 | `myResourceBindings` | operator's own role assignments only, filtered by the read-time guard |
+| `addWorkspaceMemberWithResourceRoles` | see *Combined operation* below |
+
+**Combined operation: add to the workspace and assign resource roles in one
+step (user JWT, GraphQL).** Backs both UI patterns in *Design → Adding people
+from the UI*.
+
+```graphql
+input ResourceRoleInput {
+  resourceKind: String!
+  resourceId: String!
+  role: Role!                        # must not be `limited`
+}
+input AddWorkspaceMemberWithResourceRolesInput {
+  workspaceId: ID!
+  userId: ID!
+  resources: [ResourceRoleInput!]!   # 1..100 entries, distinct (kind, id)
+}
+type AddWorkspaceMemberWithResourceRolesPayload {
+  addedToWorkspace: Boolean!         # false if the user was already a member
+  workspaceRole: Role!               # the user's workspace role after the call
+  resources: [ResourceBinding!]!
+}
+
+extend type Mutation {
+  addWorkspaceMemberWithResourceRoles(
+    input: AddWorkspaceMemberWithResourceRolesInput!
+  ): AddWorkspaceMemberWithResourceRolesPayload
+}
+```
+
+The user is identified by user ID, as in `addUsersToWorkspace`; the UI finds
+them by name or email with the existing user lookup (`userByNameOrEmail` /
+`searchUser`). No new email-based invitation is introduced. All steps run in
+**one transaction**:
+
+1. Load the workspace and serialize on it (Postgres: row lock; Mongo: concurrent
+   writes to the workspace document conflict and are retried). Personal
+   workspaces are rejected, as in `addUsersToWorkspace`.
+2. Validate every entry: the registration exists and its `workspaceID` equals
+   `workspaceId` (otherwise the whole call is rejected); `role` is not
+   `limited`; Cerbos allows `manage_members` on `(kind, id)` for the operator.
+3. If the user is **not yet a workspace member**: the operator must also pass
+   the existing add-member check of `addUsersToWorkspace` (`ActionAddMember`)
+   and the member-count (seat) hook `enforceMemberCount` (v1 default; see Open
+   Question 7). The user then joins with the `limited` role
+   (`Members().Join`), and the permittable workspace role is written through the
+   existing `bulkUpdatePermittable` path. If the user **is already a member**,
+   workspace membership and role are left unchanged — never downgraded.
+4. `LockForUpdate` each registration in a fixed order (sorted by `(kind, id)`),
+   apply the last-owner rule per resource (the call can change an existing role
+   of a user who is already a member), then `UpsertResourceRole` for each entry.
+5. Any failure rolls back everything: no workspace membership, no seat used, no
+   partial role assignments.
+
+Removing a user's last resource role (`removeResourceMember`) does **not**
+remove them from the workspace; see Open Question 8.
 
 **Last-owner rule:** a membership mutation that would take the owner count of a
 resource from ≥ 1 to 0 is rejected. A resource registered without an owner (e.g.
@@ -396,6 +500,9 @@ endpoint is exempt.
 | Two services register the same `(kind, id)` | Primary key / unique index; the loser gets `ErrAlreadyExists`. |
 | `setResourceMember` passes the workspace-membership check, then the user is removed from the workspace and the cascade runs before the role assignment is written | **Read-time guard**: a role assignment is honored only if the user currently holds a workspace role in the role assignment's workspace. The permittable is already loaded, so this costs no read. The orphaned row is harmless and is removed the next time the cascade or the unregister endpoint touches it. |
 | A stale snapshot `Save` from the workspace flow overwrites a newer role assignment (or vice versa) | Snapshot saves never write `resource_roles`; role-assignment writes never write `workspace_roles` (see *Repository changes*). |
+| Two operators add the same new user with `addWorkspaceMemberWithResourceRoles` at once (possibly with different resources) | Both serialize on the workspace (step 1); the second waits (Postgres) or conflicts and retries (Mongo), then sees the user as an existing member and only adds its resource roles. The workspace role is not changed and the seat is counted once. |
+| Two combined calls on overlapping resources deadlock | Fixed lock order: workspace first, then registrations sorted by `(kind, id)`. |
+| The user is removed from the workspace while a combined call runs | When the call joins a new user, both write the workspace record, so they serialize; if the removal commits second, its cascade removes the new role assignments. Otherwise (and for any remaining gap) the read-time guard ignores role assignments of a user who no longer holds a workspace role, as with `setResourceMember`. |
 
 #### Lifecycle and cascades
 
@@ -404,6 +511,8 @@ endpoint is exempt.
 | Resource created | Service (M2M) | `POST /api/service/resources` with `ownerUserId` = creator |
 | Resource deleted | Service (M2M) | `DELETE /api/service/resources/{kind}/{id}`. A missed call leaves an orphan registration — harmless (the resource no longer exists in the service), cleaned by an optional sweeper later |
 | Existing resources (pre-feature) | Service (M2M) | One-off backfill via the same endpoint (idempotent), before the service starts sending `resourceId` |
+| User added with `addWorkspaceMemberWithResourceRoles` | Accounts | Workspace membership (`limited`, if new) and role assignments written in one transaction |
+| User's last role assignment in a workspace removed | Accounts | Only that role assignment is removed; workspace membership (and the seat) stays. Whether a `limited` member should then be removed from the workspace is Open Question 8 |
 | User removed from workspace | Accounts | `bulkRemovePermittable` also calls `DeleteResourceRolesInWorkspace` |
 | Workspace deleted (`Workspace.Remove`) | Accounts | Same path via `bulkRemovePermittable`; registrations of the workspace are removed too |
 | Workspace deactivated / restored | Accounts | No change (mirrors workspace roles; data kept for restore) |
@@ -504,6 +613,41 @@ sequenceDiagram
     A-->>S: ok
 ```
 
+`setResourceMember` requires B to already be a workspace member. To add someone
+who may not be in the workspace yet, the UI uses the combined operation below.
+
+##### Adding a person from the UI in one step
+
+Pattern (a) passes one resource (the project being viewed); pattern (b) passes
+the projects chosen in the workspace "add member" dialog. Both call the same
+mutation.
+
+```mermaid
+sequenceDiagram
+    participant U as Admin
+    participant S as Service UI (e.g. dashboard)
+    participant A as reearth-accounts
+    participant C as Cerbos
+
+    U->>S: add C to project P1 (a)<br/>or add C to ws with projects P1, P2 (b)
+    S->>A: userByNameOrEmail(...) → C's userId
+    S->>A: addWorkspaceMemberWithResourceRoles(ws, C, [(kind,P1,writer), ...]) (U's JWT)
+    A->>A: begin tx; serialize on ws
+    A->>A: each Pn registered in ws?
+    A->>C: manage_members on each Pn for U?
+    alt C ∉ ws
+        A->>A: add-member check + seat limit → Join(C, limited) + permittable workspace role
+    else C ∈ ws
+        A->>A: keep C's workspace role unchanged
+    end
+    A->>A: LockForUpdate P1, P2 … (sorted) → last-owner rule → UpsertResourceRole each
+    A->>A: commit (any failure → roll back all)
+    A-->>S: { addedToWorkspace, workspaceRole, resources }
+```
+
+A limited member then sees only their projects: the service lists them with
+`myResourceBindings`, and `checkPermission` on any other project is denied.
+
 ##### Workspace member removal cascade
 
 ```mermaid
@@ -525,10 +669,21 @@ flowchart LR
    opt in are affected.
 4. **Workspace member removal** issues one additional targeted delete.
 5. **Policy authoring**: role names are shared between workspace and resource
-   scopes; policies must gate resource access on `P.attr.resourceRole`, not on
-   principal roles.
+   scopes. A resource role must be checked only through `P.attr.resourceRole`
+   (never as a principal role); workspace roles keep their workspace-wide
+   grants for regular members, and `limited` is never listed in a
+   workspace-role rule. Existing project policies of a service must be extended
+   with the `resourceRole` rules (union = max), not replaced.
 6. **gqlclient** (`server/pkg/gqlclient`) consumers need a version bump to use
    the new fields; old clients are unaffected.
+7. **New `Role` enum value `limited`**: clients that decode workspace members
+   with a strict enum may fail on the unknown value. Every service that reads
+   workspace members must update its client before any limited member is
+   created.
+8. **Policies**: every service's workspace- and resource-level policies must be
+   audited so that `limited` gets no access except via `P.attr.resourceRole`.
+9. **Seats**: a limited member counts toward the workspace member limit
+   (`enforceMemberCount`) like any other member.
 
 ##### Tests
 
@@ -538,23 +693,45 @@ flowchart LR
 2. **Interactor** (`internal/usecase/interactor`):
    - `CheckPermission`: no `resourceId` → unchanged roles (regression);
      unregistered resource → deny; alias of another workspace → deny; workspace
-     roles taken from the registration, not the alias; `resourceRole` set/empty.
+     roles taken from the registration, not the alias; `resourceRole` set/empty;
+     principal roles still carry the regular workspace role when a resource
+     role is also present (so policies can compute max).
    - Register: M2M only (JWT rejected); owner must be a workspace member;
      duplicate with same workspace is idempotent, different workspace is 409.
    - `setResourceMember` / `removeResourceMember`: non-member target rejected;
      denied without `manage_members`; self-leave allowed; last-owner protection.
    - Cascades: `RemoveUserMember` / `RemoveMultipleUserMembers` / `Remove`.
+   - `addWorkspaceMemberWithResourceRoles`: non-member is joined as `limited`
+     and gets every role assignment; existing member keeps their workspace role
+     (no downgrade) and only gains role assignments; a resource from another
+     workspace, an unregistered resource, a missing `manage_members`, a failed
+     add-member check or the seat limit → whole call rejected with no
+     membership and no role assignment left behind; `limited` as a resource
+     role rejected; personal workspace rejected; last-owner rule applied.
+   - Limited member: no access to any resource without a role assignment;
+     `removeResourceMember` of their last role assignment keeps workspace
+     membership.
 3. **Concurrency** (`make test-integration`, both backends): two goroutines
    removing the last two owners concurrently → exactly one succeeds; concurrent
    registrations of the same key → one succeeds; stale snapshot `Save` after
-   `UpsertResourceRole` keeps the role assignment.
+   `UpsertResourceRole` keeps the role assignment; two concurrent
+   `addWorkspaceMemberWithResourceRoles` calls for the same new user → user
+   joined once, both sets of role assignments present.
 4. **Repository**: Mongo, Postgres and memory implementations of every new
    operation; Postgres `FindByUserID` issues a single query.
 5. **Migration**: `0005` up/down on an existing DB; existing permittables load
    with empty `resourceRoles`.
 6. **E2E** (`server/e2e`): a `dashboard:project` test policy generated with the
-   conditions above; verify member / non-member / workspace-owner /
-   other-workspace outcomes.
+   rules above; verify:
+   - workspace `reader` without a role assignment → `read` allowed, `edit`
+     denied, on every project of the workspace;
+   - workspace `reader` + resource `writer` on P → `edit` allowed on P only;
+   - workspace `writer` + resource `reader` on P → `edit` still allowed on P
+     (a resource role never lowers access);
+   - workspace `owner` → every action on every project;
+   - `limited` without a role assignment → every action denied; `limited` +
+     resource `writer` on P → `read` / `edit` on P only, denied elsewhere;
+   - user from another workspace → denied.
 
 ##### Deployment
 
@@ -571,6 +748,10 @@ flowchart LR
 4. Config changes: none (reuses the existing M2M API key).
 5. DDL: Postgres migration `0005` runs automatically at startup (golang-migrate).
    Mongo: collection schema + indexes via the startup migration; no backfill in accounts.
+6. Limited members: enable the UI that calls
+   `addWorkspaceMemberWithResourceRoles` only after every service that reads
+   workspace members has updated its client and audited its policies for
+   `limited` (see *Impact* 7–8).
 
 ##### Rollback
 
@@ -581,6 +762,9 @@ flowchart LR
    Note: the old Mongo `Save` replaces the whole document and will drop
    `resource_roles` of any permittable it writes — acceptable during rollback,
    since the feature is disabled; services re-run the backfill on roll-forward.
+   If `limited` members exist, the old binary does not know that role; before
+   rolling back, decide whether to remove them from their workspaces or change
+   them to another role (changing to `reader` grants wider access).
 4. Only if the schema itself must be removed: run `0005` down (drops
    registrations and role assignments — take a dump first).
 
@@ -589,13 +773,17 @@ flowchart LR
 - Checklist
   - Create a project in dashboard staging; verify the registration and the
     creator's `owner` role assignment.
-  - Invite a workspace member; verify access. Remove them from the workspace;
-    verify project access is lost.
+  - Give a workspace `reader` the resource role `writer` on a project; verify
+    they can edit that project and still only read the others. Remove them from
+    the workspace; verify all project access is lost.
   - Call `checkPermission` with the alias of another workspace; verify deny.
+  - Call `addWorkspaceMemberWithResourceRoles` for a user outside the
+    workspace; verify they are a `limited` member, use a seat, and can access
+    only the given project.
 - Metrics
   - `checkPermission` p50/p95 latency with and without `resourceId`.
-  - Error rate of register / unregister / `setResourceMember`, including
-    Mongo transaction retries.
+  - Error rate of register / unregister / `setResourceMember` /
+    `addWorkspaceMemberWithResourceRoles`, including Mongo transaction retries.
   - Count of role assignments per permittable (max / p99) to watch FR-4.
 - Alerting
   - `checkPermission` error rate: Warning > 1%, Danger ≥ 5%.
@@ -605,7 +793,10 @@ flowchart LR
 
 1. **Resource attributes in `checkPermission`:** proposal — an optional
    `attributes: JSON` on `CheckPermissionInput`, passed through to the Cerbos
-   resource (e.g. `visibility`).
+   resource (e.g. `visibility`). A stricter per-product rule (e.g. regular
+   workspace members cannot read a `private` project without a resource role)
+   would then be a condition on the workspace-role rules, e.g.
+   `R.attr.visibility != "private"`; the default policy above stays additive.
 2. **Batch checks:** a `checkPermissions` query over many `resourceId`s for list
    screens. Cerbos `CheckResources` already supports multiple resources.
 3. **Per-service M2M keys:** v1 accepts the existing shared M2M API key for
@@ -615,6 +806,19 @@ flowchart LR
    calling the unregister endpoint.
 5. **Integration members:** M2M tokens as resource principals (possibly needed
    by cms).
+6. **UI placement:** no accounts change either way. Both UI patterns, (a) from a
+   project and (b) from the workspace member dialog, call
+   `addWorkspaceMemberWithResourceRoles`, from whichever service hosts the
+   screen.
+7. **Limited workspace role:** final identifier (tentatively `limited`);
+   workspace-level actions to grant it in each policy (e.g. reading the
+   workspace name); whether a resource `manage_members` holder who is not a
+   workspace admin may add a *new* user to the workspace (v1: no — step 3 of the
+   combined operation requires the existing add-member check).
+8. **Last role assignment removed:** if decided, `removeResourceMember` (and
+   unregister) would, in the same transaction, remove a `limited` member whose
+   last role assignment in that workspace was removed, via the existing
+   workspace member removal path.
 
 ### Option 2: Role assignments in their own collection/table (no embedding)
 
@@ -651,7 +855,13 @@ the service.
    never registered the project, or the request names a different workspace,
    the answer is "no".
 3. Accounts combines the user's role in that workspace with the user's role on
-   the project (if any) and applies the service's permission policy.
+   the project (if any) and applies the service's permission policy. By
+   default:
+   - a **regular workspace member** (owner / maintainer / writer / reader) gets
+     the higher of their workspace role and their project role — the workspace
+     role already covers every project, and a project role can only raise it;
+   - a **limited member** gets only their project role; without one, they have
+     no access to the project.
 4. A project role only counts while the user is still a member of the project's
    workspace.
 
@@ -660,14 +870,52 @@ the service.
 1. A user creates a project in a service. The service saves it and registers it
    with accounts, naming the creator as its owner (the creator must be a
    workspace member).
-2. The owner invites another workspace member with a role (for example,
-   writer). Accounts checks that the invited person is in the workspace and that
-   the inviter is allowed to manage members, then saves the role.
+2. The owner adds a person to the project with a role (for example, writer).
+   Accounts checks that the inviter is allowed to manage the project's members,
+   then saves the role. If the person is already in the workspace, only the
+   project role is added. If they are not, they are added to the workspace as a
+   limited member at the same time (see *Adding people from the UI* below), so
+   the rule "a project member must be a workspace member" is always met.
 3. Member changes on the same project are processed one at a time, so the last
    owner can never be removed, even when two people act at once. Members can
    leave a project themselves, except the last owner.
 4. A project registered without an owner (for example, one that existed before
    this feature) is managed through workspace roles until an owner is set.
+
+### Adding people from the UI
+
+An admin can give someone access to only some projects in **one step**, in
+either of two ways:
+
+- **(a) From a project:** add a person directly as a member of the project. If
+  they are not yet in the workspace, they are added to the workspace at the
+  same time.
+- **(b) From the workspace:** when adding a person to the workspace, choose
+  which projects they can see.
+
+Both use the same single operation in accounts: it adds the person to the
+workspace (if they are not already in it) and gives them their project roles
+together. Either everything succeeds or nothing changes — the person is never
+left in the workspace without the chosen projects, or vice versa.
+
+- **Limited member (name tentative).** A person added this way who was not yet
+  in the workspace joins it with a new workspace role, the *limited member*.
+  A limited member belongs to the workspace but, by default, cannot see any of
+  its projects; they see only the projects where they have a project role.
+- **Regular members are not restricted.** Regular workspace members (owner /
+  maintainer / writer / reader) keep seeing every project through their
+  workspace role; a project role can only raise their access on that project,
+  never lower it. In GitHub terms, a regular member is like an organization
+  member whose base permission gives access to all repositories, and a limited
+  member is like a person who has access only to specific repositories.
+- **Uses a seat.** As on GitHub, a limited member still counts as a workspace
+  member. Because Re:Earth is billed per seat per workspace, adding them uses a
+  seat, and the workspace's member limit applies.
+- **Existing members are not downgraded.** If the person is already in the
+  workspace, they are just given the project roles; their workspace role stays
+  as it is.
+- An admin can later change a limited member to a regular workspace role (or
+  back) in the usual way.
 
 ### Removing someone from a workspace
 
@@ -676,18 +924,25 @@ removes their workspace role and all their project roles in that workspace in
 the same step. When a workspace is deleted, its project registrations are
 removed too. Deactivating a workspace removes nothing, so it can be restored.
 
+The reverse does not happen automatically: removing a person's last project
+role does **not** remove them from the workspace. A limited member left with no
+project roles stays in the workspace (and keeps using a seat) until an admin
+removes them. Whether this should happen automatically is an open question.
+
 ### Example: Dashboard projects
 
 | Who | What they can do |
 |---|---|
 | Workspace owner / maintainer | View, edit and delete every project in the workspace, and manage its members |
-| Project owner | View, edit and delete the project, and manage its members |
-| Project writer | View and edit the project |
-| Other project roles (maintainer / reader) | View the project |
-| Workspace member with no role on the project | No access to the project (unless they are a workspace owner / maintainer) |
+| Workspace writer | View and edit every project in the workspace |
+| Workspace reader | View every project in the workspace |
+| A project role on top of a workspace role | Adds to the workspace role on that project only — for example, a workspace reader who is a writer on a project can edit that project. It never reduces what the workspace role allows |
+| Limited member (name tentative) with a project role | That project only, with the project role's permissions (owner / maintainer: view, edit, delete and manage members; writer: view and edit; reader: view) |
+| Limited member without a project role | No access to the project |
 
-Whether workspace roles *add to* project membership or are *restricted by* it is
-decided per product in its permission policy.
+Each role means the same on a workspace and on a project, and a regular
+member's access to a project is the higher of the two. Whether a product may
+apply stricter rules (for example, private projects) is an open question.
 
 Technical details: see *Solution Options → Option 1 → Request flows (sequence
 diagrams)*.
@@ -708,10 +963,19 @@ diagrams)*.
 5. **Role names are shared between workspaces and projects.** "Owner",
    "maintainer", "writer" and "reader" exist at both levels. Whoever writes a
    service's permission policy must treat "project owner" and "workspace owner"
-   as different things.
+   as different things, and must keep the default model: workspace roles still
+   give access to every project, and a project role only adds to it.
 6. **Only services that use the feature need to update.** Services that use the
    new features must update the client library they use to talk to accounts;
    services that don't update keep working unchanged.
+7. **Limited members use seats.** Each limited member counts as a workspace
+   member for billing and for the workspace's member limit, even if they can
+   see only one project.
+8. **A new workspace role every product must handle.** The limited member is a
+   new kind of workspace role. Every product's permission policy must treat it
+   as "no project access by default" — access only through a project role — and
+   every service that shows workspace members must be able to display it.
+   Limited members should not be created until all services are ready.
 
 Technical details: see *Solution Options → Option 1 → Technical notes: impact,
 tests, deployment, rollback, monitoring*.
@@ -727,12 +991,19 @@ tests, deployment, rollback, monitoring*.
    - Naming a workspace other than the project's own → denied.
    - The user's workspace role is always taken from the project's real
      workspace, not from what the caller says.
-   - The user's project role is applied when they have one, and not otherwise.
+   - A regular workspace member without a project role keeps exactly the access
+     their workspace role gives on every project.
+   - A project role raises a regular member's access on that project only (a
+     workspace reader who is a project writer can edit it) and never lowers it
+     (a workspace writer who is a project reader can still edit it).
+   - A limited member has access only through their project role.
 3. **Registering projects.** Only services can register (a user's login is
    rejected); the owner must be a workspace member; registering the same
    project again in the same workspace is harmless, but in a different
    workspace it is rejected.
-4. **Managing members.** Someone outside the workspace cannot be added; people
+4. **Managing members.** A project role cannot be given to someone outside the
+   workspace without also adding them to the workspace (that is done by the
+   one-step addition in item 9); people
    without permission to manage members are refused; members can leave a
    project themselves; the last owner cannot be removed or downgraded.
 5. **Cleanup.** Removing one or several users from a workspace, or deleting the
@@ -744,8 +1015,22 @@ tests, deployment, rollback, monitoring*.
 7. **Every supported database**, including the database upgrade and its undo on
    existing data, and existing users loading correctly with no project roles.
 8. **End to end.** With a sample Dashboard project policy, check the results for
-   a project member, a non-member, a workspace owner, and a user from another
-   workspace.
+   a workspace reader with and without a project role, a workspace writer with
+   a lower project role, a workspace owner, a user from another workspace, and a
+   limited member with and without a project role.
+9. **Adding people in one step.**
+   - Adding a person who is not in the workspace to one or more projects makes
+     them a limited member with exactly those project roles, in one step.
+   - All-or-nothing: if any part fails (a project from another workspace, a
+     project the admin may not manage, the workspace's member limit reached,
+     …), the person is not added to the workspace and gets no project roles.
+   - Adding a person who is already in the workspace only adds project roles;
+     their workspace role is not changed or downgraded.
+   - A limited member cannot see any project where they have no project role.
+   - Removing a limited member's last project role leaves them in the
+     workspace.
+   - Two admins adding the same new person at the same time → the person is
+     added to the workspace once and gets both sets of project roles.
 
 Technical details: see *Solution Options → Option 1 → Technical notes: impact,
 tests, deployment, rollback, monitoring*.
@@ -768,6 +1053,9 @@ tests, deployment, rollback, monitoring*.
 4. **Configuration changes:** none.
 5. **Database changes:** applied automatically when accounts starts. Accounts
    itself does not need to convert any existing data.
+6. **Limited members:** turn on the UI that adds limited members only after
+   every service can display the new workspace role and its permission policy
+   gives that role no project access by default.
 
 Technical details: see *Solution Options → Option 1 → Technical notes: impact,
 tests, deployment, rollback, monitoring*.
@@ -782,6 +1070,10 @@ tests, deployment, rollback, monitoring*.
    whose permission data it saves. This is acceptable because the feature is off
    at that point; services re-run the backfill when the feature is rolled out
    again.
+   If limited members already exist, the previous version does not know that
+   role. Before rolling back, decide whether to remove them from their
+   workspaces or change them to another role (a regular role gives them wider
+   access).
 4. Only if the new data structures must be removed completely: run the database
    downgrade. It deletes all project registrations and project roles, so take a
    backup first.
@@ -794,15 +1086,20 @@ tests, deployment, rollback, monitoring*.
 - Checklist
   - Create a project in Dashboard staging; check that it is registered and that
     the creator is its owner.
-  - Invite a workspace member to the project; check that they can access it.
-    Remove them from the workspace; check that they lose access to the project.
+  - Make a workspace reader a writer on one project; check that they can edit
+    that project and can still only view the others. Remove them from the
+    workspace; check that they lose access to every project.
   - Ask for a permission on the project while naming a different workspace;
     check that it is denied.
+  - From the project, add a person who is not in the workspace; check that they
+    become a limited member, use a seat, and can see only that project.
+  - From the workspace, add a person and choose two projects; check that they
+    see exactly those two.
 - Metrics
   - How long permission checks take (typical and slowest 5%), with and without a
     project named.
-  - Error rate of registering / unregistering projects and changing members,
-    including automatic retries.
+  - Error rate of registering / unregistering projects, changing members and
+    adding people in one step, including automatic retries.
   - Number of project roles per user (maximum and top 1%), to watch the ~1,000
     per user assumption.
 - Alerting
@@ -815,10 +1112,12 @@ tests, deployment, rollback, monitoring*.
 
 ## Open Questions
 
-1. **Should permission decisions use project properties?** Rules like "private
-   projects are visible only to their members, public ones to the whole
-   workspace" need to know whether a project is public. Deferred until a
-   product needs it.
+1. **Should a product be able to apply stricter rules, such as private
+   projects?** By default, regular workspace members see every project and a
+   project role only adds to that. A rule like "private projects are visible
+   only to their members, public ones to the whole workspace" would restrict
+   regular members too, and needs to know whether a project is public. Deferred
+   until a product needs it.
 2. **Should list screens be able to check many projects at once?** A screen that
    lists projects needs a permission answer for each one; one combined check
    would be faster.
@@ -833,7 +1132,21 @@ tests, deployment, rollback, monitoring*.
    only in the Dashboard, or also within each service's own screens
    (visualizer / cms / flow)? This does not change accounts (every screen uses
    the same membership functions), but it affects which services need UI work
-   and is to be decided together with the designer.
+   and is to be decided together with the designer. It also decides where the
+   two one-step patterns in *Design → Adding people from the UI* appear: (a)
+   adding a person from a project's screen, and (b) choosing projects in the
+   workspace "add member" dialog.
+7. **What is the limited member role called, and exactly what may it do?** The
+   name is tentative. Beyond seeing its own projects, does it need anything at
+   the workspace level (for example, seeing the workspace's name, or the list of
+   workspace members)? And may a project owner who is not a workspace admin add
+   a *new* person to the workspace this way, given that it uses a paid seat?
+   (Proposed for the first version: no — only people who can already add
+   workspace members can.)
+8. **Should removing a person's last project role also remove them from the
+   workspace?** Today it does not: a limited member with no project roles stays
+   in the workspace and keeps using a seat until an admin removes them. Removing
+   them automatically frees the seat but may surprise admins.
 
 Technical details: see *Solution Options → Option 1 → Technical notes on open
 questions*.
