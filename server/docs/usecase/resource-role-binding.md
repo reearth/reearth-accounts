@@ -1223,6 +1223,18 @@ workspace get on every project:
   - **A partner company's staff.** Add them to the workspace (as readers, for
     example) with a role on the one project they work on; they see nothing else.
 
+Example: what a workspace **reader** can see under each setting:
+
+| Base permission | Projects a workspace reader can see |
+|---|---|
+| Follow workspace role (default) | Can view every project (same as today) |
+| Reader | Can view every project |
+| Writer | Can view and edit every project |
+| None | Only the projects where they have a project role |
+
+Under every setting, on a project where they have a project role, their access
+goes up to that role (e.g. writer on project P → can edit P).
+
 #### Diagrams
 
 How access to a project is decided:

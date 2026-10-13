@@ -1110,6 +1110,18 @@ GitHub の outside collaborator のような、workspace のメンバーでは�
   - **取引先の担当者。** workspace に（例: reader として）追加し、担当する1つの project のロールを与える。
     それ以外は何も見えない。
 
+例: 基本権限ごとに、workspace の **reader** が見られる project:
+
+| 基本権限 | workspace の reader が見られる project |
+|---|---|
+| workspace のロールに従う（デフォルト） | すべての project を閲覧できる（今と同じ） |
+| Reader | すべての project を閲覧できる |
+| Writer | すべての project を閲覧・編集できる |
+| なし | project のロールを持つ project だけ |
+
+どの設定でも、project のロールを持つ project では、そのロールまで権限が上がる
+（例: project P の writer なら P を編集できる）。
+
 #### 図
 
 project へのアクセスの決まり方:
