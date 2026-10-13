@@ -77,21 +77,25 @@ workspace, and this principal holds this role on it".
 
 ## Goals
 
-1. Accounts can store and evaluate a role assignment for **any** resource instance,
-   identified by an opaque `(resourceKind, resourceID)` pair.
-2. `checkPermission` can evaluate a check against a specific resource instance,
-   **scoped to the workspace the resource actually belongs to** (never a
-   caller-chosen workspace), and makes the caller's resource role available to
-   Cerbos policies.
-3. Resource-wide invariants (one workspace per resource, at least one owner
-   once one exists) hold under concurrent writes on every backend.
-4. Workspace membership changes automatically revoke resource role assignments
-   (a user removed from a workspace loses every role assignment in it).
-5. The words `project` / service-specific kinds never appear in accounts Go code
-   or schema; adding a new resource kind (e.g. `cms:model`) requires **only a
-   Cerbos policy** (via the service's `definition.go`), no accounts code change.
-6. Fully backward compatible: existing `checkPermission` calls and existing
-   policies behave identically.
+1. **Members and roles can be set per project.** A workspace member can be given
+   a role on a specific project (for example, editor on project P but no access
+   to project Q), not only on the whole workspace.
+2. **Permission checks look at the specific project.** When a service asks
+   accounts "may this user do this?", the answer can take the user's role on
+   that particular project into account. The check always uses the workspace
+   the project really belongs to, so a caller cannot get access by naming a
+   different workspace.
+3. **Membership rules stay consistent.** A project always belongs to exactly
+   one workspace, and once it has an owner it never ends up with none — even
+   when several people change members at the same time.
+4. **Leaving a workspace removes project access.** When a user is removed from a
+   workspace, their roles on every project in that workspace are removed
+   automatically. Services do not need to clean this up themselves.
+5. **Accounts stays generic.** Accounts does not know what a "project" is. Any
+   service can use the same mechanism for its own resources (for example, a CMS
+   model) just by adding a permission policy, with no change to accounts.
+6. **Nothing existing breaks.** Current permission checks and policies keep
+   working exactly as they do today.
 
 ## Non-Goals
 
