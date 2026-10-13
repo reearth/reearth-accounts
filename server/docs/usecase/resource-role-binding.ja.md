@@ -1000,6 +1000,36 @@ GitHub の outside collaborator のような、workspace のメンバーでは�
   - **取引先の担当者。** workspace に（例: reader として）追加し、担当する1つの project のロールを与える。
     それ以外は何も見えない。
 
+#### 図
+
+project へのアクセスの決まり方:
+
+```mermaid
+flowchart TD
+    U["ユーザーが project P を開く"] --> M{"P の workspace の<br/>メンバーか？"}
+    M -- "いいえ" --> X["アクセスできない"]
+    M -- "はい" --> R{"workspace のロールは？"}
+    R -- "owner / maintainer" --> F["すべての project にフルアクセス"]
+    R -- "writer / reader" --> B["基本権限で決まる基準の権限<br/>（デフォルト: workspace のロール）"]
+    B --> E["P での権限 = 基準の権限と<br/>P の project ロールの高い方"]
+```
+
+例: workspace W に project P と Q がある。A さんは workspace の reader で、P の writer。
+
+```mermaid
+flowchart LR
+    subgraph D["基本権限: workspace のロールに従う（デフォルト）"]
+        direction LR
+        A1["A さん（reader、P の writer）"] -- "編集できる" --> P1["project P"]
+        A1 -- "閲覧できる" --> Q1["project Q"]
+    end
+    subgraph N["基本権限: なし"]
+        direction LR
+        A2["A さん（reader、P の writer）"] -- "編集できる" --> P2["project P"]
+        A2 -. "見えない" .-> Q2["project Q"]
+    end
+```
+
 ### project を指定した権限チェック
 
 1. サービスが accounts に、ユーザーが特定の project に対してある操作（例: 編集）をしてよいかを

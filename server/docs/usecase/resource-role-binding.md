@@ -1091,6 +1091,36 @@ workspace get on every project:
   - **A partner company's staff.** Add them to the workspace (as readers, for
     example) with a role on the one project they work on; they see nothing else.
 
+#### Diagrams
+
+How access to a project is decided:
+
+```mermaid
+flowchart TD
+    U["A person opens project P"] --> M{"Member of P's workspace?"}
+    M -- "No" --> X["No access"]
+    M -- "Yes" --> R{"Workspace role?"}
+    R -- "owner / maintainer" --> F["Full access to every project"]
+    R -- "writer / reader" --> B["Baseline from the base permission<br/>(default: the workspace role)"]
+    B --> E["Access on P = the higher of<br/>the baseline and the role on P"]
+```
+
+Example: workspace W with projects P and Q. A is a workspace reader and a writer on P.
+
+```mermaid
+flowchart LR
+    subgraph D["Base permission: Follow workspace role (default)"]
+        direction LR
+        A1["A (reader, writer on P)"] -- "edit" --> P1["project P"]
+        A1 -- "view" --> Q1["project Q"]
+    end
+    subgraph N["Base permission: None"]
+        direction LR
+        A2["A (reader, writer on P)"] -- "edit" --> P2["project P"]
+        A2 -. "cannot see" .-> Q2["project Q"]
+    end
+```
+
 ### Checking a permission on a project
 
 1. A service asks accounts whether a user may do something (for example, edit)
