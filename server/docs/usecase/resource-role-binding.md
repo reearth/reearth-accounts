@@ -34,7 +34,18 @@
   it implementable early so it is ready when workspace creation can be
   restricted.
 
-### Current situation (fact)
+### Current situation
+
+- Permissions across Re:Earth are decided by reearth-accounts. Each service
+  (dashboard, visualizer, cms, ...) asks accounts "may this user perform this
+  action?" before allowing it.
+- A user's role is held **per workspace** (plus a few platform-wide roles).
+  Joining a workspace gives the same role on every project in that workspace.
+- A permission check therefore only knows *which workspace* the request is
+  about, not *which project*. There is no way to say "user A can edit project P
+  but not project Q" within the same workspace.
+
+#### Implementation details (for reference)
 
 - reearth-accounts is the authorization hub for the Re:Earth platform. A user's
   roles are stored on the `permittable.Permittable` aggregate

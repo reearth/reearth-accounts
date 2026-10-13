@@ -33,7 +33,17 @@
   組織として機能させられます。SSO / SCIM とは別の機能ですが、ワークスペースの作成を
   制限できるようになった時点で使えるよう、早めに実装できる状態にしたいと考えています。
 
-### 現状（事実）
+### 現状
+
+- Re:Earth の権限は reearth-accounts が判定しています。各サービス（dashboard、visualizer、
+  cms など）は、操作を許可する前に「このユーザーはこの操作をしてよいか」を accounts に問い合わせます。
+- ユーザーのロールは **workspace 単位** で持っています（ほかにプラットフォーム全体のロールが少しあります）。
+  workspace に参加すると、その workspace のすべての project に対して同じロールを持つことになります。
+- そのため権限チェックで分かるのは「どの workspace か」だけで、「どの project か」は分かりません。
+  同じ workspace の中で「user A は project P を編集できるが project Q は編集できない」といった
+  指定はできません。
+
+#### 実装の詳細（参考）
 
 - reearth-accounts は Re:Earth プラットフォームの認可のハブです。ユーザーのロールは
   `permittable.Permittable` 集約（`server/pkg/permittable/permittable.go`）に保存されています。
