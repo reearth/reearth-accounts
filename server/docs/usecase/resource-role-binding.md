@@ -1227,7 +1227,7 @@ Example: what a workspace **reader** can see under each setting:
 
 | Base permission | Projects a workspace reader can see |
 |---|---|
-| Follow workspace role (default) | Can view every project (same as today) |
+| Follow workspace role (default) | Can view every project (same as today's Re:Earth) |
 | Reader | Can view every project |
 | Writer | Can view and edit every project |
 | None | Only the projects where they have a project role |

@@ -1114,7 +1114,7 @@ GitHub の outside collaborator のような、workspace のメンバーでは�
 
 | 基本権限 | workspace の reader が見られる project |
 |---|---|
-| workspace のロールに従う（デフォルト） | すべての project を閲覧できる（今と同じ） |
+| workspace のロールに従う（デフォルト） | すべての project を閲覧できる（今の Re:Earth と同じ） |
 | Reader | すべての project を閲覧できる |
 | Writer | すべての project を閲覧・編集できる |
 | なし | project のロールを持つ project だけ |
