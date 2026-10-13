@@ -58,13 +58,22 @@ steps:
   organization. This is a separate feature from SSO / SCIM, but we want to make
   it implementable early so it is ready when workspace creation can be
   restricted.
+- But restricting workspace creation raises a new problem. Today every member
+  of a workspace sees every project in it, so once all employees work in one
+  organization workspace, there is no way to keep teams from seeing each
+  other's projects. The organization needs to decide, per project, who can see
+  it — while everyone stays a member of the workspace, managed by SSO / SCIM.
 - The intended model is close to GitHub's: a workspace relates to its projects
   the way a GitHub organization relates to its repositories. On GitHub, people
   are either *organization members* or *outside collaborators* (people who are
-  not in the organization but have access to specific repositories), and both
-  can be given a role on each repository. Likewise, Re:Earth would have
-  workspace members and outside collaborators, and both can be given a role on
-  each project.
+  not in the organization but have access to specific repositories). Each
+  organization has a *base permission* that applies to all its members on every
+  repository (for example "no access" or "read"), and both members and outside
+  collaborators can be given a role on each repository. Likewise, Re:Earth
+  would have workspace members and outside collaborators, a workspace **base
+  permission**, and per-project roles for both. With the base permission set to
+  "None", employees in one workspace see only the projects they were given a
+  role on; outside collaborators are for people from outside the organization.
 
 ### Current situation
 
@@ -81,9 +90,11 @@ steps:
 ### Problem
 
 Products need **project-level membership**: "user A, a reader of the workspace,
-is an editor of project P", and "user B, who is not in the workspace, can work
-on project P only and cannot see the other projects in the workspace". Today the
-finest granularity accounts can express is the workspace.
+is an editor of project P", "in this workspace, members see only the projects
+they were added to, so team X cannot see team Y's projects", and "user B, who is
+not in the workspace, can work on project P only and cannot see the other
+projects in the workspace". Today the finest granularity accounts can express
+is the workspace.
 
 If each service implements project membership on its own:
 
@@ -110,14 +121,17 @@ outside collaborator".
 
 1. **Members and roles can be set per project.** A person can be given a role on
    a specific project, not only on the whole workspace. The model is:
-   - **Workspace members** (owner / maintainer / writer / reader) see **every**
-     project in the workspace, as today, through their workspace role. A
-     project role can **raise** their access on that project (for example, a
-     workspace reader who is a writer on project P can edit P), but never lower
-     it.
+   - **Workspace owners and maintainers** always have full access to every
+     project in the workspace.
+   - **Other workspace members** (writer / reader) get, on every project, a
+     baseline set by the workspace's **base permission** (see Goal 9). By
+     default this is their workspace role, exactly as today. A project role can
+     **raise** their access on that project (for example, a workspace reader who
+     is a writer on project P can edit P), but never lower it.
    - **Outside collaborators** (name tentative) are people who are **not**
      workspace members but were given a role on specific projects. They see and
-     act on **only** those projects, and only their project role counts.
+     act on **only** those projects, and only their project role counts; the
+     base permission does not apply to them.
 2. **Permission checks look at the specific project.** When a service asks
    accounts "may this user do this?", the answer can take the user's role on
    that particular project into account. The check always uses the workspace
@@ -137,7 +151,8 @@ outside collaborator".
    service can use the same mechanism for its own resources (for example, a CMS
    model) just by adding a permission policy, with no change to accounts.
 6. **Nothing existing breaks.** Current permission checks and policies keep
-   working exactly as they do today.
+   working exactly as they do today. Existing workspace roles do not change,
+   and the default base permission reproduces today's behavior.
 7. **Access to only some projects can be given in one step.** From the UI, an
    admin can either add a person directly to a project — they become an outside
    collaborator if they are not in the workspace — or, from the workspace's
@@ -148,6 +163,14 @@ outside collaborator".
    the workspace, however many of its projects they are on, and the
    workspace's seat limit applies when adding one. Accounts can report the
    numbers billing needs.
+9. **Each workspace has a base permission** (name tentative), like a GitHub
+   organization's base permission. Its values are "Follow workspace role"
+   (default — today's behavior), "None", "Reader" and "Writer". It decides what
+   writers and readers of the workspace get on every project; owners and
+   maintainers always have full access, and outside collaborators are not
+   affected. Workspace owners and maintainers can change it, and the change
+   takes effect immediately. With "None", members of one workspace can be kept
+   from seeing each other's projects while staying workspace members.
 
 ## Non-Goals
 
@@ -170,8 +193,9 @@ outside collaborator".
 
 1. **Permission checks stay fast.** Checks that do not name a project cost
    exactly the same as today. Checks that name a project add only one small,
-   quick lookup (which workspace the project belongs to); the user's project
-   roles are read together with the data accounts already loads.
+   quick lookup (which workspace the project belongs to, together with that
+   workspace's base permission); the user's project roles are read together
+   with the data accounts already loads.
 2. **Names and IDs have size limits.** The resource type name and the resource
    ID have a maximum length and a fixed set of allowed characters, so stored
    data stays small and predictable.
@@ -186,6 +210,10 @@ outside collaborator".
    many distinct people are outside collaborators of a workspace (each person
    counted once, and not counted again if they are also a member), so billing
    can count seats as workspace members plus outside collaborators.
+7. **Services can tell what a person may list.** For a workspace, accounts can
+   tell a service whether a person sees every project (and at what level) or
+   only the projects where they have a project role, so lists can be filtered
+   correctly whatever the base permission.
 
 Technical details: see *Solution Options → Option 1 → Detailed requirements*.
 
@@ -202,7 +230,7 @@ Three pieces of state, all opaque to accounts:
 |---|---|
 | **Resource registration** `(resourceKind, resourceID) → workspaceID, version` | Authoritative workspace scope of the resource; proof the owning service registered it; per-resource serialization point for invariants |
 | **Resource role** on `Permittable` `(workspaceID, resourceKind, resourceID, roleID, grant)` | The user's role on that resource and whether it was granted to a workspace member or to an outside collaborator; read together with the permittable for zero-read lookup |
-| **Workspace lock** `workspaceID → version` | Per-workspace serialization point for everything that decides whether a user is a member or an outside collaborator, and for the seat limit |
+| **Workspace resource settings** `workspaceID → basePermission, version` | The workspace's base permission; also the per-workspace lock (serialization point for everything that decides whether a user is a member or an outside collaborator, for the seat limit, and for base-permission changes) |
 
 #### Domain
 
@@ -268,6 +296,43 @@ Roles reuse the existing `roles` table (`owner` / `maintainer` / `writer` /
 `reader`). Their meaning per resource kind is defined solely by that kind's
 Cerbos policy.
 
+**Base permission.**
+
+```go
+// server/pkg/resource/settings.go
+type BasePermission string
+
+const (
+    BaseFollowWorkspaceRole BasePermission = "follow_workspace_role" // default; also when no row exists
+    BaseNone                BasePermission = "none"
+    BaseReader              BasePermission = "reader"
+    BaseWriter              BasePermission = "writer"
+)
+
+type WorkspaceSettings struct {
+    basePermission BasePermission
+    version        int64 // bumped by every write and by Lock
+    workspaceID    workspace.ID
+}
+
+// BaselineRole returns a member's baseline role on every resource of the workspace.
+// ok == false means "no baseline" (the member only gets resource roles).
+func BaselineRole(workspaceRole role.RoleType, base BasePermission) (r role.RoleType, ok bool)
+```
+
+| Workspace role | Follow workspace role | None | Reader | Writer |
+|---|---|---|---|---|
+| `owner` / `maintainer` | same role | same role | same role | same role |
+| `writer` | `writer` | — | `reader` | `writer` |
+| `reader` | `reader` | — | `reader` | `writer` |
+
+The setting is stored in accounts, in its own per-workspace record rather than
+on the workspace document: the existing workspace flows save the workspace as a
+snapshot (Mongo replaces the whole document), so a field there could be
+reverted by a concurrent, stale workspace save. A missing record means
+"Follow workspace role", so no data migration is needed. Existing workspace
+roles are not changed.
+
 #### Storage
 
 **PostgreSQL** — migration `0005_resource_role_binding.up.sql`:
@@ -300,15 +365,17 @@ CREATE INDEX permittable_resource_roles_resource_idx
 CREATE INDEX permittable_resource_roles_workspace_idx
     ON permittable_resource_roles (workspace_id, grant_type, permittable_id);
 
-CREATE TABLE resource_workspace_locks (
-    workspace_id text PRIMARY KEY,
-    version      bigint NOT NULL DEFAULT 0
+CREATE TABLE resource_workspace_settings (
+    workspace_id    text PRIMARY KEY,
+    base_permission text NOT NULL DEFAULT 'follow_workspace_role'
+        CHECK (base_permission IN ('follow_workspace_role', 'none', 'reader', 'writer')),
+    version         bigint NOT NULL DEFAULT 0
 );
 ```
 
 ```sql
 -- 0005_resource_role_binding.down.sql
-DROP TABLE IF EXISTS resource_workspace_locks;
+DROP TABLE IF EXISTS resource_workspace_settings;
 DROP TABLE IF EXISTS permittable_resource_roles;
 DROP TABLE IF EXISTS resource_registrations;
 ```
@@ -323,7 +390,8 @@ DROP TABLE IF EXISTS resource_registrations;
   carry `grant`), with indexes
   `{ "resource_roles.resource_kind": 1, "resource_roles.resource_id": 1 }` and
   `{ "resource_roles.workspace_id": 1, "resource_roles.grant": 1 }`.
-- New collection `resource_workspace_locks` (`_id` = workspace ID, `version`).
+- New collection `resource_workspace_settings` (`_id` = workspace ID,
+  `base_permission`, `version`).
 
 #### Repository changes (targeted writes, never snapshot writes)
 
@@ -348,8 +416,11 @@ LockForUpdate(ctx, kind, id) (*resource.Registration, error) // must run inside 
 Remove(ctx, kind, id) error                              // also removes all role assignments
 RemoveInWorkspace(ctx, workspaceID) error                // all registrations + role assignments
 
-// resource.WorkspaceLockRepo
-Lock(ctx, workspaceID) error // must run inside a transaction; creates the row on first use
+// resource.WorkspaceSettingsRepo
+Find(ctx, workspaceID) (*resource.WorkspaceSettings, error) // default settings when no row
+Lock(ctx, workspaceID) (*resource.WorkspaceSettings, error) // must run inside a transaction; creates the row on first use
+SetBasePermission(ctx, workspaceID, base resource.BasePermission) error // after Lock
+Remove(ctx, workspaceID) error
 
 // permittable.Repo (additions)
 FindResourceMembers(ctx, kind, id) ([]permittable.ResourceMember, error) // projection: userID + roleID + grant
@@ -371,7 +442,8 @@ CountOutsideCollaborators(ctx, workspaceID) (int, error) // distinct users
 | `FindResourceMembers` | aggregation `$match` → `$unwind` → `$match` → `$project {user_id, role_id, grant}` | `SELECT p.user_id, r.role_id, r.grant_type FROM permittable_resource_roles r JOIN permittables p …` |
 | `CountOutsideCollaborators` / `FindOutsideCollaborators` | aggregation `$match {resource_roles: {$elemMatch: {workspace_id, grant: "collaborator"}}}` → count / project | `SELECT count(DISTINCT permittable_id) … WHERE workspace_id=$1 AND grant_type='collaborator'` (index-only) |
 | `LockForUpdate` | in a transaction: `findOneAndUpdate {$inc: {version: 1}}` (concurrent transactions on the same registration hit a write conflict and are retried) | `SELECT … FOR UPDATE` |
-| `WorkspaceLock.Lock` | in a transaction: `findOneAndUpdate {_id: ws} {$inc: {version: 1}}, upsert` (write conflict → retry) | `INSERT … ON CONFLICT DO NOTHING` then `SELECT … FOR UPDATE` |
+| `WorkspaceSettings.Lock` | in a transaction: `findOneAndUpdate {_id: ws} {$inc: {version: 1}}, upsert` (write conflict → retry) | `INSERT … ON CONFLICT DO NOTHING` then `SELECT … FOR UPDATE` |
+| Registration + settings for `checkPermission` | one aggregation on `resource_registrations`: `$match` by key → `$lookup` `resource_workspace_settings` by `workspace_id` | one query: `SELECT r.*, s.base_permission FROM resource_registrations r LEFT JOIN resource_workspace_settings s USING (workspace_id) WHERE …` |
 
 #### Authorization check
 
@@ -387,31 +459,44 @@ input CheckPermissionInput {
 }
 ```
 
-When `resourceId` is **absent**, behavior is unchanged.
+When `resourceId` is **absent**, behavior is unchanged — whatever the base
+permission. Principal roles are the actual workspace roles, as today.
 
 When `resourceId` is **present**:
 
-1. Load the registration `(service:resource, resourceId)`. **Not found → deny.**
+1. Load the registration `(service:resource, resourceId)` together with its
+   workspace's settings (one round-trip). **Not found → deny.**
 2. If `workspaceAlias` is given and does not resolve to the registration's
    `workspaceID` → **deny**.
-3. Principal roles = global roles + the user's workspace roles **in the
-   registration's `workspaceID`** (the caller cannot choose the workspace). If
-   the user holds no workspace role there but holds a valid `collaborator`
-   role assignment on this resource, the evaluation-only principal role
-   `outside_collaborator` is added (it is never stored; it gives Cerbos a
-   non-empty role list and lets a policy recognize outside collaborators).
-4. Principal attribute `resourceRole` = the user's role on this resource after
-   the read-time guard, or `""` if none.
+3. Principal roles = global roles + the user's **baseline role**
+   `BaselineRole(workspace role, basePermission)` **in the registration's
+   `workspaceID`** (the caller cannot choose the workspace). With "Follow
+   workspace role" the baseline is the workspace role, so the roles are exactly
+   what they would be today. Evaluation-only roles (never stored; they give
+   Cerbos a non-empty role list and let a policy recognize the case) are added
+   when there is no baseline:
+   - `workspace_member` — a workspace member whose base permission gives no
+     baseline (`None` for a `writer` / `reader`);
+   - `outside_collaborator` — no workspace role, but a valid `collaborator`
+     role assignment on this resource.
+4. Principal attributes: `resourceRole` = the user's role on this resource after
+   the read-time guard, or `""` if none; `workspaceRole` = the actual workspace
+   role (or `""`), for policies that need it.
 5. The Cerbos resource ID is the real `resourceId`.
 
-**Default model.** For workspace members (`owner` / `maintainer` / `writer` /
-`reader`), effective role = max(workspace role, resource role): the workspace
-role grants its access on every resource of the workspace, as today, and the
-resource role can only add to it. For outside collaborators only the resource
-role counts. Each role means the same at both levels (`owner` / `maintainer`:
-full control and member management; `writer`: read and edit; `reader`: read),
-so a policy implements "max" as the union of a workspace-role rule and a
+**Default model.** Effective role on a resource = max(baseline role, resource
+role). Workspace `owner` / `maintainer` always have a full baseline. For
+`writer` / `reader` the baseline comes from the base permission; with `None`
+they reach a resource only through a resource role. For outside collaborators
+only the resource role counts. Each role means the same at both levels
+(`owner` / `maintainer`: full control and member management; `writer`: read and
+edit; `reader`: read), so a policy implements "max" as the union of a
+role-list rule (now evaluated against the baseline role) and a
 `resourceRole`-condition rule per action — Cerbos allows if either matches.
+Because accounts substitutes the baseline into the principal roles, existing
+role-list rules need no change: they automatically follow the base permission
+for checks with a `resourceId` and keep using the actual workspace role for
+checks without one.
 
 Policies stay in each service's `definition.go`, using the conditions the
 reearthx generator already supports. Example for `dashboard:project`:
@@ -419,16 +504,16 @@ reearthx generator already supports. Example for `dashboard:project`:
 ```go
 // dashboard: definition.go
 resourceRole := func(expr string) *generator.Condition { return generator.SimpleExpr(expr) }
-any := []string{"*"} // any principal role (including outside_collaborator); the condition does the gating
+any := []string{"*"} // any principal role (incl. workspace_member / outside_collaborator); the condition does the gating
 
 builder.AddResource("project", []generator.ActionDefinition{
-    // workspace members: access to every project of the workspace via the workspace role
-    // ("outside_collaborator" is never listed here)
+    // baseline: with a resourceId these roles are the member's baseline role (workspace role + base permission)
+    // ("workspace_member" / "outside_collaborator" are never listed here)
     generator.NewActionDefinition("read", []string{"owner", "maintainer", "writer", "reader"}),
     generator.NewActionDefinition("edit", []string{"owner", "maintainer", "writer"}),
     generator.NewActionDefinition("delete", []string{"owner", "maintainer"}),
     generator.NewActionDefinition("manage_members", []string{"owner", "maintainer"}),
-    // project roles: add on top of the workspace role; the only source of access for outside collaborators
+    // project roles: add on top of the baseline; the only source of access without a baseline
     generator.NewActionDefinitionWithCondition("read", any, resourceRole(`P.attr.resourceRole != ""`)),
     generator.NewActionDefinitionWithCondition("edit", any, resourceRole(`P.attr.resourceRole in ["owner", "maintainer", "writer"]`)),
     generator.NewActionDefinitionWithCondition("delete", any, resourceRole(`P.attr.resourceRole in ["owner", "maintainer"]`)),
@@ -438,17 +523,41 @@ builder.AddResource("project", []generator.ActionDefinition{
 
 Because resource roles arrive as a principal **attribute**, not as principal
 roles, a project `owner` is never mistaken for a workspace `owner`: a project
-role counts only for the resource named in the check. Whether a product may
-apply stricter rules than this default (e.g. private projects that workspace
-members cannot see) is Open Question 1.
+role counts only for the resource named in the check. Per-project visibility on
+top of the base permission (e.g. a "public within the workspace" project) is
+Open Question 1.
 
-**Policy note for outside collaborators.** Policies must grant
-`outside_collaborator` nothing except through `P.attr.resourceRole` conditions.
-Rules keyed to explicit role lists already exclude it (fail-closed). Rules that
-grant on `*` without a `resourceRole` condition must be reviewed per service.
-Workspace-level resources (e.g. `dashboard:workspace`) are checked without a
-`resourceId`, so an outside collaborator has no workspace role there and is
-denied; what they may see at the workspace level is Open Question 7.
+**Policy note for members without a baseline and outside collaborators.**
+Policies must grant `workspace_member` and `outside_collaborator` nothing
+except through `P.attr.resourceRole` conditions. Rules keyed to explicit role
+lists already exclude them (fail-closed). Rules that grant on `*` without a
+`resourceRole` condition must be reviewed per service. Workspace-level
+resources (e.g. `dashboard:workspace`, "create project", "list projects") are
+checked without a `resourceId`, so they keep using the actual workspace role:
+under `None` a workspace writer can still create a project (and becomes its
+owner) and may call a list endpoint — **the service must filter the list** (see
+*Listing what a user may see*). An outside collaborator has no workspace role
+and is denied there; what they may see at the workspace level is Open
+Question 7.
+
+**Listing what a user may see.** A list screen cannot call `checkPermission`
+for every resource (Open Question 2). Services ask once per workspace:
+
+```graphql
+type ResourceAccess {
+  workspaceId: ID!
+  baselineRole: Role        # null = no baseline: only the bindings below are visible
+  bindings: [ResourceBinding!]!
+}
+extend type Query {
+  myResourceAccess(workspaceId: ID!, resourceKind: String!): ResourceAccess!
+}
+```
+
+If `baselineRole` is set, the user sees every resource of the kind in the
+workspace at least at that level; otherwise (a member under `None`, or an
+outside collaborator) the service lists only `bindings`. This is the same
+filtering for members under `None` and for outside collaborators.
 
 #### Membership management API
 
@@ -476,6 +585,15 @@ GET    /api/service/workspaces/{workspaceId}/seat-usage
 
 ```graphql
 enum ResourceGrant { MEMBER OUTSIDE_COLLABORATOR }
+enum BasePermission { FOLLOW_WORKSPACE_ROLE NONE READER WRITER }
+
+extend type Workspace {
+  basePermission: BasePermission!   # FOLLOW_WORKSPACE_ROLE when never set
+}
+input UpdateWorkspaceBasePermissionInput {
+  workspaceId: ID!
+  basePermission: BasePermission!
+}
 
 input SetResourceMemberInput {
   resourceKind: String!
@@ -533,6 +651,7 @@ extend type Mutation {
   removeResourceMember(input: RemoveResourceMemberInput!): Boolean!
   inviteOutsideCollaborator(input: InviteOutsideCollaboratorInput!): OutsideCollaborator
   removeOutsideCollaborator(input: RemoveOutsideCollaboratorInput!): Boolean!
+  updateWorkspaceBasePermission(input: UpdateWorkspaceBasePermissionInput!): Workspace
 }
 ```
 
@@ -558,6 +677,9 @@ after the locks:
 | `resourceMembers` | — | Cerbos `read` on `(kind, id)`; result filtered by the read-time guard |
 | `myResourceBindings` | — | operator's own role assignments only, filtered by the read-time guard |
 | `outsideCollaborators`, `workspaceSeatUsage` | — | operator may read workspace members (`read_member`); `seat-usage` route: M2M only |
+| `updateWorkspaceBasePermission` | workspace settings (`Lock`) | operator passes the existing workspace `manage` check (owner / maintainer); personal workspace rejected (v1, Open Question 10); then `SetBasePermission`. Takes effect on the next `checkPermission` — nothing else is rewritten |
+| `Workspace.basePermission` | — | anyone who can read the workspace (`read`) |
+| `myResourceAccess` | — | operator's own access only; `baselineRole` from `BaselineRole(...)`, `bindings` filtered by the read-time guard |
 
 **Seat limit.** The existing member-count hook (`enforceMemberCount`) is
 extended to count seats as `members + CountOutsideCollaborators(ws)`. It runs
@@ -583,7 +705,7 @@ an owner is set. The unregister endpoint is exempt.
   Open Question 9.
 - `deleteWorkspace` (`Workspace.Remove`): `RemoveInWorkspace(ws)` removes all
   registrations and all role assignments of the workspace, including outside
-  collaborators'.
+  collaborators', and `WorkspaceSettings.Remove(ws)` removes its settings.
 
 #### Concurrency
 
@@ -597,6 +719,8 @@ an owner is set. The unregister endpoint is exempt.
 | An outside collaborator is added to the workspace while being given another project role | Both take the workspace lock. If the workspace add runs first, the new assignment is written as `member`; if second, `ConvertResourceGrants` converts it. No `collaborator` assignment remains for a member. |
 | A stale snapshot `Save` from the workspace flow overwrites a newer role assignment (or vice versa) | Snapshot saves never write `resource_roles`; role-assignment writes never write `workspace_roles` (see *Repository changes*). |
 | Two multi-resource calls on overlapping resources deadlock | Fixed lock order: workspace lock, then registrations sorted by `(kind, id)`. |
+| Two admins change the base permission at once, or a change races a workspace save | The setting lives in its own record and is written under the workspace lock; the last committed value wins, and no workspace snapshot `Save` can revert it. |
+| A permission check runs while the base permission changes | The check reads the setting in the same round-trip as the registration, so it sees either the old or the new value; the next check sees the new one. Accounts does not cache the setting. Services that cache `checkPermission` / `myResourceAccess` results see the change after their cache TTL, so such caches must be short (or invalidated on change). |
 
 #### Lifecycle and cascades
 
@@ -611,7 +735,8 @@ an owner is set. The unregister endpoint is exempt.
 | Outside collaborator removed from the workspace | Accounts | `removeOutsideCollaborator` deletes all their `collaborator` assignments in the workspace |
 | Outside collaborator added as a workspace member | Accounts | `addUsersToWorkspace` converts their assignments in the workspace to `member`; still one seat |
 | Workspace member removed | Accounts | `bulkRemovePermittable` also calls `DeleteResourceRolesInWorkspace(ws, users, nil)` |
-| Workspace deleted (`Workspace.Remove`) | Accounts | `RemoveInWorkspace(ws)`: all registrations and assignments of the workspace, including outside collaborators' |
+| Workspace deleted (`Workspace.Remove`) | Accounts | `RemoveInWorkspace(ws)`: all registrations and assignments of the workspace, including outside collaborators'; the workspace's settings record is removed |
+| Base permission changed | Accounts | None: role assignments are untouched; only the baseline derived at check time changes |
 | Workspace deactivated / restored | Accounts | No change (mirrors workspace roles; data kept for restore) |
 | User deleted (`DeleteMe`) | Accounts | Today `DeleteMe` does not delete the permittable. Role assignments are unreachable once the user is gone; deleting the permittable on `DeleteMe` is proposed as a follow-up fix (independent of this feature). Until then, a deleted outside collaborator would still be counted by `CountOutsideCollaborators`, so the count joins active users (or the fix lands first) |
 
@@ -636,16 +761,20 @@ an owner is set. The unregister endpoint is exempt.
 - Mongo `Save` semantics change from replace to `$set` (touches existing code).
 - Existing workspace member flows must take the workspace lock and convert or
   delete role assignments.
+- Under a base permission other than the default, services must filter lists
+  with `myResourceAccess` instead of assuming workspace writers / readers see
+  everything.
 
 #### Detailed requirements
 
-The technical form of *Functional Requirements*. The items are FR-1 to FR-7 in
+The technical form of *Functional Requirements*. The items are FR-1 to FR-8 in
 order; other parts of this section refer to them by those numbers.
 
-1. `checkPermission` without `resourceId`: **no change** in reads.
-   With `resourceId`: **one additional indexed point read** (the resource
-   registration, by primary key). The role assignment itself is read from the
-   already-loaded permittable.
+1. `checkPermission` without `resourceId`: **no change** in reads or in
+   principal roles. With `resourceId`: **one additional round-trip** — the
+   resource registration by primary key, joined with the workspace's settings
+   by primary key (Postgres `LEFT JOIN`, Mongo `$lookup`). The role assignment
+   itself is read from the already-loaded permittable.
 2. On PostgreSQL, `Permittable.FindByUserID` loads the base row, workspace roles
    and resource roles in **one round-trip** (aggregated sub-selects), so adding
    resource roles does not add a query to `checkPermission`.
@@ -662,6 +791,8 @@ order; other parts of this section refer to them by those numbers.
 7. `CountOutsideCollaborators(ws)` is index-backed (`workspace_id, grant`) and
    counts distinct users; `workspaceSeatUsage` returns members + outside
    collaborators with no user counted twice.
+8. `myResourceAccess(ws, kind)` costs the already-loaded permittable plus one
+   point read of the workspace's settings.
 
 Scope notes (technical form of *Non-Goals*):
 
@@ -687,11 +818,11 @@ sequenceDiagram
 
     S->>A: checkPermission(service, resource, action, workspaceAlias?, resourceId)
     A->>DB: Permittable.FindByUserID(user)  (existing read, one round-trip)
-    A->>DB: Registration.FindByKey(kind, resourceId)  (new point read)
+    A->>DB: Registration.FindByKey(kind, resourceId) + workspace settings  (new round-trip)
     alt not registered, or alias ≠ registration.workspace
         A-->>S: { allowed: false }
     else
-        A->>A: attr.resourceRole = guarded role or ""<br/>roles = global + workspace roles in registration.workspace<br/>(+ outside_collaborator if no workspace role and a valid collaborator grant)
+        A->>A: attr.resourceRole = guarded role or ""<br/>roles = global + BaselineRole(workspace role, basePermission)<br/>(+ workspace_member if member without baseline,<br/>+ outside_collaborator if no workspace role and a valid collaborator grant)
         A->>C: CheckResources(principal{roles, attr}, resource{kind, resourceId}, action)
         C-->>A: ALLOW / DENY
         A-->>S: { allowed }
@@ -786,20 +917,34 @@ flowchart LR
 8. **Workspace switchers**: a user who is only an outside collaborator has no
    workspace membership, so services must use `myResourceBindings` to show
    those workspaces.
+9. **Base permission and lists**: services must not assume that a workspace
+   `writer` / `reader` sees every resource; list endpoints use
+   `myResourceAccess` and filter to `bindings` when `baselineRole` is null.
+   Checks with a `resourceId` already follow the setting.
+10. **Base permission UI**: the workspace settings screen shows and edits
+    `Workspace.basePermission` (owners / maintainers only).
 
 ##### Tests
 
 1. **Unit** (`pkg/resource`, `pkg/permittable`): kind/ID validation and length
    limits; one role per resource; grant validation; the read-time guard drops a
    `member` assignment without a matching workspace role and keeps a
-   `collaborator` assignment.
+   `collaborator` assignment; `BaselineRole` for every cell of the table above
+   (a missing settings record = "Follow workspace role").
 2. **Interactor** (`internal/usecase/interactor`):
    - `CheckPermission`: no `resourceId` → unchanged roles (regression);
      unregistered resource → deny; alias of another workspace → deny; workspace
      roles taken from the registration, not the alias; `resourceRole` set/empty;
      principal roles still carry the workspace role when a resource role is
      also present (so policies can compute max); `outside_collaborator` added
-     only for a non-member with a valid collaborator grant on that resource.
+     only for a non-member with a valid collaborator grant on that resource;
+     for each base permission, the principal roles with a `resourceId` equal the
+     baseline (`workspace_member` when none) and, without a `resourceId`, equal
+     today's workspace roles whatever the setting.
+   - `updateWorkspaceBasePermission`: owner / maintainer only; personal
+     workspace rejected; the next check uses the new value.
+   - `myResourceAccess`: `baselineRole` per setting and workspace role; null
+     for a member under `None` and for an outside collaborator.
    - Register: M2M only (JWT rejected); owner must be a workspace member;
      duplicate with same workspace is idempotent, different workspace is 409.
    - `setResourceMember`: member target → `member`; non-member target →
@@ -843,7 +988,14 @@ flowchart LR
    - workspace `owner` → every action on every project;
    - outside collaborator with `writer` on P → `read` / `edit` on P only,
      denied on every other project and on workspace-level resources;
-   - user from another workspace → denied.
+   - user from another workspace → denied;
+   - base permission `None`: workspace `reader` / `writer` without a role
+     assignment → denied on every project; with resource `writer` on P →
+     `read` / `edit` on P only; workspace `maintainer` → every action on every
+     project;
+   - base permission `Writer`: workspace `reader` → `edit` allowed on every
+     project; base permission `Reader`: workspace `writer` → `edit` denied
+     unless a resource role allows it.
 
 ##### Deployment
 
@@ -860,6 +1012,9 @@ flowchart LR
    5. Billing switches to `workspaceSeatUsage` / `seat-usage`, and services show
       collaborator-only workspaces via `myResourceBindings`.
    6. Enable the UI that creates outside collaborators (only after step 5).
+   7. Services filter lists with `myResourceAccess`; only then enable the UI
+      that changes the base permission. Until a workspace changes it, every
+      workspace is "Follow workspace role", so steps 1–6 change nobody's access.
 3. Notify: dashboard / visualizer / cms owners; billing owner; whoever maintains
    Cerbos policies.
 4. Config changes: none (reuses the existing M2M API key).
@@ -869,9 +1024,13 @@ flowchart LR
 ##### Rollback
 
 1. Notify the cause in the team Slack channel.
-2. Disable the outside-collaborator UI, switch billing back to member counts,
-   then revert consumer services / policies that rely on `resourceId` /
-   `resourceRole`.
+2. Disable the outside-collaborator and base-permission UIs, switch billing
+   back to member counts, then revert consumer services / policies that rely on
+   `resourceId` / `resourceRole`. **Access widens** for workspaces whose base
+   permission is not the default: the old version has no base permission, so
+   their writers / readers see every project again. List those workspaces
+   (`base_permission <> 'follow_workspace_role'`) and inform their admins before
+   rolling back; prefer a fix-forward if any of them depend on `None`.
 3. Roll back the accounts image. The old binary ignores the new collections,
    tables and `resource_roles` field, so **no data rollback is required**.
    Outside collaborators lose access while the old version runs (the feature is
@@ -881,7 +1040,8 @@ flowchart LR
    since the feature is disabled; services re-run the backfill on roll-forward,
    but dropped outside-collaborator assignments must be re-invited.
 4. Only if the schema itself must be removed: run `0005` down (drops
-   registrations, role assignments and workspace locks — take a dump first).
+   registrations, role assignments and workspace settings, including base
+   permissions — take a dump first).
 
 ##### Post-deployment checks and monitoring
 
@@ -900,6 +1060,12 @@ flowchart LR
     gone and the seat count drops.
   - Add an outside collaborator to the workspace; verify their project roles are
     kept and the seat count is unchanged.
+  - Verify that workspaces without a settings record report
+    `FOLLOW_WORKSPACE_ROLE` and that checks for their members are unchanged.
+  - `updateWorkspaceBasePermission(NONE)` on a staging workspace; verify a
+    `reader` without resource roles is denied on every project, `myResourceAccess`
+    returns `baselineRole: null`, a `maintainer` still has full access, and
+    switching back restores access on the next check.
 - Metrics
   - `checkPermission` p50/p95 latency with and without `resourceId`.
   - Error rate of register / unregister / `setResourceMember` /
@@ -912,12 +1078,12 @@ flowchart LR
 
 #### Technical notes on open questions
 
-1. **Resource attributes in `checkPermission`:** proposal — an optional
-   `attributes: JSON` on `CheckPermissionInput`, passed through to the Cerbos
-   resource (e.g. `visibility`). A stricter per-product rule (e.g. workspace
-   members cannot read a `private` project without a resource role) would then
-   be a condition on the workspace-role rules, e.g.
-   `R.attr.visibility != "private"`; the default policy above stays additive.
+1. **Resource attributes in `checkPermission`:** restricting members is now done
+   with the base permission. If per-project visibility is still needed (e.g. a
+   project readable by the whole workspace even under `None`), the proposal is
+   an optional `attributes: JSON` on `CheckPermissionInput`, passed through to
+   the Cerbos resource (e.g. `visibility`), and a rule such as
+   `read` for `workspace_member` when `R.attr.visibility == "workspace"`.
 2. **Batch checks:** a `checkPermissions` query over many `resourceId`s for list
    screens. Cerbos `CheckResources` already supports multiple resources.
 3. **Per-service M2M keys:** v1 accepts the existing shared M2M API key for
@@ -947,6 +1113,17 @@ flowchart LR
 9. **Convert on removal:** `removeUserFromWorkspace` would accept the resources
    to keep and, in the same transaction, `ConvertResourceGrants` for those
    (member → collaborator) and delete the rest; the seat stays in use.
+10. **Base permission on personal / Free workspaces:** v1 rejects
+    `updateWorkspaceBasePermission` on personal workspaces. Restricting it by
+    plan would add a plan check (the same source `enforceMemberCount` uses) to
+    that guard.
+11. **`Maintainer` as a base permission value:** add `MAINTAINER` to the enum
+    and a column to the `BaselineRole` table; nothing else changes. It would let
+    every member manage every project's members, so it is left out of v1.
+12. **Scope of the setting:** proposed platform-wide per workspace (one record
+    per workspace, applied to every resource kind). A per-service setting would
+    key the record by `(workspaceID, service)` and look it up by the
+    registration's kind prefix; the round-trip in FR-1 stays the same.
 
 ### Option 2: Role assignments in their own collection/table (no embedding)
 
@@ -973,21 +1150,27 @@ solves only (4).
 
 **For each project, accounts keeps only two facts: which workspace it belongs
 to, and who holds which role on it (and whether each of them is a workspace
-member or an outside collaborator).** Everything else about the project stays
-in the service.
+member or an outside collaborator).** For each workspace, it also keeps one
+setting: the base permission. Everything else about the project stays in the
+service.
 
 ### Workspace members and outside collaborators
 
-- **Workspace members** (owner / maintainer / writer / reader) see every
-  project in the workspace through their workspace role, as today. A project
-  role can raise their access on that project, never lower it. They are like
-  GitHub organization members whose base permission gives access to every
-  repository.
-- **Outside collaborators** (name tentative) are not workspace members. They
-  have a role on specific projects only, see and act on only those projects, and
-  only their project role counts. They do not appear in the workspace's member
-  list. They are modeled on GitHub's outside collaborators, who have access to
-  specific repositories without being organization members.
+- **Workspace members** are the people in the organization — for example the
+  employees an SSO / SCIM connection adds. Their workspace role (owner /
+  maintainer / writer / reader) is unchanged and still governs workspace-level
+  things, such as managing members or creating projects.
+  - **Owners and maintainers** always have full access to every project, like
+    GitHub organization owners.
+  - **Writers and readers** get, on every project, the level set by the
+    workspace's base permission (below). A project role can raise their access
+    on that project, never lower it.
+- **Outside collaborators** (name tentative) are people from outside the
+  organization, such as a partner company's staff. They are not workspace
+  members: they have a role on specific projects only, see and act on only
+  those projects, and only their project role counts. They do not appear in the
+  workspace's member list, and the base permission does not apply to them. They
+  are modeled on GitHub's outside collaborators.
 - So every project member is either a workspace member or an outside
   collaborator of that project.
 - **Seats.** Re:Earth bills per seat per workspace. As on GitHub, an outside
@@ -997,6 +1180,31 @@ in the service.
   the number of outside collaborators per workspace so billing can count
   seats = workspace members + outside collaborators.
 
+### Base permission
+
+Each workspace has a **base permission** (name tentative), like a GitHub
+organization's base permission. It decides what writers and readers of the
+workspace get on every project:
+
+| Base permission | Writers and readers get, on every project |
+|---|---|
+| **Follow workspace role** (default) | Their workspace role — exactly today's behavior |
+| **None** | Nothing; they see only projects where they have a project role |
+| **Reader** | View |
+| **Writer** | View and edit |
+
+- Owners and maintainers always have full access, whatever the setting.
+- On each project, a writer or reader gets the higher of the base permission and
+  their project role.
+- Only workspace owners and maintainers can change it, and the change takes
+  effect immediately for all members.
+- **Keeping teams apart in one workspace.** When workspace creation is
+  restricted under SSO and all employees work in one organization workspace,
+  set the base permission to "None" and give each team project roles on its own
+  projects. Employees stay workspace members (managed by SSO / SCIM), and each
+  sees only their own projects. Outside collaborators are not needed for this;
+  they are for people outside the organization.
+
 ### Checking a permission on a project
 
 1. A service asks accounts whether a user may do something (for example, edit)
@@ -1004,21 +1212,28 @@ in the service.
 2. Accounts looks up which workspace the project belongs to. If the service
    never registered the project, or the request names a different workspace,
    the answer is "no".
-3. Accounts combines the user's role in that workspace with the user's role on
-   the project (if any) and applies the service's permission policy. By
-   default:
-   - a **workspace member** gets the higher of their workspace role and their
-     project role;
+3. Accounts combines the user's role in that workspace, the workspace's base
+   permission and the user's role on the project (if any), and applies the
+   service's permission policy:
+   - a workspace **owner or maintainer** has full access;
+   - a workspace **writer or reader** gets the higher of what the base
+     permission gives them and their project role (with "None", only their
+     project role);
    - an **outside collaborator** gets only their project role; on any other
      project of the workspace they have no access.
 4. A workspace member's project role only counts while they are still a member
    of the project's workspace.
+5. Checks that do not name a project (for example "may this user create a
+   project in this workspace?") still use the workspace role, as today. So when
+   a service lists projects, it asks accounts whether the person sees every
+   project or only those where they have a project role, and filters the list
+   accordingly.
 
 ### Creating a project and adding members
 
 1. A user creates a project in a service. The service saves it and registers it
    with accounts, naming the creator as its owner (the creator must be a
-   workspace member).
+   workspace member). So even under "None", the creator can see the project.
 2. Someone allowed to manage the project's members adds a person with a role
    (for example, writer). If the person is a workspace member, they just get
    the project role. If not, they become an outside collaborator on that
@@ -1066,17 +1281,19 @@ Question 6.
 
 ### Example: Dashboard projects
 
-| Who | What they can do |
-|---|---|
-| Workspace owner / maintainer | View, edit and delete every project in the workspace, and manage its members |
-| Workspace writer | View and edit every project in the workspace |
-| Workspace reader | View every project in the workspace |
-| A project role on top of a workspace role | Adds to the workspace role on that project only — for example, a workspace reader who is a writer on a project can edit that project. It never reduces what the workspace role allows |
-| Outside collaborator (name tentative) with a project role | That project only, with the project role's permissions (owner / maintainer: view, edit, delete and manage members; writer: view and edit; reader: view) |
+| Who | Base permission "Follow workspace role" (default) | Base permission "None" |
+|---|---|---|
+| Workspace owner / maintainer | View, edit and delete every project, and manage its members | Same |
+| Workspace writer | View and edit every project | Only projects where they have a project role, with that role |
+| Workspace reader | View every project | Only projects where they have a project role, with that role |
+| A project role held by a workspace writer / reader | Adds to their workspace role on that project only — for example, a workspace reader who is a writer on a project can edit it. Never reduces access | Is their access to that project |
+| Outside collaborator (name tentative) with a project role | That project only, with the project role's permissions | Same |
 
-Anyone else has no access. Each role means the same on a workspace and on a
-project, and a workspace member's access to a project is the higher of the two.
-Whether a product may apply stricter rules (for example, private projects) is an
+Project role permissions: owner / maintainer — view, edit, delete and manage
+members; writer — view and edit; reader — view. With "Reader" or "Writer" as the
+base permission, workspace writers and readers get that level on every project,
+plus anything their project roles add. Anyone else has no access. Whether a
+single project can be opened to the whole workspace even under "None" is an
 open question.
 
 Technical details: see *Solution Options → Option 1 → Request flows (sequence
@@ -1099,9 +1316,10 @@ diagrams)*.
 5. **Role names are shared between workspaces and projects.** "Owner",
    "maintainer", "writer" and "reader" exist at both levels. Whoever writes a
    service's permission policy must treat "project owner" and "workspace owner"
-   as different things, and must keep the default model: workspace roles still
-   give access to every project, a project role only adds to it, and outside
-   collaborators get nothing beyond their project roles.
+   as different things, and must keep the model: owners and maintainers see
+   every project, writers and readers get what the base permission gives plus
+   their project roles, and outside collaborators get nothing beyond their
+   project roles.
 6. **Only services that use the feature need to update.** Services that use the
    new features must update the client library they use to talk to accounts;
    services that don't update keep working unchanged.
@@ -1111,6 +1329,13 @@ diagrams)*.
 8. **Where people find their workspaces.** An outside collaborator is not a
    workspace member, so screens that list "my workspaces" must also show
    workspaces where the person only works on some projects.
+9. **Services must not assume workspace writers and readers see everything.**
+   When a workspace's base permission is not the default, project lists and
+   other screens must show writers and readers only what they may see, the same
+   way as for outside collaborators.
+10. **The base permission must be visible in the UI.** The workspace settings
+    screen shows it and lets owners and maintainers change it, so admins can
+    tell why someone cannot see a project.
 
 Technical details: see *Solution Options → Option 1 → Technical notes: impact,
 tests, deployment, rollback, monitoring*.
@@ -1172,6 +1397,19 @@ tests, deployment, rollback, monitoring*.
      one action, ends their access and frees the seat.
    - Adding an outside collaborator to the workspace keeps their project roles
      and uses no extra seat.
+10. **Base permission.**
+    - A workspace that never changed it behaves exactly as today.
+    - With "None", writers and readers see only projects where they have a
+      project role; owners and maintainers still see everything; a member who
+      creates a project can see it.
+    - With "Reader" or "Writer", writers and readers get that level on every
+      project, plus their project roles.
+    - Checks that do not name a project give the same results whatever the
+      setting.
+    - Outside collaborators are not affected.
+    - Only owners and maintainers can change it, and the change applies to the
+      next check.
+    - Project lists show members under "None" only their own projects.
 
 Technical details: see *Solution Options → Option 1 → Technical notes: impact,
 tests, deployment, rollback, monitoring*.
@@ -1193,6 +1431,10 @@ tests, deployment, rollback, monitoring*.
    5. Billing starts counting outside collaborators, and services show
       workspaces where a person is only an outside collaborator.
    6. The UI for adding outside collaborators is turned on — only after step 5.
+   7. Services filter project lists by what each person may see; then the UI
+      for changing the base permission is turned on. Every workspace starts at
+      "Follow workspace role", so nobody's access changes until an admin
+      changes the setting — the rollout is safe.
 3. **Who to notify:** the dashboard / visualizer / cms owners, the billing
    owner, and whoever maintains the permission policies.
 4. **Configuration changes:** none.
@@ -1205,9 +1447,12 @@ tests, deployment, rollback, monitoring*.
 ## Rollback Plan
 
 1. Share the cause in the team Slack channel.
-2. First, turn off the UI for adding outside collaborators, switch billing back
-   to counting workspace members only, and turn off project-level permission
-   rules in the services that use them.
+2. First, turn off the UI for adding outside collaborators and for changing the
+   base permission, switch billing back to counting workspace members only, and
+   turn off project-level permission rules in the services that use them.
+   **Rolling back widens access** in workspaces whose base permission is not
+   the default: their writers and readers see every project again. Tell those
+   workspaces' admins first, and prefer fixing forward if they rely on "None".
 3. Roll accounts back to the previous version. The previous version simply
    ignores the new data, so **no data rollback is required**.
    Note: while the previous version runs, outside collaborators have no access
@@ -1241,6 +1486,11 @@ tests, deployment, rollback, monitoring*.
     access and the seat is freed.
   - Add an outside collaborator to the workspace as a member; check that they
     keep their project roles and the seat count does not change.
+  - Check that existing workspaces show "Follow workspace role" and that their
+    members' access has not changed.
+  - Set a staging workspace's base permission to "None"; check that a reader
+    with no project roles sees no projects (also in project lists), a maintainer
+    still sees all of them, and setting it back restores access immediately.
 - Metrics
   - How long permission checks take (typical and slowest 5%), with and without a
     project named.
@@ -1259,12 +1509,12 @@ tests, deployment, rollback, monitoring*.
 
 ## Open Questions
 
-1. **Should a product be able to apply stricter rules, such as private
-   projects?** By default, workspace members see every project and a project
-   role only adds to that. A rule like "private projects are visible only to
-   their members, public ones to the whole workspace" would restrict workspace
-   members too, and needs to know whether a project is public. Deferred until a
-   product needs it.
+1. **Do we still need per-project visibility?** Keeping members from seeing
+   projects is now done with the base permission ("None" plus project roles).
+   What remains is the opposite case: under "None", should a single project be
+   openable to the whole workspace (a "visible to all members" project), as
+   GitHub does with internal repositories? That would need accounts to know a
+   project's visibility. Deferred until a product needs it.
 2. **Should list screens be able to check many projects at once?** A screen that
    lists projects needs a permission answer for each one; one combined check
    would be faster.
@@ -1295,6 +1545,16 @@ tests, deployment, rollback, monitoring*.
 9. **When a workspace member is removed, should we offer to keep them as an
    outside collaborator** on selected projects, as GitHub does? Today all their
    project roles in the workspace are removed.
+10. **Should Free plans and personal workspaces offer the base permission?** A
+    personal workspace has a single member, so the first version does not offer
+    it there. Whether it is a paid-plan feature is a product decision.
+11. **Should "Maintainer" be allowed as a base permission value?** It would let
+    every writer and reader manage every project's members. The first version
+    offers only "Follow workspace role", "None", "Reader" and "Writer".
+12. **Should the base permission be per service or platform-wide?** Proposed:
+    one setting per workspace that applies to every service (Dashboard,
+    Visualizer, CMS, Flow), so admins set it once and people see the same thing
+    everywhere.
 
 Technical details: see *Solution Options → Option 1 → Technical notes on open
 questions*.
