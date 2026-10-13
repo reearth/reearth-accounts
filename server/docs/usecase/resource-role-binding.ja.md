@@ -51,10 +51,11 @@
   組織として機能させられます。SSO / SCIM とは別の機能ですが、ワークスペースの作成を
   制限できるようになった時点で使えるよう、早めに実装できる状態にしたいと考えています。
 - 目指すモデルは GitHub に近いものです。workspace と project の関係は、GitHub の
-  organization と repository の関係に相当します。GitHub に organization member、
-  repository member、そして *outside collaborator*（organization には所属せず、特定の
-  repository にだけアクセスできる人）があるのと同様に、Re:Earth にも workspace member、
-  project member、外部コラボレーターを持たせます。
+  organization と repository の関係に相当します。GitHub では、人は *organization member* か
+  *outside collaborator*（organization には所属せず、特定の repository にだけアクセスできる人）の
+  どちらかで、どちらにも repository ごとにロールを付けられます。同様に、Re:Earth にも
+  workspace member と外部コラボレーターを持たせ、どちらにも project ごとにロールを付けられるように
+  します。
 
 ### 現状
 

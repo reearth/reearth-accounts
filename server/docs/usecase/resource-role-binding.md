@@ -59,11 +59,12 @@ steps:
   it implementable early so it is ready when workspace creation can be
   restricted.
 - The intended model is close to GitHub's: a workspace relates to its projects
-  the way a GitHub organization relates to its repositories. Just as GitHub has
-  organization members, repository members and *outside collaborators* (people
-  who are not in the organization but have access to specific repositories),
-  Re:Earth would have workspace members, project members and outside
-  collaborators.
+  the way a GitHub organization relates to its repositories. On GitHub, people
+  are either *organization members* or *outside collaborators* (people who are
+  not in the organization but have access to specific repositories), and both
+  can be given a role on each repository. Likewise, Re:Earth would have
+  workspace members and outside collaborators, and both can be given a role on
+  each project.
 
 ### Current situation
 
