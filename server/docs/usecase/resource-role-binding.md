@@ -19,6 +19,21 @@
 
 ## Background / Problem Statement
 
+### Motivation (product context)
+
+- While introducing SSO, we discussed whether users should be able to create
+  workspaces freely, and there was a request to make workspace creation
+  restrictable via an option. With that restriction, a single workspace would
+  have to hold many projects.
+- Today members can only be assigned per workspace, so customers manage members
+  workspace by workspace — even though the people involved differ from project
+  to project. When customers want to share a project across workspaces, they
+  currently copy the project into the target workspace.
+- Assigning members and permissions per project lets a workspace function as an
+  organization. This is a separate feature from SSO / SCIM, but we want to make
+  it implementable early so it is ready when workspace creation can be
+  restricted.
+
 ### Current situation (fact)
 
 - reearth-accounts is the authorization hub for the Re:Earth platform. A user's
@@ -591,6 +606,11 @@ flowchart LR
 4. **Orphan sweeper** for registrations of resources deleted without unregister:
    worth it, or rely on service discipline?
 5. **Integration members** on resources (M2M tokens) — needed by cms?
+6. **Where members are managed in the UI.** Should project membership be
+   managed only in the Dashboard, or also within each service's own UI
+   (visualizer / cms / flow)? This does not change the accounts API (all
+   clients call the same membership API), but it affects which services need
+   UI work and is to be decided together with the designer.
 
 ## Reviewed by
 
