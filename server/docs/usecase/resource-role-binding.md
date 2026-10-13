@@ -1,11 +1,11 @@
 # Resource Role Assignment (Generic Per-Resource Membership)
 
-> **Status: DRAFT.** Adds a generic, opaque **"user × resource → role"** role
-> assignment to `permittable`, so that consumer services (dashboard, visualizer,
-> cms, …) can express per-resource membership such as *project members*
-> **without reearth-accounts learning what a project is**. The first consumer is
-> `dashboard:project`. In code, a role assignment is represented by types and
-> tables named `...Binding` / `resource_bindings`.
+> **Status: DRAFT.** Lets members and roles be set **per project** — and, more
+> generally, per resource of any service — so that services (dashboard,
+> visualizer, cms, …) can have project members without each building its own
+> membership system, and **without reearth-accounts learning what a project
+> is**. The first to use it is Dashboard projects. In code, a role assignment is
+> represented by types and tables named `...Binding` / `resource_bindings`.
 >
 > Japanese version: [resource-role-binding.ja.md](resource-role-binding.ja.md)
 
@@ -65,15 +65,15 @@ If each service implements project membership on its own:
    leaves a user with access to a project in a workspace they have left.
 3. "A project member must be a member of the workspace" cannot be validated
    locally by the service without calling accounts anyway.
-4. Authorization logic splits across N services instead of living in Cerbos
-   policies evaluated through one entry point.
+4. Permission rules end up scattered across every service, instead of being
+   decided in one place (accounts).
 
 ### Constraint (the reason for this design's shape)
 
-Accounts must **not** absorb the *project* domain. Project existence, names,
-visibility, content and lifecycle remain owned by each service. Accounts may
-only own the *authorization* concept: "this opaque resource belongs to this
-workspace, and this principal holds this role on it".
+Accounts must **not** take over what a *project* is. Whether a project exists,
+its name, visibility, content and lifecycle stay with each service. Accounts
+only keeps what it needs to decide permissions: "this project belongs to this
+workspace, and this user has this role on it".
 
 ## Goals
 
@@ -99,40 +99,43 @@ workspace, and this principal holds this role on it".
 
 ## Non-Goals
 
-1. Storing any resource metadata (name, visibility, owner, timestamps) in accounts.
-2. Validating that a resource exists. Accounts trusts the **M2M-authenticated**
-   service that registers it.
-3. Detecting resource deletion. The owning service is responsible for calling
-   the unregister endpoint (see *Lifecycle*).
-4. Resource hierarchies / inheritance (e.g. folder → project → layer). Can be
-   layered later via policy; out of scope now.
-5. Integration (M2M) members on resources. Only user principals in v1.
-6. Passing arbitrary resource attributes (e.g. `visibility`) into
-   `checkPermission`. Tracked as an Open Question; v1 policies use roles only.
-7. Sending invite emails for resource membership. Emails carry resource
-   names, which accounts does not have; the service sends them.
+1. **Storing project details in accounts.** Names, visibility, owners, dates and
+   other information about a project stay in the service that owns it.
+2. **Checking that a project really exists.** Accounts trusts the service that
+   registers the project. Only services can register projects, not users.
+3. **Noticing on its own when a project is deleted.** The service that owns the
+   project must tell accounts when it is deleted.
+4. **Nested resources and inherited permissions** (for example folder → project
+   → layer). These could be added later through permission policies.
+5. **Integrations as project members.** In the first version only people (user
+   accounts) can be project members, not integrations or API tokens.
+6. **Using project properties in permission decisions** (for example "public"
+   or "private"). See *Open Questions*; the first version decides by roles only.
+7. **Sending invitation emails for project membership.** The email mentions the
+   project's name, which accounts does not know, so the service sends it.
 
 ## Functional Requirements
 
-1. `checkPermission` without `resourceId`: **no change** in reads.
-   With `resourceId`: **one additional indexed point read** (the resource
-   registration, by primary key). The role assignment itself is read from the
-   already-loaded permittable.
-2. On PostgreSQL, `Permittable.FindByUserID` loads the base row, workspace roles
-   and resource roles in **one round-trip** (aggregated sub-selects), so adding
-   resource roles does not add a query to `checkPermission`.
-3. Field limits, enforced in the domain layer and as DB constraints:
-   - `resourceKind`: ≤ 64 bytes, `^[a-z0-9-]{1,32}:[a-z0-9_-]{1,31}$`
-   - `resourceID`: ≤ 128 bytes, `^[A-Za-z0-9_.:-]{1,128}$`
-4. Expected scale: ≤ ~1,000 role assignments per user (≤ ~300 B each with the limits
-   above, i.e. ≤ ~300 KB per Mongo document, well under 16 MB) and ≤ ~1,000
-   members per resource.
-5. Listing members of one resource is index-backed and returns only
-   `(userId, role)` for that resource — it never hydrates whole aggregates.
-6. All mutations work on both MongoDB and PostgreSQL backends and in the
-   `memory` repo.
+1. **Permission checks stay fast.** Checks that do not name a project cost
+   exactly the same as today. Checks that name a project add only one small,
+   quick lookup (which workspace the project belongs to); the user's project
+   roles are read together with the data accounts already loads.
+2. **Names and IDs have size limits.** The resource type name and the resource
+   ID have a maximum length and a fixed set of allowed characters, so stored
+   data stays small and predictable.
+3. **Designed for realistic scale.** Up to about 1,000 project role assignments
+   per user, and up to about 1,000 members per project.
+4. **Listing a project's members is quick.** It returns only who the members are
+   and their roles; names and other details come from the service.
+5. **Works with every database accounts supports.** Membership changes behave
+   the same whichever database a deployment uses.
+
+Technical details: see *Solution Options → Option 1 → Detailed requirements*.
 
 ## Solution Options
+
+This section describes the system design in detail and is intended for readers
+interested in the implementation; the other sections can be read without it.
 
 ### Option 1 (Recommended): Resource registration + role assignments embedded in `Permittable`
 
@@ -424,30 +427,43 @@ endpoint is exempt.
 - Services must register resources (including a backfill) and unregister on delete.
 - Mongo `Save` semantics change from replace to `$set` (touches existing code).
 
-### Option 2: Role assignments in their own collection/table (no embedding)
+#### Detailed requirements
 
-Same registration and API, but role assignments live in a standalone
-`resource_bindings (kind, id, userID, role)` collection/table instead of on the
-permittable.
+The technical form of *Functional Requirements*. The items are FR-1 to FR-6 in
+order; other parts of this section refer to them by those numbers.
 
-**Pros:** no permittable growth; member listing is a plain index scan; snapshot
-`Save` semantics do not need to change.
+1. `checkPermission` without `resourceId`: **no change** in reads.
+   With `resourceId`: **one additional indexed point read** (the resource
+   registration, by primary key). The role assignment itself is read from the
+   already-loaded permittable.
+2. On PostgreSQL, `Permittable.FindByUserID` loads the base row, workspace roles
+   and resource roles in **one round-trip** (aggregated sub-selects), so adding
+   resource roles does not add a query to `checkPermission`.
+3. Field limits, enforced in the domain layer and as DB constraints:
+   - `resourceKind`: ≤ 64 bytes, `^[a-z0-9-]{1,32}:[a-z0-9_-]{1,31}$`
+   - `resourceID`: ≤ 128 bytes, `^[A-Za-z0-9_.:-]{1,128}$`
+4. Expected scale: ≤ ~1,000 role assignments per user (≤ ~300 B each with the limits
+   above, i.e. ≤ ~300 KB per Mongo document, well under 16 MB) and ≤ ~1,000
+   members per resource.
+5. Listing members of one resource is index-backed and returns only
+   `(userId, role)` for that resource — it never hydrates whole aggregates.
+6. All mutations work on both MongoDB and PostgreSQL backends and in the
+   `memory` repo.
 
-**Cons:** `checkPermission` needs a second extra read (the role assignment) on top of
-the registration; workspace cascades touch two stores.
+Scope notes (technical form of *Non-Goals*):
 
-**Decision:** Option 1. Revisit Option 2 if per-user role-assignment counts approach
-FR-4 or if the Mongo `Save` change proves risky.
+- Resource existence is not validated. Accounts trusts the
+  **M2M-authenticated** service that registers a resource, and relies on that
+  service to call the unregister endpoint when the resource is deleted (see
+  *Lifecycle and cascades*).
+- v1 role assignments are for **user principals only**; integration (M2M)
+  principals cannot hold resource roles.
+- v1 `checkPermission` passes no resource attributes (e.g. `visibility`) to
+  Cerbos; policies use roles only (see *Technical notes on open questions*).
 
-### Alternative considered and rejected: membership in each service
+#### Request flows (sequence diagrams)
 
-Rejected because of the duplication and cascade problems in *Problem* (1)–(4).
-The variant "services keep members but pass the role to Cerbos as an attribute"
-solves only (4).
-
-## Design
-
-### Permission check with a resource ID
+##### Permission check with a resource ID
 
 ```mermaid
 sequenceDiagram
@@ -469,7 +485,7 @@ sequenceDiagram
     end
 ```
 
-### Project creation and member invite
+##### Project creation and member invite
 
 ```mermaid
 sequenceDiagram
@@ -488,7 +504,7 @@ sequenceDiagram
     A-->>S: ok
 ```
 
-### Workspace member removal cascade
+##### Workspace member removal cascade
 
 ```mermaid
 flowchart LR
@@ -497,7 +513,9 @@ flowchart LR
     B --> RR[DeleteResourceRolesInWorkspace ws, users → targeted delete]
 ```
 
-## Potential Impact
+#### Technical notes: impact, tests, deployment, rollback, monitoring
+
+##### Impact
 
 1. **Permittable document/row size** grows by ≤ ~300 B per role assignment.
 2. **Mongo `Permittable.Save`** changes from replace to `$set`; existing tests
@@ -512,7 +530,7 @@ flowchart LR
 6. **gqlclient** (`server/pkg/gqlclient`) consumers need a version bump to use
    the new fields; old clients are unaffected.
 
-## Test Plan
+##### Tests
 
 1. **Unit** (`pkg/resource`, `pkg/permittable`): kind/ID validation and length
    limits; one role per resource; read-time guard drops role assignments without a
@@ -538,7 +556,7 @@ flowchart LR
    conditions above; verify member / non-member / workspace-owner /
    other-workspace outcomes.
 
-## Deployment Plan
+##### Deployment
 
 1. Backward compatible? **Yes.** New optional input field, new collection/tables,
    new routes and GraphQL fields. Behavior is unchanged when `resourceId` is absent.
@@ -554,7 +572,7 @@ flowchart LR
 5. DDL: Postgres migration `0005` runs automatically at startup (golang-migrate).
    Mongo: collection schema + indexes via the startup migration; no backfill in accounts.
 
-## Rollback Plan
+##### Rollback
 
 1. Notify the cause in the team Slack channel.
 2. Revert consumer services / policies that rely on `resourceId` / `resourceRole` first.
@@ -566,7 +584,7 @@ flowchart LR
 4. Only if the schema itself must be removed: run `0005` down (drops
    registrations and role assignments — take a dump first).
 
-## Post Deployment
+##### Post-deployment checks and monitoring
 
 - Checklist
   - Create a project in dashboard staging; verify the registration and the
@@ -583,26 +601,242 @@ flowchart LR
   - `checkPermission` error rate: Warning > 1%, Danger ≥ 5%.
   - `checkPermission` p95 latency: Warning > +20% vs baseline.
 
+#### Technical notes on open questions
+
+1. **Resource attributes in `checkPermission`:** proposal — an optional
+   `attributes: JSON` on `CheckPermissionInput`, passed through to the Cerbos
+   resource (e.g. `visibility`).
+2. **Batch checks:** a `checkPermissions` query over many `resourceId`s for list
+   screens. Cerbos `CheckResources` already supports multiple resources.
+3. **Per-service M2M keys:** v1 accepts the existing shared M2M API key for
+   register/unregister (`POST` / `DELETE /api/service/resources`). Option: scope
+   each key to the kinds of its own service (`dashboard:*`).
+4. **Orphan sweeper:** would remove registrations of resources deleted without
+   calling the unregister endpoint.
+5. **Integration members:** M2M tokens as resource principals (possibly needed
+   by cms).
+
+### Option 2: Role assignments in their own collection/table (no embedding)
+
+Same registration and API, but role assignments live in a standalone
+`resource_bindings (kind, id, userID, role)` collection/table instead of on the
+permittable.
+
+**Pros:** no permittable growth; member listing is a plain index scan; snapshot
+`Save` semantics do not need to change.
+
+**Cons:** `checkPermission` needs a second extra read (the role assignment) on top of
+the registration; workspace cascades touch two stores.
+
+**Decision:** Option 1. Revisit Option 2 if per-user role-assignment counts approach
+FR-4 or if the Mongo `Save` change proves risky.
+
+### Alternative considered and rejected: membership in each service
+
+Rejected because of the duplication and cascade problems in *Problem* (1)–(4).
+The variant "services keep members but pass the role to Cerbos as an attribute"
+solves only (4).
+
+## Design
+
+**For each project, accounts keeps only two facts: which workspace it belongs
+to, and who holds which role on it.** Everything else about the project stays in
+the service.
+
+### Checking a permission on a project
+
+1. A service asks accounts whether a user may do something (for example, edit)
+   on a specific project.
+2. Accounts looks up which workspace the project belongs to. If the service
+   never registered the project, or the request names a different workspace,
+   the answer is "no".
+3. Accounts combines the user's role in that workspace with the user's role on
+   the project (if any) and applies the service's permission policy.
+4. A project role only counts while the user is still a member of the project's
+   workspace.
+
+### Creating a project and inviting members
+
+1. A user creates a project in a service. The service saves it and registers it
+   with accounts, naming the creator as its owner (the creator must be a
+   workspace member).
+2. The owner invites another workspace member with a role (for example,
+   writer). Accounts checks that the invited person is in the workspace and that
+   the inviter is allowed to manage members, then saves the role.
+3. Member changes on the same project are processed one at a time, so the last
+   owner can never be removed, even when two people act at once. Members can
+   leave a project themselves, except the last owner.
+4. A project registered without an owner (for example, one that existed before
+   this feature) is managed through workspace roles until an owner is set.
+
+### Removing someone from a workspace
+
+When a user is removed from a workspace, or the workspace is deleted, accounts
+removes their workspace role and all their project roles in that workspace in
+the same step. When a workspace is deleted, its project registrations are
+removed too. Deactivating a workspace removes nothing, so it can be restored.
+
+### Example: Dashboard projects
+
+| Who | What they can do |
+|---|---|
+| Workspace owner / maintainer | View, edit and delete every project in the workspace, and manage its members |
+| Project owner | View, edit and delete the project, and manage its members |
+| Project writer | View and edit the project |
+| Other project roles (maintainer / reader) | View the project |
+| Workspace member with no role on the project | No access to the project (unless they are a workspace owner / maintainer) |
+
+Whether workspace roles *add to* project membership or are *restricted by* it is
+decided per product in its permission policy.
+
+Technical details: see *Solution Options → Option 1 → Request flows (sequence
+diagrams)*.
+
+## Potential Impact
+
+1. **Slightly more stored data per user.** Each project role adds a few hundred
+   bytes to the user's permission data.
+2. **A change in how accounts saves permission data.** In one of the databases
+   accounts supports, the way permission data is saved changes so that
+   workspace changes and project role changes never overwrite each other. This
+   is covered by the existing tests plus a new one.
+3. **Only services that opt in are affected.** Permission checks change only for
+   services that start naming a specific project; everything else behaves as
+   today.
+4. **Removing a workspace member does a little more work**, because their
+   project roles in that workspace are removed in the same step.
+5. **Role names are shared between workspaces and projects.** "Owner",
+   "maintainer", "writer" and "reader" exist at both levels. Whoever writes a
+   service's permission policy must treat "project owner" and "workspace owner"
+   as different things.
+6. **Only services that use the feature need to update.** Services that use the
+   new features must update the client library they use to talk to accounts;
+   services that don't update keep working unchanged.
+
+Technical details: see *Solution Options → Option 1 → Technical notes: impact,
+tests, deployment, rollback, monitoring*.
+
+## Test Plan
+
+1. **Basic rules.** Resource type names and IDs are validated and size-limited;
+   a user has at most one role per project; a project role is ignored once the
+   user is no longer in the project's workspace.
+2. **Permission checks.**
+   - Checks that do not name a project give exactly the same results as today.
+   - A project that was never registered → denied.
+   - Naming a workspace other than the project's own → denied.
+   - The user's workspace role is always taken from the project's real
+     workspace, not from what the caller says.
+   - The user's project role is applied when they have one, and not otherwise.
+3. **Registering projects.** Only services can register (a user's login is
+   rejected); the owner must be a workspace member; registering the same
+   project again in the same workspace is harmless, but in a different
+   workspace it is rejected.
+4. **Managing members.** Someone outside the workspace cannot be added; people
+   without permission to manage members are refused; members can leave a
+   project themselves; the last owner cannot be removed or downgraded.
+5. **Cleanup.** Removing one or several users from a workspace, or deleting the
+   workspace, removes their project roles.
+6. **Simultaneous changes.** Two people removing the last two owners at the same
+   time → exactly one succeeds. Two services registering the same project at the
+   same time → exactly one succeeds. A workspace change saved at the same time
+   as a project role change does not wipe out the project role.
+7. **Every supported database**, including the database upgrade and its undo on
+   existing data, and existing users loading correctly with no project roles.
+8. **End to end.** With a sample Dashboard project policy, check the results for
+   a project member, a non-member, a workspace owner, and a user from another
+   workspace.
+
+Technical details: see *Solution Options → Option 1 → Technical notes: impact,
+tests, deployment, rollback, monitoring*.
+
+## Deployment Plan
+
+1. **Backward compatible? Yes.** Everything is added alongside what exists.
+   Services that don't name a project in permission checks see no change.
+2. **Can it be rolled out gradually? Yes.** Order:
+   1. Deploy accounts.
+   2. Each service registers its existing projects with accounts (a one-off
+      backfill).
+   3. Each service starts registering new projects when they are created and
+      telling accounts when they are deleted.
+   4. Each service turns on its project-level permission rules and starts naming
+      the project in permission checks. Until this step, project roles have no
+      effect, so nobody gains access by mistake (fail-closed).
+3. **Who to notify:** the dashboard / visualizer / cms owners, and whoever
+   maintains the permission policies.
+4. **Configuration changes:** none.
+5. **Database changes:** applied automatically when accounts starts. Accounts
+   itself does not need to convert any existing data.
+
+Technical details: see *Solution Options → Option 1 → Technical notes: impact,
+tests, deployment, rollback, monitoring*.
+
+## Rollback Plan
+
+1. Share the cause in the team Slack channel.
+2. First, turn off project-level permission rules in the services that use them.
+3. Roll accounts back to the previous version. The previous version simply
+   ignores the new data, so **no data rollback is required**.
+   Note: while the previous version runs, it may drop the project roles of users
+   whose permission data it saves. This is acceptable because the feature is off
+   at that point; services re-run the backfill when the feature is rolled out
+   again.
+4. Only if the new data structures must be removed completely: run the database
+   downgrade. It deletes all project registrations and project roles, so take a
+   backup first.
+
+Technical details: see *Solution Options → Option 1 → Technical notes: impact,
+tests, deployment, rollback, monitoring*.
+
+## Post Deployment
+
+- Checklist
+  - Create a project in Dashboard staging; check that it is registered and that
+    the creator is its owner.
+  - Invite a workspace member to the project; check that they can access it.
+    Remove them from the workspace; check that they lose access to the project.
+  - Ask for a permission on the project while naming a different workspace;
+    check that it is denied.
+- Metrics
+  - How long permission checks take (typical and slowest 5%), with and without a
+    project named.
+  - Error rate of registering / unregistering projects and changing members,
+    including automatic retries.
+  - Number of project roles per user (maximum and top 1%), to watch the ~1,000
+    per user assumption.
+- Alerting
+  - Permission check error rate: Warning above 1%, Danger at 5% or more.
+  - Permission check response time (slowest 5%): Warning when more than 20%
+    slower than the usual baseline.
+
+Technical details: see *Solution Options → Option 1 → Technical notes: impact,
+tests, deployment, rollback, monitoring*.
+
 ## Open Questions
 
-1. **Resource attributes in `checkPermission`.** Rules like "private projects are
-   visible only to members, public ones to the whole workspace" need the
-   resource's `visibility`. Proposal: optional `attributes: JSON` on
-   `CheckPermissionInput`, passed through to the Cerbos resource. Deferred until
-   a product needs it.
-2. **Batch checks** (`checkPermissions` over many `resourceId`s) for list
-   screens. Cerbos `CheckResources` already supports it.
-3. **Per-service M2M keys.** v1 accepts the existing shared API key for
-   register/unregister. Should each key be scoped to the kinds of its own
-   service (`dashboard:*`)?
-4. **Orphan sweeper** for registrations of resources deleted without unregister:
-   worth it, or rely on service discipline?
-5. **Integration members** on resources (M2M tokens) — needed by cms?
-6. **Where members are managed in the UI.** Should project membership be
-   managed only in the Dashboard, or also within each service's own UI
-   (visualizer / cms / flow)? This does not change the accounts API (all
-   clients call the same membership API), but it affects which services need
-   UI work and is to be decided together with the designer.
+1. **Should permission decisions use project properties?** Rules like "private
+   projects are visible only to their members, public ones to the whole
+   workspace" need to know whether a project is public. Deferred until a
+   product needs it.
+2. **Should list screens be able to check many projects at once?** A screen that
+   lists projects needs a permission answer for each one; one combined check
+   would be faster.
+3. **Should each service's credentials be limited to its own resources?** In the
+   first version, all services register projects with the same shared service
+   credential. Should each service be able to register only its own kinds of
+   resources (for example, Dashboard only Dashboard projects)?
+4. **Should we build an automatic cleanup** for projects that a service deleted
+   without telling accounts, or rely on services always telling accounts?
+5. **Do integrations need to be project members** (for example, in cms)?
+6. **Where are members managed in the UI?** Should project membership be managed
+   only in the Dashboard, or also within each service's own screens
+   (visualizer / cms / flow)? This does not change accounts (every screen uses
+   the same membership functions), but it affects which services need UI work
+   and is to be decided together with the designer.
+
+Technical details: see *Solution Options → Option 1 → Technical notes on open
+questions*.
 
 ## Reviewed by
 

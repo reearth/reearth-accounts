@@ -3,11 +3,10 @@
 > **Status: DRAFT.** 本ドキュメントは [resource-role-binding.md](resource-role-binding.md)
 > の日本語版です。内容に差異がある場合は英語版を正とします。
 >
-> `permittable` に汎用的で中身を解釈しない **「user × resource → role」** のロールの割り当てを追加し、
-> 各サービス（dashboard、visualizer、cms など）が *project member* のような
-> リソース単位のメンバーシップを表現できるようにします。その際、
-> **reearth-accounts は project が何であるかを知りません**。最初の利用者は
-> `dashboard:project` です。コード上では、ロールの割り当ては `...Binding` /
+> project 単位で（より一般には、各サービスのリソース単位で）メンバーとロールを設定できるようにします。
+> これにより各サービス（dashboard、visualizer、cms など）は、メンバー管理の仕組みをそれぞれ作らずに
+> project member を持てます。その際、**reearth-accounts は project が何であるかを知りません**。
+> 最初に使うのは Dashboard の project です。コード上では、ロールの割り当ては `...Binding` /
 > `resource_bindings` という名前の型・テーブルで表します。
 
 ## Document Signature
@@ -63,14 +62,14 @@
    取りこぼすと、すでに抜けた workspace の project にユーザーがアクセスできてしまう。
 3. 「project member は workspace のメンバーでなければならない」という制約を、
    結局 accounts を呼ばずにサービス内だけで検証することはできない。
-4. 認可ロジックが、1つの入口で評価される Cerbos ポリシーではなく N 個のサービスに分散する。
+4. 権限のルールが 1 か所（accounts）で判定されず、各サービスにばらばらに散らばる。
 
 ### 制約（この設計の形を決めている理由）
 
-accounts は *project* のドメインを取り込んではいけません。project の存在、名前、
-公開範囲、中身、ライフサイクルは引き続き各サービスが所有します。accounts が持ってよいのは
-*認可* の概念、つまり「この解釈しないリソースはこの workspace に属し、この principal は
-それに対してこのロールを持つ」だけです。
+accounts は *project* が何であるかを取り込んではいけません。project の存在、名前、
+公開範囲、中身、ライフサイクルは引き続き各サービスが持ちます。accounts が持つのは、
+権限の判定に必要な「この project はこの workspace に属し、このユーザーはそれに対して
+このロールを持つ」という情報だけです。
 
 ## Goals
 
@@ -92,37 +91,42 @@ accounts は *project* のドメインを取り込んではいけません。pro
 
 ## Non-Goals
 
-1. リソースのメタデータ（名前、公開範囲、所有者、タイムスタンプ）を accounts に保存すること。
-2. リソースが実在するかを検証すること。accounts は、リソースを登録する
-   **M2M 認証された** サービスを信頼する。
-3. リソースの削除を検知すること。所有するサービスが登録解除のエンドポイントを呼ぶ責任を持つ
-   （*ライフサイクル* を参照）。
-4. リソースの階層・継承（例: folder → project → layer）。後からポリシーで重ねられるが、今回は対象外。
-5. integration（M2M）をリソースのメンバーにすること。v1 はユーザーの principal のみ。
-6. 任意のリソース属性（例: `visibility`）を `checkPermission` に渡すこと。
-   Open Questions で扱う。v1 のポリシーはロールだけを使う。
-7. リソースのメンバーシップの招待メール送信。メールにはリソース名が入るが、
-   accounts はそれを持たないため、サービス側で送る。
+1. **project の詳細情報を accounts に保存すること。** 名前、公開範囲、所有者、日時など
+   project の情報は、引き続きそれを持つサービスが管理する。
+2. **project が実在するかを確認すること。** accounts は project を登録したサービスを信頼する。
+   project を登録できるのはサービスだけで、ユーザーは登録できない。
+3. **project の削除を accounts が自分で検知すること。** project が削除されたら、
+   それを持つサービスが accounts に知らせる。
+4. **入れ子のリソースや権限の継承**（例: folder → project → layer）。後から権限ポリシーで
+   追加できるが、今回は対象外。
+5. **integration を project のメンバーにすること。** 最初のバージョンでは、project のメンバーに
+   なれるのは人（ユーザーアカウント）だけで、integration や API トークンはなれない。
+6. **project の属性（例: 公開 / 非公開）を権限の判定に使うこと。** *Open Questions* で扱う。
+   最初のバージョンはロールだけで判定する。
+7. **project メンバーシップの招待メールを送ること。** メールには project 名が入るが、
+   accounts はそれを知らないため、サービス側で送る。
 
 ## Functional Requirements
 
-1. `resourceId` なしの `checkPermission`: 読み込みは **変わらない**。
-   `resourceId` ありの場合: **インデックスが効くポイント読み込みが1回増える**
-   （主キーによるリソース登録の読み込み）。ロールの割り当て自体は、すでに読み込まれた permittable から読む。
-2. PostgreSQL では、`Permittable.FindByUserID` がベースの行、workspace ロール、リソースロールを
-   **1回のラウンドトリップ** で読み込む（集約したサブセレクト）。そのため、リソースロールを追加しても
-   `checkPermission` のクエリは増えない。
-3. 項目の上限。ドメイン層と DB 制約の両方で強制する:
-   - `resourceKind`: 64 バイト以下、`^[a-z0-9-]{1,32}:[a-z0-9_-]{1,31}$`
-   - `resourceID`: 128 バイト以下、`^[A-Za-z0-9_.:-]{1,128}$`
-4. 想定規模: 1ユーザーあたりのロールの割り当ては約 1,000 件以下（上記の上限で1件約 300 B 以下、
-   つまり Mongo の1ドキュメントあたり約 300 KB 以下で、16 MB を大きく下回る）。
-   1リソースあたりのメンバーは約 1,000 人以下。
-5. 1リソースのメンバー一覧取得はインデックスが効き、そのリソースの `(userId, role)` だけを返す。
-   集約全体を組み立てることはしない。
-6. すべての更新操作が MongoDB / PostgreSQL の両バックエンドと `memory` リポジトリで動くこと。
+1. **権限チェックの速さを保つ。** project を指定しない権限チェックの負荷は今とまったく同じ。
+   project を指定するチェックで増えるのは、その project がどの workspace に属するかを調べる
+   小さく速い参照1回だけ。ユーザーの project ロールは、accounts がすでに読み込んでいるデータと
+   一緒に読む。
+2. **名前と ID に上限を設ける。** リソースの種別名とリソース ID には最大長と使える文字の制限があり、
+   保存するデータを小さく予測しやすい状態に保つ。
+3. **現実的な規模を想定する。** 1ユーザーあたりの project ロールの割り当ては約 1,000 件まで、
+   1 project あたりのメンバーは約 1,000 人まで。
+4. **project のメンバー一覧をすばやく取得できる。** 返すのはメンバーが誰かとそのロールだけで、
+   名前などの詳細はサービス側が持つ。
+5. **accounts が対応するすべてのデータベースで動く。** どのデータベースを使う環境でも、
+   メンバーの変更は同じように動作する。
+
+技術的な詳細: *Solution Options → Option 1 → 詳細な要件* を参照。
 
 ## Solution Options
+
+この節ではシステム設計を詳しく説明します。実装に関心のある方向けの内容で、ほかの節は
+この節を読まなくても理解できます。
 
 ### Option 1（推奨）: リソース登録 + `Permittable` に埋め込んだロールの割り当て
 
@@ -408,28 +412,40 @@ extend type Mutation {
 - サービスはリソースを登録し（埋め戻しを含む）、削除時に登録を解除する必要がある。
 - Mongo の `Save` の意味が置き換えから `$set` に変わる（既存コードに手が入る）。
 
-### Option 2: ロールの割り当てを独立したコレクション / テーブルに置く（埋め込まない）
+#### 詳細な要件
 
-登録と API は同じですが、ロールの割り当てを permittable ではなく、独立した
-`resource_bindings (kind, id, userID, role)` コレクション / テーブルに置きます。
+*Functional Requirements* の技術的な形です。各項目は順に FR-1〜FR-6 で、この節のほかの部分では
+この番号で参照します。
 
-**メリット:** permittable が大きくならない。メンバー一覧は単純なインデックススキャンになる。
-スナップショットの `Save` の意味を変える必要がない。
+1. `resourceId` なしの `checkPermission`: 読み込みは **変わらない**。
+   `resourceId` ありの場合: **インデックスが効くポイント読み込みが1回増える**
+   （主キーによるリソース登録の読み込み）。ロールの割り当て自体は、すでに読み込まれた permittable から読む。
+2. PostgreSQL では、`Permittable.FindByUserID` がベースの行、workspace ロール、リソースロールを
+   **1回のラウンドトリップ** で読み込む（集約したサブセレクト）。そのため、リソースロールを追加しても
+   `checkPermission` のクエリは増えない。
+3. 項目の上限。ドメイン層と DB 制約の両方で強制する:
+   - `resourceKind`: 64 バイト以下、`^[a-z0-9-]{1,32}:[a-z0-9_-]{1,31}$`
+   - `resourceID`: 128 バイト以下、`^[A-Za-z0-9_.:-]{1,128}$`
+4. 想定規模: 1ユーザーあたりのロールの割り当ては約 1,000 件以下（上記の上限で1件約 300 B 以下、
+   つまり Mongo の1ドキュメントあたり約 300 KB 以下で、16 MB を大きく下回る）。
+   1リソースあたりのメンバーは約 1,000 人以下。
+5. 1リソースのメンバー一覧取得はインデックスが効き、そのリソースの `(userId, role)` だけを返す。
+   集約全体を組み立てることはしない。
+6. すべての更新操作が MongoDB / PostgreSQL の両バックエンドと `memory` リポジトリで動くこと。
 
-**デメリット:** `checkPermission` で、登録に加えてもう1回（ロールの割り当ての）読み込みが増える。
-workspace の連動削除で2つのストアを更新する必要がある。
+範囲についての補足（*Non-Goals* の技術的な形）:
 
-**結論:** Option 1 を採用します。1ユーザーあたりのロールの割り当て数が FR-4 に近づいた場合、
-または Mongo の `Save` の変更にリスクがあると判明した場合は、Option 2 を再検討します。
+- リソースの存在は検証しない。accounts はリソースを登録する **M2M 認証された** サービスを信頼し、
+  リソースの削除時に登録解除のエンドポイントを呼ぶこともそのサービスに任せる
+  （*ライフサイクルと連動削除* を参照）。
+- v1 のロールの割り当ては **ユーザーの principal のみ**。integration（M2M）の principal は
+  リソースロールを持てない。
+- v1 の `checkPermission` は、リソースの属性（例: `visibility`）を Cerbos に渡さない。
+  ポリシーはロールだけを使う（*Open Questions の技術的な補足* を参照）。
 
-### 検討して却下した案: 各サービスにメンバーシップを持たせる
+#### リクエストの流れ（シーケンス図）
 
-*課題* の (1)〜(4) の重複と連動削除の問題があるため却下しました。
-「メンバー情報はサービスに置き、ロールを属性として Cerbos に渡す」という派生案は、(4) しか解決しません。
-
-## Design
-
-### resource ID を指定した権限チェック
+##### resource ID を指定した権限チェック
 
 ```mermaid
 sequenceDiagram
@@ -451,7 +467,7 @@ sequenceDiagram
     end
 ```
 
-### project の作成とメンバー招待
+##### project の作成とメンバー招待
 
 ```mermaid
 sequenceDiagram
@@ -470,7 +486,7 @@ sequenceDiagram
     A-->>S: ok
 ```
 
-### workspace メンバー削除時の連動
+##### workspace メンバー削除時の連動
 
 ```mermaid
 flowchart LR
@@ -479,7 +495,9 @@ flowchart LR
     B --> RR[DeleteResourceRolesInWorkspace ws, users → targeted delete]
 ```
 
-## Potential Impact
+#### 技術的な補足: 影響・テスト・デプロイ・ロールバック・監視
+
+##### 影響
 
 1. **permittable のドキュメント / 行のサイズ** がロールの割り当て1件あたり約 300 B 以下増える。
 2. **Mongo の `Permittable.Save`** が置き換えから `$set` に変わる。permittable の永続化に関する
@@ -493,7 +511,7 @@ flowchart LR
 6. **gqlclient**（`server/pkg/gqlclient`）の利用側は、新しいフィールドを使うためにバージョンを
    上げる必要がある。古いクライアントには影響しない。
 
-## Test Plan
+##### テスト
 
 1. **ユニット**（`pkg/resource`、`pkg/permittable`）: 種別 / ID の検証と長さの上限。
    リソースごとにロールは1つ。読み込み時のガードが、対応する workspace ロールのない割り当てを除外すること。
@@ -516,7 +534,7 @@ flowchart LR
 6. **E2E**（`server/e2e`）: 上記の条件で生成した `dashboard:project` のテスト用ポリシーを使い、
    メンバー / 非メンバー / workspace owner / 別 workspace の結果を確認する。
 
-## Deployment Plan
+##### デプロイ
 
 1. 後方互換性はあるか？ **あり。** 入力の任意項目、新しいコレクション / テーブル、
    新しいルートと GraphQL フィールドの追加のみ。`resourceId` がなければ挙動は変わらない。
@@ -532,7 +550,7 @@ flowchart LR
    Mongo は起動時のマイグレーションでコレクションのスキーマとインデックスを作成する。
    accounts 側での埋め戻しはない。
 
-## Rollback Plan
+##### ロールバック
 
 1. 原因をチームの Slack チャンネルに共有する。
 2. `resourceId` / `resourceRole` に依存する利用側サービス / ポリシーを先に戻す。
@@ -544,7 +562,7 @@ flowchart LR
 4. スキーマ自体を削除する必要がある場合のみ、`0005` の down を実行する
    （登録とロールの割り当てが消えるので、先にダンプを取る）。
 
-## Post Deployment
+##### デプロイ後の確認と監視
 
 - チェックリスト
   - dashboard の staging で project を作成し、登録と作成者への `owner` ロールの割り当てができることを確認する。
@@ -559,23 +577,206 @@ flowchart LR
   - `checkPermission` のエラー率: Warning > 1%、Danger ≥ 5%。
   - `checkPermission` の p95 レイテンシ: Warning > ベースライン比 +20%。
 
+#### Open Questions の技術的な補足
+
+1. **`checkPermission` へのリソース属性の受け渡し:** 提案は、`CheckPermissionInput` に任意の
+   `attributes: JSON` を追加し、Cerbos のリソースにそのまま渡すこと（例: `visibility`）。
+2. **一括チェック:** 一覧画面向けに、複数の `resourceId` に対する `checkPermissions` を用意する。
+   Cerbos の `CheckResources` はすでに複数リソースに対応している。
+3. **サービスごとの M2M キー:** v1 では登録 / 登録解除（`POST` / `DELETE /api/service/resources`）に
+   既存の共有 M2M API キーを受け付ける。案: 各キーをそのサービス自身の種別（`dashboard:*`）に限定する。
+4. **孤立データの掃除（sweeper）:** 登録解除のエンドポイントを呼ばずに削除されたリソースの登録を
+   削除する。
+5. **integration メンバー:** M2M トークンをリソースの principal にすること（cms で必要になる可能性）。
+
+### Option 2: ロールの割り当てを独立したコレクション / テーブルに置く（埋め込まない）
+
+登録と API は同じですが、ロールの割り当てを permittable ではなく、独立した
+`resource_bindings (kind, id, userID, role)` コレクション / テーブルに置きます。
+
+**メリット:** permittable が大きくならない。メンバー一覧は単純なインデックススキャンになる。
+スナップショットの `Save` の意味を変える必要がない。
+
+**デメリット:** `checkPermission` で、登録に加えてもう1回（ロールの割り当ての）読み込みが増える。
+workspace の連動削除で2つのストアを更新する必要がある。
+
+**結論:** Option 1 を採用します。1ユーザーあたりのロールの割り当て数が FR-4 に近づいた場合、
+または Mongo の `Save` の変更にリスクがあると判明した場合は、Option 2 を再検討します。
+
+### 検討して却下した案: 各サービスにメンバーシップを持たせる
+
+*課題* の (1)〜(4) の重複と連動削除の問題があるため却下しました。
+「メンバー情報はサービスに置き、ロールを属性として Cerbos に渡す」という派生案は、(4) しか解決しません。
+
+## Design
+
+**accounts が project ごとに持つのは、「どの workspace に属するか」と「誰がどのロールを持つか」の
+2つだけ。** それ以外の project の情報はすべてサービス側に残る。
+
+### project を指定した権限チェック
+
+1. サービスが accounts に、ユーザーが特定の project に対してある操作（例: 編集）をしてよいかを
+   問い合わせる。
+2. accounts は、その project がどの workspace に属するかを調べる。サービスが登録していない
+   project の場合や、問い合わせで別の workspace が指定されていた場合は「不可」と答える。
+3. accounts は、その workspace でのユーザーのロールと、その project でのユーザーのロール（あれば）
+   を合わせ、サービスの権限ポリシーで判定する。
+4. project のロールが有効なのは、ユーザーがその project の workspace のメンバーである間だけ。
+
+### project の作成とメンバー招待
+
+1. ユーザーがサービスで project を作成する。サービスは project を保存し、作成者を owner として
+   accounts に登録する（作成者は workspace のメンバーでなければならない）。
+2. owner が別の workspace メンバーをロール（例: writer）付きで招待する。accounts は、招待される人が
+   workspace のメンバーであること、招待する人がメンバーを管理する権限を持つことを確認してから
+   ロールを保存する。
+3. 同じ project のメンバー変更は1件ずつ順に処理するため、2人が同時に操作しても最後の owner が
+   外れることはない。メンバーは自分で project から抜けられるが、最後の owner は抜けられない。
+4. owner なしで登録された project（例: 本機能より前からある project）は、owner が設定されるまで
+   workspace のロールで管理する。
+
+### workspace からのメンバー削除
+
+ユーザーを workspace から外したり workspace を削除したりすると、accounts はその workspace での
+ロールと、その workspace 内のすべての project でのロールを同じ処理の中で取り消す。workspace を
+削除した場合は、その workspace の project の登録も削除する。workspace を無効化しても何も消さず、
+復元できるようにしておく。
+
+### 例: Dashboard の project
+
+| 誰が | できること |
+|---|---|
+| workspace の owner / maintainer | workspace 内のすべての project を閲覧・編集・削除し、メンバーを管理できる |
+| project の owner | その project を閲覧・編集・削除し、メンバーを管理できる |
+| project の writer | その project を閲覧・編集できる |
+| その他の project ロール（maintainer / reader） | その project を閲覧できる |
+| project のロールを持たない workspace メンバー | その project にアクセスできない（workspace の owner / maintainer を除く） |
+
+workspace ロールが project のメンバーシップに *加算される* のか、project のメンバーシップによって
+*制限される* のかは、プロダクトごとに権限ポリシーで決める。
+
+技術的な詳細: *Solution Options → Option 1 → リクエストの流れ（シーケンス図）* を参照。
+
+## Potential Impact
+
+1. **ユーザーあたりの保存データが少し増える。** project のロール1件につき、ユーザーの権限データが
+   数百バイト増える。
+2. **accounts の権限データの保存方法が一部変わる。** accounts が対応するデータベースの1つで、
+   workspace の変更と project ロールの変更が互いに上書きしないよう、権限データの保存方法を変える。
+   既存のテストと新しいテストで確認する。
+3. **影響を受けるのは利用を始めたサービスだけ。** 権限チェックの挙動が変わるのは、特定の project を
+   指定し始めたサービスだけで、それ以外はこれまでどおり。
+4. **workspace メンバーの削除で処理が少し増える。** その workspace での project ロールも同じ処理で
+   取り消すため。
+5. **ロール名は workspace と project で共通。** 「owner」「maintainer」「writer」「reader」は
+   どちらにもある。サービスの権限ポリシーを書く人は、「project の owner」と「workspace の owner」を
+   別物として扱う必要がある。
+6. **更新が必要なのは機能を使うサービスだけ。** 新機能を使うサービスは、accounts と通信する
+   クライアントライブラリを更新する必要がある。更新しないサービスはそのまま動く。
+
+技術的な詳細: *Solution Options → Option 1 → 技術的な補足: 影響・テスト・デプロイ・ロールバック・監視*
+を参照。
+
+## Test Plan
+
+1. **基本ルール。** リソースの種別名と ID の検証と長さの上限。1ユーザーが1つの project に持てる
+   ロールは1つ。ユーザーがその project の workspace から外れたら、project のロールは無視される。
+2. **権限チェック。**
+   - project を指定しないチェックは、今とまったく同じ結果になる。
+   - 登録されていない project → 拒否。
+   - project が属するものとは別の workspace を指定 → 拒否。
+   - ユーザーの workspace ロールは、呼び出し側の指定ではなく、常に project が実際に属する
+     workspace から取る。
+   - project のロールがあれば適用され、なければ適用されない。
+3. **project の登録。** 登録できるのはサービスだけ（ユーザーのログインでは拒否）。owner は
+   workspace のメンバーでなければならない。同じ project を同じ workspace に再登録しても問題ないが、
+   別の workspace への登録は拒否する。
+4. **メンバーの管理。** workspace 外の人は追加できない。メンバーを管理する権限のない人は拒否される。
+   メンバーは自分で抜けられる。最後の owner は外せず、降格もできない。
+5. **後始末。** 1人または複数のユーザーを workspace から外したとき、workspace を削除したときに、
+   project のロールが取り消される。
+6. **同時の変更。** 2人が最後の2人の owner を同時に外す → ちょうど1つだけ成功する。2つのサービスが
+   同じ project を同時に登録する → 1つだけ成功する。workspace の変更と project ロールの変更が同時に
+   保存されても、project ロールは消えない。
+7. **対応するすべてのデータベース。** 既存データに対するデータベースの更新とその取り消しを含む。
+   既存ユーザーが project ロールなしで正しく読み込めること。
+8. **エンドツーエンド。** Dashboard の project 用のサンプルポリシーで、project メンバー、非メンバー、
+   workspace の owner、別 workspace のユーザーの結果を確認する。
+
+技術的な詳細: *Solution Options → Option 1 → 技術的な補足: 影響・テスト・デプロイ・ロールバック・監視*
+を参照。
+
+## Deployment Plan
+
+1. 後方互換性はあるか？ **あり。** すべて既存のものに追加する形。権限チェックで project を
+   指定しないサービスには変化がない。
+2. 段階的に展開できるか？ **できる。** 順序:
+   1. accounts をデプロイする。
+   2. 各サービスが既存の project を accounts に登録する（一度だけの埋め戻し）。
+   3. 各サービスが、project の作成時に登録し、削除時に accounts へ知らせるようにする。
+   4. 各サービスが project 単位の権限ルールを有効にし、権限チェックで project を指定し始める。
+      このステップまでは project のロールは効かないため、誤ってアクセスできるようになる人はいない
+      （安全側に倒れる）。
+3. 通知先: dashboard / visualizer / cms のオーナー、権限ポリシーの管理者。
+4. 設定変更: なし。
+5. データベースの変更: accounts の起動時に自動で適用される。accounts 側で既存データを変換する
+   必要はない。
+
+技術的な詳細: *Solution Options → Option 1 → 技術的な補足: 影響・テスト・デプロイ・ロールバック・監視*
+を参照。
+
+## Rollback Plan
+
+1. 原因をチームの Slack チャンネルに共有する。
+2. まず、project 単位の権限ルールを使っているサービス側で、それを無効にする。
+3. accounts を前のバージョンに戻す。前のバージョンは新しいデータを無視するだけなので、
+   **データのロールバックは不要**。
+   注意: 前のバージョンの稼働中は、権限データを保存したユーザーの project ロールが消えることがある。
+   その時点では機能が無効なので許容でき、再度展開するときにサービスが埋め戻しをやり直す。
+4. 新しいデータ構造を完全に取り除く必要がある場合のみ、データベースの取り消しを実行する。
+   project の登録とロールの割り当てがすべて消えるので、先にバックアップを取る。
+
+技術的な詳細: *Solution Options → Option 1 → 技術的な補足: 影響・テスト・デプロイ・ロールバック・監視*
+を参照。
+
+## Post Deployment
+
+- チェックリスト
+  - Dashboard の staging で project を作成し、登録されていることと、作成者が owner に
+    なっていることを確認する。
+  - workspace メンバーを project に招待し、アクセスできることを確認する。そのメンバーを
+    workspace から外し、project にアクセスできなくなることを確認する。
+  - 別の workspace を指定してその project への権限を問い合わせ、拒否されることを確認する。
+- メトリクス
+  - 権限チェックにかかる時間（通常時と、遅い方から 5%）。project を指定した場合と、しない場合。
+  - project の登録 / 登録解除とメンバー変更のエラー率（自動リトライを含む）。
+  - ユーザーあたりの project ロール数（最大と上位 1%）。1ユーザーあたり約 1,000 件という想定を監視する。
+- アラート
+  - 権限チェックのエラー率: Warning 1% 超、Danger 5% 以上。
+  - 権限チェックの応答時間（遅い方から 5%）: 通常の基準より 20% 超遅くなったら Warning。
+
+技術的な詳細: *Solution Options → Option 1 → 技術的な補足: 影響・テスト・デプロイ・ロールバック・監視*
+を参照。
+
 ## Open Questions
 
-1. **`checkPermission` へのリソース属性の受け渡し。** 「private な project はメンバーだけ、
-   public な project は workspace 全体が見られる」のようなルールには、リソースの `visibility` が必要。
-   提案: `CheckPermissionInput` に任意の `attributes: JSON` を追加し、Cerbos のリソースにそのまま渡す。
+1. **権限の判定に project の属性を使うか。** 「private な project はメンバーだけ、public な project は
+   workspace 全体が見られる」のようなルールには、project が公開かどうかを知る必要がある。
    必要とするプロダクトが出てくるまで保留。
-2. **一括チェック**（複数の `resourceId` に対する `checkPermissions`）を一覧画面向けに作るか。
-   Cerbos の `CheckResources` はすでに対応している。
-3. **サービスごとの M2M キー。** v1 では登録 / 登録解除に既存の共有 API キーを受け付ける。
-   各キーを、そのサービス自身の種別（`dashboard:*`）に限定すべきか。
-4. 登録解除せずに削除されたリソースの登録を掃除する **孤立データの掃除の仕組み**:
-   作る価値があるか、サービス側の規律に任せるか。
-5. リソースへの **integration メンバー**（M2M トークン）: cms で必要か。
-6. **UI 上でどこでメンバーを管理するか。** project のメンバー管理を Dashboard だけで
-   行うか、各サービス（visualizer / cms / flow）の画面でも行えるようにするか。
-   accounts の API は変わらない（どのクライアントも同じメンバー管理 API を呼ぶ）が、
-   どのサービスに UI の対応が必要かが変わるため、デザイナーと合わせて決める。
+2. **一覧画面で複数の project をまとめてチェックできるようにするか。** project の一覧画面では
+   project ごとに権限の判定が必要で、まとめて1回で判定できれば速くなる。
+3. **各サービスの認証情報を、そのサービス自身のリソースに限定するか。** 最初のバージョンでは、
+   すべてのサービスが共通のサービス用認証情報で project を登録する。各サービスが自分の種類の
+   リソースだけを登録できるようにすべきか（例: Dashboard は Dashboard の project だけ）。
+4. **サービスが知らせずに削除した project の登録を、自動で掃除する仕組みを作るか。** それとも、
+   サービスが必ず知らせることに任せるか。
+5. **integration を project のメンバーにする必要があるか**（例: cms で）。
+6. **UI 上でどこでメンバーを管理するか。** project のメンバー管理を Dashboard だけで行うか、
+   各サービス（visualizer / cms / flow）の画面でも行えるようにするか。accounts 側は変わらない
+   （どの画面も同じメンバー管理の仕組みを使う）が、どのサービスに UI の対応が必要かが変わるため、
+   デザイナーと合わせて決める。
+
+技術的な詳細: *Solution Options → Option 1 → Open Questions の技術的な補足* を参照。
 
 ## Reviewed by
 
