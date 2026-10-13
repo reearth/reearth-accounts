@@ -1,10 +1,11 @@
-# Resource Role Binding (Generic Per-Resource Membership)
+# Resource Role Assignment (Generic Per-Resource Membership)
 
-> **Status: DRAFT.** Adds a generic, opaque **"user × resource → role"** binding to
-> `permittable`, so that consumer services (dashboard, visualizer, cms, …) can
-> express per-resource membership such as *project members* **without
-> reearth-accounts learning what a project is**. The first consumer is
-> `dashboard:project`.
+> **Status: DRAFT.** Adds a generic, opaque **"user × resource → role"** role
+> assignment to `permittable`, so that consumer services (dashboard, visualizer,
+> cms, …) can express per-resource membership such as *project members*
+> **without reearth-accounts learning what a project is**. The first consumer is
+> `dashboard:project`. In code, a role assignment is represented by types and
+> tables named `...Binding` / `resource_bindings`.
 >
 > Japanese version: [resource-role-binding.ja.md](resource-role-binding.ja.md)
 
@@ -72,7 +73,7 @@ workspace, and this principal holds this role on it".
 
 ## Goals
 
-1. Accounts can store and evaluate a role binding for **any** resource instance,
+1. Accounts can store and evaluate a role assignment for **any** resource instance,
    identified by an opaque `(resourceKind, resourceID)` pair.
 2. `checkPermission` can evaluate a check against a specific resource instance,
    **scoped to the workspace the resource actually belongs to** (never a
@@ -80,8 +81,8 @@ workspace, and this principal holds this role on it".
    Cerbos policies.
 3. Resource-wide invariants (one workspace per resource, at least one owner
    once one exists) hold under concurrent writes on every backend.
-4. Workspace membership changes automatically revoke resource bindings
-   (a user removed from a workspace loses every binding in it).
+4. Workspace membership changes automatically revoke resource role assignments
+   (a user removed from a workspace loses every role assignment in it).
 5. The words `project` / service-specific kinds never appear in accounts Go code
    or schema; adding a new resource kind (e.g. `cms:model`) requires **only a
    Cerbos policy** (via the service's `definition.go`), no accounts code change.
@@ -107,7 +108,7 @@ workspace, and this principal holds this role on it".
 
 1. `checkPermission` without `resourceId`: **no change** in reads.
    With `resourceId`: **one additional indexed point read** (the resource
-   registration, by primary key). The binding itself is read from the
+   registration, by primary key). The role assignment itself is read from the
    already-loaded permittable.
 2. On PostgreSQL, `Permittable.FindByUserID` loads the base row, workspace roles
    and resource roles in **one round-trip** (aggregated sub-selects), so adding
@@ -115,7 +116,7 @@ workspace, and this principal holds this role on it".
 3. Field limits, enforced in the domain layer and as DB constraints:
    - `resourceKind`: ≤ 64 bytes, `^[a-z0-9-]{1,32}:[a-z0-9_-]{1,31}$`
    - `resourceID`: ≤ 128 bytes, `^[A-Za-z0-9_.:-]{1,128}$`
-4. Expected scale: ≤ ~1,000 bindings per user (≤ ~300 B each with the limits
+4. Expected scale: ≤ ~1,000 role assignments per user (≤ ~300 B each with the limits
    above, i.e. ≤ ~300 KB per Mongo document, well under 16 MB) and ≤ ~1,000
    members per resource.
 5. Listing members of one resource is index-backed and returns only
@@ -125,7 +126,7 @@ workspace, and this principal holds this role on it".
 
 ## Solution Options
 
-### Option 1 (Recommended): Resource registration + bindings embedded in `Permittable`
+### Option 1 (Recommended): Resource registration + role assignments embedded in `Permittable`
 
 Two pieces of state, both opaque to accounts:
 
@@ -241,7 +242,7 @@ New repository interfaces:
 FindByKey(ctx, kind, id) (*resource.Registration, error)
 Create(ctx, r resource.Registration) error              // ErrAlreadyExists on duplicate
 LockForUpdate(ctx, kind, id) (*resource.Registration, error) // must run inside a transaction
-Remove(ctx, kind, id) error                              // also removes all bindings
+Remove(ctx, kind, id) error                              // also removes all role assignments
 
 // permittable.Repo (additions)
 FindResourceMembers(ctx, kind, id) ([]permittable.ResourceMember, error) // projection: userID + roleID
@@ -282,7 +283,7 @@ When `resourceId` is **present**:
    `workspaceID` → **deny**.
 3. Principal roles = global roles + the user's workspace roles **in the
    registration's `workspaceID`** (the caller cannot choose the workspace).
-4. Principal attribute `resourceRole` = the user's binding role on this
+4. Principal attribute `resourceRole` = the user's assigned role on this
    resource, or `""` if none (or if the read-time guard drops it).
 5. The Cerbos resource ID is the real `resourceId`.
 
@@ -324,11 +325,11 @@ removes any way for a user to claim an unregistered ID.
 POST   /api/service/resources
        { workspaceId, resourceKind, resourceId, ownerUserId? }
        → creates the registration and, if ownerUserId is given, an `owner`
-         binding, in one transaction. ownerUserId must be a workspace member.
+         role assignment, in one transaction. ownerUserId must be a workspace member.
          409 if already registered with a different workspace; idempotent
          (200) if registered with the same workspace.
 DELETE /api/service/resources/{resourceKind}/{resourceId}
-       → removes the registration and every binding of the resource.
+       → removes the registration and every role assignment on the resource.
 ```
 
 **Membership (user JWT, GraphQL)**:
@@ -369,7 +370,7 @@ that starts with `LockForUpdate` on the registration:
 | `setResourceMember` | registration exists; target user is a member of the registration's workspace; Cerbos allows `manage_members` on `(kind, id)` for the operator; if the change downgrades the last `owner`, reject |
 | `removeResourceMember` | Cerbos `manage_members`, or operator == target (self-leave); if it removes the last `owner`, reject |
 | `resourceMembers` | Cerbos `read` on `(kind, id)`; result filtered by the read-time guard |
-| `myResourceBindings` | operator's own bindings only, filtered by the read-time guard |
+| `myResourceBindings` | operator's own role assignments only, filtered by the read-time guard |
 
 **Last-owner rule:** a membership mutation that would take the owner count of a
 resource from ≥ 1 to 0 is rejected. A resource registered without an owner (e.g.
@@ -382,12 +383,12 @@ endpoint is exempt.
 |---|---|
 | Two writers on different users of the same resource both pass the last-owner check | Both must take `LockForUpdate` on the same registration; the second waits (Postgres) or conflicts and retries (Mongo). The owner count is read after the lock. |
 | Two services register the same `(kind, id)` | Primary key / unique index; the loser gets `ErrAlreadyExists`. |
-| `setResourceMember` passes the workspace-membership check, then the user is removed from the workspace and the cascade runs before the binding is written | **Read-time guard**: a binding is honored only if the user currently holds a workspace role in the binding's workspace. The permittable is already loaded, so this costs no read. The orphaned row is harmless and is removed the next time the cascade or the unregister endpoint touches it. |
-| A stale snapshot `Save` from the workspace flow overwrites a newer binding (or vice versa) | Snapshot saves never write `resource_roles`; binding writes never write `workspace_roles` (see *Repository changes*). |
+| `setResourceMember` passes the workspace-membership check, then the user is removed from the workspace and the cascade runs before the role assignment is written | **Read-time guard**: a role assignment is honored only if the user currently holds a workspace role in the role assignment's workspace. The permittable is already loaded, so this costs no read. The orphaned row is harmless and is removed the next time the cascade or the unregister endpoint touches it. |
+| A stale snapshot `Save` from the workspace flow overwrites a newer role assignment (or vice versa) | Snapshot saves never write `resource_roles`; role-assignment writes never write `workspace_roles` (see *Repository changes*). |
 
 #### Lifecycle and cascades
 
-| Event | Who acts | Effect on bindings |
+| Event | Who acts | Effect on role assignments |
 |---|---|---|
 | Resource created | Service (M2M) | `POST /api/service/resources` with `ownerUserId` = creator |
 | Resource deleted | Service (M2M) | `DELETE /api/service/resources/{kind}/{id}`. A missed call leaves an orphan registration — harmless (the resource no longer exists in the service), cleaned by an optional sweeper later |
@@ -395,7 +396,7 @@ endpoint is exempt.
 | User removed from workspace | Accounts | `bulkRemovePermittable` also calls `DeleteResourceRolesInWorkspace` |
 | Workspace deleted (`Workspace.Remove`) | Accounts | Same path via `bulkRemovePermittable`; registrations of the workspace are removed too |
 | Workspace deactivated / restored | Accounts | No change (mirrors workspace roles; data kept for restore) |
-| User deleted (`DeleteMe`) | Accounts | Today `DeleteMe` does not delete the permittable. Bindings are unreachable once the user is gone; deleting the permittable on `DeleteMe` is proposed as a follow-up fix (independent of this feature) |
+| User deleted (`DeleteMe`) | Accounts | Today `DeleteMe` does not delete the permittable. Role assignments are unreachable once the user is gone; deleting the permittable on `DeleteMe` is proposed as a follow-up fix (independent of this feature) |
 
 **Pros**
 
@@ -405,7 +406,7 @@ endpoint is exempt.
   users cannot claim IDs.
 - Resource-wide invariants are serialized on one record per resource on both
   backends.
-- Binding lookup stays inside the already-loaded permittable; the only new read
+- Role-assignment lookup stays inside the already-loaded permittable; the only new read
   is a primary-key lookup of the registration.
 - Accounts remains domain-agnostic: opaque kind/ID, semantics in policies.
 
@@ -415,19 +416,19 @@ endpoint is exempt.
 - Services must register resources (including a backfill) and unregister on delete.
 - Mongo `Save` semantics change from replace to `$set` (touches existing code).
 
-### Option 2: Bindings in their own collection/table (no embedding)
+### Option 2: Role assignments in their own collection/table (no embedding)
 
-Same registration and API, but bindings live in a standalone
+Same registration and API, but role assignments live in a standalone
 `resource_bindings (kind, id, userID, role)` collection/table instead of on the
 permittable.
 
 **Pros:** no permittable growth; member listing is a plain index scan; snapshot
 `Save` semantics do not need to change.
 
-**Cons:** `checkPermission` needs a second extra read (the binding) on top of
+**Cons:** `checkPermission` needs a second extra read (the role assignment) on top of
 the registration; workspace cascades touch two stores.
 
-**Decision:** Option 1. Revisit Option 2 if per-user binding counts approach
+**Decision:** Option 1. Revisit Option 2 if per-user role-assignment counts approach
 FR-4 or if the Mongo `Save` change proves risky.
 
 ### Alternative considered and rejected: membership in each service
@@ -453,7 +454,7 @@ sequenceDiagram
     alt not registered, or alias ≠ registration.workspace
         A-->>S: { allowed: false }
     else
-        A->>A: roles = global + workspace roles in registration.workspace<br/>attr.resourceRole = guarded binding role or ""
+        A->>A: roles = global + workspace roles in registration.workspace<br/>attr.resourceRole = guarded assigned role or ""
         A->>C: CheckResources(principal{roles, attr}, resource{kind, resourceId}, action)
         C-->>A: ALLOW / DENY
         A-->>S: { allowed }
@@ -471,7 +472,7 @@ sequenceDiagram
     U->>S: createProject
     S->>S: persist project P
     S->>A: POST /api/service/resources {ws, "dashboard:project", P, owner=U} (M2M key)
-    A->>A: U ∈ ws? → create registration + owner binding (one tx)
+    A->>A: U ∈ ws? → create registration + owner role assignment (one tx)
     A-->>S: 201
     U->>S: invite B as writer
     S->>A: setResourceMember(kind, P, B, writer) (U's JWT)
@@ -490,7 +491,7 @@ flowchart LR
 
 ## Potential Impact
 
-1. **Permittable document/row size** grows by ≤ ~300 B per binding.
+1. **Permittable document/row size** grows by ≤ ~300 B per role assignment.
 2. **Mongo `Permittable.Save`** changes from replace to `$set`; existing tests
    for permittable persistence must still pass, and a new test verifies that
    `Save` leaves `resource_roles` untouched.
@@ -506,7 +507,7 @@ flowchart LR
 ## Test Plan
 
 1. **Unit** (`pkg/resource`, `pkg/permittable`): kind/ID validation and length
-   limits; one role per resource; read-time guard drops bindings without a
+   limits; one role per resource; read-time guard drops role assignments without a
    matching workspace role.
 2. **Interactor** (`internal/usecase/interactor`):
    - `CheckPermission`: no `resourceId` → unchanged roles (regression);
@@ -520,7 +521,7 @@ flowchart LR
 3. **Concurrency** (`make test-integration`, both backends): two goroutines
    removing the last two owners concurrently → exactly one succeeds; concurrent
    registrations of the same key → one succeeds; stale snapshot `Save` after
-   `UpsertResourceRole` keeps the binding.
+   `UpsertResourceRole` keeps the role assignment.
 4. **Repository**: Mongo, Postgres and memory implementations of every new
    operation; Postgres `FindByUserID` issues a single query.
 5. **Migration**: `0005` up/down on an existing DB; existing permittables load
@@ -555,13 +556,13 @@ flowchart LR
    `resource_roles` of any permittable it writes — acceptable during rollback,
    since the feature is disabled; services re-run the backfill on roll-forward.
 4. Only if the schema itself must be removed: run `0005` down (drops
-   registrations and bindings — take a dump first).
+   registrations and role assignments — take a dump first).
 
 ## Post Deployment
 
 - Checklist
   - Create a project in dashboard staging; verify the registration and the
-    creator's `owner` binding.
+    creator's `owner` role assignment.
   - Invite a workspace member; verify access. Remove them from the workspace;
     verify project access is lost.
   - Call `checkPermission` with the alias of another workspace; verify deny.
@@ -569,7 +570,7 @@ flowchart LR
   - `checkPermission` p50/p95 latency with and without `resourceId`.
   - Error rate of register / unregister / `setResourceMember`, including
     Mongo transaction retries.
-  - Count of bindings per permittable (max / p99) to watch FR-4.
+  - Count of role assignments per permittable (max / p99) to watch FR-4.
 - Alerting
   - `checkPermission` error rate: Warning > 1%, Danger ≥ 5%.
   - `checkPermission` p95 latency: Warning > +20% vs baseline.

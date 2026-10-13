@@ -1,13 +1,14 @@
-# Resource Role Binding（汎用的なリソース単位メンバーシップ）
+# リソース単位のロール割り当て（汎用的なリソース単位メンバーシップ）
 
 > **Status: DRAFT.** 本ドキュメントは [resource-role-binding.md](resource-role-binding.md)
 > の日本語版です。内容に差異がある場合は英語版を正とします。
 >
-> `permittable` に汎用的で中身を解釈しない **「user × resource → role」** の binding を追加し、
+> `permittable` に汎用的で中身を解釈しない **「user × resource → role」** のロールの割り当てを追加し、
 > 各サービス（dashboard、visualizer、cms など）が *project member* のような
 > リソース単位のメンバーシップを表現できるようにします。その際、
 > **reearth-accounts は project が何であるかを知りません**。最初の利用者は
-> `dashboard:project` です。
+> `dashboard:project` です。コード上では、ロールの割り当ては `...Binding` /
+> `resource_bindings` という名前の型・テーブルで表します。
 
 ## Document Signature
 
@@ -70,14 +71,14 @@ accounts は *project* のドメインを取り込んではいけません。pro
 ## Goals
 
 1. accounts が、解釈しない `(resourceKind, resourceID)` の組で識別される
-   **任意の** リソースインスタンスに対するロールの binding を保存・評価できる。
+   **任意の** リソースインスタンスに対するロールの割り当てを保存・評価できる。
 2. `checkPermission` が特定のリソースインスタンスに対して判定でき、その際の範囲は
    **リソースが実際に属する workspace** に限定される（呼び出し元が選んだ workspace は使わない）。
    また、呼び出し元のリソースロールを Cerbos ポリシーから参照できる。
 3. リソース全体の不変条件（1リソースにつき workspace は1つ、owner が一度存在したら最低1人は残る）が、
    どのバックエンドでも並行書き込みのもとで保たれる。
-4. workspace メンバーシップの変更がリソースの binding に自動で連動して取り消される
-   （workspace からユーザーを外すと、その workspace 内の binding もすべて失われる）。
+4. workspace メンバーシップの変更に連動して、リソースに対するロールの割り当てが自動で取り消される
+   （workspace からユーザーを外すと、その workspace 内の割り当てもすべて失われる）。
 5. `project` という語やサービス固有の種別が accounts の Go コードやスキーマに一切現れない。
    新しいリソース種別（例: `cms:model`）を追加するのに必要なのは
    **Cerbos ポリシーだけ**（サービスの `definition.go` 経由）で、accounts のコード変更は不要。
@@ -101,14 +102,14 @@ accounts は *project* のドメインを取り込んではいけません。pro
 
 1. `resourceId` なしの `checkPermission`: 読み込みは **変わらない**。
    `resourceId` ありの場合: **インデックスが効くポイント読み込みが1回増える**
-   （主キーによるリソース登録の読み込み）。binding 自体は、すでに読み込まれた permittable から読む。
+   （主キーによるリソース登録の読み込み）。ロールの割り当て自体は、すでに読み込まれた permittable から読む。
 2. PostgreSQL では、`Permittable.FindByUserID` がベースの行、workspace ロール、リソースロールを
    **1回のラウンドトリップ** で読み込む（集約したサブセレクト）。そのため、リソースロールを追加しても
    `checkPermission` のクエリは増えない。
 3. 項目の上限。ドメイン層と DB 制約の両方で強制する:
    - `resourceKind`: 64 バイト以下、`^[a-z0-9-]{1,32}:[a-z0-9_-]{1,31}$`
    - `resourceID`: 128 バイト以下、`^[A-Za-z0-9_.:-]{1,128}$`
-4. 想定規模: 1ユーザーあたり binding は約 1,000 件以下（上記の上限で1件約 300 B 以下、
+4. 想定規模: 1ユーザーあたりのロールの割り当ては約 1,000 件以下（上記の上限で1件約 300 B 以下、
    つまり Mongo の1ドキュメントあたり約 300 KB 以下で、16 MB を大きく下回る）。
    1リソースあたりのメンバーは約 1,000 人以下。
 5. 1リソースのメンバー一覧取得はインデックスが効き、そのリソースの `(userId, role)` だけを返す。
@@ -117,7 +118,7 @@ accounts は *project* のドメインを取り込んではいけません。pro
 
 ## Solution Options
 
-### Option 1（推奨）: リソース登録 + `Permittable` に埋め込んだ binding
+### Option 1（推奨）: リソース登録 + `Permittable` に埋め込んだロールの割り当て
 
 2つの状態を持ちます。どちらも accounts にとっては中身を解釈しないものです。
 
@@ -230,7 +231,7 @@ DROP TABLE IF EXISTS resource_registrations;
 FindByKey(ctx, kind, id) (*resource.Registration, error)
 Create(ctx, r resource.Registration) error              // ErrAlreadyExists on duplicate
 LockForUpdate(ctx, kind, id) (*resource.Registration, error) // must run inside a transaction
-Remove(ctx, kind, id) error                              // also removes all bindings
+Remove(ctx, kind, id) error                              // also removes all role assignments
 
 // permittable.Repo (additions)
 FindResourceMembers(ctx, kind, id) ([]permittable.ResourceMember, error) // projection: userID + roleID
@@ -270,8 +271,8 @@ input CheckPermissionInput {
 2. `workspaceAlias` が指定されていて、それが登録の `workspaceID` に解決されなければ **拒否**。
 3. principal のロール = グローバルロール + **登録の `workspaceID`** におけるユーザーの workspace ロール
    （呼び出し元は workspace を選べない）。
-4. principal の属性 `resourceRole` = このリソースに対するユーザーの binding のロール。
-   binding がない場合（または読み込み時のガードで除外された場合）は `""`。
+4. principal の属性 `resourceRole` = このリソースでユーザーに割り当てられたロール。
+   割り当てがない場合（または読み込み時のガードで除外された場合）は `""`。
 5. Cerbos のリソース ID は実際の `resourceId` にする。
 
 ポリシーは引き続き各サービスの `definition.go` に置き、reearthx の generator がすでに
@@ -312,11 +313,11 @@ accounts が知る手段です。登録をサービスに限定することで�
 POST   /api/service/resources
        { workspaceId, resourceKind, resourceId, ownerUserId? }
        → creates the registration and, if ownerUserId is given, an `owner`
-         binding, in one transaction. ownerUserId must be a workspace member.
+         role assignment, in one transaction. ownerUserId must be a workspace member.
          409 if already registered with a different workspace; idempotent
          (200) if registered with the same workspace.
 DELETE /api/service/resources/{resourceKind}/{resourceId}
-       → removes the registration and every binding of the resource.
+       → removes the registration and every role assignment on the resource.
 ```
 
 **メンバーシップ（ユーザーの JWT、GraphQL）**:
@@ -357,7 +358,7 @@ extend type Mutation {
 | `setResourceMember` | 登録が存在する。対象ユーザーが登録の workspace のメンバーである。操作者に `(kind, id)` への `manage_members` が Cerbos で許可されている。変更が最後の `owner` を降格させる場合は拒否 |
 | `removeResourceMember` | Cerbos の `manage_members`、または操作者 == 対象ユーザー（自分で抜ける場合）。最後の `owner` を外す場合は拒否 |
 | `resourceMembers` | `(kind, id)` への Cerbos の `read`。結果は読み込み時のガードで絞り込む |
-| `myResourceBindings` | 操作者自身の binding のみ。読み込み時のガードで絞り込む |
+| `myResourceBindings` | 操作者自身のロールの割り当てのみ。読み込み時のガードで絞り込む |
 
 **最後の owner のルール:** リソースの owner 数を 1 以上から 0 にしてしまうメンバーシップの更新は
 拒否します。owner なしで登録されたリソース（例: 埋め戻し）は、owner が設定されるまで workspace ロールで
@@ -369,12 +370,12 @@ extend type Mutation {
 |---|---|
 | 同じリソースの別々のユーザーに対する2つの書き込みが、どちらも最後の owner のチェックを通過する | どちらも同じ登録に対して `LockForUpdate` を取る必要があり、後の方は待つ（Postgres）か、競合してリトライする（Mongo）。owner 数はロック取得後に読む。 |
 | 2つのサービスが同じ `(kind, id)` を登録する | 主キー / 一意インデックスにより、負けた方は `ErrAlreadyExists` になる。 |
-| `setResourceMember` が workspace メンバーシップのチェックを通過した後、binding が書き込まれる前にユーザーが workspace から外され、連動削除が実行される | **読み込み時のガード**: binding は、ユーザーが現在その binding の workspace の workspace ロールを持っている場合にのみ有効とする。permittable はすでに読み込まれているので、追加の読み込みはかからない。残った孤立行は無害で、次に連動削除や登録解除のエンドポイントがその行に触れたときに削除される。 |
-| workspace フローからの古いスナップショットの `Save` が、新しい binding を上書きする（またはその逆） | スナップショット保存は `resource_roles` を書き込まず、binding の書き込みは `workspace_roles` を書き込まない（*リポジトリの変更* を参照）。 |
+| `setResourceMember` が workspace メンバーシップのチェックを通過した後、ロールの割り当てが書き込まれる前にユーザーが workspace から外され、連動削除が実行される | **読み込み時のガード**: ロールの割り当ては、ユーザーが現在その割り当ての workspace で workspace ロールを持っている場合にのみ有効とする。permittable はすでに読み込まれているので、追加の読み込みはかからない。残った孤立行は無害で、次に連動削除や登録解除のエンドポイントがその行に触れたときに削除される。 |
+| workspace フローからの古いスナップショットの `Save` が、新しいロールの割り当てを上書きする（またはその逆） | スナップショット保存は `resource_roles` を書き込まず、ロールの割り当ての書き込みは `workspace_roles` を書き込まない（*リポジトリの変更* を参照）。 |
 
 #### ライフサイクルと連動削除
 
-| イベント | 実行者 | binding への影響 |
+| イベント | 実行者 | ロールの割り当てへの影響 |
 |---|---|---|
 | リソース作成 | サービス（M2M） | `ownerUserId` = 作成者として `POST /api/service/resources` を呼ぶ |
 | リソース削除 | サービス（M2M） | `DELETE /api/service/resources/{kind}/{id}` を呼ぶ。呼び忘れると孤立した登録が残るが無害（そのリソースはサービス側にもう存在しない）。後から任意の掃除の仕組みで削除する |
@@ -382,7 +383,7 @@ extend type Mutation {
 | workspace からユーザーを削除 | accounts | `bulkRemovePermittable` から `DeleteResourceRolesInWorkspace` も呼ぶ |
 | workspace 削除（`Workspace.Remove`） | accounts | 同じく `bulkRemovePermittable` 経由。その workspace の登録も削除する |
 | workspace の無効化 / 復元 | accounts | 変更なし（workspace ロールと同じ。復元に備えてデータを残す） |
-| ユーザー削除（`DeleteMe`） | accounts | 現状、`DeleteMe` は permittable を削除しない。ユーザーが消えれば binding には到達できなくなる。`DeleteMe` で permittable を削除する修正は、本機能とは独立したフォローアップとして提案する |
+| ユーザー削除（`DeleteMe`） | accounts | 現状、`DeleteMe` は permittable を削除しない。ユーザーが消えればロールの割り当てには到達できなくなる。`DeleteMe` で permittable を削除する修正は、本機能とは独立したフォローアップとして提案する |
 
 **メリット**
 
@@ -391,7 +392,7 @@ extend type Mutation {
 - accounts にリソースを存在させられるのは M2M 認証されたサービスだけなので、
   ユーザーが ID を自分のものとして主張することはできない。
 - リソース全体の不変条件は、両バックエンドでリソースごとに1つのレコードで直列化される。
-- binding の参照はすでに読み込まれた permittable の中で完結する。新たな読み込みは
+- ロールの割り当ての参照はすでに読み込まれた permittable の中で完結する。新たな読み込みは
   登録の主キー参照だけ。
 - accounts はドメインに依存しないまま: 種別と ID は解釈しない値で、意味はポリシーが持つ。
 
@@ -401,18 +402,18 @@ extend type Mutation {
 - サービスはリソースを登録し（埋め戻しを含む）、削除時に登録を解除する必要がある。
 - Mongo の `Save` の意味が置き換えから `$set` に変わる（既存コードに手が入る）。
 
-### Option 2: binding を独立したコレクション / テーブルに置く（埋め込まない）
+### Option 2: ロールの割り当てを独立したコレクション / テーブルに置く（埋め込まない）
 
-登録と API は同じですが、binding を permittable ではなく、独立した
+登録と API は同じですが、ロールの割り当てを permittable ではなく、独立した
 `resource_bindings (kind, id, userID, role)` コレクション / テーブルに置きます。
 
 **メリット:** permittable が大きくならない。メンバー一覧は単純なインデックススキャンになる。
 スナップショットの `Save` の意味を変える必要がない。
 
-**デメリット:** `checkPermission` で、登録に加えてもう1回（binding の）読み込みが増える。
+**デメリット:** `checkPermission` で、登録に加えてもう1回（ロールの割り当ての）読み込みが増える。
 workspace の連動削除で2つのストアを更新する必要がある。
 
-**結論:** Option 1 を採用します。1ユーザーあたりの binding 数が FR-4 に近づいた場合、
+**結論:** Option 1 を採用します。1ユーザーあたりのロールの割り当て数が FR-4 に近づいた場合、
 または Mongo の `Save` の変更にリスクがあると判明した場合は、Option 2 を再検討します。
 
 ### 検討して却下した案: 各サービスにメンバーシップを持たせる
@@ -437,7 +438,7 @@ sequenceDiagram
     alt not registered, or alias ≠ registration.workspace
         A-->>S: { allowed: false }
     else
-        A->>A: roles = global + workspace roles in registration.workspace<br/>attr.resourceRole = guarded binding role or ""
+        A->>A: roles = global + workspace roles in registration.workspace<br/>attr.resourceRole = guarded assigned role or ""
         A->>C: CheckResources(principal{roles, attr}, resource{kind, resourceId}, action)
         C-->>A: ALLOW / DENY
         A-->>S: { allowed }
@@ -455,7 +456,7 @@ sequenceDiagram
     U->>S: createProject
     S->>S: persist project P
     S->>A: POST /api/service/resources {ws, "dashboard:project", P, owner=U} (M2M key)
-    A->>A: U ∈ ws? → create registration + owner binding (one tx)
+    A->>A: U ∈ ws? → create registration + owner role assignment (one tx)
     A-->>S: 201
     U->>S: invite B as writer
     S->>A: setResourceMember(kind, P, B, writer) (U's JWT)
@@ -474,7 +475,7 @@ flowchart LR
 
 ## Potential Impact
 
-1. **permittable のドキュメント / 行のサイズ** が binding 1件あたり約 300 B 以下増える。
+1. **permittable のドキュメント / 行のサイズ** がロールの割り当て1件あたり約 300 B 以下増える。
 2. **Mongo の `Permittable.Save`** が置き換えから `$set` に変わる。permittable の永続化に関する
    既存テストは引き続き通る必要があり、`Save` が `resource_roles` に触れないことを確認する
    新しいテストを追加する。
@@ -489,7 +490,7 @@ flowchart LR
 ## Test Plan
 
 1. **ユニット**（`pkg/resource`、`pkg/permittable`）: 種別 / ID の検証と長さの上限。
-   リソースごとにロールは1つ。読み込み時のガードが、対応する workspace ロールのない binding を除外すること。
+   リソースごとにロールは1つ。読み込み時のガードが、対応する workspace ロールのない割り当てを除外すること。
 2. **interactor**（`internal/usecase/interactor`）:
    - `CheckPermission`: `resourceId` なし → roles が変わらない（リグレッション）。
      未登録のリソース → 拒否。別の workspace の alias → 拒否。workspace ロールは alias ではなく
@@ -501,7 +502,7 @@ flowchart LR
    - 連動削除: `RemoveUserMember` / `RemoveMultipleUserMembers` / `Remove`。
 3. **並行性**（`make test-integration`、両バックエンド）: 2つの goroutine が最後の2人の owner を
    同時に外す → ちょうど1つだけ成功する。同じキーの並行登録 → 1つだけ成功する。
-   `UpsertResourceRole` の後の古いスナップショットの `Save` でも binding が残る。
+   `UpsertResourceRole` の後の古いスナップショットの `Save` でもロールの割り当てが残る。
 4. **リポジトリ**: すべての新しい操作の Mongo・Postgres・memory 実装。Postgres の
    `FindByUserID` が1本のクエリしか発行しないこと。
 5. **マイグレーション**: 既存 DB に対する `0005` の up / down。既存の permittable が
@@ -535,19 +536,19 @@ flowchart LR
    `resource_roles` は消える。機能は無効になっているのでロールバック中は許容でき、
    再度ロールフォワードする際にサービスが埋め戻しを再実行する。
 4. スキーマ自体を削除する必要がある場合のみ、`0005` の down を実行する
-   （登録と binding が消えるので、先にダンプを取る）。
+   （登録とロールの割り当てが消えるので、先にダンプを取る）。
 
 ## Post Deployment
 
 - チェックリスト
-  - dashboard の staging で project を作成し、登録と作成者の `owner` の binding ができることを確認する。
+  - dashboard の staging で project を作成し、登録と作成者への `owner` ロールの割り当てができることを確認する。
   - workspace メンバーを招待してアクセスできることを確認する。そのメンバーを workspace から外し、
     project にアクセスできなくなることを確認する。
   - 別の workspace の alias を指定して `checkPermission` を呼び、拒否されることを確認する。
 - メトリクス
   - `resourceId` あり / なしでの `checkPermission` の p50 / p95 レイテンシ。
   - 登録 / 登録解除 / `setResourceMember` のエラー率（Mongo のトランザクションのリトライを含む）。
-  - permittable あたりの binding 数（最大 / p99）。FR-4 の監視用。
+  - permittable あたりのロールの割り当て数（最大 / p99）。FR-4 の監視用。
 - アラート
   - `checkPermission` のエラー率: Warning > 1%、Danger ≥ 5%。
   - `checkPermission` の p95 レイテンシ: Warning > ベースライン比 +20%。
