@@ -7,7 +7,8 @@
 > is**. The first to use it is Dashboard projects. In code, a role assignment is
 > represented by types and tables named `...Binding` / `resource_bindings`.
 >
-> Japanese version: [resource-role-binding.ja.md](resource-role-binding.ja.md)
+> Japanese version: [resource-role-binding.ja.md](resource-role-binding.ja.md).
+> If the two versions differ, the Japanese version takes precedence.
 
 ## How to read this document
 
@@ -206,25 +207,25 @@ permission.
 
 ## Functional Requirements
 
-1. **Permission checks stay fast.** Checks that do not name a project cost
+1. **Permission checks stay fast.** (FR-1, FR-2) Checks that do not name a project cost
    exactly the same as today. Checks that name a project add only one small,
    quick lookup (which workspace the project belongs to, together with that
    workspace's base permission); the user's project roles are read together
    with the data accounts already loads.
-2. **Names and IDs have size limits.** The resource type name and the resource
+2. **Names and IDs have size limits.** (FR-3) The resource type name and the resource
    ID have a maximum length and a fixed set of allowed characters, so stored
    data stays small and predictable.
-3. **Designed for realistic scale.** Up to about 1,000 project role assignments
+3. **Designed for realistic scale.** (FR-4) Up to about 1,000 project role assignments
    per user, and up to about 1,000 members per project.
-4. **Listing a project's members is quick.** It returns only who the members are
+4. **Listing a project's members is quick.** (FR-5) It returns only who the members are
    and their roles; names and other details come from the service.
-5. **Works with every database accounts supports.** Membership changes behave
+5. **Works with every database accounts supports.** (FR-6) Membership changes behave
    the same whichever database a deployment uses.
-6. **Services can tell what a person may list.** For a workspace, accounts can
+6. **Services can tell what a person may list.** (FR-7) For a workspace, accounts can
    tell a service whether a person sees every project (and at what level) or
    only the projects where they have a project role, so lists can be filtered
    correctly whatever the base permission.
-7. **Seat usage is available per workspace.** Accounts can quickly say how many
+7. **Seat usage is available per workspace.** (FR-8) Accounts can quickly say how many
    members of a workspace use a seat (and who), so billing and every service
    use the same number.
 
@@ -778,7 +779,9 @@ they serialize with the one-step add and with each other's seat checks):
 #### Detailed requirements
 
 The technical form of *Functional Requirements*. The items are FR-1 to FR-8 in
-order; other parts of this section refer to them by those numbers.
+order; other parts of this section refer to them by those numbers. Each item in
+*Functional Requirements* is labeled with its FR numbers (1 → FR-1 and FR-2,
+2 → FR-3, 3 → FR-4, 4 → FR-5, 5 → FR-6, 6 → FR-7, 7 → FR-8).
 
 1. `checkPermission` without `resourceId`: **no change** in reads or in
    principal roles. With `resourceId`: **one additional round-trip** — the
