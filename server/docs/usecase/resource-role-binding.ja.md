@@ -74,6 +74,9 @@
   - GitHub のメンバーには、人ごとの writer / reader の区別がありません。Re:Earth では workspace の
     writer / reader のロールを残し、workspace 単位の操作（例: project の作成）は引き続きこのロールで
     決まります。project へのアクセスは、基本権限と project のロールで決まります。
+  - GitHub はメンバー全員にシートを課金します。Re:Earth では、少なくとも1つの project を **編集**
+    できるメンバーだけがシートを使い、閲覧しかできない人は無料です。これは、workspace の reader は
+    シートを使わないという今の Dashboard のルールを、project 単位のアクセスに広げたものです。
 
 ### 現状
 
@@ -144,6 +147,10 @@ accounts は *project* が何であるかを取り込んではいけません。
    追加する（必要なら同時に workspace にも追加する）ことも、workspace に人を追加するときに
    どの project を与えるかを選ぶこともできる。どちらも、すべて成功するか何も変わらないかの1ステップで
    行う（*Design → UI からの追加* を参照）。
+9. **シートは編集できるかどうかで決まる。** workspace メンバーは、その workspace の project を
+   少なくとも1つ編集できればシートを使い、閲覧しかできない人や何も見えない人は使わない。accounts は
+   すべてのサービスと課金のためにシートを1か所で数え、ある変更で誰かが新たにシートを使うことになる
+   ときは、workspace がシートの上限を超えないようにする（*Design → シート* を参照）。
 
 ## Non-Goals
 
@@ -179,6 +186,8 @@ accounts は *project* が何であるかを取り込んではいけません。
 6. **ある人が何を一覧できるかをサービスが分かる。** accounts は workspace ごとに、その人がすべての
    project を（どのレベルで）見られるのか、project のロールを持つ project だけを見られるのかをサービスに
    返せる。これにより、基本権限が何であっても一覧を正しく絞り込める。
+7. **workspace ごとのシートの使用数を取得できる。** accounts は、workspace のメンバーのうち何人が
+   （誰が）シートを使っているかをすばやく返せる。課金とすべてのサービスが同じ数を使う。
 
 技術的な詳細: *Solution Options → Option 1 → 詳細な要件* を参照。
 
@@ -195,7 +204,7 @@ accounts は *project* が何であるかを取り込んではいけません。
 |---|---|
 | **リソース登録** `(resourceKind, resourceID) → workspaceID, version` | リソースの workspace の範囲を正として持つ。所有するサービスが登録したことの証明。不変条件のためのリソース単位の直列化ポイント |
 | `Permittable` 上の **リソースロール** `(workspaceID, resourceKind, resourceID, roleID)` | そのリソースに対するユーザーのロール。permittable と一緒に読むので、参照のための追加読み込みは不要 |
-| **workspace のリソース設定** `workspaceID → basePermission, version` | workspace の基本権限。workspace 単位のロック（1ステップでの追加、workspace メンバーの追加 / 削除、シートの上限、基本権限の変更のための直列化ポイント）も兼ねる |
+| **workspace のリソース設定** `workspaceID → basePermission, seatLimit, version` | workspace の基本権限とシートの上限。workspace 単位のロック（1ステップでの追加、workspace のメンバーとロールの変更、編集できる project のロールの付与、project の登録、基本権限の変更など、シートの使用数に影響しうるすべての変更のための直列化ポイント）も兼ねる |
 
 #### ドメイン
 
@@ -250,6 +259,7 @@ const (
 
 type WorkspaceSettings struct {
     basePermission BasePermission
+    seatLimit      *int  // nil = unlimited; set by billing (M2M)
     version        int64 // bumped by every write and by Lock
     workspaceID    workspace.ID
 }
@@ -270,6 +280,41 @@ func BaselineRole(workspaceRole role.RoleType, base BasePermission) (r role.Role
 全体を置き換える）ため、workspace のフィールドにすると、同時に走る古い workspace の保存で元に戻されて
 しまうおそれがあるからです。レコードがなければ「workspace のロールに従う」と見なすので、データの
 マイグレーションは不要です。既存の workspace ロールは変えません。
+
+**シート。**
+
+```go
+// server/pkg/resource/seat.go
+var editRoles = []role.RoleType{role.RoleOwner, role.RoleMaintainer, role.RoleWriter}
+
+// UsesSeat reports whether a member uses a seat in the workspace: workspace role
+// owner / maintainer, or a baseline in editRoles, or any valid resource role in editRoles.
+func UsesSeat(p *permittable.Permittable, ws workspace.ID, base BasePermission) bool
+```
+
+workspace のシートの使用数 = `UsesSeat` が true になるメンバーの数（重複なし）。「workspace のロールに
+従う」でリソースロールがなければ、これは今の Dashboard の数（reearth-dashboard の
+`server/pkg/subscription/service.go` の `GetCurrentSeatStatus`。ロールが `reader` でないメンバーを数える）
+と一致します。
+
+シートの上限は課金が持ち、accounts に送ります（`seatLimit`。`nil` は無制限で、今の「サブスクリプション
+なし」と同じ）。これにより accounts は、変更と同じトランザクションの中で上限を強制できます。既存の
+`enforceMemberCount` のフック（`WorkspaceMemberCountEnforcer`。現在は配線されていない）は、この
+チェックに置き換えます。
+
+**シートのチェック（`ensureSeats`）。** workspace ロックのもとで、トランザクション内で変更を適用した後、
+コミットの前に実行します。`seatUsage(after) > seatUsage(before)` かつ `seatUsage(after) > seatLimit` なら、
+トランザクションを `ErrSeatLimitExceeded` でロールバックします。使用数を増やさない変更は、workspace が
+すでに上限を超えていても（例: 課金が上限を下げた後）常に許可します。シートを使わないメンバーを
+シートを使うメンバーに変えうる、つまりこのチェックを行う操作は次のとおりです。
+
+| 操作 | シートが増えうるとき |
+|---|---|
+| `setResourceMember` | 新しいロールが writer 以上 |
+| `addWorkspaceMemberWithResourceRoles` | 新しいメンバーの workspace ロールか、与えるリソースロールのいずれかが writer 以上、または基準ロールで編集できる |
+| `updateWorkspaceBasePermission` | 新しい値で、いずれかの基準ロールが writer に上がる（例: `Writer` へ、または `None` / `Reader` から「workspace のロールに従う」へ） |
+| `addUsersToWorkspace` / `updateUserOfWorkspace` / `transferWorkspaceOwnership` | メンバーが `writer`、`maintainer`、`owner` になる |
+| `ownerUserId` 付きの `POST /api/service/resources`（project の作成） | 作成者がそれまでシートを使っていなかった |
 
 #### ストレージ
 
@@ -306,6 +351,7 @@ CREATE TABLE resource_workspace_settings (
     workspace_id    text PRIMARY KEY,
     base_permission text NOT NULL DEFAULT 'follow_workspace_role'
         CHECK (base_permission IN ('follow_workspace_role', 'none', 'reader', 'writer')),
+    seat_limit      integer CHECK (seat_limit >= 0),   -- NULL = unlimited
     version         bigint NOT NULL DEFAULT 0
 );
 ```
@@ -326,7 +372,7 @@ DROP TABLE IF EXISTS resource_registrations;
   `{ "resource_roles.resource_kind": 1, "resource_roles.resource_id": 1 }` と
   `{ "resource_roles.workspace_id": 1 }` です。
 - 新しいコレクション `resource_workspace_settings`（`_id` = workspace ID、`base_permission`、
-  `version`）を追加します。
+  `seat_limit`、`version`）を追加します。
 
 #### リポジトリの変更（スナップショットではなく対象を絞った書き込み）
 
@@ -354,6 +400,7 @@ RemoveInWorkspace(ctx, workspaceID) error                // all registrations + 
 Find(ctx, workspaceID) (*resource.WorkspaceSettings, error) // default settings when no row
 Lock(ctx, workspaceID) (*resource.WorkspaceSettings, error) // must run inside a transaction; creates the row on first use
 SetBasePermission(ctx, workspaceID, base resource.BasePermission) error // after Lock
+SetSeatLimit(ctx, workspaceID, limit *int) error                       // after Lock
 Remove(ctx, workspaceID) error
 
 // permittable.Repo (additions)
@@ -362,6 +409,7 @@ CountResourceOwners(ctx, kind, id, ownerRoleID) (int, error)
 UpsertResourceRole(ctx, userID, r permittable.ResourceRole) error
 DeleteResourceRole(ctx, userID, kind, id) error
 DeleteResourceRolesInWorkspace(ctx, workspaceID, userIDs) error
+FindSeatUsers(ctx, workspaceID, baselineEditRoles []role.ID, editRoles []role.ID) ([]user.ID, error)
 ```
 
 | 操作 | Mongo | Postgres |
@@ -372,6 +420,7 @@ DeleteResourceRolesInWorkspace(ctx, workspaceID, userIDs) error
 | `FindResourceMembers` | 集約 `$match` → `$unwind` → `$match` → `$project {user_id, role_id}` | `SELECT p.user_id, r.role_id FROM permittable_resource_roles r JOIN permittables p …` |
 | `LockForUpdate` | トランザクション内で `findOneAndUpdate {$inc: {version: 1}}`（同じ登録に対する並行トランザクションは書き込み競合となり、リトライされる） | `SELECT … FOR UPDATE` |
 | `WorkspaceSettings.Lock` | トランザクション内で `findOneAndUpdate {_id: ws} {$inc: {version: 1}}, upsert`（書き込み競合 → リトライ） | `INSERT … ON CONFLICT DO NOTHING` の後に `SELECT … FOR UPDATE` |
+| `FindSeatUsers` | `permittables` に対する集約: `ws` の workspace ロールを持ち、かつ（`workspace_roles` のロール ∈ 基準ロールで編集できるロール **または** `resource_roles` が `$elemMatch {workspace_id: ws, role_id ∈ 編集できるロール}`）のユーザーを `$match` → `$project user_id` | `SELECT DISTINCT p.user_id FROM permittables p JOIN permittable_workspace_roles w … WHERE w.workspace_id=$1 AND (w.role_id = ANY($2) OR EXISTS (SELECT 1 FROM permittable_resource_roles r WHERE r.permittable_id = p.id AND r.workspace_id=$1 AND r.role_id = ANY($3)))` |
 | `checkPermission` 用の登録 + 設定 | `resource_registrations` に対する1回の集約: キーで `$match` → `workspace_id` で `resource_workspace_settings` を `$lookup` | 1本のクエリ: `SELECT r.*, s.base_permission FROM resource_registrations r LEFT JOIN resource_workspace_settings s USING (workspace_id) WHERE …` |
 
 #### 権限チェック
@@ -482,11 +531,19 @@ accounts が知る手段です。登録をサービスに限定することで�
 POST   /api/service/resources
        { workspaceId, resourceKind, resourceId, ownerUserId? }
        → creates the registration and, if ownerUserId is given, an `owner`
-         role assignment, in one transaction. ownerUserId must be a workspace member.
+         role assignment, in one transaction under the workspace lock.
+         ownerUserId must be a workspace member; seat check (the creator may
+         start using a seat) → 422 ErrSeatLimitExceeded.
          409 if already registered with a different workspace; idempotent
          (200) if registered with the same workspace.
 DELETE /api/service/resources/{resourceKind}/{resourceId}
        → removes the registration and every role assignment on the resource.
+PUT    /api/service/workspaces/{workspaceId}/seat-limit
+       { seatLimit: int | null }
+       → billing sets the workspace's seat limit (null = unlimited). Lowering
+         it below current usage is accepted; it only blocks further increases.
+GET    /api/service/workspaces/{workspaceId}/seat-usage
+       → { seatCount, seatLimit, seatUserIds } for billing.
 ```
 
 **メンバーシップと設定（ユーザーの JWT、GraphQL）**:
@@ -532,12 +589,19 @@ type AddWorkspaceMemberWithResourceRolesPayload {
   workspaceRole: Role!              # the user's workspace role after the call
   resources: [ResourceBinding!]!
 }
+type WorkspaceSeatUsage {
+  workspaceId: ID!
+  seatCount: Int!                   # distinct members for which UsesSeat is true
+  seatLimit: Int                    # null = unlimited
+  seatUserIds: [ID!]!
+}
 
 extend type Query {
   resourceMembers(resourceKind: String!, resourceId: String!): [ResourceMember!]!
   # IDs only; the owning service hydrates names etc.
   myResourceBindings(resourceKind: String!, workspaceId: ID): [ResourceBinding!]!
   myResourceAccess(workspaceId: ID!, resourceKind: String!): ResourceAccess!
+  workspaceSeatUsage(workspaceId: ID!): WorkspaceSeatUsage!
 }
 
 extend type Mutation {
@@ -563,10 +627,11 @@ extend type Mutation {
 
 | 操作 | ロック | ガード |
 |---|---|---|
-| `setResourceMember` | 登録 | 登録が存在する。対象ユーザーが登録の workspace のメンバーである（そうでなければ `ErrNotWorkspaceMember`。`addWorkspaceMemberWithResourceRoles` を使う）。操作者に `(kind, id)` への `manage_members` が Cerbos で許可されている。変更が最後の `owner` を降格させる場合は拒否 |
+| `setResourceMember` | workspace ロック、次に登録 | 登録が存在する。対象ユーザーが登録の workspace のメンバーである（そうでなければ `ErrNotWorkspaceMember`。`addWorkspaceMemberWithResourceRoles` を使う）。操作者に `(kind, id)` への `manage_members` が Cerbos で許可されている。変更が最後の `owner` を降格させる場合は拒否。シートのチェック |
 | `removeResourceMember` | 登録 | Cerbos の `manage_members`、または操作者 == 対象ユーザー（自分で抜ける場合）。最後の `owner` を外す場合は拒否 |
-| `addWorkspaceMemberWithResourceRoles` | workspace ロック、次に各登録 | すべての登録が存在し `workspaceId` に属する（そうでなければ呼び出し全体を拒否）。操作者にそれぞれへの `manage_members` が Cerbos で許可されている。ユーザーが **まだメンバーでない** 場合: 操作者が workspace 管理者（v1。Open Question 7）。個人 workspace は拒否。`workspaceRole`（デフォルト `reader`）は `addUsersToWorkspace` と同じく `owner` 以外。シートの上限（`enforceMemberCount`）を通過する。そのうえで `Members().Join` を行い、既存の `bulkUpdatePermittable` の経路で permittable の workspace ロールを書き込む。ユーザーが **すでにメンバーである** 場合: workspace のメンバーシップとロールは変えない（降格もしない。`workspaceRole` は無視する）。そのうえでリソースごとに最後の owner のルールを適用し、各項目について `UpsertResourceRole` を行う。どこかで失敗したらすべてロールバックする |
-| `updateWorkspaceBasePermission` | workspace ロック | 操作者が既存の workspace の `manage` のチェック（owner / maintainer）を通過する。個人 workspace は拒否（v1。Open Question 9）。そのうえで `SetBasePermission`。次の `checkPermission` から有効になり、ほかには何も書き換えない |
+| `addWorkspaceMemberWithResourceRoles` | workspace ロック、次に各登録 | すべての登録が存在し `workspaceId` に属する（そうでなければ呼び出し全体を拒否）。操作者にそれぞれへの `manage_members` が Cerbos で許可されている。ユーザーが **まだメンバーでない** 場合: 操作者が workspace 管理者（v1。Open Question 7）。個人 workspace は拒否。`workspaceRole`（デフォルト `reader`）は `addUsersToWorkspace` と同じく `owner` 以外。そのうえで `Members().Join` を行い、既存の `bulkUpdatePermittable` の経路で permittable の workspace ロールを書き込む。ユーザーが **すでにメンバーである** 場合: workspace のメンバーシップとロールは変えない（降格もしない。`workspaceRole` は無視する）。そのうえでリソースごとに最後の owner のルールを適用し、各項目について `UpsertResourceRole` を行い、シートのチェックを行う。どこかで失敗したらすべてロールバックする |
+| `updateWorkspaceBasePermission` | workspace ロック | 操作者が既存の workspace の `manage` のチェック（owner / maintainer）を通過する。個人 workspace は拒否（v1。Open Question 9）。そのうえで `SetBasePermission` とシートのチェック。次の `checkPermission` から有効になり、ほかには何も書き換えない |
+| `workspaceSeatUsage` | — | 操作者が workspace のメンバーを閲覧できる（`read_member`）。`seat-usage` のルートは M2M のみ |
 | `resourceMembers` | — | `(kind, id)` への Cerbos の `read`。結果は読み込み時のガードで絞り込む |
 | `myResourceBindings` | — | 操作者自身のロールの割り当てのみ。読み込み時のガードで絞り込む |
 | `myResourceAccess` | — | 操作者自身のアクセスのみ。`baselineRole` は `BaselineRole(...)` から、`bindings` は読み込み時のガードで絞り込む |
@@ -579,10 +644,11 @@ extend type Mutation {
 ユーザーの最後のリソースロールを外しても（`removeResourceMember`）、workspace からは **外れません**
 （Open Question 8）。
 
-**既存の workspace のフローの変更**（いずれもまず workspace ロックを取り、1ステップでの追加と
-直列化する）:
+**既存の workspace のフローの変更**（いずれもまず workspace ロックを取り、1ステップでの追加や
+ほかのシートのチェックと直列化する）:
 
-- `addUsersToWorkspace`: ロック以外は変更なし。
+- `addUsersToWorkspace`、`updateUserOfWorkspace`、`transferWorkspaceOwnership`: シートのチェックを
+  行う（`writer`、`maintainer`、`owner` になったメンバーは新たにシートを使うことがある）。
 - `removeUserFromWorkspace` / `removeMultipleUsersFromWorkspace`: そのユーザーの workspace 内の
   ロールの割り当ても削除する（`DeleteResourceRolesInWorkspace`）。
 - `deleteWorkspace`（`Workspace.Remove`）: `RemoveInWorkspace(ws)` で、その workspace のすべての登録と
@@ -597,7 +663,8 @@ extend type Mutation {
 | `setResourceMember` が workspace メンバーシップのチェックを通過した後、ロールの割り当てが書き込まれる前にユーザーが workspace から外され、連動削除が実行される | **読み込み時のガード**: ロールの割り当ては、ユーザーが現在その割り当ての workspace で workspace ロールを持っている場合にのみ有効とする。permittable はすでに読み込まれているので、追加の読み込みはかからない。残った孤立行は無害で、次に連動削除や登録解除のエンドポイントがその行に触れたときに削除される。 |
 | workspace フローからの古いスナップショットの `Save` が、新しいロールの割り当てを上書きする（またはその逆） | スナップショット保存は `resource_roles` を書き込まず、ロールの割り当ての書き込みは `workspace_roles` を書き込まない（*リポジトリの変更* を参照）。 |
 | 2人の管理者が `addWorkspaceMemberWithResourceRoles` で同じ新しい人を同時に追加する（project は異なる場合もある） | どちらも workspace ロックを取る。後の方は待つかリトライし、既存のメンバーと見なしてロールの割り当てだけを追加する。workspace ロールは変わらず、シートは1回だけ数えられる。 |
-| 残りシートが1つのときに、2人の管理者が別々の新しい人を追加する | シート数は workspace ロックの取得後に読むので、ちょうど1つだけ成功する。 |
+| 残りシートが1つのときに、2人の管理者がそれぞれ別の人に新たにシートを使わせる（新しいメンバー、編集できる project のロール、workspace のロールの変更、project の作成） | そうした操作はどれも workspace ロックを取り、トランザクション内でシートの使用数を計算するので、ちょうど1つだけ成功する。 |
+| 編集できる project のロールの付与中に基本権限が引き上げられる | どちらも workspace ロックを取る。後の方は先の方を含めて使用数を計算する。 |
 | 1ステップでの追加の実行中に、そのユーザーが workspace から外される | どちらも workspace ロックを取る。外す処理が後にコミットされれば、その連動削除が新しいロールの割り当てを削除する。先なら、追加の処理はそのユーザーを新しい人として扱う（管理者のチェック、シートの上限）。残る隙間は読み込み時のガードが補う。 |
 | リソースが重なる2つの複数リソースの操作がデッドロックする | ロックの順序を固定する: workspace ロック、次に `(kind, id)` でソートした登録。 |
 | 2人の管理者が同時に基本権限を変更する、または変更が workspace の保存と競合する | 設定は専用のレコードにあり、workspace ロックのもとで書き込む。最後にコミットした値が有効になり、workspace のスナップショットの `Save` で元に戻されることはない。 |
@@ -608,10 +675,11 @@ extend type Mutation {
 | イベント | 実行者 | ロールの割り当てへの影響 |
 |---|---|---|
 | リソース作成 | サービス（M2M） | `ownerUserId` = 作成者として `POST /api/service/resources` を呼ぶ |
-| リソース削除 | サービス（M2M） | `DELETE /api/service/resources/{kind}/{id}` を呼ぶ。呼び忘れると孤立した登録が残るが無害（そのリソースはサービス側にもう存在しない）。後から任意の掃除の仕組みで削除する |
+| リソース削除 | サービス（M2M） | `DELETE /api/service/resources/{kind}/{id}` を呼ぶ。そこでだけ編集できたメンバーはシートを使わなくなる。呼び忘れると孤立した登録が残る。ほぼ無害（そのリソースはサービス側にもう存在しない）だが、その編集できるロールはシートとして数えられ続ける。後から任意の掃除の仕組みで削除する |
 | 既存のリソース（本機能以前） | サービス（M2M） | サービスが `resourceId` を送り始める前に、同じエンドポイント（冪等）で一度だけ埋め戻す |
 | `addWorkspaceMemberWithResourceRoles` で人を追加 | accounts | workspace のメンバーシップ（新規の場合）とロールの割り当てを1つのトランザクションで書き込む |
-| メンバーの workspace 内の最後のロールの割り当てを削除 | accounts | そのロールの割り当てだけを削除する。workspace のメンバーシップ（とシート）は残る |
+| メンバーの workspace 内の最後のロールの割り当てを削除 | accounts | そのロールの割り当てだけを削除する。workspace のメンバーシップは残る（もう何も編集できなければシートは空く） |
+| シートの上限の変更 | 課金（M2M） | なし。今後の増加だけが新しい上限でチェックされる |
 | workspace からユーザーを削除 | accounts | `bulkRemovePermittable` から `DeleteResourceRolesInWorkspace` も呼ぶ |
 | workspace 削除（`Workspace.Remove`） | accounts | `RemoveInWorkspace(ws)`: workspace のすべての登録とロールの割り当て。設定のレコードも削除する |
 | workspace の無効化 / 復元 | accounts | 変更なし（workspace ロールと同じ。復元に備えてデータを残す） |
@@ -628,8 +696,8 @@ extend type Mutation {
   シート、基本権限）は workspace ごとに1つのレコードで、両バックエンドとも直列化される。
 - ロールの割り当ての参照はすでに読み込まれた permittable の中で完結する。新たな読み込みは、
   workspace の設定を結合した登録の主キー参照だけ。
-- アクセスできる人は全員 workspace のメンバーなので、シート、SSO / SCIM、削除は既存のメンバーの
-  フローのまま動く。
+- アクセスできる人は全員 workspace のメンバーなので、SSO / SCIM と削除は既存のメンバーのフローの
+  まま動き、シートは1か所で、変更と同じトランザクションの中で数えて強制できる。
 - accounts はドメインに依存しないまま: 種別と ID は解釈しない値で、意味はポリシーが持つ。
 
 **デメリット**
@@ -637,13 +705,14 @@ extend type Mutation {
 - `resourceId` を渡す `checkPermission` 呼び出しでラウンドトリップが1回増える。
 - サービスはリソースを登録し（埋め戻しを含む）、削除時に登録を解除する必要がある。
 - Mongo の `Save` の意味が置き換えから `$set` に変わる（既存コードに手が入る）。
-- 既存の workspace メンバーのフローで、workspace ロックを取る必要がある。
+- 既存の workspace メンバーのフローで、workspace ロックを取り、シートのチェックを行う必要がある。
+  課金はシートの上限を accounts に送る必要がある。
 - 基本権限がデフォルト以外の場合、サービスは workspace の writer / reader がすべてを見られると
   仮定せず、`myResourceAccess` で一覧を絞り込む必要がある。
 
 #### 詳細な要件
 
-*Functional Requirements* の技術的な形です。各項目は順に FR-1〜FR-7 で、この節のほかの部分では
+*Functional Requirements* の技術的な形です。各項目は順に FR-1〜FR-8 で、この節のほかの部分では
 この番号で参照します。
 
 1. `resourceId` なしの `checkPermission`: 読み込みも principal のロールも **変わらない**。
@@ -664,6 +733,9 @@ extend type Mutation {
 6. すべての更新操作が MongoDB / PostgreSQL の両バックエンドと `memory` リポジトリで動くこと。
 7. `myResourceAccess(ws, kind)` のコストは、すでに読み込まれた permittable と、workspace の設定の
    ポイント読み込み1回。
+8. `workspaceSeatUsage(ws)` / シートのチェックは、インデックスが効く1本のクエリ（`FindSeatUsers`。
+   workspace ロールとリソースロールの `workspace_id` のインデックスを使う）と設定のレコードだけで済み、
+   workspace 全体を読み込むことはない。
 
 範囲についての補足（*Non-Goals* の技術的な形）:
 
@@ -710,12 +782,12 @@ sequenceDiagram
     U->>S: createProject
     S->>S: persist project P
     S->>A: POST /api/service/resources {ws, "dashboard:project", P, owner=U} (M2M key)
-    A->>A: U ∈ ws? → create registration + owner role assignment (one tx)
-    A-->>S: 201
+    A->>A: lock ws → U ∈ ws? → create registration + owner role assignment → seat check (one tx)
+    A-->>S: 201 (or 422 ErrSeatLimitExceeded)
     U->>S: give workspace member B writer on P
     S->>A: setResourceMember(kind, P, B, writer) (U's JWT)
-    A->>A: lock registration → B ∈ ws? Cerbos manage_members for U? → upsert
-    A-->>S: ok
+    A->>A: lock ws, registration → B ∈ ws? Cerbos manage_members for U? → upsert → seat check
+    A-->>S: ok (or ErrSeatLimitExceeded)
 ```
 
 ##### UI から1ステップで人を追加する（パターン a と b）
@@ -737,11 +809,12 @@ sequenceDiagram
     A->>A: each Pn registered in ws?
     A->>C: manage_members on each Pn for U?
     alt D ∉ ws
-        A->>A: U is workspace admin? seat limit → Join(D, reader) + permittable workspace role
+        A->>A: U is workspace admin? → Join(D, reader) + permittable workspace role
     else D ∈ ws
         A->>A: keep D's workspace role unchanged
     end
     A->>A: LockForUpdate P1, P2 … (sorted) → last-owner rule → UpsertResourceRole each
+    A->>A: seat check (D uses a seat if any role is writer+)
     A->>A: commit (any failure → roll back all)
     A-->>S: { addedToWorkspace, workspaceRole, resources }
 ```
@@ -780,12 +853,22 @@ flowchart LR
    絞り込む。`resourceId` ありのチェックはすでに設定に従う。
 8. **基本権限の UI**: workspace の設定画面で `Workspace.basePermission` を表示・編集する（owner /
    maintainer のみ）。
+9. **Dashboard のシートのロジックを accounts に移す**: reearth-dashboard の
+   `server/pkg/subscription/service.go` の `GetCurrentSeatStatus` / `TempGetCurrentSeatStatus`（reader 以外の
+   メンバーを数える）と、project の作成 / 更新 / 削除での `IsOverUsedSeat` のガードは、メンバーを数える
+   代わりに `workspaceSeatUsage` / `seat-usage` を使う必要がある。課金はサブスクリプションが変わるたびに
+   `PUT /api/service/workspaces/{id}/seat-limit` で `seatLimit` を送る。
+10. **新しい拒否**: `setResourceMember`、`addWorkspaceMemberWithResourceRoles`、
+    `updateWorkspaceBasePermission`、`addUsersToWorkspace`、`updateUserOfWorkspace`、
+    `transferWorkspaceOwnership`、project の登録は `ErrSeatLimitExceeded` を返すことがある。呼び出し側は
+    すべて分かりやすいメッセージを表示する必要がある。
 
 ##### テスト
 
 1. **ユニット**（`pkg/resource`、`pkg/permittable`）: 種別 / ID の検証と長さの上限。
    リソースごとにロールは1つ。読み込み時のガードが、対応する workspace ロールのない割り当てを除外すること。
    上の表のすべてのセルについての `BaselineRole`（設定のレコードがなければ「workspace のロールに従う」）。
+   workspace ロール × 基本権限 × リソースロールの組み合わせごとの `UsesSeat`。
 2. **interactor**（`internal/usecase/interactor`）:
    - `CheckPermission`: `resourceId` なし → 設定にかかわらず roles が変わらない（リグレッション）。
      未登録のリソース → 拒否。別の workspace の alias → 拒否。workspace ロールは alias ではなく
@@ -806,12 +889,19 @@ flowchart LR
    - `updateWorkspaceBasePermission`: owner / maintainer のみ。個人 workspace は拒否。次のチェックで
      新しい値が使われる。
    - `myResourceAccess`: 設定と workspace ロールごとの `baselineRole`。「なし」のメンバーでは null。
+   - `workspaceSeatUsage`: デフォルトの設定でリソースロールがなければ、以前の Dashboard の数と一致する。
+     writer のリソースロールを持つ reader は、そのロールがいくつあっても1回だけ数える。「なし」で
+     reader のリソースロールしか持たない writer は数えない。
+   - シートのチェック: 上限に達しているとき、*シートのチェック* の表の各操作は `ErrSeatLimitExceeded` で
+     拒否され、何も残らない。シートが増えない同じ操作は成功する。上限を超えていてもシートを空ける
+     操作は成功する。`seatLimit = null` では決して止めない。
    - 連動削除: `RemoveUserMember` / `RemoveMultipleUserMembers` / `Remove`。
 3. **並行性**（`make test-integration`、両バックエンド）: 2つの goroutine が最後の2人の owner を
    同時に外す → ちょうど1つだけ成功する。同じキーの並行登録 → 1つだけ成功する。
    `UpsertResourceRole` の後の古いスナップショットの `Save` でもロールの割り当てが残る。同じ新しい人に
    対する2つの1ステップでの追加を同時に実行 → 1回だけ参加し、両方のロールの割り当てが残る。残り
-   シートが1つのときに別々の新しい人を同時に追加 → ちょうど1つだけ成功する。
+   シートが1つのときに、種類の違うシートを増やす操作（1ステップでの追加、`setResourceMember` の
+   writer、project の登録、基本権限を `Writer` に）を同時に実行 → ちょうど1つだけ成功する。
 4. **リポジトリ**: すべての新しい操作の Mongo・Postgres・memory 実装。Postgres の
    `FindByUserID` が1本のクエリしか発行しないこと。
 5. **マイグレーション**: 既存 DB に対する `0005` の up / down。既存の permittable が
@@ -838,16 +928,21 @@ flowchart LR
    新しいルートと GraphQL のフィールド・enum の追加のみ。`resourceId` がなければ挙動は変わらず、
    workspace のメンバー一覧とロールも変わらない。
 2. 部分的にデプロイできるか？ **できる。** 順序:
-   1. accounts をデプロイする。
-   2. 各サービスが既存リソースの登録を埋め戻す。
-   3. 各サービスが作成時の登録 / 削除時の登録解除を始める。
-   4. 各サービスが `P.attr.resourceRole` を使うポリシーをデプロイし、`resourceId` を送り始める。
-      ステップ 4 より前は属性が存在せず、条件がマッチしない（安全側に倒れる）。
-   5. 1ステップでの追加の UI を有効にする。
-   6. サービスが `myResourceAccess` で一覧を絞り込むようにし、そのうえで基本権限を変更する UI を
+   1. accounts をデプロイする。`seatLimit` が設定されていなければ、シートのチェックは止めない。
+   2. 課金がすべての workspace の `seatLimit` を送り、Dashboard は `GetCurrentSeatStatus` /
+      `IsOverUsedSeat` を `seat-usage` に切り替える。切り替えの前に、すべての workspace で `seatCount` を
+      Dashboard の数と比べる。デフォルトの設定でリソースロールがなければ一致する。
+   3. 各サービスが既存リソースの登録を埋め戻す（既存の project には `ownerUserId` を付けないので、
+      埋め戻しでシートは増えない）。
+   4. 各サービスが作成時の登録 / 削除時の登録解除を始める。
+   5. 各サービスが `P.attr.resourceRole` を使うポリシーをデプロイし、`resourceId` を送り始める。
+      ステップ 5 より前は属性が存在せず、条件がマッチしない（安全側に倒れる）。
+   6. 1ステップでの追加の UI を有効にする。
+   7. サービスが `myResourceAccess` で一覧を絞り込むようにし、そのうえで基本権限を変更する UI を
       有効にする。workspace が変更するまではすべての workspace が「workspace のロールに従う」なので、
-      ステップ 1〜5 で誰のアクセスも変わらない。
-3. 通知先: dashboard / visualizer / cms のオーナー、Cerbos ポリシーの管理者。
+      ステップ 1〜6 で誰のアクセスもシートの数も変わらない（新しい編集できる project のロールと新しい
+      project の分を除く）。
+3. 通知先: dashboard / visualizer / cms のオーナー、課金の担当者、Cerbos ポリシーの管理者。
 4. 設定変更: なし（既存の M2M API キーを再利用する）。
 5. DDL: Postgres のマイグレーション `0005` は起動時に自動で実行される（golang-migrate）。
    Mongo は起動時のマイグレーションでコレクションのスキーマとインデックスを作成する。
@@ -861,6 +956,8 @@ flowchart LR
    バージョンには基本権限がないので、その writer / reader は再びすべての project を見られるようになる。
    そうした workspace（`base_permission <> 'follow_workspace_role'`）を洗い出し、ロールバックの前に
    管理者に知らせる。「なし」に依存している workspace があれば、修正して前に進めることを優先する。
+   Dashboard のシートの状態を自前のメンバー数に戻す。リソースロールでシートを使っていた reader
+   （数えられなくなる）と、「なし」の workspace（writer が再び数えられる）では、使用数が変わることがある。
 3. accounts のイメージを戻す。旧バイナリは新しいコレクション、テーブル、`resource_roles`
    フィールドを無視するので、**データのロールバックは不要**。
    注意: 旧バージョンの Mongo の `Save` はドキュメント全体を置き換えるため、書き込んだ permittable の
@@ -878,8 +975,13 @@ flowchart LR
     ほかの project は閲覧だけできることを確認する。そのメンバーを workspace から外し、すべての
     project にアクセスできなくなることを確認する。
   - 別の workspace の alias を指定して `checkPermission` を呼び、拒否されることを確認する。
-  - workspace 外のユーザーに対して `addWorkspaceMemberWithResourceRoles` を呼び、`reader` のメンバーに
-    なること、シートを使うこと、指定した project のロールを得ることを確認する。
+  - Dashboard を切り替える前に、すべての workspace で `seatCount` が Dashboard の今の数と一致することを
+    確認する。
+  - workspace 外のユーザーに対して project の `writer` を付けて `addWorkspaceMemberWithResourceRoles` を
+    呼び、そのロールを持つ `reader` のメンバーになり、`seatUserIds` に入ることを確認する。project の
+    `reader` を付けた場合は入らないことを確認する。
+  - `seatCount == seatLimit` のときに reader に `setResourceMember(writer)` を呼び、
+    `ErrSeatLimitExceeded` になり何も変わらないことを確認する。
   - 設定のレコードがない workspace が `FOLLOW_WORKSPACE_ROLE` を返し、そのメンバーのチェックが
     変わらないことを確認する。
   - staging の workspace で `updateWorkspaceBasePermission(NONE)` を呼び、リソースロールのない `reader` が
@@ -891,6 +993,7 @@ flowchart LR
     `updateWorkspaceBasePermission` のエラー率（Mongo のトランザクションのリトライとシートの上限による
     拒否を含む）。
   - permittable あたりのロールの割り当て数（最大 / p99）。FR-4 の監視用。
+  - 操作と workspace ごとの `ErrSeatLimitExceeded` の件数。`workspaceSeatUsage` のレイテンシ。
 - アラート
   - `checkPermission` のエラー率: Warning > 1%、Danger ≥ 5%。
   - `checkPermission` の p95 レイテンシ: Warning > ベースライン比 +20%。
@@ -919,7 +1022,7 @@ flowchart LR
 8. **最後の project のロールで workspace からも外す:** そうすると決めた場合、`removeResourceMember`
    （と登録解除）は、同じトランザクションの中で workspace ロックのもと、workspace 内の最後のロールの
    割り当てが外れたメンバーを、既存の workspace メンバー削除の経路で外す。対象は基準ロールのない
-   （「なし」の）メンバーだけ。
+   （「なし」の）メンバーだけ。そうしたメンバーはもともとシートを使っていないので、シートには影響しない。
 9. **個人 / Free の workspace での基本権限:** v1 では個人 workspace に対する
    `updateWorkspaceBasePermission` を拒否する。プランで制限するなら、そのガードにプランのチェック
    （`enforceMemberCount` と同じ情報源）を加える。
@@ -929,6 +1032,13 @@ flowchart LR
 11. **設定の範囲:** workspace ごとにプラットフォーム全体で1つ（workspace ごとに1レコードで、すべての
     リソース種別に適用）を提案する。サービスごとにするなら、レコードを `(workspaceID, service)` で持ち、
     登録の種別の接頭辞で引く。FR-1 のラウンドトリップは変わらない。
+12. **シートの上限を超える場合:** v1 は `ensureSeats` から `ErrSeatLimitExceeded`（M2M のルートでは 422）で
+    拒否する。「許可して超過を示す」案なら、拒否をやめ、今の Dashboard の `IsOverUsedSeat` のように
+    `workspaceSeatUsage` で `seatCount > seatLimit` を見せる。project の作成だけを別扱いにするなら、
+    `POST /api/service/resources` でだけチェックを省く。
+13. **「編集」の意味:** `UsesSeat` はサービスごとの操作ではなくロールのレベル（`editRoles` = writer、
+    maintainer、owner）を使うので、すべてのリソース種別で同じになる。サービスごとに線を変える必要が
+    あれば、`editRoles` を種別ごと（サービスがポリシーと同じように宣言する）にする必要がある。
 
 ### Option 2: ロールの割り当てを独立したコレクション / テーブルに置く（埋め込まない）
 
@@ -966,8 +1076,8 @@ GitHub の outside collaborator のような、workspace のメンバーでは�
 ### workspace メンバー、ロール、基本権限
 
 - **project にアクセスできる人は全員 workspace のメンバー。** 人は今と同じく（管理者によって、または
-  SSO / SCIM によって）workspace に追加され、今と同じくシートを使い、メンバー一覧に表示され、
-  外されるとすべてのアクセスを失う。
+  SSO / SCIM によって）workspace に追加され、メンバー一覧に表示され、何かを編集できればシートを使い
+  （*シート* を参照）、外されるとすべてのアクセスを失う。
 - **workspace のロール**（owner / maintainer / writer / reader）は変わらず、メンバー管理や project の
   作成といった workspace 単位のことは引き続きこのロールで決まる。
   - **owner と maintainer** は、GitHub の organization owner と同じく、常にすべての project に
@@ -1030,6 +1140,31 @@ flowchart LR
     end
 ```
 
+### シート
+
+Re:Earth は workspace ごとのシート単位で課金される。**workspace メンバーは、その workspace の project を
+少なくとも1つ編集できればシートを使う。** 閲覧しかできない人や何も見えない人はシートを使わない。
+次のいずれかに当てはまるメンバーがシートを使う。
+
+- workspace のロールが owner または maintainer（すべてを編集できる）。
+- 基本権限によってすべての project を編集できる（「workspace のロールに従う」の writer、または
+  「Writer」のときの全員）。
+- 少なくとも1つの project で、編集できる project のロール（writer、maintainer、owner）を持つ。
+
+何個の project を編集できても、1人は1回だけ数える。基本権限がデフォルトで project のロールがなければ、
+これは今の Dashboard のルール（reader 以外の全員がシートを使う）とまったく同じ。
+
+例:
+
+- project P の **writer** である workspace の **reader** はシートを使う。
+- 「なし」のもとで、project のロールがすべて **reader** の workspace の **writer** はシートを使わない。
+- 「Writer」のもとでは、workspace の **reader** もシートを使う（すべての project を編集できるため）。
+- **project を作成する** と作成者がその owner になるので、project を作成した reader はシートを使い始める。
+
+シートの使用数は、project のロール、workspace のロール、基本権限が変わるとすぐに変わる。ある変更で
+誰かが新たにシートを使うことになり、workspace に空きシートがない場合、その変更は分かりやすい
+メッセージとともに拒否される（Open Question 12）。シートを空ける変更は常に許可される。
+
 ### project を指定した権限チェック
 
 1. サービスが accounts に、ユーザーが特定の project に対してある操作（例: 編集）をしてよいかを
@@ -1071,8 +1206,8 @@ flowchart LR
   project のロールを与える。
 - **(b) workspace から:** workspace に人を追加するときに、どの project をどのロールで与えるかを選ぶ。
 
-新しい人を workspace に追加すると、今と同じくシートを1つ使い、最初のバージョンでは workspace の
-owner と maintainer だけができる。すでにメンバーなら、project のロールを与えるだけで、workspace の
+新しい人を workspace に追加すると、その結果何かを編集できるならシートを1つ使い（*シート* を参照）、
+最初のバージョンでは workspace の owner と maintainer だけができる。すでにメンバーなら、project のロールを与えるだけで、workspace の
 ロールは変えない。基本権限が「workspace のロールに従う」の場合、reader として追加した人は引き続き
 すべての project を閲覧できる。選んだ project だけに限るには、workspace を「なし」にする。
 
@@ -1081,23 +1216,23 @@ owner と maintainer だけができる。すでにメンバーなら、project 
 - **workspace から人を外す** と、その人の workspace のロールと、その workspace 内のすべての project の
   ロールを同じ処理の中で取り消す。
 - **ある人の最後の project のロールを外しても**、その人は workspace から **外れない**。管理者が外す
-  までメンバーのまま残り、シートも使い続ける。
+  までメンバーのまま残る。もう何も編集できなければ、シートは使わなくなる。
 - **workspace を削除する** と、その workspace のすべての project の登録と project のロールを削除する。
   workspace を無効化しても何も消さず、復元できるようにしておく。
 
 ### 例: Dashboard の project
 
-| 誰が | 基本権限「workspace のロールに従う」（デフォルト） | 基本権限「なし」 |
-|---|---|---|
-| workspace の owner / maintainer | すべての project を閲覧・編集・削除し、メンバーを管理できる | 同じ |
-| workspace の writer | すべての project を閲覧・編集できる | project のロールを持つ project だけを、そのロールで扱える |
-| workspace の reader | すべての project を閲覧できる | project のロールを持つ project だけを、そのロールで扱える |
-| workspace の writer / reader が持つ project のロール | その project でだけ workspace のロールに加算される。例: workspace の reader がある project の writer なら、その project を編集できる。減らすことはない | その project へのアクセスそのもの |
+| 誰が | 基本権限「workspace のロールに従う」（デフォルト） | 基本権限「なし」 | シートを使うか |
+|---|---|---|---|
+| workspace の owner / maintainer | すべての project を閲覧・編集・削除し、メンバーを管理できる | 同じ | 使う |
+| workspace の writer | すべての project を閲覧・編集できる | project のロールを持つ project だけを、そのロールで扱える | デフォルト: 使う。「なし」: writer 以上の project のロールがあるときだけ |
+| workspace の reader | すべての project を閲覧できる | project のロールを持つ project だけを、そのロールで扱える | writer 以上の project のロールがあるときだけ |
+| workspace の writer / reader が持つ project のロール | その project でだけ workspace のロールに加算される。例: workspace の reader がある project の writer なら、その project を編集できる。減らすことはない | その project へのアクセスそのもの | writer、maintainer、owner の project のロールがあればシートを使う |
 
 project のロールの権限: owner / maintainer は閲覧・編集・削除・メンバー管理、writer は閲覧・編集、
 reader は閲覧。基本権限が「Reader」または「Writer」なら、workspace の writer と reader はすべての
-project でそのレベルを得て、さらに project のロールの分が加わる。workspace のメンバーでない人は
-アクセスできない。「なし」でも1つの project を workspace 全体に公開できるようにするかは未決事項とする。
+project でそのレベルを得て、さらに project のロールの分が加わる（「Writer」では全員がシートを使う）。
+workspace のメンバーでない人はアクセスできない。「なし」でも1つの project を workspace 全体に公開できるようにするかは未決事項とする。
 
 技術的な詳細: *Solution Options → Option 1 → リクエストの流れ（シーケンス図）* を参照。
 
@@ -1123,6 +1258,11 @@ project でそのレベルを得て、さらに project のロールの分が加
    表示する必要がある。
 8. **基本権限を UI に表示する必要がある。** workspace の設定画面で表示し、owner と maintainer が変更
    できるようにする。管理者が、ある人が project を見られない理由を分かるようにするため。
+9. **シートの数はアクセスに合わせて変わる。** ある人に1つの project の writer を与える、workspace の
+   ロールを変える、project を作成する、基本権限を変えると、シートの使用数がすぐに変わることがある。
+   基本権限を「Writer」にすると、すべての reader が一度にシートを使い始めることがある。課金とすべての
+   サービスは、自分でメンバーを数えるのではなく accounts からシートの数を取る必要があり、workspace に
+   空きシートがないときは、いくつかの操作が拒否されるようになる。
 
 技術的な詳細: *Solution Options → Option 1 → 技術的な補足: 影響・テスト・デプロイ・ロールバック・監視*
 を参照。
@@ -1153,8 +1293,8 @@ project でそのレベルを得て、さらに project のロールの分が加
 6. **同時の変更。** 2人が最後の2人の owner を同時に外す → ちょうど1つだけ成功する。2つのサービスが
    同じ project を同時に登録する → 1つだけ成功する。workspace の変更と project ロールの変更が同時に
    保存されても、project ロールは消えない。2人の管理者が同じ新しい人を同時に追加する → その人は
-   1回だけ追加され、両方の project のロールを得る。残りシートが1つのときに2人の管理者が別々の新しい人を
-   追加する → ちょうど1つだけ成功する。
+   1回だけ追加され、両方の project のロールを得る。残りシートが1つのときに2人の管理者がそれぞれ別の人に
+   新たにシートを使わせる → ちょうど1つだけ成功する。
 7. **対応するすべてのデータベース。** 既存データに対するデータベースの更新とその取り消しを含む。
    既存ユーザーが project ロールなしで正しく読み込めること。
 8. **エンドツーエンド。** Dashboard の project 用のサンプルポリシーで、project のロールを持つ / 持たない
@@ -1170,7 +1310,7 @@ project でそのレベルを得て、さらに project のロールの分が加
      など）、その人は追加されず、project のロールも得ない。
    - すでにメンバーである人を追加すると、project のロールが増えるだけで、workspace のロールは
      変わらず、降格もしない。
-   - 新しい人を追加できるのは workspace の owner と maintainer だけで、シートを使う。
+   - 新しい人を追加できるのは workspace の owner と maintainer だけで、何かを編集できるならシートを使う。
 10. **基本権限。**
     - 一度も変更していない workspace は、今とまったく同じように動く。
     - 「なし」では、writer と reader は project のロールを持つ project だけを見られる。owner と
@@ -1179,6 +1319,18 @@ project でそのレベルを得て、さらに project のロールの分が加
       project のロールの分が加わる。
     - 変更できるのは owner と maintainer だけで、変更は次のチェックから適用される。
     - project の一覧では、「なし」のメンバーには自分の project だけが表示される。
+11. **シート。**
+    - 基本権限がデフォルトで project のロールがなければ、シートの数は今の Dashboard の数（reader 以外の
+      全員）と同じ。
+    - ある project の writer になった reader はシートを使い始め、そのロールを失うとシートが空く。
+    - 「なし」のもとで reader の project のロールしか持たない writer はシートを使わない。
+    - 基本権限を「Writer」にするとすべての reader が数えられ、「なし」にすると編集できる project の
+      ロールを持たないメンバーのシートが空く。
+    - project を作成すると、作成者がシートを使う。
+    - 何個の project を編集できても、1人は1回だけ数える。
+    - 空きシートがないときは、誰かに新たにシートを使わせる変更はすべて分かりやすいメッセージとともに
+      拒否され、何も変わらない。シートを空ける変更は常に成功する。2人の管理者が同時に最後のシートを
+      使おうとする → ちょうど1つだけ成功する。
 
 技術的な詳細: *Solution Options → Option 1 → 技術的な補足: 影響・テスト・デプロイ・ロールバック・監視*
 を参照。
@@ -1188,17 +1340,20 @@ project でそのレベルを得て、さらに project のロールの分が加
 1. 後方互換性はあるか？ **あり。** すべて既存のものに追加する形。権限チェックで project を
    指定しないサービスには変化がなく、workspace のメンバーとロールも変わらない。
 2. 段階的に展開できるか？ **できる。** 順序:
-   1. accounts をデプロイする。
-   2. 各サービスが既存の project を accounts に登録する（一度だけの埋め戻し）。
-   3. 各サービスが、project の作成時に登録し、削除時に accounts へ知らせるようにする。
-   4. 各サービスが project 単位の権限ルールを有効にし、権限チェックで project を指定し始める。
+   1. accounts をデプロイする。課金が各 workspace のシートの上限を伝えるまでは、シートを制限しない。
+   2. 課金が各 workspace のシートの上限を accounts に伝え、accounts のシートの数を使うように切り替える。
+      基本権限がデフォルトで project のロールがまだないので、数は今の Dashboard のルール（reader 以外の
+      全員）とまったく同じで、誰のシートの使用も変わらない。
+   3. 各サービスが既存の project を accounts に登録する（一度だけの埋め戻し）。
+   4. 各サービスが、project の作成時に登録し、削除時に accounts へ知らせるようにする。
+   5. 各サービスが project 単位の権限ルールを有効にし、権限チェックで project を指定し始める。
       このステップまでは project のロールは効かないため、誤ってアクセスできるようになる人はいない
       （安全側に倒れる）。
-   5. 1ステップで人を追加する UI を有効にする。
-   6. サービスが、それぞれの人が見てよいもので project の一覧を絞り込むようにし、そのうえで基本権限を
+   6. 1ステップで人を追加する UI を有効にする。
+   7. サービスが、それぞれの人が見てよいもので project の一覧を絞り込むようにし、そのうえで基本権限を
       変更する UI を有効にする。すべての workspace は「workspace のロールに従う」から始まるので、
-      管理者が設定を変えるまで誰のアクセスも変わらない。安全に展開できる。
-3. 通知先: dashboard / visualizer / cms のオーナー、権限ポリシーの管理者。
+      管理者が何かを変えるまで誰のアクセスもシートの使用も変わらない。安全に展開できる。
+3. 通知先: dashboard / visualizer / cms のオーナー、課金の担当者、権限ポリシーの管理者。
 4. 設定変更: なし。
 5. データベースの変更: accounts の起動時に自動で適用される。accounts 側で既存データを変換する
    必要はない。
@@ -1213,7 +1368,8 @@ project でそのレベルを得て、さらに project のロールの分が加
    使っているサービス側でそれを無効にする。基本権限がデフォルト以外の workspace では
    **ロールバックするとアクセスが広がる**: その writer と reader は再びすべての project を見られるように
    なる。先にそうした workspace の管理者に知らせ、「なし」に依存している場合は修正して前に進める
-   ことを優先する。
+   ことを優先する。課金を自前のシートの数（reader 以外の全員）に戻す。project のロールでシートを
+   使っていた人では、シートの使用が変わることがある。
 3. accounts を前のバージョンに戻す。前のバージョンは新しいデータを無視するだけなので、
    **データのロールバックは不要**。
    注意: 前のバージョンの稼働中は、権限データを保存したユーザーの project ロールが消えることがある。
@@ -1234,8 +1390,13 @@ project でそのレベルを得て、さらに project のロールの分が加
     閲覧だけできることを確認する。そのメンバーを workspace から外し、すべての project に
     アクセスできなくなることを確認する。
   - 別の workspace を指定してその project への権限を問い合わせ、拒否されることを確認する。
-  - project から、workspace にいない人を追加し、reader のメンバーになること、シートを使うこと、
-    project のロールを得ることを確認する。
+  - 課金を切り替える前に、すべての workspace で accounts のシートの数が Dashboard の今の数と一致する
+    ことを確認する。
+  - project から、workspace にいない人をその project の writer として追加し、そのロールを持つ reader の
+    メンバーになり、シートを使うことを確認する。別の人を reader として追加し、シートを使わないことを
+    確認する。
+  - 空きシートがないときに reader に writer の project のロールを与えようとし、分かりやすいメッセージ
+    とともに拒否され、何も変わらないことを確認する。
   - workspace から人を追加して project を2つ選び、ちょうどその2つの project のロールを得ることを
     確認する。
   - 既存の workspace が「workspace のロールに従う」になっていて、そのメンバーのアクセスが変わって
@@ -1248,6 +1409,7 @@ project でそのレベルを得て、さらに project のロールの分が加
   - project の登録 / 登録解除、メンバー変更、1ステップでの追加、基本権限の変更のエラー率（自動
     リトライとシートの上限による拒否を含む）。
   - ユーザーあたりの project ロール数（最大と上位 1%）。1ユーザーあたり約 1,000 件という想定を監視する。
+  - 空きシートがないために拒否された変更の数（workspace ごと）。
 - アラート
   - 権限チェックのエラー率: Warning 1% 超、Danger 5% 以上。
   - 権限チェックの応答時間（遅い方から 5%）: 通常の基準より 20% 超遅くなったら Warning。
@@ -1277,11 +1439,11 @@ project でそのレベルを得て、さらに project のロールの分が加
    どこに置くかも決める。
 7. **project から追加した人にどの workspace ロールを与え、誰が追加できるか。** 仮に reader とし、
    管理者が選ぶこともできる。workspace の owner でも maintainer でもない project の owner が、この方法で
-   新しい人を workspace に追加してよいか（有料のシートを使うため）。（最初のバージョンの提案: できない。
+   新しい人を workspace に追加してよいか（有料のシートを使うことがあるため）。（最初のバージョンの提案: できない。
    workspace の owner と maintainer だけ。）
 8. **ある人の最後の project のロールを外したら、workspace からも外すか。** 現状は外さない。「なし」の
-   もとではそのメンバーはどの project も見られないが、管理者が外すまで workspace に残り、シートを
-   使い続ける。自動で外せばシートが空くが、管理者が驚く可能性がある。
+   もとではそのメンバーはどの project も見られないが、管理者が外すまでメンバー一覧に残る。シートは
+   もう使わないので、これはメンバー一覧を整理するための問題。自動で外すと管理者が驚く可能性がある。
 9. **Free プランや個人 workspace でも基本権限を使えるようにするか。** 個人 workspace のメンバーは
    1人なので、最初のバージョンでは提供しない。有料プランの機能にするかはプロダクトの判断。
 10. **基本権限の値として「Maintainer」を認めるか。** 認めると、すべての writer と reader がすべての
@@ -1290,6 +1452,14 @@ project でそのレベルを得て、さらに project のロールの分が加
 11. **基本権限はサービスごとか、プラットフォーム全体か。** 提案: workspace ごとに1つの設定で、すべての
     サービス（Dashboard、Visualizer、CMS、Flow）に適用する。管理者は1回設定すれば済み、どのサービスでも
     同じものが見える。
+12. **変更でシートの上限を超える場合はどうするか。** 編集できる project のロールを与える、workspace の
+    ロールを上げる、基本権限を変える、人を追加する、project を作成すると、誰かが新たにシートを使うことが
+    ある。提案: workspace に空きシートがないことを伝える分かりやすいメッセージとともに変更を拒否する
+    （そのため、上限に達しているときは reader は project を作成できない）。代案: 今の Dashboard のように
+    許可して workspace をシート超過として示す、または project の作成だけ別扱いにする。
+13. **「編集」はすべてのサービスで同じ意味か。** シートのルールは、writer、maintainer、owner のロールを
+    どこでも「編集できる」と数える。Visualizer、CMS、Flow でもそれで正しいか。writer でなくても編集
+    できるロールや、writer でも実際には編集できないロールがあるサービスはないか。
 
 技術的な詳細: *Solution Options → Option 1 → Open Questions の技術的な補足* を参照。
 

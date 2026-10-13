@@ -85,6 +85,10 @@ steps:
     the workspace roles writer / reader stay and keep governing workspace-level
     actions (for example, creating projects); access to projects comes from the
     base permission plus project roles.
+  - GitHub charges a seat for every member. In Re:Earth a member uses a seat
+    only if they can **edit** at least one project; people who can only view
+    are free. This extends today's Dashboard rule, where workspace readers do
+    not use a seat, to per-project access.
 
 ### Current situation
 
@@ -168,6 +172,11 @@ permission.
    at the same time if needed — or, while adding a person to the workspace,
    choose which projects they get. Either way it is one step that either fully
    succeeds or changes nothing (see *Design → Adding people from the UI*).
+9. **Seats follow edit access.** A workspace member uses a seat if they can
+   edit at least one project in the workspace; people who can only view, or see
+   nothing, do not. Accounts counts seats in one place for every service and
+   for billing, and keeps a workspace within its seat limit whenever a change
+   would make someone start using a seat (see *Design → Seats*).
 
 ## Non-Goals
 
@@ -207,6 +216,9 @@ permission.
    tell a service whether a person sees every project (and at what level) or
    only the projects where they have a project role, so lists can be filtered
    correctly whatever the base permission.
+7. **Seat usage is available per workspace.** Accounts can quickly say how many
+   members of a workspace use a seat (and who), so billing and every service
+   use the same number.
 
 Technical details: see *Solution Options → Option 1 → Detailed requirements*.
 
@@ -223,7 +235,7 @@ Three pieces of state, all opaque to accounts:
 |---|---|
 | **Resource registration** `(resourceKind, resourceID) → workspaceID, version` | Authoritative workspace scope of the resource; proof the owning service registered it; per-resource serialization point for invariants |
 | **Resource role** on `Permittable` `(workspaceID, resourceKind, resourceID, roleID)` | The user's role on that resource; read together with the permittable for zero-read lookup |
-| **Workspace resource settings** `workspaceID → basePermission, version` | The workspace's base permission; also the per-workspace lock (serialization point for the one-step add, workspace member add / remove, the seat limit, and base-permission changes) |
+| **Workspace resource settings** `workspaceID → basePermission, seatLimit, version` | The workspace's base permission and seat limit; also the per-workspace lock (serialization point for every change that can affect seat usage: the one-step add, workspace member and role changes, editing project roles, project registration, and base-permission changes) |
 
 #### Domain
 
@@ -279,6 +291,7 @@ const (
 
 type WorkspaceSettings struct {
     basePermission BasePermission
+    seatLimit      *int  // nil = unlimited; set by billing (M2M)
     version        int64 // bumped by every write and by Lock
     workspaceID    workspace.ID
 }
@@ -300,6 +313,44 @@ snapshot (Mongo replaces the whole document), so a field there could be
 reverted by a concurrent, stale workspace save. A missing record means
 "Follow workspace role", so no data migration is needed. Existing workspace
 roles are not changed.
+
+**Seats.**
+
+```go
+// server/pkg/resource/seat.go
+var editRoles = []role.RoleType{role.RoleOwner, role.RoleMaintainer, role.RoleWriter}
+
+// UsesSeat reports whether a member uses a seat in the workspace: workspace role
+// owner / maintainer, or a baseline in editRoles, or any valid resource role in editRoles.
+func UsesSeat(p *permittable.Permittable, ws workspace.ID, base BasePermission) bool
+```
+
+Seat usage of a workspace = the number of distinct members for which `UsesSeat`
+is true. With "Follow workspace role" and no resource roles this equals today's
+Dashboard count (`GetCurrentSeatStatus` in reearth-dashboard
+`server/pkg/subscription/service.go`, which counts members whose role is not
+`reader`).
+
+The seat limit is owned by billing and pushed to accounts (`seatLimit`, `nil` =
+unlimited, the same as "no subscription" today), so accounts can enforce it in
+the same transaction as the change. The existing `enforceMemberCount` hook
+(`WorkspaceMemberCountEnforcer`, not wired today) is replaced by this check.
+
+**Seat check (`ensureSeats`).** Runs under the workspace lock, after the change
+has been applied inside the transaction and before commit: if
+`seatUsage(after) > seatUsage(before)` and `seatUsage(after) > seatLimit`, the
+transaction is rolled back with `ErrSeatLimitExceeded`. Changes that do not
+increase usage are always allowed, even if the workspace is already over its
+limit (for example after billing lowered it). Operations that can turn a
+non-seat member into a seat member, and therefore run the check:
+
+| Operation | Can add a seat when |
+|---|---|
+| `setResourceMember` | the new role is writer or above |
+| `addWorkspaceMemberWithResourceRoles` | the new member's workspace role or any of the given resource roles is writer or above, or the baseline allows editing |
+| `updateWorkspaceBasePermission` | the new value raises any baseline to writer (e.g. to `Writer`, or from `None` / `Reader` to "Follow workspace role") |
+| `addUsersToWorkspace` / `updateUserOfWorkspace` / `transferWorkspaceOwnership` | a member gets `writer`, `maintainer` or `owner` |
+| `POST /api/service/resources` with `ownerUserId` (project creation) | the creator did not use a seat before |
 
 #### Storage
 
@@ -336,6 +387,7 @@ CREATE TABLE resource_workspace_settings (
     workspace_id    text PRIMARY KEY,
     base_permission text NOT NULL DEFAULT 'follow_workspace_role'
         CHECK (base_permission IN ('follow_workspace_role', 'none', 'reader', 'writer')),
+    seat_limit      integer CHECK (seat_limit >= 0),   -- NULL = unlimited
     version         bigint NOT NULL DEFAULT 0
 );
 ```
@@ -357,7 +409,7 @@ DROP TABLE IF EXISTS resource_registrations;
   `{ "resource_roles.resource_kind": 1, "resource_roles.resource_id": 1 }` and
   `{ "resource_roles.workspace_id": 1 }`.
 - New collection `resource_workspace_settings` (`_id` = workspace ID,
-  `base_permission`, `version`).
+  `base_permission`, `seat_limit`, `version`).
 
 #### Repository changes (targeted writes, never snapshot writes)
 
@@ -386,6 +438,7 @@ RemoveInWorkspace(ctx, workspaceID) error                // all registrations + 
 Find(ctx, workspaceID) (*resource.WorkspaceSettings, error) // default settings when no row
 Lock(ctx, workspaceID) (*resource.WorkspaceSettings, error) // must run inside a transaction; creates the row on first use
 SetBasePermission(ctx, workspaceID, base resource.BasePermission) error // after Lock
+SetSeatLimit(ctx, workspaceID, limit *int) error                       // after Lock
 Remove(ctx, workspaceID) error
 
 // permittable.Repo (additions)
@@ -394,6 +447,7 @@ CountResourceOwners(ctx, kind, id, ownerRoleID) (int, error)
 UpsertResourceRole(ctx, userID, r permittable.ResourceRole) error
 DeleteResourceRole(ctx, userID, kind, id) error
 DeleteResourceRolesInWorkspace(ctx, workspaceID, userIDs) error
+FindSeatUsers(ctx, workspaceID, baselineEditRoles []role.ID, editRoles []role.ID) ([]user.ID, error)
 ```
 
 | Operation | Mongo | Postgres |
@@ -404,6 +458,7 @@ DeleteResourceRolesInWorkspace(ctx, workspaceID, userIDs) error
 | `FindResourceMembers` | aggregation `$match` → `$unwind` → `$match` → `$project {user_id, role_id}` | `SELECT p.user_id, r.role_id FROM permittable_resource_roles r JOIN permittables p …` |
 | `LockForUpdate` | in a transaction: `findOneAndUpdate {$inc: {version: 1}}` (concurrent transactions on the same registration hit a write conflict and are retried) | `SELECT … FOR UPDATE` |
 | `WorkspaceSettings.Lock` | in a transaction: `findOneAndUpdate {_id: ws} {$inc: {version: 1}}, upsert` (write conflict → retry) | `INSERT … ON CONFLICT DO NOTHING` then `SELECT … FOR UPDATE` |
+| `FindSeatUsers` | aggregation on `permittables`: `$match` users with a workspace role in `ws` and (`workspace_roles` role ∈ baseline-edit roles **or** `resource_roles` `$elemMatch {workspace_id: ws, role_id ∈ edit roles}`) → `$project user_id` | `SELECT DISTINCT p.user_id FROM permittables p JOIN permittable_workspace_roles w … WHERE w.workspace_id=$1 AND (w.role_id = ANY($2) OR EXISTS (SELECT 1 FROM permittable_resource_roles r WHERE r.permittable_id = p.id AND r.workspace_id=$1 AND r.role_id = ANY($3)))` |
 | Registration + settings for `checkPermission` | one aggregation on `resource_registrations`: `$match` by key → `$lookup` `resource_workspace_settings` by `workspace_id` | one query: `SELECT r.*, s.base_permission FROM resource_registrations r LEFT JOIN resource_workspace_settings s USING (workspace_id) WHERE …` |
 
 #### Authorization check
@@ -524,11 +579,19 @@ removes any way for a user to claim an unregistered ID.
 POST   /api/service/resources
        { workspaceId, resourceKind, resourceId, ownerUserId? }
        → creates the registration and, if ownerUserId is given, an `owner`
-         role assignment, in one transaction. ownerUserId must be a workspace member.
+         role assignment, in one transaction under the workspace lock.
+         ownerUserId must be a workspace member; seat check (the creator may
+         start using a seat) → 422 ErrSeatLimitExceeded.
          409 if already registered with a different workspace; idempotent
          (200) if registered with the same workspace.
 DELETE /api/service/resources/{resourceKind}/{resourceId}
        → removes the registration and every role assignment on the resource.
+PUT    /api/service/workspaces/{workspaceId}/seat-limit
+       { seatLimit: int | null }
+       → billing sets the workspace's seat limit (null = unlimited). Lowering
+         it below current usage is accepted; it only blocks further increases.
+GET    /api/service/workspaces/{workspaceId}/seat-usage
+       → { seatCount, seatLimit, seatUserIds } for billing.
 ```
 
 **Membership and settings (user JWT, GraphQL)**:
@@ -574,12 +637,19 @@ type AddWorkspaceMemberWithResourceRolesPayload {
   workspaceRole: Role!              # the user's workspace role after the call
   resources: [ResourceBinding!]!
 }
+type WorkspaceSeatUsage {
+  workspaceId: ID!
+  seatCount: Int!                   # distinct members for which UsesSeat is true
+  seatLimit: Int                    # null = unlimited
+  seatUserIds: [ID!]!
+}
 
 extend type Query {
   resourceMembers(resourceKind: String!, resourceId: String!): [ResourceMember!]!
   # IDs only; the owning service hydrates names etc.
   myResourceBindings(resourceKind: String!, workspaceId: ID): [ResourceBinding!]!
   myResourceAccess(workspaceId: ID!, resourceKind: String!): ResourceAccess!
+  workspaceSeatUsage(workspaceId: ID!): WorkspaceSeatUsage!
 }
 
 extend type Mutation {
@@ -607,10 +677,11 @@ transaction**; locks are taken in a fixed order — workspace lock
 
 | Operation | Locks | Guard |
 |---|---|---|
-| `setResourceMember` | the registration | registration exists; target user is a member of the registration's workspace (else `ErrNotWorkspaceMember` — use `addWorkspaceMemberWithResourceRoles`); Cerbos allows `manage_members` on `(kind, id)` for the operator; if the change downgrades the last `owner`, reject |
+| `setResourceMember` | workspace lock, then the registration | registration exists; target user is a member of the registration's workspace (else `ErrNotWorkspaceMember` — use `addWorkspaceMemberWithResourceRoles`); Cerbos allows `manage_members` on `(kind, id)` for the operator; if the change downgrades the last `owner`, reject; seat check |
 | `removeResourceMember` | the registration | Cerbos `manage_members`, or operator == target (self-leave); if it removes the last `owner`, reject |
-| `addWorkspaceMemberWithResourceRoles` | workspace lock, then each registration | every registration exists and belongs to `workspaceId` (else the whole call is rejected); Cerbos allows `manage_members` on each for the operator. If the user is **not yet a member**: operator is a workspace admin (v1, Open Question 7); personal workspace rejected; `workspaceRole` (default `reader`) is not `owner`, as in `addUsersToWorkspace`; the seat limit (`enforceMemberCount`) passes; then `Members().Join` and the permittable workspace role via the existing `bulkUpdatePermittable` path. If the user **is already a member**: workspace membership and role are left unchanged — never downgraded (`workspaceRole` is ignored). Then the last-owner rule per resource and `UpsertResourceRole` for each entry. Any failure rolls everything back |
-| `updateWorkspaceBasePermission` | workspace lock | operator passes the existing workspace `manage` check (owner / maintainer); personal workspace rejected (v1, Open Question 9); then `SetBasePermission`. Takes effect on the next `checkPermission` — nothing else is rewritten |
+| `addWorkspaceMemberWithResourceRoles` | workspace lock, then each registration | every registration exists and belongs to `workspaceId` (else the whole call is rejected); Cerbos allows `manage_members` on each for the operator. If the user is **not yet a member**: operator is a workspace admin (v1, Open Question 7); personal workspace rejected; `workspaceRole` (default `reader`) is not `owner`, as in `addUsersToWorkspace`; then `Members().Join` and the permittable workspace role via the existing `bulkUpdatePermittable` path. If the user **is already a member**: workspace membership and role are left unchanged — never downgraded (`workspaceRole` is ignored). Then the last-owner rule per resource, `UpsertResourceRole` for each entry, and the seat check. Any failure rolls everything back |
+| `updateWorkspaceBasePermission` | workspace lock | operator passes the existing workspace `manage` check (owner / maintainer); personal workspace rejected (v1, Open Question 9); then `SetBasePermission` and the seat check. Takes effect on the next `checkPermission` — nothing else is rewritten |
+| `workspaceSeatUsage` | — | operator may read workspace members (`read_member`); the `seat-usage` route is M2M only |
 | `resourceMembers` | — | Cerbos `read` on `(kind, id)`; result filtered by the read-time guard |
 | `myResourceBindings` | — | operator's own role assignments only, filtered by the read-time guard |
 | `myResourceAccess` | — | operator's own access only; `baselineRole` from `BaselineRole(...)`, `bindings` filtered by the read-time guard |
@@ -625,9 +696,11 @@ Removing a user's last resource role (`removeResourceMember`) does **not**
 remove them from the workspace (Open Question 8).
 
 **Changes to existing workspace flows** (all take the workspace lock first, so
-they serialize with the one-step add):
+they serialize with the one-step add and with each other's seat checks):
 
-- `addUsersToWorkspace`: unchanged apart from the lock.
+- `addUsersToWorkspace`, `updateUserOfWorkspace`,
+  `transferWorkspaceOwnership`: run the seat check (a member given `writer`,
+  `maintainer` or `owner` may start using a seat).
 - `removeUserFromWorkspace` / `removeMultipleUsersFromWorkspace`: also delete
   the users' role assignments in the workspace (`DeleteResourceRolesInWorkspace`).
 - `deleteWorkspace` (`Workspace.Remove`): `RemoveInWorkspace(ws)` removes all
@@ -643,7 +716,8 @@ they serialize with the one-step add):
 | `setResourceMember` passes the workspace-membership check, then the user is removed from the workspace and the cascade runs before the role assignment is written | **Read-time guard**: a role assignment is honored only if the user currently holds a workspace role in the role assignment's workspace. The permittable is already loaded, so this costs no read. The orphaned row is harmless and is removed the next time the cascade or the unregister endpoint touches it. |
 | A stale snapshot `Save` from the workspace flow overwrites a newer role assignment (or vice versa) | Snapshot saves never write `resource_roles`; role-assignment writes never write `workspace_roles` (see *Repository changes*). |
 | Two admins add the same new person with `addWorkspaceMemberWithResourceRoles` at once (possibly with different projects) | Both take the workspace lock; the second waits / retries, then sees an existing member and only adds its role assignments. The workspace role is not changed and the seat is counted once. |
-| Two admins add two different new people when one seat is left | The seat count is read after the workspace lock, so exactly one succeeds. |
+| Two admins make two different people start using a seat (new members, editing project roles, workspace role changes, project creation) when one seat is left | Every such operation takes the workspace lock and computes seat usage inside the transaction, so exactly one succeeds. |
+| The base permission is raised while someone is given an editing project role | Both take the workspace lock; the second computes usage including the first. |
 | A user is removed from the workspace while a one-step add for them runs | Both take the workspace lock. If the removal commits second, its cascade deletes the new role assignments; if first, the add treats the user as new (admin check, seat limit). The read-time guard covers any remaining gap. |
 | Two multi-resource calls on overlapping resources deadlock | Fixed lock order: workspace lock, then registrations sorted by `(kind, id)`. |
 | Two admins change the base permission at once, or a change races a workspace save | The setting lives in its own record and is written under the workspace lock; the last committed value wins, and no workspace snapshot `Save` can revert it. |
@@ -654,10 +728,11 @@ they serialize with the one-step add):
 | Event | Who acts | Effect on role assignments |
 |---|---|---|
 | Resource created | Service (M2M) | `POST /api/service/resources` with `ownerUserId` = creator |
-| Resource deleted | Service (M2M) | `DELETE /api/service/resources/{kind}/{id}`. A missed call leaves an orphan registration — harmless (the resource no longer exists in the service), cleaned by an optional sweeper later |
+| Resource deleted | Service (M2M) | `DELETE /api/service/resources/{kind}/{id}`; members whose only editing role was on it stop using a seat. A missed call leaves an orphan registration — harmless (the resource no longer exists in the service) except that its editing roles still count as seats; cleaned by an optional sweeper later |
 | Existing resources (pre-feature) | Service (M2M) | One-off backfill via the same endpoint (idempotent), before the service starts sending `resourceId` |
 | Person added with `addWorkspaceMemberWithResourceRoles` | Accounts | Workspace membership (if new) and role assignments written in one transaction |
-| A member's last role assignment in a workspace removed | Accounts | Only that role assignment is removed; workspace membership (and the seat) stays |
+| A member's last role assignment in a workspace removed | Accounts | Only that role assignment is removed; workspace membership stays (the seat is freed if they can no longer edit anything) |
+| Seat limit changed | Billing (M2M) | None; only future increases are checked against the new limit |
 | User removed from workspace | Accounts | `bulkRemovePermittable` also calls `DeleteResourceRolesInWorkspace` |
 | Workspace deleted (`Workspace.Remove`) | Accounts | `RemoveInWorkspace(ws)`: all registrations and role assignments of the workspace; the settings record is removed |
 | Workspace deactivated / restored | Accounts | No change (mirrors workspace roles; data kept for restore) |
@@ -676,8 +751,9 @@ they serialize with the one-step add):
 - Role-assignment lookup stays inside the already-loaded permittable; the only
   new read is a primary-key lookup of the registration joined with the
   workspace settings.
-- Everyone with access is a workspace member, so seats, SSO / SCIM and removal
-  keep working through the existing member flows.
+- Everyone with access is a workspace member, so SSO / SCIM and removal keep
+  working through the existing member flows, and seats are counted and
+  enforced in one place, in the same transaction as the change.
 - Accounts remains domain-agnostic: opaque kind/ID, semantics in policies.
 
 **Cons**
@@ -685,14 +761,15 @@ they serialize with the one-step add):
 - One extra round-trip for `checkPermission` calls that pass `resourceId`.
 - Services must register resources (including a backfill) and unregister on delete.
 - Mongo `Save` semantics change from replace to `$set` (touches existing code).
-- Existing workspace member flows must take the workspace lock.
+- Existing workspace member flows must take the workspace lock and run the seat
+  check; billing must push seat limits to accounts.
 - Under a base permission other than the default, services must filter lists
   with `myResourceAccess` instead of assuming workspace writers / readers see
   everything.
 
 #### Detailed requirements
 
-The technical form of *Functional Requirements*. The items are FR-1 to FR-7 in
+The technical form of *Functional Requirements*. The items are FR-1 to FR-8 in
 order; other parts of this section refer to them by those numbers.
 
 1. `checkPermission` without `resourceId`: **no change** in reads or in
@@ -715,6 +792,9 @@ order; other parts of this section refer to them by those numbers.
    `memory` repo.
 7. `myResourceAccess(ws, kind)` costs the already-loaded permittable plus one
    point read of the workspace's settings.
+8. `workspaceSeatUsage(ws)` / the seat check is one index-backed query
+   (`FindSeatUsers`, using the `workspace_id` indexes on workspace roles and
+   resource roles) plus the settings record; it never loads whole workspaces.
 
 Scope notes (technical form of *Non-Goals*):
 
@@ -762,12 +842,12 @@ sequenceDiagram
     U->>S: createProject
     S->>S: persist project P
     S->>A: POST /api/service/resources {ws, "dashboard:project", P, owner=U} (M2M key)
-    A->>A: U ∈ ws? → create registration + owner role assignment (one tx)
-    A-->>S: 201
+    A->>A: lock ws → U ∈ ws? → create registration + owner role assignment → seat check (one tx)
+    A-->>S: 201 (or 422 ErrSeatLimitExceeded)
     U->>S: give workspace member B writer on P
     S->>A: setResourceMember(kind, P, B, writer) (U's JWT)
-    A->>A: lock registration → B ∈ ws? Cerbos manage_members for U? → upsert
-    A-->>S: ok
+    A->>A: lock ws, registration → B ∈ ws? Cerbos manage_members for U? → upsert → seat check
+    A-->>S: ok (or ErrSeatLimitExceeded)
 ```
 
 ##### Adding a person from the UI in one step (patterns a and b)
@@ -790,11 +870,12 @@ sequenceDiagram
     A->>A: each Pn registered in ws?
     A->>C: manage_members on each Pn for U?
     alt D ∉ ws
-        A->>A: U is workspace admin? seat limit → Join(D, reader) + permittable workspace role
+        A->>A: U is workspace admin? → Join(D, reader) + permittable workspace role
     else D ∈ ws
         A->>A: keep D's workspace role unchanged
     end
     A->>A: LockForUpdate P1, P2 … (sorted) → last-owner rule → UpsertResourceRole each
+    A->>A: seat check (D uses a seat if any role is writer+)
     A->>A: commit (any failure → roll back all)
     A-->>S: { addedToWorkspace, workspaceRole, resources }
 ```
@@ -836,13 +917,26 @@ flowchart LR
    Checks with a `resourceId` already follow the setting.
 8. **Base permission UI**: the workspace settings screen shows and edits
    `Workspace.basePermission` (owners / maintainers only).
+9. **Dashboard seat logic moves to accounts**: `GetCurrentSeatStatus` /
+   `TempGetCurrentSeatStatus` (count of non-reader members) and the
+   `IsOverUsedSeat` guard on project create / update / delete in reearth-dashboard
+   `server/pkg/subscription/service.go` must use `workspaceSeatUsage` /
+   `seat-usage` instead of counting members. Billing pushes `seatLimit` with
+   `PUT /api/service/workspaces/{id}/seat-limit` whenever a subscription
+   changes.
+10. **New refusals**: `setResourceMember`, `addWorkspaceMemberWithResourceRoles`,
+    `updateWorkspaceBasePermission`, `addUsersToWorkspace`,
+    `updateUserOfWorkspace`, `transferWorkspaceOwnership` and project
+    registration can return `ErrSeatLimitExceeded`; every caller must show a
+    clear message.
 
 ##### Tests
 
 1. **Unit** (`pkg/resource`, `pkg/permittable`): kind/ID validation and length
    limits; one role per resource; read-time guard drops role assignments without
    a matching workspace role; `BaselineRole` for every cell of the table above
-   (a missing settings record = "Follow workspace role").
+   (a missing settings record = "Follow workspace role"); `UsesSeat` for each
+   workspace role × base permission × resource-role combination.
 2. **Interactor** (`internal/usecase/interactor`):
    - `CheckPermission`: no `resourceId` → unchanged roles whatever the setting
      (regression); unregistered resource → deny; alias of another workspace →
@@ -867,14 +961,23 @@ flowchart LR
      workspace rejected; the next check uses the new value.
    - `myResourceAccess`: `baselineRole` per setting and workspace role; null
      for a member under `None`.
+   - `workspaceSeatUsage`: equals the old Dashboard count with the default
+     setting and no resource roles; counts a reader with a writer resource role
+     once however many such roles; excludes writers under `None` with only
+     reader resource roles.
+   - Seat check: with the limit reached, each operation in the *Seat check*
+     table is rejected with `ErrSeatLimitExceeded` and leaves nothing behind;
+     the same operation succeeds when it does not add a seat; seat-freeing
+     operations succeed while over the limit; `seatLimit = null` never blocks.
    - Cascades: `RemoveUserMember` / `RemoveMultipleUserMembers` / `Remove`.
 3. **Concurrency** (`make test-integration`, both backends): two goroutines
    removing the last two owners concurrently → exactly one succeeds; concurrent
    registrations of the same key → one succeeds; stale snapshot `Save` after
    `UpsertResourceRole` keeps the role assignment; two concurrent one-step adds
    of the same new person → joined once, both sets of role assignments present;
-   two concurrent one-step adds of different new people with one seat left →
-   exactly one succeeds.
+   two concurrent seat-adding operations of different kinds (one-step add,
+   `setResourceMember` writer, project registration, base permission to
+   `Writer`) with one seat left → exactly one succeeds.
 4. **Repository**: Mongo, Postgres and memory implementations of every new
    operation; Postgres `FindByUserID` issues a single query.
 5. **Migration**: `0005` up/down on an existing DB; existing permittables load
@@ -904,17 +1007,24 @@ flowchart LR
    unchanged when `resourceId` is absent; the workspace member list and roles
    are unchanged.
 2. Partial deployment? **Yes.** Order:
-   1. Deploy accounts.
-   2. Each service backfills registrations for existing resources.
-   3. Each service starts registering on create / unregistering on delete.
-   4. Each service deploys policies using `P.attr.resourceRole` and starts
-      sending `resourceId`. Before step 4 the attribute is absent and conditions
+   1. Deploy accounts. With no `seatLimit` set, the seat check never blocks.
+   2. Billing pushes `seatLimit` for every workspace; Dashboard switches
+      `GetCurrentSeatStatus` / `IsOverUsedSeat` to `seat-usage`. Before the
+      switch, compare `seatCount` with Dashboard's count for every workspace —
+      with the default setting and no resource roles they are identical.
+   3. Each service backfills registrations for existing resources (without
+      `ownerUserId` for existing projects, so the backfill adds no seats).
+   4. Each service starts registering on create / unregistering on delete.
+   5. Each service deploys policies using `P.attr.resourceRole` and starts
+      sending `resourceId`. Before step 5 the attribute is absent and conditions
       never match (fail-closed).
-   5. Enable the UI for the one-step add.
-   6. Services filter lists with `myResourceAccess`; only then enable the UI
+   6. Enable the UI for the one-step add.
+   7. Services filter lists with `myResourceAccess`; only then enable the UI
       that changes the base permission. Until a workspace changes it, every
-      workspace is "Follow workspace role", so steps 1–5 change nobody's access.
-3. Notify: dashboard / visualizer / cms owners; whoever maintains Cerbos policies.
+      workspace is "Follow workspace role", so steps 1–6 change nobody's access
+      or seat count (apart from new editing project roles and new projects).
+3. Notify: dashboard / visualizer / cms owners; billing owner; whoever maintains
+   Cerbos policies.
 4. Config changes: none (reuses the existing M2M API key).
 5. DDL: Postgres migration `0005` runs automatically at startup (golang-migrate).
    Mongo: collection schema + indexes via the startup migration; no backfill in accounts.
@@ -928,7 +1038,10 @@ flowchart LR
    version has no base permission, so their writers / readers see every project
    again. List those workspaces
    (`base_permission <> 'follow_workspace_role'`) and inform their admins before
-   rolling back; prefer a fix-forward if any of them depend on `None`.
+   rolling back; prefer a fix-forward if any of them depend on `None`. Switch
+   Dashboard's seat status back to its own member count; seat usage may jump
+   for readers whose seats came from resource roles (they stop counting) and
+   for workspaces on `None` (writers count again).
 3. Roll back the accounts image. The old binary ignores the new collections,
    tables and `resource_roles` field, so **no data rollback is required**.
    Note: the old Mongo `Save` replaces the whole document and will drop
@@ -948,9 +1061,14 @@ flowchart LR
     they can edit that project and still only read the others. Remove them from
     the workspace; verify all project access is lost.
   - Call `checkPermission` with the alias of another workspace; verify deny.
-  - `addWorkspaceMemberWithResourceRoles` for a user outside the workspace;
-    verify they become a `reader` member, use a seat, and get the role on the
-    given project.
+  - Before switching Dashboard, verify `seatCount` equals Dashboard's current
+    count for every workspace.
+  - `addWorkspaceMemberWithResourceRoles` for a user outside the workspace with
+    `writer` on a project; verify they become a `reader` member with that role
+    and appear in `seatUserIds`. With `reader` on the project instead, verify
+    they do not.
+  - With `seatCount == seatLimit`, `setResourceMember(writer)` for a reader;
+    verify `ErrSeatLimitExceeded` and no change.
   - Verify that workspaces without a settings record report
     `FOLLOW_WORKSPACE_ROLE` and that checks for their members are unchanged.
   - `updateWorkspaceBasePermission(NONE)` on a staging workspace; verify a
@@ -963,6 +1081,8 @@ flowchart LR
     `addWorkspaceMemberWithResourceRoles` / `updateWorkspaceBasePermission`,
     including Mongo transaction retries and seat-limit rejections.
   - Count of role assignments per permittable (max / p99) to watch FR-4.
+  - `ErrSeatLimitExceeded` count per operation and workspace; `workspaceSeatUsage`
+    latency.
 - Alerting
   - `checkPermission` error rate: Warning > 1%, Danger ≥ 5%.
   - `checkPermission` p95 latency: Warning > +20% vs baseline.
@@ -997,7 +1117,8 @@ flowchart LR
    `removeResourceMember` (and unregister) would, in the same transaction and
    under the workspace lock, remove a member whose last role assignment in the
    workspace was removed — only when that member has no baseline (`None`), via
-   the existing workspace member removal path.
+   the existing workspace member removal path. It does not affect seats: such
+   a member already uses none.
 9. **Base permission on personal / Free workspaces:** v1 rejects
    `updateWorkspaceBasePermission` on personal workspaces. Restricting it by
    plan would add a plan check (the same source `enforceMemberCount` uses) to
@@ -1009,6 +1130,16 @@ flowchart LR
     per workspace, applied to every resource kind). A per-service setting would
     key the record by `(workspaceID, service)` and look it up by the
     registration's kind prefix; the round-trip in FR-1 stays the same.
+12. **Exceeding the seat limit:** v1 rejects with `ErrSeatLimitExceeded` (422 on
+    the M2M route) from `ensureSeats`. The alternative "allow and flag" would
+    drop the rejection and expose `seatCount > seatLimit` through
+    `workspaceSeatUsage`, as Dashboard's `IsOverUsedSeat` does today. Treating
+    project creation differently would skip the check only for
+    `POST /api/service/resources`.
+13. **Meaning of "edit":** `UsesSeat` uses role levels (`editRoles` = writer,
+    maintainer, owner), not per-service actions, so it is the same for every
+    resource kind. If a service needs a different line, `editRoles` would have
+    to become per kind (declared by the service, like its policy).
 
 ### Option 2: Role assignments in their own collection/table (no embedding)
 
@@ -1050,8 +1181,9 @@ service.
 ### Workspace members, roles and the base permission
 
 - **Everyone with access to a project is a workspace member.** People are
-  added to the workspace as today (by an admin, or by SSO / SCIM), use a seat as
-  today, appear in the member list, and lose all access when removed.
+  added to the workspace as today (by an admin, or by SSO / SCIM), appear in
+  the member list, use a seat if they can edit something (see *Seats*), and lose
+  all access when removed.
 - **Workspace roles** (owner / maintainer / writer / reader) are unchanged and
   still govern workspace-level things, such as managing members or creating
   projects.
@@ -1121,6 +1253,36 @@ flowchart LR
     end
 ```
 
+### Seats
+
+Re:Earth bills per seat per workspace. **A workspace member uses a seat if they
+can edit at least one project in the workspace.** People who can only view, or
+see nothing, do not use a seat. A member uses a seat if any of these is true:
+
+- their workspace role is owner or maintainer (they can edit everything);
+- the base permission lets them edit every project (a writer under "Follow
+  workspace role", or anyone under "Writer");
+- they have a project role that allows editing (writer, maintainer or owner) on
+  at least one project.
+
+Each person counts once, however many projects they can edit. With the default
+base permission and no project roles, this is exactly today's Dashboard rule:
+everyone except readers uses a seat.
+
+Examples:
+
+- A workspace **reader** who is a **writer on project P** uses a seat.
+- A workspace **writer** under "None" whose project roles are all **reader**
+  does not use a seat.
+- A workspace **reader** under "Writer" uses a seat (they can edit every project).
+- **Creating a project** makes the creator its owner, so a reader who creates a
+  project starts using a seat.
+
+Seat usage changes as soon as project roles, workspace roles or the base
+permission change. When a change would make someone start using a seat and the
+workspace has no seat left, the change is refused with a clear message (Open
+Question 12); changes that free seats are always allowed.
+
 ### Checking a permission on a project
 
 1. A service asks accounts whether a user may do something (for example, edit)
@@ -1172,8 +1334,9 @@ either of two ways. Either everything succeeds or nothing changes.
 - **(b) From the workspace:** when adding a person to the workspace, choose
   which projects they get and with which roles.
 
-Adding a new person to the workspace uses a seat, as today, and in the first
-version only workspace owners and maintainers can do it. If the person is
+Adding a new person to the workspace uses a seat if the result lets them edit
+something (see *Seats*), and in the first version only workspace owners and
+maintainers can do it. If the person is
 already a member, they just get the project roles; their workspace role is not
 changed. With the base permission "Follow workspace role", a person added as a
 reader can still view every project; to limit them to the chosen projects, the
@@ -1184,25 +1347,25 @@ workspace uses "None".
 - **Removing a person from the workspace** removes their workspace role and all
   their project roles in that workspace, in the same step.
 - **Removing someone's last project role** does **not** remove them from the
-  workspace; they stay a member (and keep using a seat) until an admin removes
-  them.
+  workspace; they stay a member until an admin removes them. If they can no
+  longer edit anything, they stop using a seat.
 - **Deleting a workspace** removes all its project registrations and project
   roles. Deactivating a workspace removes nothing, so it can be restored.
 
 ### Example: Dashboard projects
 
-| Who | Base permission "Follow workspace role" (default) | Base permission "None" |
-|---|---|---|
-| Workspace owner / maintainer | View, edit and delete every project, and manage its members | Same |
-| Workspace writer | View and edit every project | Only projects where they have a project role, with that role |
-| Workspace reader | View every project | Only projects where they have a project role, with that role |
-| A project role held by a workspace writer / reader | Adds to their workspace role on that project only — for example, a workspace reader who is a writer on a project can edit it. Never reduces access | Is their access to that project |
+| Who | Base permission "Follow workspace role" (default) | Base permission "None" | Uses a seat? |
+|---|---|---|---|
+| Workspace owner / maintainer | View, edit and delete every project, and manage its members | Same | Yes |
+| Workspace writer | View and edit every project | Only projects where they have a project role, with that role | Default: yes. "None": only with a writer-or-above project role |
+| Workspace reader | View every project | Only projects where they have a project role, with that role | Only with a writer-or-above project role |
+| A project role held by a workspace writer / reader | Adds to their workspace role on that project only — for example, a workspace reader who is a writer on a project can edit it. Never reduces access | Is their access to that project | A writer, maintainer or owner project role makes them use a seat |
 
 Project role permissions: owner / maintainer — view, edit, delete and manage
 members; writer — view and edit; reader — view. With "Reader" or "Writer" as the
 base permission, workspace writers and readers get that level on every project,
-plus anything their project roles add. People who are not workspace members
-have no access. Whether a single project can be opened to the whole workspace
+plus anything their project roles add (under "Writer" they all use a seat).
+People who are not workspace members have no access. Whether a single project can be opened to the whole workspace
 even under "None" is an open question.
 
 Technical details: see *Solution Options → Option 1 → Request flows (sequence
@@ -1236,6 +1399,13 @@ diagrams)*.
 8. **The base permission must be visible in the UI.** The workspace settings
    screen shows it and lets owners and maintainers change it, so admins can
    tell why someone cannot see a project.
+9. **Seat counts change with access.** Giving someone a writer role on one
+   project, changing a workspace role, creating a project, or changing the base
+   permission can change seat usage at once. Changing the base permission to
+   "Writer" can make every reader start using a seat in one step. Billing and
+   every service must take the seat count from accounts, not count members
+   themselves, and some actions can now be refused when the workspace has no
+   seat left.
 
 Technical details: see *Solution Options → Option 1 → Technical notes: impact,
 tests, deployment, rollback, monitoring*.
@@ -1274,8 +1444,8 @@ tests, deployment, rollback, monitoring*.
    same time → exactly one succeeds. A workspace change saved at the same time
    as a project role change does not wipe out the project role. Two admins
    adding the same new person at the same time → the person is added once and
-   gets both sets of project roles. Two admins adding different new people when
-   one seat is left → exactly one succeeds.
+   gets both sets of project roles. Two admins each making a different person
+   start using a seat when one seat is left → exactly one succeeds.
 7. **Every supported database**, including the database upgrade and its undo on
    existing data, and existing users loading correctly with no project roles.
 8. **End to end.** With a sample Dashboard project policy, check the results for
@@ -1292,7 +1462,8 @@ tests, deployment, rollback, monitoring*.
      project roles.
    - Adding a person who is already a member only adds project roles; their
      workspace role is not changed or downgraded.
-   - Only workspace owners and maintainers can add new people; it uses a seat.
+   - Only workspace owners and maintainers can add new people; they use a seat
+     if they can edit something.
 10. **Base permission.**
     - A workspace that never changed it behaves exactly as today.
     - With "None", writers and readers see only projects where they have a
@@ -1303,6 +1474,20 @@ tests, deployment, rollback, monitoring*.
     - Only owners and maintainers can change it, and the change applies to the
       next check.
     - Project lists show members under "None" only their own projects.
+11. **Seats.**
+    - With the default base permission and no project roles, the seat count is
+      the same as today's Dashboard count (everyone except readers).
+    - A reader who becomes a writer on one project starts using a seat; losing
+      that role frees it.
+    - A writer under "None" with only reader project roles uses no seat.
+    - Changing the base permission to "Writer" counts every reader; changing it
+      to "None" frees seats of members without edit-level project roles.
+    - Creating a project makes the creator use a seat.
+    - Each person counts once, however many projects they can edit.
+    - When no seat is left, every change that would make someone start using a
+      seat is refused with a clear message, and nothing changes; changes that
+      free seats always succeed. Two admins taking the last seat at the same
+      time → exactly one succeeds.
 
 Technical details: see *Solution Options → Option 1 → Technical notes: impact,
 tests, deployment, rollback, monitoring*.
@@ -1313,21 +1498,26 @@ tests, deployment, rollback, monitoring*.
    Services that don't name a project in permission checks see no change, and
    workspace members and roles do not change.
 2. **Can it be rolled out gradually? Yes.** Order:
-   1. Deploy accounts.
-   2. Each service registers its existing projects with accounts (a one-off
+   1. Deploy accounts. It does not limit seats until billing tells it each
+      workspace's seat limit.
+   2. Billing gives accounts each workspace's seat limit and switches to
+      accounts' seat count. With the default base permission and no project
+      roles yet, the count is identical to today's Dashboard rule (everyone
+      except readers), so nobody's seat usage changes.
+   3. Each service registers its existing projects with accounts (a one-off
       backfill).
-   3. Each service starts registering new projects when they are created and
+   4. Each service starts registering new projects when they are created and
       telling accounts when they are deleted.
-   4. Each service turns on its project-level permission rules and starts naming
+   5. Each service turns on its project-level permission rules and starts naming
       the project in permission checks. Until this step, project roles have no
       effect, so nobody gains access by mistake (fail-closed).
-   5. The UI for adding people in one step is turned on.
-   6. Services filter project lists by what each person may see; then the UI
+   6. The UI for adding people in one step is turned on.
+   7. Services filter project lists by what each person may see; then the UI
       for changing the base permission is turned on. Every workspace starts at
-      "Follow workspace role", so nobody's access changes until an admin
-      changes the setting — the rollout is safe.
-3. **Who to notify:** the dashboard / visualizer / cms owners, and whoever
-   maintains the permission policies.
+      "Follow workspace role", so nobody's access or seat usage changes until
+      an admin changes something — the rollout is safe.
+3. **Who to notify:** the dashboard / visualizer / cms owners, the billing
+   owner, and whoever maintains the permission policies.
 4. **Configuration changes:** none.
 5. **Database changes:** applied automatically when accounts starts. Accounts
    itself does not need to convert any existing data.
@@ -1343,7 +1533,9 @@ tests, deployment, rollback, monitoring*.
    that use them. **Rolling back widens access** in workspaces whose base
    permission is not the default: their writers and readers see every project
    again. Tell those workspaces' admins first, and prefer fixing forward if
-   they rely on "None".
+   they rely on "None". Switch billing back to its own seat count (everyone
+   except readers); seat usage may differ for people whose seats came from
+   project roles.
 3. Roll accounts back to the previous version. The previous version simply
    ignores the new data, so **no data rollback is required**.
    Note: while the previous version runs, it may drop the project roles of users
@@ -1367,8 +1559,13 @@ tests, deployment, rollback, monitoring*.
     workspace; check that they lose access to every project.
   - Ask for a permission on the project while naming a different workspace;
     check that it is denied.
-  - From the project, add a person who is not in the workspace; check that they
-    become a reader member, use a seat, and get the project role.
+  - Before switching billing, check that accounts' seat count equals
+    Dashboard's current count for every workspace.
+  - From the project, add a person who is not in the workspace as a writer on
+    it; check that they become a reader member with that project role and use
+    a seat. Add another as a reader on it; check that they use no seat.
+  - With no seat left, try to give a reader a writer project role; check that it
+    is refused with a clear message and nothing changes.
   - From the workspace, add a person and choose two projects; check that they
     get exactly those two project roles.
   - Check that existing workspaces show "Follow workspace role" and that their
@@ -1384,6 +1581,7 @@ tests, deployment, rollback, monitoring*.
     automatic retries and seat-limit rejections.
   - Number of project roles per user (maximum and top 1%), to watch the ~1,000
     per user assumption.
+  - Number of changes refused because no seat was left, per workspace.
 - Alerting
   - Permission check error rate: Warning above 1%, Danger at 5% or more.
   - Permission check response time (slowest 5%): Warning when more than 20%
@@ -1421,12 +1619,13 @@ tests, deployment, rollback, monitoring*.
 7. **What workspace role do people added from a project get, and who may add
    them?** Tentatively reader, and the admin may choose. May a project owner who
    is not a workspace owner or maintainer add new people to the workspace this
-   way, given that it uses a paid seat? (Proposed for the first version: no —
+   way, given that it can use a paid seat? (Proposed for the first version: no —
    only workspace owners and maintainers.)
 8. **Should removing a person's last project role also remove them from the
    workspace?** Today it does not: under "None" such a member sees no projects
-   but stays in the workspace and keeps using a seat until an admin removes
-   them. Removing them automatically frees the seat but may surprise admins.
+   but stays in the member list until an admin removes them. They no longer
+   use a seat, so this is about keeping the member list tidy; removing them
+   automatically may surprise admins.
 9. **Should Free plans and personal workspaces offer the base permission?** A
    personal workspace has a single member, so the first version does not offer
    it there. Whether it is a paid-plan feature is a product decision.
@@ -1437,6 +1636,17 @@ tests, deployment, rollback, monitoring*.
     one setting per workspace that applies to every service (Dashboard,
     Visualizer, CMS, Flow), so admins set it once and people see the same thing
     everywhere.
+12. **What happens when a change would exceed the seat limit?** Giving someone
+    an editing project role, raising a workspace role, changing the base
+    permission, adding a person, or creating a project can make someone start
+    using a seat. Proposed: refuse the change with a clear message saying the
+    workspace has no seat left (so a reader at the limit cannot create a
+    project). Alternatives: allow it and flag the workspace as over its seats,
+    as Dashboard does today, or treat project creation differently.
+13. **Does "edit" mean the same in every service?** The seat rule counts writer,
+    maintainer and owner roles as "can edit" everywhere. Is that right for
+    Visualizer, CMS and Flow, or does any service have a role that edits
+    without being writer, or a writer that cannot really edit?
 
 Technical details: see *Solution Options → Option 1 → Technical notes on open
 questions*.
