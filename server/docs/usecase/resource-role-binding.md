@@ -152,9 +152,11 @@ permission.
      P can edit P), but never lower it.
 2. **Permission checks look at the specific project.** When a service asks
    accounts "may this user do this?", the answer can take the user's role on
-   that particular project into account. The check always uses the workspace
-   the project really belongs to, so a caller cannot get access by naming a
-   different workspace.
+   that particular project into account. The check uses the workspace the
+   project belongs to. For a project that has ever had a project role, accounts
+   remembers that workspace, so a caller cannot get access by naming a different
+   one. For a project that has never had a project role, the service's own
+   record of its workspace is used (not user input).
 3. **Membership rules stay consistent.** A project always belongs to exactly
    one workspace, every project member is a member of that workspace, and once
    a project has an owner it never ends up with none — even when several people
@@ -168,6 +170,14 @@ permission.
 6. **Nothing existing breaks.** Current permission checks and policies keep
    working exactly as they do today. Existing workspace roles do not change,
    and the default base permission reproduces today's behavior.
+   - **Compatibility and migration:** existing data (members, workspace roles,
+     permission data, projects) is used as is. There is no data conversion and
+     no bulk registration of existing projects (no backfill). The new storage is
+     created automatically on startup and stays empty until the feature is
+     used. A project is registered in accounts only when it first gets a project
+     role (or when it is created from now on). With the default base permission
+     and no project roles, every permission check and seat count is exactly the
+     same as today.
 7. **Each workspace has a base permission** (name tentative), like a GitHub
    organization's base permission. Its values are "Follow workspace role"
    (default — today's behavior), "None", "Reader" and "Writer". It decides what
@@ -191,7 +201,9 @@ permission.
 1. **Storing project details in accounts.** Names, visibility, owners, dates and
    other information about a project stay in the service that owns it.
 2. **Checking that a project really exists.** Accounts trusts the service that
-   registers the project. Only services can register projects, not users.
+   registers the project. Only services can register projects, not users. For a
+   project that is not registered yet, accounts trusts the workspace the service
+   tells it.
 3. **Noticing on its own when a project is deleted.** The service that owns the
    project must tell accounts when it is deleted.
 4. **Nested resources and inherited permissions** (for example folder → project
@@ -204,14 +216,18 @@ permission.
    the base permission only.
 7. **Sending invitation emails for project membership.** The email mentions the
    project's name, which accounts does not know, so the service sends it.
+8. **Registering existing projects in bulk (backfill).** A project is registered
+   when it is needed (when it first gets a project role, or when it is created
+   from now on).
 
 ## Functional Requirements
 
 1. **Permission checks stay fast.** (FR-1, FR-2) Checks that do not name a project cost
-   exactly the same as today. Checks that name a project add only one small,
+   exactly the same as today. Checks that name a project add only a small,
    quick lookup (which workspace the project belongs to, together with that
-   workspace's base permission); the user's project roles are read together
-   with the data accounts already loads.
+   workspace's base permission; for a project that is not registered, one more
+   lookup of the workspace's base permission); the user's project roles are read
+   together with the data accounts already loads.
 2. **Names and IDs have size limits.** (FR-3) The resource type name and the resource
    ID have a maximum length and a fixed set of allowed characters, so stored
    data stays small and predictable.
@@ -242,7 +258,7 @@ Three pieces of state, all opaque to accounts:
 
 | State | Purpose |
 |---|---|
-| **Resource registration** `(resourceKind, resourceID) → workspaceID, version` | Authoritative workspace scope of the resource; proof the owning service registered it; per-resource serialization point for invariants |
+| **Resource registration** `(resourceKind, resourceID) → workspaceID, version` | Authoritative workspace scope of the resource; proof the owning service registered it; per-resource serialization point for invariants. **Created only when needed** (on creation, or before the first resource role). Existing resources are not registered in bulk |
 | **Resource role** on `Permittable` `(workspaceID, resourceKind, resourceID, roleID)` | The user's role on that resource; read together with the permittable for zero-read lookup |
 | **Workspace resource settings** `workspaceID → basePermission, seatLimit, version` | The workspace's base permission and seat limit; also the per-workspace lock (serialization point for every change that can affect seat usage: the one-step add, workspace member and role changes, editing project roles, project registration, and base-permission changes) |
 
@@ -408,6 +424,9 @@ DROP TABLE IF EXISTS permittable_resource_roles;
 DROP TABLE IF EXISTS resource_registrations;
 ```
 
+The migration only creates tables and indexes; it converts no existing rows.
+The new tables stay empty until the feature is used.
+
 **MongoDB**
 
 - New collection `resource_registrations` with a unique index on
@@ -468,7 +487,7 @@ FindSeatUsers(ctx, workspaceID, baselineEditRoles []role.ID, editRoles []role.ID
 | `LockForUpdate` | in a transaction: `findOneAndUpdate {$inc: {version: 1}}` (concurrent transactions on the same registration hit a write conflict and are retried) | `SELECT … FOR UPDATE` |
 | `WorkspaceSettings.Lock` | in a transaction: `findOneAndUpdate {_id: ws} {$inc: {version: 1}}, upsert` (write conflict → retry) | `INSERT … ON CONFLICT DO NOTHING` then `SELECT … FOR UPDATE` |
 | `FindSeatUsers` | aggregation on `permittables`: `$match` users with a workspace role in `ws` and (`workspace_roles` role ∈ baseline-edit roles **or** `resource_roles` `$elemMatch {workspace_id: ws, role_id ∈ edit roles}`) → `$project user_id` | `SELECT DISTINCT p.user_id FROM permittables p JOIN permittable_workspace_roles w … WHERE w.workspace_id=$1 AND (w.role_id = ANY($2) OR EXISTS (SELECT 1 FROM permittable_resource_roles r WHERE r.permittable_id = p.id AND r.workspace_id=$1 AND r.role_id = ANY($3)))` |
-| Registration + settings for `checkPermission` | one aggregation on `resource_registrations`: `$match` by key → `$lookup` `resource_workspace_settings` by `workspace_id` | one query: `SELECT r.*, s.base_permission FROM resource_registrations r LEFT JOIN resource_workspace_settings s USING (workspace_id) WHERE …` |
+| Registration + settings for `checkPermission` | one aggregation on `resource_registrations`: `$match` by key → `$lookup` `resource_workspace_settings` by `workspace_id`. If there is no registration, `WorkspaceSettings.Find` for the workspace resolved from `workspaceAlias` | one query: `SELECT r.*, s.base_permission FROM resource_registrations r LEFT JOIN resource_workspace_settings s USING (workspace_id) WHERE …`. If there is no registration, likewise `WorkspaceSettings.Find` |
 
 #### Authorization check
 
@@ -487,15 +506,24 @@ input CheckPermissionInput {
 When `resourceId` is **absent**, behavior is unchanged — whatever the base
 permission. Principal roles are the actual workspace roles, as today.
 
-When `resourceId` is **present**:
+When `resourceId` is **present**, the service also passes `workspaceAlias`, as
+today (the project's workspace, read from the service's own data, not from user
+input).
 
 1. Load the registration `(service:resource, resourceId)` together with its
-   workspace's settings (one round-trip). **Not found → deny.**
-2. If `workspaceAlias` is given and does not resolve to the registration's
-   `workspaceID` → **deny**.
+   workspace's settings (one round-trip).
+2. **If registered:** the deciding workspace = the registration's `workspaceID`.
+   If `workspaceAlias` is given and does not resolve to it → **deny** (the
+   caller cannot choose the workspace).
+   **If not registered** (it has never had a resource role): the deciding
+   workspace = the workspace resolved from `workspaceAlias`. Without
+   `workspaceAlias` → **deny**. Read that workspace's settings (one point
+   read). No resource roles exist yet, so the decision comes from the workspace
+   role and base permission only — exactly today's result under the default
+   base permission.
 3. Principal roles = global roles + the user's **baseline role**
-   `BaselineRole(workspace role, basePermission)` **in the registration's
-   `workspaceID`** (the caller cannot choose the workspace). With "Follow
+   `BaselineRole(workspace role, basePermission)` **in the deciding
+   workspace**. With "Follow
    workspace role" the baseline is the workspace role, so the roles are exactly
    what they would be today. When a workspace member has no baseline (`None`
    for a `writer` / `reader`), the evaluation-only role `workspace_member` is
@@ -574,8 +602,10 @@ extend type Query {
 ```
 
 If `baselineRole` is set, the user sees every resource of the kind in the
-workspace at least at that level; otherwise (a member under `None`) the service
-lists only `bindings`.
+workspace at least at that level (registered or not — the service lists all of
+its resources); otherwise (a member under `None`) the service lists only
+`bindings`. Every resource in `bindings` has a role, so it is always
+registered.
 
 #### Membership management API
 
@@ -584,17 +614,33 @@ M2M API key (a user JWT is rejected). Registration is how accounts learns that a
 resource exists and which workspace it belongs to; restricting it to services
 removes any way for a user to claim an unregistered ID.
 
+**Registering when needed (lazy registration).** Services register only in
+these cases; existing resources are never registered in bulk.
+
+- On creation, with the creator as `ownerUserId` (every resource created from
+  now on is registered).
+- Before giving an existing resource its first resource role (before calling
+  `setResourceMember` / `addWorkspaceMemberWithResourceRoles`), without
+  `ownerUserId`. The service reads `workspaceId` from its own data.
+
+Registration is idempotent, so a service may call it every time before granting
+a role. A registration without roles is decided the same way as no
+registration (workspace role and base permission only), so a registration left
+behind by a failed role grant is harmless.
+
 ```
 POST   /api/service/resources
        { workspaceId, resourceKind, resourceId, ownerUserId? }
-       → creates the registration and, if ownerUserId is given, an `owner`
-         role assignment, in one transaction under the workspace lock.
+       → registers the resource on first use (creation, or before its first
+         resource role). If ownerUserId is given, also an `owner` role
+         assignment, in one transaction under the workspace lock.
          ownerUserId must be a workspace member; seat check (the creator may
          start using a seat) → 422 ErrSeatLimitExceeded.
-         409 if already registered with a different workspace; idempotent
-         (200) if registered with the same workspace.
+         Idempotent: 200 if already registered with the same workspace (no
+         change); 409 ErrWorkspaceMismatch if registered with a different one.
 DELETE /api/service/resources/{resourceKind}/{resourceId}
        → removes the registration and every role assignment on the resource.
+         Idempotent: 204 also when the resource was never registered.
 PUT    /api/service/workspaces/{workspaceId}/seat-limit
        { seatLimit: int | null }
        → billing sets the workspace's seat limit (null = unlimited). Lowering
@@ -686,9 +732,9 @@ transaction**; locks are taken in a fixed order — workspace lock
 
 | Operation | Locks | Guard |
 |---|---|---|
-| `setResourceMember` | workspace lock, then the registration | registration exists; target user is a member of the registration's workspace (else `ErrNotWorkspaceMember` — use `addWorkspaceMemberWithResourceRoles`); Cerbos allows `manage_members` on `(kind, id)` for the operator; if the change downgrades the last `owner`, reject; seat check |
+| `setResourceMember` | workspace lock, then the registration | registration exists (else `ErrNotRegistered` — the service first calls the idempotent registration); target user is a member of the registration's workspace (else `ErrNotWorkspaceMember` — use `addWorkspaceMemberWithResourceRoles`); Cerbos allows `manage_members` on `(kind, id)` for the operator; if the change downgrades the last `owner`, reject; seat check |
 | `removeResourceMember` | the registration | Cerbos `manage_members`, or operator == target (self-leave); if it removes the last `owner`, reject |
-| `addWorkspaceMemberWithResourceRoles` | workspace lock, then each registration | every registration exists and belongs to `workspaceId` (else the whole call is rejected); Cerbos allows `manage_members` on each for the operator. If the user is **not yet a member**: operator is a workspace admin (v1, Open Question 7); personal workspace rejected; `workspaceRole` (default `reader`) is not `owner`, as in `addUsersToWorkspace`; then `Members().Join` and the permittable workspace role via the existing `bulkUpdatePermittable` path. If the user **is already a member**: workspace membership and role are left unchanged — never downgraded (`workspaceRole` is ignored). Then the last-owner rule per resource, `UpsertResourceRole` for each entry, and the seat check. Any failure rolls everything back |
+| `addWorkspaceMemberWithResourceRoles` | workspace lock, then each registration | every registration exists and belongs to `workspaceId` (else the whole call is rejected; the service first calls the idempotent registration for each resource); Cerbos allows `manage_members` on each for the operator. If the user is **not yet a member**: operator is a workspace admin (v1, Open Question 7); personal workspace rejected; `workspaceRole` (default `reader`) is not `owner`, as in `addUsersToWorkspace`; then `Members().Join` and the permittable workspace role via the existing `bulkUpdatePermittable` path. If the user **is already a member**: workspace membership and role are left unchanged — never downgraded (`workspaceRole` is ignored). Then the last-owner rule per resource, `UpsertResourceRole` for each entry, and the seat check. Any failure rolls everything back |
 | `updateWorkspaceBasePermission` | workspace lock | operator passes the existing workspace `manage` check (owner / maintainer); personal workspace rejected (v1, Open Question 9); then `SetBasePermission` and the seat check. Takes effect on the next `checkPermission` — nothing else is rewritten |
 | `workspaceSeatUsage` | — | operator may read workspace members (`read_member`); the `seat-usage` route is M2M only |
 | `resourceMembers` | — | Cerbos `read` on `(kind, id)`; result filtered by the read-time guard |
@@ -697,9 +743,9 @@ transaction**; locks are taken in a fixed order — workspace lock
 | `Workspace.basePermission` | — | anyone who can read the workspace (`read`) |
 
 **Last-owner rule:** a membership mutation that would take the owner count of a
-resource from ≥ 1 to 0 is rejected. A resource registered without an owner (e.g.
-backfill) is managed by workspace roles until an owner is set. The unregister
-endpoint is exempt.
+resource from ≥ 1 to 0 is rejected. A resource registered without an owner
+(when an existing resource first gets, say, a writer) is managed by workspace
+roles until an owner is set. The unregister endpoint is exempt.
 
 Removing a user's last resource role (`removeResourceMember`) does **not**
 remove them from the workspace (Open Question 8).
@@ -721,7 +767,8 @@ they serialize with the one-step add and with each other's seat checks):
 | Race | Mitigation |
 |---|---|
 | Two writers on different users of the same resource both pass the last-owner check | Both must take `LockForUpdate` on the same registration; the second waits (Postgres) or conflicts and retries (Mongo). The owner count is read after the lock. |
-| Two services register the same `(kind, id)` | Primary key / unique index; the loser gets `ErrAlreadyExists`. |
+| The first registration of the same `(kind, id)` runs twice at once (e.g. two admins give roles on the same existing project at the same time) | Primary key / unique index; the loser gets `ErrAlreadyExists` and re-reads the registration. Same workspace → continues as success (idempotent); different workspace → 409 `ErrWorkspaceMismatch`. |
+| A permission check runs during the first registration | The check sees either "not registered" or "registered". No roles exist yet, so both give the same result from the workspace role and base permission. |
 | `setResourceMember` passes the workspace-membership check, then the user is removed from the workspace and the cascade runs before the role assignment is written | **Read-time guard**: a role assignment is honored only if the user currently holds a workspace role in the role assignment's workspace. The permittable is already loaded, so this costs no read. The orphaned row is harmless and is removed the next time the cascade or the unregister endpoint touches it. |
 | A stale snapshot `Save` from the workspace flow overwrites a newer role assignment (or vice versa) | Snapshot saves never write `resource_roles`; role-assignment writes never write `workspace_roles` (see *Repository changes*). |
 | Two admins add the same new person with `addWorkspaceMemberWithResourceRoles` at once (possibly with different projects) | Both take the workspace lock; the second waits / retries, then sees an existing member and only adds its role assignments. The workspace role is not changed and the seat is counted once. |
@@ -736,9 +783,10 @@ they serialize with the one-step add and with each other's seat checks):
 
 | Event | Who acts | Effect on role assignments |
 |---|---|---|
-| Resource created | Service (M2M) | `POST /api/service/resources` with `ownerUserId` = creator |
+| Resource created (after this feature ships) | Service (M2M) | `POST /api/service/resources` with `ownerUserId` = creator |
 | Resource deleted | Service (M2M) | `DELETE /api/service/resources/{kind}/{id}`; members whose only editing role was on it stop using a seat. A missed call leaves an orphan registration — harmless (the resource no longer exists in the service) except that its editing roles still count as seats; cleaned by an optional sweeper later |
-| Existing resources (pre-feature) | Service (M2M) | One-off backfill via the same endpoint (idempotent), before the service starts sending `resourceId` |
+| Existing resources (pre-feature) | — | Not registered. Permission checks are decided by the workspace role and base permission of the `workspaceAlias` workspace |
+| An existing resource gets its first resource role | Service (M2M) → Accounts | The service calls `POST /api/service/resources` without `ownerUserId` (idempotent), then `setResourceMember` / `addWorkspaceMemberWithResourceRoles` |
 | Person added with `addWorkspaceMemberWithResourceRoles` | Accounts | Workspace membership (if new) and role assignments written in one transaction |
 | A member's last role assignment in a workspace removed | Accounts | Only that role assignment is removed; workspace membership stays (the seat is freed if they can no longer edit anything) |
 | Seat limit changed | Billing (M2M) | None; only future increases are checked against the new limit |
@@ -768,7 +816,10 @@ they serialize with the one-step add and with each other's seat checks):
 **Cons**
 
 - One extra round-trip for `checkPermission` calls that pass `resourceId`.
-- Services must register resources (including a backfill) and unregister on delete.
+- Services must register resources on creation and before their first role
+  (no backfill), and unregister on delete.
+- For unregistered resources, the correct workspace depends on the
+  `workspaceAlias` the service passes (accounts enforces it once registered).
 - Mongo `Save` semantics change from replace to `$set` (touches existing code).
 - Existing workspace member flows must take the workspace lock and run the seat
   check; billing must push seat limits to accounts.
@@ -784,10 +835,12 @@ order; other parts of this section refer to them by those numbers. Each item in
 2 → FR-3, 3 → FR-4, 4 → FR-5, 5 → FR-6, 6 → FR-7, 7 → FR-8).
 
 1. `checkPermission` without `resourceId`: **no change** in reads or in
-   principal roles. With `resourceId`: **one additional round-trip** — the
-   resource registration by primary key, joined with the workspace's settings
-   by primary key (Postgres `LEFT JOIN`, Mongo `$lookup`). The role assignment
-   itself is read from the already-loaded permittable.
+   principal roles. With `resourceId`: if registered, **one additional
+   round-trip** — the resource registration by primary key, joined with the
+   workspace's settings by primary key (Postgres `LEFT JOIN`, Mongo `$lookup`).
+   If not registered, that miss plus one point read of the workspace's settings
+   (`workspaceAlias` is already resolved today). The role assignment itself is
+   read from the already-loaded permittable.
 2. On PostgreSQL, `Permittable.FindByUserID` loads the base row, workspace roles
    and resource roles in **one round-trip** (aggregated sub-selects), so adding
    resource roles does not add a query to `checkPermission`.
@@ -812,7 +865,9 @@ Scope notes (technical form of *Non-Goals*):
 - Resource existence is not validated. Accounts trusts the
   **M2M-authenticated** service that registers a resource, and relies on that
   service to call the unregister endpoint when the resource is deleted (see
-  *Lifecycle and cascades*).
+  *Lifecycle and cascades*). For unregistered resources, it trusts the
+  `workspaceAlias` the service passes to `checkPermission`.
+- Existing resources are not backfilled (lazy registration).
 - v1 role assignments are for **user principals only**; integration (M2M)
   principals cannot hold resource roles.
 - v1 `checkPermission` passes no resource attributes (e.g. `visibility`) to
@@ -829,13 +884,18 @@ sequenceDiagram
     participant DB as Mongo/Postgres
     participant C as Cerbos
 
-    S->>A: checkPermission(service, resource, action, workspaceAlias?, resourceId)
+    S->>A: checkPermission(service, resource, action, workspaceAlias, resourceId)
     A->>DB: Permittable.FindByUserID(user)  (existing read, one round-trip)
     A->>DB: Registration.FindByKey(kind, resourceId) + workspace settings  (new round-trip)
-    alt not registered, or alias ≠ registration.workspace
+    alt registered and alias ≠ registration.workspace
+        A-->>S: { allowed: false }
+    else not registered and no alias
         A-->>S: { allowed: false }
     else
-        A->>A: attr.resourceRole = guarded role or ""<br/>roles = global + BaselineRole(workspace role, basePermission)<br/>(+ workspace_member if member without baseline)
+        opt not registered
+            A->>DB: WorkspaceSettings.Find(workspace of alias)
+        end
+        A->>A: ws = registration.workspace or workspace of alias<br/>attr.resourceRole = guarded role or "" (always "" if not registered)<br/>roles = global + BaselineRole(workspace role in ws, basePermission)<br/>(+ workspace_member if member without baseline)
         A->>C: CheckResources(principal{roles, attr}, resource{kind, resourceId}, action)
         C-->>A: ALLOW / DENY
         A-->>S: { allowed }
@@ -856,6 +916,7 @@ sequenceDiagram
     A->>A: lock ws → U ∈ ws? → create registration + owner role assignment → seat check (one tx)
     A-->>S: 201 (or 422 ErrSeatLimitExceeded)
     U->>S: give workspace member B writer on P
+    S->>A: POST /api/service/resources {ws, kind, P} (idempotent, no-op here)
     S->>A: setResourceMember(kind, P, B, writer) (U's JWT)
     A->>A: lock ws, registration → B ∈ ws? Cerbos manage_members for U? → upsert → seat check
     A-->>S: ok (or ErrSeatLimitExceeded)
@@ -876,6 +937,7 @@ sequenceDiagram
 
     U->>S: add D to project P1 (a)<br/>or add D to ws with projects P1, P2 (b)
     S->>A: userByNameOrEmail(...) → D's userId
+    S->>A: POST /api/service/resources {ws, kind, Pn} for each Pn (idempotent, M2M key)
     S->>A: addWorkspaceMemberWithResourceRoles(ws, D, reader, [(kind,P1,writer), ...]) (U's JWT)
     A->>A: begin tx, lock ws
     A->>A: each Pn registered in ws?
@@ -940,6 +1002,16 @@ flowchart LR
     `updateUserOfWorkspace`, `transferWorkspaceOwnership` and project
     registration can return `ErrSeatLimitExceeded`; every caller must show a
     clear message.
+11. **Lazy registration and `workspaceAlias`**: services register a project on
+    creation and call the idempotent registration before giving an existing
+    project its first role. For `checkPermission` with a `resourceId`, they read
+    the project's workspace from their own data and pass it as
+    `workspaceAlias` (unregistered projects are decided by it).
+12. **Compatibility and migration**: no existing data is converted and nothing
+    is backfilled. The new tables / collections are created on startup and stay
+    empty until the feature is used. With the default base permission and no
+    resource roles, `checkPermission` results and `seatCount` are the same as
+    today.
 
 ##### Tests
 
@@ -950,14 +1022,20 @@ flowchart LR
    workspace role × base permission × resource-role combination.
 2. **Interactor** (`internal/usecase/interactor`):
    - `CheckPermission`: no `resourceId` → unchanged roles whatever the setting
-     (regression); unregistered resource → deny; alias of another workspace →
-     deny; workspace roles taken from the registration, not the alias;
+     (regression); unregistered resource + alias → decided by the alias
+     workspace's role and base permission (today's result under the default;
+     only owner / maintainer allowed under `None`); unregistered + no alias →
+     deny; registered + alias of another workspace → deny; for registered
+     resources, workspace roles taken from the registration, not the alias;
      `resourceRole` set/empty; with a `resourceId`, principal roles equal the
      baseline (`workspace_member` when none) for each base permission; a user
      with no workspace role → deny even with a stale role assignment.
    - Register: M2M only (JWT rejected); owner must be a workspace member;
-     duplicate with same workspace is idempotent, different workspace is 409.
-   - `setResourceMember` / `removeResourceMember`: non-member target rejected;
+     duplicate with same workspace is idempotent (roles unchanged), different
+     workspace is 409; a registration without `ownerUserId` alone does not
+     change any decision; unregister succeeds even when never registered.
+   - `setResourceMember` / `removeResourceMember`: unregistered resource →
+     `ErrNotRegistered`; non-member target rejected;
      denied without `manage_members`; self-leave allowed; last-owner
      protection; removing the last role assignment keeps workspace membership.
    - `addWorkspaceMemberWithResourceRoles`: a non-member joins with the given
@@ -988,12 +1066,15 @@ flowchart LR
    of the same new person → joined once, both sets of role assignments present;
    two concurrent seat-adding operations of different kinds (one-step add,
    `setResourceMember` writer, project registration, base permission to
-   `Writer`) with one seat left → exactly one succeeds.
+   `Writer`) with one seat left → exactly one succeeds; two concurrent first
+   registrations of the same existing resource → one registration, both
+   succeed.
 4. **Repository**: Mongo, Postgres and memory implementations of every new
    operation; Postgres `FindByUserID` issues a single query.
-5. **Migration**: `0005` up/down on an existing DB; existing permittables load
-   with empty `resourceRoles`; workspaces without a settings record read as
-   "Follow workspace role".
+5. **Migration**: `0005` up/down on an existing DB; no existing row is changed;
+   existing permittables load with empty `resourceRoles`; workspaces without a
+   settings record read as "Follow workspace role"; checks on existing projects
+   with no registration give the same results as today.
 6. **E2E** (`server/e2e`): a `dashboard:project` test policy generated with the
    rules above; verify:
    - workspace `reader` without a role assignment → `read` allowed, `edit`
@@ -1003,8 +1084,9 @@ flowchart LR
      (a resource role never lowers access);
    - workspace `owner` → every action on every project;
    - user from another workspace → denied;
+   - unregistered project (with alias): today's result under the default;
    - base permission `None`: workspace `reader` / `writer` without a role
-     assignment → denied on every project; with resource `writer` on P →
+     assignment → denied on every project (including unregistered ones); with resource `writer` on P →
      `read` / `edit` on P only; workspace `maintainer` → every action on every
      project;
    - base permission `Writer`: workspace `reader` → `edit` allowed on every
@@ -1016,29 +1098,32 @@ flowchart LR
 1. Backward compatible? **Yes.** New optional input field, new
    collections/tables, new routes and GraphQL fields and enum. Behavior is
    unchanged when `resourceId` is absent; the workspace member list and roles
-   are unchanged.
+   are unchanged. No existing data is converted and nothing is backfilled.
 2. Partial deployment? **Yes.** Order:
    1. Deploy accounts. With no `seatLimit` set, the seat check never blocks.
    2. Billing pushes `seatLimit` for every workspace; Dashboard switches
       `GetCurrentSeatStatus` / `IsOverUsedSeat` to `seat-usage`. Before the
       switch, compare `seatCount` with Dashboard's count for every workspace —
       with the default setting and no resource roles they are identical.
-   3. Each service backfills registrations for existing resources (without
-      `ownerUserId` for existing projects, so the backfill adds no seats).
-   4. Each service starts registering on create / unregistering on delete.
-   5. Each service deploys policies using `P.attr.resourceRole` and starts
-      sending `resourceId`. Before step 5 the attribute is absent and conditions
-      never match (fail-closed).
-   6. Enable the UI for the one-step add.
-   7. Services filter lists with `myResourceAccess`; only then enable the UI
+   3. Each service starts registering on create (creator as owner) /
+      unregistering on delete, and calling the idempotent registration before a
+      resource's first role. Existing resources are not registered.
+   4. Each service deploys policies using `P.attr.resourceRole` and starts
+      sending `resourceId` (and, as today, `workspaceAlias`). Existing projects
+      with no registration give today's results. Before step 4 the attribute is
+      absent and conditions never match (fail-closed).
+   5. Enable the UI for the one-step add.
+   6. Services filter lists with `myResourceAccess`; only then enable the UI
       that changes the base permission. Until a workspace changes it, every
-      workspace is "Follow workspace role", so steps 1–6 change nobody's access
+      workspace is "Follow workspace role", so steps 1–5 change nobody's access
       or seat count (apart from new editing project roles and new projects).
 3. Notify: dashboard / visualizer / cms owners; billing owner; whoever maintains
    Cerbos policies.
 4. Config changes: none (reuses the existing M2M API key).
 5. DDL: Postgres migration `0005` runs automatically at startup (golang-migrate).
-   Mongo: collection schema + indexes via the startup migration; no backfill in accounts.
+   Mongo: collection schema + indexes via the startup migration. No existing
+   row is changed and there is no backfill, in accounts or in any service. The
+   new tables / collections stay empty until the feature is used.
 
 ##### Rollback
 
@@ -1057,8 +1142,11 @@ flowchart LR
    tables and `resource_roles` field, so **no data rollback is required**.
    Note: the old Mongo `Save` replaces the whole document and will drop
    `resource_roles` of any permittable it writes — acceptable during rollback,
-   since the feature is disabled; services re-run the backfill on roll-forward.
-   People added with the one-step add stay workspace members.
+   since the feature is disabled, but dropped role assignments do not come back
+   by themselves (there is no backfill) and must be granted again after
+   roll-forward, so keep the rollback window short. Registrations stay (a
+   registration without roles is decided like no registration). People added
+   with the one-step add stay workspace members.
 4. Only if the schema itself must be removed: run `0005` down (drops
    registrations, role assignments and workspace settings, including base
    permissions — take a dump first).
@@ -1068,6 +1156,9 @@ flowchart LR
 - Checklist
   - Create a project in dashboard staging; verify the registration and the
     creator's `owner` role assignment.
+  - `checkPermission` (with alias) on an existing project with no registration
+    gives the same result as before the deploy. Give that project its first
+    role with `setResourceMember`; verify it is registered at that point.
   - Give a workspace `reader` the resource role `writer` on a project; verify
     they can edit that project and still only read the others. Remove them from
     the workspace; verify all project access is lost.
@@ -1151,6 +1242,11 @@ flowchart LR
     maintainer, owner), not per-service actions, so it is the same for every
     resource kind. If a service needs a different line, `editRoles` would have
     to become per kind (declared by the service, like its policy).
+14. **Workspace of unregistered projects:** for unregistered projects,
+    `workspaceAlias` is trusted. To have accounts always enforce the workspace,
+    a service can register existing projects without `ownerUserId` at any time
+    (idempotent, and it changes no decision). The same endpoint works whether
+    done all at once or gradually per service.
 
 ### Option 2: Role assignments in their own collection/table (no embedding)
 
@@ -1188,6 +1284,14 @@ gives the same access while keeping everyone in one member list.
 to, and who holds which role on it.** For each workspace, it also keeps one
 setting: the base permission. Everything else about the project stays in the
 service.
+
+**A project is not registered in accounts until it is needed.** Without a
+project role, access to a project comes from the workspace role and the base
+permission, so accounts does not need to know about a project until it gets a
+project role. Existing projects are therefore not registered in bulk (no
+backfill). Projects created from now on are registered at creation, with the
+creator as owner. Existing projects are registered when they first get a
+project role.
 
 ### Workspace members, roles and the base permission
 
@@ -1290,7 +1394,8 @@ see nothing, do not use a seat. A member uses a seat if any of these is true:
 
 Each person counts once, however many projects they can edit. With the default
 base permission and no project roles, this is exactly today's Dashboard rule:
-everyone except readers uses a seat.
+everyone except readers uses a seat. Unregistered projects have no project
+roles, so they never change seat counts.
 
 Examples:
 
@@ -1310,9 +1415,19 @@ Question 12); changes that free seats are always allowed.
 
 1. A service asks accounts whether a user may do something (for example, edit)
    on a specific project.
-2. Accounts looks up which workspace the project belongs to. If the service
-   never registered the project, or the request names a different workspace,
-   the answer is "no".
+2. Accounts looks up which workspace the project belongs to.
+   - **Registered projects** (ones that have had a project role, or were created
+     after this feature): accounts uses the workspace it remembers. If the
+     request names a different workspace, the answer is "no".
+   - **Unregistered projects** (existing projects that have never had a project
+     role): accounts uses the workspace the service tells it, read from the
+     service's own data. There are no project roles yet, so the answer comes
+     from the workspace role and the base permission only — exactly today's
+     result under the default base permission. Under "None", only workspace
+     owners and maintainers can see them.
+   - Because of this difference, using the right workspace for an unregistered
+     project is up to the service (using its own data, not user input). Once
+     the project is registered, accounts enforces it.
 3. Accounts combines the user's role in that workspace, the workspace's base
    permission and the user's role on the project (if any), and applies the
    service's permission policy:
@@ -1334,16 +1449,19 @@ Question 12); changes that free seats are always allowed.
 1. A user creates a project in a service. The service saves it and registers it
    with accounts, naming the creator as its owner (the creator must be a
    workspace member). So even under "None", the creator can see the project.
+   Projects that existed before this feature are not registered.
 2. Someone allowed to manage the project's members gives a workspace member a
-   role on it (for example, writer). Accounts checks that the person is in the
+   role on it (for example, writer). If the project is not registered yet, the
+   service registers it at this point. Accounts checks that the person is in the
    workspace and that the operator may manage members, then saves the role.
    People who are not yet in the workspace are added through the one-step flow
    below.
 3. Member changes on the same project are processed one at a time, so the last
    owner can never be removed, even when two people act at once. Members can
    leave a project themselves, except the last owner.
-4. A project registered without an owner (for example, one that existed before
-   this feature) is managed through workspace roles until an owner is set.
+4. A project that existed before this feature may have no owner even after it
+   is registered with its first role. Until an owner is set, it is managed
+   through workspace roles.
 
 ### Adding people from the UI
 
@@ -1436,6 +1554,20 @@ diagrams)*.
    every service must take the seat count from accounts, not count members
    themselves, and some actions can now be refused when the workspace has no
    seat left.
+10. **No data migration.** Existing members, workspace roles, permission data
+    and projects are used as is, with no conversion and no bulk registration
+    (backfill). The new storage is created automatically on startup and stays
+    empty until the feature is used. With the default base permission and no
+    project roles, every permission check and seat count is the same as today.
+11. **The workspace of an unregistered project is up to the service.** For a
+    project that has never had a project role, accounts trusts the workspace
+    the service tells it. The service must read it from its own data, never
+    from user input. Once the project gets a project role and is registered,
+    accounts enforces it. Each service must register projects on creation and
+    before giving an existing project its first role. This is not a new risk:
+    every permission check today already decides by the workspace the service
+    passes, on the same assumption. For registered projects accounts also
+    checks it, so this is safer than today.
 
 Technical details: see *Solution Options → Option 1 → Technical notes: impact,
 tests, deployment, rollback, monitoring*.
@@ -1448,10 +1580,14 @@ tests, deployment, rollback, monitoring*.
 2. **Permission checks.**
    - Checks that do not name a project give exactly the same results as today,
      whatever the base permission.
-   - A project that was never registered → denied.
-   - Naming a workspace other than the project's own → denied.
-   - The user's workspace role is always taken from the project's real
-     workspace, not from what the caller says.
+   - An existing project that is not registered → decided by the workspace role
+     and base permission of the workspace the service tells accounts; exactly
+     today's result under the default base permission. Under "None", only
+     owners and maintainers can see it. If no workspace is given → denied.
+   - For a registered project, naming a workspace other than the project's own
+     → denied.
+   - For a registered project, the user's workspace role is always taken from
+     the project's real workspace, not from what the caller says.
    - With the default base permission, a workspace writer or reader without a
      project role keeps exactly the access their workspace role gives on every
      project.
@@ -1461,7 +1597,9 @@ tests, deployment, rollback, monitoring*.
 3. **Registering projects.** Only services can register (a user's login is
    rejected); the owner must be a workspace member; registering the same
    project again in the same workspace is harmless, but in a different
-   workspace it is rejected.
+   workspace it is rejected. New projects are registered on creation; existing
+   projects are registered only when they first get a project role. Existing
+   projects are never registered in bulk.
 4. **Managing members.** A project role can be given only to workspace members
    (people outside are added through the one-step addition in item 9); people
    without permission to manage members are refused; members can leave a
@@ -1477,7 +1615,9 @@ tests, deployment, rollback, monitoring*.
    gets both sets of project roles. Two admins each making a different person
    start using a seat when one seat is left → exactly one succeeds.
 7. **Every supported database**, including the database upgrade and its undo on
-   existing data, and existing users loading correctly with no project roles.
+   existing data; existing data is not changed; existing users load correctly
+   with no project roles; checks on existing projects with no registration give
+   the same results as today.
 8. **End to end.** With a sample Dashboard project policy, check the results for
    a workspace reader with and without a project role, a workspace writer with
    a lower project role, a workspace owner, a user from another workspace, and
@@ -1526,7 +1666,10 @@ tests, deployment, rollback, monitoring*.
 
 1. **Backward compatible? Yes.** Everything is added alongside what exists.
    Services that don't name a project in permission checks see no change, and
-   workspace members and roles do not change.
+   workspace members and roles do not change. Existing data (members, workspace
+   roles, permission data, projects) is used as is, with no conversion and no
+   bulk registration (backfill). With the default base permission and no project
+   roles, every permission check and seat count is the same as today.
 2. **Can it be rolled out gradually? Yes.** Order:
    1. Deploy accounts. It does not limit seats until billing tells it each
       workspace's seat limit.
@@ -1534,23 +1677,24 @@ tests, deployment, rollback, monitoring*.
       accounts' seat count. With the default base permission and no project
       roles yet, the count is identical to today's Dashboard rule (everyone
       except readers), so nobody's seat usage changes.
-   3. Each service registers its existing projects with accounts (a one-off
-      backfill).
-   4. Each service starts registering new projects when they are created and
-      telling accounts when they are deleted.
-   5. Each service turns on its project-level permission rules and starts naming
-      the project in permission checks. Until this step, project roles have no
+   3. Each service starts registering projects on creation and before giving an
+      existing project its first role, and telling accounts when they are
+      deleted. Existing projects are not registered.
+   4. Each service turns on its project-level permission rules and starts naming
+      the project in permission checks. Existing projects with no registration
+      give the same results as today. Until this step, project roles have no
       effect, so nobody gains access by mistake (fail-closed).
-   6. The UI for adding people in one step is turned on.
-   7. Services filter project lists by what each person may see; then the UI
+   5. The UI for adding people in one step is turned on.
+   6. Services filter project lists by what each person may see; then the UI
       for changing the base permission is turned on. Every workspace starts at
       "Follow workspace role", so nobody's access or seat usage changes until
       an admin changes something — the rollout is safe.
 3. **Who to notify:** the dashboard / visualizer / cms owners, the billing
    owner, and whoever maintains the permission policies.
 4. **Configuration changes:** none.
-5. **Database changes:** applied automatically when accounts starts. Accounts
-   itself does not need to convert any existing data.
+5. **Database changes:** applied automatically when accounts starts. Only new
+   storage is created; existing data is not converted. The new storage stays
+   empty until the feature is used. There is no data migration and no backfill.
 
 Technical details: see *Solution Options → Option 1 → Technical notes: impact,
 tests, deployment, rollback, monitoring*.
@@ -1570,8 +1714,9 @@ tests, deployment, rollback, monitoring*.
    ignores the new data, so **no data rollback is required**.
    Note: while the previous version runs, it may drop the project roles of users
    whose permission data it saves. This is acceptable because the feature is off
-   at that point; services re-run the backfill when the feature is rolled out
-   again. People added in one step stay workspace members.
+   at that point, but dropped roles do not come back by themselves (there is no
+   backfill) and must be granted again after rolling out again, so keep the
+   rollback window short. People added in one step stay workspace members.
 4. Only if the new data structures must be removed completely: run the database
    downgrade. It deletes all project registrations, project roles and base
    permission settings, so take a backup first.
@@ -1584,6 +1729,8 @@ tests, deployment, rollback, monitoring*.
 - Checklist
   - Create a project in Dashboard staging; check that it is registered and that
     the creator is its owner.
+  - Check that a project that existed before this feature can be seen exactly as
+    before. Give it its first role; check that it is registered at that point.
   - Make a workspace reader a writer on one project; check that they can edit
     that project and can still only view the others. Remove them from the
     workspace; check that they lose access to every project.
@@ -1677,6 +1824,13 @@ tests, deployment, rollback, monitoring*.
     maintainer and owner roles as "can edit" everywhere. Is that right for
     Visualizer, CMS and Flow, or does any service have a role that edits
     without being writer, or a writer that cannot really edit?
+14. **Is it fine to leave the workspace of unregistered projects to the
+    service?** For an existing project that has never had a project role, the
+    service tells accounts which workspace it belongs to, from its own data, and
+    accounts trusts it (as with today's permission checks). Once the project gets
+    a project role and is registered, accounts enforces it. Is this enough, or
+    should each service, in the future, gradually register existing projects too
+    so that accounts always enforces it (optional, and possible at any time)?
 
 Technical details: see *Solution Options → Option 1 → Technical notes on open
 questions*.
