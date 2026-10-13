@@ -94,7 +94,7 @@ steps:
   |---|---|---|
   | People outside the organization / workspace | *Outside collaborators* (access to a repository without being an organization member) | None. **Every person with access is a workspace member**, so SSO / SCIM, seats, the member list and removal are all managed in one place |
   | Per-member roles | Everyone except owners is a "member"; no per-person writer / reader distinction | Workspace writer / reader stay and govern workspace-level actions (e.g. creating projects) |
-  | Base permission values and default | Choose from none / read / write / admin, etc.; default is read | Adds "Follow workspace role" and makes it the default, so nothing changes unless an admin changes it |
+  | Base permission values and default | Choose from none / read / write / admin, etc.; default is read | Adds "Follow workspace role" and makes it the default; left at the default, behavior is the same as today's Re:Earth |
   | Seats | Every member is billed | Only members who can **edit** at least one project use a seat; view-only people are free (extends today's Dashboard rule that readers do not use a seat) |
 
 ### Current situation
@@ -194,7 +194,8 @@ permission.
 3. **Noticing on its own when a project is deleted.** The service that owns the
    project must tell accounts when it is deleted.
 4. **Nested resources and inherited permissions** (for example folder → project
-   → layer). These could be added later through permission policies.
+   → layer). These could be added later through permission policies, but are
+   out of scope this time.
 5. **Integrations as project members.** In the first version only people (user
    accounts) can be project members, not integrations or API tokens.
 6. **Using project properties in permission decisions** (for example "public"
@@ -1391,8 +1392,8 @@ Project role permissions: owner / maintainer — view, edit, delete and manage
 members; writer — view and edit; reader — view. With "Reader" or "Writer" as the
 base permission, workspace writers and readers get that level on every project,
 plus anything their project roles add (under "Writer" they all use a seat).
-People who are not workspace members have no access. Whether a single project can be opened to the whole workspace
-even under "None" is an open question.
+People who are not workspace members have no access. Whether a single project
+can be opened to the whole workspace even under "None" is an open question.
 
 Technical details: see *Solution Options → Option 1 → Request flows (sequence
 diagrams)*.
