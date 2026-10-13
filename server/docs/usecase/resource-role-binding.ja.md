@@ -815,7 +815,7 @@ sequenceDiagram
     U->>S: add D to project P1 (a)<br/>or add D to ws with projects P1, P2 (b)
     S->>A: userByNameOrEmail(...) → D's userId
     S->>A: addWorkspaceMemberWithResourceRoles(ws, D, reader, [(kind,P1,writer), ...]) (U's JWT)
-    A->>A: begin tx; lock ws
+    A->>A: begin tx, lock ws
     A->>A: each Pn registered in ws?
     A->>C: manage_members on each Pn for U?
     alt D ∉ ws
