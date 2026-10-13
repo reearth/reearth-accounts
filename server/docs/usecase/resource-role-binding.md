@@ -76,19 +76,26 @@ steps:
   With the base permission set to "None", members see only the projects they
   were given a role on — this is how teams in one workspace are kept apart, and
   how a partner company's staff can be given just one project.
-- Two deliberate differences from GitHub:
-  - GitHub also has *outside collaborators* (people with access to a repository
-    without being organization members). Re:Earth deliberately does not: **every
-    person with access is a workspace member**, so all of them are managed in
-    one place — SSO / SCIM, seats, the member list, and removal.
-  - GitHub members have no per-person writer / reader distinction. In Re:Earth
-    the workspace roles writer / reader stay and keep governing workspace-level
-    actions (for example, creating projects); access to projects comes from the
-    base permission plus project roles.
-  - GitHub charges a seat for every member. In Re:Earth a member uses a seat
-    only if they can **edit** at least one project; people who can only view
-    are free. This extends today's Dashboard rule, where workspace readers do
-    not use a seat, to per-project access.
+
+  For example, what a workspace reader can see depends on the base permission:
+
+  | Base permission | Projects a workspace reader can see |
+  |---|---|
+  | Follow workspace role (default) | Can view every project (same as today's Re:Earth) |
+  | Reader | Can view every project |
+  | Writer | Can view and edit every project |
+  | None | Only the projects where they have a project role |
+
+  Under every setting, on a project where they have a project role, their
+  access goes up to that role (e.g. writer on project P → can edit P).
+- Differences from GitHub:
+
+  | Aspect | GitHub | Re:Earth |
+  |---|---|---|
+  | People outside the organization / workspace | *Outside collaborators* (access to a repository without being an organization member) | None. **Every person with access is a workspace member**, so SSO / SCIM, seats, the member list and removal are all managed in one place |
+  | Per-member roles | Everyone except owners is a "member"; no per-person writer / reader distinction | Workspace writer / reader stay and govern workspace-level actions (e.g. creating projects) |
+  | Base permission values and default | Choose from none / read / write / admin, etc.; default is read | Adds "Follow workspace role" and makes it the default, so nothing changes unless an admin changes it |
+  | Seats | Every member is billed | Only members who can **edit** at least one project use a seat; view-only people are free (extends today's Dashboard rule that readers do not use a seat) |
 
 ### Current situation
 

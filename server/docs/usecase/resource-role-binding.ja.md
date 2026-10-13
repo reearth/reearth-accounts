@@ -67,16 +67,26 @@
 
   基本権限を「なし」にすると、メンバーはロールを与えられた project だけを見られます。これにより、
   1つの workspace の中でチームを分けたり、取引先の担当者に1つの project だけを見せたりできます。
-- GitHub との意図的な違いが2つあります。
-  - GitHub には *outside collaborator*（organization のメンバーではないが repository にアクセスできる人）も
-    あります。Re:Earth ではこれを意図的に設けません。**アクセスできる人は全員 workspace のメンバー**
-    なので、SSO / SCIM、シート、メンバー一覧、削除をすべて1か所で管理できます。
-  - GitHub のメンバーには、人ごとの writer / reader の区別がありません。Re:Earth では workspace の
-    writer / reader のロールを残し、workspace 単位の操作（例: project の作成）は引き続きこのロールで
-    決まります。project へのアクセスは、基本権限と project のロールで決まります。
-  - GitHub はメンバー全員にシートを課金します。Re:Earth では、少なくとも1つの project を **編集**
-    できるメンバーだけがシートを使い、閲覧しかできない人は無料です。これは、workspace の reader は
-    シートを使わないという今の Dashboard のルールを、project 単位のアクセスに広げたものです。
+
+  たとえば workspace の reader が見られる project は、基本権限によって次のように変わります。
+
+  | 基本権限 | workspace の reader が見られる project |
+  |---|---|
+  | workspace のロールに従う（デフォルト） | すべての project を閲覧できる（今の Re:Earth と同じ） |
+  | Reader | すべての project を閲覧できる |
+  | Writer | すべての project を閲覧・編集できる |
+  | なし | project のロールを持つ project だけ |
+
+  どの設定でも、project のロールを持つ project では、そのロールまで権限が上がります
+  （例: project P の writer なら P を編集できる）。
+- GitHub との違いは次のとおりです。
+
+  | 観点 | GitHub | Re:Earth |
+  |---|---|---|
+  | organization / workspace の外の人 | *outside collaborator*（organization のメンバーではないが repository にアクセスできる人）がいる | 設けない。**アクセスできる人は全員 workspace のメンバー** なので、SSO / SCIM、シート、メンバー一覧、削除をすべて1か所で管理できる |
+  | メンバーごとのロール | owner 以外は全員 member で、人ごとの writer / reader の区別はない | workspace の writer / reader を残す。workspace 単位の操作（例: project の作成）はこのロールで決まる |
+  | 基本権限の選択肢とデフォルト | none / read / write / admin などから選ぶ。デフォルトは read | 「workspace のロールに従う」を加え、これをデフォルトにする。デフォルトのままなら今の Re:Earth と同じ挙動 |
+  | シート | メンバー全員が課金対象 | 少なくとも1つの project を **編集** できるメンバーだけがシートを使う。閲覧しかできない人は無料（今の Dashboard の「reader はシートを使わない」を project 単位に広げたもの） |
 
 ### 現状
 
