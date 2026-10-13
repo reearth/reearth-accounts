@@ -26,6 +26,16 @@
   workspaces freely, and there was a request to make workspace creation
   restrictable via an option. With that restriction, a single workspace would
   have to hold many projects.
+  Why an organization using SSO wants to restrict workspace creation:
+  - **Company data stays under the company's control.** If anyone can create a
+    workspace, employees can put company projects and data in workspaces that
+    the organization's administrators cannot see or manage.
+  - **Leaving the company really cuts off access.** SSO / SCIM removes a
+    departing employee from the organization's workspaces, but workspaces they
+    created themselves stay outside that control, along with the data in them.
+  - **Members are managed in one place.** Administrators want to manage who can
+    access what in the organization's workspace, instead of chasing many
+    workspaces created by individual employees.
 - Today members can only be assigned per workspace, so customers manage members
   workspace by workspace — even though the people involved differ from project
   to project. When customers want to share a project across workspaces, they
