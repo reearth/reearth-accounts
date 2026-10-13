@@ -1361,6 +1361,13 @@ changed. With the base permission "Follow workspace role", a person added as a
 reader can still view every project; to limit them to the chosen projects, the
 workspace uses "None".
 
+**To decide (UI/UX): where membership is managed.** We need to decide, from a
+UI/UX point of view, whether project members (including patterns (a) and (b)
+above) are managed **only from the Dashboard**, or **also from each service**
+(visualizer / cms / flow). accounts works the same either way, but the choice
+decides which services need UI work and where users go to manage access. To be
+decided together with the designer (*Open Question 6*).
+
 ### Removing people
 
 - **Removing a person from the workspace** removes their workspace role and all

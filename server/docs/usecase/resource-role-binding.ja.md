@@ -1233,6 +1233,12 @@ Re:Earth は workspace ごとのシート単位で課金される。**workspace 
 ロールは変えない。基本権限が「workspace のロールに従う」の場合、reader として追加した人は引き続き
 すべての project を閲覧できる。選んだ project だけに限るには、workspace を「なし」にする。
 
+**要決定（UI/UX）: メンバーをどこで管理するか。** UI/UX の観点で、project のメンバー管理（上の
+パターン (a)・(b) を含む）を **Dashboard からのみ** 行えるようにするか、**各サービス**（visualizer /
+cms / flow）**からも** 行えるようにするかを決める必要がある。accounts の仕組みはどちらでも変わらないが、
+どのサービスに UI の対応が必要か、ユーザーがどこでアクセスを管理するかが変わる。デザイナーと合わせて
+決める（*Open Question 6*）。
+
 ### 人を外す
 
 - **workspace から人を外す** と、その人の workspace のロールと、その workspace 内のすべての project の
