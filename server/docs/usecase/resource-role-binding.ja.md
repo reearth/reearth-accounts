@@ -43,31 +43,6 @@
   同じ workspace の中で「user A は project P を編集できるが project Q は編集できない」といった
   指定はできません。
 
-#### 実装の詳細（参考）
-
-- reearth-accounts は Re:Earth プラットフォームの認可のハブです。ユーザーのロールは
-  `permittable.Permittable` 集約（`server/pkg/permittable/permittable.go`）に保存されています。
-  - `roleIDs`: グローバルロール
-  - `workspaceRoles`: `(workspaceID, roleID)` の組。メンバーシップが変わるたびに
-    `Workspace` interactor が更新します
-    （`server/internal/usecase/interactor/workspace.go` の `updatePermittable` / `bulkRemovePermittable`）。
-- `Query.checkPermission(service, resource, action, workspaceAlias)` は、
-  *グローバルロール + その workspace のロール* から Cerbos principal を組み立て、
-  リソース種別 `"<service>:<resource>"` に対して判定します
-  （`server/internal/usecase/interactor/cerbos.go`）。入力には
-  **リソースのインスタンス ID がありません**。リソース ID は
-  service / resource / workspaceAlias / userId から合成されています。
-- `dashboard:project` のようなリソース種別は、すでに Cerbos ポリシーとして存在します。
-  これらは各サービスの `definition.go` から reearthx の `cerbos/generator`
-  （`NewActionDefinition` / `NewActionDefinitionWithCondition`）で生成されています。
-  accounts は `"<service>:<resource>"` を解釈しない文字列として扱っています。
-- サービス間（M2M）の呼び出しは、設定された API キーで認証されます
-  （`internal/adapter/http/middleware_apikey.go`）。
-- 現在の永続化は permittable のスナップショット全体を保存します。Mongo はドキュメントを置き換え、
-  Postgres は行を upsert したうえで `permittable_workspace_roles` の子行をすべて削除・再挿入します
-  （`internal/infrastructure/postgres/permittable.go`）。Postgres の読み込みでは、
-  2回目のクエリで子行を取得して組み立てています。
-
 ### 課題
 
 プロダクトでは **project 単位のメンバーシップ** が必要です。たとえば

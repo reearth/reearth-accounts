@@ -45,34 +45,6 @@
   about, not *which project*. There is no way to say "user A can edit project P
   but not project Q" within the same workspace.
 
-#### Implementation details (for reference)
-
-- reearth-accounts is the authorization hub for the Re:Earth platform. A user's
-  roles are stored on the `permittable.Permittable` aggregate
-  (`server/pkg/permittable/permittable.go`):
-  - `roleIDs` — global roles
-  - `workspaceRoles` — `(workspaceID, roleID)` pairs, maintained by the
-    `Workspace` interactor whenever membership changes
-    (`updatePermittable` / `bulkRemovePermittable` in
-    `server/internal/usecase/interactor/workspace.go`).
-- `Query.checkPermission(service, resource, action, workspaceAlias)` builds a
-  Cerbos principal from *global roles + the roles of that workspace* and checks
-  resource kind `"<service>:<resource>"`
-  (`server/internal/usecase/interactor/cerbos.go`). There is **no resource
-  instance ID** in the input; the resource ID is synthesized from
-  service/resource/workspaceAlias/userId.
-- Resource kinds such as `dashboard:project` already exist as Cerbos policies,
-  generated from each service's `definition.go` with the reearthx
-  `cerbos/generator` (`NewActionDefinition` / `NewActionDefinitionWithCondition`).
-  Accounts treats `"<service>:<resource>"` as an opaque string.
-- Service-to-service (M2M) calls are authenticated with a configured API key
-  (`internal/adapter/http/middleware_apikey.go`).
-- Persistence today saves the whole permittable snapshot: Mongo replaces the
-  document; Postgres upserts the row and deletes/re-inserts every
-  `permittable_workspace_roles` child row
-  (`internal/infrastructure/postgres/permittable.go`). Postgres reads hydrate
-  child rows with a second query.
-
 ### Problem
 
 Products need **project-level membership**: "user A is an editor of project P,
