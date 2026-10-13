@@ -33,9 +33,10 @@
   組織として機能させられます。SSO / SCIM とは別の機能ですが、ワークスペースの作成を
   制限できるようになった時点で使えるよう、早めに実装できる状態にしたいと考えています。
 - 目指すモデルは GitHub に近いものです。workspace と project の関係は、GitHub の
-  organization と repository の関係に相当します。GitHub に organization member と
-  repository member の両方があるのと同様に、Re:Earth にも workspace member と
-  project member の両方を持たせます。
+  organization と repository の関係に相当します。GitHub に organization member、
+  repository member、そして *outside collaborator*（organization には所属せず、特定の
+  repository にだけアクセスできる人）があるのと同様に、Re:Earth にも workspace member、
+  project member、外部コラボレーターを持たせます。
 
 ### 現状
 
@@ -45,15 +46,14 @@
   workspace に参加すると、その workspace のすべての project に対して同じロールを持つことになります。
 - そのため権限チェックで分かるのは「どの workspace か」だけで、「どの project か」は分かりません。
   同じ workspace の中で「user A は project P を編集できるが project Q は編集できない」といった
-  指定はできません。
+  指定はできず、workspace 外の人に1つの project だけへのアクセスを与えることもできません。
 
 ### 課題
 
 プロダクトでは **project 単位のメンバーシップ** が必要です。たとえば
 「workspace の reader である user A を project P の editor にする」や、
-「project P だけに（workspace 全体ではなく）追加された user B は、workspace 内のほかの project を
-見られない」といったものです。
-現在 accounts が表現できる最も細かい単位は workspace です。
+「workspace に所属していない user B は project P でだけ作業でき、workspace 内のほかの project は
+見られない」といったものです。現在 accounts が表現できる最も細かい単位は workspace です。
 
 各サービスが project のメンバーシップを独自に実装すると、次の問題が起きます。
 
@@ -62,8 +62,8 @@
    （workspace からのユーザー削除、workspace の削除）に反応しなければならない。
    その情報を持つのは accounts だけなので、サービスごとにイベントや同期の仕組みが必要になる。
    取りこぼすと、すでに抜けた workspace の project にユーザーがアクセスできてしまう。
-3. 「project member は workspace のメンバーでなければならない」という制約を、
-   結局 accounts を呼ばずにサービス内だけで検証することはできない。
+3. 「project member は、workspace のメンバーか、その project に明示的に招待された外部コラボレーターの
+   どちらかである」という制約を、結局 accounts を呼ばずにサービス内だけで検証することはできない。
 4. 権限のルールが 1 か所（accounts）で判定されず、各サービスにばらばらに散らばる。
 
 ### 制約（この設計の形を決めている理由）
@@ -71,37 +71,39 @@
 accounts は *project* が何であるかを取り込んではいけません。project の存在、名前、
 公開範囲、中身、ライフサイクルは引き続き各サービスが持ちます。accounts が持つのは、
 権限の判定に必要な「この project はこの workspace に属し、このユーザーはそれに対して
-このロールを持つ」という情報だけです。
+このロールを持つ（workspace メンバーとして、または外部コラボレーターとして）」という情報だけです。
 
 ## Goals
 
 1. **project ごとにメンバーとロールを設定できる。** workspace 全体だけでなく、特定の project
    に対してロールを与えられる。モデルは次のとおり。
-   - **通常の workspace メンバー**（owner / maintainer / writer / reader）は、今と同じく workspace の
+   - **workspace メンバー**（owner / maintainer / writer / reader）は、今と同じく workspace の
      ロールによって workspace 内の **すべての** project を見られる。project のロールは、その project での
      アクセスを **引き上げる** ことはできる（例: workspace の reader を project P の writer にすると P を
      編集できる）が、引き下げることはない。
-   - **限定メンバー**（特定の project だけに追加された人。Goal 7 を参照）は、project のロールを持つ
-     project **だけ** を見られる。
+   - **外部コラボレーター**（名前は仮）は、workspace のメンバー **ではない** が、特定の project で
+     ロールを与えられた人。その project **だけ** を見て操作でき、有効なのは project のロールだけ。
 2. **権限チェックで、対象の project を考慮できる。** サービスが accounts に「このユーザーは
    この操作をしてよいか」と問い合わせたとき、その project でのユーザーのロールを踏まえて判定できる。
    判定には常にその project が実際に属する workspace を使うため、呼び出し側が別の workspace を
    指定してアクセスを得ることはできない。
-3. **メンバーの整合性が保たれる。** project は必ず1つの workspace に属し、一度 owner が
-   設定されたら owner が0人になることはない。複数人が同時にメンバーを変更しても崩れない。
-4. **workspace から外れると project へのアクセスもなくなる。** ユーザーを workspace から外すと、
-   その workspace 内のすべての project でのロールも自動で取り消される。各サービスが個別に
-   後始末をする必要はない。
+3. **メンバーの整合性が保たれる。** project は必ず1つの workspace に属し、project member は必ず
+   workspace のメンバーかその project の外部コラボレーターのどちらかであり、一度 owner が設定されたら
+   owner が0人になることはない。複数人が同時にメンバーを変更しても崩れない。
+4. **外れるとアクセスもなくなる。** ユーザーを workspace から外すと、その workspace 内のすべての
+   project でのロールも自動で取り消される。外部コラボレーターが workspace 内の最後の project から
+   外れると、その workspace との関係はなくなる。各サービスが個別に後始末をする必要はない。
 5. **accounts は汎用的なままにする。** accounts は「project」が何かを知らない。どのサービスも、
    権限ポリシーを追加するだけで、自分のリソース（例: CMS のモデル）に同じ仕組みを使える。
    accounts の変更は不要。
 6. **既存の動作を壊さない。** 現在の権限チェックとポリシーは、これまでとまったく同じように動く。
 7. **一部の project だけへのアクセスを1ステップで与えられる。** UI から管理者は、人を project に
-   直接追加する（まだ workspace にいなければ同時に workspace にも追加する）ことも、workspace に人を
-   追加するときに見られる project を選ぶこともできる。どちらも、すべて成功するか何も変わらないかの
-   1ステップで行う。この方法で追加された人は、ロールを与えられた project だけが見える
-   *限定メンバー* として workspace に所属する。通常の workspace メンバーは引き続きすべての project を
-   見られる（*Design → UI からの追加* を参照）。
+   直接追加する（workspace にいなければ外部コラボレーターになる）ことも、workspace のメンバー画面から
+   選んだ project の外部コラボレーターとして人を招待することもできる。どちらも、すべて成功するか
+   何も変わらないかの1ステップで行う（*Design → UI からの追加* を参照）。
+8. **シートを GitHub と同じように数える。** 外部コラボレーターは、workspace 内のいくつの project に
+   参加していても workspace のシートを1つ使い、追加するときには workspace のシートの上限が適用される。
+   accounts は課金に必要な数を提供できる。
 
 ## Non-Goals
 
@@ -130,10 +132,13 @@ accounts は *project* が何であるかを取り込んではいけません。
    保存するデータを小さく予測しやすい状態に保つ。
 3. **現実的な規模を想定する。** 1ユーザーあたりの project ロールの割り当ては約 1,000 件まで、
    1 project あたりのメンバーは約 1,000 人まで。
-4. **project のメンバー一覧をすばやく取得できる。** 返すのはメンバーが誰かとそのロールだけで、
-   名前などの詳細はサービス側が持つ。
+4. **project のメンバー一覧をすばやく取得できる。** 返すのはメンバーが誰か、そのロール、そして
+   それぞれが workspace メンバーか外部コラボレーターかだけで、名前などの詳細はサービス側が持つ。
 5. **accounts が対応するすべてのデータベースで動く。** どのデータベースを使う環境でも、
    メンバーの変更は同じように動作する。
+6. **workspace ごとのシート数を取得できる。** accounts は、workspace の外部コラボレーターが
+   何人いるかをすばやく返せる（1人は1回だけ数え、メンバーでもある人は重ねて数えない）。課金は
+   これを使って、シート数を workspace メンバー + 外部コラボレーターとして数えられる。
 
 技術的な詳細: *Solution Options → Option 1 → 詳細な要件* を参照。
 
@@ -144,12 +149,13 @@ accounts は *project* が何であるかを取り込んではいけません。
 
 ### Option 1（推奨）: リソース登録 + `Permittable` に埋め込んだロールの割り当て
 
-2つの状態を持ちます。どちらも accounts にとっては中身を解釈しないものです。
+3つの状態を持ちます。いずれも accounts にとっては中身を解釈しないものです。
 
 | 状態 | 目的 |
 |---|---|
 | **リソース登録** `(resourceKind, resourceID) → workspaceID, version` | リソースの workspace の範囲を正として持つ。所有するサービスが登録したことの証明。不変条件のためのリソース単位の直列化ポイント |
-| `Permittable` 上の **リソースロール** `(workspaceID, resourceKind, resourceID, roleID)` | そのリソースに対するユーザーのロール。permittable と一緒に読むので、参照のための追加読み込みは不要 |
+| `Permittable` 上の **リソースロール** `(workspaceID, resourceKind, resourceID, roleID, grant)` | そのリソースに対するユーザーのロールと、それが workspace メンバーと外部コラボレーターのどちらに与えられたか。permittable と一緒に読むので、参照のための追加読み込みは不要 |
+| **workspace ロック** `workspaceID → version` | ユーザーがメンバーか外部コラボレーターかを決めるすべての処理と、シートの上限のための、workspace 単位の直列化ポイント |
 
 #### ドメイン
 
@@ -173,7 +179,15 @@ type Permittable struct {
     workspaceRoles []WorkspaceRole
 }
 
+type Grant string
+
+const (
+    GrantMember       Grant = "member"       // granted to a workspace member
+    GrantCollaborator Grant = "collaborator" // granted to an outside collaborator
+)
+
 type ResourceRole struct {
+    grant        Grant
     resourceID   resource.ID
     resourceKind resource.Kind
     roleID       role.ID
@@ -181,23 +195,25 @@ type ResourceRole struct {
 }
 ```
 
-`ResourceRole(kind, id)` は、**ユーザーがまだ `workspaceID` の workspace ロールを持っている場合に限り**、
-そのリソースに対するユーザーのロールを返します（読み込み時のガード。*並行性* を参照）。
-ロールはユーザーごとに `(kind, id)` 1つにつき1つです。accounts のどこにも、`kind` で
-`switch` する処理はありません。
+**読み込み時のガード。** `ResourceRole(kind, id)` は、そのリソースに対するユーザーのロールが
+まだ有効な場合にだけ返します。
+
+- `grant = member`: **ユーザーが `workspaceID` の workspace ロールを持っている間だけ** 有効（従来どおり）。
+- `grant = collaborator`: それ単独で有効。ユーザーは workspace ロールを持たない前提。
+
+ユーザーが workspace のメンバーかどうかを変えるすべての操作は、同じトランザクションの中で、その
+ユーザーのロールの割り当ての `grant` も書き換えます（*ライフサイクルと連動削除* を参照）。そうした操作は
+すべて workspace ロックで直列化されるので、コミット後に両者が食い違うことはありません。ガードは
+多層防御として残します。ロールはユーザーごとに `(kind, id)` 1つにつき1つです。accounts のどこにも、
+`kind` で `switch` する処理はありません。
+
+**workspace W の外部コラボレーター** とは、`workspaceID` が W である有効な `collaborator` のロールの
+割り当てを1つ以上持つユーザーのことです。これは保存するものではなく導出するもので、外部コラボレーター
+専用のレコードはありません。そのため最後の割り当てを外すと、関係（とシート）は自動的になくなります。
+外部コラボレーターが workspace のメンバー一覧や `Permittable.workspaceRoles` に現れることはありません。
 
 ロールは既存の `roles` テーブル（`owner` / `maintainer` / `writer` / `reader`）を再利用します。
 リソース種別ごとのロールの意味は、その種別の Cerbos ポリシーだけで定義します。
-
-**限定 workspace ロール（名前は仮: `limited`）。** workspace に所属するが、リソースロールを持つ
-リソースだけを見られるようにする人のための、新しい workspace ロールの値です（GraphQL の `Role` enum と
-`role.RoleType` に追加）。通常の workspace ロールと同じく、workspace のメンバー一覧と
-`Permittable.workspaceRoles` に保存され、workspace のメンバー数（シート）の上限に数えられ、
-「対象ユーザーは workspace のメンバーでなければならない」というチェックと読み込み時のガードの両方を
-満たします。それ自体では何の権限も与えません（*権限チェック* のポリシーに関する補足を参照）。
-workspace ロールとしてのみ有効で、`setResourceMember` と `addWorkspaceMemberWithResourceRoles` は
-リソースロールとしての指定を拒否します。既存の `updateUserOfWorkspace` で owner 以外のほかのロールとの間で
-変更でき、その変更はリソースロールには触れません。
 
 #### ストレージ
 
@@ -221,6 +237,7 @@ CREATE TABLE permittable_resource_roles (
     resource_id    text NOT NULL,
     workspace_id   text NOT NULL,
     role_id        text NOT NULL,
+    grant_type     text NOT NULL CHECK (grant_type IN ('member', 'collaborator')),
     PRIMARY KEY (permittable_id, resource_kind, resource_id),
     FOREIGN KEY (resource_kind, resource_id)
         REFERENCES resource_registrations (resource_kind, resource_id) ON DELETE CASCADE
@@ -228,11 +245,17 @@ CREATE TABLE permittable_resource_roles (
 CREATE INDEX permittable_resource_roles_resource_idx
     ON permittable_resource_roles (resource_kind, resource_id);
 CREATE INDEX permittable_resource_roles_workspace_idx
-    ON permittable_resource_roles (workspace_id, permittable_id);
+    ON permittable_resource_roles (workspace_id, grant_type, permittable_id);
+
+CREATE TABLE resource_workspace_locks (
+    workspace_id text PRIMARY KEY,
+    version      bigint NOT NULL DEFAULT 0
+);
 ```
 
 ```sql
 -- 0005_resource_role_binding.down.sql
+DROP TABLE IF EXISTS resource_workspace_locks;
 DROP TABLE IF EXISTS permittable_resource_roles;
 DROP TABLE IF EXISTS resource_registrations;
 ```
@@ -242,9 +265,10 @@ DROP TABLE IF EXISTS resource_registrations;
 - 新しいコレクション `resource_registrations` を追加します。`{ resource_kind: 1, resource_id: 1 }`
   に一意インデックス、`{ workspace_id: 1 }` にインデックスを張ります
   （スキーマは `mongoschemagen` で登録し、`server/CLAUDE.md` の手順に従ってマイグレーションを追加）。
-- permittable ドキュメントに任意の配列 `resource_roles` を追加します。インデックスは
-  `{ "resource_roles.resource_kind": 1, "resource_roles.resource_id": 1 }` と
-  `{ "resource_roles.workspace_id": 1 }` です。
+- permittable ドキュメントに任意の配列 `resource_roles` を追加します（各要素は `grant` を持つ）。
+  インデックスは `{ "resource_roles.resource_kind": 1, "resource_roles.resource_id": 1 }` と
+  `{ "resource_roles.workspace_id": 1, "resource_roles.grant": 1 }` です。
+- 新しいコレクション `resource_workspace_locks`（`_id` = workspace ID、`version`）を追加します。
 
 #### リポジトリの変更（スナップショットではなく対象を絞った書き込み）
 
@@ -266,22 +290,32 @@ FindByKey(ctx, kind, id) (*resource.Registration, error)
 Create(ctx, r resource.Registration) error              // ErrAlreadyExists on duplicate
 LockForUpdate(ctx, kind, id) (*resource.Registration, error) // must run inside a transaction
 Remove(ctx, kind, id) error                              // also removes all role assignments
+RemoveInWorkspace(ctx, workspaceID) error                // all registrations + role assignments
+
+// resource.WorkspaceLockRepo
+Lock(ctx, workspaceID) error // must run inside a transaction; creates the row on first use
 
 // permittable.Repo (additions)
-FindResourceMembers(ctx, kind, id) ([]permittable.ResourceMember, error) // projection: userID + roleID
+FindResourceMembers(ctx, kind, id) ([]permittable.ResourceMember, error) // projection: userID + roleID + grant
 CountResourceOwners(ctx, kind, id, ownerRoleID) (int, error)
 UpsertResourceRole(ctx, userID, r permittable.ResourceRole) error
 DeleteResourceRole(ctx, userID, kind, id) error
-DeleteResourceRolesInWorkspace(ctx, workspaceID, userIDs) error
+DeleteResourceRolesInWorkspace(ctx, workspaceID, userIDs, grant *Grant) error // nil = both grants
+ConvertResourceGrants(ctx, workspaceID, userIDs, from, to Grant) error
+FindOutsideCollaborators(ctx, workspaceID) ([]permittable.OutsideCollaborator, error) // userID + bindings
+CountOutsideCollaborators(ctx, workspaceID) (int, error) // distinct users
 ```
 
 | 操作 | Mongo | Postgres |
 |---|---|---|
-| `UpsertResourceRole` | 単一ドキュメントの更新: `(kind,id)` の要素を `$pull` してから新しい要素を `$push`（集約パイプラインを使った1回の `updateOne`） | `INSERT … ON CONFLICT (permittable_id, resource_kind, resource_id) DO UPDATE SET role_id = …` |
+| `UpsertResourceRole` | 単一ドキュメントの更新: `(kind,id)` の要素を `$pull` してから新しい要素を `$push`（集約パイプラインを使った1回の `updateOne`） | `INSERT … ON CONFLICT (permittable_id, resource_kind, resource_id) DO UPDATE SET role_id = …, grant_type = …` |
 | `DeleteResourceRole` | `$pull` | `DELETE … WHERE permittable_id=$1 AND resource_kind=$2 AND resource_id=$3` |
-| `DeleteResourceRolesInWorkspace` | `updateMany` + `$pull {workspace_id}` | `DELETE … WHERE workspace_id=$1 AND permittable_id = ANY($2)` |
-| `FindResourceMembers` | 集約 `$match` → `$unwind` → `$match` → `$project {user_id, role_id}` | `SELECT p.user_id, r.role_id FROM permittable_resource_roles r JOIN permittables p …` |
+| `DeleteResourceRolesInWorkspace` | `updateMany` + `$pull {workspace_id[, grant]}` | `DELETE … WHERE workspace_id=$1 AND permittable_id = ANY($2) [AND grant_type=$3]` |
+| `ConvertResourceGrants` | `{workspace_id, grant: from}` を `arrayFilters` にした `updateMany` → `$set grant: to` | `UPDATE … SET grant_type=$4 WHERE workspace_id=$1 AND permittable_id = ANY($2) AND grant_type=$3` |
+| `FindResourceMembers` | 集約 `$match` → `$unwind` → `$match` → `$project {user_id, role_id, grant}` | `SELECT p.user_id, r.role_id, r.grant_type FROM permittable_resource_roles r JOIN permittables p …` |
+| `CountOutsideCollaborators` / `FindOutsideCollaborators` | 集約 `$match {resource_roles: {$elemMatch: {workspace_id, grant: "collaborator"}}}` → 件数 / 射影 | `SELECT count(DISTINCT permittable_id) … WHERE workspace_id=$1 AND grant_type='collaborator'`（インデックスのみで完結） |
 | `LockForUpdate` | トランザクション内で `findOneAndUpdate {$inc: {version: 1}}`（同じ登録に対する並行トランザクションは書き込み競合となり、リトライされる） | `SELECT … FOR UPDATE` |
+| `WorkspaceLock.Lock` | トランザクション内で `findOneAndUpdate {_id: ws} {$inc: {version: 1}}, upsert`（書き込み競合 → リトライ） | `INSERT … ON CONFLICT DO NOTHING` の後に `SELECT … FOR UPDATE` |
 
 #### 権限チェック
 
@@ -304,34 +338,38 @@ input CheckPermissionInput {
 1. 登録 `(service:resource, resourceId)` を読み込む。**見つからなければ拒否。**
 2. `workspaceAlias` が指定されていて、それが登録の `workspaceID` に解決されなければ **拒否**。
 3. principal のロール = グローバルロール + **登録の `workspaceID`** におけるユーザーの workspace ロール
-   （呼び出し元は workspace を選べない）。
-4. principal の属性 `resourceRole` = このリソースでユーザーに割り当てられたロール。
-   割り当てがない場合（または読み込み時のガードで除外された場合）は `""`。
+   （呼び出し元は workspace を選べない）。ユーザーがその workspace のロールを持たず、このリソースに
+   有効な `collaborator` のロールの割り当てを持つ場合は、評価時だけのロール `outside_collaborator` を
+   加える（保存はしない。Cerbos に空でないロールの一覧を渡し、ポリシーが外部コラボレーターを識別できる
+   ようにするため）。
+4. principal の属性 `resourceRole` = 読み込み時のガードを通過した、このリソースでのユーザーのロール。
+   なければ `""`。
 5. Cerbos のリソース ID は実際の `resourceId` にする。
+
+**デフォルトのモデル。** workspace メンバー（`owner` / `maintainer` / `writer` / `reader`）では、
+実効ロール = max(workspace ロール, リソースロール) です。今と同じく workspace ロールが workspace のすべての
+リソースに対するアクセスを与え、リソースロールはそれに加算されるだけです。外部コラボレーターでは
+リソースロールだけが有効です。各ロールの意味は両方のレベルで同じ（`owner` / `maintainer`: すべての操作と
+メンバー管理、`writer`: 閲覧と編集、`reader`: 閲覧）なので、ポリシーは操作ごとに「workspace ロールの
+ルール」と「`resourceRole` の条件のルール」の和集合として max を表現します。Cerbos はどちらかが
+マッチすれば許可します。
 
 ポリシーは引き続き各サービスの `definition.go` に置き、reearthx の generator がすでに
 サポートしている条件を使います。`dashboard:project` の例:
 
-**デフォルトのモデル: 実効ロール = max(workspace ロール, リソースロール)。** 通常の workspace ロール
-（`owner` / `maintainer` / `writer` / `reader`）では、今と同じく workspace ロールが workspace のすべての
-リソースに対するアクセスを与え、リソースロールはそれに加算されるだけです。`limited` では、リソースロール
-だけが有効です。各ロールの意味は両方のレベルで同じ（`owner` / `maintainer`: すべての操作とメンバー管理、
-`writer`: 閲覧と編集、`reader`: 閲覧）なので、ポリシーは操作ごとに「workspace ロールのルール」と
-「`resourceRole` の条件のルール」の和集合として max を表現します。Cerbos はどちらかがマッチすれば許可します。
-
 ```go
 // dashboard: definition.go
 resourceRole := func(expr string) *generator.Condition { return generator.SimpleExpr(expr) }
-any := []string{"*"} // any principal role (including limited); the condition does the gating
+any := []string{"*"} // any principal role (including outside_collaborator); the condition does the gating
 
 builder.AddResource("project", []generator.ActionDefinition{
-    // regular workspace members: access to every project of the workspace via the workspace role
-    // ("limited" is never listed here)
+    // workspace members: access to every project of the workspace via the workspace role
+    // ("outside_collaborator" is never listed here)
     generator.NewActionDefinition("read", []string{"owner", "maintainer", "writer", "reader"}),
     generator.NewActionDefinition("edit", []string{"owner", "maintainer", "writer"}),
     generator.NewActionDefinition("delete", []string{"owner", "maintainer"}),
     generator.NewActionDefinition("manage_members", []string{"owner", "maintainer"}),
-    // project roles: add on top of the workspace role; the only source of access for limited members
+    // project roles: add on top of the workspace role; the only source of access for outside collaborators
     generator.NewActionDefinitionWithCondition("read", any, resourceRole(`P.attr.resourceRole != ""`)),
     generator.NewActionDefinitionWithCondition("edit", any, resourceRole(`P.attr.resourceRole in ["owner", "maintainer", "writer"]`)),
     generator.NewActionDefinitionWithCondition("delete", any, resourceRole(`P.attr.resourceRole in ["owner", "maintainer"]`)),
@@ -342,14 +380,14 @@ builder.AddResource("project", []generator.ActionDefinition{
 リソースロールは principal のロールではなく principal の **属性** として渡されるので、
 project の `owner` が workspace の `owner` と取り違えられることはありません。project のロールは、
 チェックで指定されたリソースに対してだけ有効です。プロダクトがこのデフォルトより厳しいルール
-（例: 通常の workspace メンバーにも見えない private な project）を適用できるかは Open Question 1 で扱います。
+（例: workspace メンバーにも見えない private な project）を適用できるかは Open Question 1 で扱います。
 
-**限定 workspace ロールに関するポリシーの補足。** 各サービスのポリシーは、`limited` に
-`P.attr.resourceRole` の条件以外では何も許可してはいけません。上の例のように明示的なロールの一覧で
-許可するルールはもともと `limited` を含まないので、デフォルトで拒否されます（安全側に倒れる）。
-`resourceRole` の条件なしで `*` に許可するルールと、workspace 単位のリソース（例: `dashboard:workspace`）は、
-サービスごとに見直す必要があります。限定メンバーに workspace 単位でどの操作が必要か（例: workspace 切り替えで
-表示するための workspace 名の読み取り）は Open Question 7 で扱います。
+**外部コラボレーターに関するポリシーの補足。** ポリシーは `outside_collaborator` に
+`P.attr.resourceRole` の条件以外では何も許可してはいけません。明示的なロールの一覧で許可するルールは
+もともとこれを含まないので、拒否されます（安全側に倒れる）。`resourceRole` の条件なしで `*` に許可する
+ルールは、サービスごとに見直す必要があります。workspace 単位のリソース（例: `dashboard:workspace`）は
+`resourceId` なしでチェックされるため、外部コラボレーターはそこで workspace ロールを持たず、拒否されます。
+workspace 単位で何を見られるかは Open Question 7 で扱います。
 
 #### メンバー管理 API
 
@@ -362,16 +400,22 @@ accounts が知る手段です。登録をサービスに限定することで�
 POST   /api/service/resources
        { workspaceId, resourceKind, resourceId, ownerUserId? }
        → creates the registration and, if ownerUserId is given, an `owner`
-         role assignment, in one transaction. ownerUserId must be a workspace member.
+         role assignment (grant = member), in one transaction.
+         ownerUserId must be a workspace member.
          409 if already registered with a different workspace; idempotent
          (200) if registered with the same workspace.
 DELETE /api/service/resources/{resourceKind}/{resourceId}
-       → removes the registration and every role assignment on the resource.
+       → removes the registration and every role assignment on the resource
+         (of both grants).
+GET    /api/service/workspaces/{workspaceId}/seat-usage
+       → { memberCount, outsideCollaboratorCount, seatCount } for billing (FR-7).
 ```
 
 **メンバーシップ（ユーザーの JWT、GraphQL）**:
 
 ```graphql
+enum ResourceGrant { MEMBER OUTSIDE_COLLABORATOR }
+
 input SetResourceMemberInput {
   resourceKind: String!
   resourceId: String!
@@ -383,88 +427,96 @@ input RemoveResourceMemberInput {
   resourceId: String!
   userId: ID!
 }
+input ResourceRoleInput {
+  resourceKind: String!
+  resourceId: String!
+  role: Role!
+}
+input InviteOutsideCollaboratorInput {
+  workspaceId: ID!
+  userId: ID!
+  resources: [ResourceRoleInput!]!   # 1..100 entries, distinct (kind, id)
+}
+input RemoveOutsideCollaboratorInput {
+  workspaceId: ID!
+  userId: ID!
+}
 
-type ResourceMember { userId: ID!, role: Role! }
-type ResourceBinding { workspaceId: ID!, resourceKind: String!, resourceId: String!, role: Role! }
+type ResourceMember { userId: ID!, role: Role!, grant: ResourceGrant! }
+type ResourceBinding {
+  workspaceId: ID!
+  resourceKind: String!
+  resourceId: String!
+  role: Role!
+  grant: ResourceGrant!
+}
+type OutsideCollaborator { userId: ID!, resources: [ResourceBinding!]! }
+type WorkspaceSeatUsage {
+  workspaceId: ID!
+  memberCount: Int!
+  outsideCollaboratorCount: Int!   # distinct users, members excluded
+  seatCount: Int!                  # memberCount + outsideCollaboratorCount
+}
 
 extend type Query {
   resourceMembers(resourceKind: String!, resourceId: String!): [ResourceMember!]!
   # IDs only; the owning service hydrates names etc.
+  # Without workspaceId it also lists workspaces where the user is only an outside collaborator.
   myResourceBindings(resourceKind: String!, workspaceId: ID): [ResourceBinding!]!
+  outsideCollaborators(workspaceId: ID!): [OutsideCollaborator!]!
+  workspaceSeatUsage(workspaceId: ID!): WorkspaceSeatUsage!
 }
 
 extend type Mutation {
   setResourceMember(input: SetResourceMemberInput!): ResourceMember
   removeResourceMember(input: RemoveResourceMemberInput!): Boolean!
-}
-```
-
-ガード（汎用的で、種別固有のコードはなし）。すべての更新操作は、登録に対する `LockForUpdate`
-から始まる1つのトランザクションで実行します（下記の一括操作は、まず workspace で直列化してから
-登録をロックします）。
-
-| 操作 | ガード（ロック取得後に評価） |
-|---|---|
-| `setResourceMember` | 登録が存在する。対象ユーザーが登録の workspace のメンバーである。操作者に `(kind, id)` への `manage_members` が Cerbos で許可されている。変更が最後の `owner` を降格させる場合は拒否 |
-| `removeResourceMember` | Cerbos の `manage_members`、または操作者 == 対象ユーザー（自分で抜ける場合）。最後の `owner` を外す場合は拒否 |
-| `resourceMembers` | `(kind, id)` への Cerbos の `read`。結果は読み込み時のガードで絞り込む |
-| `myResourceBindings` | 操作者自身のロールの割り当てのみ。読み込み時のガードで絞り込む |
-| `addWorkspaceMemberWithResourceRoles` | 下記の *一括操作* を参照 |
-
-**一括操作: workspace への追加とリソースロールの割り当てを1ステップで行う（ユーザーの JWT、GraphQL）。**
-*Design → UI からの追加* の2つの UI パターンの両方をこれで実現します。
-
-```graphql
-input ResourceRoleInput {
-  resourceKind: String!
-  resourceId: String!
-  role: Role!                        # must not be `limited`
-}
-input AddWorkspaceMemberWithResourceRolesInput {
-  workspaceId: ID!
-  userId: ID!
-  resources: [ResourceRoleInput!]!   # 1..100 entries, distinct (kind, id)
-}
-type AddWorkspaceMemberWithResourceRolesPayload {
-  addedToWorkspace: Boolean!         # false if the user was already a member
-  workspaceRole: Role!               # the user's workspace role after the call
-  resources: [ResourceBinding!]!
-}
-
-extend type Mutation {
-  addWorkspaceMemberWithResourceRoles(
-    input: AddWorkspaceMemberWithResourceRolesInput!
-  ): AddWorkspaceMemberWithResourceRolesPayload
+  inviteOutsideCollaborator(input: InviteOutsideCollaboratorInput!): OutsideCollaborator
+  removeOutsideCollaborator(input: RemoveOutsideCollaboratorInput!): Boolean!
 }
 ```
 
 ユーザーは `addUsersToWorkspace` と同じくユーザー ID で指定します。UI は既存のユーザー検索
 （`userByNameOrEmail` / `searchUser`）で名前またはメールアドレスから探します。メールアドレスによる
-新しい招待の仕組みは追加しません。すべてのステップを **1つのトランザクション** で実行します。
+新しい招待の仕組みは追加しません。
 
-1. workspace を読み込み、workspace で直列化する（Postgres: 行ロック。Mongo: workspace ドキュメントへの
-   並行書き込みが競合し、リトライされる）。`addUsersToWorkspace` と同じく、個人 workspace は拒否する。
-2. すべての項目を検証する: 登録が存在し、その `workspaceID` が `workspaceId` と一致する（一致しなければ
-   呼び出し全体を拒否）。`role` が `limited` でない。操作者に `(kind, id)` への `manage_members` が
-   Cerbos で許可されている。
-3. ユーザーが **まだ workspace のメンバーでない** 場合: 操作者は `addUsersToWorkspace` の既存の
-   メンバー追加チェック（`ActionAddMember`）と、メンバー数（シート）のフック `enforceMemberCount` も
-   通過しなければならない（v1 のデフォルト。Open Question 7 を参照）。そのうえでユーザーを `limited` ロールで
-   参加させ（`Members().Join`）、既存の `bulkUpdatePermittable` の経路で permittable の workspace ロールを
-   書き込む。ユーザーが **すでにメンバーである** 場合は、workspace のメンバーシップとロールは変えない
-   （降格もしない）。
-4. 各登録に対して決まった順序（`(kind, id)` でソート）で `LockForUpdate` を取り、リソースごとに最後の
-   owner のルールを適用してから（すでにメンバーであるユーザーの既存のロールを変える場合があるため）、
-   各項目について `UpsertResourceRole` を行う。
-5. どこかで失敗したらすべてロールバックする: workspace のメンバーシップも、シートの消費も、
-   一部だけのロールの割り当ても残らない。
+以下の「workspace 管理者」とは、`addUsersToWorkspace` / `removeUserFromWorkspace` が使う既存の
+workspace のチェック（`add_member` / `delete_member`、つまり workspace の owner または maintainer）を
+通過する操作者を指します。
 
-ユーザーの最後のリソースロールを外しても（`removeResourceMember`）、workspace からは **外れません**。
-Open Question 8 を参照。
+ガード（汎用的で、種別固有のコードはなし）。すべての更新操作は **1つのトランザクション** で実行します。
+ロックは決まった順序で取り（必要な場合はまず workspace ロック、次に `(kind, id)` でソートした登録）、
+ガードはロック取得後に評価します。
+
+| 操作 | ロック | ガード |
+|---|---|---|
+| `setResourceMember` | 登録の workspace の workspace ロック、次に登録 | 登録が存在する。操作者に `(kind, id)` への `manage_members` が Cerbos で許可されている。そのうえで: **対象ユーザーが workspace メンバー** → `grant = member`。**対象ユーザーがこのリソースにすでに `collaborator` の割り当てを持つ** → ロールの変更で、`grant` は `collaborator` のまま。**それ以外**（新しい外部コラボレーターの割り当て）→ 操作者は workspace 管理者でなければならない（v1。Open Question 7）。個人 workspace は拒否。対象ユーザーがまだその workspace の外部コラボレーターでなければシートの上限を確認する（下記）。変更が最後の `owner` を降格させる場合は最後の owner のルール |
+| `removeResourceMember` | 登録 | Cerbos の `manage_members`、または操作者 == 対象ユーザー（自分で抜ける場合）。最後の owner のルール |
+| `inviteOutsideCollaborator` | workspace ロック、次に各登録 | 操作者が workspace 管理者。個人 workspace は拒否。対象ユーザーが workspace メンバーで **ない**（メンバーなら `ErrAlreadyWorkspaceMember`。`setResourceMember` を使う）。すべての登録が存在し `workspaceId` に属する（そうでなければ呼び出し全体を拒否）。対象ユーザーがまだ外部コラボレーターでなければシートの上限。リソースごとに最後の owner のルール（既存のコラボレーターのロールが変わる場合がある）。そのうえで各項目について `UpsertResourceRole(grant = collaborator)`。すべてか無か |
+| `removeOutsideCollaborator` | workspace ロック、次に対象ユーザーが `collaborator` の割り当てを持つすべての登録 | 操作者が workspace 管理者。対象ユーザーがそれらのリソースのいずれかで最後の `owner` なら拒否。そのうえで `DeleteResourceRolesInWorkspace(ws, [user], collaborator)` |
+| `resourceMembers` | — | `(kind, id)` への Cerbos の `read`。結果は読み込み時のガードで絞り込む |
+| `myResourceBindings` | — | 操作者自身のロールの割り当てのみ。読み込み時のガードで絞り込む |
+| `outsideCollaborators`、`workspaceSeatUsage` | — | 操作者が workspace のメンバーを閲覧できる（`read_member`）。`seat-usage` のルートは M2M のみ |
+
+**シートの上限。** 既存のメンバー数のフック（`enforceMemberCount`）を拡張し、シート数を
+`members + CountOutsideCollaborators(ws)` として数えます。新しくシートを使う場合には必ず workspace ロックの
+もとで実行します。すなわち、外部コラボレーターでない人を workspace メンバーとして追加するとき、または
+あるユーザーの workspace 内で最初の `collaborator` の割り当てを作るときです。すでに外部コラボレーターである
+ユーザーや、コラボレーターからメンバーに変わるユーザーは、追加のシートを使いません。
 
 **最後の owner のルール:** リソースの owner 数を 1 以上から 0 にしてしまうメンバーシップの更新は
-拒否します。owner なしで登録されたリソース（例: 埋め戻し）は、owner が設定されるまで workspace ロールで
-管理します。登録解除のエンドポイントはこのルールの対象外です。
+拒否します。owner はどちらの grant でも数えます。owner なしで登録されたリソース（例: 埋め戻し）は、
+owner が設定されるまで workspace ロールで管理します。登録解除のエンドポイントはこのルールの対象外です。
+
+**既存の workspace のフローの変更**（いずれもまず workspace ロックを取る）:
+
+- `addUsersToWorkspace`: その workspace の外部コラボレーターであるユーザーは project のロールを保つ。
+  同じトランザクションで `ConvertResourceGrants(ws, users, collaborator → member)` を行い、シートの
+  チェックでは重ねて数えない。
+- `removeUserFromWorkspace` / `removeMultipleUsersFromWorkspace`: 今と同じく、そのユーザーの
+  workspace 内のロールの割り当てをすべて（両方の grant）削除する。一部を残して外部コラボレーターに
+  変えることは Open Question 9。
+- `deleteWorkspace`（`Workspace.Remove`）: `RemoveInWorkspace(ws)` で、その workspace のすべての登録と
+  すべてのロールの割り当て（外部コラボレーターのものを含む）を削除する。
 
 #### 並行性
 
@@ -472,25 +524,29 @@ Open Question 8 を参照。
 |---|---|
 | 同じリソースの別々のユーザーに対する2つの書き込みが、どちらも最後の owner のチェックを通過する | どちらも同じ登録に対して `LockForUpdate` を取る必要があり、後の方は待つ（Postgres）か、競合してリトライする（Mongo）。owner 数はロック取得後に読む。 |
 | 2つのサービスが同じ `(kind, id)` を登録する | 主キー / 一意インデックスにより、負けた方は `ErrAlreadyExists` になる。 |
-| `setResourceMember` が workspace メンバーシップのチェックを通過した後、ロールの割り当てが書き込まれる前にユーザーが workspace から外され、連動削除が実行される | **読み込み時のガード**: ロールの割り当ては、ユーザーが現在その割り当ての workspace で workspace ロールを持っている場合にのみ有効とする。permittable はすでに読み込まれているので、追加の読み込みはかからない。残った孤立行は無害で、次に連動削除や登録解除のエンドポイントがその行に触れたときに削除される。 |
+| 残りシートが1つのときに、2人の管理者が別々の新しい外部コラボレーターを追加する | どちらも workspace ロックを取る。後の方は待つかリトライし、ロック取得後に読むシート数には先の方が含まれる。ちょうど1つだけ成功する。 |
+| 同じ新しい人を2人の管理者が同時に外部コラボレーターとして追加する | workspace ロックで直列化される。後の方は既存の外部コラボレーターと見なすので、追加のシートは使わない。 |
+| `setResourceMember` が project のロールを割り当てている最中に、ユーザーが workspace から外される | どちらも workspace ロックを取るので、一方がもう一方の後に実行される。外す処理が後なら、新しい割り当ても削除される。先なら、`setResourceMember` は非メンバーと見なして外部コラボレーターの経路（管理者のチェック、シートの上限）を通る。さらに読み込み時のガードが、workspace ロールのないユーザーの `member` の割り当てを無視する。 |
+| 外部コラボレーターが、別の project のロールを与えられている最中に workspace に追加される | どちらも workspace ロックを取る。workspace への追加が先なら新しい割り当ては `member` として書かれ、後なら `ConvertResourceGrants` で変換される。メンバーに `collaborator` の割り当てが残ることはない。 |
 | workspace フローからの古いスナップショットの `Save` が、新しいロールの割り当てを上書きする（またはその逆） | スナップショット保存は `resource_roles` を書き込まず、ロールの割り当ての書き込みは `workspace_roles` を書き込まない（*リポジトリの変更* を参照）。 |
-| 2人の操作者が `addWorkspaceMemberWithResourceRoles` で同じ新しいユーザーを同時に追加する（リソースは異なる場合もある） | どちらも workspace で直列化する（ステップ 1）。後の方は待つ（Postgres）か、競合してリトライし（Mongo）、そのユーザーを既存メンバーとして扱ってリソースロールだけを追加する。workspace ロールは変わらず、シートは1回だけ数えられる。 |
-| リソースが重なる2つの一括操作がデッドロックする | ロックの順序を固定する: まず workspace、次に `(kind, id)` でソートした登録。 |
-| 一括操作の実行中にユーザーが workspace から外される | 一括操作が新しいユーザーを参加させる場合は、どちらも workspace のレコードに書き込むので直列化される。外す処理が後にコミットされれば、その連動削除が新しいロールの割り当てを削除する。それ以外の場合（および残る隙間）は、`setResourceMember` と同じく、workspace ロールをもう持たないユーザーのロールの割り当てを読み込み時のガードが無視する。 |
+| リソースが重なる2つの複数リソースの操作がデッドロックする | ロックの順序を固定する: workspace ロック、次に `(kind, id)` でソートした登録。 |
 
 #### ライフサイクルと連動削除
 
 | イベント | 実行者 | ロールの割り当てへの影響 |
 |---|---|---|
-| リソース作成 | サービス（M2M） | `ownerUserId` = 作成者として `POST /api/service/resources` を呼ぶ |
-| リソース削除 | サービス（M2M） | `DELETE /api/service/resources/{kind}/{id}` を呼ぶ。呼び忘れると孤立した登録が残るが無害（そのリソースはサービス側にもう存在しない）。後から任意の掃除の仕組みで削除する |
+| リソース作成 | サービス（M2M） | `ownerUserId` = 作成者（`member`）として `POST /api/service/resources` を呼ぶ |
+| リソース削除 | サービス（M2M） | `DELETE /api/service/resources/{kind}/{id}` でそのリソースの割り当てをすべて削除する。workspace 内の最後の割り当てがそこだった外部コラボレーターは、外部コラボレーターでなくなる（シートも空く）。呼び忘れると孤立した登録が残るが無害で、後から任意の掃除の仕組みで削除する |
 | 既存のリソース（本機能以前） | サービス（M2M） | サービスが `resourceId` を送り始める前に、同じエンドポイント（冪等）で一度だけ埋め戻す |
-| `addWorkspaceMemberWithResourceRoles` でユーザーを追加 | accounts | workspace のメンバーシップ（新規なら `limited`）とロールの割り当てを1つのトランザクションで書き込む |
-| ユーザーの workspace 内の最後のロールの割り当てを削除 | accounts | そのロールの割り当てだけを削除する。workspace のメンバーシップ（とシート）は残る。その後 `limited` メンバーを workspace から外すべきかは Open Question 8 |
-| workspace からユーザーを削除 | accounts | `bulkRemovePermittable` から `DeleteResourceRolesInWorkspace` も呼ぶ |
-| workspace 削除（`Workspace.Remove`） | accounts | 同じく `bulkRemovePermittable` 経由。その workspace の登録も削除する |
+| project メンバーの追加（`setResourceMember`） | accounts | workspace メンバーには `member` の割り当て。それ以外は `collaborator` の割り当て（まだでなければ外部コラボレーターになる） |
+| 外部コラボレーターを project に招待 | accounts | `collaborator` の割り当てを1つのトランザクションで書き込む |
+| 外部コラボレーターの workspace 内の最後の割り当てを削除 | accounts | ほかに何もしない。関係とシートは導出なので自動的になくなる |
+| 外部コラボレーターを workspace から外す | accounts | `removeOutsideCollaborator` が workspace 内のその人の `collaborator` の割り当てをすべて削除する |
+| 外部コラボレーターを workspace メンバーとして追加 | accounts | `addUsersToWorkspace` が workspace 内のその人の割り当てを `member` に変換する。シートは1つのまま |
+| workspace メンバーを削除 | accounts | `bulkRemovePermittable` から `DeleteResourceRolesInWorkspace(ws, users, nil)` も呼ぶ |
+| workspace 削除（`Workspace.Remove`） | accounts | `RemoveInWorkspace(ws)`: workspace のすべての登録と割り当て（外部コラボレーターのものを含む） |
 | workspace の無効化 / 復元 | accounts | 変更なし（workspace ロールと同じ。復元に備えてデータを残す） |
-| ユーザー削除（`DeleteMe`） | accounts | 現状、`DeleteMe` は permittable を削除しない。ユーザーが消えればロールの割り当てには到達できなくなる。`DeleteMe` で permittable を削除する修正は、本機能とは独立したフォローアップとして提案する |
+| ユーザー削除（`DeleteMe`） | accounts | 現状、`DeleteMe` は permittable を削除しない。ユーザーが消えればロールの割り当てには到達できなくなる。`DeleteMe` で permittable を削除する修正は、本機能とは独立したフォローアップとして提案する。それまでは削除された外部コラボレーターも `CountOutsideCollaborators` に数えられてしまうため、件数は有効なユーザーと突き合わせる（または修正を先に入れる） |
 
 **メリット**
 
@@ -498,9 +554,11 @@ Open Question 8 を参照。
   別の workspace のロールを借りることはできない。
 - accounts にリソースを存在させられるのは M2M 認証されたサービスだけなので、
   ユーザーが ID を自分のものとして主張することはできない。
-- リソース全体の不変条件は、両バックエンドでリソースごとに1つのレコードで直列化される。
+- リソース全体の不変条件はリソースごとに1つのレコードで、メンバー / コラボレーターの判定とシートは
+  workspace ごとに1つのレコードで、両バックエンドとも直列化される。
 - ロールの割り当ての参照はすでに読み込まれた permittable の中で完結する。新たな読み込みは
   登録の主キー参照だけ。
+- 外部コラボレーターのために新しい workspace ロールや専用のレコードは要らない。
 - accounts はドメインに依存しないまま: 種別と ID は解釈しない値で、意味はポリシーが持つ。
 
 **デメリット**
@@ -508,10 +566,12 @@ Open Question 8 を参照。
 - `resourceId` を渡す `checkPermission` 呼び出しでポイント読み込みが1回増える。
 - サービスはリソースを登録し（埋め戻しを含む）、削除時に登録を解除する必要がある。
 - Mongo の `Save` の意味が置き換えから `$set` に変わる（既存コードに手が入る）。
+- 既存の workspace メンバーのフローで、workspace ロックを取り、ロールの割り当てを変換または削除する
+  必要がある。
 
 #### 詳細な要件
 
-*Functional Requirements* の技術的な形です。各項目は順に FR-1〜FR-6 で、この節のほかの部分では
+*Functional Requirements* の技術的な形です。各項目は順に FR-1〜FR-7 で、この節のほかの部分では
 この番号で参照します。
 
 1. `resourceId` なしの `checkPermission`: 読み込みは **変わらない**。
@@ -526,9 +586,11 @@ Open Question 8 を参照。
 4. 想定規模: 1ユーザーあたりのロールの割り当ては約 1,000 件以下（上記の上限で1件約 300 B 以下、
    つまり Mongo の1ドキュメントあたり約 300 KB 以下で、16 MB を大きく下回る）。
    1リソースあたりのメンバーは約 1,000 人以下。
-5. 1リソースのメンバー一覧取得はインデックスが効き、そのリソースの `(userId, role)` だけを返す。
+5. 1リソースのメンバー一覧取得はインデックスが効き、そのリソースの `(userId, role, grant)` だけを返す。
    集約全体を組み立てることはしない。
 6. すべての更新操作が MongoDB / PostgreSQL の両バックエンドと `memory` リポジトリで動くこと。
+7. `CountOutsideCollaborators(ws)` はインデックス（`workspace_id, grant`）が効き、ユーザーを重複なく
+   数える。`workspaceSeatUsage` はメンバー + 外部コラボレーターを、同じユーザーを2回数えずに返す。
 
 範囲についての補足（*Non-Goals* の技術的な形）:
 
@@ -557,14 +619,14 @@ sequenceDiagram
     alt not registered, or alias ≠ registration.workspace
         A-->>S: { allowed: false }
     else
-        A->>A: roles = global + workspace roles in registration.workspace<br/>attr.resourceRole = guarded assigned role or ""
+        A->>A: attr.resourceRole = guarded role or ""<br/>roles = global + workspace roles in registration.workspace<br/>(+ outside_collaborator if no workspace role and a valid collaborator grant)
         A->>C: CheckResources(principal{roles, attr}, resource{kind, resourceId}, action)
         C-->>A: ALLOW / DENY
         A-->>S: { allowed }
     end
 ```
 
-##### project の作成とメンバー招待
+##### project の作成と project メンバーの追加（パターン a）
 
 ```mermaid
 sequenceDiagram
@@ -575,55 +637,52 @@ sequenceDiagram
     U->>S: createProject
     S->>S: persist project P
     S->>A: POST /api/service/resources {ws, "dashboard:project", P, owner=U} (M2M key)
-    A->>A: U ∈ ws? → create registration + owner role assignment (one tx)
+    A->>A: U ∈ ws? → create registration + owner role assignment (member, one tx)
     A-->>S: 201
-    U->>S: invite B as writer
+    U->>S: add B to P as writer
     S->>A: setResourceMember(kind, P, B, writer) (U's JWT)
-    A->>A: lock registration → B ∈ ws? Cerbos manage_members for U? → upsert
-    A-->>S: ok
+    A->>A: begin tx; lock ws; lock registration; Cerbos manage_members for U?
+    alt B ∈ ws
+        A->>A: upsert (B, P, writer, member)
+    else B ∉ ws
+        A->>A: U is workspace admin? seat limit (if B is new to ws) → upsert (B, P, writer, collaborator)
+    end
+    A-->>S: { userId: B, role: writer, grant }
 ```
 
-`setResourceMember` は、B がすでに workspace のメンバーであることを前提とします。まだ workspace に
-いないかもしれない人を追加するには、UI は下記の一括操作を使います。
-
-##### UI から1ステップで人を追加する
-
-パターン (a) は1つのリソース（表示中の project）を渡し、パターン (b) は workspace の
-「メンバー追加」ダイアログで選んだ project を渡します。どちらも同じ mutation を呼びます。
+##### 選んだ project への外部コラボレーターの招待（パターン b）
 
 ```mermaid
 sequenceDiagram
     participant U as Admin
     participant S as Service UI (e.g. dashboard)
     participant A as reearth-accounts
-    participant C as Cerbos
 
-    U->>S: add C to project P1 (a)<br/>or add C to ws with projects P1, P2 (b)
+    U->>S: invite C as outside collaborator on P1, P2
     S->>A: userByNameOrEmail(...) → C's userId
-    S->>A: addWorkspaceMemberWithResourceRoles(ws, C, [(kind,P1,writer), ...]) (U's JWT)
-    A->>A: begin tx; serialize on ws
-    A->>A: each Pn registered in ws?
-    A->>C: manage_members on each Pn for U?
-    alt C ∉ ws
-        A->>A: add-member check + seat limit → Join(C, limited) + permittable workspace role
-    else C ∈ ws
-        A->>A: keep C's workspace role unchanged
-    end
-    A->>A: LockForUpdate P1, P2 … (sorted) → last-owner rule → UpsertResourceRole each
+    S->>A: inviteOutsideCollaborator(ws, C, [(kind,P1,writer), (kind,P2,reader)]) (U's JWT)
+    A->>A: begin tx; lock ws
+    A->>A: U is workspace admin? C ∉ ws? P1, P2 registered in ws?
+    A->>A: seat limit (if C is not yet an outside collaborator)
+    A->>A: LockForUpdate P1, P2 (sorted) → last-owner rule → upsert (collaborator) each
     A->>A: commit (any failure → roll back all)
-    A-->>S: { addedToWorkspace, workspaceRole, resources }
+    A-->>S: { userId: C, resources }
 ```
 
-その後、限定メンバーには自分の project だけが見えます。サービスは `myResourceBindings` でそれを一覧し、
-それ以外の project に対する `checkPermission` は拒否されます。
+その後、外部コラボレーターには自分の project だけが見えます。サービスは `myResourceBindings` で
+それを一覧し（workspace 切り替えに表示するためにも使う）、workspace 内のそれ以外の project に対する
+`checkPermission` は拒否されます。
 
-##### workspace メンバー削除時の連動
+##### 削除時の連動
 
 ```mermaid
 flowchart LR
-    R[removeUserFromWorkspace / deleteWorkspace] --> B[bulkRemovePermittable]
+    R[removeUserFromWorkspace] --> B[bulkRemovePermittable]
     B --> W[RemoveWorkspaceRole ws → snapshot Save]
-    B --> RR[DeleteResourceRolesInWorkspace ws, users → targeted delete]
+    B --> RR[DeleteResourceRolesInWorkspace ws, users, both grants]
+    O[removeOutsideCollaborator] --> OC[DeleteResourceRolesInWorkspace ws, user, collaborator]
+    D[deleteWorkspace] --> B
+    D --> RW[RemoveInWorkspace ws → all registrations + assignments]
 ```
 
 #### 技術的な補足: 影響・テスト・デプロイ・ロールバック・監視
@@ -636,48 +695,56 @@ flowchart LR
    新しいテストを追加する。
 3. `resourceId` を渡した場合の **Cerbos のリソース ID の変更**: 影響を受けるのは、利用を始めた
    呼び出し元だけ。
-4. **workspace メンバー削除** で、対象を絞った削除が1回増える。
+4. **既存の workspace メンバーのフロー**（`addUsersToWorkspace`、`removeUserFromWorkspace`、
+   `removeMultipleUsersFromWorkspace`、`deleteWorkspace`）は workspace ロックを取り、同じトランザクションで
+   ロールの割り当てを変換または削除する。
 5. **ポリシーの書き方**: ロール名は workspace とリソースで共通。リソースロールは `P.attr.resourceRole`
-   でのみ判定する（principal のロールとして扱わない）。通常のメンバーに対する workspace ロールの
-   workspace 全体への許可はそのまま残し、`limited` は workspace ロールのルールに決して含めない。
-   サービスの既存の project ポリシーは、置き換えるのではなく `resourceRole` のルールを追加して
-   拡張する（和集合 = max）。
-6. **gqlclient**（`server/pkg/gqlclient`）の利用側は、新しいフィールドを使うためにバージョンを
-   上げる必要がある。古いクライアントには影響しない。
-7. **`Role` enum の新しい値 `limited`**: workspace メンバーを厳密な enum でデコードするクライアントは、
-   未知の値で失敗する可能性がある。workspace メンバーを読むすべてのサービスは、限定メンバーが
-   作られる前にクライアントを更新する必要がある。
-8. **ポリシー**: 各サービスの workspace 単位・リソース単位のポリシーを見直し、`limited` が
-   `P.attr.resourceRole` 経由以外ではアクセスできないようにする必要がある。
-9. **シート**: 限定メンバーもほかのメンバーと同じく、workspace のメンバー数の上限
-   （`enforceMemberCount`）に数えられる。
+   でのみ判定する（principal のロールとして扱わない）。メンバーに対する workspace ロールの workspace 全体への
+   許可はそのまま残し、`outside_collaborator` は workspace ロールのルールに決して含めない。サービスの
+   既存の project ポリシーは、置き換えるのではなく `resourceRole` のルールを追加して拡張する（和集合 = max）。
+6. **gqlclient**（`server/pkg/gqlclient`）の利用側は、新しいフィールドと `ResourceGrant` enum を使うために
+   バージョンを上げる必要がある。古いクライアントには影響しない（workspace のメンバー一覧と `Role` enum は
+   変わらない）。
+7. **シート**: `enforceMemberCount` が外部コラボレーターを数える。課金はメンバー数だけでなく
+   `workspaceSeatUsage` / `seat-usage` のルートを使う必要がある。
+8. **workspace 切り替え**: 外部コラボレーターでしかないユーザーは workspace のメンバーシップを持たないので、
+   サービスは `myResourceBindings` を使ってそうした workspace を表示する必要がある。
 
 ##### テスト
 
 1. **ユニット**（`pkg/resource`、`pkg/permittable`）: 種別 / ID の検証と長さの上限。
-   リソースごとにロールは1つ。読み込み時のガードが、対応する workspace ロールのない割り当てを除外すること。
+   リソースごとにロールは1つ。grant の検証。読み込み時のガードが、対応する workspace ロールのない
+   `member` の割り当てを除外し、`collaborator` の割り当ては残すこと。
 2. **interactor**（`internal/usecase/interactor`）:
    - `CheckPermission`: `resourceId` なし → roles が変わらない（リグレッション）。
      未登録のリソース → 拒否。別の workspace の alias → 拒否。workspace ロールは alias ではなく
      登録から取られる。`resourceRole` が設定される / 空になる。リソースロールがある場合も、principal の
-     ロールには通常の workspace ロールが入っている（ポリシーが max を計算できる）。
+     ロールには workspace ロールが入っている（ポリシーが max を計算できる）。`outside_collaborator` は、
+     そのリソースに有効なコラボレーターの割り当てを持つ非メンバーにだけ加わる。
    - 登録: M2M のみ（JWT は拒否）。owner は workspace のメンバーでなければならない。
      同じ workspace での重複は冪等、別の workspace なら 409。
-   - `setResourceMember` / `removeResourceMember`: メンバーでない対象ユーザーは拒否。
-     `manage_members` がなければ拒否。自分で抜けるのは許可。最後の owner の保護。
-   - 連動削除: `RemoveUserMember` / `RemoveMultipleUserMembers` / `Remove`。
-   - `addWorkspaceMemberWithResourceRoles`: メンバーでないユーザーは `limited` で参加し、すべてのロールの
-     割り当てを得る。既存メンバーは workspace ロールが変わらず（降格しない）、ロールの割り当てだけが
-     増える。別の workspace のリソース、未登録のリソース、`manage_members` がない、メンバー追加チェックの
-     失敗、シートの上限 → 呼び出し全体が拒否され、メンバーシップもロールの割り当ても残らない。
-     リソースロールとしての `limited` は拒否。個人 workspace は拒否。最後の owner のルールが適用される。
-   - 限定メンバー: ロールの割り当てのないリソースにはアクセスできない。最後のロールの割り当てを
-     `removeResourceMember` で外しても workspace のメンバーシップは残る。
+   - `setResourceMember`: メンバーの対象 → `member`。非メンバーの対象 → `collaborator`。これは
+     workspace 管理者だけができ、workspace にとって新しい人ならシートの上限を適用し、個人 workspace は拒否。
+     既存のコラボレーターのロール変更は project の `manage_members` 保持者でもできる。`manage_members`
+     がなければ拒否。最後の owner の保護。
+   - `removeResourceMember`: 自分で抜けるのは許可。最後の owner の保護。コラボレーターの最後の割り当てを
+     外すと `CountOutsideCollaborators` が1減る。
+   - `inviteOutsideCollaborator`: 別の workspace のリソース、未登録のリソース、管理者でない操作者、
+     すでにメンバーである対象、シートの上限のいずれでも、すべてか無か。既存のコラボレーターを別の
+     リソースに招待しても追加のシートは使わない。
+   - `removeOutsideCollaborator`: workspace 内のそのユーザーのコラボレーターの割り当てをすべて削除する。
+     そのいずれかで最後の owner なら拒否。
+   - 既存の外部コラボレーターに対する `addUsersToWorkspace`: 割り当てが `member` に変換され、シート数は
+     変わらない。
+   - 連動削除: `RemoveUserMember` / `RemoveMultipleUserMembers` は両方の grant を削除する。`Remove` は
+     コラボレーターを含めてすべて削除する。
+   - `workspaceSeatUsage`: メンバー + 重複のないコラボレーターで、二重に数えない。
 3. **並行性**（`make test-integration`、両バックエンド）: 2つの goroutine が最後の2人の owner を
    同時に外す → ちょうど1つだけ成功する。同じキーの並行登録 → 1つだけ成功する。
-   `UpsertResourceRole` の後の古いスナップショットの `Save` でもロールの割り当てが残る。
-   同じ新しいユーザーに対する2つの `addWorkspaceMemberWithResourceRoles` を同時に実行 → ユーザーは
-   1回だけ参加し、両方のロールの割り当てが残る。
+   `UpsertResourceRole` の後の古いスナップショットの `Save` でもロールの割り当てが残る。残りシートが
+   1つのときに別々の新しいコラボレーターを同時に招待 → ちょうど1つだけ成功する。`setResourceMember` の
+   実行中にメンバーを外す → その後アクセスできない。コラボレーターの workspace への追加と新しい project
+   ロールの付与が同時 → 割り当てはすべて `member` になる。
 4. **リポジトリ**: すべての新しい操作の Mongo・Postgres・memory 実装。Postgres の
    `FindByUserID` が1本のクエリしか発行しないこと。
 5. **マイグレーション**: 既存 DB に対する `0005` の up / down。既存の permittable が
@@ -690,43 +757,44 @@ flowchart LR
    - workspace の `writer` + P のリソースロール `reader` → P でも `edit` は許可のまま
      （リソースロールはアクセスを引き下げない）。
    - workspace の `owner` → すべての project ですべての操作が許可。
-   - ロールの割り当てのない `limited` → すべて拒否。`limited` + P のリソースロール `writer` →
-     P でだけ `read` / `edit` が許可、ほかでは拒否。
+   - P で `writer` の外部コラボレーター → P でだけ `read` / `edit` が許可、ほかの project と
+     workspace 単位のリソースでは拒否。
    - 別 workspace のユーザー → 拒否。
 
 ##### デプロイ
 
 1. 後方互換性はあるか？ **あり。** 入力の任意項目、新しいコレクション / テーブル、
-   新しいルートと GraphQL フィールドの追加のみ。`resourceId` がなければ挙動は変わらない。
+   新しいルートと GraphQL のフィールド・enum の追加のみ。`resourceId` がなければ挙動は変わらず、
+   workspace のメンバー一覧も変わらない。
 2. 部分的にデプロイできるか？ **できる。** 順序:
    1. accounts をデプロイする。
    2. 各サービスが既存リソースの登録を埋め戻す。
    3. 各サービスが作成時の登録 / 削除時の登録解除を始める。
    4. 各サービスが `P.attr.resourceRole` を使うポリシーをデプロイし、`resourceId` を送り始める。
       ステップ 4 より前は属性が存在せず、条件がマッチしない（安全側に倒れる）。
-3. 通知先: dashboard / visualizer / cms のオーナー、Cerbos ポリシーの管理者。
+   5. 課金が `workspaceSeatUsage` / `seat-usage` に切り替わり、サービスがコラボレーターとしてだけ
+      参加している workspace を `myResourceBindings` で表示する。
+   6. 外部コラボレーターを作る UI を有効にする（ステップ 5 の後でのみ）。
+3. 通知先: dashboard / visualizer / cms のオーナー、課金の担当者、Cerbos ポリシーの管理者。
 4. 設定変更: なし（既存の M2M API キーを再利用する）。
 5. DDL: Postgres のマイグレーション `0005` は起動時に自動で実行される（golang-migrate）。
    Mongo は起動時のマイグレーションでコレクションのスキーマとインデックスを作成する。
    accounts 側での埋め戻しはない。
-6. 限定メンバー: `addWorkspaceMemberWithResourceRoles` を呼ぶ UI は、workspace メンバーを読むすべての
-   サービスがクライアントを更新し、`limited` についてポリシーを見直した後で有効にする
-   （*影響* の 7〜8 を参照）。
 
 ##### ロールバック
 
 1. 原因をチームの Slack チャンネルに共有する。
-2. `resourceId` / `resourceRole` に依存する利用側サービス / ポリシーを先に戻す。
+2. 外部コラボレーターの UI を無効にし、課金をメンバー数に戻してから、`resourceId` / `resourceRole` に
+   依存する利用側サービス / ポリシーを戻す。
 3. accounts のイメージを戻す。旧バイナリは新しいコレクション、テーブル、`resource_roles`
    フィールドを無視するので、**データのロールバックは不要**。
-   注意: 旧バージョンの Mongo の `Save` はドキュメント全体を置き換えるため、書き込んだ permittable の
-   `resource_roles` は消える。機能は無効になっているのでロールバック中は許容でき、
-   再度ロールフォワードする際にサービスが埋め戻しを再実行する。
-   `limited` メンバーが存在する場合、旧バイナリはそのロールを知らない。ロールバックの前に、
-   それらのメンバーを workspace から外すか、別のロールに変えるかを決める（`reader` に変えると
-   アクセス範囲が広がる）。
+   旧バージョンの稼働中は外部コラボレーターはアクセスできず（機能が無効のため）、ロールフォワードで
+   元に戻る。ただし割り当てが消えた場合は除く: 旧バージョンの Mongo の `Save` はドキュメント全体を
+   置き換えるため、書き込んだ permittable の `resource_roles` は消える。機能は無効になっているので
+   ロールバック中は許容でき、再度ロールフォワードする際にサービスが埋め戻しを再実行するが、消えた
+   外部コラボレーターの割り当ては招待し直す必要がある。
 4. スキーマ自体を削除する必要がある場合のみ、`0005` の down を実行する
-   （登録とロールの割り当てが消えるので、先にダンプを取る）。
+   （登録、ロールの割り当て、workspace ロックが消えるので、先にダンプを取る）。
 
 ##### デプロイ後の確認と監視
 
@@ -736,12 +804,18 @@ flowchart LR
     ほかの project は閲覧だけできることを確認する。そのメンバーを workspace から外し、すべての
     project にアクセスできなくなることを確認する。
   - 別の workspace の alias を指定して `checkPermission` を呼び、拒否されることを確認する。
-  - workspace 外のユーザーに対して `addWorkspaceMemberWithResourceRoles` を呼び、`limited` メンバーに
-    なること、シートを使うこと、指定した project にだけアクセスできることを確認する。
+  - workspace 外のユーザーに対して `setResourceMember` を呼び、`collaborator` の割り当てになること、
+    その project にだけアクセスできること、workspace のメンバー一覧に現れないこと、
+    `outsideCollaboratorCount` が1増えることを確認する。
+  - 2つの project に対して `inviteOutsideCollaborator` を呼び、両方に割り当てられること、シート数が
+    1だけ増えることを確認する。`removeOutsideCollaborator` を呼び、すべてのアクセスがなくなり、
+    シート数が減ることを確認する。
+  - 外部コラボレーターを workspace に追加し、project のロールが残ること、シート数が変わらないことを
+    確認する。
 - メトリクス
   - `resourceId` あり / なしでの `checkPermission` の p50 / p95 レイテンシ。
-  - 登録 / 登録解除 / `setResourceMember` / `addWorkspaceMemberWithResourceRoles` のエラー率
-    （Mongo のトランザクションのリトライを含む）。
+  - 登録 / 登録解除 / `setResourceMember` / `inviteOutsideCollaborator` / `removeOutsideCollaborator`
+    のエラー率（Mongo のトランザクションのリトライとシートの上限による拒否を含む）。
   - permittable あたりのロールの割り当て数（最大 / p99）。FR-4 の監視用。
 - アラート
   - `checkPermission` のエラー率: Warning > 1%、Danger ≥ 5%。
@@ -751,7 +825,7 @@ flowchart LR
 
 1. **`checkPermission` へのリソース属性の受け渡し:** 提案は、`CheckPermissionInput` に任意の
    `attributes: JSON` を追加し、Cerbos のリソースにそのまま渡すこと（例: `visibility`）。
-   プロダクトごとのより厳しいルール（例: 通常の workspace メンバーも、リソースロールがなければ
+   プロダクトごとのより厳しいルール（例: workspace メンバーも、リソースロールがなければ
    `private` な project を閲覧できない）は、workspace ロールのルールへの条件（例:
    `R.attr.visibility != "private"`）として表現する。上記のデフォルトのポリシーは加算のまま。
 2. **一括チェック:** 一覧画面向けに、複数の `resourceId` に対する `checkPermissions` を用意する。
@@ -759,26 +833,30 @@ flowchart LR
 3. **サービスごとの M2M キー:** v1 では登録 / 登録解除（`POST` / `DELETE /api/service/resources`）に
    既存の共有 M2M API キーを受け付ける。案: 各キーをそのサービス自身の種別（`dashboard:*`）に限定する。
 4. **孤立データの掃除（sweeper）:** 登録解除のエンドポイントを呼ばずに削除されたリソースの登録を
-   削除する。
+   削除する。シートにも関係する: 孤立した登録が残ると、そのコラボレーターが数えられ続ける。
 5. **integration メンバー:** M2M トークンをリソースの principal にすること（cms で必要になる可能性）。
-6. **UI の配置:** どちらにしても accounts の変更はない。2つの UI パターン、(a) project からの追加と
-   (b) workspace のメンバー追加ダイアログは、どのサービスの画面であっても
-   `addWorkspaceMemberWithResourceRoles` を呼ぶ。
-7. **限定 workspace ロール:** 最終的な識別子（仮に `limited`）。各ポリシーで与える workspace 単位の操作
-   （例: workspace 名の読み取り）。workspace の管理者ではないリソースの `manage_members` 保持者が、
-   *新しい* ユーザーを workspace に追加できるか（v1: できない。一括操作のステップ 3 で既存の
-   メンバー追加チェックを要求する）。
-8. **最後のロールの割り当ての削除:** そうすると決めた場合、`removeResourceMember`（と登録解除）は、
-   workspace 内の最後のロールの割り当てが外れた `limited` メンバーを、同じトランザクションの中で
-   既存の workspace メンバー削除の経路を使って workspace から外す。
+6. **UI の配置:** どちらにしても accounts の変更はない。パターン (a) は `setResourceMember` を呼び、
+   パターン (b) と外部コラボレーターの一覧は `inviteOutsideCollaborator` / `outsideCollaborators` /
+   `removeOutsideCollaborator` を、どのサービスの画面からでも呼ぶ。
+7. **外部コラボレーターの名前と権限:** GraphQL の enum の値と評価時だけのロール名は、最終的な名前に
+   合わせる。workspace 単位で見えるもの（例: workspace 名）は、特定の workspace 単位の操作に
+   `outside_collaborator` を並べることで許可する。そのためには、ユーザーがその workspace にコラボレーター
+   の割り当てを持つ場合、`resourceId` なしのチェックでも principal にこのロールを加える必要がある。
+   project の `manage_members` 保持者に外部コラボレーターの作成を許すなら、`setResourceMember` /
+   `inviteOutsideCollaborator` の workspace 管理者のチェックを外す。
+8. **公開 project の外部コラボレーターを無料にする:** accounts で project の公開範囲が必要になる
+   （登録の属性、または Open Question 1 の `attributes`）。そのうえで `CountOutsideCollaborators` は、
+   公開でないリソースにコラボレーターの割り当てを1つ以上持つユーザーだけを数える。
+9. **削除時の変換:** `removeUserFromWorkspace` が残すリソースを受け取り、同じトランザクションでそれらを
+   `ConvertResourceGrants`（member → collaborator）し、残りを削除する。シートは使われたまま。
 
 ### Option 2: ロールの割り当てを独立したコレクション / テーブルに置く（埋め込まない）
 
 登録と API は同じですが、ロールの割り当てを permittable ではなく、独立した
-`resource_bindings (kind, id, userID, role)` コレクション / テーブルに置きます。
+`resource_bindings (kind, id, userID, role, grant)` コレクション / テーブルに置きます。
 
-**メリット:** permittable が大きくならない。メンバー一覧は単純なインデックススキャンになる。
-スナップショットの `Save` の意味を変える必要がない。
+**メリット:** permittable が大きくならない。メンバー一覧とコラボレーター数の取得は単純なインデックス
+スキャンになる。スナップショットの `Save` の意味を変える必要がない。
 
 **デメリット:** `checkPermission` で、登録に加えてもう1回（ロールの割り当ての）読み込みが増える。
 workspace の連動削除で2つのストアを更新する必要がある。
@@ -793,8 +871,26 @@ workspace の連動削除で2つのストアを更新する必要がある。
 
 ## Design
 
-**accounts が project ごとに持つのは、「どの workspace に属するか」と「誰がどのロールを持つか」の
-2つだけ。** それ以外の project の情報はすべてサービス側に残る。
+**accounts が project ごとに持つのは、「どの workspace に属するか」と「誰がどのロールを持つか
+（それぞれが workspace メンバーか外部コラボレーターか）」の2つだけ。** それ以外の project の情報は
+すべてサービス側に残る。
+
+### workspace メンバーと外部コラボレーター
+
+- **workspace メンバー**（owner / maintainer / writer / reader）は、今と同じく workspace のロールによって
+  workspace 内のすべての project を見られる。project のロールはその project でのアクセスを引き上げる
+  ことはできるが、引き下げることはない。基本権限ですべての repository にアクセスできる GitHub の
+  organization member に相当する。
+- **外部コラボレーター**（名前は仮）は workspace のメンバーではない。特定の project にだけロールを持ち、
+  その project だけを見て操作でき、有効なのは project のロールだけ。workspace のメンバー一覧には現れない。
+  organization に所属せずに特定の repository にアクセスできる、GitHub の outside collaborator を
+  モデルにしている。
+- したがって、project member は必ず workspace メンバーかその project の外部コラボレーターのどちらか。
+- **シート。** Re:Earth は workspace ごとのシート単位で課金される。GitHub と同じく、外部コラボレーターは
+  workspace 内のいくつの project に参加していてもシートを1つ使い、追加するときには workspace のシートの
+  上限が適用される。メンバーでもあり外部コラボレーターでもある人は1回だけ数える。accounts は workspace
+  ごとの外部コラボレーターの人数を返すので、課金はシート数 = workspace メンバー + 外部コラボレーター
+  として数えられる。
 
 ### project を指定した権限チェック
 
@@ -804,22 +900,19 @@ workspace の連動削除で2つのストアを更新する必要がある。
    project の場合や、問い合わせで別の workspace が指定されていた場合は「不可」と答える。
 3. accounts は、その workspace でのユーザーのロールと、その project でのユーザーのロール（あれば）
    を合わせ、サービスの権限ポリシーで判定する。デフォルトでは次のとおり。
-   - **通常の workspace メンバー**（owner / maintainer / writer / reader）は、workspace のロールと
-     project のロールのうち高い方になる。workspace のロールですでにすべての project が対象になっており、
-     project のロールはそれを引き上げることしかできない。
-   - **限定メンバー** は project のロールだけで判定される。project のロールがなければ、その project には
+   - **workspace メンバー** は、workspace のロールと project のロールのうち高い方になる。
+   - **外部コラボレーター** は project のロールだけで判定される。workspace 内のほかの project には
      アクセスできない。
-4. project のロールが有効なのは、ユーザーがその project の workspace のメンバーである間だけ。
+4. workspace メンバーの project のロールが有効なのは、その人がその project の workspace のメンバーで
+   ある間だけ。
 
-### project の作成とメンバー招待
+### project の作成とメンバーの追加
 
 1. ユーザーがサービスで project を作成する。サービスは project を保存し、作成者を owner として
    accounts に登録する（作成者は workspace のメンバーでなければならない）。
-2. owner が人をロール（例: writer）付きで project に追加する。accounts は、招待する人が project の
-   メンバーを管理する権限を持つことを確認してからロールを保存する。その人がすでに workspace に
-   いれば、project のロールだけを追加する。いなければ、同時に限定メンバーとして workspace にも追加する
-   （下記の *UI からの追加* を参照）。そのため「project member は workspace のメンバーでなければならない」
-   というルールは常に満たされる。
+2. project のメンバーを管理できる人が、人をロール（例: writer）付きで追加する。その人が workspace
+   メンバーなら、project のロールを与えるだけ。そうでなければ、その project の外部コラボレーターになる。
+   これはシートを使うため、最初のバージョンでは workspace の owner または maintainer だけができる。
 3. 同じ project のメンバー変更は1件ずつ順に処理するため、2人が同時に操作しても最後の owner が
    外れることはない。メンバーは自分で project から抜けられるが、最後の owner は抜けられない。
 4. owner なしで登録された project（例: 本機能より前からある project）は、owner が設定されるまで
@@ -827,42 +920,30 @@ workspace の連動削除で2つのストアを更新する必要がある。
 
 ### UI からの追加
 
-管理者は、一部の project だけへのアクセスを **1ステップで** 与えられる。方法は次の2つ。
+管理者は、一部の project だけへのアクセスを **1ステップで** 与えられる。方法は次の2つで、
+どちらもすべて成功するか何も変わらないかのどちらか。
 
-- **(a) project から:** 人を project のメンバーとして直接追加する。その人がまだ workspace に
-  いなければ、同時に workspace にも追加する。
-- **(b) workspace から:** workspace に人を追加するときに、その人が見られる project を選ぶ。
+- **(a) project から:** 人を project に直接追加する。workspace メンバーなら project のロールを与える
+  だけで、それ以外の人はその project の外部コラボレーターになる。
+- **(b) workspace のメンバー画面から:** workspace に追加する代わりに、選んだ project の外部
+  コラボレーターとして人を招待する。通常の workspace メンバーとして追加する方法は既存のまま。
 
-どちらも accounts の同じ1つの操作を使う。その操作は、その人を workspace に追加し（まだいなければ）、
-project のロールを同時に与える。すべて成功するか何も変わらないかのどちらかで、選んだ project なしで
-workspace にだけ追加される、あるいはその逆、ということは起きない。
+workspace の画面では、外部コラボレーターをメンバーとは別に一覧し（GitHub の「Outside collaborators」
+タブのように）、それぞれの人の project を表示することを想定する。これらの画面をどこに置くか
+（Dashboard か各サービスか）は Open Question 6 で扱う。
 
-- **限定メンバー（名前は仮）。** この方法で追加された、まだ workspace にいなかった人は、新しい
-  workspace ロールである *限定メンバー* として workspace に参加する。限定メンバーは workspace に
-  所属するが、デフォルトではその workspace のどの project も見られず、project のロールを持つ
-  project だけが見える。
-- **通常のメンバーは制限されない。** 通常の workspace メンバー（owner / maintainer / writer / reader）は、
-  workspace のロールによって引き続きすべての project を見られる。project のロールは、その project での
-  アクセスを引き上げることはできるが、引き下げることはない。GitHub で言えば、通常のメンバーは
-  基本権限ですべての repository にアクセスできる organization member に、限定メンバーは特定の
-  repository にだけアクセスできる人に相当する。
-- **シートを使う。** GitHub と同じく、限定メンバーも workspace のメンバーとして数える。Re:Earth は
-  workspace ごとのシート単位で課金されるため、追加するとシートを1つ使い、workspace のメンバー数の
-  上限も適用される。
-- **既存メンバーは降格しない。** その人がすでに workspace にいる場合は、project のロールを与える
-  だけで、workspace のロールはそのまま。
-- 管理者は後から、通常の方法で限定メンバーを通常の workspace ロールに変えられる（その逆も可能）。
+### 人を外す
 
-### workspace からのメンバー削除
-
-ユーザーを workspace から外したり workspace を削除したりすると、accounts はその workspace での
-ロールと、その workspace 内のすべての project でのロールを同じ処理の中で取り消す。workspace を
-削除した場合は、その workspace の project の登録も削除する。workspace を無効化しても何も消さず、
-復元できるようにしておく。
-
-逆方向は自動では行わない: ある人の最後の project ロールを外しても、その人は workspace から
-**外れない**。project のロールがなくなった限定メンバーは、管理者が外すまで workspace に残り、
-シートも使い続ける。これを自動で行うべきかは未決事項とする。
+- **workspace メンバーを workspace から外す** と、今と同じく、その人の workspace のロールと
+  その workspace 内のすべての project のロールを取り消す。GitHub のように、一部の project のロールを
+  残して外部コラボレーターにする選択肢を用意するかは未決事項とする。
+- **外部コラボレーターの workspace 内の最後の project のロールを外す** と、その workspace との関係は
+  なくなり、シートも使わなくなる。
+- 管理者は、**外部コラボレーターを workspace のすべての project から1回の操作で外せる**。
+- **外部コラボレーターを workspace に通常のメンバーとして追加する** と、project のロールは残る。以降は
+  workspace メンバーとして数える（シートは1つのまま）。
+- **workspace を削除する** と、その workspace のすべての project の登録と、外部コラボレーターのものを
+  含むすべての project のロールを削除する。workspace を無効化しても何も消さず、復元できるようにしておく。
 
 ### 例: Dashboard の project
 
@@ -872,12 +953,11 @@ workspace にだけ追加される、あるいはその逆、ということは�
 | workspace の writer | workspace 内のすべての project を閲覧・編集できる |
 | workspace の reader | workspace 内のすべての project を閲覧できる |
 | workspace のロールに加えて持つ project のロール | その project でだけ workspace のロールに加算される。例: workspace の reader がある project の writer なら、その project を編集できる。workspace のロールで許される範囲を減らすことはない |
-| project のロールを持つ限定メンバー（名前は仮） | その project だけを、project のロールの権限で扱える（owner / maintainer: 閲覧・編集・削除・メンバー管理、writer: 閲覧・編集、reader: 閲覧） |
-| project のロールを持たない限定メンバー | その project にアクセスできない |
+| project のロールを持つ外部コラボレーター（名前は仮） | その project だけを、project のロールの権限で扱える（owner / maintainer: 閲覧・編集・削除・メンバー管理、writer: 閲覧・編集、reader: 閲覧） |
 
-各ロールの意味は workspace と project で同じで、通常のメンバーの project へのアクセスは、
-2つのうち高い方になる。プロダクトがより厳しいルール（例: private な project）を適用できるかは
-未決事項とする。
+それ以外の人はアクセスできない。各ロールの意味は workspace と project で同じで、workspace メンバーの
+project へのアクセスは、2つのうち高い方になる。プロダクトがより厳しいルール（例: private な project）を
+適用できるかは未決事項とする。
 
 技術的な詳細: *Solution Options → Option 1 → リクエストの流れ（シーケンス図）* を参照。
 
@@ -890,21 +970,20 @@ workspace にだけ追加される、あるいはその逆、ということは�
    既存のテストと新しいテストで確認する。
 3. **影響を受けるのは利用を始めたサービスだけ。** 権限チェックの挙動が変わるのは、特定の project を
    指定し始めたサービスだけで、それ以外はこれまでどおり。
-4. **workspace メンバーの削除で処理が少し増える。** その workspace での project ロールも同じ処理で
-   取り消すため。
+4. **workspace メンバーの追加と削除で処理が少し増える。** その workspace での project ロールも同じ処理で
+   更新または取り消すため。
 5. **ロール名は workspace と project で共通。** 「owner」「maintainer」「writer」「reader」は
    どちらにもある。サービスの権限ポリシーを書く人は、「project の owner」と「workspace の owner」を
    別物として扱い、デフォルトのモデル（workspace のロールは引き続きすべての project へのアクセスを
-   与え、project のロールはそれに加算されるだけ）を守る必要がある。
+   与え、project のロールはそれに加算されるだけで、外部コラボレーターには project のロール以上のものを
+   与えない）を守る必要がある。
 6. **更新が必要なのは機能を使うサービスだけ。** 新機能を使うサービスは、accounts と通信する
    クライアントライブラリを更新する必要がある。更新しないサービスはそのまま動く。
-7. **限定メンバーもシートを使う。** 限定メンバーは、見られる project が1つだけでも、課金と
-   workspace のメンバー数の上限の上では workspace のメンバーとして数えられる。
-8. **すべてのプロダクトが対応すべき新しい workspace ロール。** 限定メンバーは新しい種類の
-   workspace ロール。すべてのプロダクトの権限ポリシーは、これを「デフォルトでは project に
-   アクセスできない」（project のロール経由でのみアクセスできる）ものとして扱う必要があり、
-   workspace のメンバーを表示するすべてのサービスがこれを表示できる必要がある。すべてのサービスの
-   準備ができるまで、限定メンバーは作らない。
+7. **シートと課金。** 外部コラボレーターはシートを使うため、課金は workspace メンバー + 外部コラボレーター
+   を数える必要があり、シートの上限にも外部コラボレーターが含まれる。
+8. **自分の workspace の見つけ方。** 外部コラボレーターは workspace のメンバーではないため、
+   「自分の workspace」を一覧する画面では、一部の project だけに参加している workspace も表示する
+   必要がある。
 
 技術的な詳細: *Solution Options → Option 1 → 技術的な補足: 影響・テスト・デプロイ・ロールバック・監視*
 を参照。
@@ -912,47 +991,49 @@ workspace にだけ追加される、あるいはその逆、ということは�
 ## Test Plan
 
 1. **基本ルール。** リソースの種別名と ID の検証と長さの上限。1ユーザーが1つの project に持てる
-   ロールは1つ。ユーザーがその project の workspace から外れたら、project のロールは無視される。
+   ロールは1つ。workspace メンバーがその project の workspace から外れたら project のロールは無視され、
+   外部コラボレーターの project のロールは有効なまま。
 2. **権限チェック。**
    - project を指定しないチェックは、今とまったく同じ結果になる。
    - 登録されていない project → 拒否。
    - project が属するものとは別の workspace を指定 → 拒否。
    - ユーザーの workspace ロールは、呼び出し側の指定ではなく、常に project が実際に属する
      workspace から取る。
-   - project のロールを持たない通常の workspace メンバーは、workspace のロールで与えられるアクセスを
+   - project のロールを持たない workspace メンバーは、workspace のロールで与えられるアクセスを
      すべての project でそのまま持つ。
-   - project のロールは、通常のメンバーのその project でのアクセスだけを引き上げ（workspace の reader が
-     project の writer なら編集できる）、引き下げることはない（workspace の writer が project の reader
-     でも編集できる）。
-   - 限定メンバーは、project のロールによってのみアクセスできる。
+   - project のロールは、workspace メンバーのその project でのアクセスだけを引き上げ（workspace の
+     reader が project の writer なら編集できる）、引き下げることはない（workspace の writer が project の
+     reader でも編集できる）。
+   - 外部コラボレーターは、自分の project にだけ、project のロールによってのみアクセスできる。
 3. **project の登録。** 登録できるのはサービスだけ（ユーザーのログインでは拒否）。owner は
    workspace のメンバーでなければならない。同じ project を同じ workspace に再登録しても問題ないが、
    別の workspace への登録は拒否する。
-4. **メンバーの管理。** workspace 外の人に、workspace への追加を伴わずに project のロールを与えることは
-   できない（それは 9 の1ステップでの追加で行う）。メンバーを管理する権限のない人は拒否される。
-   メンバーは自分で抜けられる。最後の owner は外せず、降格もできない。
+4. **メンバーの管理。** メンバーを管理する権限のない人は拒否される。メンバーは自分で抜けられる。
+   最後の owner は外せず、降格もできない。人を外部コラボレーターにできるのは workspace の owner または
+   maintainer だけ。
 5. **後始末。** 1人または複数のユーザーを workspace から外したとき、workspace を削除したときに、
-   project のロールが取り消される。
+   project のロールが取り消される。workspace を削除すると、その外部コラボレーターも取り消される。
 6. **同時の変更。** 2人が最後の2人の owner を同時に外す → ちょうど1つだけ成功する。2つのサービスが
    同じ project を同時に登録する → 1つだけ成功する。workspace の変更と project ロールの変更が同時に
-   保存されても、project ロールは消えない。
+   保存されても、project ロールは消えない。残りシートが1つのときに2人の管理者が別々の新しい外部
+   コラボレーターを追加する → ちょうど1つだけ成功する。
 7. **対応するすべてのデータベース。** 既存データに対するデータベースの更新とその取り消しを含む。
    既存ユーザーが project ロールなしで正しく読み込めること。
 8. **エンドツーエンド。** Dashboard の project 用のサンプルポリシーで、project のロールを持つ / 持たない
    workspace の reader、より低い project のロールを持つ workspace の writer、workspace の owner、
-   別 workspace のユーザー、project のロールを持つ / 持たない限定メンバーの結果を確認する。
-9. **1ステップでの追加。**
-   - workspace にいない人を1つ以上の project に追加すると、1ステップで、ちょうどそれらの project の
-     ロールを持つ限定メンバーになる。
-   - すべてか無か: どこかが失敗したら（別の workspace の project、管理者が管理できない project、
-     workspace のメンバー数の上限に達しているなど）、その人は workspace に追加されず、project の
-     ロールも得ない。
-   - すでに workspace にいる人を追加すると、project のロールが増えるだけで、workspace のロールは
-     変わらず、降格もしない。
-   - 限定メンバーは、project のロールを持たない project を見られない。
-   - 限定メンバーの最後の project ロールを外しても、workspace には残る。
-   - 2人の管理者が同じ新しい人を同時に追加する → その人は workspace に1回だけ追加され、両方の
-     project のロールを得る。
+   別 workspace のユーザー、1つの project の外部コラボレーターの結果を確認する。
+9. **外部コラボレーター。**
+   - (a) workspace メンバーを project に追加すると project のロールが与えられるだけで、それ以外の人を
+     追加するとその project の外部コラボレーターになる。
+   - (b) 人を複数の project の外部コラボレーターとして招待すると、1ステップでちょうどそれらのロールが
+     与えられる。どこかが失敗したら（別の workspace の project、権限がない、シートの上限に達している
+     など）、何も変わらない。
+   - 外部コラボレーターは workspace のメンバー一覧に現れず、自分の project 以外は何も見えない。
+   - シート: 複数の project の外部コラボレーターもシートは1つ。メンバーでもあり外部コラボレーターでも
+     ある人は1回だけ数える。追加するときにシートの上限が適用される。
+   - 最後の project のロールを外す、または1回の操作で workspace から外すと、アクセスがなくなり、
+     シートが空く。
+   - 外部コラボレーターを workspace に追加すると、project のロールは残り、追加のシートは使わない。
 
 技術的な詳細: *Solution Options → Option 1 → 技術的な補足: 影響・テスト・デプロイ・ロールバック・監視*
 を参照。
@@ -960,7 +1041,7 @@ workspace にだけ追加される、あるいはその逆、ということは�
 ## Deployment Plan
 
 1. 後方互換性はあるか？ **あり。** すべて既存のものに追加する形。権限チェックで project を
-   指定しないサービスには変化がない。
+   指定しないサービスには変化がなく、workspace のメンバー一覧も変わらない。
 2. 段階的に展開できるか？ **できる。** 順序:
    1. accounts をデプロイする。
    2. 各サービスが既存の project を accounts に登録する（一度だけの埋め戻し）。
@@ -968,12 +1049,13 @@ workspace にだけ追加される、あるいはその逆、ということは�
    4. 各サービスが project 単位の権限ルールを有効にし、権限チェックで project を指定し始める。
       このステップまでは project のロールは効かないため、誤ってアクセスできるようになる人はいない
       （安全側に倒れる）。
-3. 通知先: dashboard / visualizer / cms のオーナー、権限ポリシーの管理者。
+   5. 課金が外部コラボレーターを数え始め、サービスが外部コラボレーターとしてだけ参加している
+      workspace を表示するようにする。
+   6. 外部コラボレーターを追加する UI を有効にする（ステップ 5 の後でのみ）。
+3. 通知先: dashboard / visualizer / cms のオーナー、課金の担当者、権限ポリシーの管理者。
 4. 設定変更: なし。
 5. データベースの変更: accounts の起動時に自動で適用される。accounts 側で既存データを変換する
    必要はない。
-6. 限定メンバー: 限定メンバーを追加する UI は、すべてのサービスが新しい workspace ロールを表示でき、
-   その権限ポリシーがデフォルトでそのロールに project へのアクセスを与えないようになってから有効にする。
 
 技術的な詳細: *Solution Options → Option 1 → 技術的な補足: 影響・テスト・デプロイ・ロールバック・監視*
 を参照。
@@ -981,14 +1063,13 @@ workspace にだけ追加される、あるいはその逆、ということは�
 ## Rollback Plan
 
 1. 原因をチームの Slack チャンネルに共有する。
-2. まず、project 単位の権限ルールを使っているサービス側で、それを無効にする。
+2. まず、外部コラボレーターを追加する UI を無効にし、課金を workspace メンバーだけを数える方法に戻し、
+   project 単位の権限ルールを使っているサービス側でそれを無効にする。
 3. accounts を前のバージョンに戻す。前のバージョンは新しいデータを無視するだけなので、
    **データのロールバックは不要**。
-   注意: 前のバージョンの稼働中は、権限データを保存したユーザーの project ロールが消えることがある。
-   その時点では機能が無効なので許容でき、再度展開するときにサービスが埋め戻しをやり直す。
-   すでに限定メンバーがいる場合、前のバージョンはそのロールを知らない。ロールバックの前に、
-   それらのメンバーを workspace から外すか、別のロールに変えるかを決める（通常のロールにすると
-   アクセスできる範囲が広がる）。
+   注意: 前のバージョンの稼働中は、外部コラボレーターはアクセスできず（機能が無効のため）、権限データを
+   保存したユーザーの project ロールが消えることがある。再度展開するときにサービスが埋め戻しをやり直すが、
+   ロールが消えた外部コラボレーターは招待し直す必要がある。
 4. 新しいデータ構造を完全に取り除く必要がある場合のみ、データベースの取り消しを実行する。
    project の登録とロールの割り当てがすべて消えるので、先にバックアップを取る。
 
@@ -1004,12 +1085,17 @@ workspace にだけ追加される、あるいはその逆、ということは�
     閲覧だけできることを確認する。そのメンバーを workspace から外し、すべての project に
     アクセスできなくなることを確認する。
   - 別の workspace を指定してその project への権限を問い合わせ、拒否されることを確認する。
-  - project から、workspace にいない人を追加し、限定メンバーになること、シートを使うこと、
-    その project だけが見えることを確認する。
-  - workspace から人を追加して project を2つ選び、ちょうどその2つだけが見えることを確認する。
+  - project から、workspace にいない人を追加し、外部コラボレーターになること、その project だけが
+    見えること、workspace のメンバー一覧に現れないこと、シートを1つ使うことを確認する。
+  - workspace の画面から、人を2つの project の外部コラボレーターとして招待し、ちょうどその2つだけが
+    見えること、シートは1つしか使わないことを確認する。その人を workspace の外部コラボレーターから外し、
+    アクセスできなくなり、シートが空くことを確認する。
+  - 外部コラボレーターを workspace にメンバーとして追加し、project のロールが残ること、シート数が
+    変わらないことを確認する。
 - メトリクス
   - 権限チェックにかかる時間（通常時と、遅い方から 5%）。project を指定した場合と、しない場合。
-  - project の登録 / 登録解除、メンバー変更、1ステップでの追加のエラー率（自動リトライを含む）。
+  - project の登録 / 登録解除、メンバー変更、外部コラボレーターの追加・削除のエラー率（自動リトライと
+    シートの上限による拒否を含む）。
   - ユーザーあたりの project ロール数（最大と上位 1%）。1ユーザーあたり約 1,000 件という想定を監視する。
 - アラート
   - 権限チェックのエラー率: Warning 1% 超、Danger 5% 以上。
@@ -1021,9 +1107,9 @@ workspace にだけ追加される、あるいはその逆、ということは�
 ## Open Questions
 
 1. **プロダクトが private な project のような、より厳しいルールを適用できるようにするか。** デフォルトでは、
-   通常の workspace メンバーはすべての project を見られ、project のロールはそれに加算されるだけ。
+   workspace メンバーはすべての project を見られ、project のロールはそれに加算されるだけ。
    「private な project はメンバーだけ、public な project は workspace 全体が見られる」のようなルールは
-   通常のメンバーも制限することになり、project が公開かどうかを知る必要がある。
+   workspace メンバーも制限することになり、project が公開かどうかを知る必要がある。
    必要とするプロダクトが出てくるまで保留。
 2. **一覧画面で複数の project をまとめてチェックできるようにするか。** project の一覧画面では
    project ごとに権限の判定が必要で、まとめて1回で判定できれば速くなる。
@@ -1036,17 +1122,18 @@ workspace にだけ追加される、あるいはその逆、ということは�
 6. **UI 上でどこでメンバーを管理するか。** project のメンバー管理を Dashboard だけで行うか、
    各サービス（visualizer / cms / flow）の画面でも行えるようにするか。accounts 側は変わらない
    （どの画面も同じメンバー管理の仕組みを使う）が、どのサービスに UI の対応が必要かが変わるため、
-   デザイナーと合わせて決める。これは、*Design → UI からの追加* の2つの1ステップのパターン、
-   (a) project の画面からの追加と (b) workspace の「メンバー追加」ダイアログでの project の選択を、
+   デザイナーと合わせて決める。これは、*Design → UI からの追加* のパターン、(a) project の画面からの
+   追加、(b) workspace のメンバー画面からの外部コラボレーターの招待、そして外部コラボレーターの一覧を、
    どこに置くかも決める。
-7. **限定メンバーのロールの名前と、正確に何ができるか。** 名前は仮。自分の project を見ること以外に、
-   workspace 単位で何か必要か（例: workspace の名前や workspace のメンバー一覧を見ること）。また、
-   workspace の管理者ではない project の owner が、この方法で *新しい* 人を workspace に追加してよいか
-   （有料のシートを使うため）。（最初のバージョンの提案: できない。すでに workspace にメンバーを
-   追加できる人だけができる。）
-8. **ある人の最後の project ロールを外したら、workspace からも外すか。** 現状は外さない。project の
-   ロールがなくなった限定メンバーは、管理者が外すまで workspace に残り、シートを使い続ける。自動で
-   外せばシートが空くが、管理者が驚く可能性がある。
+7. **外部コラボレーターを何と呼び、何を見られ、誰が追加できるか。** 名前は仮。自分の project 以外に、
+   workspace 単位で何か見られるか（例: workspace の名前や、ほかに誰がいるか）。workspace の owner でも
+   maintainer でもない project の owner が、外部コラボレーターを追加してよいか（有料のシートを使うため）。
+   （最初のバージョンの提案: できない。workspace の owner と maintainer だけ。）
+8. **公開 project の外部コラボレーターを無料にするか。** GitHub は public な repository の outside
+   collaborator には課金しない。Re:Earth も同じにするなら、accounts はどの project が公開かを知る
+   必要がある。
+9. **workspace メンバーを外すとき、選んだ project の外部コラボレーターとして残す選択肢を用意するか**
+   （GitHub のように）。現状は、その workspace 内の project のロールをすべて取り消す。
 
 技術的な詳細: *Solution Options → Option 1 → Open Questions の技術的な補足* を参照。
 
