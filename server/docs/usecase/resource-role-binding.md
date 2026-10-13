@@ -9,6 +9,20 @@
 >
 > Japanese version: [resource-role-binding.ja.md](resource-role-binding.ja.md)
 
+## How to read this document
+
+Sections from *Goals* onward include technical content. Please review in two
+steps:
+
+1. **Concept first.** Read *Background / Problem Statement* and check whether
+   the concept feels right: does anything seem off, contradictory, or confusing
+   for customers?
+2. **Then technical adoption.** Read *Goals* and the sections after it, and
+   check how difficult it would be to adopt this in each service (dashboard,
+   visualizer, cms, flow) and what concerns you see. *Solution Options* holds
+   the system design details and is for readers interested in the
+   implementation.
+
 ## Document Signature
 
 |           |                |

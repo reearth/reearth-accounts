@@ -9,6 +9,16 @@
 > 最初に使うのは Dashboard の project です。コード上では、ロールの割り当ては `...Binding` /
 > `resource_bindings` という名前の型・テーブルで表します。
 
+## このドキュメントの読み方
+
+*Goals* 以降には技術的な内容が含まれます。次の2段階で読んでください。
+
+1. **まずコンセプトを確認する。** *Background / Problem Statement* を読み、コンセプトに
+   違和感がないか（おかしな点、矛盾、顧客にとって分かりにくい点がないか）を確認してください。
+2. **次に技術的な導入を確認する。** *Goals* 以降を読み、各サービス（dashboard、visualizer、
+   cms、flow）に導入する際の難易度や懸念点を確認してください。*Solution Options* はシステム
+   設計の詳細なので、実装に関心がある方向けです。
+
 ## Document Signature
 
 |           |                |
