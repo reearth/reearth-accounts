@@ -2,6 +2,9 @@ package interactor
 
 import (
 	"context"
+	"crypto/sha256"
+	"encoding/hex"
+	"strings"
 	"testing"
 
 	accountmemory "github.com/reearth/reearth-accounts/server/internal/infrastructure/memory"
@@ -394,10 +397,18 @@ func TestGenerateScimToken(t *testing.T) {
 	require.NoError(t, err)
 	assert.NotEmpty(t, plaintext1)
 
+	// Token must have the "<workspaceID>.<secret>" format.
+	wsIDStr := ws.ID().String()
+	assert.True(t, strings.HasPrefix(plaintext1, wsIDStr+"."), "token must start with workspace ID prefix")
+
 	saved, err := db.Workspace.FindByID(ctx, ws.ID())
 	require.NoError(t, err)
 	hash1 := saved.ScimConfig().TokenHash()
 	assert.NotEmpty(t, hash1)
+
+	// The stored hash must be the SHA-256 hex of the full token (including prefix).
+	sum := sha256.Sum256([]byte(plaintext1))
+	assert.Equal(t, hex.EncodeToString(sum[:]), hash1)
 
 	// second call replaces hash
 	plaintext2, err := uc.GenerateScimToken(ctx, ws.ID(), op)

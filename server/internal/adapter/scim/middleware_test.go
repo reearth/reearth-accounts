@@ -1,6 +1,8 @@
 package scim
 
 import (
+	"crypto/sha256"
+	"encoding/hex"
 	"net/http"
 	"net/http/httptest"
 	"testing"
@@ -115,6 +117,86 @@ func TestScimBearerAuth_ValidToken(t *testing.T) {
 	require.NoError(t, err)
 	assert.Equal(t, http.StatusOK, rec.Code)
 	assert.Equal(t, ws.ID(), capturedWSID)
+}
+
+func sha256hex(s string) string {
+	sum := sha256.Sum256([]byte(s))
+	return hex.EncodeToString(sum[:])
+}
+
+func TestScimBearerAuth_NewFormatToken(t *testing.T) {
+	db := accountmemory.New()
+
+	ownerID := user.NewID()
+	ws := workspace.New().
+		NewID().
+		Name("test").
+		Alias("test-alias").
+		Members(map[user.ID]workspace.Member{
+			ownerID: {Role: role.RoleOwner, InvitedBy: ownerID},
+		}).
+		MustBuild()
+
+	plaintext := ws.ID().String() + ".randomsecretpart"
+
+	cfg := workspace.NewScimConfig()
+	cfg.SetEnabled(true)
+	cfg.SetTokenHash(sha256hex(plaintext))
+	ws.SetScimConfig(cfg)
+	require.NoError(t, db.Workspace.Save(t.Context(), ws))
+
+	e := echo.New()
+	req := httptest.NewRequest(http.MethodGet, "/scim/v2/Users", nil)
+	req.Header.Set("Authorization", "Bearer "+plaintext)
+	rec := httptest.NewRecorder()
+	c := e.NewContext(req, rec)
+
+	var capturedWSID workspace.ID
+	mw := ScimBearerAuth(db.Workspace)
+	handler := mw(func(c echo.Context) error {
+		id, ok := WorkspaceIDFromContext(c.Request().Context())
+		require.True(t, ok)
+		capturedWSID = id
+		return c.String(http.StatusOK, "ok")
+	})
+
+	require.NoError(t, handler(c))
+	assert.Equal(t, http.StatusOK, rec.Code)
+	assert.Equal(t, ws.ID(), capturedWSID)
+}
+
+func TestScimBearerAuth_NewFormatWrongSecret(t *testing.T) {
+	db := accountmemory.New()
+
+	ownerID := user.NewID()
+	ws := workspace.New().
+		NewID().
+		Name("test").
+		Alias("test-alias2").
+		Members(map[user.ID]workspace.Member{
+			ownerID: {Role: role.RoleOwner, InvitedBy: ownerID},
+		}).
+		MustBuild()
+
+	plaintext := ws.ID().String() + ".correctsecret"
+
+	cfg := workspace.NewScimConfig()
+	cfg.SetEnabled(true)
+	cfg.SetTokenHash(sha256hex(plaintext))
+	ws.SetScimConfig(cfg)
+	require.NoError(t, db.Workspace.Save(t.Context(), ws))
+
+	e := echo.New()
+	req := httptest.NewRequest(http.MethodGet, "/scim/v2/Users", nil)
+	req.Header.Set("Authorization", "Bearer "+ws.ID().String()+".wrongsecret")
+	rec := httptest.NewRecorder()
+	c := e.NewContext(req, rec)
+
+	mw := ScimBearerAuth(db.Workspace)
+	handler := mw(func(c echo.Context) error { return c.String(http.StatusOK, "ok") })
+
+	require.NoError(t, handler(c))
+	assert.Equal(t, http.StatusUnauthorized, rec.Code)
 }
 
 func TestScimBearerAuth_DisabledWorkspace(t *testing.T) {

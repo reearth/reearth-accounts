@@ -3,7 +3,9 @@ package interactor
 import (
 	"context"
 	"crypto/rand"
+	"crypto/sha256"
 	"encoding/base64"
+	"encoding/hex"
 	"errors"
 	"fmt"
 	"os"
@@ -20,7 +22,6 @@ import (
 	"github.com/reearth/reearth-accounts/server/pkg/workspace"
 	"github.com/reearth/reearthx/log"
 	"github.com/reearth/reearthx/rerror"
-	"golang.org/x/crypto/bcrypt"
 )
 
 type Scim struct {
@@ -179,18 +180,21 @@ func (i *Scim) GenerateScimToken(ctx context.Context, workspaceID workspace.ID, 
 		if _, err := rand.Read(raw); err != nil {
 			return "", err
 		}
-		plaintext := base64.RawURLEncoding.EncodeToString(raw)
+		// Token format: "<workspaceID>.<base64url-random>"
+		// The workspace ID prefix lets the auth middleware do a single FindByID
+		// instead of scanning every workspace on every SCIM request.
+		plaintext := workspaceID.String() + "." + base64.RawURLEncoding.EncodeToString(raw)
 
-		hash, err := bcrypt.GenerateFromPassword([]byte(plaintext), bcrypt.DefaultCost)
-		if err != nil {
-			return "", err
-		}
+		// SHA-256 is sufficient for 256-bit random tokens; bcrypt's slowness only
+		// matters for low-entropy secrets (passwords), not cryptographically random keys.
+		sum := sha256.Sum256([]byte(plaintext))
+		tokenHash := hex.EncodeToString(sum[:])
 
 		cfg := ws.ScimConfig()
 		if cfg == nil {
 			cfg = workspace.NewScimConfig()
 		}
-		cfg.SetTokenHash(string(hash))
+		cfg.SetTokenHash(tokenHash)
 		ws.SetScimConfig(cfg)
 
 		if err := i.repos.Workspace.Save(ctx, ws); err != nil {
