@@ -2,6 +2,7 @@ package postgres
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 
 	"github.com/jackc/pgx/v5"
@@ -110,10 +111,17 @@ func (r *Permittable) Save(ctx context.Context, p permittable.Permittable) error
 		if err := q.PermittableWorkspaceRolesDeleteByPermittable(ctx, pid); err != nil {
 			return rerror.ErrInternalByWithContext(ctx, err)
 		}
-		for _, wr := range wrs {
-			if err := q.PermittableWorkspaceRoleInsert(ctx, gen.PermittableWorkspaceRoleInsertParams{
-				PermittableID: pid, WorkspaceID: wr.WorkspaceID, RoleID: wr.RoleID,
-			}); err != nil {
+		if len(wrs) > 0 {
+			// pid is the row's actual DB id, which ON CONFLICT may have kept as
+			// the pre-existing id rather than p.ID(); every role must use it.
+			for i := range wrs {
+				wrs[i].PermittableID = pid
+			}
+			payload, err := json.Marshal(wrs)
+			if err != nil {
+				return rerror.ErrInternalByWithContext(ctx, err)
+			}
+			if err := q.PermittableWorkspaceRolesInsertBulk(ctx, payload); err != nil {
 				return rerror.ErrInternalByWithContext(ctx, err)
 			}
 		}
