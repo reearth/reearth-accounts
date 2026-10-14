@@ -213,7 +213,8 @@ permission.
    accounts) can be project members, not integrations or API tokens.
 6. **Using project properties in permission decisions** (for example "public"
    or "private"). See *Open Questions*; the first version decides by roles and
-   the base permission only.
+   the base permission only. This is about deciding who can view or edit, not
+   about how seats are counted (public projects and seats are Open Question 15).
 7. **Sending invitation emails for project membership.** The email mentions the
    project's name, which accounts does not know, so the service sends it.
 8. **Registering existing projects in bulk (backfill).** A project is registered
@@ -1247,6 +1248,24 @@ flowchart LR
     a service can register existing projects without `ownerUserId` at any time
     (idempotent, and it changes no decision). The same endpoint works whether
     done all at once or gradually per service.
+15. **Public projects and seats:** to make them free, give the registration an
+    optional `public: Boolean` that the service sends at registration and when
+    visibility changes (e.g. a new M2M route
+    `PUT /api/service/resources/{kind}/{id}/visibility`). `UsesSeat` /
+    `FindSeatUsers` would then not count roles on public resources as editing
+    roles. A visibility change runs `ensureSeats` under the workspace lock, and
+    making a resource private is refused with `ErrSeatLimitExceeded` if it would
+    exceed the limit. Unregistered projects have no roles, so they are not
+    affected. Nothing is done in v1.
+16. **Access requests:** a request record keyed by `(workspaceId, resourceKind,
+    resourceId, targetUserId or email)` (requester, role, state). Approval only
+    calls `addWorkspaceMemberWithResourceRoles` or `setResourceMember` with the
+    approver's identity, so the existing guards (`manage_members`, workspace
+    admin for a new person, last-owner rule) and the seat check apply as is. A
+    new person known only by email becomes a user through the existing user
+    lookup / invitation flow before approval. The workspace member list
+    (`read_member`) is a workspace-level check without `resourceId`, so the base
+    permission does not affect it.
 
 ### Option 2: Role assignments in their own collection/table (no embedding)
 
@@ -1395,7 +1414,9 @@ see nothing, do not use a seat. A member uses a seat if any of these is true:
 Each person counts once, however many projects they can edit. With the default
 base permission and no project roles, this is exactly today's Dashboard rule:
 everyone except readers uses a seat. Unregistered projects have no project
-roles, so they never change seat counts.
+roles, so they never change seat counts. Whether a project is public or private
+does not matter: someone who can edit only public projects also uses a seat
+(Open Question 15).
 
 Examples:
 
@@ -1482,6 +1503,21 @@ already a member, they just get the project roles; their workspace role is not
 changed. With the base permission "Follow workspace role", a person added as a
 reader can still view every project; to limit them to the chosen projects, the
 workspace uses "None".
+
+**Who can add people.** Anyone who can manage a project's members (that
+project's owner / maintainer, or a workspace owner / maintainer) can add an
+existing workspace member to the project directly. Adding someone who is not
+yet in the workspace needs a workspace owner or maintainer in the first
+version. So an "access request" flow is needed when:
+
+- the person who wants someone added (the requester) is a writer / reader on
+  the project (cannot manage members), or
+- the person to be added is not yet in the workspace.
+
+A flow where a project member searches the workspace's users (or enters an
+email address for a new person), picks a role and sends a request, and someone
+who can approve accepts or declines it, is considered as a possible follow-up
+(*Open Question 16*).
 
 **To decide (UI/UX): where membership is managed.** We need to decide, from a
 UI/UX point of view, whether project members (including patterns (a) and (b)
@@ -1831,6 +1867,36 @@ tests, deployment, rollback, monitoring*.
     a project role and is registered, accounts enforces it. Is this enough, or
     should each service, in the future, gradually register existing projects too
     so that accounts always enforces it (optional, and possible at any time)?
+15. **Does someone who can edit only public projects use a seat?** Under the
+    current rule, anyone who can edit at least one project uses a seat, public
+    or private. GitHub does not charge outside collaborators on public
+    repositories, but Re:Earth has no outside collaborators, so making this free
+    would be a new pricing rule for members. Accounts would then need to know
+    whether each project is public or private (today it does not; the services
+    own that), for example by the service telling it at registration and when it
+    changes. Seat counts would also change when a project's visibility changes,
+    and making a project private could be refused when it would exceed the seat
+    limit. Proposed: keep "can edit anywhere → uses a seat" in the first version
+    and decide together with the business / billing side.
+16. **Should there be "access requests"?** As described in *Design → Adding
+    people from the UI*, a project writer / reader cannot add members, and adding
+    someone who is not yet in the workspace needs a workspace owner / maintainer.
+    Should a project member be able to search the workspace's users (or enter an
+    email address for a new person), pick a role and send a request? It would be
+    approved by the project's owner / maintainer for an existing workspace
+    member, and by a workspace owner / maintainer when the person must join the
+    workspace or would use a new seat. Approval runs the existing one-step add
+    (all-or-nothing, same seat check). Open points:
+    - Where requests are stored and shown (accounts, or each service /
+      Dashboard), and how people are notified.
+    - Whether people can request access for themselves (like "request access"
+      when opening a link to a private project).
+    - Whether it is in the first version or a follow-up. Proposed: a follow-up;
+      the first version provides the APIs that approval would call (the one-step
+      add and so on).
+    - Searching the workspace's users: workspace members can see the member list
+      today. This is workspace-level, not project-level, so it stays visible
+      under the base permission "None" (to be confirmed).
 
 Technical details: see *Solution Options → Option 1 → Technical notes on open
 questions*.

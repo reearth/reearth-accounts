@@ -183,7 +183,8 @@ accounts は *project* が何であるかを取り込んではいけません。
 5. **integration を project のメンバーにすること。** 最初のバージョンでは、project のメンバーに
    なれるのは人（ユーザーアカウント）だけで、integration や API トークンはなれない。
 6. **project の属性（例: 公開 / 非公開）を権限の判定に使うこと。** *Open Questions* で扱う。
-   最初のバージョンはロールと基本権限だけで判定する。
+   最初のバージョンはロールと基本権限だけで判定する。これは「誰が閲覧・編集できるか」の判定の話で、
+   シートの数え方の話ではない（公開 project とシートの関係は Open Question 15 で扱う）。
 7. **project メンバーシップの招待メールを送ること。** メールには project 名が入るが、
    accounts はそれを知らないため、サービス側で送る。
 8. **既存の project を一括で登録すること（埋め戻し）。** project は必要になったとき（最初に project の
@@ -1118,6 +1119,19 @@ flowchart LR
     常に強制するようにするには、サービスが任意の時点で既存の project を `ownerUserId` なしで登録すればよい
     （冪等で、判定は変わらない）。一括で行う場合も、サービスごとに少しずつ行う場合も、同じ
     エンドポイントでよい。
+15. **公開 project とシート:** 無料にするなら、登録に任意の `public: Boolean` を持たせ、サービスが登録時と
+    公開範囲の変更時（新しい M2M のルート `PUT /api/service/resources/{kind}/{id}/visibility` など）に
+    送る。`UsesSeat` / `FindSeatUsers` は、公開のリソースのロールを編集できるロールとして数えないように
+    する。公開範囲の変更は workspace ロックのもとで `ensureSeats` を通し、非公開にして上限を超えるなら
+    `ErrSeatLimitExceeded` で拒否する。未登録の project はロールを持たないので影響しない。v1 では
+    何もしない。
+16. **アクセスのリクエスト:** `(workspaceId, resourceKind, resourceId, targetUserId または email)` を
+    キーにしたリクエストのレコード（要求者、ロール、状態）を持つ。承認は、承認者の ID で
+    `addWorkspaceMemberWithResourceRoles` または `setResourceMember` を呼ぶだけにして、既存のガード
+    （`manage_members`、新しい人には workspace 管理者、最後の owner のルール）とシートのチェックを
+    そのまま効かせる。メールアドレスだけの新しい人は、既存のユーザー検索や招待の流れでユーザーになって
+    から承認する。workspace のメンバー一覧（`read_member`）は `resourceId` なしの workspace 単位の
+    チェックなので、基本権限の影響を受けない。
 
 ### Option 2: ロールの割り当てを独立したコレクション / テーブルに置く（埋め込まない）
 
@@ -1250,7 +1264,8 @@ Re:Earth は workspace ごとのシート単位で課金される。**workspace 
 
 何個の project を編集できても、1人は1回だけ数える。基本権限がデフォルトで project のロールがなければ、
 これは今の Dashboard のルール（reader 以外の全員がシートを使う）とまったく同じ。未登録の project には
-project のロールがないので、シートの数を変えることはない。
+project のロールがないので、シートの数を変えることはない。project が公開か非公開かは関係なく、公開
+project だけを編集できる人もシートを使う（Open Question 15）。
 
 例:
 
@@ -1317,6 +1332,18 @@ project のロールがないので、シートの数を変えることはない
 最初のバージョンでは workspace の owner と maintainer だけができる。すでにメンバーなら、project のロールを与えるだけで、workspace の
 ロールは変えない。基本権限が「workspace のロールに従う」の場合、reader として追加した人は引き続き
 すべての project を閲覧できる。選んだ project だけに限るには、workspace を「なし」にする。
+
+**誰が人を追加できるか。** project のメンバーを管理できる人（その project の owner / maintainer、
+workspace の owner / maintainer）は、すでに workspace のメンバーである人を直接 project に追加できる。
+まだ workspace にいない人を追加するには、最初のバージョンでは workspace の owner か maintainer が必要。
+そのため、次の場合には「アクセスのリクエスト」の流れが必要になる。
+
+- 追加を頼みたい人（依頼する側）が、その project の writer / reader（メンバーを管理できない）である場合。
+- 追加される人が、まだ workspace にいない場合。
+
+project のメンバーが workspace のユーザーを探して（新しい人ならメールアドレスを入れて）、ロールを選んで
+リクエストを送り、承認できる人が承認または却下する流れを、今後の追加機能として検討する
+（*Open Question 16*）。
 
 **要決定（UI/UX）: メンバーをどこで管理するか。** UI/UX の観点で、project のメンバー管理（上の
 パターン (a)・(b) を含む）を **Dashboard からのみ** 行えるようにするか、**各サービス**（visualizer /
@@ -1596,6 +1623,28 @@ workspace のメンバーでない人はアクセスできない。「なし」�
     信頼する（今の権限チェックと同じ）。project のロールが付いて登録された後は accounts が強制する。
     これで十分か、それとも将来、各サービスが既存の project も少しずつ登録して、accounts が常に強制
     できるようにするか（任意で、いつでもできる）。
+15. **公開 project だけを編集できる人はシートを使うか。** 今のルールでは、公開か非公開かに関係なく、
+    どれか1つでも project を編集できる人はシートを使う。GitHub は public な repository の outside
+    collaborator には課金しないが、Re:Earth には outside collaborator がないので、無料にするならメンバーに
+    対する新しい料金のルールになる。その場合、accounts は各 project が公開か非公開かを知る必要がある
+    （今は知らず、サービスが持っている）。たとえばサービスが登録時と変更時にそれを伝える。また、project の
+    公開範囲が変わるとシートの数も変わり、project を非公開にするとシートの上限を超える場合は、その変更が
+    拒否されることになる。提案: 最初のバージョンは「どこかで編集できればシートを使う」のままにし、
+    事業・課金の担当と合わせて決める。
+16. **「アクセスのリクエスト」を用意するか。** *Design → UI からの追加* のとおり、project の writer / reader
+    はメンバーを追加できず、まだ workspace にいない人の追加には workspace の owner / maintainer が必要。
+    そこで、project のメンバーが workspace のユーザーを探して（新しい人ならメールアドレスを入れて）、
+    ロールを選んでリクエストを送れるようにするか。承認するのは、workspace の既存メンバーなら project の
+    owner / maintainer、workspace に新しく加わる人やシートが新たに必要になる場合は workspace の
+    owner / maintainer。承認すると既存の1ステップでの追加が実行される（すべてか無か、シートのチェックも
+    同じ）。未決の点:
+    - リクエストをどこに保存して表示するか（accounts か、各サービス / Dashboard か）。通知をどうするか。
+    - 自分自身のアクセスをリクエストできるようにするか（非公開 project のリンクを開いたときの
+      「アクセスをリクエスト」のように）。
+    - 最初のバージョンに入れるか、後から追加するか。提案: 後から追加する。最初のバージョンでは、
+      承認時に呼ぶ API（1ステップでの追加など）を用意しておく。
+    - workspace のユーザーを探すこと: workspace のメンバー一覧は今もメンバーが見られる。これは project
+      単位ではなく workspace 単位のことなので、基本権限が「なし」でも見られる（確認する）。
 
 技術的な詳細: *Solution Options → Option 1 → Open Questions の技術的な補足* を参照。
 
