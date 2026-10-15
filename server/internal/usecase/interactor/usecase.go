@@ -3,8 +3,10 @@ package interactor
 import (
 	"context"
 
+	"github.com/reearth/reearth-accounts/server/internal/rbac"
 	"github.com/reearth/reearth-accounts/server/internal/usecase/interfaces"
 	"github.com/reearth/reearth-accounts/server/internal/usecase/repo"
+	"github.com/reearth/reearth-accounts/server/pkg/applog"
 	"github.com/reearth/reearth-accounts/server/pkg/id"
 	"github.com/reearth/reearth-accounts/server/pkg/workspace"
 	"github.com/reearth/reearthx/usecasex"
@@ -95,6 +97,28 @@ func (u *uc) EnsurePermission(op *workspace.Operator) usecasex.Middleware {
 			return next(ctx)
 		}
 	}
+}
+
+func checkCerbosPermission(ctx context.Context, cerbos interfaces.Cerbos, ws *workspace.Workspace, operator *workspace.Operator, action string) error {
+	if operator == nil || operator.User == nil {
+		return interfaces.ErrOperationDenied
+	}
+	if cerbos == nil {
+		return nil
+	}
+	result, err := cerbos.CheckPermission(ctx, *operator.User, interfaces.CheckPermissionParam{
+		Service:        rbac.ServiceName,
+		Resource:       rbac.ResourceWorkspace,
+		Action:         action,
+		WorkspaceAlias: ws.Alias(),
+	})
+	if err != nil {
+		return applog.ErrorWithCallerLogging(ctx, "failed to check permission", err)
+	}
+	if result != nil && !result.Allowed {
+		return interfaces.ErrPermissionDenied
+	}
+	return nil
 }
 
 func (u *uc) checkPermission(op *workspace.Operator) error {
