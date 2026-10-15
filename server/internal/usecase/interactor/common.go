@@ -27,7 +27,7 @@ func NewContainer(
 		Cerbos:      cerbos,
 		Permittable: NewPermittable(r),
 		Role:        r.Role,
-		Scim:        NewScim(r),
+		Scim:        NewScim(r, cerbos),
 		User:        NewUser(r, acg, cerbos, config.SignupSecret, config.AuthSrvUIDomain, config.AllowedISS...),
 		Workspace:   NewWorkspace(r, enforcer, cerbos),
 	}
