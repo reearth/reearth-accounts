@@ -761,6 +761,8 @@ func TestUser_FindOrCreate_AllowlistRejectsUnknownISS(t *testing.T) {
 
 // mockAuthenticator is a test helper that implements the Authenticator interface
 type mockAuthenticator struct {
+	emailVerified                 bool
+	getUserError                  error
 	resendVerificationEmailCalled bool
 	resendVerificationEmailUserID string
 	resendVerificationEmailError  error
@@ -789,6 +791,13 @@ func (m *mockAuthenticator) EnableMFA(_ context.Context, _ string) (string, erro
 
 func (m *mockAuthenticator) GetMFAStatus(_ context.Context, _ string) (gateway.MFAStatus, error) {
 	return gateway.MFAStatus{}, nil
+}
+
+func (m *mockAuthenticator) GetUser(_ context.Context, _ string) (gateway.AuthenticatorUser, error) {
+	if m.getUserError != nil {
+		return gateway.AuthenticatorUser{}, m.getUserError
+	}
+	return gateway.AuthenticatorUser{EmailVerified: m.emailVerified}, nil
 }
 
 func (m *mockAuthenticator) RegenerateMFARecoveryCode(_ context.Context, _ string) (string, error) {
@@ -1110,12 +1119,12 @@ func TestUser_SyncSSOUser(t *testing.T) {
 		assert.Equal(t, "sso2@example.com", u.Email())
 	})
 
-	t.Run("sends ResendVerificationEmail and returns user (verification state not persisted)", func(t *testing.T) {
+	t.Run("sends ResendVerificationEmail when Auth0 email_verified is false", func(t *testing.T) {
 		ctx := context.Background()
 		r := accountmemory.New()
 		setupRoles(ctx, r)
 
-		auth0Mock := &mockAuthenticator{}
+		auth0Mock := &mockAuthenticator{emailVerified: false}
 		g := &gateway.Container{
 			Authenticators: map[gateway.Provider]gateway.Authenticator{
 				gateway.ProviderAuth0: auth0Mock,
@@ -1132,6 +1141,30 @@ func TestUser_SyncSSOUser(t *testing.T) {
 		assert.NoError(t, err)
 		assert.NotNil(t, u)
 		assert.True(t, auth0Mock.resendVerificationEmailCalled)
+	})
+
+	t.Run("skips ResendVerificationEmail when Auth0 email_verified is true", func(t *testing.T) {
+		ctx := context.Background()
+		r := accountmemory.New()
+		setupRoles(ctx, r)
+
+		auth0Mock := &mockAuthenticator{emailVerified: true}
+		g := &gateway.Container{
+			Authenticators: map[gateway.Provider]gateway.Authenticator{
+				gateway.ProviderAuth0: auth0Mock,
+			},
+		}
+
+		uc := NewUser(r, g, nil, "", "")
+		u, err := uc.SyncSSOUser(ctx, interfaces.SyncSSOUserParam{
+			Email: "sso-verified@example.com",
+			Name:  "SSO Verified",
+			Sub:   "samlp|org123|already-verified",
+		})
+
+		assert.NoError(t, err)
+		assert.NotNil(t, u)
+		assert.False(t, auth0Mock.resendVerificationEmailCalled, "email must not be sent when already verified in Auth0")
 	})
 
 	t.Run("calls auth0 ResendVerificationEmail for new user", func(t *testing.T) {
@@ -1179,11 +1212,9 @@ func TestUser_SyncSSOUser(t *testing.T) {
 		})
 
 		// User is persisted; the email failure is best-effort and must not surface as an error.
-		// User stays unverified so the next SyncSSOUser call retries the email.
 		assert.NoError(t, err)
 		assert.NotNil(t, u)
 		assert.True(t, auth0Mock.resendVerificationEmailCalled)
-		assert.False(t, u.Verification().IsVerified(), "user must remain unverified so the email is retried on next login")
 	})
 
 	t.Run("skips auth0 call when no gateway configured", func(t *testing.T) {
@@ -1241,12 +1272,12 @@ func TestUser_SyncSSOUser(t *testing.T) {
 		assert.NotEqual(t, u1.Name(), u2.Name(), "each user must get a distinct placeholder name to avoid workspace alias collisions")
 	})
 
-	t.Run("sends ResendVerificationEmail on every login (verification state not persisted)", func(t *testing.T) {
+	t.Run("retries email on subsequent login when Auth0 email_verified is still false", func(t *testing.T) {
 		ctx := context.Background()
 		r := accountmemory.New()
 		setupRoles(ctx, r)
 
-		auth0Mock := &mockAuthenticator{}
+		auth0Mock := &mockAuthenticator{emailVerified: false}
 		g := &gateway.Container{
 			Authenticators: map[gateway.Provider]gateway.Authenticator{
 				gateway.ProviderAuth0: auth0Mock,
@@ -1263,10 +1294,10 @@ func TestUser_SyncSSOUser(t *testing.T) {
 		assert.NoError(t, err)
 		assert.True(t, auth0Mock.resendVerificationEmailCalled)
 
-		// Reset the mock to detect a second call.
+		// Reset the mock — email_verified still false (user hasn't clicked the link).
 		auth0Mock.resendVerificationEmailCalled = false
 
-		// Second call: existing user — email is sent again since verified state is not persisted.
+		// Second call: Auth0 still unverified → email is retried.
 		u, err := uc.SyncSSOUser(ctx, interfaces.SyncSSOUserParam{
 			Email: "returning@example.com",
 			Name:  "Returning User",
@@ -1274,7 +1305,57 @@ func TestUser_SyncSSOUser(t *testing.T) {
 		})
 		assert.NoError(t, err)
 		assert.NotNil(t, u)
-		assert.True(t, auth0Mock.resendVerificationEmailCalled, "ResendVerificationEmail is sent on every login")
+		assert.True(t, auth0Mock.resendVerificationEmailCalled, "email must be retried while Auth0 email_verified remains false")
+	})
+
+	t.Run("persists verified state and skips Auth0 calls on subsequent logins", func(t *testing.T) {
+		ctx := context.Background()
+		r := accountmemory.New()
+		setupRoles(ctx, r)
+
+		auth0Mock := &mockAuthenticator{emailVerified: false}
+		g := &gateway.Container{
+			Authenticators: map[gateway.Provider]gateway.Authenticator{
+				gateway.ProviderAuth0: auth0Mock,
+			},
+		}
+
+		uc := NewUser(r, g, nil, "", "")
+		_, err := uc.SyncSSOUser(ctx, interfaces.SyncSSOUserParam{
+			Email: "clicked@example.com",
+			Name:  "Clicked User",
+			Sub:   "samlp|org123|clicked",
+		})
+		assert.NoError(t, err)
+		assert.True(t, auth0Mock.resendVerificationEmailCalled)
+
+		// Simulate user clicking the verification link — Auth0 now reports verified.
+		auth0Mock.emailVerified = true
+		auth0Mock.resendVerificationEmailCalled = false
+
+		u, err := uc.SyncSSOUser(ctx, interfaces.SyncSSOUserParam{
+			Email: "clicked@example.com",
+			Name:  "Clicked User",
+			Sub:   "samlp|org123|clicked",
+		})
+		assert.NoError(t, err)
+		assert.NotNil(t, u)
+		assert.False(t, auth0Mock.resendVerificationEmailCalled)
+		assert.True(t, u.Verification().IsVerified(), "verified state must be persisted to DB")
+
+		// Third login: local DB has verified=true — no Auth0 calls at all.
+		auth0Mock.emailVerified = false // would trigger email if called
+		auth0Mock.resendVerificationEmailCalled = false
+
+		u, err = uc.SyncSSOUser(ctx, interfaces.SyncSSOUserParam{
+			Email: "clicked@example.com",
+			Name:  "Clicked User",
+			Sub:   "samlp|org123|clicked",
+		})
+		assert.NoError(t, err)
+		assert.NotNil(t, u)
+		assert.True(t, u.Verification().IsVerified())
+		assert.False(t, auth0Mock.resendVerificationEmailCalled, "no Auth0 calls once verified is cached in DB")
 	})
 
 	t.Run("retries ResendVerificationEmail on next login after transient failure", func(t *testing.T) {

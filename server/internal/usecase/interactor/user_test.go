@@ -1273,6 +1273,10 @@ func (m *mockAuthenticatorWithError) GetMFAStatus(_ context.Context, _ string) (
 	return gateway.MFAStatus{}, nil
 }
 
+func (m *mockAuthenticatorWithError) GetUser(_ context.Context, _ string) (gateway.AuthenticatorUser, error) {
+	return gateway.AuthenticatorUser{}, nil
+}
+
 func (m *mockAuthenticatorWithError) RegenerateMFARecoveryCode(_ context.Context, _ string) (string, error) {
 	return "new-recovery-code", nil
 }
