@@ -283,6 +283,22 @@ func (a *Auth0) GetMFAStatus(ctx context.Context, sub string) (gateway.MFAStatus
 	return status, nil
 }
 
+func (a *Auth0) GetUser(ctx context.Context, userID string) (gateway.AuthenticatorUser, error) {
+	if err := a.updateToken(ctx); err != nil {
+		return gateway.AuthenticatorUser{}, err
+	}
+
+	r, err := a.exec(ctx, http.MethodGet, "api/v2/users/"+userID, a.token, nil)
+	if err != nil {
+		if !a.disableLogging {
+			log.Errorf("auth0: get user: %+v", err)
+		}
+		return gateway.AuthenticatorUser{}, rerror.NewE(i18n.T("failed to get user"))
+	}
+
+	return r.Into(), nil
+}
+
 func (a *Auth0) now() time.Time {
 	if a.current == nil {
 		a.current = currentTime

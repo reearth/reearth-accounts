@@ -300,16 +300,27 @@ func (i *User) SyncSSOUser(ctx context.Context, param interfaces.SyncSSOUserPara
 		return nil, err
 	}
 
-	// Send the verification email after the transaction commits. Using
-	// IsVerified() as a durable pending-delivery flag: if a previous attempt
-	// failed the user remains unverified, so the next SyncSSOUser call retries.
 	authenticator := i.gateways.AuthenticatorFor(string(gateway.ProviderAuth0))
-	if authenticator == nil || u.Verification().IsVerified() {
+	if authenticator == nil || (u.Verification() != nil && u.Verification().IsVerified()) {
 		return u, nil
 	}
+
+	authUser, err := authenticator.GetUser(ctx, param.Sub)
+	if err != nil {
+		log.Warnf("SyncSSOUser: could not fetch Auth0 user, skipping verification email (sub=%s): %v", param.Sub, err)
+		return u, nil
+	}
+
+	if authUser.EmailVerified {
+		u.Verification().SetVerified(true)
+		if err = i.repos.User.Save(ctx, u); err != nil {
+			log.Warnf("SyncSSOUser: failed to persist verified state (sub=%s): %v", param.Sub, err)
+		}
+		return u, nil
+	}
+
 	if err = authenticator.ResendVerificationEmail(ctx, param.Sub); err != nil {
 		log.Warnf("SyncSSOUser: verification email failed, will retry on next login (sub=%s): %v", param.Sub, err)
-		return u, nil
 	}
 	return u, nil
 }

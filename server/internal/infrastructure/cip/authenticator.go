@@ -157,6 +157,15 @@ func (a *Authenticator) GetMFAStatus(_ context.Context, _ string) (gateway.MFASt
 	return gateway.MFAStatus{}, nil
 }
 
+func (a *Authenticator) GetUser(ctx context.Context, userID string) (gateway.AuthenticatorUser, error) {
+	rec, err := a.client.GetUser(ctx, userID)
+	if err != nil {
+		log.Errorf("cip: get user: %+v", err)
+		return gateway.AuthenticatorUser{}, rerror.NewE(i18n.T("failed to get user"))
+	}
+	return toAuthenticatorUser(rec), nil
+}
+
 func (a *Authenticator) RegenerateMFARecoveryCode(_ context.Context, _ string) (string, error) {
 	return "", nil
 }
