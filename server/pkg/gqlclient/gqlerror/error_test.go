@@ -48,7 +48,7 @@ func TestWarnAlsoDownGradesRealFailures(t *testing.T) {
 	assert.Equal(t, "WARN", severityOf(t, ReturnAccountsWarn, errors.New("net/http: request canceled (Client.Timeout exceeded while awaiting headers)")))
 }
 
-func TestMessageIsTheSameAtBothSeverities(t *testing.T) {
+func TestLogMessagesMatchFunctionPurpose(t *testing.T) {
 	ctx := context.Background()
 	e := errors.New("input: deleteWorkspace operation denied")
 
@@ -61,7 +61,7 @@ func TestMessageIsTheSameAtBothSeverities(t *testing.T) {
 	atWarn := logBuf.String()
 
 	assert.Contains(t, atError, "error with caller logging")
-	assert.Contains(t, atWarn, "error with caller logging")
+	assert.Contains(t, atWarn, "transport failure")
 	assert.Contains(t, atError, "ERROR")
 	assert.Contains(t, atWarn, "WARN")
 }
