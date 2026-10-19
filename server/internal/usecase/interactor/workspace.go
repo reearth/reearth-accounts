@@ -329,7 +329,7 @@ func (i *Workspace) AddUserMember(ctx context.Context, workspaceID workspace.ID,
 			return nil, workspace.ErrCannotChangeRoleToOwner
 		}
 
-		if !operator.IsWritableWorkspace(workspaceID) {
+		if !operator.IsMaintainingWorkspace(workspaceID) {
 			if err := i.checkOwnerLikePermission(ctx, ws, operator, rbac.ActionAddMember); err != nil {
 				return nil, err
 			}
@@ -418,7 +418,7 @@ func (i *Workspace) RemoveMultipleUserMembers(ctx context.Context, id workspace.
 			return nil, workspace.ErrCannotModifyPersonalWorkspace
 		}
 
-		if !operator.IsWritableWorkspace(id) {
+		if !operator.IsMaintainingWorkspace(id) {
 			if err := i.checkOwnerLikePermission(ctx, ws, operator, rbac.ActionDeleteMember); err != nil {
 				return nil, err
 			}
@@ -524,7 +524,7 @@ func (i *Workspace) UpdateUserMember(ctx context.Context, id workspace.ID, u wor
 
 		currentRole := ws.Members().UserRole(u)
 
-		if currentRole == role.RoleOwner || !operator.IsWritableWorkspace(id) {
+		if !operator.IsMaintainingWorkspace(id) {
 			if err := i.checkOwnerLikePermission(ctx, ws, operator, rbac.ActionEditMember); err != nil {
 				return nil, err
 			}

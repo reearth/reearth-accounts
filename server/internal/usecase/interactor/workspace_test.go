@@ -1790,7 +1790,7 @@ func TestWorkspace_UpdateMember(t *testing.T) {
 			wantErr: workspace.ErrCannotChangeRoleToOwner,
 		},
 		{
-			name:       "Non-owner cannot self-promote to higher role",
+			name:       "Non-owner (writer) cannot edit member roles — denied before self-promote check",
 			seeds:      workspace.List{w6},
 			usersSeeds: []*user.User{u},
 			args: struct {
@@ -1808,10 +1808,13 @@ func TestWorkspace_UpdateMember(t *testing.T) {
 					WritableWorkspaces: []workspace.ID{id6},
 				},
 			},
-			wantErr: interfaces.ErrCannotSelfPromote,
+			// Writers no longer bypass checkOwnerLikePermission; edit_member
+			// requires maintainer/owner per the RBAC matrix. Without Cerbos, the
+			// fallback returns ErrOperationDenied.
+			wantErr: interfaces.ErrOperationDenied,
 		},
 		{
-			name:       "Non-owner can self-demote to lower role",
+			name:       "Non-owner (writer) cannot self-demote — edit_member requires maintainer/owner",
 			seeds:      workspace.List{w7},
 			usersSeeds: []*user.User{u},
 			args: struct {
@@ -1829,8 +1832,10 @@ func TestWorkspace_UpdateMember(t *testing.T) {
 					WritableWorkspaces: []workspace.ID{id7},
 				},
 			},
-			wantErr: nil,
-			want:    workspace.NewMembersWith(map[user.ID]workspace.Member{userID: {Role: role.RoleOwner}, u.ID(): {Role: role.RoleWriter}}, nil, false),
+			// Writers no longer bypass checkOwnerLikePermission; even self-demotion
+			// requires maintainer/owner permission per the RBAC matrix. Without
+			// Cerbos, the fallback returns ErrOperationDenied.
+			wantErr: interfaces.ErrOperationDenied,
 		},
 		{
 			name: "mock error",
@@ -2613,7 +2618,7 @@ func TestWorkspace_MemberManagement_CerbosFallback(t *testing.T) {
 		return wid, op, db
 	}
 
-	t.Run("AddUserMember: real writer membership needs no Cerbos call", func(t *testing.T) {
+	t.Run("AddUserMember: maintainer membership needs no Cerbos call", func(t *testing.T) {
 		db := memory.New()
 		seedRoles(db)
 		ownerID := id.NewUserID()
@@ -2625,12 +2630,34 @@ func TestWorkspace_MemberManagement_CerbosFallback(t *testing.T) {
 		newUser := user.New().NewID().Name("bbb").Email("bbb@bbb.com").MustBuild()
 		assert.NoError(t, db.User.Save(ctx, newUser))
 
-		op := &workspace.Operator{User: lo.ToPtr(ownerID), WritableWorkspaces: []workspace.ID{wid}}
+		// A workspace maintainer (or owner) bypasses checkOwnerLikePermission.
+		op := &workspace.Operator{User: lo.ToPtr(ownerID), MaintainableWorkspaces: []workspace.ID{wid}}
 		workspaceUC := NewWorkspace(db, nil, nil)
 
 		got, err := workspaceUC.AddUserMember(ctx, wid, map[user.ID]role.RoleType{newUser.ID(): role.RoleReader}, op)
 		assert.NoError(t, err)
 		assert.Equal(t, role.RoleReader, got.Members().UserRole(newUser.ID()))
+	})
+
+	t.Run("AddUserMember: writer is denied — add_member requires maintainer/owner", func(t *testing.T) {
+		db := memory.New()
+		seedRoles(db)
+		ownerID := id.NewUserID()
+		wid := id.NewWorkspaceID()
+		ws := workspace.New().ID(wid).Name("Test").Alias("test-alias").
+			Members(map[user.ID]workspace.Member{ownerID: {Role: role.RoleOwner}}).
+			Personal(false).MustBuild()
+		assert.NoError(t, db.Workspace.Save(ctx, ws))
+		newUser := user.New().NewID().Name("bbb").Email("bbb@bbb.com").MustBuild()
+		assert.NoError(t, db.User.Save(ctx, newUser))
+
+		// A plain writer no longer bypasses checkOwnerLikePermission (SEC-05 fix).
+		// Without Cerbos, the fallback returns ErrOperationDenied.
+		op := &workspace.Operator{User: lo.ToPtr(ownerID), WritableWorkspaces: []workspace.ID{wid}}
+		workspaceUC := NewWorkspace(db, nil, nil)
+
+		_, err := workspaceUC.AddUserMember(ctx, wid, map[user.ID]role.RoleType{newUser.ID(): role.RoleReader}, op)
+		assert.ErrorIs(t, err, interfaces.ErrOperationDenied)
 	})
 
 	t.Run("AddUserMember: Cerbos global role allows a non-member", func(t *testing.T) {
