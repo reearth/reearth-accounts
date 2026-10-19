@@ -17,7 +17,17 @@ func (r *Resolver) WorkspaceUserMember() WorkspaceUserMemberResolver {
 type workspaceUserMemberResolver struct{ *Resolver }
 
 func (w workspaceUserMemberResolver) User(ctx context.Context, obj *gqlmodel.WorkspaceUserMember) (*gqlmodel.User, error) {
-	return dataloaders(ctx).User.Load(obj.UserID)
+	u, err := dataloaders(ctx).User.Load(obj.UserID)
+	if err != nil || u == nil {
+		return u, err
+	}
+	// Unauthenticated bypass callers (no operator) must not receive member emails.
+	if getOperator(ctx) == nil {
+		redacted := *u
+		redacted.Email = ""
+		return &redacted, nil
+	}
+	return u, nil
 }
 
 func (r *queryResolver) FindByID(ctx context.Context, workpaceId gqlmodel.ID) (*gqlmodel.Workspace, error) {
@@ -43,6 +53,10 @@ func (r *queryResolver) FindByID(ctx context.Context, workpaceId gqlmodel.ID) (*
 	if err != nil {
 		log.Errorf("[FindByID] failed to convert workspace: %s, workspace id: %v", err.Error(), wid)
 		return nil, gqlerror.ReturnAccountsError(ctx, err)
+	}
+
+	if getOperator(ctx) == nil && converted.Metadata != nil {
+		converted.Metadata.BillingEmail = ""
 	}
 
 	return converted, nil
@@ -108,6 +122,10 @@ func (r *queryResolver) FindByAlias(ctx context.Context, alias string) (*gqlmode
 	if err != nil {
 		log.Errorf("[FindByID] failed to convert workspace: %s, workspace id: %v", err.Error(), w.ID().String())
 		return nil, gqlerror.ReturnAccountsError(ctx, err)
+	}
+
+	if getOperator(ctx) == nil && converted.Metadata != nil {
+		converted.Metadata.BillingEmail = ""
 	}
 
 	return converted, nil
