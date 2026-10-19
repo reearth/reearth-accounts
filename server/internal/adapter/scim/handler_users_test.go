@@ -68,7 +68,7 @@ func setupHandlerTest(t *testing.T) (
 		MustBuild()
 	require.NoError(t, db.Workspace.Save(t.Context(), ws))
 
-	scimUC := interactor.NewScim(db)
+	scimUC := interactor.NewScim(db, nil)
 	handler = NewUserHandler(scimUC, db.Workspace)
 	return
 }
@@ -77,7 +77,7 @@ func setupHandlerTest(t *testing.T) (
 // provisionTestUser is a helper to provision a standard test user.
 func provisionTestUser(t *testing.T, ctx context.Context, db *repo.Container, wsID workspace.ID) *user.User {
 	t.Helper()
-	scimUC := interactor.NewScim(db)
+	scimUC := interactor.NewScim(db, nil)
 	u, err := scimUC.ProvisionScimUser(ctx, interfaces.ProvisionScimUserParam{
 		Email:       "alice@example.com",
 		ExternalID:  "ext-alice-001",
