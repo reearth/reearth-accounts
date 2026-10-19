@@ -15,6 +15,7 @@ import (
 	"github.com/reearth/reearth-accounts/server/pkg/user"
 	"github.com/reearth/reearth-accounts/server/pkg/workspace"
 	"github.com/reearth/reearthx/appx"
+	"github.com/reearth/reearthx/log"
 	"github.com/reearth/reearthx/rerror"
 	"github.com/samber/lo"
 )
@@ -306,10 +307,12 @@ func applyPermittablesToResponses(ctx context.Context, c echo.Context, userRespo
 	// Build role name map (ULID → name) for resolving platform roles and workspace roles.
 	roleNames := map[string]string{}
 	if uc := httpinternal.Usecases(c); uc.Role != nil {
-		if roles, err := uc.Role.FindAll(ctx); err == nil {
-			for _, r := range roles {
-				roleNames[r.ID().String()] = r.Name()
-			}
+		roles, roleErr := uc.Role.FindAll(ctx)
+		if roleErr != nil {
+			log.Errorfc(ctx, "failed to fetch roles for name resolution, falling back to raw IDs: %v", roleErr)
+		}
+		for _, r := range roles {
+			roleNames[r.ID().String()] = r.Name()
 		}
 	}
 
