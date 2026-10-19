@@ -4862,7 +4862,6 @@ fragment FragmentUser on User {
 	workspace
 	auths
 	verification {
-		code
 		expiration
 		verified
 	}
@@ -5244,7 +5243,6 @@ fragment FragmentUser on User {
 	workspace
 	auths
 	verification {
-		code
 		expiration
 		verified
 	}
@@ -5300,7 +5298,6 @@ fragment FragmentUser on User {
 	workspace
 	auths
 	verification {
-		code
 		expiration
 		verified
 	}
@@ -5356,7 +5353,6 @@ fragment FragmentUser on User {
 	workspace
 	auths
 	verification {
-		code
 		expiration
 		verified
 	}
@@ -5718,7 +5714,6 @@ fragment FragmentUser on User {
 	workspace
 	auths
 	verification {
-		code
 		expiration
 		verified
 	}
@@ -5820,7 +5815,6 @@ fragment FragmentUser on User {
 	workspace
 	auths
 	verification {
-		code
 		expiration
 		verified
 	}
@@ -5876,7 +5870,6 @@ fragment FragmentUser on User {
 	workspace
 	auths
 	verification {
-		code
 		expiration
 		verified
 	}

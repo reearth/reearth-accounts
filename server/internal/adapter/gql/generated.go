@@ -1502,7 +1502,6 @@ type UserMetadata {
 }
 
 type Verification {
-  code: String!
   expiration: String!
   verified: Boolean!
 }
