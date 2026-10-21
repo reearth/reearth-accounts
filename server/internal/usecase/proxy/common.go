@@ -21,7 +21,7 @@ func NewHTTPClient(c graphql.Doer, token string) *httpClient {
 func (c *httpClient) Do(req *http.Request) (*http.Response, error) {
 	h := req.Header
 	if h.Get("Authorization") == "" {
-		h.Set("Authozation", "Bearer "+c.token)
+		h.Set("Authorization", "Bearer "+c.token)
 	}
 	if c == nil || c.c == nil {
 		return http.DefaultClient.Do(req)
