@@ -49,7 +49,6 @@ jobs:
     needs: prepare
     if: needs.prepare.outputs.server == 'true'
     uses: ./.github/workflows/ci_server.yml
-    secrets: inherit
 
   ci:
     runs-on: ubuntu-latest
@@ -134,6 +133,7 @@ jobs:
       new_tag_short: ${{ needs.ci-collect-info.outputs.new_tag_short }}
       name: ${{ needs.ci-collect-info.outputs.name }}
       sha: ${{ github.sha }}
+    # git-cascade:allow -- DOCKERHUB credentials are stored as repository secrets; passing them explicitly requires declaring them in the reusable workflow, which adds maintenance overhead with no security benefit over scoped inheritance.
     secrets: inherit
 
   build-admin:
@@ -160,6 +160,7 @@ jobs:
       new_tag_short: ${{ needs.ci-collect-info.outputs.new_tag_short }}
       name: ${{ needs.ci-collect-info.outputs.name }}
       sha: ${{ github.sha }}
+    # git-cascade:allow -- DOCKERHUB credentials are stored as repository secrets; passing them explicitly requires declaring them in the reusable workflow, which adds maintenance overhead with no security benefit over scoped inheritance.
     secrets: inherit
 
   deploy-server-oss:
@@ -169,4 +170,5 @@ jobs:
       id-token: write
       packages: write
     uses: ./.github/workflows/deploy_server_nightly.yml
+    # git-cascade:allow -- secrets are resolved via `environment: oss` inside the reusable workflow; a caller job cannot declare an environment, so secrets: inherit is the only delivery mechanism.
     secrets: inherit
