@@ -294,7 +294,6 @@ type UsersWithPagination struct {
 }
 
 type Verification struct {
-	Code       string `json:"code"`
 	Expiration string `json:"expiration"`
 	Verified   bool   `json:"verified"`
 }

@@ -210,7 +210,6 @@ type ComplexityRoot struct {
 	}
 
 	Verification struct {
-		Code       func(childComplexity int) int
 		Expiration func(childComplexity int) int
 		Verified   func(childComplexity int) int
 	}
@@ -1104,12 +1103,6 @@ func (e *executableSchema) Complexity(ctx context.Context, typeName, field strin
 
 		return e.complexity.UsersWithPagination.Users(childComplexity), true
 
-	case "Verification.code":
-		if e.complexity.Verification.Code == nil {
-			break
-		}
-
-		return e.complexity.Verification.Code(childComplexity), true
 	case "Verification.expiration":
 		if e.complexity.Verification.Expiration == nil {
 			break
@@ -1509,7 +1502,6 @@ type UserMetadata {
 }
 
 type Verification {
-  code: String!
   expiration: String!
   verified: Boolean!
 }
@@ -5904,8 +5896,6 @@ func (ec *executionContext) fieldContext_User_verification(_ context.Context, fi
 		IsResolver: false,
 		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
 			switch field.Name {
-			case "code":
-				return ec.fieldContext_Verification_code(ctx, field)
 			case "expiration":
 				return ec.fieldContext_Verification_expiration(ctx, field)
 			case "verified":
@@ -6184,35 +6174,6 @@ func (ec *executionContext) fieldContext_UsersWithPagination_totalCount(_ contex
 		IsResolver: false,
 		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
 			return nil, errors.New("field of type Int does not have child fields")
-		},
-	}
-	return fc, nil
-}
-
-func (ec *executionContext) _Verification_code(ctx context.Context, field graphql.CollectedField, obj *gqlmodel.Verification) (ret graphql.Marshaler) {
-	return graphql.ResolveField(
-		ctx,
-		ec.OperationContext,
-		field,
-		ec.fieldContext_Verification_code,
-		func(ctx context.Context) (any, error) {
-			return obj.Code, nil
-		},
-		nil,
-		ec.marshalNString2string,
-		true,
-		true,
-	)
-}
-
-func (ec *executionContext) fieldContext_Verification_code(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
-	fc = &graphql.FieldContext{
-		Object:     "Verification",
-		Field:      field,
-		IsMethod:   false,
-		IsResolver: false,
-		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
-			return nil, errors.New("field of type String does not have child fields")
 		},
 	}
 	return fc, nil
@@ -11026,11 +10987,6 @@ func (ec *executionContext) _Verification(ctx context.Context, sel ast.Selection
 		switch field.Name {
 		case "__typename":
 			out.Values[i] = graphql.MarshalString("Verification")
-		case "code":
-			out.Values[i] = ec._Verification_code(ctx, field, obj)
-			if out.Values[i] == graphql.Null {
-				out.Invalids++
-			}
 		case "expiration":
 			out.Values[i] = ec._Verification_expiration(ctx, field, obj)
 			if out.Values[i] == graphql.Null {

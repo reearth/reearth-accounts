@@ -21,7 +21,6 @@ type UserMetadataResponse struct {
 
 // VerificationResponse mirrors Verification.
 type VerificationResponse struct {
-	Code       string `json:"code"`
 	Expiration string `json:"expiration"`
 	Verified   bool   `json:"verified"`
 }
@@ -94,7 +93,6 @@ func NewUserResponse(u *user.User) *UserResponse {
 	var v *VerificationResponse
 	if u.Verification() != nil {
 		v = &VerificationResponse{
-			Code:       u.Verification().Code(),
 			Expiration: u.Verification().Expiration().Format("2006-01-02T15:04:05.000Z"),
 			Verified:   u.Verification().IsVerified(),
 		}

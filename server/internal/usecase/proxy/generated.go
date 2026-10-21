@@ -1219,13 +1219,9 @@ func (v *FragmentUserMetadata) GetWebsite() string { return v.Website }
 
 // FragmentUserVerification includes the requested fields of the GraphQL type Verification.
 type FragmentUserVerification struct {
-	Code       string `json:"code"`
 	Expiration string `json:"expiration"`
 	Verified   bool   `json:"verified"`
 }
-
-// GetCode returns FragmentUserVerification.Code, and is useful for accessing the field via an interface.
-func (v *FragmentUserVerification) GetCode() string { return v.Code }
 
 // GetExpiration returns FragmentUserVerification.Expiration, and is useful for accessing the field via an interface.
 func (v *FragmentUserVerification) GetExpiration() string { return v.Expiration }
@@ -4866,7 +4862,6 @@ fragment FragmentUser on User {
 	workspace
 	auths
 	verification {
-		code
 		expiration
 		verified
 	}
@@ -5248,7 +5243,6 @@ fragment FragmentUser on User {
 	workspace
 	auths
 	verification {
-		code
 		expiration
 		verified
 	}
@@ -5304,7 +5298,6 @@ fragment FragmentUser on User {
 	workspace
 	auths
 	verification {
-		code
 		expiration
 		verified
 	}
@@ -5360,7 +5353,6 @@ fragment FragmentUser on User {
 	workspace
 	auths
 	verification {
-		code
 		expiration
 		verified
 	}
@@ -5722,7 +5714,6 @@ fragment FragmentUser on User {
 	workspace
 	auths
 	verification {
-		code
 		expiration
 		verified
 	}
@@ -5824,7 +5815,6 @@ fragment FragmentUser on User {
 	workspace
 	auths
 	verification {
-		code
 		expiration
 		verified
 	}
@@ -5880,7 +5870,6 @@ fragment FragmentUser on User {
 	workspace
 	auths
 	verification {
-		code
 		expiration
 		verified
 	}
