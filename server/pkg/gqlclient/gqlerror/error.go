@@ -33,6 +33,6 @@ func ReturnAccountsWarn(ctx context.Context, err error) AccountsError {
 		log.Warnfc(ctx, "[Warn] unauthorized at %s:%d %+v", file, line, err)
 		return ErrUnauthorized
 	}
-	log.Warnfc(ctx, "[Error] error with caller logging at %s:%d %+v", file, line, err)
+	log.Warnfc(ctx, "[Warn] transport failure at %s:%d %+v", file, line, err)
 	return err
 }
