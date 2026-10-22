@@ -56,7 +56,7 @@ func setupGroupHandlerTest(t *testing.T) (
 		MustBuild()
 	require.NoError(t, db.Workspace.Save(t.Context(), ws))
 
-	scimUC := interactor.NewScim(db)
+	scimUC := interactor.NewScim(db, nil)
 	handler = NewGroupHandler(scimUC, db.Workspace, db.User)
 	return
 }
@@ -106,7 +106,7 @@ func TestListGroups_Empty(t *testing.T) {
 		ScimConfig(cfg).MustBuild()
 	require.NoError(t, db.Workspace.Save(t.Context(), ws))
 
-	handler := NewGroupHandler(interactor.NewScim(db), db.Workspace, db.User)
+	handler := NewGroupHandler(interactor.NewScim(db, nil), db.Workspace, db.User)
 
 	e := echo.New()
 	req := httptest.NewRequest(http.MethodGet, "/scim/v2/Groups", nil)

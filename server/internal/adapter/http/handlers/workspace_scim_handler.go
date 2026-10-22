@@ -15,6 +15,49 @@ type WorkspaceScimHandler struct{}
 
 func NewWorkspaceScimHandler() *WorkspaceScimHandler { return &WorkspaceScimHandler{} }
 
+// GetState handles GET /api/workspaces/:id/scim.
+// Returns whether SCIM provisioning has been activated for the workspace by a platform admin.
+// Requires platform-level maintainer or owner role.
+func (h *WorkspaceScimHandler) GetState(c echo.Context) error {
+	ctx := c.Request().Context()
+	wid, err := id.WorkspaceIDFrom(c.Param("id"))
+	if err != nil {
+		return httpinternal.NewError(http.StatusNotFound, "workspace not found", nil)
+	}
+
+	available, err := httpinternal.Usecases(c).Scim.GetWorkspaceScimState(ctx, wid, httpinternal.Operator(c))
+	if err != nil {
+		return err
+	}
+
+	return c.JSON(http.StatusOK, httpmodel.WorkspaceScimStateResponse{ScimEnabled: available})
+}
+
+// SetAvailable handles PATCH /api/workspaces/:id/scim.
+// Enables or disables SCIM provisioning for the workspace.
+// When enabling, a ScimConfig is initialised if one does not yet exist.
+// When disabling, the existing ScimConfig (and any issued token) is cleared.
+// Requires platform-level maintainer or owner role.
+func (h *WorkspaceScimHandler) SetAvailable(c echo.Context) error {
+	ctx := c.Request().Context()
+	wid, err := id.WorkspaceIDFrom(c.Param("id"))
+	if err != nil {
+		return httpinternal.NewError(http.StatusNotFound, "workspace not found", nil)
+	}
+
+	req := &httpmodel.UpdateWorkspaceScimStateRequest{}
+	if err := httpinternal.BindValidate(c, req); err != nil {
+		return err
+	}
+
+	available, err := httpinternal.Usecases(c).Scim.SetWorkspaceScimAvailable(ctx, wid, req.Enabled, httpinternal.Operator(c))
+	if err != nil {
+		return err
+	}
+
+	return c.JSON(http.StatusOK, httpmodel.WorkspaceScimStateResponse{ScimEnabled: available})
+}
+
 // GenerateToken handles POST /api/workspaces/:id/scim/token.
 // Generates (or rotates) the SCIM bearer token for the workspace.
 // The plaintext token is returned once and never stored; a second call rotates it.

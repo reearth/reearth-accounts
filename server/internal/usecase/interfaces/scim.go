@@ -37,10 +37,12 @@ type Scim interface {
 	GenerateScimToken(ctx context.Context, workspaceID workspace.ID, operator *workspace.Operator) (string, error)
 	GetScimConfig(ctx context.Context, workspaceID workspace.ID, operator *workspace.Operator) (*workspace.ScimConfig, error)
 	GetScimUser(ctx context.Context, workspaceID workspace.ID, userID user.ID) (*user.User, error)
+	GetWorkspaceScimState(ctx context.Context, workspaceID workspace.ID, operator *workspace.Operator) (bool, error)
 	ListScimUsers(ctx context.Context, workspaceID workspace.ID, filter string) ([]*user.User, error)
 	ProvisionScimUser(ctx context.Context, param ProvisionScimUserParam) (*user.User, error)
 	ReactivateScimUserByUserID(ctx context.Context, workspaceID workspace.ID, userID user.ID) error
 	RevokeScimToken(ctx context.Context, workspaceID workspace.ID, operator *workspace.Operator) error
+	SetWorkspaceScimAvailable(ctx context.Context, workspaceID workspace.ID, enabled bool, operator *workspace.Operator) (bool, error)
 	SyncScimGroup(ctx context.Context, workspaceID workspace.ID, groupID, groupName string, members []ScimGroupMember) error
 	UpdateScimConfig(ctx context.Context, workspaceID workspace.ID, enabled bool, groupRoleMapping map[string]role.RoleType, operator *workspace.Operator) (*workspace.ScimConfig, error)
 }
