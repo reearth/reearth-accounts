@@ -19,6 +19,7 @@ fragment FragmentUser on User {
     workspace
     auths
     verification {
+        code
         expiration
         verified
     }

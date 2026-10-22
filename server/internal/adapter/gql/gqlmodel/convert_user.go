@@ -26,6 +26,7 @@ func ToUser(u *user.User) *User {
 	var v *Verification
 	if u.Verification() != nil {
 		v = &Verification{
+			Code:       u.Verification().Code(),
 			Expiration: u.Verification().Expiration().Format("2006-01-02T15:04:05.000Z"),
 			Verified:   u.Verification().IsVerified(),
 		}
