@@ -91,8 +91,9 @@ distribution proves prohibitive.
 | `GET /api/v1/workspaces` | `workspace` | `list` | viewer |
 | `GET /api/v1/workspaces/:id` | `workspace` | `read` | viewer |
 | `GET /api/v1/workspaces/:id/members` | `workspace` | `read_member` | viewer |
+| `POST /api/v1/workspaces/:id/transfer-owner` | `workspace` | `transfer_owner` | system_admin |
 | *(future)* `PATCH /api/v1/users/:id`, `DELETE /api/v1/users/:id` | `user` | `edit` / `delete` | system_admin |
-| *(future)* `PATCH /api/v1/workspaces/:id`, `DELETE /api/v1/workspaces/:id` | `workspace` | `edit` / `delete` | system_admin |
+| *(future)* `PATCH /api/v1/workspaces/:id`, `DELETE /api/v1/workspaces/:id` | `workspace` | `edit` / `delete` / `transfer_owner` | system_admin |
 | *(future)* `PUT /api/v1/admin-users/:id/roles` | `admin_user` | `assign_role` | system_admin |
 
 Notes:
@@ -115,7 +116,7 @@ Notes:
 | `user` | `list` / `read` | system_admin, viewer |
 | `user` | `edit` / `delete` | system_admin |
 | `workspace` | `list` / `read` / `read_member` | system_admin, viewer |
-| `workspace` | `edit` / `delete` | system_admin |
+| `workspace` | `edit` / `delete` / `transfer_owner` | system_admin |
 
 `resourceRules` in `server/internal/admin/rbac/definitions.go` is the single source of
 truth, compiled into the `accounts-admin` Cerbos policy via

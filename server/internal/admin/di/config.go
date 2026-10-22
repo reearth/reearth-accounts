@@ -22,6 +22,7 @@ import (
 	"github.com/reearth/reearth-accounts/server/pkg/user"
 	"github.com/reearth/reearthx/appx"
 	"github.com/reearth/reearthx/log"
+	"github.com/reearth/reearthx/mongox"
 	"go.mongodb.org/mongo-driver/mongo"
 	"go.mongodb.org/mongo-driver/mongo/options"
 )
@@ -245,7 +246,10 @@ func provideRepoContainer(cfg *Config) (*repo.Container, func(), error) {
 	if err != nil {
 		return nil, nil, fmt.Errorf("mongo connect: %w", err)
 	}
-	repos, err := mongorepo.New(context.Background(), client.Database(cfg.DBName), false, false, []user.Repo{})
+	// Without a transaction-capable client, Container.Transaction is a no-op and
+	// multi-document admin writes (ownership transfer) are not atomic.
+	txAvailable := mongox.IsTransactionAvailable(cfg.DB)
+	repos, err := mongorepo.New(context.Background(), client.Database(cfg.DBName), txAvailable, false, []user.Repo{})
 	if err != nil {
 		_ = client.Disconnect(context.Background())
 		return nil, nil, fmt.Errorf("init mongo repos: %w", err)

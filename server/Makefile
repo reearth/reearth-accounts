@@ -32,7 +32,8 @@ test-integration:
 		./internal/infrastructure/postgres/... \
 		./internal/infrastructure/conformance/... \
 		./e2e/... \
-		-run 'Conformance|TestMigrate|TestTransaction|TestResolveDBTX|TestPostgresE2E_GetAndUpdateMe'
+		./internal/admin/usecase/workspaceuc/... \
+		-run 'Conformance|TestMigrate|TestTransaction|TestResolveDBTX|TestPostgresE2E_GetAndUpdateMe|TestTransferOwner_Postgres'
 
 # Regenerate the sqlc query package for the PostgreSQL backend after editing
 # any *.sql under internal/infrastructure/postgres/sqlc. Requires sqlc v1.27+.

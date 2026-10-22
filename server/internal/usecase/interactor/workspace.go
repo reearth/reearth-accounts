@@ -11,6 +11,7 @@ import (
 
 	"github.com/reearth/reearth-accounts/server/internal/rbac"
 	"github.com/reearth/reearth-accounts/server/internal/usecase/interfaces"
+	"github.com/reearth/reearth-accounts/server/internal/usecase/permittablesync"
 	"github.com/reearth/reearth-accounts/server/internal/usecase/repo"
 	"github.com/reearth/reearth-accounts/server/pkg/applog"
 	"github.com/reearth/reearth-accounts/server/pkg/pagination"
@@ -829,39 +830,7 @@ func filterWorkspaces(
 }
 
 func (i *Workspace) updatePermittable(ctx context.Context, userID user.ID, workspaceID workspace.ID, roleName role.RoleType) error {
-	r, err := i.roleRepo.FindByName(ctx, string(roleName))
-	if err != nil {
-		// If role not found and MockAuth is enabled, auto-create it
-		if errors.Is(err, rerror.ErrNotFound) && os.Getenv("REEARTH_MOCK_AUTH") == "true" {
-			log.Infof("[MockAuth] Auto-creating role for workspace: %s", roleName)
-			newRole := role.New().NewID().Name(string(roleName)).MustBuild()
-			if saveErr := i.roleRepo.Save(ctx, *newRole); saveErr != nil {
-				return applog.ErrorWithCallerLogging(ctx, "failed to auto-create role", saveErr)
-			}
-			r = newRole
-		} else {
-			return err
-		}
-	}
-
-	p, err := i.permittableRepo.FindByUserID(ctx, userID)
-	if err != nil && !errors.Is(err, rerror.ErrNotFound) {
-		return err
-	}
-
-	if p == nil {
-		p, err = permittable.New().
-			NewID().
-			UserID(userID).
-			Build()
-		if err != nil {
-			return err
-		}
-	}
-
-	p.UpdateWorkspaceRole(workspaceID, r.ID())
-
-	return i.permittableRepo.Save(ctx, *p)
+	return permittablesync.SetWorkspaceRole(ctx, i.roleRepo, i.permittableRepo, userID, workspaceID, roleName)
 }
 
 func (i *Workspace) bulkRemovePermittable(ctx context.Context, workspaceID workspace.ID, userIDs user.IDList) error {

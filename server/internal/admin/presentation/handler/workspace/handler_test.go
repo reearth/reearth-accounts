@@ -19,6 +19,7 @@ import (
 	"github.com/reearth/reearth-accounts/server/pkg/role"
 	"github.com/reearth/reearth-accounts/server/pkg/user"
 	"github.com/reearth/reearth-accounts/server/pkg/workspace"
+	"github.com/reearth/reearthx/usecasex"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -46,6 +47,7 @@ func newTestEchoWithUsers(wsRepo workspace.Repo, userRepo user.Repo, adminRepo a
 		workspaceuc.NewGetWorkspaceUseCase(wsRepo),
 		workspaceuc.NewListWorkspacesUseCase(wsRepo),
 		workspaceuc.NewListWorkspaceMembersUseCase(wsRepo, userRepo),
+		workspaceuc.NewTransferOwnerUseCase(wsRepo, userRepo, seededRoleRepo(), memory.NewPermittable(), &usecasex.NopTransaction{}),
 	)
 	requireApproved := echo.MiddlewareFunc(mw.NewRequireApprovedMiddleware(sess, adminRepo))
 
@@ -55,7 +57,16 @@ func newTestEchoWithUsers(wsRepo workspace.Repo, userRepo user.Repo, adminRepo a
 	g.GET("", h.ListWorkspaces)
 	g.GET("/:id", h.GetWorkspace)
 	g.GET("/:id/members", h.GetWorkspaceMembers)
+	g.POST("/:id/transfer-owner", h.TransferWorkspaceOwner)
 	return e
+}
+
+func seededRoleRepo() role.Repo {
+	roles := make([]*role.Role, 0, 4)
+	for _, rt := range []role.RoleType{role.RoleOwner, role.RoleMaintainer, role.RoleWriter, role.RoleReader} {
+		roles = append(roles, role.New().NewID().Name(string(rt)).MustBuild())
+	}
+	return memory.NewRoleWith(roles...)
 }
 
 func cookieFor(t *testing.T, sess *session.Manager, id adminuser.ID) *http.Cookie {

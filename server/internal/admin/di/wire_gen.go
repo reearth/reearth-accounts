@@ -59,7 +59,11 @@ func InitializeEcho() (*Server, func(), error) {
 	getWorkspaceUseCase := workspaceuc.NewGetWorkspaceUseCase(workspaceRepo)
 	listWorkspacesUseCase := workspaceuc.NewListWorkspacesUseCase(workspaceRepo)
 	listWorkspaceMembersUseCase := workspaceuc.NewListWorkspaceMembersUseCase(workspaceRepo, userRepo)
-	workspaceHandler := workspace.NewHandler(getWorkspaceUseCase, listWorkspacesUseCase, listWorkspaceMembersUseCase)
+	roleRepo := container.Role
+	permittableRepo := container.Permittable
+	transaction := container.Transaction
+	transferOwnerUseCase := workspaceuc.NewTransferOwnerUseCase(workspaceRepo, userRepo, roleRepo, permittableRepo, transaction)
+	workspaceHandler := workspace.NewHandler(getWorkspaceUseCase, listWorkspacesUseCase, listWorkspaceMembersUseCase, transferOwnerUseCase)
 	sessionMiddleware := middleware.NewSessionMiddleware(manager)
 	requireApprovedMiddleware := middleware.NewRequireApprovedMiddleware(manager, repo)
 	grpcClient, err := provideCerbosClient(config)

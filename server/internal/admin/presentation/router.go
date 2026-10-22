@@ -46,10 +46,11 @@ func RegisterRoutes(e *echo.Echo, h *Handler) {
 		users.GET("/:id", h.User.GetUser, mw.RequirePermission(h.Checker, adminrbac.ResourceUser, adminrbac.ActionRead))
 		users.GET("/:id/workspaces", h.User.GetUserWorkspaces, mw.RequirePermission(h.Checker, adminrbac.ResourceUser, adminrbac.ActionRead))
 
-		// Cross-tenant workspace listing (requires an approved admin session)
+		// Cross-tenant workspaces (requires an approved admin session)
 		workspaces := v1.Group("/workspaces", requireApproved)
 		workspaces.GET("", h.Workspace.ListWorkspaces, mw.RequirePermission(h.Checker, adminrbac.ResourceWorkspace, adminrbac.ActionList))
 		workspaces.GET("/:id", h.Workspace.GetWorkspace, mw.RequirePermission(h.Checker, adminrbac.ResourceWorkspace, adminrbac.ActionRead))
 		workspaces.GET("/:id/members", h.Workspace.GetWorkspaceMembers, mw.RequirePermission(h.Checker, adminrbac.ResourceWorkspace, adminrbac.ActionReadMember))
+		workspaces.POST("/:id/transfer-owner", h.Workspace.TransferWorkspaceOwner, mw.RequirePermission(h.Checker, adminrbac.ResourceWorkspace, adminrbac.ActionTransferOwner))
 	}
 }

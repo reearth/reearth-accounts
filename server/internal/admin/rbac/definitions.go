@@ -30,6 +30,10 @@ const (
 	ActionRead       = "read"
 	ActionReadMember = "read_member"
 	ActionReject     = "reject"
+
+	// ActionTransferOwner is separate from ActionEdit so that overriding a
+	// workspace's ownership can be granted independently of editing it.
+	ActionTransferOwner = "transfer_owner"
 )
 
 // roleSystemAdmin and roleViewer are the admin console roles. They reference the
@@ -67,11 +71,12 @@ var resourceRules = []ResourceRule{
 	{
 		Resource: ResourceWorkspace,
 		Actions: map[string][]string{
-			ActionList:       {roleSystemAdmin, roleViewer},
-			ActionRead:       {roleSystemAdmin, roleViewer},
-			ActionReadMember: {roleSystemAdmin, roleViewer},
-			ActionEdit:       {roleSystemAdmin},
-			ActionDelete:     {roleSystemAdmin},
+			ActionList:          {roleSystemAdmin, roleViewer},
+			ActionRead:          {roleSystemAdmin, roleViewer},
+			ActionReadMember:    {roleSystemAdmin, roleViewer},
+			ActionEdit:          {roleSystemAdmin},
+			ActionDelete:        {roleSystemAdmin},
+			ActionTransferOwner: {roleSystemAdmin},
 		},
 	},
 }

@@ -3,6 +3,7 @@ package workspace
 import (
 	"time"
 
+	"github.com/reearth/reearth-accounts/server/internal/admin/usecase/workspaceuc"
 	"github.com/reearth/reearth-accounts/server/pkg/workspace"
 )
 
@@ -55,4 +56,47 @@ func newWorkspaceResponses(list workspace.List) []WorkspaceResponse {
 		items = append(items, newWorkspaceResponse(w))
 	}
 	return items
+}
+
+// TransferredWorkspaceResponse is the workspace a transfer was applied to.
+type TransferredWorkspaceResponse struct {
+	ID       string `json:"id"`
+	Name     string `json:"name"`
+	Alias    string `json:"alias"`
+	Personal bool   `json:"personal"`
+} // @name TransferredWorkspace
+
+// TransferWorkspaceOwnerResponse is the result of a committed ownership
+// transfer. DemotedUserIDs is never null; it is empty when the workspace had
+// no owner other than the target.
+type TransferWorkspaceOwnerResponse struct {
+	Workspace      TransferredWorkspaceResponse `json:"workspace"`
+	NewOwner       WorkspaceMemberResponse      `json:"newOwner"`
+	DemotedUserIDs []string                     `json:"demotedUserIds"`
+} // @name TransferWorkspaceOwnerResponse
+
+func newTransferWorkspaceOwnerResponse(out *workspaceuc.TransferOwnerOutput) TransferWorkspaceOwnerResponse {
+	ws := out.Workspace
+	res := TransferWorkspaceOwnerResponse{
+		Workspace: TransferredWorkspaceResponse{
+			ID:       ws.ID().String(),
+			Name:     ws.Name(),
+			Alias:    ws.Alias(),
+			Personal: ws.IsPersonal(),
+		},
+		NewOwner: WorkspaceMemberResponse{
+			UserID: out.NewOwner.ID().String(),
+			Name:   out.NewOwner.Name(),
+			Email:  out.NewOwner.Email(),
+		},
+		DemotedUserIDs: make([]string, 0, len(out.DemotedUserIDs)),
+	}
+	if m := ws.Members().User(out.NewOwner.ID()); m != nil {
+		res.NewOwner.Role = string(m.Role)
+		res.NewOwner.Disabled = m.Disabled
+	}
+	for _, uid := range out.DemotedUserIDs {
+		res.DemotedUserIDs = append(res.DemotedUserIDs, uid.String())
+	}
+	return res
 }

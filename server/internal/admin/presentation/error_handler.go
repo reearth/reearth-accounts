@@ -8,6 +8,7 @@ import (
 	"github.com/reearth/reearth-accounts/server/internal/admin/presentation/internal"
 	"github.com/reearth/reearth-accounts/server/internal/admin/usecase/adminuseruc"
 	"github.com/reearth/reearth-accounts/server/internal/admin/usecase/authuc"
+	"github.com/reearth/reearth-accounts/server/internal/admin/usecase/workspaceuc"
 	"github.com/reearth/reearth-accounts/server/pkg/user"
 	"github.com/reearth/reearth-accounts/server/pkg/workspace"
 	"github.com/reearth/reearthx/log"
@@ -62,6 +63,16 @@ func classify(err error) (status int, code, msg string) {
 		return http.StatusBadRequest, http.StatusText(http.StatusBadRequest), "cursor pagination is not supported"
 	case errors.Is(err, workspace.ErrNotImplemented):
 		return http.StatusNotImplemented, http.StatusText(http.StatusNotImplemented), "not implemented on this backend"
+	case errors.Is(err, workspaceuc.ErrAlreadyOwner):
+		return http.StatusConflict, "already_owner", "target user is already the sole owner"
+	case errors.Is(err, workspaceuc.ErrPersonalWorkspace):
+		return http.StatusUnprocessableEntity, "personal_workspace", "personal workspace ownership cannot be transferred"
+	case errors.Is(err, workspaceuc.ErrTargetNotMember):
+		return http.StatusUnprocessableEntity, "target_not_member", "target user is not a member of the workspace"
+	case errors.Is(err, workspaceuc.ErrTargetDisabled):
+		return http.StatusUnprocessableEntity, "target_disabled", "target member is disabled"
+	case errors.Is(err, workspaceuc.ErrTargetUserNotFound):
+		return http.StatusUnprocessableEntity, "target_user_not_found", "target user not found"
 	case errors.Is(err, rerror.ErrNotFound):
 		return http.StatusNotFound, http.StatusText(http.StatusNotFound), "not found"
 	default:
