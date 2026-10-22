@@ -11,9 +11,9 @@ import (
 
 	"github.com/reearth/reearth-accounts/server/internal/rbac"
 	"github.com/reearth/reearth-accounts/server/internal/usecase/interfaces"
-	"github.com/reearth/reearth-accounts/server/internal/usecase/permittablesync"
 	"github.com/reearth/reearth-accounts/server/internal/usecase/repo"
 	"github.com/reearth/reearth-accounts/server/pkg/applog"
+	"github.com/reearth/reearth-accounts/server/pkg/membership"
 	"github.com/reearth/reearth-accounts/server/pkg/pagination"
 	"github.com/reearth/reearth-accounts/server/pkg/permittable"
 	"github.com/reearth/reearth-accounts/server/pkg/role"
@@ -179,7 +179,7 @@ func (i *Workspace) Create(ctx context.Context, alias, name, description string,
 		}
 
 		if !skipOwnerMembership {
-			if err := i.updatePermittable(ctx, firstUsers[0].ID(), ws.ID(), role.RoleOwner); err != nil {
+			if err := i.changeMemberRole(ctx, ws, firstUsers[0].ID(), role.RoleOwner); err != nil {
 				return nil, err
 			}
 			operator.AddNewWorkspace(ws.ID())
@@ -540,12 +540,7 @@ func (i *Workspace) UpdateUserMember(ctx context.Context, id workspace.ID, u wor
 			}
 		}
 
-		err = ws.Members().UpdateUserRole(u, newRole)
-		if err != nil {
-			return nil, err
-		}
-
-		if err := i.updatePermittable(ctx, u, ws.ID(), newRole); err != nil {
+		if err := i.changeMemberRole(ctx, ws, u, newRole); err != nil {
 			return nil, err
 		}
 
@@ -589,11 +584,7 @@ func (i *Workspace) UpdateUserMemberViaService(ctx context.Context, id workspace
 			}
 		}
 
-		if err := ws.Members().UpdateUserRole(u, newRole); err != nil {
-			return nil, err
-		}
-
-		if err := i.updatePermittable(ctx, u, ws.ID(), newRole); err != nil {
+		if err := i.changeMemberRole(ctx, ws, u, newRole); err != nil {
 			return nil, err
 		}
 
@@ -752,21 +743,11 @@ func (i *Workspace) TransferOwnership(ctx context.Context, workspaceID workspace
 			return nil, workspace.ErrCannotChangeRoleToOwner
 		}
 
-		err = ws.Members().UpdateUserRole(newOwnerID, role.RoleOwner)
-		if err != nil {
+		if err := i.changeMemberRole(ctx, ws, newOwnerID, role.RoleOwner); err != nil {
 			return nil, err
 		}
 
-		if err := i.updatePermittable(ctx, newOwnerID, ws.ID(), role.RoleOwner); err != nil {
-			return nil, err
-		}
-
-		err = ws.Members().UpdateUserRole(*operator.User, role.RoleMaintainer)
-		if err != nil {
-			return nil, err
-		}
-
-		if err := i.updatePermittable(ctx, *operator.User, ws.ID(), role.RoleMaintainer); err != nil {
+		if err := i.changeMemberRole(ctx, ws, *operator.User, role.RoleMaintainer); err != nil {
 			return nil, err
 		}
 
@@ -829,8 +810,43 @@ func filterWorkspaces(
 	return workspaces, nil
 }
 
-func (i *Workspace) updatePermittable(ctx context.Context, userID user.ID, workspaceID workspace.ID, roleName role.RoleType) error {
-	return permittablesync.SetWorkspaceRole(ctx, i.roleRepo, i.permittableRepo, userID, workspaceID, roleName)
+// changeMemberRole saves uid's Permittable; the caller saves ws.
+func (i *Workspace) changeMemberRole(ctx context.Context, ws *workspace.Workspace, uid user.ID, roleName role.RoleType) error {
+	r, err := i.findRole(ctx, roleName)
+	if err != nil {
+		return err
+	}
+	p, err := i.permittableRepo.FindByUserID(ctx, uid)
+	if err != nil && !errors.Is(err, rerror.ErrNotFound) {
+		return err
+	}
+	if p == nil {
+		if p, err = permittable.NewForUser(uid); err != nil {
+			return err
+		}
+	}
+	if err := membership.ChangeMemberRole(ws, p, uid, r); err != nil {
+		return err
+	}
+	return i.permittableRepo.Save(ctx, *p)
+}
+
+// findRole returns the role record named roleName. When REEARTH_MOCK_AUTH is
+// "true", a missing record is created.
+func (i *Workspace) findRole(ctx context.Context, roleName role.RoleType) (*role.Role, error) {
+	r, err := i.roleRepo.FindByName(ctx, string(roleName))
+	if err == nil {
+		return r, nil
+	}
+	if !errors.Is(err, rerror.ErrNotFound) || os.Getenv("REEARTH_MOCK_AUTH") != "true" {
+		return nil, err
+	}
+	log.Infofc(ctx, "[MockAuth] Auto-creating role for workspace: %s", roleName)
+	newRole := role.New().NewID().Name(string(roleName)).MustBuild()
+	if err := i.roleRepo.Save(ctx, *newRole); err != nil {
+		return nil, applog.ErrorWithCallerLogging(ctx, "failed to auto-create role", err)
+	}
+	return newRole, nil
 }
 
 func (i *Workspace) bulkRemovePermittable(ctx context.Context, workspaceID workspace.ID, userIDs user.IDList) error {
@@ -870,18 +886,9 @@ func (i *Workspace) bulkUpdatePermittable(ctx context.Context, workspaceID works
 		if _, seen := roleIDByName[roleName]; seen {
 			continue
 		}
-		r, err := i.roleRepo.FindByName(ctx, string(roleName))
+		r, err := i.findRole(ctx, roleName)
 		if err != nil {
-			if errors.Is(err, rerror.ErrNotFound) && os.Getenv("REEARTH_MOCK_AUTH") == "true" {
-				log.Infof("[MockAuth] Auto-creating role for workspace: %s", roleName)
-				newRole := role.New().NewID().Name(string(roleName)).MustBuild()
-				if saveErr := i.roleRepo.Save(ctx, *newRole); saveErr != nil {
-					return applog.ErrorWithCallerLogging(ctx, "failed to auto-create role", saveErr)
-				}
-				r = newRole
-			} else {
-				return err
-			}
+			return err
 		}
 		roleIDByName[roleName] = r.ID()
 	}

@@ -3,9 +3,11 @@ package workspaceuc
 import (
 	"context"
 	"errors"
+	"os"
 	"slices"
 
-	"github.com/reearth/reearth-accounts/server/internal/usecase/permittablesync"
+	"github.com/reearth/reearth-accounts/server/pkg/applog"
+	"github.com/reearth/reearth-accounts/server/pkg/membership"
 	"github.com/reearth/reearth-accounts/server/pkg/permittable"
 	"github.com/reearth/reearth-accounts/server/pkg/role"
 	"github.com/reearth/reearth-accounts/server/pkg/user"
@@ -140,20 +142,11 @@ func (uc *TransferOwnerUseCase) transfer(ctx context.Context, in TransferOwnerIn
 	}
 
 	for _, uid := range demoted {
-		if err := members.UpdateUserRole(uid, role.RoleMaintainer); err != nil {
-			return nil, err
-		}
-		if err := permittablesync.SetWorkspaceRoleID(ctx, uc.permittableRepo, uid, ws.ID(), maintainerRole.ID()); err != nil {
+		if err := uc.changeMemberRole(ctx, ws, uid, maintainerRole); err != nil {
 			return nil, err
 		}
 	}
-
-	if target.Role != role.RoleOwner {
-		if err := members.UpdateUserRole(in.NewOwnerID, role.RoleOwner); err != nil {
-			return nil, err
-		}
-	}
-	if err := permittablesync.SetWorkspaceRoleID(ctx, uc.permittableRepo, in.NewOwnerID, ws.ID(), ownerRole.ID()); err != nil {
+	if err := uc.changeMemberRole(ctx, ws, in.NewOwnerID, ownerRole); err != nil {
 		return nil, err
 	}
 
@@ -168,11 +161,41 @@ func (uc *TransferOwnerUseCase) transfer(ctx context.Context, in TransferOwnerIn
 	}, nil
 }
 
-func (uc *TransferOwnerUseCase) findRole(ctx context.Context, name role.RoleType) (*role.Role, error) {
-	r, err := permittablesync.FindRole(ctx, uc.roleRepo, name)
-	if errors.Is(err, rerror.ErrNotFound) {
-		log.Errorfc(ctx, "[admin] transfer workspace owner: role record %q is missing", name)
-		return nil, ErrRoleNotConfigured
+// changeMemberRole saves uid's Permittable; the caller saves ws.
+func (uc *TransferOwnerUseCase) changeMemberRole(ctx context.Context, ws *workspace.Workspace, uid user.ID, r *role.Role) error {
+	p, err := uc.permittableRepo.FindByUserID(ctx, uid)
+	if err != nil && !errors.Is(err, rerror.ErrNotFound) {
+		return err
 	}
-	return r, err
+	if p == nil {
+		if p, err = permittable.NewForUser(uid); err != nil {
+			return err
+		}
+	}
+	if err := membership.ChangeMemberRole(ws, p, uid, r); err != nil {
+		return err
+	}
+	return uc.permittableRepo.Save(ctx, *p)
+}
+
+// findRole returns the role record named name. When REEARTH_MOCK_AUTH is
+// "true", a missing record is created; otherwise it is ErrRoleNotConfigured.
+func (uc *TransferOwnerUseCase) findRole(ctx context.Context, name role.RoleType) (*role.Role, error) {
+	r, err := uc.roleRepo.FindByName(ctx, string(name))
+	if err == nil {
+		return r, nil
+	}
+	if !errors.Is(err, rerror.ErrNotFound) {
+		return nil, err
+	}
+	if os.Getenv("REEARTH_MOCK_AUTH") == "true" {
+		log.Infofc(ctx, "[MockAuth] Auto-creating role for workspace: %s", name)
+		newRole := role.New().NewID().Name(string(name)).MustBuild()
+		if err := uc.roleRepo.Save(ctx, *newRole); err != nil {
+			return nil, applog.ErrorWithCallerLogging(ctx, "failed to auto-create role", err)
+		}
+		return newRole, nil
+	}
+	log.Errorfc(ctx, "[admin] transfer workspace owner: role record %q is missing", name)
+	return nil, ErrRoleNotConfigured
 }

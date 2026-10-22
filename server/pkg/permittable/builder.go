@@ -68,3 +68,8 @@ func (b *Builder) WorkspaceRoles(workspaceRoles []WorkspaceRole) *Builder {
 	b.p.workspaceRoles = workspaceRoles
 	return b
 }
+
+// NewForUser returns a new Permittable for uid with no roles.
+func NewForUser(uid user.ID) (*Permittable, error) {
+	return New().NewID().UserID(uid).Build()
+}
