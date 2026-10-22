@@ -27,13 +27,6 @@ func newContext(t *testing.T) (echo.Context, *bool) {
 	return c, &called
 }
 
-func next(called *bool) echo.HandlerFunc {
-	return func(c echo.Context) error {
-		*called = true
-		return c.NoContent(http.StatusOK)
-	}
-}
-
 func TestRequirePermission_NoAdminUser_Unauthorized(t *testing.T) {
 	c, called := newContext(t)
 

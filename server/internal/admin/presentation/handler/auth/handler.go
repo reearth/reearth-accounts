@@ -13,12 +13,6 @@ import (
 	"github.com/reearth/reearth-accounts/server/internal/admin/usecase/authuc"
 )
 
-// csrfCookieName is the name of the non-HttpOnly companion cookie carrying the
-// double-submit CSRF token. The frontend JS reads it via document.cookie and
-// echoes it back in the session.CSRFHeaderName header; middleware.RequireCSRF
-// matches the two on mutating routes.
-const csrfCookieName = session.CSRFCookieName
-
 // CookieSecure is a named bool so Wire can inject it unambiguously. It controls
 // the Secure attribute of the session cookie (true in production/HTTPS).
 type CookieSecure bool
@@ -69,7 +63,7 @@ func (h *Handler) clearSessionCookie() *http.Cookie {
 // its value and echo it back in a request header.
 func (h *Handler) newCSRFCookie(value string, now time.Time) *http.Cookie {
 	return &http.Cookie{
-		Name:     csrfCookieName,
+		Name:     session.CSRFCookieName,
 		Value:    value,
 		Path:     "/",
 		HttpOnly: false,
@@ -82,7 +76,7 @@ func (h *Handler) newCSRFCookie(value string, now time.Time) *http.Cookie {
 
 func (h *Handler) clearCSRFCookie() *http.Cookie {
 	return &http.Cookie{
-		Name:     csrfCookieName,
+		Name:     session.CSRFCookieName,
 		Value:    "",
 		Path:     "/",
 		HttpOnly: false,

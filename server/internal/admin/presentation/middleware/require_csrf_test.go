@@ -63,3 +63,48 @@ func TestRequireCSRF(t *testing.T) {
 		})
 	}
 }
+
+func TestRequireCSRFIfCookie(t *testing.T) {
+	const token = "csrf-token-value"
+
+	tests := []struct {
+		name       string
+		cookie     string
+		header     string
+		wantCalled bool
+		wantMsg    string
+	}{
+		{name: "no cookie passes", wantCalled: true},
+		{name: "no cookie with header passes", header: token, wantCalled: true},
+		{name: "matching token passes", cookie: token, header: token, wantCalled: true},
+		{name: "cookie without header", cookie: token, wantMsg: "missing csrf token"},
+		{name: "mismatched token", cookie: token, header: "other", wantMsg: "invalid csrf token"},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			e := echo.New()
+			req := httptest.NewRequest(http.MethodPost, "/", nil)
+			if tt.cookie != "" {
+				req.AddCookie(&http.Cookie{Name: session.CSRFCookieName, Value: tt.cookie})
+			}
+			if tt.header != "" {
+				req.Header.Set(session.CSRFHeaderName, tt.header)
+			}
+			c := e.NewContext(req, httptest.NewRecorder())
+
+			called := false
+			err := mw.RequireCSRFIfCookie(next(&called))(c)
+
+			assert.Equal(t, tt.wantCalled, called)
+			if tt.wantCalled {
+				require.NoError(t, err)
+				return
+			}
+			var httpErr *echo.HTTPError
+			require.ErrorAs(t, err, &httpErr)
+			assert.Equal(t, http.StatusForbidden, httpErr.Code)
+			assert.Equal(t, tt.wantMsg, httpErr.Message)
+		})
+	}
+}
