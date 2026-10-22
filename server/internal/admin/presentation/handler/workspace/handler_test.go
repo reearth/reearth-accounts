@@ -46,8 +46,10 @@ func newTestEcho(wsRepo workspace.Repo, adminRepo adminuser.Repo, sess *session.
 func newTestEchoWithUsers(wsRepo workspace.Repo, userRepo user.Repo, adminRepo adminuser.Repo, sess *session.Manager) *echo.Echo {
 	h := workspacehandler.NewHandler(
 		workspaceuc.NewGetWorkspaceUseCase(wsRepo),
+		workspaceuc.NewGetWorkspaceScimStateUseCase(wsRepo),
 		workspaceuc.NewListWorkspacesUseCase(wsRepo),
 		workspaceuc.NewListWorkspaceMembersUseCase(wsRepo, userRepo),
+		workspaceuc.NewSetWorkspaceScimAvailableUseCase(wsRepo),
 		workspaceuc.NewTransferOwnerUseCase(wsRepo, userRepo, seededRoleRepo(), memory.NewPermittable(), &usecasex.NopTransaction{}),
 	)
 	requireApproved := echo.MiddlewareFunc(mw.NewRequireApprovedMiddleware(sess, adminRepo))
@@ -59,6 +61,8 @@ func newTestEchoWithUsers(wsRepo workspace.Repo, userRepo user.Repo, adminRepo a
 	g.GET("", h.ListWorkspaces)
 	g.GET("/:id", h.GetWorkspace)
 	g.GET("/:id/members", h.GetWorkspaceMembers)
+	g.GET("/:id/scim", h.GetScimState)
+	g.PATCH("/:id/scim", h.SetScimAvailable)
 	g.POST("/:id/transfer-owner", h.TransferWorkspaceOwner)
 	return e
 }

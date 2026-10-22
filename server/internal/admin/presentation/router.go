@@ -61,6 +61,8 @@ func RegisterRoutes(e *echo.Echo, h *Handler) {
 		workspaces.GET("", h.Workspace.ListWorkspaces, mw.RequirePermission(h.Checker, adminrbac.ResourceWorkspace, adminrbac.ActionList))
 		workspaces.GET("/:id", h.Workspace.GetWorkspace, mw.RequirePermission(h.Checker, adminrbac.ResourceWorkspace, adminrbac.ActionRead))
 		workspaces.GET("/:id/members", h.Workspace.GetWorkspaceMembers, mw.RequirePermission(h.Checker, adminrbac.ResourceWorkspace, adminrbac.ActionReadMember))
+		workspaces.GET("/:id/scim", h.Workspace.GetScimState, mw.RequirePermission(h.Checker, adminrbac.ResourceWorkspace, adminrbac.ActionRead))
+		workspaces.PATCH("/:id/scim", h.Workspace.SetScimAvailable, mw.RequirePermission(h.Checker, adminrbac.ResourceWorkspace, adminrbac.ActionEdit))
 		workspaces.POST("/:id/transfer-owner", h.Workspace.TransferWorkspaceOwner, mw.RequirePermission(h.Checker, adminrbac.ResourceWorkspace, adminrbac.ActionTransferOwner))
 	}
 }

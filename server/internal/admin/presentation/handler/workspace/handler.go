@@ -10,17 +10,21 @@ import (
 // Handler serves the /workspaces endpoints.
 type Handler struct {
 	get           *workspaceuc.GetWorkspaceUseCase
+	getScim       *workspaceuc.GetWorkspaceScimStateUseCase
 	list          *workspaceuc.ListWorkspacesUseCase
 	members       *workspaceuc.ListWorkspaceMembersUseCase
+	setScim       *workspaceuc.SetWorkspaceScimAvailableUseCase
 	transferOwner *workspaceuc.TransferOwnerUseCase
 }
 
 // NewHandler is a Wire provider for the workspace Handler.
 func NewHandler(
 	get *workspaceuc.GetWorkspaceUseCase,
+	getScim *workspaceuc.GetWorkspaceScimStateUseCase,
 	list *workspaceuc.ListWorkspacesUseCase,
 	members *workspaceuc.ListWorkspaceMembersUseCase,
+	setScim *workspaceuc.SetWorkspaceScimAvailableUseCase,
 	transferOwner *workspaceuc.TransferOwnerUseCase,
 ) *Handler {
-	return &Handler{get: get, list: list, members: members, transferOwner: transferOwner}
+	return &Handler{get: get, getScim: getScim, list: list, members: members, setScim: setScim, transferOwner: transferOwner}
 }

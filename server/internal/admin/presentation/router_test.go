@@ -355,8 +355,10 @@ func TestRoutes_TransferWorkspaceOwner_ByRole(t *testing.T) {
 			h := &presentation.Handler{
 				Workspace: workspacehandler.NewHandler(
 					workspaceuc.NewGetWorkspaceUseCase(wsRepo),
+					workspaceuc.NewGetWorkspaceScimStateUseCase(wsRepo),
 					workspaceuc.NewListWorkspacesUseCase(wsRepo),
 					workspaceuc.NewListWorkspaceMembersUseCase(wsRepo, userRepo),
+					workspaceuc.NewSetWorkspaceScimAvailableUseCase(wsRepo),
 					workspaceuc.NewTransferOwnerUseCase(wsRepo, userRepo, memory.NewRoleWith(roles...), memory.NewPermittable(), &usecasex.NopTransaction{}),
 				),
 				SessionMw:       mw.NewSessionMiddleware(sess),
