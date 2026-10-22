@@ -105,6 +105,30 @@ func (q *Queries) WorkspaceFindByID(ctx context.Context, id string) (Workspace, 
 	return i, err
 }
 
+const workspaceFindByIDForUpdate = `-- name: WorkspaceFindByIDForUpdate :one
+SELECT id, name, alias, email, personal, policy, members_hash, metadata, created_at, created_by, updated_at, deleted_at FROM workspaces WHERE id = $1 FOR UPDATE
+`
+
+func (q *Queries) WorkspaceFindByIDForUpdate(ctx context.Context, id string) (Workspace, error) {
+	row := q.db.QueryRow(ctx, workspaceFindByIDForUpdate, id)
+	var i Workspace
+	err := row.Scan(
+		&i.ID,
+		&i.Name,
+		&i.Alias,
+		&i.Email,
+		&i.Personal,
+		&i.Policy,
+		&i.MembersHash,
+		&i.Metadata,
+		&i.CreatedAt,
+		&i.CreatedBy,
+		&i.UpdatedAt,
+		&i.DeletedAt,
+	)
+	return i, err
+}
+
 const workspaceFindByIDs = `-- name: WorkspaceFindByIDs :many
 SELECT id, name, alias, email, personal, policy, members_hash, metadata, created_at, created_by, updated_at, deleted_at FROM workspaces WHERE id = ANY($1::text[]) ORDER BY id
 `

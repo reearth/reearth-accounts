@@ -93,10 +93,16 @@ distribution proves prohibitive.
 | `GET /api/v1/workspaces/:id/members` | `workspace` | `read_member` | viewer |
 | `POST /api/v1/workspaces/:id/transfer-owner` | `workspace` | `transfer_owner` | system_admin |
 | *(future)* `PATCH /api/v1/users/:id`, `DELETE /api/v1/users/:id` | `user` | `edit` / `delete` | system_admin |
-| *(future)* `PATCH /api/v1/workspaces/:id`, `DELETE /api/v1/workspaces/:id` | `workspace` | `edit` / `delete` / `transfer_owner` | system_admin |
+| *(future)* `PATCH /api/v1/workspaces/:id`, `DELETE /api/v1/workspaces/:id` | `workspace` | `edit` / `delete` | system_admin |
 | *(future)* `PUT /api/v1/admin-users/:id/roles` | `admin_user` | `assign_role` | system_admin |
 
 Notes:
+- `transfer_owner` is a **new action**. Cerbos denies an action the deployed
+  `accounts-admin` policy does not list, so until the policy is regenerated
+  (`make gen-policies`) and deployed, `POST /api/v1/workspaces/:id/transfer-owner`
+  returns 403 for every admin, system_admin included. Deploy the regenerated
+  policy before, or together with, the admin-api and admin-web release that
+  exposes the transfer.
 - `/api/v1/me` and `/api/v1/auth/*` stay public / session-only (no permission
   check) — they are the pending/rejected screens' lifeline and must work for any
   status.

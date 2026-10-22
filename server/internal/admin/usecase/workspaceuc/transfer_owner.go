@@ -10,6 +10,7 @@ import (
 	"github.com/reearth/reearth-accounts/server/pkg/role"
 	"github.com/reearth/reearth-accounts/server/pkg/user"
 	"github.com/reearth/reearth-accounts/server/pkg/workspace"
+	"github.com/reearth/reearthx/log"
 	"github.com/reearth/reearthx/rerror"
 	"github.com/reearth/reearthx/usecasex"
 )
@@ -61,8 +62,17 @@ type TransferOwnerOutput struct {
 
 // Execute demotes every other owner to maintainer and promotes the target to
 // owner. The role changes, their permittables and the workspace are written in
-// one transaction, so a failure leaves the workspace's owners unchanged.
+// one transaction, so a failure leaves the workspace's owners unchanged. With a
+// NopTransaction (Mongo without transaction support) the writes are applied one
+// by one and a failure part-way leaves them partially applied.
+//
+// A conflicting concurrent write surfaces as usecasex.ErrTransaction. It is not
+// retried: a Mongo transaction that hit a write conflict is aborted and cannot
+// run fn again.
 func (uc *TransferOwnerUseCase) Execute(ctx context.Context, in TransferOwnerInput) (*TransferOwnerOutput, error) {
+	if _, nop := uc.transaction.(*usecasex.NopTransaction); nop || uc.transaction == nil {
+		log.Warnfc(ctx, "[admin] transfer workspace owner without a transaction; writes are not atomic: workspace=%s", in.WorkspaceID)
+	}
 	var out *TransferOwnerOutput
 	err := usecasex.DoTransaction(ctx, uc.transaction, 0, func(ctx context.Context) error {
 		res, err := uc.transfer(ctx, in)
@@ -79,9 +89,14 @@ func (uc *TransferOwnerUseCase) Execute(ctx context.Context, in TransferOwnerInp
 }
 
 func (uc *TransferOwnerUseCase) transfer(ctx context.Context, in TransferOwnerInput) (*TransferOwnerOutput, error) {
-	ws, err := uc.workspaceRepo.FindByID(ctx, in.WorkspaceID)
+	// The lock must be taken by the first read: everything read after it is then
+	// what the previous transfer on this workspace committed.
+	ws, err := uc.workspaceRepo.FindByIDForUpdate(ctx, in.WorkspaceID)
 	if err != nil {
 		return nil, err
+	}
+	if ws.IsDeleted() {
+		return nil, rerror.ErrNotFound
 	}
 	if ws.IsPersonal() {
 		return nil, ErrPersonalWorkspace
@@ -109,15 +124,26 @@ func (uc *TransferOwnerUseCase) transfer(ctx context.Context, in TransferOwnerIn
 		return id == in.NewOwnerID
 	})
 	if target.Role == role.RoleOwner && len(demoted) == 0 {
-		return nil, ErrAlreadyOwner
+		return nil, &AlreadyOwnerError{Workspace: ws, NewOwner: newOwner}
 	}
 	slices.SortFunc(demoted, func(a, b user.ID) int { return a.Compare(b) })
+
+	ownerRole, err := uc.findRole(ctx, role.RoleOwner)
+	if err != nil {
+		return nil, err
+	}
+	var maintainerRole *role.Role
+	if len(demoted) > 0 {
+		if maintainerRole, err = uc.findRole(ctx, role.RoleMaintainer); err != nil {
+			return nil, err
+		}
+	}
 
 	for _, uid := range demoted {
 		if err := members.UpdateUserRole(uid, role.RoleMaintainer); err != nil {
 			return nil, err
 		}
-		if err := permittablesync.SetWorkspaceRole(ctx, uc.roleRepo, uc.permittableRepo, uid, ws.ID(), role.RoleMaintainer); err != nil {
+		if err := permittablesync.SetWorkspaceRoleID(ctx, uc.permittableRepo, uid, ws.ID(), maintainerRole.ID()); err != nil {
 			return nil, err
 		}
 	}
@@ -127,7 +153,7 @@ func (uc *TransferOwnerUseCase) transfer(ctx context.Context, in TransferOwnerIn
 			return nil, err
 		}
 	}
-	if err := permittablesync.SetWorkspaceRole(ctx, uc.roleRepo, uc.permittableRepo, in.NewOwnerID, ws.ID(), role.RoleOwner); err != nil {
+	if err := permittablesync.SetWorkspaceRoleID(ctx, uc.permittableRepo, in.NewOwnerID, ws.ID(), ownerRole.ID()); err != nil {
 		return nil, err
 	}
 
@@ -140,4 +166,13 @@ func (uc *TransferOwnerUseCase) transfer(ctx context.Context, in TransferOwnerIn
 		NewOwner:       newOwner,
 		DemotedUserIDs: demoted,
 	}, nil
+}
+
+func (uc *TransferOwnerUseCase) findRole(ctx context.Context, name role.RoleType) (*role.Role, error) {
+	r, err := permittablesync.FindRole(ctx, uc.roleRepo, name)
+	if errors.Is(err, rerror.ErrNotFound) {
+		log.Errorfc(ctx, "[admin] transfer workspace owner: role record %q is missing", name)
+		return nil, ErrRoleNotConfigured
+	}
+	return r, err
 }

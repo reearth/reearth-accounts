@@ -1,6 +1,7 @@
 package workspace_test
 
 import (
+	"context"
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
@@ -16,6 +17,7 @@ import (
 	"github.com/reearth/reearth-accounts/server/pkg/role"
 	"github.com/reearth/reearth-accounts/server/pkg/user"
 	"github.com/reearth/reearth-accounts/server/pkg/workspace"
+	"github.com/reearth/reearthx/usecasex"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -113,7 +115,55 @@ func TestTransferWorkspaceOwner_RetryAfterCommit_409(t *testing.T) {
 
 	rec := env.serveReq(t, env.ws.ID().String(), transferBody(env.member.ID().String()), true)
 	assert.Equal(t, http.StatusConflict, rec.Code)
-	assert.Equal(t, "already_owner", decodeError(t, rec).Code)
+
+	var body workspacehandler.TransferWorkspaceOwnerConflictResponse
+	require.NoError(t, json.Unmarshal(rec.Body.Bytes(), &body))
+	assert.Equal(t, "already_owner", body.Code)
+	assert.Equal(t, "target user is already the sole owner", body.Message)
+	require.NotNil(t, body.NewOwner)
+	assert.Equal(t, workspacehandler.WorkspaceMemberResponse{
+		UserID: env.member.ID().String(), Name: "Member", Email: "member@example.com", Role: "owner",
+	}, *body.NewOwner)
+}
+
+type failingSaveRepo struct {
+	workspace.Repo
+	err error
+}
+
+func (r failingSaveRepo) Save(context.Context, *workspace.Workspace) error { return r.err }
+
+func TestTransferWorkspaceOwner_TransactionConflict_409(t *testing.T) {
+	op := approvedAdmin("op@eukarya.io")
+	owner := user.New().NewID().Name("Owner").Email("owner@example.com").MustBuild()
+	member := user.New().NewID().Name("Member").Email("member@example.com").MustBuild()
+	w := workspace.New().NewID().Name("Team").Alias("team").Members(ownerAndWriter(owner, member)).MustBuild()
+	sess := session.NewManager(testSecret, time.Hour)
+	repo := failingSaveRepo{Repo: memory.NewWorkspaceWith(w), err: usecasex.ErrTransaction}
+	e := newTestEchoWithUsers(repo, memory.NewUserWith(owner, member), memory.NewAdminUserWith(op), sess)
+
+	req := httptest.NewRequest(http.MethodPost, "/api/v1/workspaces/"+w.ID().String()+"/transfer-owner", strings.NewReader(transferBody(member.ID().String())))
+	req.Header.Set("Content-Type", "application/json")
+	req.AddCookie(cookieFor(t, sess, op.ID()))
+	rec := httptest.NewRecorder()
+	e.ServeHTTP(rec, req)
+
+	assert.Equal(t, http.StatusConflict, rec.Code)
+	var raw map[string]any
+	require.NoError(t, json.Unmarshal(rec.Body.Bytes(), &raw))
+	assert.Equal(t, "conflict", raw["code"])
+	assert.NotContains(t, raw, "newOwner")
+}
+
+func TestTransferWorkspaceOwner_SoftDeleted_404(t *testing.T) {
+	env := newTransferEnv(t, ownerAndWriter, false)
+	env.ws.Delete()
+
+	rec := env.serveReq(t, env.ws.ID().String(), transferBody(env.member.ID().String()), true)
+	assert.Equal(t, http.StatusNotFound, rec.Code)
+	saved, err := env.wsRepo.FindByID(t.Context(), env.ws.ID())
+	require.NoError(t, err)
+	assert.Equal(t, role.RoleOwner, saved.Members().UserRole(env.owner.ID()))
 }
 
 func TestTransferWorkspaceOwner_DomainErrors(t *testing.T) {
@@ -181,6 +231,13 @@ func TestTransferWorkspaceOwner_DomainErrors(t *testing.T) {
 			rec := env.serveReq(t, env.ws.ID().String(), transferBody(tt.target(env)), true)
 			assert.Equal(t, tt.status, rec.Code)
 			assert.Equal(t, tt.code, decodeError(t, rec).Code)
+			var raw map[string]any
+			require.NoError(t, json.Unmarshal(rec.Body.Bytes(), &raw))
+			if tt.code == "already_owner" {
+				assert.Contains(t, raw, "newOwner")
+			} else {
+				assert.NotContains(t, raw, "newOwner")
+			}
 		})
 	}
 }

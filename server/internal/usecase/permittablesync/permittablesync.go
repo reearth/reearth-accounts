@@ -29,20 +29,41 @@ func SetWorkspaceRole(
 	workspaceID workspace.ID,
 	roleName role.RoleType,
 ) error {
-	r, err := roleRepo.FindByName(ctx, string(roleName))
+	r, err := FindRole(ctx, roleRepo, roleName)
 	if err != nil {
-		if errors.Is(err, rerror.ErrNotFound) && os.Getenv("REEARTH_MOCK_AUTH") == "true" {
-			log.Infof("[MockAuth] Auto-creating role for workspace: %s", roleName)
-			newRole := role.New().NewID().Name(string(roleName)).MustBuild()
-			if saveErr := roleRepo.Save(ctx, *newRole); saveErr != nil {
-				return applog.ErrorWithCallerLogging(ctx, "failed to auto-create role", saveErr)
-			}
-			r = newRole
-		} else {
-			return err
-		}
+		return err
 	}
+	return SetWorkspaceRoleID(ctx, permittableRepo, userID, workspaceID, r.ID())
+}
 
+// FindRole returns the role record named roleName. When REEARTH_MOCK_AUTH is
+// "true", a missing role is created on the fly; otherwise a missing role is
+// returned as rerror.ErrNotFound.
+func FindRole(ctx context.Context, roleRepo role.Repo, roleName role.RoleType) (*role.Role, error) {
+	r, err := roleRepo.FindByName(ctx, string(roleName))
+	if err == nil {
+		return r, nil
+	}
+	if !errors.Is(err, rerror.ErrNotFound) || os.Getenv("REEARTH_MOCK_AUTH") != "true" {
+		return nil, err
+	}
+	log.Infofc(ctx, "[MockAuth] Auto-creating role for workspace: %s", roleName)
+	newRole := role.New().NewID().Name(string(roleName)).MustBuild()
+	if saveErr := roleRepo.Save(ctx, *newRole); saveErr != nil {
+		return nil, applog.ErrorWithCallerLogging(ctx, "failed to auto-create role", saveErr)
+	}
+	return newRole, nil
+}
+
+// SetWorkspaceRoleID is SetWorkspaceRole for a caller that has already
+// resolved the role, e.g. with FindRole.
+func SetWorkspaceRoleID(
+	ctx context.Context,
+	permittableRepo permittable.Repo,
+	userID user.ID,
+	workspaceID workspace.ID,
+	roleID role.ID,
+) error {
 	p, err := permittableRepo.FindByUserID(ctx, userID)
 	if err != nil && !errors.Is(err, rerror.ErrNotFound) {
 		return err
@@ -58,7 +79,7 @@ func SetWorkspaceRole(
 		}
 	}
 
-	p.UpdateWorkspaceRole(workspaceID, r.ID())
+	p.UpdateWorkspaceRole(workspaceID, roleID)
 
 	return permittableRepo.Save(ctx, *p)
 }

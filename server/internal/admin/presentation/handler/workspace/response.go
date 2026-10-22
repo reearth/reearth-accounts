@@ -4,6 +4,7 @@ import (
 	"time"
 
 	"github.com/reearth/reearth-accounts/server/internal/admin/usecase/workspaceuc"
+	"github.com/reearth/reearth-accounts/server/pkg/user"
 	"github.com/reearth/reearth-accounts/server/pkg/workspace"
 )
 
@@ -84,19 +85,24 @@ func newTransferWorkspaceOwnerResponse(out *workspaceuc.TransferOwnerOutput) Tra
 			Alias:    ws.Alias(),
 			Personal: ws.IsPersonal(),
 		},
-		NewOwner: WorkspaceMemberResponse{
-			UserID: out.NewOwner.ID().String(),
-			Name:   out.NewOwner.Name(),
-			Email:  out.NewOwner.Email(),
-		},
+		NewOwner:       newWorkspaceMemberResponse(ws, out.NewOwner),
 		DemotedUserIDs: make([]string, 0, len(out.DemotedUserIDs)),
-	}
-	if m := ws.Members().User(out.NewOwner.ID()); m != nil {
-		res.NewOwner.Role = string(m.Role)
-		res.NewOwner.Disabled = m.Disabled
 	}
 	for _, uid := range out.DemotedUserIDs {
 		res.DemotedUserIDs = append(res.DemotedUserIDs, uid.String())
+	}
+	return res
+}
+
+func newWorkspaceMemberResponse(ws *workspace.Workspace, u *user.User) WorkspaceMemberResponse {
+	res := WorkspaceMemberResponse{
+		UserID: u.ID().String(),
+		Name:   u.Name(),
+		Email:  u.Email(),
+	}
+	if m := ws.Members().User(u.ID()); m != nil {
+		res.Role = string(m.Role)
+		res.Disabled = m.Disabled
 	}
 	return res
 }

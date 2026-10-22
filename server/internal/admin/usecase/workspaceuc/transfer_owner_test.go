@@ -290,3 +290,97 @@ func TestTransferOwner_ReusesExistingPermittable(t *testing.T) {
 	f.assertPermittableRole(t, b.ID(), ws.ID(), role.RoleOwner)
 	f.assertPermittableRole(t, b.ID(), other, role.RoleReader)
 }
+
+func TestTransferOwner_SoftDeletedWorkspaceIsNotFound(t *testing.T) {
+	ctx := context.Background()
+	a, b := newUser("a"), newUser("b")
+	ws := teamWs(map[workspace.UserID]workspace.Member{
+		a.ID(): {Role: role.RoleOwner},
+		b.ID(): {Role: role.RoleWriter},
+	})
+	ws.Delete()
+	f := newTransferFixture(t, ws, a, b)
+
+	_, err := f.uc.Execute(ctx, TransferOwnerInput{WorkspaceID: ws.ID(), NewOwnerID: b.ID()})
+	assert.ErrorIs(t, err, rerror.ErrNotFound)
+	assert.False(t, f.tx.IsCommitted())
+	f.assertNoPermittable(t, a.ID())
+	f.assertNoPermittable(t, b.ID())
+}
+
+func TestTransferOwner_AlreadyOwnerCarriesOwner(t *testing.T) {
+	a, b := newUser("a"), newUser("b")
+	ws := teamWs(map[workspace.UserID]workspace.Member{
+		a.ID(): {Role: role.RoleOwner},
+		b.ID(): {Role: role.RoleWriter},
+	})
+	f := newTransferFixture(t, ws, a, b)
+
+	_, err := f.uc.Execute(context.Background(), TransferOwnerInput{WorkspaceID: ws.ID(), NewOwnerID: a.ID()})
+	require.ErrorIs(t, err, ErrAlreadyOwner)
+	var already *AlreadyOwnerError
+	require.ErrorAs(t, err, &already)
+	assert.Equal(t, ws.ID(), already.Workspace.ID())
+	assert.Equal(t, a.ID(), already.NewOwner.ID())
+}
+
+func TestTransferOwner_MissingRoleIsNotNotFound(t *testing.T) {
+	t.Setenv("REEARTH_MOCK_AUTH", "")
+	a, b := newUser("a"), newUser("b")
+	ws := teamWs(map[workspace.UserID]workspace.Member{
+		a.ID(): {Role: role.RoleOwner},
+		b.ID(): {Role: role.RoleWriter},
+	})
+	f := newTransferFixture(t, ws, a, b)
+	uc := NewTransferOwnerUseCase(f.wsRepo, f.userRepo, memory.NewRoleWith(f.roles[role.RoleOwner]), f.permittableRepo, f.tx)
+
+	_, err := uc.Execute(context.Background(), TransferOwnerInput{WorkspaceID: ws.ID(), NewOwnerID: b.ID()})
+	assert.ErrorIs(t, err, ErrRoleNotConfigured)
+	assert.False(t, errors.Is(err, rerror.ErrNotFound), "must not map to 404")
+	assert.False(t, f.tx.IsCommitted())
+	f.assertNoPermittable(t, a.ID())
+	f.assertNoPermittable(t, b.ID())
+}
+
+type countingRoleRepo struct {
+	role.Repo
+	calls map[string]int
+}
+
+func (r *countingRoleRepo) FindByName(ctx context.Context, name string) (*role.Role, error) {
+	r.calls[name]++
+	return r.Repo.FindByName(ctx, name)
+}
+
+func TestTransferOwner_ResolvesEachRoleOnce(t *testing.T) {
+	a, b, c := newUser("a"), newUser("b"), newUser("c")
+	ws := teamWs(map[workspace.UserID]workspace.Member{
+		a.ID(): {Role: role.RoleOwner},
+		b.ID(): {Role: role.RoleOwner},
+		c.ID(): {Role: role.RoleWriter},
+	})
+	f := newTransferFixture(t, ws, a, b, c)
+	roles := &countingRoleRepo{Repo: f.roleRepo, calls: map[string]int{}}
+	uc := NewTransferOwnerUseCase(f.wsRepo, f.userRepo, roles, f.permittableRepo, f.tx)
+
+	_, err := uc.Execute(context.Background(), TransferOwnerInput{WorkspaceID: ws.ID(), NewOwnerID: c.ID()})
+	require.NoError(t, err)
+	assert.Equal(t, map[string]int{string(role.RoleOwner): 1, string(role.RoleMaintainer): 1}, roles.calls)
+	f.assertPermittableRole(t, a.ID(), ws.ID(), role.RoleMaintainer)
+	f.assertPermittableRole(t, b.ID(), ws.ID(), role.RoleMaintainer)
+	f.assertPermittableRole(t, c.ID(), ws.ID(), role.RoleOwner)
+}
+
+func TestTransferOwner_TransactionConflictIsReturned(t *testing.T) {
+	a, b := newUser("a"), newUser("b")
+	ws := teamWs(map[workspace.UserID]workspace.Member{
+		a.ID(): {Role: role.RoleOwner},
+		b.ID(): {Role: role.RoleWriter},
+	})
+	f := newTransferFixture(t, ws, a, b)
+	uc := NewTransferOwnerUseCase(failingSaveWorkspaceRepo{Repo: f.wsRepo, err: usecasex.ErrTransaction}, f.userRepo, f.roleRepo, f.permittableRepo, f.tx)
+
+	_, err := uc.Execute(context.Background(), TransferOwnerInput{WorkspaceID: ws.ID(), NewOwnerID: b.ID()})
+	assert.ErrorIs(t, err, usecasex.ErrTransaction)
+	assert.False(t, f.tx.IsCommitted())
+}

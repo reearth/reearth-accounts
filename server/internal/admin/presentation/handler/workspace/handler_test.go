@@ -8,6 +8,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/go-playground/validator/v10"
 	"github.com/labstack/echo/v4"
 	"github.com/reearth/reearth-accounts/server/internal/admin/auth/session"
 	adminpresentation "github.com/reearth/reearth-accounts/server/internal/admin/presentation"
@@ -53,12 +54,22 @@ func newTestEchoWithUsers(wsRepo workspace.Repo, userRepo user.Repo, adminRepo a
 
 	e := echo.New()
 	e.HTTPErrorHandler = adminpresentation.CustomHTTPErrorHandler
+	e.Validator = testValidator{v: validator.New()}
 	g := e.Group("/api/v1/workspaces", requireApproved)
 	g.GET("", h.ListWorkspaces)
 	g.GET("/:id", h.GetWorkspace)
 	g.GET("/:id/members", h.GetWorkspaceMembers)
 	g.POST("/:id/transfer-owner", h.TransferWorkspaceOwner)
 	return e
+}
+
+type testValidator struct{ v *validator.Validate }
+
+func (t testValidator) Validate(i any) error {
+	if err := t.v.Struct(i); err != nil {
+		return echo.NewHTTPError(http.StatusBadRequest, err.Error())
+	}
+	return nil
 }
 
 func seededRoleRepo() role.Repo {

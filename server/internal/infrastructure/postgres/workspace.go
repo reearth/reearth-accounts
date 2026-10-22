@@ -147,6 +147,13 @@ func (r *Workspace) FindByID(ctx context.Context, wid id.WorkspaceID) (*workspac
 	return r.one(ctx, w, err)
 }
 
+// FindByIDForUpdate locks the workspace row before hydrating, so the member
+// rows read afterwards are the ones committed by the previous lock holder.
+func (r *Workspace) FindByIDForUpdate(ctx context.Context, wid id.WorkspaceID) (*workspace.Workspace, error) {
+	w, err := r.c.queries(ctx).WorkspaceFindByIDForUpdate(ctx, wid.String())
+	return r.one(ctx, w, err)
+}
+
 func (r *Workspace) FindByIDs(ctx context.Context, ids id.WorkspaceIDList) (workspace.List, error) {
 	if len(ids) == 0 {
 		return nil, nil

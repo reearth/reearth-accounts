@@ -117,6 +117,17 @@ definitions:
     required:
     - role
     type: object
+  TransferWorkspaceOwnerConflictResponse:
+    properties:
+      code:
+        example: already_owner
+        type: string
+      message:
+        example: target user is already the sole owner
+        type: string
+      newOwner:
+        $ref: '#/definitions/WorkspaceMember'
+    type: object
   TransferWorkspaceOwnerRequest:
     properties:
       newOwnerUserId:
@@ -709,7 +720,12 @@ paths:
       - application/json
       description: Makes an existing, enabled member of a team workspace its sole
         owner. Every other owner becomes a maintainer. A reader may be made owner.
-        Role and permittable changes are committed atomically.
+        A soft-deleted workspace is treated as not found. On PostgreSQL, and on MongoDB
+        with transactions enabled, the role and permittable changes are committed
+        in one transaction and concurrent changes to the same workspace are serialized
+        (PostgreSQL) or rejected with 409 conflict (MongoDB). On MongoDB without transaction
+        support the changes are applied one by one, and a failure part-way can leave
+        them partially applied.
       parameters:
       - description: Workspace ID
         in: path
@@ -746,9 +762,10 @@ paths:
           schema:
             $ref: '#/definitions/ErrorResponse'
         "409":
-          description: already_owner
+          description: already_owner (with newOwner) / conflict (concurrent change,
+            retry)
           schema:
-            $ref: '#/definitions/ErrorResponse'
+            $ref: '#/definitions/TransferWorkspaceOwnerConflictResponse'
         "422":
           description: personal_workspace / target_not_member / target_disabled /
             target_user_not_found

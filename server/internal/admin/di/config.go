@@ -247,8 +247,13 @@ func provideRepoContainer(cfg *Config) (*repo.Container, func(), error) {
 		return nil, nil, fmt.Errorf("mongo connect: %w", err)
 	}
 	// Without a transaction-capable client, Container.Transaction is a no-op and
-	// multi-document admin writes (ownership transfer) are not atomic.
+	// multi-document admin writes (ownership transfer) are not atomic. The check
+	// is URI-based and can misjudge a single-host replica set URI, so this only
+	// warns instead of refusing to start.
 	txAvailable := mongox.IsTransactionAvailable(cfg.DB)
+	if !txAvailable {
+		log.Warnf("[admin] mongo transactions are disabled for this DB URI; workspace ownership transfer will not be atomic")
+	}
 	repos, err := mongorepo.New(context.Background(), client.Database(cfg.DBName), txAvailable, false, []user.Repo{})
 	if err != nil {
 		_ = client.Disconnect(context.Background())

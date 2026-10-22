@@ -52,6 +52,7 @@ type Querier interface {
 	// Case-insensitive, matching the case-insensitive unique alias index.
 	WorkspaceFindByAliases(ctx context.Context, dollar_1 []string) ([]Workspace, error)
 	WorkspaceFindByID(ctx context.Context, id string) (Workspace, error)
+	WorkspaceFindByIDForUpdate(ctx context.Context, id string) (Workspace, error)
 	WorkspaceFindByIDs(ctx context.Context, dollar_1 []string) ([]Workspace, error)
 	WorkspaceFindByName(ctx context.Context, name string) (Workspace, error)
 	// Cross-tenant listing (no readable-workspace filter): pass '' for no keyword
