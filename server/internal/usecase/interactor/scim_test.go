@@ -59,7 +59,7 @@ func TestProvisionScimUser_NewUser(t *testing.T) {
 	ws := newScimEnabledWorkspace(ownerID)
 	require.NoError(t, db.Workspace.Save(ctx, ws))
 
-	uc := NewScim(db)
+	uc := NewScim(db, nil)
 
 	u, err := uc.ProvisionScimUser(ctx, interfaces.ProvisionScimUserParam{
 		Email:       "alice@example.com",
@@ -94,7 +94,7 @@ func TestProvisionScimUser_Idempotent(t *testing.T) {
 	ws := newScimEnabledWorkspace(ownerID)
 	require.NoError(t, db.Workspace.Save(ctx, ws))
 
-	uc := NewScim(db)
+	uc := NewScim(db, nil)
 
 	param := interfaces.ProvisionScimUserParam{
 		Email:       "bob@example.com",
@@ -142,7 +142,7 @@ func TestProvisionScimUser_ExistingUserByEmail(t *testing.T) {
 	existing := user.New().ID(existingID).Name("Carol").Email("carol@example.com").Workspace(user.NewWorkspaceID()).MustBuild()
 	require.NoError(t, db.User.Save(ctx, existing))
 
-	uc := NewScim(db)
+	uc := NewScim(db, nil)
 
 	u, err := uc.ProvisionScimUser(ctx, interfaces.ProvisionScimUserParam{
 		Email:       "carol@example.com",
@@ -186,7 +186,7 @@ func TestDeprovisionScimUser_OK(t *testing.T) {
 		MustBuild()
 	require.NoError(t, db.Workspace.Save(ctx, ws))
 
-	uc := NewScim(db)
+	uc := NewScim(db, nil)
 
 	err := uc.DeprovisionScimUser(ctx, ws.ID(), "ext-member-001")
 	require.NoError(t, err)
@@ -220,7 +220,7 @@ func TestDeprovisionScimUser_LastOwner(t *testing.T) {
 		MustBuild()
 	require.NoError(t, db.Workspace.Save(ctx, ws))
 
-	uc := NewScim(db)
+	uc := NewScim(db, nil)
 
 	err := uc.DeprovisionScimUser(ctx, ws.ID(), "ext-owner-001")
 	assert.ErrorIs(t, err, interfaces.ErrOwnerCannotLeaveTheWorkspace)
@@ -252,7 +252,7 @@ func TestDeprovisionScimUserByUserID_OK(t *testing.T) {
 		MustBuild()
 	require.NoError(t, db.Workspace.Save(ctx, ws))
 
-	uc := NewScim(db)
+	uc := NewScim(db, nil)
 
 	err := uc.DeprovisionScimUserByUserID(ctx, ws.ID(), memberID)
 	require.NoError(t, err)
@@ -286,7 +286,7 @@ func TestDeprovisionScimUserByUserID_LastOwner(t *testing.T) {
 		MustBuild()
 	require.NoError(t, db.Workspace.Save(ctx, ws))
 
-	uc := NewScim(db)
+	uc := NewScim(db, nil)
 
 	err := uc.DeprovisionScimUserByUserID(ctx, ws.ID(), ownerID)
 	assert.ErrorIs(t, err, interfaces.ErrOwnerCannotLeaveTheWorkspace)
@@ -313,7 +313,7 @@ func TestDeprovisionScimUserByUserID_NotFound(t *testing.T) {
 		MustBuild()
 	require.NoError(t, db.Workspace.Save(ctx, ws))
 
-	uc := NewScim(db)
+	uc := NewScim(db, nil)
 
 	unknownID := user.NewID()
 	err := uc.DeprovisionScimUserByUserID(ctx, ws.ID(), unknownID)
@@ -356,7 +356,7 @@ func TestSyncScimGroup_AddAndRemove(t *testing.T) {
 		MustBuild()
 	require.NoError(t, db.Workspace.Save(ctx, ws))
 
-	uc := NewScim(db)
+	uc := NewScim(db, nil)
 
 	err := uc.SyncScimGroup(ctx, ws.ID(), "group-id", "engineers", []interfaces.ScimGroupMember{
 		{ExternalID: "ext-new-001", UserID: &newID},
@@ -388,10 +388,10 @@ func TestGenerateScimToken(t *testing.T) {
 
 	op := &workspace.Operator{
 		User:                   &ownerID,
-		MaintainableWorkspaces: []workspace.ID{ws.ID()},
+		OwningWorkspaces: []workspace.ID{ws.ID()},
 	}
 
-	uc := NewScim(db)
+	uc := NewScim(db, nil)
 
 	plaintext1, err := uc.GenerateScimToken(ctx, ws.ID(), op)
 	require.NoError(t, err)
