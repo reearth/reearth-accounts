@@ -15,8 +15,9 @@ import (
 
 // csrfCookieName is the name of the non-HttpOnly companion cookie carrying the
 // double-submit CSRF token. The frontend JS reads it via document.cookie and
-// echoes it back in a request header; the admin BFF matches the two.
-const csrfCookieName = "admin_csrf"
+// echoes it back in the session.CSRFHeaderName header; middleware.RequireCSRF
+// matches the two on mutating routes.
+const csrfCookieName = session.CSRFCookieName
 
 // CookieSecure is a named bool so Wire can inject it unambiguously. It controls
 // the Secure attribute of the session cookie (true in production/HTTPS).

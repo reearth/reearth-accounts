@@ -15,16 +15,23 @@ func RegisterRoutes(e *echo.Echo, h *Handler) {
 	})
 
 	api := e.Group("/api")
-	v1 := api.Group("/v1")
+
+	// Auth. Sign-in and logout are public: logout only clears the cookie,
+	// and it must work even when the session token is expired/invalid since
+	// the browser cannot delete an HttpOnly cookie itself. This group is built
+	// from api (not v1) so it stays outside the CSRF check below: sign-in runs
+	// before the admin_csrf cookie exists, and logout must clear it even when it
+	// is missing or stale.
+	authg := api.Group("/v1/auth")
+	authg.POST("/google", h.Auth.GoogleSignIn)
+	authg.POST("/logout", h.Auth.Logout)
+
+	// Every other /api/v1 route inherits the double-submit CSRF check, so any
+	// mutating route added to v1 or one of its sub-groups is covered without
+	// opting in. A route that must be exempt belongs in authg above.
+	v1 := api.Group("/v1", mw.RequireCSRF)
 	{
 		sessionMw := echo.MiddlewareFunc(h.SessionMw)
-
-		// Auth. Sign-in and logout are public: logout only clears the cookie,
-		// and it must work even when the session token is expired/invalid since
-		// the browser cannot delete an HttpOnly cookie itself.
-		authg := v1.Group("/auth")
-		authg.POST("/google", h.Auth.GoogleSignIn)
-		authg.POST("/logout", h.Auth.Logout)
 
 		// Current admin user (any status)
 		v1.GET("/me", h.Auth.Me, sessionMw)
