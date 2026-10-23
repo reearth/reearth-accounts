@@ -58,7 +58,7 @@ func setupScimAdminTest(t *testing.T) (
 		OwningWorkspaces: id.WorkspaceIDList{ws.ID()},
 	}
 
-	scimUC := interactor.NewScim(db)
+	scimUC := interactor.NewScim(db, nil)
 	uc = &interfaces.Container{Scim: scimUC}
 	return
 }

@@ -26,15 +26,16 @@ type WorkspaceMetadataResponse struct {
 
 // WorkspaceResponse mirrors the GraphQL Workspace type.
 type WorkspaceResponse struct {
-	ID        string                     `json:"id"`
-	Name      string                     `json:"name"`
-	Alias     string                     `json:"alias"`
-	Personal  bool                       `json:"personal"`
-	Members   []WorkspaceMemberResponse  `json:"members"`
-	Metadata  *WorkspaceMetadataResponse `json:"metadata"`
-	CreatedAt *time.Time                 `json:"created_at,omitempty"`
-	CreatedBy *string                    `json:"created_by,omitempty"`
-	DeletedAt *time.Time                 `json:"deleted_at,omitempty"`
+	ID            string                     `json:"id"`
+	Name          string                     `json:"name"`
+	Alias         string                     `json:"alias"`
+	Personal      bool                       `json:"personal"`
+	Members       []WorkspaceMemberResponse  `json:"members"`
+	Metadata      *WorkspaceMetadataResponse `json:"metadata"`
+	ScimAvailable bool                       `json:"scim_available"`
+	CreatedAt     *time.Time                 `json:"created_at,omitempty"`
+	CreatedBy     *string                    `json:"created_by,omitempty"`
+	DeletedAt     *time.Time                 `json:"deleted_at,omitempty"`
 }
 
 // NewWorkspaceResponse converts a domain workspace (no signed-URL resolution).
@@ -60,14 +61,15 @@ func NewWorkspaceResponse(w *workspace.Workspace) *WorkspaceResponse {
 		PhotoURL:     md.PhotoURL(),
 	}
 	res := &WorkspaceResponse{
-		ID:        w.ID().String(),
-		Name:      w.Name(),
-		Alias:     w.Alias(),
-		Personal:  w.IsPersonal(),
-		Members:   members,
-		Metadata:  meta,
-		CreatedAt: w.CreatedAt(),
-		DeletedAt: w.DeletedAt(),
+		ID:            w.ID().String(),
+		Name:          w.Name(),
+		Alias:         w.Alias(),
+		Personal:      w.IsPersonal(),
+		Members:       members,
+		Metadata:      meta,
+		ScimAvailable: w.ScimAvailable(),
+		CreatedAt:     w.CreatedAt(),
+		DeletedAt:     w.DeletedAt(),
 	}
 	if cb := w.CreatedBy(); cb != nil {
 		s := cb.String()

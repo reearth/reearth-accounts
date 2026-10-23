@@ -8,10 +8,21 @@ type GenerateScimTokenResponse struct {
 	Warning string `json:"warning"`
 }
 
+// UpdateWorkspaceScimStateRequest is the request body for PATCH /api/workspaces/:id/scim.
+type UpdateWorkspaceScimStateRequest struct {
+	Enabled bool `json:"enabled"`
+}
+
+// WorkspaceScimStateResponse is the response for GET and PATCH /api/workspaces/:id/scim.
+type WorkspaceScimStateResponse struct {
+	ScimEnabled bool `json:"scim_enabled"`
+}
+
 // ScimConfigResponse is the response for GET and PUT /api/workspaces/:id/scim/config.
 type ScimConfigResponse struct {
 	Enabled          bool              `json:"enabled"`
 	GroupRoleMapping map[string]string `json:"group_role_mapping"`
+	ScimAvailable    bool              `json:"scim_available"`
 	ScimBaseURL      string            `json:"scim_base_url"`
 	TokenIssued      bool              `json:"token_issued"`
 }
@@ -24,6 +35,7 @@ type UpdateScimConfigRequest struct {
 
 // NewScimConfigResponse converts a domain ScimConfig to a ScimConfigResponse.
 // The token hash is masked: token_issued is true when a hash exists, but the raw hash is never included.
+// ScimAvailable is true when a ScimConfig record exists (admin has enabled SCIM for the workspace).
 func NewScimConfigResponse(cfg *workspace.ScimConfig, scimBaseURL string) ScimConfigResponse {
 	resp := ScimConfigResponse{
 		GroupRoleMapping: map[string]string{},
@@ -32,6 +44,7 @@ func NewScimConfigResponse(cfg *workspace.ScimConfig, scimBaseURL string) ScimCo
 	if cfg == nil {
 		return resp
 	}
+	resp.ScimAvailable = true
 	resp.Enabled = cfg.Enabled()
 	resp.TokenIssued = cfg.TokenHash() != ""
 	for k, v := range cfg.GroupRoleMapping() {
