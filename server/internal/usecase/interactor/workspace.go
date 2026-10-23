@@ -4,7 +4,6 @@ import (
 	"context"
 	"errors"
 	"maps"
-	"os"
 	"slices"
 	"strings"
 	"time"
@@ -19,7 +18,6 @@ import (
 	"github.com/reearth/reearth-accounts/server/pkg/role"
 	"github.com/reearth/reearth-accounts/server/pkg/user"
 	"github.com/reearth/reearth-accounts/server/pkg/workspace"
-	"github.com/reearth/reearthx/log"
 	"github.com/reearth/reearthx/rerror"
 	"github.com/reearth/reearthx/util"
 	"github.com/samber/lo"
@@ -812,7 +810,7 @@ func filterWorkspaces(
 
 // changeMemberRole saves uid's Permittable; the caller saves ws.
 func (i *Workspace) changeMemberRole(ctx context.Context, ws *workspace.Workspace, uid user.ID, roleName role.RoleType) error {
-	r, err := i.findRole(ctx, roleName)
+	r, err := i.roleRepo.FindByName(ctx, string(roleName))
 	if err != nil {
 		return err
 	}
@@ -829,24 +827,6 @@ func (i *Workspace) changeMemberRole(ctx context.Context, ws *workspace.Workspac
 		return err
 	}
 	return i.permittableRepo.Save(ctx, *p)
-}
-
-// findRole returns the role record named roleName. When REEARTH_MOCK_AUTH is
-// "true", a missing record is created.
-func (i *Workspace) findRole(ctx context.Context, roleName role.RoleType) (*role.Role, error) {
-	r, err := i.roleRepo.FindByName(ctx, string(roleName))
-	if err == nil {
-		return r, nil
-	}
-	if !errors.Is(err, rerror.ErrNotFound) || os.Getenv("REEARTH_MOCK_AUTH") != "true" {
-		return nil, err
-	}
-	log.Infofc(ctx, "[MockAuth] Auto-creating role for workspace: %s", roleName)
-	newRole := role.New().NewID().Name(string(roleName)).MustBuild()
-	if err := i.roleRepo.Save(ctx, *newRole); err != nil {
-		return nil, applog.ErrorWithCallerLogging(ctx, "failed to auto-create role", err)
-	}
-	return newRole, nil
 }
 
 func (i *Workspace) bulkRemovePermittable(ctx context.Context, workspaceID workspace.ID, userIDs user.IDList) error {
@@ -886,7 +866,7 @@ func (i *Workspace) bulkUpdatePermittable(ctx context.Context, workspaceID works
 		if _, seen := roleIDByName[roleName]; seen {
 			continue
 		}
-		r, err := i.findRole(ctx, roleName)
+		r, err := i.roleRepo.FindByName(ctx, string(roleName))
 		if err != nil {
 			return err
 		}

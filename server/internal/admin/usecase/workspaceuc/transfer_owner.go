@@ -3,10 +3,8 @@ package workspaceuc
 import (
 	"context"
 	"errors"
-	"os"
 	"slices"
 
-	"github.com/reearth/reearth-accounts/server/pkg/applog"
 	"github.com/reearth/reearth-accounts/server/pkg/membership"
 	"github.com/reearth/reearth-accounts/server/pkg/permittable"
 	"github.com/reearth/reearth-accounts/server/pkg/role"
@@ -130,14 +128,14 @@ func (uc *TransferOwnerUseCase) transfer(ctx context.Context, in TransferOwnerIn
 	}
 	slices.SortFunc(demoted, func(a, b user.ID) int { return a.Compare(b) })
 
-	ownerRole, err := uc.findRole(ctx, role.RoleOwner)
+	ownerRole, err := uc.roleRepo.FindByName(ctx, role.RoleOwner.String())
 	if err != nil {
-		return nil, err
+		return nil, roleLookupError(ctx, role.RoleOwner, err)
 	}
 	var maintainerRole *role.Role
 	if len(demoted) > 0 {
-		if maintainerRole, err = uc.findRole(ctx, role.RoleMaintainer); err != nil {
-			return nil, err
+		if maintainerRole, err = uc.roleRepo.FindByName(ctx, role.RoleMaintainer.String()); err != nil {
+			return nil, roleLookupError(ctx, role.RoleMaintainer, err)
 		}
 	}
 
@@ -178,24 +176,12 @@ func (uc *TransferOwnerUseCase) changeMemberRole(ctx context.Context, ws *worksp
 	return uc.permittableRepo.Save(ctx, *p)
 }
 
-// findRole returns the role record named name. When REEARTH_MOCK_AUTH is
-// "true", a missing record is created; otherwise it is ErrRoleNotConfigured.
-func (uc *TransferOwnerUseCase) findRole(ctx context.Context, name role.RoleType) (*role.Role, error) {
-	r, err := uc.roleRepo.FindByName(ctx, string(name))
-	if err == nil {
-		return r, nil
-	}
+// roleLookupError maps a missing role record to ErrRoleNotConfigured so it is
+// not reported as a missing workspace.
+func roleLookupError(ctx context.Context, name role.RoleType, err error) error {
 	if !errors.Is(err, rerror.ErrNotFound) {
-		return nil, err
-	}
-	if os.Getenv("REEARTH_MOCK_AUTH") == "true" {
-		log.Infofc(ctx, "[MockAuth] Auto-creating role for workspace: %s", name)
-		newRole := role.New().NewID().Name(string(name)).MustBuild()
-		if err := uc.roleRepo.Save(ctx, *newRole); err != nil {
-			return nil, applog.ErrorWithCallerLogging(ctx, "failed to auto-create role", err)
-		}
-		return newRole, nil
+		return err
 	}
 	log.Errorfc(ctx, "[admin] transfer workspace owner: role record %q is missing", name)
-	return nil, ErrRoleNotConfigured
+	return ErrRoleNotConfigured
 }

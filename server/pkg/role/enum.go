@@ -35,6 +35,11 @@ func (r RoleType) Valid() bool {
 	return slices.Contains(roleTypes, r)
 }
 
+// RoleTypes returns every role type, including RoleSelf.
+func RoleTypes() []RoleType {
+	return slices.Clone(roleTypes)
+}
+
 func (r RoleType) String() string {
 	return string(r)
 }

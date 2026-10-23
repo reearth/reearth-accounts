@@ -325,7 +325,6 @@ func TestTransferOwner_AlreadyOwnerCarriesOwner(t *testing.T) {
 }
 
 func TestTransferOwner_MissingRoleIsNotNotFound(t *testing.T) {
-	t.Setenv("REEARTH_MOCK_AUTH", "")
 	a, b := newUser("a"), newUser("b")
 	ws := teamWs(map[workspace.UserID]workspace.Member{
 		a.ID(): {Role: role.RoleOwner},
