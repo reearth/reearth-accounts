@@ -893,7 +893,7 @@ func (i *Workspace) bulkUpdatePermittable(ctx context.Context, workspaceID works
 	for uid, roleName := range userRoles {
 		p, ok := permByUserID[uid]
 		if !ok {
-			p, err = permittable.New().NewID().UserID(uid).Build()
+			p, err = permittable.NewForUser(uid)
 			if err != nil {
 				return err
 			}

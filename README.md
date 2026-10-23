@@ -92,7 +92,7 @@ cp .env.docker.example .env.docker
 make run
 ```
 
-On a fresh MongoDB, run `make run-migration` once before using the service: it creates the role records (`owner`, `maintainer`, `writer`, `reader`, `self`) that workspace operations require. See [Database Migrations](#database-migrations).
+On a fresh MongoDB, run `make run-migration` once before using the service: it creates the role records (`owner`, `maintainer`, `writer`, `reader`, `self`) that workspace operations require. Workspace operations do not create missing role records, also with `REEARTH_MOCK_AUTH=true`. See [Database Migrations](#database-migrations).
 
 This will:
 - Start Cerbos authorization server on port 3593

@@ -22,10 +22,12 @@ var (
 // on p, uid's Permittable.
 //
 // Invariant: for every user member of a workspace, workspace.Member.Role and
-// the role recorded for that workspace on the user's Permittable agree. Every
-// change to a member's role must go through this function, and the caller must
-// save both ws and p in the same transaction; saving only one of them breaks
-// the invariant.
+// the role recorded for that workspace on the user's Permittable agree. A
+// caller that changes a member's role through this function must save both ws
+// and p in the same transaction; saving only one of them breaks the invariant.
+// The SCIM sync and the bulk member add set the two sides themselves and do
+// not go through this function, so they must keep them in agreement on their
+// own.
 //
 // Either both aggregates are changed or neither is: on error, ws and p are left
 // as they were.
