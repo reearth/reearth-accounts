@@ -3,6 +3,7 @@ package workspaceuc
 import (
 	"context"
 	"errors"
+	"fmt"
 	"slices"
 
 	"github.com/reearth/reearth-accounts/server/pkg/membership"
@@ -66,9 +67,10 @@ type TransferOwnerOutput struct {
 // NopTransaction (Mongo without transaction support) the writes are applied one
 // by one and a failure part-way leaves them partially applied.
 //
-// A conflicting concurrent write surfaces as usecasex.ErrTransaction. It is not
-// retried: a Mongo transaction that hit a write conflict is aborted and cannot
-// run fn again.
+// A conflicting concurrent write (a Mongo write conflict, or a Postgres
+// deadlock or serialization failure, including one reported at commit)
+// surfaces as usecasex.ErrTransaction. It is not retried: a Mongo transaction
+// that hit a write conflict is aborted and cannot run fn again.
 func (uc *TransferOwnerUseCase) Execute(ctx context.Context, in TransferOwnerInput) (*TransferOwnerOutput, error) {
 	if _, nop := uc.transaction.(*usecasex.NopTransaction); nop || uc.transaction == nil {
 		log.Warnfc(ctx, "[admin] transfer workspace owner without a transaction; writes are not atomic: workspace=%s", in.WorkspaceID)
@@ -83,14 +85,19 @@ func (uc *TransferOwnerUseCase) Execute(ctx context.Context, in TransferOwnerInp
 		return nil
 	})
 	if err != nil {
+		if isTransactionConflict(err) {
+			return nil, fmt.Errorf("%w: %w", usecasex.ErrTransaction, err)
+		}
 		return nil, err
 	}
 	return out, nil
 }
 
 func (uc *TransferOwnerUseCase) transfer(ctx context.Context, in TransferOwnerInput) (*TransferOwnerOutput, error) {
-	// The lock must be taken by the first read: everything read after it is then
-	// what the previous transfer on this workspace committed.
+	// The workspace lock must be taken by the first read, so the members read
+	// are what the previous transfer on this workspace committed. The affected
+	// users' permittables are locked after it (lockPermittables); taking the two
+	// in the other order can deadlock against another transfer.
 	ws, err := uc.workspaceRepo.FindByIDForUpdate(ctx, in.WorkspaceID)
 	if err != nil {
 		return nil, err
@@ -139,13 +146,23 @@ func (uc *TransferOwnerUseCase) transfer(ctx context.Context, in TransferOwnerIn
 		}
 	}
 
+	affected := append(slices.Clone(demoted), in.NewOwnerID)
+	perms, err := uc.lockPermittables(ctx, affected)
+	if err != nil {
+		return nil, err
+	}
 	for _, uid := range demoted {
-		if err := uc.changeMemberRole(ctx, ws, uid, maintainerRole); err != nil {
+		if err := changeMemberRole(ws, perms, uid, maintainerRole); err != nil {
 			return nil, err
 		}
 	}
-	if err := uc.changeMemberRole(ctx, ws, in.NewOwnerID, ownerRole); err != nil {
+	if err := changeMemberRole(ws, perms, in.NewOwnerID, ownerRole); err != nil {
 		return nil, err
+	}
+	for _, uid := range affected {
+		if err := uc.permittableRepo.Save(ctx, *perms[uid]); err != nil {
+			return nil, err
+		}
 	}
 
 	if err := uc.workspaceRepo.Save(ctx, ws); err != nil {
@@ -159,21 +176,37 @@ func (uc *TransferOwnerUseCase) transfer(ctx context.Context, in TransferOwnerIn
 	}, nil
 }
 
-// changeMemberRole saves uid's Permittable; the caller saves ws.
-func (uc *TransferOwnerUseCase) changeMemberRole(ctx context.Context, ws *workspace.Workspace, uid user.ID, r *role.Role) error {
-	p, err := uc.permittableRepo.FindByUserID(ctx, uid)
+// lockPermittables reads, and on Postgres row-locks, the permittables of the
+// users whose role the transfer changes. The permittable holds the user's roles
+// in every workspace, so the lock is what keeps a concurrent transfer in
+// another workspace that shares one of these users from writing back a stale
+// copy. All of the users must be locked in one call, before any is saved: the
+// repo takes the locks in user ID order, which is what keeps two transfers with
+// crossed users from deadlocking.
+func (uc *TransferOwnerUseCase) lockPermittables(ctx context.Context, uids user.IDList) (map[user.ID]*permittable.Permittable, error) {
+	found, err := uc.permittableRepo.FindByUserIDsForUpdate(ctx, uids)
 	if err != nil && !errors.Is(err, rerror.ErrNotFound) {
-		return err
+		return nil, err
 	}
+	perms := make(map[user.ID]*permittable.Permittable, len(uids))
+	for _, p := range found {
+		perms[p.UserID()] = p
+	}
+	return perms, nil
+}
+
+// changeMemberRole changes uid's role in ws and in its entry of perms, adding a
+// new Permittable when the user has none. The caller saves both.
+func changeMemberRole(ws *workspace.Workspace, perms map[user.ID]*permittable.Permittable, uid user.ID, r *role.Role) error {
+	p := perms[uid]
 	if p == nil {
+		var err error
 		if p, err = permittable.NewForUser(uid); err != nil {
 			return err
 		}
+		perms[uid] = p
 	}
-	if err := membership.ChangeMemberRole(ws, p, uid, r); err != nil {
-		return err
-	}
-	return uc.permittableRepo.Save(ctx, *p)
+	return membership.ChangeMemberRole(ws, p, uid, r)
 }
 
 // roleLookupError maps a missing role record to ErrRoleNotConfigured so it is

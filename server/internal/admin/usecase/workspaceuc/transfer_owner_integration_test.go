@@ -13,6 +13,7 @@ import (
 	"github.com/reearth/reearth-accounts/server/internal/infrastructure/postgres"
 	"github.com/reearth/reearth-accounts/server/internal/infrastructure/postgres/migration"
 	"github.com/reearth/reearth-accounts/server/internal/usecase/repo"
+	"github.com/reearth/reearth-accounts/server/pkg/permittable"
 	"github.com/reearth/reearth-accounts/server/pkg/role"
 	"github.com/reearth/reearth-accounts/server/pkg/user"
 	"github.com/reearth/reearth-accounts/server/pkg/workspace"
@@ -196,4 +197,166 @@ func TestTransferOwner_Postgres_ConcurrentTransfersAreSerialized(t *testing.T) {
 		}
 		assert.Equal(t, []string{r.ID().String()}, got, "permittable role of %s", uid)
 	}
+}
+
+// permittableLockProbe reports each time a transfer has taken its permittable
+// locks.
+type permittableLockProbe struct {
+	permittable.Repo
+	locked chan struct{}
+}
+
+func (r *permittableLockProbe) FindByUserIDsForUpdate(ctx context.Context, ids user.IDList) (permittable.List, error) {
+	list, err := r.Repo.FindByUserIDsForUpdate(ctx, ids)
+	r.locked <- struct{}{}
+	return list, err
+}
+
+// savePostgresPermittable stores uid's permittable with the given role in each
+// workspace, as a member add would have.
+func savePostgresPermittable(t *testing.T, repos *repo.Container, uid user.ID, roles map[workspace.ID]role.RoleType) {
+	t.Helper()
+	ctx := context.Background()
+	p, err := permittable.NewForUser(uid)
+	require.NoError(t, err)
+	for wid, rt := range roles {
+		r, err := repos.Role.FindByName(ctx, string(rt))
+		require.NoError(t, err)
+		p.UpdateWorkspaceRole(wid, r.ID())
+	}
+	require.NoError(t, repos.Permittable.Save(ctx, *p))
+}
+
+// assertMemberRolesMatchPermittables checks the invariant the transfer keeps:
+// each user's member role in each workspace is the role its permittable
+// records for that workspace.
+func assertMemberRolesMatchPermittables(t *testing.T, repos *repo.Container, want map[workspace.ID]map[user.ID]role.RoleType) {
+	t.Helper()
+	ctx := context.Background()
+	for wid, members := range want {
+		ws, err := repos.Workspace.FindByID(ctx, wid)
+		require.NoError(t, err)
+		for uid, rt := range members {
+			assert.Equal(t, rt, ws.Members().UserRole(uid), "member role of %s in %s", uid, wid)
+
+			r, err := repos.Role.FindByName(ctx, string(rt))
+			require.NoError(t, err)
+			p, err := repos.Permittable.FindByUserID(ctx, uid)
+			require.NoError(t, err)
+			var got []string
+			for _, wr := range p.WorkspaceRoles() {
+				if wr.ID() == wid {
+					got = append(got, wr.RoleID().String())
+				}
+			}
+			assert.Equal(t, []string{r.ID().String()}, got, "permittable role of %s in %s", uid, wid)
+		}
+	}
+}
+
+// runOverlappingTransfers starts first, holds it in its workspace Save (after
+// it has taken its locks and written the permittables), then starts second and
+// checks that second does not get its permittable locks until first commits.
+func runOverlappingTransfers(t *testing.T, repos *repo.Container, first, second TransferOwnerInput) {
+	t.Helper()
+	ctx := context.Background()
+	wsProbe := &lockProbeRepo{
+		Repo:    repos.Workspace,
+		locked:  make(chan struct{}, 2),
+		inSave:  make(chan struct{}, 1),
+		release: make(chan struct{}),
+		saves:   make(chan struct{}, 1),
+	}
+	release := sync.OnceFunc(func() { close(wsProbe.release) })
+	t.Cleanup(release)
+	permProbe := &permittableLockProbe{Repo: repos.Permittable, locked: make(chan struct{}, 2)}
+	uc := NewTransferOwnerUseCase(wsProbe, repos.User, repos.Role, permProbe, repos.Transaction)
+
+	errs := make(chan error, 2)
+	go func() {
+		_, err := uc.Execute(ctx, first)
+		errs <- err
+	}()
+	<-permProbe.locked
+	<-wsProbe.inSave
+
+	go func() {
+		_, err := uc.Execute(ctx, second)
+		errs <- err
+	}()
+	select {
+	case <-permProbe.locked:
+		t.Fatal("second transfer locked the shared permittables while the first held them")
+	case <-time.After(500 * time.Millisecond):
+	}
+
+	release()
+	require.NoError(t, <-errs)
+	require.NoError(t, <-errs)
+}
+
+// Transfers in two workspaces that share an owner both rewrite that owner's
+// permittable. The second must read what the first committed, or it writes
+// back the shared owner's old role in the first workspace.
+func TestTransferOwner_Postgres_TransfersSharingAnOwnerAreSerialized(t *testing.T) {
+	ctx := context.Background()
+	repos := newPostgresRepos(t)
+	x := savePostgresUser(t, repos, "x")
+	y := savePostgresUser(t, repos, "y")
+	z := savePostgresUser(t, repos, "z")
+	wa := teamWs(map[workspace.UserID]workspace.Member{
+		x.ID(): {Role: role.RoleOwner},
+		y.ID(): {Role: role.RoleWriter},
+	})
+	wb := teamWs(map[workspace.UserID]workspace.Member{
+		x.ID(): {Role: role.RoleOwner},
+		z.ID(): {Role: role.RoleWriter},
+	})
+	require.NoError(t, repos.Workspace.Save(ctx, wa))
+	require.NoError(t, repos.Workspace.Save(ctx, wb))
+	savePostgresPermittable(t, repos, x.ID(), map[workspace.ID]role.RoleType{wa.ID(): role.RoleOwner, wb.ID(): role.RoleOwner})
+	savePostgresPermittable(t, repos, y.ID(), map[workspace.ID]role.RoleType{wa.ID(): role.RoleWriter})
+	savePostgresPermittable(t, repos, z.ID(), map[workspace.ID]role.RoleType{wb.ID(): role.RoleWriter})
+
+	runOverlappingTransfers(t, repos,
+		TransferOwnerInput{WorkspaceID: wa.ID(), NewOwnerID: y.ID()},
+		TransferOwnerInput{WorkspaceID: wb.ID(), NewOwnerID: z.ID()},
+	)
+
+	assertMemberRolesMatchPermittables(t, repos, map[workspace.ID]map[user.ID]role.RoleType{
+		wa.ID(): {x.ID(): role.RoleMaintainer, y.ID(): role.RoleOwner},
+		wb.ID(): {x.ID(): role.RoleMaintainer, z.ID(): role.RoleOwner},
+	})
+}
+
+// Two transfers that demote and promote the same two users in opposite roles
+// lock the same permittables. Taking them in one order means the second waits
+// for the first instead of the two deadlocking.
+func TestTransferOwner_Postgres_CrossedTransfersDoNotDeadlock(t *testing.T) {
+	ctx := context.Background()
+	repos := newPostgresRepos(t)
+	x := savePostgresUser(t, repos, "x")
+	y := savePostgresUser(t, repos, "y")
+	wa := teamWs(map[workspace.UserID]workspace.Member{
+		x.ID(): {Role: role.RoleOwner},
+		y.ID(): {Role: role.RoleWriter},
+	})
+	wb := teamWs(map[workspace.UserID]workspace.Member{
+		y.ID(): {Role: role.RoleOwner},
+		x.ID(): {Role: role.RoleWriter},
+	})
+	require.NoError(t, repos.Workspace.Save(ctx, wa))
+	require.NoError(t, repos.Workspace.Save(ctx, wb))
+	savePostgresPermittable(t, repos, x.ID(), map[workspace.ID]role.RoleType{wa.ID(): role.RoleOwner, wb.ID(): role.RoleWriter})
+	savePostgresPermittable(t, repos, y.ID(), map[workspace.ID]role.RoleType{wa.ID(): role.RoleWriter, wb.ID(): role.RoleOwner})
+
+	runOverlappingTransfers(t, repos,
+		TransferOwnerInput{WorkspaceID: wa.ID(), NewOwnerID: y.ID()},
+		TransferOwnerInput{WorkspaceID: wb.ID(), NewOwnerID: x.ID()},
+	)
+
+	assertMemberRolesMatchPermittables(t, repos, map[workspace.ID]map[user.ID]role.RoleType{
+		wa.ID(): {x.ID(): role.RoleMaintainer, y.ID(): role.RoleOwner},
+		wb.ID(): {x.ID(): role.RoleOwner, y.ID(): role.RoleMaintainer},
+	})
 }

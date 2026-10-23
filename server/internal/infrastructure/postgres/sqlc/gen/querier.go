@@ -19,6 +19,7 @@ type Querier interface {
 	PermittableFindByRoleID(ctx context.Context, dollar_1 string) ([]Permittable, error)
 	PermittableFindByUserID(ctx context.Context, userID string) (Permittable, error)
 	PermittableFindByUserIDs(ctx context.Context, dollar_1 []string) ([]Permittable, error)
+	PermittableFindByUserIDsForUpdate(ctx context.Context, dollar_1 []string) ([]Permittable, error)
 	PermittableUpsert(ctx context.Context, arg PermittableUpsertParams) (string, error)
 	PermittableWorkspaceRoleInsert(ctx context.Context, arg PermittableWorkspaceRoleInsertParams) error
 	PermittableWorkspaceRolesByPermittableIDs(ctx context.Context, dollar_1 []string) ([]PermittableWorkspaceRole, error)

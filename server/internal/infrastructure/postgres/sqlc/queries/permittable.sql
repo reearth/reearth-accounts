@@ -10,6 +10,9 @@ SELECT * FROM permittables WHERE user_id = $1;
 -- name: PermittableFindByUserIDs :many
 SELECT * FROM permittables WHERE user_id = ANY($1::text[]) ORDER BY id;
 
+-- name: PermittableFindByUserIDsForUpdate :many
+SELECT * FROM permittables WHERE user_id = ANY($1::text[]) ORDER BY user_id FOR UPDATE;
+
 -- name: PermittableFindByRoleID :many
 SELECT * FROM permittables WHERE role_ids @> ARRAY[$1::text] ORDER BY id;
 

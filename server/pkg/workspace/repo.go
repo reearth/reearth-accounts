@@ -38,11 +38,12 @@ type Repo interface {
 	FindAll(ctx context.Context, keyword *string, personal *bool, status StatusFilter, pagination *usecasex.Pagination, excludePersonal bool) (List, *usecasex.PageInfo, error)
 	FindByID(context.Context, ID) (*Workspace, error)
 	// FindByIDForUpdate is FindByID that, on Postgres, also row-locks the
-	// workspace until the surrounding transaction ends, so a concurrent
-	// read-modify-write of the same workspace waits instead of overwriting.
-	// Outside a transaction the lock is released immediately. Mongo and memory
-	// take no lock: a Mongo transaction already aborts the second writer with a
-	// write conflict.
+	// workspace until the surrounding transaction ends. It serializes callers
+	// that also use it: the second one waits and then reads what the first
+	// committed. A writer that reads with FindByID is not blocked and can still
+	// save a stale copy over it. Outside a transaction the lock is released
+	// immediately. Mongo and memory take no lock: a Mongo transaction already
+	// aborts the second writer with a write conflict.
 	FindByIDForUpdate(context.Context, ID) (*Workspace, error)
 	FindByName(context.Context, string) (*Workspace, error)
 	FindByAlias(ctx context.Context, alias string) (*Workspace, error)

@@ -3,8 +3,10 @@ package workspaceuc
 import (
 	"context"
 	"errors"
+	"slices"
 	"testing"
 
+	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/reearth/reearth-accounts/server/internal/infrastructure/memory"
 	"github.com/reearth/reearth-accounts/server/pkg/permittable"
 	"github.com/reearth/reearth-accounts/server/pkg/role"
@@ -14,6 +16,7 @@ import (
 	"github.com/reearth/reearthx/usecasex"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"go.mongodb.org/mongo-driver/mongo"
 )
 
 type transferFixture struct {
@@ -382,4 +385,75 @@ func TestTransferOwner_TransactionConflictIsReturned(t *testing.T) {
 	_, err := uc.Execute(context.Background(), TransferOwnerInput{WorkspaceID: ws.ID(), NewOwnerID: b.ID()})
 	assert.ErrorIs(t, err, usecasex.ErrTransaction)
 	assert.False(t, f.tx.IsCommitted())
+}
+
+func TestTransferOwner_DatabaseConflictIsTransactionError(t *testing.T) {
+	tests := []struct {
+		name     string
+		saveErr  error
+		commit   error
+		conflict bool
+	}{
+		{name: "postgres deadlock", saveErr: rerror.ErrInternalBy(&pgconn.PgError{Code: "40P01"}), conflict: true},
+		{name: "postgres serialization failure", saveErr: rerror.ErrInternalBy(&pgconn.PgError{Code: "40001"}), conflict: true},
+		{name: "postgres unique violation", saveErr: rerror.ErrInternalBy(&pgconn.PgError{Code: "23505"})},
+		{name: "mongo write conflict at commit", commit: mongo.CommandError{Code: 112, Name: "WriteConflict", Labels: []string{"TransientTransactionError"}}, conflict: true},
+		{name: "mongo unknown commit result", commit: mongo.CommandError{Code: 50, Labels: []string{"UnknownTransactionCommitResult"}}},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			a, b := newUser("a"), newUser("b")
+			ws := teamWs(map[workspace.UserID]workspace.Member{
+				a.ID(): {Role: role.RoleOwner},
+				b.ID(): {Role: role.RoleWriter},
+			})
+			f := newTransferFixture(t, ws, a, b)
+			var wsRepo workspace.Repo = f.wsRepo
+			if tt.saveErr != nil {
+				wsRepo = failingSaveWorkspaceRepo{Repo: f.wsRepo, err: tt.saveErr}
+			}
+			tx := &usecasex.NopTransaction{CommitError: tt.commit}
+			uc := NewTransferOwnerUseCase(wsRepo, f.userRepo, f.roleRepo, f.permittableRepo, tx)
+
+			_, err := uc.Execute(context.Background(), TransferOwnerInput{WorkspaceID: ws.ID(), NewOwnerID: b.ID()})
+			require.Error(t, err)
+			assert.Equal(t, tt.conflict, errors.Is(err, usecasex.ErrTransaction), err)
+		})
+	}
+}
+
+type lockRecordingPermittableRepo struct {
+	permittable.Repo
+	locked [][]user.ID
+}
+
+func (r *lockRecordingPermittableRepo) FindByUserIDsForUpdate(ctx context.Context, ids user.IDList) (permittable.List, error) {
+	r.locked = append(r.locked, slices.Clone(ids))
+	return r.Repo.FindByUserIDsForUpdate(ctx, ids)
+}
+
+func (r *lockRecordingPermittableRepo) FindByUserID(context.Context, user.ID) (*permittable.Permittable, error) {
+	return nil, errors.New("permittables must be read through FindByUserIDsForUpdate")
+}
+
+func TestTransferOwner_LocksEveryAffectedPermittableInOneCall(t *testing.T) {
+	a, b, c, d := newUser("a"), newUser("b"), newUser("c"), newUser("d")
+	ws := teamWs(map[workspace.UserID]workspace.Member{
+		a.ID(): {Role: role.RoleOwner},
+		b.ID(): {Role: role.RoleOwner},
+		c.ID(): {Role: role.RoleWriter},
+		d.ID(): {Role: role.RoleReader},
+	})
+	f := newTransferFixture(t, ws, a, b, c, d)
+	repo := &lockRecordingPermittableRepo{Repo: f.permittableRepo}
+	uc := NewTransferOwnerUseCase(f.wsRepo, f.userRepo, f.roleRepo, repo, f.tx)
+
+	_, err := uc.Execute(context.Background(), TransferOwnerInput{WorkspaceID: ws.ID(), NewOwnerID: c.ID()})
+	require.NoError(t, err)
+	require.Len(t, repo.locked, 1)
+	assert.ElementsMatch(t, []user.ID{a.ID(), b.ID(), c.ID()}, repo.locked[0])
+	f.assertPermittableRole(t, a.ID(), ws.ID(), role.RoleMaintainer)
+	f.assertPermittableRole(t, b.ID(), ws.ID(), role.RoleMaintainer)
+	f.assertPermittableRole(t, c.ID(), ws.ID(), role.RoleOwner)
+	f.assertNoPermittable(t, d.ID())
 }
