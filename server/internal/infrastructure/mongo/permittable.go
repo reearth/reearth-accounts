@@ -38,6 +38,10 @@ func (r *Permittable) FindByUserIDs(ctx context.Context, ids user.IDList) (permi
 	})
 }
 
+func (r *Permittable) FindByUserIDsForUpdate(ctx context.Context, ids user.IDList) (permittable.List, error) {
+	return r.FindByUserIDs(ctx, ids)
+}
+
 func (r *Permittable) FindByRoleID(ctx context.Context, roleId id.RoleID) (permittable.List, error) {
 	return r.find(ctx, bson.M{
 		"roleids": bson.M{"$in": []string{roleId.String()}},

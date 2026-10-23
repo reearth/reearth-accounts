@@ -12,6 +12,7 @@ import (
 	"sort"
 	"strings"
 
+	"github.com/reearth/reearth-accounts/server/internal/rbac"
 	"github.com/reearth/reearth-accounts/server/internal/usecase/interfaces"
 	"github.com/reearth/reearth-accounts/server/internal/usecase/repo"
 	"github.com/reearth/reearth-accounts/server/pkg/applog"
@@ -25,15 +26,17 @@ import (
 )
 
 type Scim struct {
-	repos           *repo.Container
+	cerbos          interfaces.Cerbos
 	permittableRepo permittable.Repo
+	repos           *repo.Container
 	roleRepo        role.Repo
 }
 
-func NewScim(repos *repo.Container) *Scim {
+func NewScim(repos *repo.Container, cerbos interfaces.Cerbos) *Scim {
 	return &Scim{
-		repos:           repos,
+		cerbos:          cerbos,
 		permittableRepo: repos.Permittable,
+		repos:           repos,
 		roleRepo:        repos.Role,
 	}
 }
@@ -700,4 +703,94 @@ func (i *Scim) UpdateScimConfig(ctx context.Context, workspaceID workspace.ID, e
 		}
 		return result, nil
 	})
+}
+
+// GetWorkspaceScimState returns whether SCIM has been activated for the workspace
+// by a platform admin (i.e. a ScimConfig record exists).
+// Requires platform-level maintainer or owner role.
+func (i *Scim) GetWorkspaceScimState(ctx context.Context, workspaceID workspace.ID, operator *workspace.Operator) (bool, error) {
+	return Run1(ctx, operator, i.repos, Usecase(), func(ctx context.Context) (bool, error) {
+		if err := i.checkMaintainerPermission(ctx, operator); err != nil {
+			return false, err
+		}
+
+		ws, err := i.repos.Workspace.FindByID(ctx, workspaceID)
+		if err != nil {
+			return false, err
+		}
+		return ws.ScimAvailable(), nil
+	})
+}
+
+// SetWorkspaceScimAvailable enables or disables SCIM availability for a workspace.
+// When enabling, a ScimConfig is created if one does not yet exist.
+// When disabling, the ScimConfig is cleared, revoking any issued token.
+// Requires platform-level maintainer or owner role.
+func (i *Scim) SetWorkspaceScimAvailable(ctx context.Context, workspaceID workspace.ID, enabled bool, operator *workspace.Operator) (bool, error) {
+	return Run1(ctx, operator, i.repos, Usecase().Transaction(), func(ctx context.Context) (bool, error) {
+		if err := i.checkMaintainerPermission(ctx, operator); err != nil {
+			return false, err
+		}
+
+		ws, err := i.repos.Workspace.FindByID(ctx, workspaceID)
+		if err != nil {
+			return false, err
+		}
+
+		if enabled {
+			if ws.ScimConfig() == nil {
+				ws.SetScimConfig(workspace.NewScimConfig())
+			}
+		} else {
+			ws.SetScimConfig(nil)
+		}
+
+		if err := i.repos.Workspace.Save(ctx, ws); err != nil {
+			return false, err
+		}
+		return ws.ScimAvailable(), nil
+	})
+}
+
+// checkMaintainerPermission gates admin SCIM operations to platform-level
+// maintainer/owner principals, mirroring the same check used by User.Deactivate.
+func (i *Scim) checkMaintainerPermission(ctx context.Context, operator *workspace.Operator) error {
+	if operator == nil || operator.User == nil {
+		return interfaces.ErrPermissionDenied
+	}
+
+	if i.cerbos != nil {
+		result, err := i.cerbos.CheckPermission(ctx, *operator.User, interfaces.CheckPermissionParam{
+			Service:  rbac.ServiceName,
+			Resource: rbac.ResourceWorkspace,
+			Action:   rbac.ActionManage,
+		})
+		if err != nil {
+			return err
+		}
+		if result != nil {
+			if !result.Allowed {
+				return interfaces.ErrPermissionDenied
+			}
+			return nil
+		}
+	}
+
+	p, err := i.repos.Permittable.FindByUserID(ctx, *operator.User)
+	if err != nil && !errors.Is(err, rerror.ErrNotFound) {
+		return err
+	}
+	if p == nil {
+		return interfaces.ErrPermissionDenied
+	}
+	for _, rid := range p.RoleIDs() {
+		r, err := i.roleRepo.FindByID(ctx, rid)
+		if err != nil {
+			continue
+		}
+		if r.Name() == role.RoleMaintainer.String() || r.Name() == role.RoleOwner.String() {
+			return nil
+		}
+	}
+	return interfaces.ErrPermissionDenied
 }

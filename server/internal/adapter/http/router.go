@@ -133,6 +133,8 @@ func RegisterRESTRouter(e *echo.Echo, cfg RouterConfig) {
 
 	// --- Workspace SCIM admin ---
 	sh := handlers.NewWorkspaceScimHandler()
+	api.GET("/workspaces/:id/scim", sh.GetState, required)
+	api.PATCH("/workspaces/:id/scim", sh.SetAvailable, required)
 	api.POST("/workspaces/:id/scim/token", sh.GenerateToken, required)
 	api.DELETE("/workspaces/:id/scim/token", sh.RevokeToken, required)
 	api.PUT("/workspaces/:id/scim/config", sh.UpdateConfig, required)

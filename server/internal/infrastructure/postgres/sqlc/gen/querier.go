@@ -19,6 +19,7 @@ type Querier interface {
 	PermittableFindByRoleID(ctx context.Context, dollar_1 string) ([]Permittable, error)
 	PermittableFindByUserID(ctx context.Context, userID string) (Permittable, error)
 	PermittableFindByUserIDs(ctx context.Context, dollar_1 []string) ([]Permittable, error)
+	PermittableFindByUserIDsForUpdate(ctx context.Context, dollar_1 []string) ([]Permittable, error)
 	PermittableUpsert(ctx context.Context, arg PermittableUpsertParams) (string, error)
 	PermittableWorkspaceRoleInsert(ctx context.Context, arg PermittableWorkspaceRoleInsertParams) error
 	PermittableWorkspaceRolesByPermittableIDs(ctx context.Context, dollar_1 []string) ([]PermittableWorkspaceRole, error)
@@ -52,6 +53,7 @@ type Querier interface {
 	// Case-insensitive, matching the case-insensitive unique alias index.
 	WorkspaceFindByAliases(ctx context.Context, dollar_1 []string) ([]Workspace, error)
 	WorkspaceFindByID(ctx context.Context, id string) (Workspace, error)
+	WorkspaceFindByIDForUpdate(ctx context.Context, id string) (Workspace, error)
 	WorkspaceFindByIDs(ctx context.Context, dollar_1 []string) ([]Workspace, error)
 	WorkspaceFindByName(ctx context.Context, name string) (Workspace, error)
 	// Cross-tenant listing (no readable-workspace filter): pass '' for no keyword

@@ -64,6 +64,10 @@ func (p *Permittable) FindByUserIDs(ctx context.Context, userIDs user.IDList) (p
 	return results, nil
 }
 
+func (p *Permittable) FindByUserIDsForUpdate(ctx context.Context, userIDs user.IDList) (permittable.List, error) {
+	return p.FindByUserIDs(ctx, userIDs)
+}
+
 func (p *Permittable) FindByRoleID(ctx context.Context, roleID id.RoleID) (permittable.List, error) {
 	p.lock.Lock()
 	defer p.lock.Unlock()

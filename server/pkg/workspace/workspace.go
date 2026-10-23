@@ -81,6 +81,10 @@ func (w *Workspace) PolicytOr(def PolicyID) PolicyID {
 	return *w.policy
 }
 
+func (w *Workspace) ScimAvailable() bool {
+	return w.scimConfig != nil
+}
+
 func (w *Workspace) ScimConfig() *ScimConfig {
 	return w.scimConfig.Clone()
 }

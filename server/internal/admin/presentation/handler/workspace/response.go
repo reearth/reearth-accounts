@@ -3,6 +3,8 @@ package workspace
 import (
 	"time"
 
+	"github.com/reearth/reearth-accounts/server/internal/admin/usecase/workspaceuc"
+	"github.com/reearth/reearth-accounts/server/pkg/user"
 	"github.com/reearth/reearth-accounts/server/pkg/workspace"
 )
 
@@ -55,4 +57,52 @@ func newWorkspaceResponses(list workspace.List) []WorkspaceResponse {
 		items = append(items, newWorkspaceResponse(w))
 	}
 	return items
+}
+
+// TransferredWorkspaceResponse is the workspace a transfer was applied to.
+type TransferredWorkspaceResponse struct {
+	ID       string `json:"id"`
+	Name     string `json:"name"`
+	Alias    string `json:"alias"`
+	Personal bool   `json:"personal"`
+} // @name TransferredWorkspace
+
+// TransferWorkspaceOwnerResponse is the result of a committed ownership
+// transfer. DemotedUserIDs is never null; it is empty when the workspace had
+// no owner other than the target.
+type TransferWorkspaceOwnerResponse struct {
+	Workspace      TransferredWorkspaceResponse `json:"workspace"`
+	NewOwner       WorkspaceMemberResponse      `json:"newOwner"`
+	DemotedUserIDs []string                     `json:"demotedUserIds"`
+} // @name TransferWorkspaceOwnerResponse
+
+func newTransferWorkspaceOwnerResponse(out *workspaceuc.TransferOwnerOutput) TransferWorkspaceOwnerResponse {
+	ws := out.Workspace
+	res := TransferWorkspaceOwnerResponse{
+		Workspace: TransferredWorkspaceResponse{
+			ID:       ws.ID().String(),
+			Name:     ws.Name(),
+			Alias:    ws.Alias(),
+			Personal: ws.IsPersonal(),
+		},
+		NewOwner:       newWorkspaceMemberResponse(ws, out.NewOwner),
+		DemotedUserIDs: make([]string, 0, len(out.DemotedUserIDs)),
+	}
+	for _, uid := range out.DemotedUserIDs {
+		res.DemotedUserIDs = append(res.DemotedUserIDs, uid.String())
+	}
+	return res
+}
+
+func newWorkspaceMemberResponse(ws *workspace.Workspace, u *user.User) WorkspaceMemberResponse {
+	res := WorkspaceMemberResponse{
+		UserID: u.ID().String(),
+		Name:   u.Name(),
+		Email:  u.Email(),
+	}
+	if m := ws.Members().User(u.ID()); m != nil {
+		res.Role = string(m.Role)
+		res.Disabled = m.Disabled
+	}
+	return res
 }

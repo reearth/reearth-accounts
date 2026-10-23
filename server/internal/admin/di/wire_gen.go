@@ -57,9 +57,15 @@ func InitializeEcho() (*Server, func(), error) {
 	listUsersUseCase := useruc.NewListUsersUseCase(userRepo)
 	userHandler := user.NewHandler(getUserUseCase, getUserWorkspacesUseCase, listUsersUseCase)
 	getWorkspaceUseCase := workspaceuc.NewGetWorkspaceUseCase(workspaceRepo)
+	getWorkspaceScimStateUseCase := workspaceuc.NewGetWorkspaceScimStateUseCase(workspaceRepo)
 	listWorkspacesUseCase := workspaceuc.NewListWorkspacesUseCase(workspaceRepo)
 	listWorkspaceMembersUseCase := workspaceuc.NewListWorkspaceMembersUseCase(workspaceRepo, userRepo)
-	workspaceHandler := workspace.NewHandler(getWorkspaceUseCase, listWorkspacesUseCase, listWorkspaceMembersUseCase)
+	setWorkspaceScimAvailableUseCase := workspaceuc.NewSetWorkspaceScimAvailableUseCase(workspaceRepo)
+	roleRepo := container.Role
+	permittableRepo := container.Permittable
+	transaction := container.Transaction
+	transferOwnerUseCase := workspaceuc.NewTransferOwnerUseCase(workspaceRepo, userRepo, roleRepo, permittableRepo, transaction)
+	workspaceHandler := workspace.NewHandler(getWorkspaceUseCase, getWorkspaceScimStateUseCase, listWorkspacesUseCase, listWorkspaceMembersUseCase, setWorkspaceScimAvailableUseCase, transferOwnerUseCase)
 	sessionMiddleware := middleware.NewSessionMiddleware(manager)
 	requireApprovedMiddleware := middleware.NewRequireApprovedMiddleware(manager, repo)
 	grpcClient, err := provideCerbosClient(config)
