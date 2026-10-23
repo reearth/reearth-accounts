@@ -840,7 +840,7 @@ sequenceDiagram
     else not registered and no alias
         A-->>S: { allowed: false }
     else
-        A->>A: ws = registration.workspace or workspace of alias<br/>attr.resourceRole = guarded role or "" (always "" if not registered)<br/>roles = global + workspace role in ws (as today;<br/>limited matches no role-list rule = no baseline)
+        A->>A: ws = registration.workspace or workspace of alias<br/>attr.resourceRole = guarded role or "" (always "" if not registered)<br/>roles = global + workspace role in ws (as today,<br/>limited matches no role-list rule = no baseline)
         A->>C: CheckResources(principal{roles, attr}, resource{kind, resourceId}, action)
         C-->>A: ALLOW / DENY
         A-->>S: { allowed }
