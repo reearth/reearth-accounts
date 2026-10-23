@@ -71,32 +71,34 @@ steps:
   |---|---|
   | Organization member | Workspace member |
   | Organization owner | Workspace owner / maintainer |
-  | Organization base permission (applies to all members on every repository) | Workspace **base permission** |
   | Repository role | Project role |
 
-  With the base permission set to "None", members see only the projects they
-  were given a role on — this is how teams in one workspace are kept apart, and
-  how a partner company's staff can be given just one project.
+  By default, access to projects follows the workspace role (same as today's
+  Re:Earth). On top of that, a new workspace role, **Limited**, is added: a
+  Limited member sees only the projects they were given a role on — this is how
+  teams in one workspace are kept apart, and how a partner company's staff can
+  be given just one project.
 
-  For example, what a workspace reader can see depends on the base permission:
+  What each workspace role can see:
 
-  | Base permission | Projects a workspace reader can see |
+  | Workspace role | Projects they can see |
   |---|---|
-  | Follow workspace role (default) | Can view every project (same as today's Re:Earth) |
-  | Reader | Can view every project |
-  | Writer | Can view and edit every project |
-  | None | Only the projects where they have a project role |
+  | Owner / maintainer | Full access to every project (same as today) |
+  | Writer | Can view and edit every project (same as today) |
+  | Reader | Can view every project (same as today) |
+  | Limited (new) | Only the projects where they have a project role |
 
-  Under every setting, on a project where they have a project role, their
-  access goes up to that role (e.g. writer on project P → can edit P).
+  Under every role, on a project where they have a project role, their access
+  goes up to that role (e.g. a workspace reader who is a writer on project P →
+  can edit P). A project role never lowers access.
 - Differences from GitHub:
 
   | Aspect | GitHub | Re:Earth |
   |---|---|---|
   | People outside the organization / workspace | *Outside collaborators* (access to a repository without being an organization member) | None. **Every person with access is a workspace member**, so SSO / SCIM, seats, the member list and removal are all managed in one place |
-  | Per-member roles | Everyone except owners is a "member"; no per-person writer / reader distinction | Workspace writer / reader stay and govern workspace-level actions (e.g. creating projects) |
-  | Base permission values and default | Choose from none / read / write / admin, etc.; default is read | Adds "Follow workspace role" and makes it the default; left at the default, behavior is the same as today's Re:Earth |
-  | Seats | Every member is billed | Only members who can **edit** at least one project use a seat; view-only people are free (extends today's Dashboard rule that readers do not use a seat) |
+  | Per-member roles | Everyone except owners is a "member"; no per-person writer / reader distinction | Workspace writer / reader stay, and **Limited** is added; these govern workspace-level actions (e.g. creating projects). Limited narrows, per person, the visible projects to those where they have a project role |
+  | Organization-wide base access | A base permission (none / read / write / admin, etc.; default read) applies uniformly to every member on every repository | None. Each member's workspace role is the baseline. To restrict only some people, make those people Limited. Of the products compared (Notion, Figma, Felt, Miro, ArcGIS Online, CARTO, Vercel, GitLab, …), only GitHub has such a workspace-wide setting; it applies to everyone at once (restricting one partner restricts the whole workspace) and adds a concept users must learn |
+  | Seats | Every member is billed | Only members who can **edit** at least one project use a seat; view-only people and Limited members are free unless they can edit some project (extends today's Dashboard rule that readers do not use a seat) |
 
 ### Current situation
 
@@ -135,8 +137,7 @@ If each service implements project membership on its own:
 Accounts must **not** take over what a *project* is. Whether a project exists,
 its name, visibility, content and lifecycle stay with each service. Accounts
 only keeps what it needs to decide permissions: "this project belongs to this
-workspace, and this user has this role on it", plus each workspace's base
-permission.
+workspace, and this user has this role on it".
 
 ## Goals
 
@@ -145,11 +146,13 @@ permission.
    model is:
    - **Workspace owners and maintainers** always have full access to every
      project in the workspace.
-   - **Workspace writers and readers** get, on every project, a baseline set by
-     the workspace's base permission (Goal 7). By default this is their
-     workspace role, exactly as today. A project role can **raise** their access
-     on that project (for example, a workspace reader who is a writer on project
-     P can edit P), but never lower it.
+   - **Workspace writers** can view and edit every project, and **readers** can
+     view every project. This is their baseline, exactly as today.
+   - **Workspace Limited members** (Goal 7) have no baseline: they see only the
+     projects where they have a project role.
+   - A project role can **raise** access on that project (for example, a
+     workspace reader who is a writer on project P can edit P), but never lower
+     it. Effective access is the higher of the baseline and the project role.
 2. **Permission checks look at the specific project.** When a service asks
    accounts "may this user do this?", the answer can take the user's role on
    that particular project into account. The check uses the workspace the
@@ -168,23 +171,26 @@ permission.
    service can use the same mechanism for its own resources (for example, a CMS
    model) just by adding a permission policy, with no change to accounts.
 6. **Nothing existing breaks.** Current permission checks and policies keep
-   working exactly as they do today. Existing workspace roles do not change,
-   and the default base permission reproduces today's behavior.
+   working exactly as they do today. The meaning of existing workspace roles
+   does not change, and Limited changes nothing until someone is given it.
    - **Compatibility and migration:** existing data (members, workspace roles,
      permission data, projects) is used as is. There is no data conversion and
      no bulk registration of existing projects (no backfill). The new storage is
      created automatically on startup and stays empty until the feature is
      used. A project is registered in accounts only when it first gets a project
-     role (or when it is created from now on). With the default base permission
-     and no project roles, every permission check and seat count is exactly the
-     same as today.
-7. **Each workspace has a base permission** (name tentative), like a GitHub
-   organization's base permission. Its values are "Follow workspace role"
-   (default — today's behavior), "None", "Reader" and "Writer". It decides what
-   writers and readers of the workspace get on every project; owners and
-   maintainers always have full access. Workspace owners and maintainers can
-   change it, and the change takes effect immediately. "None" plus project roles
-   is the way to give someone access to only some projects.
+     role (or when it is created from now on). With no Limited members and no
+     project roles, every permission check and seat count is exactly the same
+     as today.
+7. **A Limited workspace role is added.** It is set per person: a Limited
+   member sees only the projects where they have a project role, and has no
+   baseline access to any other project. It is for a partner company's staff,
+   or for a member who should not see anything outside their own projects.
+   Like any other role, a Limited member is a workspace member, so SSO / SCIM,
+   the member list and removal stay in one place (still no outside
+   collaborators). It is set the same way as any other workspace role, and the
+   change takes effect immediately. There is no workspace-wide base access
+   setting (see *Alternative considered and rejected: a workspace-wide base
+   permission*).
 8. **Access to specific projects can be given in one step.** From the UI, an
    admin can add a person directly to a project — adding them to the workspace
    at the same time if needed — or, while adding a person to the workspace,
@@ -192,9 +198,13 @@ permission.
    succeeds or changes nothing (see *Design → Adding people from the UI*).
 9. **Seats follow edit access.** A workspace member uses a seat if they can
    edit at least one project in the workspace; people who can only view, or see
-   nothing, do not. Accounts counts seats in one place for every service and
-   for billing, and keeps a workspace within its seat limit whenever a change
-   would make someone start using a seat (see *Design → Seats*).
+   nothing, do not. So owners, maintainers and writers use a seat, and readers
+   and Limited members are free unless they have a writer-or-above role on some
+   project. Accounts counts seats in one place for every service and for
+   billing, and keeps a workspace within its seat limit whenever a change would
+   make someone start using a seat. Because "reader" no longer guarantees
+   "free", the UI shows the seat separately from the role (see *Design →
+   Seats*).
 
 ## Non-Goals
 
@@ -212,23 +222,32 @@ permission.
 5. **Integrations as project members.** In the first version only people (user
    accounts) can be project members, not integrations or API tokens.
 6. **Using project properties in permission decisions** (for example "public"
-   or "private"). See *Open Questions*; the first version decides by roles and
-   the base permission only. This is about deciding who can view or edit, not
+   or "private"). See *Open Questions*; the first version decides by roles
+   only. This is about deciding who can view or edit, not
    about how seats are counted (public projects and seats are Open Question 15).
 7. **Sending invitation emails for project membership.** The email mentions the
    project's name, which accounts does not know, so the service sends it.
 8. **Registering existing projects in bulk (backfill).** A project is registered
    when it is needed (when it first gets a project role, or when it is created
    from now on).
+9. **A per-project "only people added" setting.** A setting to choose, per
+   project, between "everyone in the workspace" and "only people added", to
+   hide a confidential project from ordinary writers / readers, is not added
+   this time. It will be added later as an optional feature if and when a real
+   case comes up; the raise-only model of project roles does not block adding
+   it later (Open Question 1). Until then, hiding a project from ordinary
+   members requires making those members Limited.
+10. **Teams.** "Teams" (adding a group of people to a project at once) are
+    something customers want, as confirmed by sales, but they are out of scope
+    this time to keep the scope manageable.
 
 ## Functional Requirements
 
 1. **Permission checks stay fast.** (FR-1, FR-2) Checks that do not name a project cost
    exactly the same as today. Checks that name a project add only a small,
-   quick lookup (which workspace the project belongs to, together with that
-   workspace's base permission; for a project that is not registered, one more
-   lookup of the workspace's base permission); the user's project roles are read
-   together with the data accounts already loads.
+   quick lookup (which workspace the project belongs to); the user's workspace
+   role and project roles are read together with the data accounts already
+   loads.
 2. **Names and IDs have size limits.** (FR-3) The resource type name and the resource
    ID have a maximum length and a fixed set of allowed characters, so stored
    data stays small and predictable.
@@ -240,8 +259,8 @@ permission.
    the same whichever database a deployment uses.
 6. **Services can tell what a person may list.** (FR-7) For a workspace, accounts can
    tell a service whether a person sees every project (and at what level) or
-   only the projects where they have a project role, so lists can be filtered
-   correctly whatever the base permission.
+   only the projects where they have a project role (Limited), so lists can be
+   filtered correctly for Limited members too.
 7. **Seat usage is available per workspace.** (FR-8) Accounts can quickly say how many
    members of a workspace use a seat (and who), so billing and every service
    use the same number.
@@ -261,7 +280,7 @@ Three pieces of state, all opaque to accounts:
 |---|---|
 | **Resource registration** `(resourceKind, resourceID) → workspaceID, version` | Authoritative workspace scope of the resource; proof the owning service registered it; per-resource serialization point for invariants. **Created only when needed** (on creation, or before the first resource role). Existing resources are not registered in bulk |
 | **Resource role** on `Permittable` `(workspaceID, resourceKind, resourceID, roleID)` | The user's role on that resource; read together with the permittable for zero-read lookup |
-| **Workspace resource settings** `workspaceID → basePermission, seatLimit, version` | The workspace's base permission and seat limit; also the per-workspace lock (serialization point for every change that can affect seat usage: the one-step add, workspace member and role changes, editing project roles, project registration, and base-permission changes) |
+| **Workspace resource settings** `workspaceID → seatLimit, version` | The workspace's seat limit; also the per-workspace lock (serialization point for every change that can affect seat usage: the one-step add, workspace member and role changes, editing project roles, and project registration) |
 
 #### Domain
 
@@ -302,43 +321,50 @@ Roles reuse the existing `roles` table (`owner` / `maintainer` / `writer` /
 `reader`). Their meaning per resource kind is defined solely by that kind's
 Cerbos policy.
 
-**Base permission.**
+**Limited and the baseline role.**
+
+```go
+// server/pkg/role/enum.go (addition)
+RoleLimited = RoleType("limited") // workspace role only; never a resource role
+
+// server/pkg/resource/baseline.go
+// BaselineRole returns a member's baseline role on every resource of the workspace:
+// the workspace role itself, except limited, which has no baseline
+// (ok == false: the member only gets resource roles).
+func BaselineRole(workspaceRole role.RoleType) (r role.RoleType, ok bool)
+```
+
+| Workspace role | Baseline role |
+|---|---|
+| `owner` / `maintainer` / `writer` / `reader` | the same role (as today) |
+| `limited` | — (resource roles only) |
+
+`limited` is a new value for workspace roles only. It is stored where the other
+workspace roles are (the workspace members and the permittable's workspace
+roles), so no new storage is needed. Its `roles` row is created by the startup
+migration (`internal/app/migration.go`), as `maintainer` is. `limited` cannot
+be used as a resource role (rejected with `role.ErrInvalidRole`). There is no
+workspace-wide base access setting, so the baseline is decided by the
+workspace role alone.
+
+**Workspace settings.**
 
 ```go
 // server/pkg/resource/settings.go
-type BasePermission string
-
-const (
-    BaseFollowWorkspaceRole BasePermission = "follow_workspace_role" // default; also when no row exists
-    BaseNone                BasePermission = "none"
-    BaseReader              BasePermission = "reader"
-    BaseWriter              BasePermission = "writer"
-)
-
 type WorkspaceSettings struct {
-    basePermission BasePermission
-    seatLimit      *int  // nil = unlimited; set by billing (M2M)
-    version        int64 // bumped by every write and by Lock
-    workspaceID    workspace.ID
+    seatLimit   *int  // nil = unlimited; set by billing (M2M)
+    version     int64 // bumped by every write and by Lock
+    workspaceID workspace.ID
 }
-
-// BaselineRole returns a member's baseline role on every resource of the workspace.
-// ok == false means "no baseline" (the member only gets resource roles).
-func BaselineRole(workspaceRole role.RoleType, base BasePermission) (r role.RoleType, ok bool)
 ```
 
-| Workspace role | Follow workspace role | None | Reader | Writer |
-|---|---|---|---|---|
-| `owner` / `maintainer` | same role | same role | same role | same role |
-| `writer` | `writer` | — | `reader` | `writer` |
-| `reader` | `reader` | — | `reader` | `writer` |
-
-The setting is stored in accounts, in its own per-workspace record rather than
-on the workspace document: the existing workspace flows save the workspace as a
-snapshot (Mongo replaces the whole document), so a field there could be
-reverted by a concurrent, stale workspace save. A missing record means
-"Follow workspace role", so no data migration is needed. Existing workspace
-roles are not changed.
+This record exists for the seat limit and for the workspace lock that
+serializes changes affecting seat usage. It is stored in accounts, in its own
+per-workspace record rather than on the workspace document: the existing
+workspace flows save the workspace as a snapshot (Mongo replaces the whole
+document), so a field there could be reverted by a concurrent, stale workspace
+save. A missing record means no limit (`seatLimit = nil`) and is created on
+first lock, so no data migration is needed.
 
 **Seats.**
 
@@ -346,13 +372,14 @@ roles are not changed.
 // server/pkg/resource/seat.go
 var editRoles = []role.RoleType{role.RoleOwner, role.RoleMaintainer, role.RoleWriter}
 
-// UsesSeat reports whether a member uses a seat in the workspace: workspace role
-// owner / maintainer, or a baseline in editRoles, or any valid resource role in editRoles.
-func UsesSeat(p *permittable.Permittable, ws workspace.ID, base BasePermission) bool
+// UsesSeat reports whether a member uses a seat in the workspace: a workspace role
+// in editRoles (owner / maintainer / writer), or any valid resource role in editRoles.
+// reader and limited use a seat only through a resource role.
+func UsesSeat(p *permittable.Permittable, ws workspace.ID) bool
 ```
 
 Seat usage of a workspace = the number of distinct members for which `UsesSeat`
-is true. With "Follow workspace role" and no resource roles this equals today's
+is true. With no Limited members and no resource roles this equals today's
 Dashboard count (`GetCurrentSeatStatus` in reearth-dashboard
 `server/pkg/subscription/service.go`, which counts members whose role is not
 `reader`).
@@ -373,9 +400,8 @@ non-seat member into a seat member, and therefore run the check:
 | Operation | Can add a seat when |
 |---|---|
 | `setResourceMember` | the new role is writer or above |
-| `addWorkspaceMemberWithResourceRoles` | the new member's workspace role or any of the given resource roles is writer or above, or the baseline allows editing |
-| `updateWorkspaceBasePermission` | the new value raises any baseline to writer (e.g. to `Writer`, or from `None` / `Reader` to "Follow workspace role") |
-| `addUsersToWorkspace` / `updateUserOfWorkspace` / `transferWorkspaceOwnership` | a member gets `writer`, `maintainer` or `owner` |
+| `addWorkspaceMemberWithResourceRoles` | the new member's workspace role or any of the given resource roles is writer or above |
+| `addUsersToWorkspace` / `updateUserOfWorkspace` / `transferWorkspaceOwnership` | a member gets `writer`, `maintainer` or `owner` (a change to `reader` / `limited` never adds a seat) |
 | `POST /api/service/resources` with `ownerUserId` (project creation) | the creator did not use a seat before |
 
 #### Storage
@@ -410,11 +436,9 @@ CREATE INDEX permittable_resource_roles_workspace_idx
     ON permittable_resource_roles (workspace_id, permittable_id);
 
 CREATE TABLE resource_workspace_settings (
-    workspace_id    text PRIMARY KEY,
-    base_permission text NOT NULL DEFAULT 'follow_workspace_role'
-        CHECK (base_permission IN ('follow_workspace_role', 'none', 'reader', 'writer')),
-    seat_limit      integer CHECK (seat_limit >= 0),   -- NULL = unlimited
-    version         bigint NOT NULL DEFAULT 0
+    workspace_id text PRIMARY KEY,
+    seat_limit   integer CHECK (seat_limit >= 0),   -- NULL = unlimited
+    version      bigint NOT NULL DEFAULT 0
 );
 ```
 
@@ -426,7 +450,9 @@ DROP TABLE IF EXISTS resource_registrations;
 ```
 
 The migration only creates tables and indexes; it converts no existing rows.
-The new tables stay empty until the feature is used.
+The new tables stay empty until the feature is used. Workspace member roles are
+already unconstrained `text`, so `limited` needs no schema change (its `roles`
+row is created by the startup migration).
 
 **MongoDB**
 
@@ -438,7 +464,9 @@ The new tables stay empty until the feature is used.
   `{ "resource_roles.resource_kind": 1, "resource_roles.resource_id": 1 }` and
   `{ "resource_roles.workspace_id": 1 }`.
 - New collection `resource_workspace_settings` (`_id` = workspace ID,
-  `base_permission`, `seat_limit`, `version`).
+  `seat_limit`, `version`).
+- The `limited` entry in the `roles` collection is created by the startup
+  migration, as on Postgres.
 
 #### Repository changes (targeted writes, never snapshot writes)
 
@@ -466,8 +494,7 @@ RemoveInWorkspace(ctx, workspaceID) error                // all registrations + 
 // resource.WorkspaceSettingsRepo
 Find(ctx, workspaceID) (*resource.WorkspaceSettings, error) // default settings when no row
 Lock(ctx, workspaceID) (*resource.WorkspaceSettings, error) // must run inside a transaction; creates the row on first use
-SetBasePermission(ctx, workspaceID, base resource.BasePermission) error // after Lock
-SetSeatLimit(ctx, workspaceID, limit *int) error                       // after Lock
+SetSeatLimit(ctx, workspaceID, limit *int) error            // after Lock
 Remove(ctx, workspaceID) error
 
 // permittable.Repo (additions)
@@ -476,7 +503,7 @@ CountResourceOwners(ctx, kind, id, ownerRoleID) (int, error)
 UpsertResourceRole(ctx, userID, r permittable.ResourceRole) error
 DeleteResourceRole(ctx, userID, kind, id) error
 DeleteResourceRolesInWorkspace(ctx, workspaceID, userIDs) error
-FindSeatUsers(ctx, workspaceID, baselineEditRoles []role.ID, editRoles []role.ID) ([]user.ID, error)
+FindSeatUsers(ctx, workspaceID, editRoles []role.ID) ([]user.ID, error)
 ```
 
 | Operation | Mongo | Postgres |
@@ -487,8 +514,8 @@ FindSeatUsers(ctx, workspaceID, baselineEditRoles []role.ID, editRoles []role.ID
 | `FindResourceMembers` | aggregation `$match` → `$unwind` → `$match` → `$project {user_id, role_id}` | `SELECT p.user_id, r.role_id FROM permittable_resource_roles r JOIN permittables p …` |
 | `LockForUpdate` | in a transaction: `findOneAndUpdate {$inc: {version: 1}}` (concurrent transactions on the same registration hit a write conflict and are retried) | `SELECT … FOR UPDATE` |
 | `WorkspaceSettings.Lock` | in a transaction: `findOneAndUpdate {_id: ws} {$inc: {version: 1}}, upsert` (write conflict → retry) | `INSERT … ON CONFLICT DO NOTHING` then `SELECT … FOR UPDATE` |
-| `FindSeatUsers` | aggregation on `permittables`: `$match` users with a workspace role in `ws` and (`workspace_roles` role ∈ baseline-edit roles **or** `resource_roles` `$elemMatch {workspace_id: ws, role_id ∈ edit roles}`) → `$project user_id` | `SELECT DISTINCT p.user_id FROM permittables p JOIN permittable_workspace_roles w … WHERE w.workspace_id=$1 AND (w.role_id = ANY($2) OR EXISTS (SELECT 1 FROM permittable_resource_roles r WHERE r.permittable_id = p.id AND r.workspace_id=$1 AND r.role_id = ANY($3)))` |
-| Registration + settings for `checkPermission` | one aggregation on `resource_registrations`: `$match` by key → `$lookup` `resource_workspace_settings` by `workspace_id`. If there is no registration, `WorkspaceSettings.Find` for the workspace resolved from `workspaceAlias` | one query: `SELECT r.*, s.base_permission FROM resource_registrations r LEFT JOIN resource_workspace_settings s USING (workspace_id) WHERE …`. If there is no registration, likewise `WorkspaceSettings.Find` |
+| `FindSeatUsers` | aggregation on `permittables`: `$match` users with a workspace role in `ws` and (`workspace_roles` role ∈ edit roles **or** `resource_roles` `$elemMatch {workspace_id: ws, role_id ∈ edit roles}`) → `$project user_id` | `SELECT DISTINCT p.user_id FROM permittables p JOIN permittable_workspace_roles w … WHERE w.workspace_id=$1 AND (w.role_id = ANY($2) OR EXISTS (SELECT 1 FROM permittable_resource_roles r WHERE r.permittable_id = p.id AND r.workspace_id=$1 AND r.role_id = ANY($2)))` |
+| Registration for `checkPermission` | `findOne` on `resource_registrations` by key | `SELECT … FROM resource_registrations WHERE resource_kind=$1 AND resource_id=$2` |
 
 #### Authorization check
 
@@ -504,50 +531,44 @@ input CheckPermissionInput {
 }
 ```
 
-When `resourceId` is **absent**, behavior is unchanged — whatever the base
-permission. Principal roles are the actual workspace roles, as today.
+When `resourceId` is **absent**, behavior is unchanged. Principal roles are the
+actual workspace roles, as today.
 
 When `resourceId` is **present**, the service also passes `workspaceAlias`, as
 today (the project's workspace, read from the service's own data, not from user
 input).
 
-1. Load the registration `(service:resource, resourceId)` together with its
-   workspace's settings (one round-trip).
+1. Load the registration `(service:resource, resourceId)` (one round-trip, by
+   primary key).
 2. **If registered:** the deciding workspace = the registration's `workspaceID`.
    If `workspaceAlias` is given and does not resolve to it → **deny** (the
    caller cannot choose the workspace).
    **If not registered** (it has never had a resource role): the deciding
    workspace = the workspace resolved from `workspaceAlias`. Without
-   `workspaceAlias` → **deny**. Read that workspace's settings (one point
-   read). No resource roles exist yet, so the decision comes from the workspace
-   role and base permission only — exactly today's result under the default
-   base permission.
-3. Principal roles = global roles + the user's **baseline role**
-   `BaselineRole(workspace role, basePermission)` **in the deciding
-   workspace**. With "Follow
-   workspace role" the baseline is the workspace role, so the roles are exactly
-   what they would be today. When a workspace member has no baseline (`None`
-   for a `writer` / `reader`), the evaluation-only role `workspace_member` is
-   added instead (never stored; it gives Cerbos a non-empty role list and lets
-   a policy recognize the case). A user with no workspace role in that
-   workspace gets neither, and so is denied.
+   `workspaceAlias` → **deny**. No resource roles exist yet, so the decision
+   comes from the workspace role only — exactly today's result for every role
+   other than `limited`.
+3. Principal roles = global roles + the user's actual workspace role **in the
+   deciding workspace** — the same roles as today; the baseline is the
+   workspace role itself, so nothing is substituted. `limited` is passed as is:
+   it is never listed in a role-list rule, so it grants no baseline, while still
+   giving Cerbos a non-empty role list and letting a policy recognize the case.
+   A user with no workspace role in that workspace gets none, and so is denied.
 4. Principal attributes: `resourceRole` = the user's role on this resource after
    the read-time guard, or `""` if none; `workspaceRole` = the actual workspace
    role (or `""`), for policies that need it.
 5. The Cerbos resource ID is the real `resourceId`.
 
 **Default model.** Effective role on a resource = max(baseline role, resource
-role). Workspace `owner` / `maintainer` always have a full baseline. For
-`writer` / `reader` the baseline comes from the base permission; with `None`
-they reach a resource only through a resource role. Each role means the same at
-both levels (`owner` / `maintainer`: full control and member management;
+role). The baseline is `BaselineRole(workspace role)`: the role itself for
+`owner` / `maintainer` / `writer` / `reader`, and no baseline for `limited`
+(they reach a resource only through a resource role). Each role means the same
+at both levels (`owner` / `maintainer`: full control and member management;
 `writer`: read and edit; `reader`: read), so a policy implements "max" as the
-union of a role-list rule (now evaluated against the baseline role) and a
+union of a role-list rule (evaluated against the workspace role) and a
 `resourceRole`-condition rule per action — Cerbos allows if either matches.
-Because accounts substitutes the baseline into the principal roles, existing
-role-list rules need no change: they automatically follow the base permission
-for checks with a `resourceId` and keep using the actual workspace role for
-checks without one.
+Principal roles are the same as today, so existing role-list rules need no
+change.
 
 Policies stay in each service's `definition.go`, using the conditions the
 reearthx generator already supports. Example for `dashboard:project`:
@@ -555,11 +576,11 @@ reearthx generator already supports. Example for `dashboard:project`:
 ```go
 // dashboard: definition.go
 resourceRole := func(expr string) *generator.Condition { return generator.SimpleExpr(expr) }
-any := []string{"*"} // any principal role (incl. workspace_member); the condition does the gating
+any := []string{"*"} // any principal role (incl. limited); the condition does the gating
 
 builder.AddResource("project", []generator.ActionDefinition{
-    // baseline: with a resourceId these roles are the member's baseline role (workspace role + base permission)
-    // ("workspace_member" is never listed here)
+    // baseline: these roles are the member's workspace role, as today
+    // ("limited" is never listed here: it has no baseline)
     generator.NewActionDefinition("read", []string{"owner", "maintainer", "writer", "reader"}),
     generator.NewActionDefinition("edit", []string{"owner", "maintainer", "writer"}),
     generator.NewActionDefinition("delete", []string{"owner", "maintainer"}),
@@ -574,19 +595,21 @@ builder.AddResource("project", []generator.ActionDefinition{
 
 Because resource roles arrive as a principal **attribute**, not as principal
 roles, a project `owner` is never mistaken for a workspace `owner`: a project
-role counts only for the resource named in the check. Per-project visibility on
-top of the base permission (e.g. a "visible to all members" project) is Open
-Question 1.
+role counts only for the resource named in the check. A per-project "only
+people added" setting is a later addition (*Non-Goals*, Open Question 1).
 
-**Policy note for members without a baseline.** Policies must grant
-`workspace_member` nothing except through `P.attr.resourceRole` conditions.
-Rules keyed to explicit role lists already exclude it (fail-closed). Rules that
-grant on `*` without a `resourceRole` condition must be reviewed per service.
-Workspace-level resources (e.g. `dashboard:workspace`, "create project", "list
-projects") are checked without a `resourceId`, so they keep using the actual
-workspace role: under `None` a workspace writer can still create a project (and
-becomes its owner) and may call a list endpoint — **the service must filter the
-list** (see *Listing what a user may see*).
+**Policy note for Limited members.** Policies must grant `limited` nothing
+except through `P.attr.resourceRole` conditions. Rules keyed to explicit role
+lists already exclude it (fail-closed). Rules that grant on `*` without a
+`resourceRole` condition must be reviewed per service. Workspace-level
+resources (e.g. `dashboard:workspace`, "create project", "list projects") and
+accounts' own policy (workspace `read`, `read_member`, … in
+`internal/rbac/definitions.go`) are checked without a `resourceId` against the
+actual workspace role, and no existing rule lists `limited`, so by default a
+Limited member is granted nothing at the workspace level. Which actions get
+`limited` is decided in Open Question 10. A Limited member must still be able
+to list their own projects, so the list endpoint is granted to `limited` too,
+and **the service must filter the list** (see *Listing what a user may see*).
 
 **Listing what a user may see.** A list screen cannot call `checkPermission`
 for every resource (Open Question 2). Services ask once per workspace:
@@ -604,7 +627,7 @@ extend type Query {
 
 If `baselineRole` is set, the user sees every resource of the kind in the
 workspace at least at that level (registered or not — the service lists all of
-its resources); otherwise (a member under `None`) the service lists only
+its resources); otherwise (a Limited member) the service lists only
 `bindings`. Every resource in `bindings` has a role, so it is always
 registered.
 
@@ -626,7 +649,7 @@ these cases; existing resources are never registered in bulk.
 
 Registration is idempotent, so a service may call it every time before granting
 a role. A registration without roles is decided the same way as no
-registration (workspace role and base permission only), so a registration left
+registration (workspace role only), so a registration left
 behind by a failed role grant is harmless.
 
 ```
@@ -650,13 +673,15 @@ GET    /api/service/workspaces/{workspaceId}/seat-usage
        → { seatCount, seatLimit, seatUserIds } for billing.
 ```
 
-**Membership and settings (user JWT, GraphQL)**:
+**Membership (user JWT, GraphQL)**:
 
 ```graphql
-enum BasePermission { FOLLOW_WORKSPACE_ROLE NONE READER WRITER }
-
-extend type Workspace {
-  basePermission: BasePermission!   # FOLLOW_WORKSPACE_ROLE when never set
+enum Role {
+  reader
+  writer
+  owner
+  maintainer
+  limited      # NEW: workspace role only; rejected as a resource role
 }
 
 input SetResourceMemberInput {
@@ -678,12 +703,8 @@ input ResourceRoleInput {
 input AddWorkspaceMemberWithResourceRolesInput {
   workspaceId: ID!
   userId: ID!
-  workspaceRole: Role               # used only if the user is not yet a member; default reader; not owner
+  workspaceRole: Role               # used only if the user is not yet a member; default reader; not owner; may be limited
   resources: [ResourceRoleInput!]!  # 0..100 entries, distinct (kind, id)
-}
-input UpdateWorkspaceBasePermissionInput {
-  workspaceId: ID!
-  basePermission: BasePermission!
 }
 
 type ResourceMember { userId: ID!, role: Role! }
@@ -714,9 +735,15 @@ extend type Mutation {
   addWorkspaceMemberWithResourceRoles(
     input: AddWorkspaceMemberWithResourceRolesInput!
   ): AddWorkspaceMemberWithResourceRolesPayload
-  updateWorkspaceBasePermission(input: UpdateWorkspaceBasePermissionInput!): Workspace
 }
 ```
+
+`limited` is a value added to the existing `Role` enum. It can be used by the
+existing mutations that set a workspace role (`addUsersToWorkspace`,
+`updateUserOfWorkspace`) and by
+`AddWorkspaceMemberWithResourceRolesInput.workspaceRole`. Passing `limited` as
+a resource role (`SetResourceMemberInput.role`, `ResourceRoleInput.role`) is
+rejected.
 
 The user is identified by user ID, as in `addUsersToWorkspace`; the UI finds
 them by name or email with the existing user lookup (`userByNameOrEmail` /
@@ -733,15 +760,13 @@ transaction**; locks are taken in a fixed order — workspace lock
 
 | Operation | Locks | Guard |
 |---|---|---|
-| `setResourceMember` | workspace lock, then the registration | registration exists (else `ErrNotRegistered` — the service first calls the idempotent registration); target user is a member of the registration's workspace (else `ErrNotWorkspaceMember` — use `addWorkspaceMemberWithResourceRoles`); Cerbos allows `manage_members` on `(kind, id)` for the operator; if the change downgrades the last `owner`, reject; seat check |
+| `setResourceMember` | workspace lock, then the registration | `role` is not `limited` (else `ErrInvalidRole`); registration exists (else `ErrNotRegistered` — the service first calls the idempotent registration); target user is a member of the registration's workspace (else `ErrNotWorkspaceMember` — use `addWorkspaceMemberWithResourceRoles`); Cerbos allows `manage_members` on `(kind, id)` for the operator; if the change downgrades the last `owner`, reject; seat check |
 | `removeResourceMember` | the registration | Cerbos `manage_members`, or operator == target (self-leave); if it removes the last `owner`, reject |
-| `addWorkspaceMemberWithResourceRoles` | workspace lock, then each registration | every registration exists and belongs to `workspaceId` (else the whole call is rejected; the service first calls the idempotent registration for each resource); Cerbos allows `manage_members` on each for the operator. If the user is **not yet a member**: operator is a workspace admin (v1, Open Question 7); personal workspace rejected; `workspaceRole` (default `reader`) is not `owner`, as in `addUsersToWorkspace`; then `Members().Join` and the permittable workspace role via the existing `bulkUpdatePermittable` path. If the user **is already a member**: workspace membership and role are left unchanged — never downgraded (`workspaceRole` is ignored). Then the last-owner rule per resource, `UpsertResourceRole` for each entry, and the seat check. Any failure rolls everything back |
-| `updateWorkspaceBasePermission` | workspace lock | operator passes the existing workspace `manage` check (owner / maintainer); personal workspace rejected (v1, Open Question 9); then `SetBasePermission` and the seat check. Takes effect on the next `checkPermission` — nothing else is rewritten |
+| `addWorkspaceMemberWithResourceRoles` | workspace lock, then each registration | no resource role is `limited`; every registration exists and belongs to `workspaceId` (else the whole call is rejected; the service first calls the idempotent registration for each resource); Cerbos allows `manage_members` on each for the operator. If the user is **not yet a member**: operator is a workspace admin (v1, Open Question 7); personal workspace rejected; `workspaceRole` (default `reader`) is not `owner`, as in `addUsersToWorkspace` (`limited` is allowed); then `Members().Join` and the permittable workspace role via the existing `bulkUpdatePermittable` path. If the user **is already a member**: workspace membership and role are left unchanged — never downgraded (`workspaceRole` is ignored). Then the last-owner rule per resource, `UpsertResourceRole` for each entry, and the seat check. Any failure rolls everything back |
 | `workspaceSeatUsage` | — | operator may read workspace members (`read_member`); the `seat-usage` route is M2M only |
 | `resourceMembers` | — | Cerbos `read` on `(kind, id)`; result filtered by the read-time guard |
 | `myResourceBindings` | — | operator's own role assignments only, filtered by the read-time guard |
-| `myResourceAccess` | — | operator's own access only; `baselineRole` from `BaselineRole(...)`, `bindings` filtered by the read-time guard |
-| `Workspace.basePermission` | — | anyone who can read the workspace (`read`) |
+| `myResourceAccess` | — | operator's own access only; `baselineRole` from `BaselineRole(workspace role)` (null for Limited), `bindings` filtered by the read-time guard |
 
 **Last-owner rule:** a membership mutation that would take the owner count of a
 resource from ≥ 1 to 0 is rejected. A resource registered without an owner
@@ -756,7 +781,10 @@ they serialize with the one-step add and with each other's seat checks):
 
 - `addUsersToWorkspace`, `updateUserOfWorkspace`,
   `transferWorkspaceOwnership`: run the seat check (a member given `writer`,
-  `maintainer` or `owner` may start using a seat).
+  `maintainer` or `owner` may start using a seat). `addUsersToWorkspace` and
+  `updateUserOfWorkspace` accept `limited` (same guards as for other roles). A
+  change to `limited` does not touch resource roles; only the baseline derived
+  at check time changes.
 - `removeUserFromWorkspace` / `removeMultipleUsersFromWorkspace`: also delete
   the users' role assignments in the workspace (`DeleteResourceRolesInWorkspace`).
 - `deleteWorkspace` (`Workspace.Remove`): `RemoveInWorkspace(ws)` removes all
@@ -769,16 +797,16 @@ they serialize with the one-step add and with each other's seat checks):
 |---|---|
 | Two writers on different users of the same resource both pass the last-owner check | Both must take `LockForUpdate` on the same registration; the second waits (Postgres) or conflicts and retries (Mongo). The owner count is read after the lock. |
 | The first registration of the same `(kind, id)` runs twice at once (e.g. two admins give roles on the same existing project at the same time) | Primary key / unique index; the loser gets `ErrAlreadyExists` and re-reads the registration. Same workspace → continues as success (idempotent); different workspace → 409 `ErrWorkspaceMismatch`. |
-| A permission check runs during the first registration | The check sees either "not registered" or "registered". No roles exist yet, so both give the same result from the workspace role and base permission. |
+| A permission check runs during the first registration | The check sees either "not registered" or "registered". No roles exist yet, so both give the same result from the workspace role. |
 | `setResourceMember` passes the workspace-membership check, then the user is removed from the workspace and the cascade runs before the role assignment is written | **Read-time guard**: a role assignment is honored only if the user currently holds a workspace role in the role assignment's workspace. The permittable is already loaded, so this costs no read. The orphaned row is harmless and is removed the next time the cascade or the unregister endpoint touches it. |
 | A stale snapshot `Save` from the workspace flow overwrites a newer role assignment (or vice versa) | Snapshot saves never write `resource_roles`; role-assignment writes never write `workspace_roles` (see *Repository changes*). |
 | Two admins add the same new person with `addWorkspaceMemberWithResourceRoles` at once (possibly with different projects) | Both take the workspace lock; the second waits / retries, then sees an existing member and only adds its role assignments. The workspace role is not changed and the seat is counted once. |
 | Two admins make two different people start using a seat (new members, editing project roles, workspace role changes, project creation) when one seat is left | Every such operation takes the workspace lock and computes seat usage inside the transaction, so exactly one succeeds. |
-| The base permission is raised while someone is given an editing project role | Both take the workspace lock; the second computes usage including the first. |
+| Someone's workspace role is raised to writer while they are given an editing project role | Both take the workspace lock; the second computes usage including the first. |
 | A user is removed from the workspace while a one-step add for them runs | Both take the workspace lock. If the removal commits second, its cascade deletes the new role assignments; if first, the add treats the user as new (admin check, seat limit). The read-time guard covers any remaining gap. |
 | Two multi-resource calls on overlapping resources deadlock | Fixed lock order: workspace lock, then registrations sorted by `(kind, id)`. |
-| Two admins change the base permission at once, or a change races a workspace save | The setting lives in its own record and is written under the workspace lock; the last committed value wins, and no workspace snapshot `Save` can revert it. |
-| A permission check runs while the base permission changes | The check reads the setting in the same round-trip as the registration, so it sees either the old or the new value; the next check sees the new one. Accounts does not cache the setting. Services that cache `checkPermission` / `myResourceAccess` results see the change after their cache TTL, so such caches must be short (or invalidated on change). |
+| Billing changes the seat limit while a workspace save runs | The limit lives in its own record and is written under the workspace lock; the last committed value wins, and no workspace snapshot `Save` can revert it. |
+| A permission check runs while a member's workspace role is changed to (or from) Limited | The check uses the workspace role in the permittable it already loads, so it sees either the old or the new role; the next check sees the new one. Services that cache `checkPermission` / `myResourceAccess` results see the change after their cache TTL, so such caches must be short (or invalidated on change). |
 
 #### Lifecycle and cascades
 
@@ -786,7 +814,7 @@ they serialize with the one-step add and with each other's seat checks):
 |---|---|---|
 | Resource created (after this feature ships) | Service (M2M) | `POST /api/service/resources` with `ownerUserId` = creator |
 | Resource deleted | Service (M2M) | `DELETE /api/service/resources/{kind}/{id}`; members whose only editing role was on it stop using a seat. A missed call leaves an orphan registration — harmless (the resource no longer exists in the service) except that its editing roles still count as seats; cleaned by an optional sweeper later |
-| Existing resources (pre-feature) | — | Not registered. Permission checks are decided by the workspace role and base permission of the `workspaceAlias` workspace |
+| Existing resources (pre-feature) | — | Not registered. Permission checks are decided by the workspace role in the `workspaceAlias` workspace |
 | An existing resource gets its first resource role | Service (M2M) → Accounts | The service calls `POST /api/service/resources` without `ownerUserId` (idempotent), then `setResourceMember` / `addWorkspaceMemberWithResourceRoles` |
 | Person added with `addWorkspaceMemberWithResourceRoles` | Accounts | Workspace membership (if new) and role assignments written in one transaction |
 | A member's last role assignment in a workspace removed | Accounts | Only that role assignment is removed; workspace membership stays (the seat is freed if they can no longer edit anything) |
@@ -794,7 +822,7 @@ they serialize with the one-step add and with each other's seat checks):
 | User removed from workspace | Accounts | `bulkRemovePermittable` also calls `DeleteResourceRolesInWorkspace` |
 | Workspace deleted (`Workspace.Remove`) | Accounts | `RemoveInWorkspace(ws)`: all registrations and role assignments of the workspace; the settings record is removed |
 | Workspace deactivated / restored | Accounts | No change (mirrors workspace roles; data kept for restore) |
-| Base permission changed | Accounts | None: role assignments are untouched; only the baseline derived at check time changes |
+| A member's workspace role changed to / from Limited | Accounts | None: role assignments are untouched; only the baseline derived at check time changes (no baseline for Limited). A member changed to Limited stops using a seat unless they hold an editing resource role |
 | User deleted (`DeleteMe`) | Accounts | Today `DeleteMe` does not delete the permittable. Role assignments are unreachable once the user is gone; deleting the permittable on `DeleteMe` is proposed as a follow-up fix (independent of this feature) |
 
 **Pros**
@@ -804,11 +832,13 @@ they serialize with the one-step add and with each other's seat checks):
 - Only M2M-authenticated services can make a resource exist in accounts, so
   users cannot claim IDs.
 - Resource-wide invariants are serialized on one record per resource, and
-  workspace-wide decisions (one-step add, seats, base permission) on one record
-  per workspace, on both backends.
+  workspace-wide decisions (one-step add, seats) on one record per workspace,
+  on both backends.
 - Role-assignment lookup stays inside the already-loaded permittable; the only
-  new read is a primary-key lookup of the registration joined with the
-  workspace settings.
+  new read is a primary-key lookup of the registration.
+- There is no workspace-wide permission setting, and Limited only adds one value to the
+  existing workspace roles, so there is no extra concept for users to learn
+  and nothing extra to store.
 - Everyone with access is a workspace member, so SSO / SCIM and removal keep
   working through the existing member flows, and seats are counted and
   enforced in one place, in the same transaction as the change.
@@ -824,9 +854,14 @@ they serialize with the one-step add and with each other's seat checks):
 - Mongo `Save` semantics change from replace to `$set` (touches existing code).
 - Existing workspace member flows must take the workspace lock and run the seat
   check; billing must push seat limits to accounts.
-- Under a base permission other than the default, services must filter lists
-  with `myResourceAccess` instead of assuming workspace writers / readers see
+- In case there are Limited members, services must filter lists with
+  `myResourceAccess` instead of assuming every workspace member sees
   everything.
+- The `Role` enum gains a value, so consumers that handle workspace roles must
+  support `limited`.
+- A single project cannot be hidden from ordinary members (those members must
+  be made Limited). If needed, an "only people added" setting is added later
+  (*Non-Goals*).
 
 #### Detailed requirements
 
@@ -836,12 +871,10 @@ order; other parts of this section refer to them by those numbers. Each item in
 2 → FR-3, 3 → FR-4, 4 → FR-5, 5 → FR-6, 6 → FR-7, 7 → FR-8).
 
 1. `checkPermission` without `resourceId`: **no change** in reads or in
-   principal roles. With `resourceId`: if registered, **one additional
-   round-trip** — the resource registration by primary key, joined with the
-   workspace's settings by primary key (Postgres `LEFT JOIN`, Mongo `$lookup`).
-   If not registered, that miss plus one point read of the workspace's settings
-   (`workspaceAlias` is already resolved today). The role assignment itself is
-   read from the already-loaded permittable.
+   principal roles. With `resourceId`: **one additional round-trip** — the
+   resource registration by primary key (if not registered, just that miss;
+   `workspaceAlias` is already resolved today). The workspace role and the role
+   assignment are read from the already-loaded permittable.
 2. On PostgreSQL, `Permittable.FindByUserID` loads the base row, workspace roles
    and resource roles in **one round-trip** (aggregated sub-selects), so adding
    resource roles does not add a query to `checkPermission`.
@@ -855,11 +888,11 @@ order; other parts of this section refer to them by those numbers. Each item in
    `(userId, role)` for that resource — it never hydrates whole aggregates.
 6. All mutations work on both MongoDB and PostgreSQL backends and in the
    `memory` repo.
-7. `myResourceAccess(ws, kind)` costs the already-loaded permittable plus one
-   point read of the workspace's settings.
+7. `myResourceAccess(ws, kind)` costs only the already-loaded permittable (no
+   extra read).
 8. `workspaceSeatUsage(ws)` / the seat check is one index-backed query
    (`FindSeatUsers`, using the `workspace_id` indexes on workspace roles and
-   resource roles) plus the settings record; it never loads whole workspaces.
+   resource roles) plus the seat-limit record; it never loads whole workspaces.
 
 Scope notes (technical form of *Non-Goals*):
 
@@ -887,16 +920,13 @@ sequenceDiagram
 
     S->>A: checkPermission(service, resource, action, workspaceAlias, resourceId)
     A->>DB: Permittable.FindByUserID(user)  (existing read, one round-trip)
-    A->>DB: Registration.FindByKey(kind, resourceId) + workspace settings  (new round-trip)
+    A->>DB: Registration.FindByKey(kind, resourceId)  (new round-trip)
     alt registered and alias ≠ registration.workspace
         A-->>S: { allowed: false }
     else not registered and no alias
         A-->>S: { allowed: false }
     else
-        opt not registered
-            A->>DB: WorkspaceSettings.Find(workspace of alias)
-        end
-        A->>A: ws = registration.workspace or workspace of alias<br/>attr.resourceRole = guarded role or "" (always "" if not registered)<br/>roles = global + BaselineRole(workspace role in ws, basePermission)<br/>(+ workspace_member if member without baseline)
+        A->>A: ws = registration.workspace or workspace of alias<br/>attr.resourceRole = guarded role or "" (always "" if not registered)<br/>roles = global + workspace role in ws (as today;<br/>limited matches no role-list rule = no baseline)
         A->>C: CheckResources(principal{roles, attr}, resource{kind, resourceId}, action)
         C-->>A: ALLOW / DENY
         A-->>S: { allowed }
@@ -979,18 +1009,20 @@ flowchart LR
 5. **Policy authoring**: role names are shared between workspace and resource
    scopes. A resource role must be checked only through `P.attr.resourceRole`
    (never as a principal role); role-list rules are evaluated against the
-   baseline role when a `resourceId` is given, and `workspace_member` is never
-   listed in them. Existing project policies of a service must be extended with
-   the `resourceRole` rules (union = max), not replaced.
+   workspace role, as today, and `limited` is never listed in them. Existing
+   project policies of a service must be extended with the `resourceRole` rules
+   (union = max), not replaced.
 6. **gqlclient** (`server/pkg/gqlclient`) consumers need a version bump to use
-   the new fields; old clients are unaffected (the workspace member list and
-   the `Role` enum do not change).
-7. **Base permission and lists**: services must not assume that a workspace
-   `writer` / `reader` sees every resource; list endpoints use
-   `myResourceAccess` and filter to `bindings` when `baselineRole` is null.
-   Checks with a `resourceId` already follow the setting.
-8. **Base permission UI**: the workspace settings screen shows and edits
-   `Workspace.basePermission` (owners / maintainers only).
+   the new fields. The `Role` enum gains `limited`, so consumers that read the
+   workspace member list or roles must support the new value before any
+   Limited member appears. Other old clients are unaffected.
+7. **Limited and lists**: services must not assume that every workspace member
+   sees every resource; list endpoints use `myResourceAccess` and filter to
+   `bindings` when `baselineRole` is null. Checks with a `resourceId` already
+   follow Limited.
+8. **Limited and seat UI**: the workspace members screen adds Limited to the
+   role choices (changeable by owners / maintainers only, as with existing role
+   changes) and shows the seat separately from the role (*Design → Seats*).
 9. **Dashboard seat logic moves to accounts**: `GetCurrentSeatStatus` /
    `TempGetCurrentSeatStatus` (count of non-reader members) and the
    `IsOverUsedSeat` guard on project create / update / delete in reearth-dashboard
@@ -999,7 +1031,7 @@ flowchart LR
    `PUT /api/service/workspaces/{id}/seat-limit` whenever a subscription
    changes.
 10. **New refusals**: `setResourceMember`, `addWorkspaceMemberWithResourceRoles`,
-    `updateWorkspaceBasePermission`, `addUsersToWorkspace`,
+    `addUsersToWorkspace`,
     `updateUserOfWorkspace`, `transferWorkspaceOwnership` and project
     registration can return `ErrSeatLimitExceeded`; every caller must show a
     clear message.
@@ -1010,51 +1042,56 @@ flowchart LR
     `workspaceAlias` (unregistered projects are decided by it).
 12. **Compatibility and migration**: no existing data is converted and nothing
     is backfilled. The new tables / collections are created on startup and stay
-    empty until the feature is used. With the default base permission and no
-    resource roles, `checkPermission` results and `seatCount` are the same as
-    today.
+    empty until the feature is used. With no Limited members and no resource
+    roles, `checkPermission` results and `seatCount` are the same as today.
+13. **Limited works only in services that adopted it**: `limited` is listed in
+    no existing policy's role lists, so in a service that does not yet have the
+    `resourceRole` rules a Limited member is granted nothing (fail-closed).
 
 ##### Tests
 
 1. **Unit** (`pkg/resource`, `pkg/permittable`): kind/ID validation and length
    limits; one role per resource; read-time guard drops role assignments without
-   a matching workspace role; `BaselineRole` for every cell of the table above
-   (a missing settings record = "Follow workspace role"); `UsesSeat` for each
-   workspace role × base permission × resource-role combination.
+   a matching workspace role; `BaselineRole` for every workspace role in the
+   table above (no baseline for `limited`); `UsesSeat` for each workspace role
+   (including `limited`) × resource-role combination; `limited` is a valid
+   `role.RoleType` and is rejected as a resource role.
 2. **Interactor** (`internal/usecase/interactor`):
-   - `CheckPermission`: no `resourceId` → unchanged roles whatever the setting
+   - `CheckPermission`: no `resourceId` → unchanged roles for existing roles
      (regression); unregistered resource + alias → decided by the alias
-     workspace's role and base permission (today's result under the default;
-     only owner / maintainer allowed under `None`); unregistered + no alias →
+     workspace's role (today's result for every role but `limited`; `limited`
+     denied); unregistered + no alias →
      deny; registered + alias of another workspace → deny; for registered
      resources, workspace roles taken from the registration, not the alias;
-     `resourceRole` set/empty; with a `resourceId`, principal roles equal the
-     baseline (`workspace_member` when none) for each base permission; a user
+     `resourceRole` set/empty; with a `resourceId`, principal roles still equal
+     the actual workspace role (including `limited`); a user
      with no workspace role → deny even with a stale role assignment.
    - Register: M2M only (JWT rejected); owner must be a workspace member;
      duplicate with same workspace is idempotent (roles unchanged), different
      workspace is 409; a registration without `ownerUserId` alone does not
      change any decision; unregister succeeds even when never registered.
    - `setResourceMember` / `removeResourceMember`: unregistered resource →
-     `ErrNotRegistered`; non-member target rejected;
+     `ErrNotRegistered`; a `limited` role → rejected; non-member target rejected;
      denied without `manage_members`; self-leave allowed; last-owner
      protection; removing the last role assignment keeps workspace membership.
    - `addWorkspaceMemberWithResourceRoles`: a non-member joins with the given
-     (default `reader`) workspace role and gets every role assignment; an
+     (default `reader`; `limited` allowed) workspace role and gets every role
+     assignment; an
      existing member keeps their workspace role (no downgrade) and only gains
      role assignments; a resource from another workspace, an unregistered
      resource, a missing `manage_members`, a non-admin operator for a new
      person, `owner` as workspace role, a personal workspace, or the seat limit
      → whole call rejected with no membership and no role assignment left
      behind; last-owner rule applied.
-   - `updateWorkspaceBasePermission`: owner / maintainer only; personal
-     workspace rejected; the next check uses the new value.
-   - `myResourceAccess`: `baselineRole` per setting and workspace role; null
-     for a member under `None`.
-   - `workspaceSeatUsage`: equals the old Dashboard count with the default
-     setting and no resource roles; counts a reader with a writer resource role
-     once however many such roles; excludes writers under `None` with only
-     reader resource roles.
+   - `limited` through `updateUserOfWorkspace` / `addUsersToWorkspace`: owner /
+     maintainer only (the existing guards); the next check uses the new role;
+     resource roles are unchanged.
+   - `myResourceAccess`: `baselineRole` per workspace role; null for a Limited
+     member.
+   - `workspaceSeatUsage`: equals the old Dashboard count with no Limited
+     members and no resource roles; counts a reader / Limited member with a
+     writer resource role once however many such roles; excludes a Limited
+     member with only reader resource roles.
    - Seat check: with the limit reached, each operation in the *Seat check*
      table is rejected with `ErrSeatLimitExceeded` and leaves nothing behind;
      the same operation succeeds when it does not add a seat; seat-freeing
@@ -1066,16 +1103,17 @@ flowchart LR
    `UpsertResourceRole` keeps the role assignment; two concurrent one-step adds
    of the same new person → joined once, both sets of role assignments present;
    two concurrent seat-adding operations of different kinds (one-step add,
-   `setResourceMember` writer, project registration, base permission to
-   `Writer`) with one seat left → exactly one succeeds; two concurrent first
+   `setResourceMember` writer, project registration, `updateUserOfWorkspace`
+   to writer) with one seat left → exactly one succeeds; two concurrent first
    registrations of the same existing resource → one registration, both
    succeed.
 4. **Repository**: Mongo, Postgres and memory implementations of every new
    operation; Postgres `FindByUserID` issues a single query.
 5. **Migration**: `0005` up/down on an existing DB; no existing row is changed;
    existing permittables load with empty `resourceRoles`; workspaces without a
-   settings record read as "Follow workspace role"; checks on existing projects
-   with no registration give the same results as today.
+   settings record read as unlimited; the `limited` `roles` row is created once
+   on startup; checks on existing projects with no registration give the same
+   results as today.
 6. **E2E** (`server/e2e`): a `dashboard:project` test policy generated with the
    rules above; verify:
    - workspace `reader` without a role assignment → `read` allowed, `edit`
@@ -1085,27 +1123,25 @@ flowchart LR
      (a resource role never lowers access);
    - workspace `owner` → every action on every project;
    - user from another workspace → denied;
-   - unregistered project (with alias): today's result under the default;
-   - base permission `None`: workspace `reader` / `writer` without a role
-     assignment → denied on every project (including unregistered ones); with resource `writer` on P →
-     `read` / `edit` on P only; workspace `maintainer` → every action on every
-     project;
-   - base permission `Writer`: workspace `reader` → `edit` allowed on every
-     project; base permission `Reader`: workspace `writer` → `edit` denied
-     unless a resource role allows it.
+   - unregistered project (with alias): today's result for every role but
+     `limited`;
+   - workspace `limited`: without a role assignment → denied on every project
+     (including unregistered ones); with resource `writer` on P → `read` /
+     `edit` on P only; with resource `reader` on P → `read` on P only.
 
 ##### Deployment
 
 1. Backward compatible? **Yes.** New optional input field, new
-   collections/tables, new routes and GraphQL fields and enum. Behavior is
-   unchanged when `resourceId` is absent; the workspace member list and roles
-   are unchanged. No existing data is converted and nothing is backfilled.
+   collections/tables, new routes and GraphQL fields, and `limited` added to
+   the `Role` enum. Behavior is unchanged when `resourceId` is absent; the
+   workspace member list and roles are unchanged until someone is made
+   Limited. No existing data is converted and nothing is backfilled.
 2. Partial deployment? **Yes.** Order:
    1. Deploy accounts. With no `seatLimit` set, the seat check never blocks.
    2. Billing pushes `seatLimit` for every workspace; Dashboard switches
       `GetCurrentSeatStatus` / `IsOverUsedSeat` to `seat-usage`. Before the
       switch, compare `seatCount` with Dashboard's count for every workspace —
-      with the default setting and no resource roles they are identical.
+      with no Limited members and no resource roles they are identical.
    3. Each service starts registering on create (creator as owner) /
       unregistering on delete, and calling the idempotent registration before a
       resource's first role. Existing resources are not registered.
@@ -1114,10 +1150,11 @@ flowchart LR
       with no registration give today's results. Before step 4 the attribute is
       absent and conditions never match (fail-closed).
    5. Enable the UI for the one-step add.
-   6. Services filter lists with `myResourceAccess`; only then enable the UI
-      that changes the base permission. Until a workspace changes it, every
-      workspace is "Follow workspace role", so steps 1–5 change nobody's access
-      or seat count (apart from new editing project roles and new projects).
+   6. Services filter lists with `myResourceAccess` and deploy policies and
+      gqlclient that support `limited` (Open Question 10); only then enable the
+      UI that lets admins choose Limited. Nobody is Limited at first, so steps
+      1–5 change nobody's access or seat count (apart from new editing project
+      roles and new projects).
 3. Notify: dashboard / visualizer / cms owners; billing owner; whoever maintains
    Cerbos policies.
 4. Config changes: none (reuses the existing M2M API key).
@@ -1129,16 +1166,17 @@ flowchart LR
 ##### Rollback
 
 1. Notify the cause in the team Slack channel.
-2. Disable the one-step-add and base-permission UIs, then revert consumer
-   services / policies that rely on `resourceId` / `resourceRole`. **Access
-   widens** for workspaces whose base permission is not the default: the old
-   version has no base permission, so their writers / readers see every project
-   again. List those workspaces
-   (`base_permission <> 'follow_workspace_role'`) and inform their admins before
-   rolling back; prefer a fix-forward if any of them depend on `None`. Switch
-   Dashboard's seat status back to its own member count; seat usage may jump
-   for readers whose seats came from resource roles (they stop counting) and
-   for workspaces on `None` (writers count again).
+2. Disable the one-step-add UI and the UI for choosing Limited, then revert
+   consumer services / policies that rely on `resourceId` / `resourceRole`.
+   **Watch for Limited members**: the old version does not know `limited`, so
+   it cannot handle such members correctly (role conversion may fail). Before
+   rolling back, list the members whose workspace role is `limited` and inform
+   their admins; prefer a fix-forward if any workspace uses Limited. Rolling
+   back requires changing those members to another role, and making them
+   readers lets them see every project (**access widens**). Switch Dashboard's
+   seat status back to its own member count; seat usage may jump for readers
+   whose seats came from resource roles (they stop counting) and for former
+   Limited members (as a result of their new role).
 3. Roll back the accounts image. The old binary ignores the new collections,
    tables and `resource_roles` field, so **no data rollback is required**.
    Note: the old Mongo `Save` replaces the whole document and will drop
@@ -1149,8 +1187,9 @@ flowchart LR
    registration without roles is decided like no registration). People added
    with the one-step add stay workspace members.
 4. Only if the schema itself must be removed: run `0005` down (drops
-   registrations, role assignments and workspace settings, including base
-   permissions — take a dump first).
+   registrations, role assignments and workspace settings, including seat
+   limits — take a dump first). Workspace members' `limited` roles live
+   outside `0005`, so down does not remove them (change them first, as in 2).
 
 ##### Post-deployment checks and monitoring
 
@@ -1172,17 +1211,19 @@ flowchart LR
     they do not.
   - With `seatCount == seatLimit`, `setResourceMember(writer)` for a reader;
     verify `ErrSeatLimitExceeded` and no change.
-  - Verify that workspaces without a settings record report
-    `FOLLOW_WORKSPACE_ROLE` and that checks for their members are unchanged.
-  - `updateWorkspaceBasePermission(NONE)` on a staging workspace; verify a
-    `reader` without resource roles is denied on every project,
-    `myResourceAccess` returns `baselineRole: null`, a `maintainer` still has
-    full access, and switching back restores access on the next check.
+  - Verify that checks for members of workspaces without Limited members are
+    unchanged.
+  - On a staging workspace, make a member `limited` with
+    `updateUserOfWorkspace`; verify they are denied on every project without a
+    resource role, `myResourceAccess` returns `baselineRole: null`, giving them
+    resource `writer` on P lets them edit only P and puts them in
+    `seatUserIds`, and changing them back to `reader` lets them view every
+    project on the next check.
 - Metrics
   - `checkPermission` p50/p95 latency with and without `resourceId`.
   - Error rate of register / unregister / `setResourceMember` /
-    `addWorkspaceMemberWithResourceRoles` / `updateWorkspaceBasePermission`,
-    including Mongo transaction retries and seat-limit rejections.
+    `addWorkspaceMemberWithResourceRoles`, including Mongo transaction retries
+    and seat-limit rejections.
   - Count of role assignments per permittable (max / p99) to watch FR-4.
   - `ErrSeatLimitExceeded` count per operation and workspace; `workspaceSeatUsage`
     latency.
@@ -1192,13 +1233,15 @@ flowchart LR
 
 #### Technical notes on open questions
 
-1. **Per-project visibility:** restricting members is done with the base
-   permission. If a project must be visible to the whole workspace even under
-   `None`, the proposal is an optional `attributes: JSON` on
-   `CheckPermissionInput`, passed through to the Cerbos resource (e.g.
-   `visibility`), and a rule such as `read` for `workspace_member` when
-   `R.attr.visibility == "workspace"`; services would then also have to merge
-   such projects into lists built from `myResourceAccess`.
+1. **Per-project "only people added":** if added, give the registration an
+   optional `restricted: Boolean` that the service sends at registration and
+   when the setting changes (the same shape as `public` in Open Question 15).
+   On a `restricted` resource the `writer` / `reader` baseline is not used, and
+   the decision comes from resource roles only, as for Limited (accounts either
+   substitutes the principal roles or passes an attribute to the policy).
+   `myResourceAccess` returns such resources so services can drop them from
+   lists. The raise-only model and the role assignments stay as they are, so
+   the v1 design does not need to change.
 2. **Batch checks:** a `checkPermissions` query over many `resourceId`s for list
    screens. Cerbos `CheckResources` already supports multiple resources.
 3. **Per-service M2M keys:** v1 accepts the existing shared M2M API key for
@@ -1219,20 +1262,30 @@ flowchart LR
 8. **Remove from the workspace with the last project role:** if decided,
    `removeResourceMember` (and unregister) would, in the same transaction and
    under the workspace lock, remove a member whose last role assignment in the
-   workspace was removed — only when that member has no baseline (`None`), via
+   workspace was removed — only when that member has no baseline (Limited), via
    the existing workspace member removal path. It does not affect seats: such
    a member already uses none.
-9. **Base permission on personal / Free workspaces:** v1 rejects
-   `updateWorkspaceBasePermission` on personal workspaces. Restricting it by
-   plan would add a plan check (the same source `enforceMemberCount` uses) to
-   that guard.
-10. **`Maintainer` as a base permission value:** add `MAINTAINER` to the enum
-    and a column to the `BaselineRole` table; nothing else changes. It would let
-    every member manage every project's members, so it is left out of v1.
-11. **Scope of the setting:** proposed platform-wide per workspace (one record
-    per workspace, applied to every resource kind). A per-service setting would
-    key the record by `(workspaceID, service)` and look it up by the
-    registration's kind prefix; the round-trip in FR-1 stays the same.
+9. **Limited on personal / Free workspaces:** members cannot be added to a
+   personal workspace in the first place, so Limited is never used there.
+   Restricting it by plan would add a plan check (the same source
+   `enforceMemberCount` uses) to the guard that gives `limited` in
+   `addUsersToWorkspace` / `updateUserOfWorkspace` /
+   `addWorkspaceMemberWithResourceRoles`.
+10. **What a Limited member can see at the workspace level:** workspace-level
+    checks use the actual workspace role without a `resourceId`, and no
+    existing rule lists `limited`, so by default Limited is granted nothing
+    (fail-closed). Once decided, `limited` is added only to the allowed actions
+    in accounts' policy (workspace `read`, `read_member`, … in
+    `internal/rbac/definitions.go`) and in each service's workspace-level
+    policies (creating projects, …). This also decides the minimum a Limited
+    member needs to reach their own projects, such as the workspace `read`
+    needed to open the workspace. Names of projects they have no role on stay
+    out of lists filtered with `myResourceAccess`.
+11. **Seat display:** grouping by "uses a seat / free" and the "19 of 25"
+    warning can be built from the existing `workspaceSeatUsage` (`seatUserIds`,
+    `seatCount`, `seatLimit`). A breakdown such as "Writer on 1 project" needs
+    each member's count of editing resource roles; if needed, a per-member
+    breakdown is added to `workspaceSeatUsage` once the design is settled.
 12. **Exceeding the seat limit:** v1 rejects with `ErrSeatLimitExceeded` (422 on
     the M2M route) from `ensureSeats`. The alternative "allow and flag" would
     drop the rejection and expose `seatCount > seatLimit` through
@@ -1264,8 +1317,9 @@ flowchart LR
     admin for a new person, last-owner rule) and the seat check apply as is. A
     new person known only by email becomes a user through the existing user
     lookup / invitation flow before approval. The workspace member list
-    (`read_member`) is a workspace-level check without `resourceId`, so the base
-    permission does not affect it.
+    (`read_member`) is a workspace-level check without `resourceId`, so whether
+    Limited members see it depends on whether `limited` is added to
+    `read_member` (Open Question 10).
 
 ### Option 2: Role assignments in their own collection/table (no embedding)
 
@@ -1293,81 +1347,109 @@ solves only (4).
 GitHub-style outside collaborators (people with project roles who are not
 workspace members) were considered and rejected: they would need a second kind
 of membership, separate seat counting and their own removal and listing flows,
-and they would sit outside SSO / SCIM management. With the base permission set
-to "None", adding a person as a workspace member with only some project roles
-gives the same access while keeping everyone in one member list.
+and they would sit outside SSO / SCIM management. Adding a person as a Limited
+workspace member with only some project roles gives the same access while
+keeping everyone in one member list.
+
+### Alternative considered and rejected: a workspace-wide base permission
+
+Earlier versions of this document recommended a per-workspace base permission
+like a GitHub organization's ("Follow workspace role" / "None" / "Reader" /
+"Writer"), deciding workspace-wide what writers and readers get on every
+project. It was rejected after the UX review, because:
+
+- Of the products compared (Notion, Figma, Felt, Miro, ArcGIS Online, CARTO,
+  Vercel, GitLab, …), only GitHub has a workspace-wide base access setting.
+- It is all-or-nothing: restricting one person, for example a partner company's
+  staff member, restricts everyone in the workspace.
+- It adds a concept users must learn.
+
+What "None" was meant to achieve (showing someone only some projects) is done
+per person with Limited.
+
+### Alternative considered and rejected: per-project visibility capped by the workspace role
+
+The UX review also compared a per-project setting, "Everyone in workspace" /
+"Only people added", where viewing / editing on a project is capped by the
+workspace role. It is not adopted for v1: a cap cannot express "a workspace
+reader who is a writer on one project". That is one of the main motivations of
+this feature, so project roles only raise access, keeping workspace
+permissions separate from project permissions. Its "only people added" part
+can be added on top of the raise-only model later, so it is left as a future
+addition for when a real case comes up (*Non-Goals*, Open Question 1).
 
 ## Design
 
 **For each project, accounts keeps only two facts: which workspace it belongs
-to, and who holds which role on it.** For each workspace, it also keeps one
-setting: the base permission. Everything else about the project stays in the
-service.
+to, and who holds which role on it.** For each workspace, it keeps only the
+seat limit it receives from billing. Everything else about the project stays in
+the service.
 
 **A project is not registered in accounts until it is needed.** Without a
-project role, access to a project comes from the workspace role and the base
-permission, so accounts does not need to know about a project until it gets a
-project role. Existing projects are therefore not registered in bulk (no
-backfill). Projects created from now on are registered at creation, with the
-creator as owner. Existing projects are registered when they first get a
-project role.
+project role, access to a project comes from the workspace role, so accounts
+does not need to know about a project until it gets a project role. Existing
+projects are therefore not registered in bulk (no backfill). Projects created
+from now on are registered at creation, with the creator as owner. Existing
+projects are registered when they first get a project role.
 
-### Workspace members, roles and the base permission
+### Workspace members and roles
 
 - **Everyone with access to a project is a workspace member.** People are
   added to the workspace as today (by an admin, or by SSO / SCIM), appear in
   the member list, use a seat if they can edit something (see *Seats*), and lose
   all access when removed.
-- **Workspace roles** (owner / maintainer / writer / reader) are unchanged and
-  still govern workspace-level things, such as managing members or creating
-  projects.
+- **Workspace roles** (owner / maintainer / writer / reader, plus the new
+  Limited) still govern workspace-level things, such as managing members or
+  creating projects. On projects, the workspace role is the baseline.
   - **Owners and maintainers** always have full access to every project, like
     GitHub organization owners.
-  - **Writers and readers** get, on every project, the level set by the
-    workspace's base permission (below). A project role can raise their access
-    on that project, never lower it.
+  - **Writers** can view and edit every project, and **readers** can view
+    every project (as today).
+  - **Limited** members have no baseline; they see only the projects where they
+    have a project role (below).
+  - A project role can raise access on that project, never lower it.
 - Unlike GitHub, there are no outside collaborators: a partner company's staff
-  are added as workspace members too, and the base permission plus project
+  are added as workspace members too (usually as Limited), and their project
   roles decide what they can see.
 
-### Base permission
+### Limited
 
-Each workspace has a **base permission** (name tentative), like a GitHub
-organization's base permission. It decides what writers and readers of the
-workspace get on every project:
+**Limited** is a per-person workspace role. A Limited member sees only the
+projects where they have a project role, and has no access at all to any other
+project.
 
-| Base permission | Writers and readers get, on every project |
+| Workspace role | Projects they can see |
 |---|---|
-| **Follow workspace role** (default) | Their workspace role — exactly today's behavior |
-| **None** | Nothing; they see only projects where they have a project role |
-| **Reader** | View |
-| **Writer** | View and edit |
+| Owner / maintainer | Full access to every project (same as today) |
+| Writer | Can view and edit every project (same as today) |
+| Reader | Can view every project (same as today) |
+| Limited (new) | Only the projects where they have a project role |
 
-- Owners and maintainers always have full access, whatever the setting.
-- On each project, a writer or reader gets the higher of the base permission and
-  their project role.
-- Only workspace owners and maintainers can change it, and the change takes
-  effect immediately for all members.
-- **Giving access to only some projects.** Set the base permission to "None"
-  and give people project roles. For example:
-  - **Teams in one SSO workspace.** When workspace creation is restricted and
-    all employees work in one organization workspace, each team gets project
-    roles on its own projects; employees stay workspace members managed by SSO /
+Under every role, on a project where they have a project role, their access
+goes up to that role (e.g. a workspace reader who is a writer on project P →
+can edit P).
+
+- **When to use it:**
+  - **A partner company's staff.** Add them to the workspace as Limited, with a
+    role on the one project they work on; they see nothing else.
+  - **A member who should not see anything outside their own projects.** Even
+    when workspace creation is restricted and all employees work in one
+    organization workspace, such members are made Limited and given project
+    roles on their own projects; they stay workspace members managed by SSO /
     SCIM, and each sees only their own projects.
-  - **A partner company's staff.** Add them to the workspace (as readers, for
-    example) with a role on the one project they work on; they see nothing else.
-
-Example: what a workspace **reader** can see under each setting:
-
-| Base permission | Projects a workspace reader can see |
-|---|---|
-| Follow workspace role (default) | Can view every project (same as today's Re:Earth) |
-| Reader | Can view every project |
-| Writer | Can view and edit every project |
-| None | Only the projects where they have a project role |
-
-Under every setting, on a project where they have a project role, their access
-goes up to that role (e.g. writer on project P → can edit P).
+- A Limited member is a workspace member like any other, so SSO / SCIM, the
+  member list and removal all stay in one place. It is set with the existing
+  way of changing a workspace role (by owners and maintainers), and the change
+  takes effect immediately.
+- **There is no workspace-wide base access setting.** Only the people who need
+  to be restricted are made Limited; other members are not affected (see
+  *Alternative considered and rejected: a workspace-wide base permission*).
+- **What a Limited member can see or do at the workspace level** (the member
+  list, names of projects they have no role on, creating projects) is not
+  decided (Open Question 10).
+- A setting to hide a single project from ordinary writers and readers ("only
+  people added") is not added this time (*Non-Goals*). Until then, to hide a
+  project from ordinary members, those members are made Limited.
 
 #### Diagrams
 
@@ -1379,22 +1461,24 @@ flowchart TD
     M -- "No" --> X["No access"]
     M -- "Yes" --> R{"Workspace role?"}
     R -- "owner / maintainer" --> F["Full access to every project"]
-    R -- "writer / reader" --> B["Baseline from the base permission<br/>(default: the workspace role)"]
+    R -- "writer / reader" --> B["Baseline = the workspace role<br/>(writer: view and edit, reader: view)"]
+    R -- "Limited" --> L["No baseline"]
     B --> E["Access on P = the higher of<br/>the baseline and the role on P"]
+    L --> E2["Access on P = the role on P<br/>(none: cannot see P)"]
 ```
 
-Example: workspace W with projects P and Q. A is a workspace reader and a writer on P.
+Example: workspace W with projects P and Q. A is a writer on P.
 
 ```mermaid
 flowchart LR
-    subgraph D["Base permission: Follow workspace role (default)"]
+    subgraph D["A is a workspace reader"]
         direction LR
         A1["A (reader, writer on P)"] -- "edit" --> P1["project P"]
         A1 -- "view" --> Q1["project Q"]
     end
-    subgraph N["Base permission: None"]
+    subgraph N["A is a workspace Limited member"]
         direction LR
-        A2["A (reader, writer on P)"] -- "edit" --> P2["project P"]
+        A2["A (Limited, writer on P)"] -- "edit" --> P2["project P"]
         A2 -. "cannot see" .-> Q2["project Q"]
     end
 ```
@@ -1405,32 +1489,44 @@ Re:Earth bills per seat per workspace. **A workspace member uses a seat if they
 can edit at least one project in the workspace.** People who can only view, or
 see nothing, do not use a seat. A member uses a seat if any of these is true:
 
-- their workspace role is owner or maintainer (they can edit everything);
-- the base permission lets them edit every project (a writer under "Follow
-  workspace role", or anyone under "Writer");
+- their workspace role is owner, maintainer or writer (they can edit
+  everything);
 - they have a project role that allows editing (writer, maintainer or owner) on
   at least one project.
 
-Each person counts once, however many projects they can edit. With the default
-base permission and no project roles, this is exactly today's Dashboard rule:
-everyone except readers uses a seat. Unregistered projects have no project
-roles, so they never change seat counts. Whether a project is public or private
-does not matter: someone who can edit only public projects also uses a seat
-(Open Question 15).
+So readers and Limited members are free unless they have a writer-or-above role
+on some project. Each person counts once, however many projects they can edit.
+With no Limited members and no project roles, this is exactly today's
+Dashboard rule: everyone except readers uses a seat. Unregistered projects have
+no project roles, so they never change seat counts. Whether a project is public
+or private does not matter: someone who can edit only public projects also uses
+a seat (Open Question 15).
 
 Examples:
 
 - A workspace **reader** who is a **writer on project P** uses a seat.
-- A workspace **writer** under "None" whose project roles are all **reader**
-  does not use a seat.
-- A workspace **reader** under "Writer" uses a seat (they can edit every project).
+- A workspace **Limited** member whose project roles are all **reader** does
+  not use a seat.
+- A workspace **Limited** member who is a **writer on project P** uses a seat.
 - **Creating a project** makes the creator its owner, so a reader who creates a
   project starts using a seat.
 
-Seat usage changes as soon as project roles, workspace roles or the base
-permission change. When a change would make someone start using a seat and the
-workspace has no seat left, the change is refused with a clear message (Open
-Question 12); changes that free seats are always allowed.
+Seat usage changes as soon as project roles or workspace roles change. When a
+change would make someone start using a seat and the workspace has no seat
+left, the change is refused with a clear message (Open Question 12); changes
+that free seats are always allowed.
+
+**The UI shows the seat separately from the role,** because "reader" no longer
+guarantees "free" (the same idea as Figma separating seat and role). This is
+the agreed UX direction; the exact UI is to be explored in design (Open
+Question 11). For example:
+
+- The member list shows the role and the seat side by side ("Reader · Writer on
+  1 project · uses a seat").
+- The Members page is grouped by seat ("Uses a seat" / "Free") instead of by
+  role.
+- Before making a reader or a Limited member a writer on a project, the UI
+  warns that it uses a seat ("This uses a seat (19 of 25)").
 
 ### Checking a permission on a project
 
@@ -1443,34 +1539,34 @@ Question 12); changes that free seats are always allowed.
    - **Unregistered projects** (existing projects that have never had a project
      role): accounts uses the workspace the service tells it, read from the
      service's own data. There are no project roles yet, so the answer comes
-     from the workspace role and the base permission only — exactly today's
-     result under the default base permission. Under "None", only workspace
-     owners and maintainers can see them.
+     from the workspace role only — exactly today's result for everyone except
+     Limited members, who cannot see them.
    - Because of this difference, using the right workspace for an unregistered
      project is up to the service (using its own data, not user input). Once
      the project is registered, accounts enforces it.
-3. Accounts combines the user's role in that workspace, the workspace's base
-   permission and the user's role on the project (if any), and applies the
-   service's permission policy:
+3. Accounts combines the user's role in that workspace and the user's role on
+   the project (if any), and applies the service's permission policy:
    - a workspace **owner or maintainer** has full access;
-   - a workspace **writer or reader** gets the higher of what the base
-     permission gives them and their project role (with "None", only their
-     project role);
+   - a workspace **writer or reader** gets the higher of their workspace role
+     and their project role;
+   - a workspace **Limited** member gets only their project role (no access
+     without one);
    - anyone who is not a member of the workspace has no access.
 4. A project role only counts while the user is still a member of the project's
    workspace.
 5. Checks that do not name a project (for example "may this user create a
    project in this workspace?") still use the workspace role, as today. So when
    a service lists projects, it asks accounts whether the person sees every
-   project or only those where they have a project role, and filters the list
-   accordingly.
+   project or only those where they have a project role (Limited), and filters
+   the list accordingly.
 
 ### Creating a project and adding members
 
 1. A user creates a project in a service. The service saves it and registers it
    with accounts, naming the creator as its owner (the creator must be a
-   workspace member). So even under "None", the creator can see the project.
-   Projects that existed before this feature are not registered.
+   workspace member). So even if Limited members are allowed to create projects
+   (Open Question 10), the creator can see the project. Projects that existed
+   before this feature are not registered.
 2. Someone allowed to manage the project's members gives a workspace member a
    role on it (for example, writer). If the project is not registered yet, the
    service registers it at this point. Accounts checks that the person is in the
@@ -1500,9 +1596,9 @@ Adding a new person to the workspace uses a seat if the result lets them edit
 something (see *Seats*), and in the first version only workspace owners and
 maintainers can do it. If the person is
 already a member, they just get the project roles; their workspace role is not
-changed. With the base permission "Follow workspace role", a person added as a
-reader can still view every project; to limit them to the chosen projects, the
-workspace uses "None".
+changed. A person added as a reader can view every project, not just the chosen
+ones; to limit them to the chosen projects, add them with the Limited workspace
+role.
 
 **Who can add people.** Anyone who can manage a project's members (that
 project's owner / maintainer, or a workspace owner / maintainer) can add an
@@ -1538,19 +1634,19 @@ decided together with the designer (*Open Question 6*).
 
 ### Example: Dashboard projects
 
-| Who | Base permission "Follow workspace role" (default) | Base permission "None" | Uses a seat? |
-|---|---|---|---|
-| Workspace owner / maintainer | View, edit and delete every project, and manage its members | Same | Yes |
-| Workspace writer | View and edit every project | Only projects where they have a project role, with that role | Default: yes. "None": only with a writer-or-above project role |
-| Workspace reader | View every project | Only projects where they have a project role, with that role | Only with a writer-or-above project role |
-| A project role held by a workspace writer / reader | Adds to their workspace role on that project only — for example, a workspace reader who is a writer on a project can edit it. Never reduces access | Is their access to that project | A writer, maintainer or owner project role makes them use a seat |
+| Who | What they can see and do | Uses a seat? |
+|---|---|---|
+| Workspace owner / maintainer | View, edit and delete every project, and manage its members | Yes |
+| Workspace writer | View and edit every project | Yes |
+| Workspace reader | View every project | Only with a writer-or-above project role |
+| Workspace Limited member | Only projects where they have a project role, with that role | Only with a writer-or-above project role |
+| A project role held by a workspace writer / reader | Adds to their workspace role on that project only — for example, a workspace reader who is a writer on a project can edit it. Never reduces access | A writer, maintainer or owner project role makes them use a seat |
+| A project role held by a workspace Limited member | Is their access to that project | A writer, maintainer or owner project role makes them use a seat |
 
 Project role permissions: owner / maintainer — view, edit, delete and manage
-members; writer — view and edit; reader — view. With "Reader" or "Writer" as the
-base permission, workspace writers and readers get that level on every project,
-plus anything their project roles add (under "Writer" they all use a seat).
-People who are not workspace members have no access. Whether a single project
-can be opened to the whole workspace even under "None" is an open question.
+members; writer — view and edit; reader — view. People who are not workspace
+members have no access. A setting to hide a single project from ordinary
+writers and readers ("only people added") is a future addition (*Non-Goals*).
 
 Technical details: see *Solution Options → Option 1 → Request flows (sequence
 diagrams)*.
@@ -1572,29 +1668,31 @@ diagrams)*.
    "maintainer", "writer" and "reader" exist at both levels. Whoever writes a
    service's permission policy must treat "project owner" and "workspace owner"
    as different things, and must keep the model: owners and maintainers see
-   every project, and writers and readers get what the base permission gives
-   plus their project roles.
+   every project, writers and readers get their workspace role plus their
+   project roles, and Limited members get only their project roles.
 6. **Only services that use the feature need to update.** Services that use the
    new features must update the client library they use to talk to accounts;
-   services that don't update keep working unchanged.
-7. **Services must not assume workspace writers and readers see everything.**
-   When a workspace's base permission is not the default, project lists and
-   other screens must show writers and readers only what they may see.
-8. **The base permission must be visible in the UI.** The workspace settings
-   screen shows it and lets owners and maintainers change it, so admins can
-   tell why someone cannot see a project.
+   services that don't update keep working unchanged. However, because Limited
+   is added to the workspace roles, services that show or handle workspace
+   roles must support it before Limited is used.
+7. **Services must not assume every workspace member sees everything.** Project
+   lists and other screens must show Limited members only what they may see.
+8. **Limited and seats must be visible in the UI.** The workspace members
+   screen adds Limited to the role choices and shows the seat separately from
+   the role (*Design → Seats*), so admins can tell why someone cannot see a
+   project, or why someone uses a seat.
 9. **Seat counts change with access.** Giving someone a writer role on one
-   project, changing a workspace role, creating a project, or changing the base
-   permission can change seat usage at once. Changing the base permission to
-   "Writer" can make every reader start using a seat in one step. Billing and
+   project, changing a workspace role, or creating a project can change seat
+   usage at once. A workspace reader may use a seat, so "reader" no longer
+   means "free". Billing and
    every service must take the seat count from accounts, not count members
    themselves, and some actions can now be refused when the workspace has no
    seat left.
 10. **No data migration.** Existing members, workspace roles, permission data
     and projects are used as is, with no conversion and no bulk registration
     (backfill). The new storage is created automatically on startup and stays
-    empty until the feature is used. With the default base permission and no
-    project roles, every permission check and seat count is the same as today.
+    empty until the feature is used. With no Limited members and no project
+    roles, every permission check and seat count is the same as today.
 11. **The workspace of an unregistered project is up to the service.** For a
     project that has never had a project role, accounts trusts the workspace
     the service tells it. The service must read it from its own data, never
@@ -1604,6 +1702,12 @@ diagrams)*.
     every permission check today already decides by the workspace the service
     passes, on the same assumption. For registered projects accounts also
     checks it, so this is safer than today.
+12. **Limited works only in services that support project-level permissions.**
+    In a service that does not yet support them, a Limited member sees nothing
+    (fail-closed).
+13. **A single project cannot be hidden from ordinary members.** The "only
+    people added" setting is a future addition (*Non-Goals*); until then, the
+    people to hide it from must be made Limited.
 
 Technical details: see *Solution Options → Option 1 → Technical notes: impact,
 tests, deployment, rollback, monitoring*.
@@ -1612,21 +1716,21 @@ tests, deployment, rollback, monitoring*.
 
 1. **Basic rules.** Resource type names and IDs are validated and size-limited;
    a user has at most one role per project; a project role is ignored once the
-   user is no longer in the project's workspace.
+   user is no longer in the project's workspace; Limited can be used only as a
+   workspace role, never as a project role.
 2. **Permission checks.**
-   - Checks that do not name a project give exactly the same results as today,
-     whatever the base permission.
+   - Checks that do not name a project give exactly the same results as today
+     for existing roles.
    - An existing project that is not registered → decided by the workspace role
-     and base permission of the workspace the service tells accounts; exactly
-     today's result under the default base permission. Under "None", only
-     owners and maintainers can see it. If no workspace is given → denied.
+     in the workspace the service tells accounts; exactly today's result for
+     everyone except Limited members, who cannot see it. If no workspace is
+     given → denied.
    - For a registered project, naming a workspace other than the project's own
      → denied.
    - For a registered project, the user's workspace role is always taken from
      the project's real workspace, not from what the caller says.
-   - With the default base permission, a workspace writer or reader without a
-     project role keeps exactly the access their workspace role gives on every
-     project.
+   - A workspace writer or reader without a project role keeps exactly the
+     access their workspace role gives on every project.
    - A project role raises a writer's or reader's access on that project only (a
      workspace reader who is a project writer can edit it) and never lowers it
      (a workspace writer who is a project reader can still edit it).
@@ -1657,7 +1761,7 @@ tests, deployment, rollback, monitoring*.
 8. **End to end.** With a sample Dashboard project policy, check the results for
    a workspace reader with and without a project role, a workspace writer with
    a lower project role, a workspace owner, a user from another workspace, and
-   — under "None" — a reader with and without a project role and a maintainer.
+   a workspace Limited member with and without a project role.
 9. **Adding people in one step.**
    - (a) Adding a person who is not in the workspace to a project makes them a
      member (a reader by default) with that project role, in one step.
@@ -1670,24 +1774,25 @@ tests, deployment, rollback, monitoring*.
      workspace role is not changed or downgraded.
    - Only workspace owners and maintainers can add new people; they use a seat
      if they can edit something.
-10. **Base permission.**
-    - A workspace that never changed it behaves exactly as today.
-    - With "None", writers and readers see only projects where they have a
-      project role; owners and maintainers still see everything; a member who
-      creates a project can see it.
-    - With "Reader" or "Writer", writers and readers get that level on every
-      project, plus their project roles.
-    - Only owners and maintainers can change it, and the change applies to the
-      next check.
-    - Project lists show members under "None" only their own projects.
+10. **Limited.**
+    - A workspace with no Limited members behaves exactly as today.
+    - A Limited member sees only projects where they have a project role (not
+      unregistered projects either); owners, maintainers, writers and readers
+      are as today.
+    - As with any other role change, only owners and maintainers can make a
+      member Limited, and the change applies to the next check; changing them
+      back restores the access of their workspace role right away.
+    - Project lists show Limited members only their own projects.
+    - Workspace-level actions not granted to Limited are refused (following
+      what Open Question 10 decides).
 11. **Seats.**
-    - With the default base permission and no project roles, the seat count is
-      the same as today's Dashboard count (everyone except readers).
-    - A reader who becomes a writer on one project starts using a seat; losing
-      that role frees it.
-    - A writer under "None" with only reader project roles uses no seat.
-    - Changing the base permission to "Writer" counts every reader; changing it
-      to "None" frees seats of members without edit-level project roles.
+    - With no Limited members and no project roles, the seat count is the same
+      as today's Dashboard count (everyone except readers).
+    - A reader or Limited member who becomes a writer on one project starts
+      using a seat; losing that role frees it.
+    - A Limited member with only reader project roles uses no seat.
+    - Changing a writer to Limited frees their seat unless they have an
+      edit-level project role.
     - Creating a project makes the creator use a seat.
     - Each person counts once, however many projects they can edit.
     - When no seat is left, every change that would make someone start using a
@@ -1702,16 +1807,17 @@ tests, deployment, rollback, monitoring*.
 
 1. **Backward compatible? Yes.** Everything is added alongside what exists.
    Services that don't name a project in permission checks see no change, and
-   workspace members and roles do not change. Existing data (members, workspace
-   roles, permission data, projects) is used as is, with no conversion and no
-   bulk registration (backfill). With the default base permission and no project
-   roles, every permission check and seat count is the same as today.
+   workspace members and roles do not change until someone is made Limited.
+   Existing data (members, workspace roles, permission data, projects) is used
+   as is, with no conversion and no bulk registration (backfill). With no
+   Limited members and no project roles, every permission check and seat count
+   is the same as today.
 2. **Can it be rolled out gradually? Yes.** Order:
    1. Deploy accounts. It does not limit seats until billing tells it each
       workspace's seat limit.
    2. Billing gives accounts each workspace's seat limit and switches to
-      accounts' seat count. With the default base permission and no project
-      roles yet, the count is identical to today's Dashboard rule (everyone
+      accounts' seat count. With no Limited members and no project roles yet,
+      the count is identical to today's Dashboard rule (everyone
       except readers), so nobody's seat usage changes.
    3. Each service starts registering projects on creation and before giving an
       existing project its first role, and telling accounts when they are
@@ -1721,10 +1827,10 @@ tests, deployment, rollback, monitoring*.
       give the same results as today. Until this step, project roles have no
       effect, so nobody gains access by mistake (fail-closed).
    5. The UI for adding people in one step is turned on.
-   6. Services filter project lists by what each person may see; then the UI
-      for changing the base permission is turned on. Every workspace starts at
-      "Follow workspace role", so nobody's access or seat usage changes until
-      an admin changes something — the rollout is safe.
+   6. Services filter project lists by what each person may see and support
+      Limited; then the UI for choosing Limited is turned on. Nobody is Limited
+      at first, so nobody's access or seat usage changes until an admin makes
+      someone Limited — the rollout is safe.
 3. **Who to notify:** the dashboard / visualizer / cms owners, the billing
    owner, and whoever maintains the permission policies.
 4. **Configuration changes:** none.
@@ -1738,14 +1844,15 @@ tests, deployment, rollback, monitoring*.
 ## Rollback Plan
 
 1. Share the cause in the team Slack channel.
-2. First, turn off the UI for adding people in one step and for changing the
-   base permission, and turn off project-level permission rules in the services
-   that use them. **Rolling back widens access** in workspaces whose base
-   permission is not the default: their writers and readers see every project
-   again. Tell those workspaces' admins first, and prefer fixing forward if
-   they rely on "None". Switch billing back to its own seat count (everyone
-   except readers); seat usage may differ for people whose seats came from
-   project roles.
+2. First, turn off the UI for adding people in one step and for choosing
+   Limited, and turn off project-level permission rules in the services that
+   use them. **Watch for workspaces with Limited members**: the previous
+   version does not know Limited, so it cannot handle such members correctly.
+   Tell those workspaces' admins first, and prefer fixing forward if they rely
+   on Limited. Rolling back requires changing those members to another role,
+   and making them readers lets them see every project (**access widens**).
+   Switch billing back to its own seat count (everyone except readers); seat
+   usage may differ for people whose seats came from project roles.
 3. Roll accounts back to the previous version. The previous version simply
    ignores the new data, so **no data rollback is required**.
    Note: while the previous version runs, it may drop the project roles of users
@@ -1754,8 +1861,8 @@ tests, deployment, rollback, monitoring*.
    backfill) and must be granted again after rolling out again, so keep the
    rollback window short. People added in one step stay workspace members.
 4. Only if the new data structures must be removed completely: run the database
-   downgrade. It deletes all project registrations, project roles and base
-   permission settings, so take a backup first.
+   downgrade. It deletes all project registrations, project roles and seat
+   limit settings, so take a backup first.
 
 Technical details: see *Solution Options → Option 1 → Technical notes: impact,
 tests, deployment, rollback, monitoring*.
@@ -1781,17 +1888,19 @@ tests, deployment, rollback, monitoring*.
     is refused with a clear message and nothing changes.
   - From the workspace, add a person and choose two projects; check that they
     get exactly those two project roles.
-  - Check that existing workspaces show "Follow workspace role" and that their
-    members' access has not changed.
-  - Set a staging workspace's base permission to "None"; check that a reader
-    with no project roles sees no projects (also in project lists), a maintainer
-    still sees all of them, and setting it back restores access immediately.
+  - Check that in existing workspaces without Limited members, members' access
+    has not changed.
+  - Make a member of a staging workspace Limited; check that they cannot see
+    projects where they have no project role (also in project lists), that
+    making them a writer on one project lets them edit only that project and
+    makes them use a seat, and that changing them back to reader lets them
+    view every project immediately.
 - Metrics
   - How long permission checks take (typical and slowest 5%), with and without a
     project named.
-  - Error rate of registering / unregistering projects, changing members,
-    adding people in one step and changing the base permission, including
-    automatic retries and seat-limit rejections.
+  - Error rate of registering / unregistering projects, changing members and
+    adding people in one step, including automatic retries and seat-limit
+    rejections.
   - Number of project roles per user (maximum and top 1%), to watch the ~1,000
     per user assumption.
   - Number of changes refused because no seat was left, per workspace.
@@ -1805,12 +1914,13 @@ tests, deployment, rollback, monitoring*.
 
 ## Open Questions
 
-1. **Do we need per-project visibility?** Keeping members from seeing projects
-   is done with the base permission ("None" plus project roles). What remains
-   is the opposite case: under "None", should a single project be openable to
-   the whole workspace (a "visible to all members" project), as GitHub does
-   with internal repositories? That would need accounts to know a project's
-   visibility. Deferred until a product needs it.
+1. **When should a per-project "only people added" setting be added?** Not in
+   the first version (*Non-Goals*). Today, hiding a project from ordinary
+   members requires making those members Limited. If a real case comes up of
+   hiding a confidential project from ordinary writers and readers, it is added
+   as an optional feature. That would need accounts to know the project's
+   setting. The raise-only model of project roles does not block adding it
+   later.
 2. **Should list screens be able to check many projects at once?** A screen that
    lists projects needs a permission answer for each one; one combined check
    would be faster.
@@ -1830,29 +1940,35 @@ tests, deployment, rollback, monitoring*.
    adding a person from a project's screen, and (b) choosing projects in the
    workspace "add member" dialog.
 7. **What workspace role do people added from a project get, and who may add
-   them?** Tentatively reader, and the admin may choose. May a project owner who
+   them?** Tentatively reader, and the admin may choose (Limited, to show them
+   only that project). May a project owner who
    is not a workspace owner or maintainer add new people to the workspace this
    way, given that it can use a paid seat? (Proposed for the first version: no —
    only workspace owners and maintainers.)
 8. **Should removing a person's last project role also remove them from the
-   workspace?** Today it does not: under "None" such a member sees no projects
+   workspace?** Today it does not: a Limited member then sees no projects
    but stays in the member list until an admin removes them. They no longer
    use a seat, so this is about keeping the member list tidy; removing them
    automatically may surprise admins.
-9. **Should Free plans and personal workspaces offer the base permission?** A
-   personal workspace has a single member, so the first version does not offer
-   it there. Whether it is a paid-plan feature is a product decision.
-10. **Should "Maintainer" be allowed as a base permission value?** It would let
-    every writer and reader manage every project's members. The first version
-    offers only "Follow workspace role", "None", "Reader" and "Writer".
-11. **Should the base permission be per service or platform-wide?** Proposed:
-    one setting per workspace that applies to every service (Dashboard,
-    Visualizer, CMS, Flow), so admins set it once and people see the same thing
-    everywhere.
+9. **Should Free plans offer Limited?** A personal workspace has a single
+   member, so Limited is never used there. Whether Limited is a paid-plan
+   feature is a product decision.
+10. **What can a Limited member see and do at the workspace level?** What a
+    Limited member can do inside a project is decided by their project role,
+    but workspace-level things are not decided, for example:
+    - whether they can see the workspace member list;
+    - whether they can see the names (the list) of projects they have no role
+      on;
+    - whether they can create projects.
+    Proposed: hidden / not allowed is safer.
+11. **How should the seat be shown separately from the role?** Because
+    "reader" no longer guarantees "free", we agreed to show the seat separately
+    from the role (*Design → Seats*). How the member list shows it, how the
+    Members page is grouped, and the warning before a change that uses a seat
+    are to be worked out in design.
 12. **What happens when a change would exceed the seat limit?** Giving someone
-    an editing project role, raising a workspace role, changing the base
-    permission, adding a person, or creating a project can make someone start
-    using a seat. Proposed: refuse the change with a clear message saying the
+    an editing project role, raising a workspace role, adding a person, or
+    creating a project can make someone start using a seat. Proposed: refuse the change with a clear message saying the
     workspace has no seat left (so a reader at the limit cannot create a
     project). Alternatives: allow it and flag the workspace as over its seats,
     as Dashboard does today, or treat project creation differently.
@@ -1895,8 +2011,8 @@ tests, deployment, rollback, monitoring*.
       the first version provides the APIs that approval would call (the one-step
       add and so on).
     - Searching the workspace's users: workspace members can see the member list
-      today. This is workspace-level, not project-level, so it stays visible
-      under the base permission "None" (to be confirmed).
+      today. This is workspace-level, not project-level; whether Limited
+      members can see it is decided in Open Question 10.
 
 Technical details: see *Solution Options → Option 1 → Technical notes on open
 questions*.
@@ -1906,3 +2022,8 @@ questions*.
 - Technical Architect: [name]
 - Technical Leader: [name]
 - Peers: [name]
+- UX: Mykyta. After a review comparing the workspace-wide base permission with
+  per-project visibility ("Everyone in workspace" / "Only people added", with
+  view / edit capped by the workspace role), we dropped the workspace-wide base
+  permission, added a Limited workspace role, and show the seat separately
+  from the role (see the *Alternative considered and rejected* sections).
