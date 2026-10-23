@@ -41,12 +41,9 @@ func newPostgresRepos(t *testing.T) *repo.Container {
 	t.Cleanup(pool.Close)
 	require.NoError(t, migration.Migrate(ctx, pool))
 
+	// Role records come from the schema migration above.
 	repos, err := postgres.New(ctx, pool, nil)
 	require.NoError(t, err)
-
-	for _, rt := range []role.RoleType{role.RoleOwner, role.RoleMaintainer} {
-		require.NoError(t, repos.Role.Save(ctx, *role.New().NewID().Name(string(rt)).MustBuild()))
-	}
 	return repos
 }
 

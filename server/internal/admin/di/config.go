@@ -16,7 +16,6 @@ import (
 	"github.com/reearth/reearth-accounts/server/internal/admin/gateway/google"
 	authhandler "github.com/reearth/reearth-accounts/server/internal/admin/presentation/handler/auth"
 	"github.com/reearth/reearth-accounts/server/internal/admin/usecase/authuc"
-	"github.com/reearth/reearth-accounts/server/internal/bootstrap"
 	mongorepo "github.com/reearth/reearth-accounts/server/internal/infrastructure/mongo"
 	"github.com/reearth/reearth-accounts/server/internal/infrastructure/postgres"
 	"github.com/reearth/reearth-accounts/server/internal/usecase/repo"
@@ -59,9 +58,6 @@ type Config struct {
 	SessionTTL          time.Duration `default:"12h" envconfig:"REEARTH_ACCOUNTS_ADMIN_SESSION_TTL"`
 	BootstrapEmails     []string      `envconfig:"REEARTH_ACCOUNTS_ADMIN_BOOTSTRAP_EMAILS"`
 	AllowedEmailDomain  string        `default:"eukarya.io" envconfig:"REEARTH_ACCOUNTS_ADMIN_ALLOWED_EMAIL_DOMAIN"`
-
-	// MockAuth shares the main service's flag; it only enables the role seed.
-	MockAuth bool `envconfig:"REEARTH_MOCK_AUTH"`
 }
 
 type Auth0Config struct {
@@ -218,23 +214,9 @@ func provideCookieSecure(cfg *Config) authhandler.CookieSecure {
 
 // provideRepoContainer connects to the configured backend (Mongo or Postgres)
 // and builds the shared repository container. Schema migrations are owned by
-// the main reearth-accounts service; the admin API only connects, plus the
-// mock-auth role seed. The returned cleanup closes the underlying connection.
+// the main reearth-accounts service; the admin API only connects. The returned
+// cleanup closes the underlying connection.
 func provideRepoContainer(cfg *Config) (*repo.Container, func(), error) {
-	repos, cleanup, err := connectRepoContainer(cfg)
-	if err != nil {
-		return nil, nil, err
-	}
-	// Wire builds this before the server starts, so the seed finishes before
-	// any request is served.
-	if err := bootstrap.SeedMockAuthRoles(context.Background(), cfg.MockAuth, repos.Role); err != nil {
-		cleanup()
-		return nil, nil, fmt.Errorf("seed mock auth roles: %w", err)
-	}
-	return repos, cleanup, nil
-}
-
-func connectRepoContainer(cfg *Config) (*repo.Container, func(), error) {
 	if cfg.resolveDBDriver() == "postgres" {
 		ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 		defer cancel()

@@ -17,7 +17,6 @@ import (
 	infraCerbos "github.com/reearth/reearth-accounts/server/internal/infrastructure/cerbos"
 	mongorepo "github.com/reearth/reearth-accounts/server/internal/infrastructure/mongo"
 	"github.com/reearth/reearth-accounts/server/internal/infrastructure/mongo/migration"
-	"github.com/reearth/reearth-accounts/server/internal/bootstrap"
 	pgmigration "github.com/reearth/reearth-accounts/server/internal/infrastructure/postgres/migration"
 	"github.com/reearth/reearth-accounts/server/internal/usecase/gateway"
 	"github.com/reearth/reearth-accounts/server/internal/usecase/repo"
@@ -147,10 +146,6 @@ func Start(debug bool) {
 			}
 			return
 		}
-	}
-
-	if err := bootstrap.SeedMockAuthRoles(ctx, conf.Mock_Auth, repos.Role); err != nil {
-		log.Fatalc(ctx, fmt.Sprintf("mock auth role seed error: %+v", err))
 	}
 
 	// Cerbos

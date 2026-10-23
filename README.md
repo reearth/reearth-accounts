@@ -92,6 +92,8 @@ cp .env.docker.example .env.docker
 make run
 ```
 
+On a fresh MongoDB, run `make run-migration` once before using the service: it creates the role records (`owner`, `maintainer`, `writer`, `reader`, `self`) that workspace operations require. See [Database Migrations](#database-migrations).
+
 This will:
 - Start Cerbos authorization server on port 3593
 - Start Re:Earth Accounts server on port 8090
@@ -180,7 +182,8 @@ This generates:
 
 ### Database Migrations
 
-Migrations run automatically on server startup. To run migrations manually:
+- **MongoDB**: data migrations do not run on server startup. Run them with the command below; on a fresh database this is required once to create the role records.
+- **PostgreSQL**: schema migrations, including the role records, run automatically on server startup.
 
 ```bash
 make run-migration

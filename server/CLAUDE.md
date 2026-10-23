@@ -121,10 +121,12 @@ server/
 - `make run-cerbos` - Start Cerbos authorization server via Docker Compose
 
 ## Database Management
-- MongoDB with automatic migrations
+- MongoDB data migrations
 - Migrations located in `internal/infrastructure/mongo/migration/`
 - Naming pattern: `YYMMDDHHMMSS_description.go`
-- Migrations run automatically on startup
+- Migrations do not run on startup: run `make run-migration`. A fresh local
+  database (including `REEARTH_MOCK_AUTH=true` setups) needs it once to create
+  the role records that workspace operations look up by name.
 - Schema management: See [internal/infrastructure/mongo/SCHEMA.md](internal/infrastructure/mongo/SCHEMA.md)
 
 ### PostgreSQL backend (opt-in)
@@ -136,7 +138,8 @@ server/
   schema mirror: `.../sqlc/schema/schema.sql`; generated (committed) package:
   `.../sqlc/gen/`. Regenerate with `make sqlc` after editing any `*.sql`.
 - Runtime migrations: embedded SQL in `.../postgres/migration/` run on startup
-  via golang-migrate (advisory-locked, idempotent).
+  via golang-migrate (advisory-locked, idempotent). They also insert the role
+  records when missing, so no separate step is needed.
 - Deployment requirement: the embedded `0001_init` migration runs
   `CREATE EXTENSION IF NOT EXISTS pg_trgm`, so the connecting DB role needs
   permission to create the extension (or have a DBA pre-create it). This is
