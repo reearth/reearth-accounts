@@ -21,7 +21,8 @@ func RegisterRoutes(e *echo.Echo, h *Handler) {
 	// the browser cannot delete an HttpOnly cookie itself. Sign-in cannot carry
 	// a CSRF token (the admin_csrf cookie does not exist yet); logout checks it
 	// only when the cookie is present, so a client without one can still clear
-	// a stale session.
+	// a stale session. That check does not cover a cross-site forced logout
+	// (see RequireCSRFIfCookie).
 	authg := api.Group("/v1/auth")
 	authg.POST("/google", h.Auth.GoogleSignIn)
 	authg.POST("/logout", h.Auth.Logout, mw.RequireCSRFIfCookie)

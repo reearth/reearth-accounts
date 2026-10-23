@@ -12,6 +12,7 @@ import (
 
 	"github.com/go-playground/validator/v10"
 	"github.com/labstack/echo/v4"
+	echomw "github.com/labstack/echo/v4/middleware"
 	"github.com/reearth/reearth-accounts/server/internal/admin/auth/session"
 	"github.com/reearth/reearth-accounts/server/internal/admin/presentation"
 	adminuserhandler "github.com/reearth/reearth-accounts/server/internal/admin/presentation/handler/adminuser"
@@ -48,9 +49,9 @@ type routerFixture struct {
 	target *adminuser.AdminUser
 }
 
-// newRouterFixture registers the real admin routes. Only the handlers the tests
-// call are constructed; the user/workspace handlers stay nil because their
-// routes are never invoked here.
+// newRouterFixture registers the real admin routes. Only the admin-user handler
+// is constructed; the user/workspace handlers stay nil, so a request must not
+// get past the middleware on their routes.
 func newRouterFixture(t *testing.T) *routerFixture {
 	t.Helper()
 	op := adminuser.New().NewID().Name("op").Email("op@eukarya.io").
@@ -76,6 +77,10 @@ func newRouterFixture(t *testing.T) *routerFixture {
 	)
 
 	e := echo.New()
+	// A mutating user/workspace route that skips RequireCSRF reaches a nil
+	// handler; Recover turns that panic into a 500 so the route walk fails
+	// with the route's method and path.
+	e.Use(echomw.Recover())
 	e.HTTPErrorHandler = presentation.CustomHTTPErrorHandler
 	e.Validator = testValidator{v: validator.New()}
 	presentation.RegisterRoutes(e, h)
@@ -221,9 +226,11 @@ func TestRouter_Logout(t *testing.T) {
 		header   string
 		wantCode int
 	}{
+		// A cross-site POST looks like this too: SameSite=Lax keeps admin_csrf
+		// off it, so this guard does not reject it.
 		{name: "no csrf cookie clears stale session", path: "/api/v1/auth/logout", wantCode: http.StatusNoContent},
 		{name: "matching token", path: "/api/v1/auth/logout", cookie: csrfToken, header: csrfToken, wantCode: http.StatusNoContent},
-		{name: "cookie without header", path: "/api/v1/auth/logout", cookie: csrfToken, wantCode: http.StatusForbidden},
+		{name: "same-site forged request carrying the cookie without header", path: "/api/v1/auth/logout", cookie: csrfToken, wantCode: http.StatusForbidden},
 		{name: "mismatched header", path: "/api/v1/auth/logout", cookie: csrfToken, header: "forged", wantCode: http.StatusForbidden},
 		{name: "trailing slash is not the exempt route", path: "/api/v1/auth/logout/", wantCode: http.StatusNotFound},
 	}

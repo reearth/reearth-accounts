@@ -30,9 +30,14 @@ func RequireCSRF(next echo.HandlerFunc) echo.HandlerFunc {
 }
 
 // RequireCSRFIfCookie applies the RequireCSRF check only when an admin_csrf
-// cookie is present. Logout must still clear cookies for a client whose
-// admin_csrf cookie is missing, while a client holding one (the only state a
-// cross-site forced logout can target) has to prove it can read it.
+// cookie is present, so logout can still clear a stale session for a client
+// whose admin_csrf cookie is missing.
+//
+// It only rejects a forged request that carries the admin_csrf cookie, i.e.
+// one sent from a same-site origin. It does not stop a cross-site forced
+// logout: the admin cookies are SameSite=Lax, so a cross-site POST arrives
+// without admin_csrf and passes. Blocking cross-site requests needs an
+// Origin / Sec-Fetch-Site check in front of this service.
 func RequireCSRFIfCookie(next echo.HandlerFunc) echo.HandlerFunc {
 	return func(c echo.Context) error {
 		if isSafeMethod(c.Request().Method) {

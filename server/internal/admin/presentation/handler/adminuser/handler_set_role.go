@@ -21,12 +21,13 @@ type SetAdminUserRoleRequest struct {
 //	@Tags			admin-users
 //	@Accept			json
 //	@Produce		json
-//	@Param			id		path		string					true	"Admin user ID"
+//	@Param			id				path		string					true	"Admin user ID"
+//	@Param			X-Csrf-Token	header		string					true	"admin_csrf cookie value"
 //	@Param			body	body		SetAdminUserRoleRequest	true	"Role to assign"
 //	@Success		200		{object}	AdminUserResponse
 //	@Failure		400		{object}	internal.ErrorResponse	"invalid id / invalid role / cannot demote the last system admin"
 //	@Failure		401		{object}	internal.ErrorResponse	"unauthorized"
-//	@Failure		403		{object}	internal.ErrorResponse	"not approved / forbidden"
+//	@Failure		403		{object}	internal.ErrorResponse	"not approved / missing or invalid csrf token / forbidden"
 //	@Failure		404		{object}	internal.ErrorResponse	"not found"
 //	@Router			/admin-users/{id}/roles [put]
 func (h *Handler) SetAdminUserRole(c echo.Context) error {

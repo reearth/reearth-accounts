@@ -14,11 +14,12 @@ import (
 //	@Description	Approves a pending or rejected admin user, recording the current admin as approver. Idempotent for already-approved users (the original approver/timestamp is kept). Cannot approve your own account.
 //	@Tags			admin-users
 //	@Produce		json
-//	@Param			id	path		string	true	"Admin user ID"
+//	@Param			id				path		string	true	"Admin user ID"
+//	@Param			X-Csrf-Token	header		string	true	"admin_csrf cookie value"
 //	@Success		200	{object}	AdminUserResponse
 //	@Failure		400	{object}	internal.ErrorResponse	"invalid id / cannot modify self"
 //	@Failure		401	{object}	internal.ErrorResponse	"unauthorized"
-//	@Failure		403	{object}	internal.ErrorResponse	"not approved"
+//	@Failure		403	{object}	internal.ErrorResponse	"not approved / missing or invalid csrf token"
 //	@Failure		404	{object}	internal.ErrorResponse	"not found"
 //	@Router			/admin-users/{id}/approve [post]
 func (h *Handler) ApproveAdminUser(c echo.Context) error {
