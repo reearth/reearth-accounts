@@ -14,11 +14,12 @@ import (
 //	@Description	Rejects a pending admin user or revokes an approved one. Cannot reject your own account, and the last approved admin cannot be rejected.
 //	@Tags			admin-users
 //	@Produce		json
-//	@Param			id	path		string	true	"Admin user ID"
+//	@Param			id				path		string	true	"Admin user ID"
+//	@Param			X-Csrf-Token	header		string	true	"admin_csrf cookie value"
 //	@Success		200	{object}	AdminUserResponse
 //	@Failure		400	{object}	internal.ErrorResponse	"invalid id / cannot modify self / last approved admin"
 //	@Failure		401	{object}	internal.ErrorResponse	"unauthorized"
-//	@Failure		403	{object}	internal.ErrorResponse	"not approved"
+//	@Failure		403	{object}	internal.ErrorResponse	"not approved / missing or invalid csrf token"
 //	@Failure		404	{object}	internal.ErrorResponse	"not found"
 //	@Router			/admin-users/{id}/reject [post]
 func (h *Handler) RejectAdminUser(c echo.Context) error {
