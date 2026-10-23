@@ -26,6 +26,15 @@ const issuer = "reearth-accounts-admin"
 // CookieName is the name of the HttpOnly cookie carrying the session token.
 const CookieName = "admin_session"
 
+// CSRFCookieName is the name of the readable (non-HttpOnly) double-submit CSRF
+// cookie issued alongside the session cookie. Mutating requests must echo its
+// value in CSRFHeaderName.
+const CSRFCookieName = "admin_csrf"
+
+// CSRFHeaderName is the request header that must carry the admin_csrf cookie
+// value on mutating requests.
+const CSRFHeaderName = "X-Csrf-Token"
+
 // Manager signs and parses session tokens using a server-side HMAC secret.
 type Manager struct {
 	secret []byte
