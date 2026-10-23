@@ -438,12 +438,22 @@ paths:
     post:
       description: Clears the admin session cookie and the admin_csrf double-submit
         cookie. Public endpoint so the cookies can be cleared even with an expired/invalid
-        token.
+        token. When an admin_csrf cookie is sent, the X-Csrf-Token header must match
+        it.
+      parameters:
+      - description: admin_csrf cookie value; required when that cookie is sent
+        in: header
+        name: X-Csrf-Token
+        type: string
       produces:
       - application/json
       responses:
         "204":
           description: No Content
+        "403":
+          description: missing or invalid csrf token
+          schema:
+            $ref: '#/definitions/ErrorResponse'
       summary: Log out
       tags:
       - auth

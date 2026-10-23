@@ -313,7 +313,7 @@ const docTemplate = `{
         },
         "/auth/logout": {
             "post": {
-                "description": "Clears the admin session cookie and the admin_csrf double-submit cookie. Public endpoint so the cookies can be cleared even with an expired/invalid token.",
+                "description": "Clears the admin session cookie and the admin_csrf double-submit cookie. Public endpoint so the cookies can be cleared even with an expired/invalid token. When an admin_csrf cookie is sent, the X-Csrf-Token header must match it.",
                 "produces": [
                     "application/json"
                 ],
@@ -321,9 +321,23 @@ const docTemplate = `{
                     "auth"
                 ],
                 "summary": "Log out",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "admin_csrf cookie value; required when that cookie is sent",
+                        "name": "X-Csrf-Token",
+                        "in": "header"
+                    }
+                ],
                 "responses": {
                     "204": {
                         "description": "No Content"
+                    },
+                    "403": {
+                        "description": "missing or invalid csrf token",
+                        "schema": {
+                            "$ref": "#/definitions/ErrorResponse"
+                        }
                     }
                 }
             }
