@@ -9,7 +9,111 @@
 > 最初に使うのは Dashboard の project です。コード上では、ロールの割り当ては `...Binding` /
 > `resource_bindings` という名前の型・テーブルで表します。
 
+## Summary
+
+**課題。** 今は workspace のメンバー全員がその workspace のすべての project を見られます。そのため、
+1つの組織の workspace の中でチームごとに（または取引先の担当者に）見せる project を絞れません。
+**決定。** project へのアクセスは、デフォルトでは workspace のロールで決まります。project のロールは
+その project での権限を上げるだけです。人ごとの新しい workspace のロール **Limited** を設け、Limited の
+メンバーは project のロールを持つ project だけを見られます。accounts が持つのは「この project はこの
+workspace に属する」と「このユーザーはこのロールを持つ」だけで、project が何であるかは知りません。
+
+### workspace のロール
+
+| workspace のロール | デフォルトで見られる project | project のロールを持つ project P | シートを使うか |
+|---|---|---|---|
+| owner / maintainer | すべての project にフルアクセス（今と同じ） | もともとフルアクセス | 使う |
+| writer | すべての project を閲覧・編集（今と同じ） | writer と P のロールの高い方 | 使う |
+| reader | すべての project を閲覧（今と同じ） | reader と P のロールの高い方 | どこかの project で writer 以上のロールがあるときだけ |
+| Limited（新設） | なし | P のロールそのもの | どこかの project で writer 以上のロールがあるときだけ |
+
+### ルール
+
+- project のロールは権限を **上げるだけ** で、下げることはない。project での実効の権限は、基準の権限
+  （workspace のロール。Limited にはない）と project のロールの高い方。
+- **アクセスできる人は全員 workspace のメンバー**（外部コラボレーターはない）。SSO / SCIM、メンバー
+  一覧、シート、削除は1か所のまま。
+- **workspace から外すと、その workspace 内のすべての project のロールも同じ処理で取り消す。**
+- **シート = 少なくとも1つの project を編集できること。** 1人は1回だけ数える。「reader だから無料」とは
+  限らなくなるので、UI ではシートをロールと分けて表示する。
+- **accounts は project が何であるかを知らない。** サービスが自分のリソースを登録し、名前、公開範囲、
+  中身、ライフサイクルはサービスが持つ。workspace 全体にかかる基本の権限は設けない。
+
+### 代表的なケース
+
+| ケース | workspace のロール | project のロール | シートを使うか |
+|---|---|---|---|
+| 今と同じ（project のロールなし） | owner / maintainer / writer / reader | なし | reader 以外は使う |
+| reader が project P だけを編集する（ほかは閲覧） | reader | P の writer | 使う |
+| 取引先の担当者に P だけを見せる | Limited | P の reader | 使わない |
+| 取引先の担当者が P だけを編集する | Limited | P の writer | 使う |
+| チーム X がチーム Y の project を見られない | Limited（チーム X のメンバー） | チーム X の project のロール | そのロールに writer 以上があれば使う |
+
+### 役割の分担
+
+```mermaid
+flowchart LR
+    subgraph SV["サービス: dashboard / visualizer / cms / flow"]
+        S["project そのもの:<br/>名前、公開範囲、中身、ライフサイクル<br/>project の一覧の絞り込み<br/>招待メール"]
+    end
+    subgraph AC["reearth-accounts"]
+        A["アクセスだけ:<br/>project → workspace（登録）<br/>誰がどのロールを持つか<br/>workspace のメンバーとロール（Limited を含む）<br/>シートの数と上限"]
+        C["Cerbos<br/>（各サービスのポリシー）"]
+    end
+    BL["課金"]
+    S -- "POST / DELETE /api/service/resources<br/>（M2M: 登録 / 登録解除）" --> A
+    S -- "setResourceMember / removeResourceMember<br/>addWorkspaceMemberWithResourceRoles<br/>（ユーザーの JWT）" --> A
+    S -- "checkPermission(..., workspaceAlias, resourceId)<br/>myResourceAccess（一覧に出すもの）" --> A
+    A -- "判定" --> C
+    BL -- "PUT seat-limit / GET seat-usage" --> A
+```
+
+project は必要になったときにだけ登録する（作成時に作成者を owner として、または最初に project の
+ロールを付ける前）。既存の project を一括で登録することはなく、既存のデータも変換しない。
+
+### project へのアクセスの決まり方
+
+```mermaid
+flowchart TD
+    U["ユーザーが project P を開く"] --> M{"P の workspace の<br/>メンバーか？"}
+    M -- "いいえ" --> X["アクセスできない"]
+    M -- "はい" --> R{"workspace のロールは？"}
+    R -- "owner / maintainer" --> F["すべての project にフルアクセス"]
+    R -- "writer / reader" --> B["workspace のロールが基準の権限<br/>（writer: 閲覧・編集、reader: 閲覧）"]
+    R -- "Limited" --> L["基準の権限なし"]
+    B --> E["P での権限 = 基準の権限と<br/>P の project ロールの高い方"]
+    L --> E2["P での権限 = P の project ロール<br/>（なければ見えない）"]
+```
+
+### 範囲
+
+| 項目 | 状態 | 詳細 |
+|---|---|---|
+| project のロール（上げるだけ）と、project を指定した権限チェック | 今回 | Goals 1、2 |
+| workspace のロール Limited | 今回 | Goal 7 |
+| workspace から外すと project のロールも取り消す | 今回 | Goal 4 |
+| UI からの1ステップでの追加（project から、または workspace から） | 今回 | Goal 8 |
+| シートは編集できるかで決まり、ロールと分けて表示する | 今回 | Goal 9 |
+| project ごとの「追加した人だけ」の設定 | 後から | Non-Goal 9、Open Question 1 |
+| チーム | 後から | Non-Goal 10 |
+| integration を project のメンバーにする | 後から | Non-Goal 5、Open Question 5 |
+| メンバーをどこで管理するか（Dashboard だけか、各サービスでもか） | 未決 | Open Question 6 |
+| project から追加した人の workspace のロールと、誰が追加できるか | 未決 | Open Question 7 |
+| Limited のメンバーが workspace 単位で見られるもの・できること | 未決 | Open Question 10 |
+| シートの表示と、シートの上限を超える場合 | 未決 | Open Questions 11、12 |
+| 公開 project とシート | 未決 | Open Question 15 |
+| アクセスのリクエスト | 未決 | Open Question 16 |
+
+### 詳細
+
+[Background / Problem Statement](#background--problem-statement) ·
+[Goals](#goals) · [Non-Goals](#non-goals) ·
+[Solution Options](#solution-options) · [Design](#design) ·
+[Open Questions](#open-questions)
+
 ## このドキュメントの読み方
+
+最初に *Summary* で設計の全体をつかんでください。
 
 *Goals* 以降には技術的な内容が含まれます。次の2段階で読んでください。
 

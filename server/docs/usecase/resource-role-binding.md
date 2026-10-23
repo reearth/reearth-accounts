@@ -10,7 +10,117 @@
 > Japanese version: [resource-role-binding.ja.md](resource-role-binding.ja.md).
 > If the two versions differ, the Japanese version takes precedence.
 
+## Summary
+
+**Problem.** Today every workspace member sees every project in the workspace,
+so teams in one organization workspace (or a partner company's staff) cannot be
+kept to their own projects. **Decision.** Projects follow the workspace role by
+default; a project role can only raise access on that project; a new per-person
+workspace role, **Limited**, sees only the projects where it has a project role.
+Accounts stores only "this project belongs to this workspace" and "this user
+has this role on it" — it never learns what a project is.
+
+### Workspace roles
+
+| Workspace role | Projects by default | On a project P where they have a project role | Uses a seat |
+|---|---|---|---|
+| Owner / maintainer | Full access to every project (as today) | Already full access | Yes |
+| Writer | View and edit every project (as today) | The higher of writer and the role on P | Yes |
+| Reader | View every project (as today) | The higher of reader and the role on P | Only with a writer-or-above project role somewhere |
+| Limited (new) | None | Exactly the role on P | Only with a writer-or-above project role somewhere |
+
+### Rules
+
+- A project role only **raises** access, never lowers it. Effective access on a
+  project = the higher of the baseline (the workspace role; none for Limited)
+  and the project role.
+- **Everyone with access is a workspace member** (no outside collaborators), so
+  SSO / SCIM, the member list, seats and removal stay in one place.
+- **Removing someone from the workspace removes all their project roles** in it,
+  in the same step.
+- **A seat = can edit at least one project.** Each person counts once. Because
+  "reader" no longer guarantees "free", the UI shows the seat separately from
+  the role.
+- **Accounts never learns what a project is.** Services register their
+  resources; their name, visibility, content and lifecycle stay in the service.
+  There is no workspace-wide base permission.
+
+### Representative cases
+
+| Case | Workspace role | Project role | Uses a seat |
+|---|---|---|---|
+| As today (no project roles) | owner / maintainer / writer / reader | None | Yes, except readers |
+| A reader edits only project P (and views the rest) | Reader | Writer on P | Yes |
+| A partner's staff sees only P | Limited | Reader on P | No |
+| A partner's staff edits only P | Limited | Writer on P | Yes |
+| Team X cannot see team Y's projects | Limited (team X's members) | Roles on team X's projects | Yes if any of those roles is writer or above |
+
+### Who owns what
+
+```mermaid
+flowchart LR
+    subgraph SV["Services: dashboard / visualizer / cms / flow"]
+        S["The project itself:<br/>name, visibility, content, lifecycle<br/>filtering project lists<br/>invitation emails"]
+    end
+    subgraph AC["reearth-accounts"]
+        A["Access only:<br/>project → workspace (registration)<br/>who has which role on it<br/>workspace members and roles (incl. Limited)<br/>seat count and seat limit"]
+        C["Cerbos<br/>(each service's policy)"]
+    end
+    BL["Billing"]
+    S -- "POST / DELETE /api/service/resources<br/>(M2M: register / unregister)" --> A
+    S -- "setResourceMember / removeResourceMember<br/>addWorkspaceMemberWithResourceRoles<br/>(user JWT)" --> A
+    S -- "checkPermission(..., workspaceAlias, resourceId)<br/>myResourceAccess (what to list)" --> A
+    A -- "decide" --> C
+    BL -- "PUT seat-limit / GET seat-usage" --> A
+```
+
+A project is registered only when needed: on creation (creator as owner), or
+before its first project role. Existing projects are not registered in bulk,
+and no existing data is converted.
+
+### How access to a project is decided
+
+```mermaid
+flowchart TD
+    U["A person opens project P"] --> M{"Member of P's workspace?"}
+    M -- "No" --> X["No access"]
+    M -- "Yes" --> R{"Workspace role?"}
+    R -- "owner / maintainer" --> F["Full access to every project"]
+    R -- "writer / reader" --> B["Baseline = the workspace role<br/>(writer: view and edit, reader: view)"]
+    R -- "Limited" --> L["No baseline"]
+    B --> E["Access on P = the higher of<br/>the baseline and the role on P"]
+    L --> E2["Access on P = the role on P<br/>(none: cannot see P)"]
+```
+
+### Scope
+
+| Item | Status | Details |
+|---|---|---|
+| Project roles (raise only), checks that name the project | Now | Goals 1, 2 |
+| Limited workspace role | Now | Goal 7 |
+| Project roles removed with workspace membership | Now | Goal 4 |
+| One-step add from the UI (from a project, or from the workspace) | Now | Goal 8 |
+| Seats follow edit access, shown separately from the role | Now | Goal 9 |
+| Per-project "only people added" setting | Later | Non-Goal 9, Open Question 1 |
+| Teams | Later | Non-Goal 10 |
+| Integrations as project members | Later | Non-Goal 5, Open Question 5 |
+| Where members are managed (Dashboard only, or each service too) | Open | Open Question 6 |
+| Workspace role for people added from a project, and who may add them | Open | Open Question 7 |
+| What a Limited member can see and do at the workspace level | Open | Open Question 10 |
+| How the seat is shown, and what happens at the seat limit | Open | Open Questions 11, 12 |
+| Public projects and seats | Open | Open Question 15 |
+| Access requests | Open | Open Question 16 |
+
+### Details
+
+[Background / Problem Statement](#background--problem-statement) ·
+[Goals](#goals) · [Non-Goals](#non-goals) ·
+[Solution Options](#solution-options) · [Design](#design) ·
+[Open Questions](#open-questions)
+
 ## How to read this document
+
+Start with *Summary* for the overall design.
 
 Sections from *Goals* onward include technical content. Please review in two
 steps:
