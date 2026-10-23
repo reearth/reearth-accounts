@@ -87,6 +87,21 @@ func (mr *MockRepoMockRecorder) FindByUserIDs(arg0, arg1 any) *gomock.Call {
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "FindByUserIDs", reflect.TypeOf((*MockRepo)(nil).FindByUserIDs), arg0, arg1)
 }
 
+// FindByUserIDsForUpdate mocks base method.
+func (m *MockRepo) FindByUserIDsForUpdate(arg0 context.Context, arg1 user.IDList) (List, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "FindByUserIDsForUpdate", arg0, arg1)
+	ret0, _ := ret[0].(List)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// FindByUserIDsForUpdate indicates an expected call of FindByUserIDsForUpdate.
+func (mr *MockRepoMockRecorder) FindByUserIDsForUpdate(arg0, arg1 any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "FindByUserIDsForUpdate", reflect.TypeOf((*MockRepo)(nil).FindByUserIDsForUpdate), arg0, arg1)
+}
+
 // Save mocks base method.
 func (m *MockRepo) Save(arg0 context.Context, arg1 Permittable) error {
 	m.ctrl.T.Helper()

@@ -157,6 +157,10 @@ func (r *Workspace) FindByID(ctx context.Context, id id.WorkspaceID) (*workspace
 	return r.findOne(ctx, bson.M{"id": id.String()})
 }
 
+func (r *Workspace) FindByIDForUpdate(ctx context.Context, id id.WorkspaceID) (*workspace.Workspace, error) {
+	return r.FindByID(ctx, id)
+}
+
 func (r *Workspace) FindByName(ctx context.Context, name string) (*workspace.Workspace, error) {
 	if name == "" {
 		return nil, rerror.ErrNotFound

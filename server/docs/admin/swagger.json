@@ -726,6 +726,83 @@
                     }
                 }
             }
+        },
+        "/workspaces/{id}/transfer-owner": {
+            "post": {
+                "description": "Makes an existing, enabled member of a team workspace its sole owner. Every other owner becomes a maintainer. A reader may be made owner. A soft-deleted workspace is treated as not found. On PostgreSQL, and on MongoDB with transactions enabled, the role and permittable changes are committed in one transaction and concurrent changes to the same workspace are serialized (PostgreSQL) or rejected with 409 conflict (MongoDB). On MongoDB without transaction support the changes are applied one by one, and a failure part-way can leave them partially applied.",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "workspaces"
+                ],
+                "summary": "Transfer a workspace's ownership",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Workspace ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "description": "New owner",
+                        "name": "body",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/TransferWorkspaceOwnerRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/TransferWorkspaceOwnerResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "invalid id / invalid request body",
+                        "schema": {
+                            "$ref": "#/definitions/ErrorResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/ErrorResponse"
+                        }
+                    },
+                    "403": {
+                        "description": "not approved / forbidden",
+                        "schema": {
+                            "$ref": "#/definitions/ErrorResponse"
+                        }
+                    },
+                    "404": {
+                        "description": "workspace not found",
+                        "schema": {
+                            "$ref": "#/definitions/ErrorResponse"
+                        }
+                    },
+                    "409": {
+                        "description": "already_owner (with newOwner) / conflict (concurrent change, retry)",
+                        "schema": {
+                            "$ref": "#/definitions/TransferWorkspaceOwnerConflictResponse"
+                        }
+                    },
+                    "422": {
+                        "description": "personal_workspace / target_not_member / target_disabled / target_user_not_found",
+                        "schema": {
+                            "$ref": "#/definitions/ErrorResponse"
+                        }
+                    }
+                }
+            }
         }
     },
     "definitions": {
@@ -905,6 +982,67 @@
             "properties": {
                 "role": {
                     "type": "string"
+                }
+            }
+        },
+        "TransferWorkspaceOwnerConflictResponse": {
+            "type": "object",
+            "properties": {
+                "code": {
+                    "type": "string",
+                    "example": "already_owner"
+                },
+                "message": {
+                    "type": "string",
+                    "example": "target user is already the sole owner"
+                },
+                "newOwner": {
+                    "$ref": "#/definitions/WorkspaceMember"
+                }
+            }
+        },
+        "TransferWorkspaceOwnerRequest": {
+            "type": "object",
+            "required": [
+                "newOwnerUserId"
+            ],
+            "properties": {
+                "newOwnerUserId": {
+                    "type": "string"
+                }
+            }
+        },
+        "TransferWorkspaceOwnerResponse": {
+            "type": "object",
+            "properties": {
+                "demotedUserIds": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
+                },
+                "newOwner": {
+                    "$ref": "#/definitions/WorkspaceMember"
+                },
+                "workspace": {
+                    "$ref": "#/definitions/TransferredWorkspace"
+                }
+            }
+        },
+        "TransferredWorkspace": {
+            "type": "object",
+            "properties": {
+                "alias": {
+                    "type": "string"
+                },
+                "id": {
+                    "type": "string"
+                },
+                "name": {
+                    "type": "string"
+                },
+                "personal": {
+                    "type": "boolean"
                 }
             }
         },

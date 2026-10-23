@@ -9,6 +9,9 @@ ON CONFLICT (id) DO UPDATE SET
 -- name: WorkspaceFindByID :one
 SELECT * FROM workspaces WHERE id = $1;
 
+-- name: WorkspaceFindByIDForUpdate :one
+SELECT * FROM workspaces WHERE id = $1 FOR UPDATE;
+
 -- name: WorkspaceFindByIDs :many
 SELECT * FROM workspaces WHERE id = ANY($1::text[]) ORDER BY id;
 

@@ -1,5 +1,6 @@
 // Package workspace implements the admin cross-tenant workspace endpoints
-// (V1: read-only list), behind the RequireApproved middleware.
+// (list, detail, members, ownership transfer), behind the RequireApproved
+// middleware.
 package workspace
 
 import (
@@ -8,12 +9,18 @@ import (
 
 // Handler serves the /workspaces endpoints.
 type Handler struct {
-	get     *workspaceuc.GetWorkspaceUseCase
-	list    *workspaceuc.ListWorkspacesUseCase
-	members *workspaceuc.ListWorkspaceMembersUseCase
+	get           *workspaceuc.GetWorkspaceUseCase
+	list          *workspaceuc.ListWorkspacesUseCase
+	members       *workspaceuc.ListWorkspaceMembersUseCase
+	transferOwner *workspaceuc.TransferOwnerUseCase
 }
 
 // NewHandler is a Wire provider for the workspace Handler.
-func NewHandler(get *workspaceuc.GetWorkspaceUseCase, list *workspaceuc.ListWorkspacesUseCase, members *workspaceuc.ListWorkspaceMembersUseCase) *Handler {
-	return &Handler{get: get, list: list, members: members}
+func NewHandler(
+	get *workspaceuc.GetWorkspaceUseCase,
+	list *workspaceuc.ListWorkspacesUseCase,
+	members *workspaceuc.ListWorkspaceMembersUseCase,
+	transferOwner *workspaceuc.TransferOwnerUseCase,
+) *Handler {
+	return &Handler{get: get, list: list, members: members, transferOwner: transferOwner}
 }

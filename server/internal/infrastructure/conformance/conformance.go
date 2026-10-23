@@ -642,6 +642,15 @@ func testPermittableFindByUserIDsAndSaveMany(t *testing.T, nc Factory) {
 	got, err := c.Permittable.FindByUserIDs(ctx, user.IDList{u1, u2})
 	require.NoError(t, err)
 	assert.Len(t, got, 2)
+
+	// Outside a transaction it finds the same rows and releases any lock.
+	locked, err := c.Permittable.FindByUserIDsForUpdate(ctx, user.IDList{u2, u1, id.NewUserID()})
+	require.NoError(t, err)
+	require.Len(t, locked, 2)
+	assert.ElementsMatch(t, []id.UserID{u1, u2}, []id.UserID{locked[0].UserID(), locked[1].UserID()})
+
+	_, err = c.Permittable.FindByUserIDsForUpdate(ctx, user.IDList{id.NewUserID()})
+	assert.ErrorIs(t, err, rerror.ErrNotFound)
 }
 
 func testPermittableNotFound(t *testing.T, nc Factory) {

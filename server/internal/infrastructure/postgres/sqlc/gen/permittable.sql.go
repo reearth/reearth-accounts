@@ -84,6 +84,35 @@ func (q *Queries) PermittableFindByUserIDs(ctx context.Context, dollar_1 []strin
 	return items, nil
 }
 
+const permittableFindByUserIDsForUpdate = `-- name: PermittableFindByUserIDsForUpdate :many
+SELECT id, user_id, role_ids, updated_at FROM permittables WHERE user_id = ANY($1::text[]) ORDER BY user_id FOR UPDATE
+`
+
+func (q *Queries) PermittableFindByUserIDsForUpdate(ctx context.Context, dollar_1 []string) ([]Permittable, error) {
+	rows, err := q.db.Query(ctx, permittableFindByUserIDsForUpdate, dollar_1)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []Permittable
+	for rows.Next() {
+		var i Permittable
+		if err := rows.Scan(
+			&i.ID,
+			&i.UserID,
+			&i.RoleIds,
+			&i.UpdatedAt,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const permittableUpsert = `-- name: PermittableUpsert :one
 INSERT INTO permittables (id, user_id, role_ids, updated_at)
 VALUES ($1,$2,$3,$4)

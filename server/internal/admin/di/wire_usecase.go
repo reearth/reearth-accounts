@@ -37,4 +37,5 @@ var usecaseWire = wire.NewSet(
 	workspaceuc.NewGetWorkspaceUseCase,
 	workspaceuc.NewListWorkspaceMembersUseCase,
 	workspaceuc.NewListWorkspacesUseCase,
+	workspaceuc.NewTransferOwnerUseCase,
 )

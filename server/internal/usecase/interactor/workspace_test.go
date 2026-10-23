@@ -1131,7 +1131,7 @@ func TestWorkspace_AddMember(t *testing.T) {
 				return
 			}
 			assert.NoError(t, err)
-			assert.Equal(t, tc.want, got.Members())
+			assertMembers(t, tc.want, got.Members())
 
 			got, err = db.Workspace.FindByID(ctx, tc.args.wId)
 			if tc.want == nil {
@@ -1139,7 +1139,7 @@ func TestWorkspace_AddMember(t *testing.T) {
 			} else {
 				assert.NoError(t, err)
 			}
-			assert.Equal(t, tc.want, got.Members())
+			assertMembers(t, tc.want, got.Members())
 		})
 	}
 }
@@ -1381,7 +1381,7 @@ func TestWorkspace_RemoveMember(t *testing.T) {
 				return
 			}
 			assert.NoError(t, err)
-			assert.Equal(t, tc.want, got.Members())
+			assertMembers(t, tc.want, got.Members())
 
 			got, err = db.Workspace.FindByID(ctx, tc.args.wId)
 			if tc.want == nil {
@@ -1389,7 +1389,7 @@ func TestWorkspace_RemoveMember(t *testing.T) {
 			} else {
 				assert.NoError(t, err)
 			}
-			assert.Equal(t, tc.want, got.Members())
+			assertMembers(t, tc.want, got.Members())
 		})
 	}
 }
@@ -1632,7 +1632,7 @@ func TestWorkspace_RemoveMultipleMembers(t *testing.T) {
 				return
 			}
 			assert.NoError(t, err)
-			assert.Equal(t, tc.want, got.Members())
+			assertMembers(t, tc.want, got.Members())
 
 			got, err = db.Workspace.FindByID(ctx, tc.args.wId)
 			if tc.want == nil {
@@ -1640,7 +1640,7 @@ func TestWorkspace_RemoveMultipleMembers(t *testing.T) {
 			} else {
 				assert.NoError(t, err)
 			}
-			assert.Equal(t, tc.want, got.Members())
+			assertMembers(t, tc.want, got.Members())
 		})
 	}
 }
@@ -1882,7 +1882,7 @@ func TestWorkspace_UpdateMember(t *testing.T) {
 				return
 			}
 			assert.NoError(t, err)
-			assert.Equal(t, tc.want, got.Members())
+			assertMembers(t, tc.want, got.Members())
 
 			got, err = db.Workspace.FindByID(ctx, tc.args.wId)
 			if tc.want == nil {
@@ -1890,7 +1890,7 @@ func TestWorkspace_UpdateMember(t *testing.T) {
 			} else {
 				assert.NoError(t, err)
 			}
-			assert.Equal(t, tc.want, got.Members())
+			assertMembers(t, tc.want, got.Members())
 		})
 	}
 }
@@ -2031,7 +2031,7 @@ func TestWorkspace_RemoveIntegrations(t *testing.T) {
 			assert.NotNil(t, got)
 			assert.Equal(t, tc.want.ID(), got.ID())
 			assert.Equal(t, tc.want.Name(), got.Name())
-			assert.Equal(t, tc.want.Members(), got.Members())
+			assertMembers(t, tc.want.Members(), got.Members())
 			assert.NotZero(t, got.UpdatedAt(), "updatedAt should be set")
 		})
 	}
@@ -2850,4 +2850,14 @@ func TestWorkspace_MemberManagement_CerbosFallback(t *testing.T) {
 		assert.NoError(t, err)
 		assert.False(t, got.Members().HasUser(targetUser))
 	})
+}
+
+// assertMembers compares the member data only. Comparing *workspace.Members
+// directly also compares its RWMutex, whose reader count is non-zero while a
+// parallel subtest sharing the fixture holds a read lock.
+func assertMembers(t *testing.T, want, got *workspace.Members) {
+	t.Helper()
+	assert.Equal(t, want.Users(), got.Users())
+	assert.Equal(t, want.Integrations(), got.Integrations())
+	assert.Equal(t, want.Fixed(), got.Fixed())
 }

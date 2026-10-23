@@ -193,6 +193,10 @@ func (r *Workspace) FindByID(_ context.Context, v workspace.ID) (*workspace.Work
 	}), rerror.ErrNotFound)
 }
 
+func (r *Workspace) FindByIDForUpdate(ctx context.Context, v workspace.ID) (*workspace.Workspace, error) {
+	return r.FindByID(ctx, v)
+}
+
 func (r *Workspace) FindByName(_ context.Context, name string) (*workspace.Workspace, error) {
 	if r.err != nil {
 		return nil, r.err

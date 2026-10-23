@@ -80,6 +80,24 @@ func (r *Permittable) FindByUserIDs(ctx context.Context, ids user.IDList) (permi
 	return list, nil
 }
 
+// FindByUserIDsForUpdate returns ErrNotFound on empty result for parity with
+// FindByUserIDs. The locks are taken before hydrating, so the workspace roles
+// read afterwards are the ones committed by the previous lock holder.
+func (r *Permittable) FindByUserIDsForUpdate(ctx context.Context, ids user.IDList) (permittable.List, error) {
+	rows, err := r.c.queries(ctx).PermittableFindByUserIDsForUpdate(ctx, ids.Strings())
+	if err != nil {
+		return nil, rerror.ErrInternalByWithContext(ctx, err)
+	}
+	list, err := r.hydrate(ctx, rows)
+	if err != nil {
+		return nil, err
+	}
+	if len(list) == 0 {
+		return nil, rerror.ErrNotFound
+	}
+	return list, nil
+}
+
 // FindByRoleID returns ErrNotFound on empty result for mongo parity.
 func (r *Permittable) FindByRoleID(ctx context.Context, rid id.RoleID) (permittable.List, error) {
 	rows, err := r.c.queries(ctx).PermittableFindByRoleID(ctx, rid.String())
