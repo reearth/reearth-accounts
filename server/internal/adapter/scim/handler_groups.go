@@ -152,7 +152,7 @@ func (h *GroupHandler) List(c echo.Context) error {
 		if parseErr != nil || attr != "displayname" || op != "eq" {
 			return scimErrorResponse(c, http.StatusBadRequest, "unsupported filter expression", "invalidFilter")
 		}
-		var filtered []ScimGroup
+		filtered := make([]ScimGroup, 0)
 		for _, g := range groups {
 			if strings.EqualFold(g.DisplayName, val) {
 				filtered = append(filtered, g)
