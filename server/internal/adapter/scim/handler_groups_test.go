@@ -122,6 +122,27 @@ func TestListGroups_Empty(t *testing.T) {
 	assert.Equal(t, 0, resp.TotalResults)
 }
 
+// TestListGroups_FilterNoMatch verifies that a filter that matches no groups returns
+// Resources:[] (empty array) not Resources:null. Entra rejects null with
+// SystemForCrossDomainIdentityManagementServiceIncompatible.
+func TestListGroups_FilterNoMatch(t *testing.T) {
+	_, ws, _, handler := setupGroupHandlerTest(t)
+
+	e := echo.New()
+	req := httptest.NewRequest(http.MethodGet, `/scim/v2/Groups?filter=displayName+eq+"nonexistent"`, nil)
+	req = contextWithWorkspace(req, ws.ID())
+	rec := httptest.NewRecorder()
+	c := e.NewContext(req, rec)
+
+	require.NoError(t, handler.List(c))
+	assert.Equal(t, http.StatusOK, rec.Code)
+
+	// Use a raw map so we can inspect the Resources field type directly.
+	var raw map[string]json.RawMessage
+	require.NoError(t, json.Unmarshal(rec.Body.Bytes(), &raw))
+	assert.Equal(t, json.RawMessage("[]"), raw["Resources"], "Resources must be [] not null when filter matches nothing")
+}
+
 // TestGetGroup verifies that Get returns the correct group by decoded ID.
 func TestGetGroup(t *testing.T) {
 	_, ws, _, handler := setupGroupHandlerTest(t)
