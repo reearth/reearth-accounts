@@ -255,7 +255,8 @@ func (h *GroupHandler) Patch(c echo.Context) error {
 		case opLower == "replace" && pathLower == "displayname":
 			return scimErrorResponse(c, http.StatusBadRequest, "displayName is immutable", "mutability")
 		default:
-			return scimErrorResponse(c, http.StatusBadRequest, "unsupported PATCH operation: "+op.Op+" "+op.Path, "invalidValue")
+			// Ignore PATCH operations on unrecognised attributes (e.g. externalId sent by Entra).
+			// RFC 7644 §3.5.2: unrecognised attributes SHOULD be ignored.
 		}
 	}
 

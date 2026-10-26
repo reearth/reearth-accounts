@@ -298,6 +298,27 @@ func TestPatchGroup_RemoveLastOwner(t *testing.T) {
 	assert.False(t, m.Disabled, "last owner must NOT be disabled by SyncScimGroup")
 }
 
+// TestPatchGroup_IgnoreUnknownAttributes verifies that PATCH operations on unrecognised attributes
+// (e.g. externalId sent by Microsoft Entra) are silently ignored and return 200.
+func TestPatchGroup_IgnoreUnknownAttributes(t *testing.T) {
+	_, ws, ownerID, handler := setupGroupHandlerTest(t)
+
+	gid := makeGroupID(ws.ID(), "Engineering")
+	body := `{"schemas":["urn:ietf:params:scim:api:messages:2.0:PatchOp"],"Operations":[{"op":"Add","path":"externalId","value":"` + ownerID.String() + `"}]}`
+
+	e := echo.New()
+	req := httptest.NewRequest(http.MethodPatch, "/scim/v2/Groups/"+gid, strings.NewReader(body))
+	req.Header.Set("Content-Type", "application/json")
+	req = contextWithWorkspace(req, ws.ID())
+	rec := httptest.NewRecorder()
+	c := e.NewContext(req, rec)
+	c.SetParamNames("id")
+	c.SetParamValues(gid)
+
+	require.NoError(t, handler.Patch(c))
+	assert.Equal(t, http.StatusOK, rec.Code)
+}
+
 // TestDeleteGroup verifies that Delete removes the group mapping without deprovisioning members.
 func TestDeleteGroup(t *testing.T) {
 	db, ws, ownerID, handler := setupGroupHandlerTest(t)
