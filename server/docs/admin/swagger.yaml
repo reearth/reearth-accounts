@@ -291,6 +291,11 @@ paths:
         name: id
         required: true
         type: string
+      - description: admin_csrf cookie value
+        in: header
+        name: X-Csrf-Token
+        required: true
+        type: string
       produces:
       - application/json
       responses:
@@ -307,7 +312,7 @@ paths:
           schema:
             $ref: '#/definitions/ErrorResponse'
         "403":
-          description: not approved
+          description: not approved / missing or invalid csrf token
           schema:
             $ref: '#/definitions/ErrorResponse'
         "404":
@@ -327,6 +332,11 @@ paths:
         name: id
         required: true
         type: string
+      - description: admin_csrf cookie value
+        in: header
+        name: X-Csrf-Token
+        required: true
+        type: string
       produces:
       - application/json
       responses:
@@ -343,7 +353,7 @@ paths:
           schema:
             $ref: '#/definitions/ErrorResponse'
         "403":
-          description: not approved
+          description: not approved / missing or invalid csrf token
           schema:
             $ref: '#/definitions/ErrorResponse'
         "404":
@@ -364,6 +374,11 @@ paths:
       - description: Admin user ID
         in: path
         name: id
+        required: true
+        type: string
+      - description: admin_csrf cookie value
+        in: header
+        name: X-Csrf-Token
         required: true
         type: string
       - description: Role to assign
@@ -388,7 +403,7 @@ paths:
           schema:
             $ref: '#/definitions/ErrorResponse'
         "403":
-          description: not approved / forbidden
+          description: not approved / missing or invalid csrf token / forbidden
           schema:
             $ref: '#/definitions/ErrorResponse'
         "404":
@@ -436,10 +451,11 @@ paths:
       - auth
   /auth/logout:
     post:
-      description: Clears the admin session cookie and the admin_csrf double-submit
+      description: 'Clears the admin session cookie and the admin_csrf double-submit
         cookie. Public endpoint so the cookies can be cleared even with an expired/invalid
         token. When an admin_csrf cookie is sent, the X-Csrf-Token header must match
-        it.
+        it. This only rejects forged same-site requests: a cross-site request arrives
+        without the SameSite=Lax admin_csrf cookie and is not CSRF-checked.'
       parameters:
       - description: admin_csrf cookie value; required when that cookie is sent
         in: header

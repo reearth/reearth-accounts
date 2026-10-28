@@ -303,9 +303,11 @@ func TestRouter_Logout(t *testing.T) {
 		header   string
 		wantCode int
 	}{
+		// A cross-site POST looks like this too: SameSite=Lax keeps admin_csrf
+		// off it, so this guard does not reject it.
 		{name: "no csrf cookie clears stale session", path: "/api/v1/auth/logout", wantCode: http.StatusNoContent},
 		{name: "matching token", path: "/api/v1/auth/logout", cookie: csrfToken, header: csrfToken, wantCode: http.StatusNoContent},
-		{name: "cookie without header", path: "/api/v1/auth/logout", cookie: csrfToken, wantCode: http.StatusForbidden},
+		{name: "same-site forged request carrying the cookie without header", path: "/api/v1/auth/logout", cookie: csrfToken, wantCode: http.StatusForbidden},
 		{name: "mismatched header", path: "/api/v1/auth/logout", cookie: csrfToken, header: "forged", wantCode: http.StatusForbidden},
 		{name: "trailing slash is not the exempt route", path: "/api/v1/auth/logout/", wantCode: http.StatusNotFound},
 	}

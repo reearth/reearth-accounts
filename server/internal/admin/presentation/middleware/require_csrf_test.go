@@ -77,7 +77,7 @@ func TestRequireCSRFIfCookie(t *testing.T) {
 		{name: "no cookie passes", wantCalled: true},
 		{name: "no cookie with header passes", header: token, wantCalled: true},
 		{name: "matching token passes", cookie: token, header: token, wantCalled: true},
-		{name: "cookie without header", cookie: token, wantMsg: "missing csrf token"},
+		{name: "same-site request with cookie but no header", cookie: token, wantMsg: "missing csrf token"},
 		{name: "mismatched token", cookie: token, header: "other", wantMsg: "invalid csrf token"},
 	}
 

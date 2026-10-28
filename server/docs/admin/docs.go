@@ -105,6 +105,13 @@ const docTemplate = `{
                         "name": "id",
                         "in": "path",
                         "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "admin_csrf cookie value",
+                        "name": "X-Csrf-Token",
+                        "in": "header",
+                        "required": true
                     }
                 ],
                 "responses": {
@@ -127,7 +134,7 @@ const docTemplate = `{
                         }
                     },
                     "403": {
-                        "description": "not approved",
+                        "description": "not approved / missing or invalid csrf token",
                         "schema": {
                             "$ref": "#/definitions/ErrorResponse"
                         }
@@ -158,6 +165,13 @@ const docTemplate = `{
                         "name": "id",
                         "in": "path",
                         "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "admin_csrf cookie value",
+                        "name": "X-Csrf-Token",
+                        "in": "header",
+                        "required": true
                     }
                 ],
                 "responses": {
@@ -180,7 +194,7 @@ const docTemplate = `{
                         }
                     },
                     "403": {
-                        "description": "not approved",
+                        "description": "not approved / missing or invalid csrf token",
                         "schema": {
                             "$ref": "#/definitions/ErrorResponse"
                         }
@@ -216,6 +230,13 @@ const docTemplate = `{
                         "required": true
                     },
                     {
+                        "type": "string",
+                        "description": "admin_csrf cookie value",
+                        "name": "X-Csrf-Token",
+                        "in": "header",
+                        "required": true
+                    },
+                    {
                         "description": "Role to assign",
                         "name": "body",
                         "in": "body",
@@ -245,7 +266,7 @@ const docTemplate = `{
                         }
                     },
                     "403": {
-                        "description": "not approved / forbidden",
+                        "description": "not approved / missing or invalid csrf token / forbidden",
                         "schema": {
                             "$ref": "#/definitions/ErrorResponse"
                         }
@@ -313,7 +334,7 @@ const docTemplate = `{
         },
         "/auth/logout": {
             "post": {
-                "description": "Clears the admin session cookie and the admin_csrf double-submit cookie. Public endpoint so the cookies can be cleared even with an expired/invalid token. When an admin_csrf cookie is sent, the X-Csrf-Token header must match it.",
+                "description": "Clears the admin session cookie and the admin_csrf double-submit cookie. Public endpoint so the cookies can be cleared even with an expired/invalid token. When an admin_csrf cookie is sent, the X-Csrf-Token header must match it. This only rejects forged same-site requests: a cross-site request arrives without the SameSite=Lax admin_csrf cookie and is not CSRF-checked.",
                 "produces": [
                     "application/json"
                 ],
