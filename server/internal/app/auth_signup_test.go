@@ -39,22 +39,22 @@ func TestIsBypassed(t *testing.T) {
 			assert.True(t, result)
 		})
 
-		t.Run("findById query", func(t *testing.T) {
+		t.Run("findById query (requires auth — no longer bypassed)", func(t *testing.T) {
 			body := `{"query":"query { findById(id: \"test\") { id } }"}`
 			req, err := http.NewRequest(http.MethodPost, "/api/graphql", io.NopCloser(bytes.NewBufferString(body)))
 			assert.NoError(t, err)
 
 			result := isBypassed(req)
-			assert.True(t, result)
+			assert.False(t, result)
 		})
 
-		t.Run("findByAlias query", func(t *testing.T) {
+		t.Run("findByAlias query (requires auth — no longer bypassed)", func(t *testing.T) {
 			body := `{"query":"query { findByAlias(alias: \"test\") { id } }"}`
 			req, err := http.NewRequest(http.MethodPost, "/api/graphql", io.NopCloser(bytes.NewBufferString(body)))
 			assert.NoError(t, err)
 
 			result := isBypassed(req)
-			assert.True(t, result)
+			assert.False(t, result)
 		})
 
 		t.Run("createVerification mutation", func(t *testing.T) {
@@ -75,13 +75,13 @@ func TestIsBypassed(t *testing.T) {
 			assert.True(t, result)
 		})
 
-		t.Run("findUsersByIdsWithPagination query", func(t *testing.T) {
+		t.Run("findUsersByIdsWithPagination query (requires auth — no longer bypassed)", func(t *testing.T) {
 			body := `{"query":"query { findUsersByIdsWithPagination(ids: [\"id1\"]) { nodes { id } } }"}`
 			req, err := http.NewRequest(http.MethodPost, "/api/graphql", io.NopCloser(bytes.NewBufferString(body)))
 			assert.NoError(t, err)
 
 			result := isBypassed(req)
-			assert.True(t, result)
+			assert.False(t, result)
 		})
 
 		t.Run("signup mutation with whitespace and newlines", func(t *testing.T) {
@@ -131,7 +131,7 @@ func TestIsBypassed(t *testing.T) {
 	})
 
 	t.Run("should allow multiple bypassed fields", func(t *testing.T) {
-		body := `{"query":"query { authConfig { auth0ClientId } findByID(id: \"abc\") { id } }"}`
+		body := `{"query":"mutation { signup(input: {}) { user { id } } signupOIDC(input: {}) { user { id } } }"}`
 		req, err := http.NewRequest(http.MethodPost, "/api/graphql", io.NopCloser(bytes.NewBufferString(body)))
 		assert.NoError(t, err)
 

@@ -54,17 +54,20 @@ type graphqlRequest struct {
 
 // bypassedFields is the set of top-level GraphQL field names that are
 // allowed without authentication. Field names must be lowercase.
+//
+// Workspace-querying operations (findByAlias, findByID, findByIDs,
+// findUsersByIDsWithPagination) are intentionally excluded: their resolvers
+// return nested member records that include user emails and live email-
+// verification codes, which must not be exposed to unauthenticated callers.
+// All services that legitimately call these fields carry a valid auth token
+// and therefore do not need the bypass.
 var bypassedFields = map[string]struct{}{
-	"authconfig":                   {},
-	"createverification":           {},
-	"findbyalias":                  {},
-	"findbyid":                     {},
-	"findbyids":                    {},
-	"findusersbyidswithpagination": {},
-	"signup":                       {},
-	"signupoidc":                   {},
-	"signupsso":                    {},
-	"startpasswordreset":           {},
+	"authconfig":         {},
+	"createverification": {},
+	"signup":             {},
+	"signupoidc":         {},
+	"signupsso":          {},
+	"startpasswordreset": {},
 }
 
 func isBypassed(req *http.Request) bool {
