@@ -29,11 +29,42 @@ SELECT * FROM workspaces WHERE lower(alias) = ANY($1::text[]) ORDER BY id;
 -- Cross-tenant listing (no readable-workspace filter): pass '' for no keyword
 -- filter, and one of 'all'/'active'/'deleted' for the status filter.
 -- Set exclude_personal=true to omit per-user personal workspaces (used by /api/workspaces/all).
+-- NOTE: kept for backward compatibility; prefer WorkspaceIDsAllCursor or
+-- WorkspaceIDsAllOffset when the result set may be large.
 SELECT id FROM workspaces
 WHERE (NOT sqlc.arg(exclude_personal)::boolean OR personal = false)
   AND (sqlc.arg(keyword)::text = '' OR name ILIKE '%' || sqlc.arg(keyword)::text || '%' OR alias ILIKE '%' || sqlc.arg(keyword)::text || '%')
   AND (sqlc.arg(status)::text = 'all' OR (sqlc.arg(status)::text = 'active' AND deleted_at IS NULL) OR (sqlc.arg(status)::text = 'deleted' AND deleted_at IS NOT NULL))
 ORDER BY id;
+
+-- name: WorkspaceIDsAllCount :one
+-- Count of workspaces for the cross-tenant listing (same filters as WorkspaceIDsAll).
+SELECT COUNT(*)::bigint FROM workspaces
+WHERE (NOT sqlc.arg(exclude_personal)::boolean OR personal = false)
+  AND (sqlc.arg(keyword)::text = '' OR name ILIKE '%' || sqlc.arg(keyword)::text || '%' OR alias ILIKE '%' || sqlc.arg(keyword)::text || '%')
+  AND (sqlc.arg(status)::text = 'all' OR (sqlc.arg(status)::text = 'active' AND deleted_at IS NULL) OR (sqlc.arg(status)::text = 'deleted' AND deleted_at IS NOT NULL));
+
+-- name: WorkspaceIDsAllCursor :many
+-- Cursor-forward page for the cross-tenant listing. Pass '' for cursor to
+-- start from the beginning; IDs are ULIDs so lexicographic order equals
+-- insertion order.
+SELECT id FROM workspaces
+WHERE (NOT sqlc.arg(exclude_personal)::boolean OR personal = false)
+  AND (sqlc.arg(keyword)::text = '' OR name ILIKE '%' || sqlc.arg(keyword)::text || '%' OR alias ILIKE '%' || sqlc.arg(keyword)::text || '%')
+  AND (sqlc.arg(status)::text = 'all' OR (sqlc.arg(status)::text = 'active' AND deleted_at IS NULL) OR (sqlc.arg(status)::text = 'deleted' AND deleted_at IS NOT NULL))
+  AND (sqlc.arg(cursor)::text = '' OR id > sqlc.arg(cursor)::text)
+ORDER BY id
+LIMIT sqlc.arg(page_size)::int;
+
+-- name: WorkspaceIDsAllOffset :many
+-- Offset page for the cross-tenant listing.
+SELECT id FROM workspaces
+WHERE (NOT sqlc.arg(exclude_personal)::boolean OR personal = false)
+  AND (sqlc.arg(keyword)::text = '' OR name ILIKE '%' || sqlc.arg(keyword)::text || '%' OR alias ILIKE '%' || sqlc.arg(keyword)::text || '%')
+  AND (sqlc.arg(status)::text = 'all' OR (sqlc.arg(status)::text = 'active' AND deleted_at IS NULL) OR (sqlc.arg(status)::text = 'deleted' AND deleted_at IS NOT NULL))
+ORDER BY id
+LIMIT sqlc.arg(page_size)::int
+OFFSET sqlc.arg(offset_val)::bigint;
 
 -- name: WorkspaceDelete :exec
 DELETE FROM workspaces WHERE id = $1;
