@@ -156,16 +156,35 @@ func (i *User) SignupOIDC(ctx context.Context, param interfaces.SignupOIDCParam)
 		return nil, err
 	}
 
+	// Determine sub and email.
+	//
+	// When an access token is present it is always verified against the issuer's
+	// userinfo endpoint; caller-supplied sub/email are ignored in this case to
+	// prevent an attacker from binding their own IdP identity to an arbitrary
+	// email address (SEC-03).
+	//
+	// When no access token is present (e.g. server-side CIP provisioning), the
+	// caller must supply both sub and email. This path is protected by the
+	// signup secret: if no secret is configured the server is effectively open
+	// and an unauthenticated caller could inject arbitrary sub/email pairs, so
+	// we reject the request to close that window.
 	sub := param.Sub
-	name := param.Name
 	email := param.Email
-	if sub == "" || email == "" {
+	name := param.Name
+	if param.AccessToken != "" {
 		ui, err := i.getUserInfoFromISS(ctx, param.Issuer, param.AccessToken)
 		if err != nil {
 			return nil, err
 		}
 		sub = ui.Sub
 		email = ui.Email
+	} else {
+		if i.signupSecret == "" {
+			return nil, rerror.NewE(i18n.T("access token is required for unauthenticated OIDC signup"))
+		}
+		if sub == "" || email == "" {
+			return nil, rerror.NewE(i18n.T("sub and email are required"))
+		}
 	}
 
 	return Run1(ctx, nil, i.repos, Usecase().Transaction(), func(ctx context.Context) (*user.User, error) {
