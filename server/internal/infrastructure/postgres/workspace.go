@@ -289,21 +289,33 @@ func (r *Workspace) save(ctx context.Context, ws *workspace.Workspace) error {
 		if err := q.WorkspaceMembersDeleteByWorkspace(ctx, row.ID); err != nil {
 			return rerror.ErrInternalByWithContext(ctx, err)
 		}
-		for _, m := range members {
-			if err := q.WorkspaceMemberInsert(ctx, gen.WorkspaceMemberInsertParams{
-				WorkspaceID: m.WorkspaceID, UserID: m.UserID, Role: m.Role,
-				InvitedBy: m.InvitedBy, Disabled: m.Disabled, ExternalID: m.ExternalID,
-			}); err != nil {
+		if len(members) > 0 {
+			p := gen.WorkspaceMembersBulkInsertParams{}
+			for _, m := range members {
+				p.Column1 = append(p.Column1, m.WorkspaceID)
+				p.Column2 = append(p.Column2, m.UserID)
+				p.Column3 = append(p.Column3, m.Role)
+				p.Column4 = append(p.Column4, m.InvitedBy)
+				p.Column5 = append(p.Column5, m.Disabled)
+				p.Column6 = append(p.Column6, m.ExternalID)
+			}
+			if err := q.WorkspaceMembersBulkInsert(ctx, p); err != nil {
 				return rerror.ErrInternalByWithContext(ctx, err)
 			}
 		}
 		if err := q.WorkspaceIntegrationsDeleteByWorkspace(ctx, row.ID); err != nil {
 			return rerror.ErrInternalByWithContext(ctx, err)
 		}
-		for _, m := range integrations {
-			if err := q.WorkspaceIntegrationInsert(ctx, gen.WorkspaceIntegrationInsertParams{
-				WorkspaceID: m.WorkspaceID, IntegrationID: m.IntegrationID, Role: m.Role, InvitedBy: m.InvitedBy, Disabled: m.Disabled,
-			}); err != nil {
+		if len(integrations) > 0 {
+			p := gen.WorkspaceIntegrationsBulkInsertParams{}
+			for _, m := range integrations {
+				p.Column1 = append(p.Column1, m.WorkspaceID)
+				p.Column2 = append(p.Column2, m.IntegrationID)
+				p.Column3 = append(p.Column3, m.Role)
+				p.Column4 = append(p.Column4, m.InvitedBy)
+				p.Column5 = append(p.Column5, m.Disabled)
+			}
+			if err := q.WorkspaceIntegrationsBulkInsert(ctx, p); err != nil {
 				return rerror.ErrInternalByWithContext(ctx, err)
 			}
 		}
