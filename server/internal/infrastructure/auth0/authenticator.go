@@ -22,9 +22,12 @@ type Auth0 struct {
 	client         *http.Client
 	clientID       string
 	clientSecret   string
-	token          string
-	expireAt       time.Time
-	lock           sync.Mutex
+	// token and expireAt are protected by lock (read: RLock, write: Lock).
+	token    string
+	expireAt time.Time
+	// lock guards token, expireAt, and the one-at-a-time token-refresh path.
+	// Callers that only need to read the token must hold at least RLock.
+	lock           sync.RWMutex
 	current        func() time.Time
 	disableLogging bool
 
@@ -97,7 +100,16 @@ func New(domain, clientID, clientSecret string, httpTimeout time.Duration) *Auth
 		client:       &http.Client{Timeout: httpTimeout},
 		clientID:     clientID,
 		clientSecret: clientSecret,
+		current:      currentTime, // initialised here so nil checks are never needed
 	}
+}
+
+// readToken returns the cached management-API bearer token under a read lock.
+// Callers must call updateToken first to ensure the token is fresh.
+func (a *Auth0) readToken() string {
+	a.lock.RLock()
+	defer a.lock.RUnlock()
+	return a.token
 }
 
 func (a *Auth0) UpdateUser(ctx context.Context, p gateway.AuthenticatorUpdateUserParam) (data gateway.AuthenticatorUser, err error) {
@@ -125,7 +137,7 @@ func (a *Auth0) UpdateUser(ctx context.Context, p gateway.AuthenticatorUpdateUse
 	}
 
 	var r response
-	r, err = a.exec(ctx, http.MethodPatch, "api/v2/users/"+p.ID, a.token, payload)
+	r, err = a.exec(ctx, http.MethodPatch, "api/v2/users/"+p.ID, a.readToken(), payload)
 	if err != nil {
 		if !a.disableLogging {
 			log.Errorf("auth0: update user: %+v", err)
@@ -158,7 +170,7 @@ func (a *Auth0) ResendVerificationEmail(ctx context.Context, userID string) erro
 		},
 	}
 
-	_, err = a.exec(ctx, http.MethodPost, "api/v2/jobs/verification-email", a.token, payload)
+	_, err = a.exec(ctx, http.MethodPost, "api/v2/jobs/verification-email", a.readToken(), payload)
 	if err != nil {
 		if !a.disableLogging {
 			log.Errorf("auth0: resend verification email: %+v", err)
@@ -175,7 +187,7 @@ func (a *Auth0) DisableMFA(ctx context.Context, sub string) error {
 	}
 
 	var enrollments []enrollment
-	if err := a.execInto(ctx, http.MethodGet, "api/v2/users/"+sub+"/enrollments", a.token, nil, &enrollments); err != nil {
+	if err := a.execInto(ctx, http.MethodGet, "api/v2/users/"+sub+"/enrollments", a.readToken(), nil, &enrollments); err != nil {
 		if !a.disableLogging {
 			log.Errorf("auth0: disable mfa: list enrollments: %+v", err)
 		}
@@ -196,7 +208,7 @@ func (a *Auth0) DisableMFA(ctx context.Context, sub string) error {
 		for i, e := range confirmed {
 			go func() {
 				defer wg.Done()
-				errs[i] = a.execInto(ctx, http.MethodDelete, "api/v2/guardian/enrollments/"+e.ID, a.token, nil, nil)
+				errs[i] = a.execInto(ctx, http.MethodDelete, "api/v2/guardian/enrollments/"+e.ID, a.readToken(), nil, nil)
 			}()
 		}
 		wg.Wait()
@@ -210,7 +222,7 @@ func (a *Auth0) DisableMFA(ctx context.Context, sub string) error {
 		}
 	}
 
-	if _, err := a.exec(ctx, http.MethodPatch, "api/v2/users/"+sub, a.token, map[string]any{
+	if _, err := a.exec(ctx, http.MethodPatch, "api/v2/users/"+sub, a.readToken(), map[string]any{
 		"app_metadata": map[string]any{"mfa_enabled": false},
 	}); err != nil {
 		if !a.disableLogging {
@@ -228,7 +240,7 @@ func (a *Auth0) EnableMFA(ctx context.Context, sub string) (string, error) {
 		return "", err
 	}
 
-	if _, err := a.exec(ctx, http.MethodPatch, "api/v2/users/"+sub, a.token, map[string]any{
+	if _, err := a.exec(ctx, http.MethodPatch, "api/v2/users/"+sub, a.readToken(), map[string]any{
 		"app_metadata": map[string]any{"mfa_enabled": true},
 	}); err != nil {
 		if !a.disableLogging {
@@ -237,7 +249,7 @@ func (a *Auth0) EnableMFA(ctx context.Context, sub string) (string, error) {
 		return "", rerror.NewE(i18n.T("failed to update mfa status"))
 	}
 
-	r, err := a.exec(ctx, http.MethodPost, "api/v2/guardian/enrollments/ticket", a.token, map[string]any{
+	r, err := a.exec(ctx, http.MethodPost, "api/v2/guardian/enrollments/ticket", a.readToken(), map[string]any{
 		"user_id":   sub,
 		"send_mail": false,
 	})
@@ -264,7 +276,7 @@ func (a *Auth0) GetMFAStatus(ctx context.Context, sub string) (gateway.MFAStatus
 	}
 
 	var enrollments []enrollment
-	if err := a.execInto(ctx, http.MethodGet, "api/v2/users/"+sub+"/enrollments", a.token, nil, &enrollments); err != nil {
+	if err := a.execInto(ctx, http.MethodGet, "api/v2/users/"+sub+"/enrollments", a.readToken(), nil, &enrollments); err != nil {
 		if !a.disableLogging {
 			log.Errorf("auth0: get mfa status: %+v", err)
 		}
@@ -288,7 +300,7 @@ func (a *Auth0) GetUser(ctx context.Context, userID string) (gateway.Authenticat
 		return gateway.AuthenticatorUser{}, err
 	}
 
-	r, err := a.exec(ctx, http.MethodGet, "api/v2/users/"+userID, a.token, nil)
+	r, err := a.exec(ctx, http.MethodGet, "api/v2/users/"+userID, a.readToken(), nil)
 	if err != nil {
 		if !a.disableLogging {
 			log.Errorf("auth0: get user: %+v", err)
@@ -300,9 +312,6 @@ func (a *Auth0) GetUser(ctx context.Context, userID string) (gateway.Authenticat
 }
 
 func (a *Auth0) now() time.Time {
-	if a.current == nil {
-		a.current = currentTime
-	}
 	return a.current()
 }
 
@@ -342,7 +351,7 @@ func (a *Auth0) RegenerateMFARecoveryCode(ctx context.Context, sub string) (stri
 	var r struct {
 		RecoveryCode string `json:"recovery_code"`
 	}
-	if err := a.execInto(ctx, http.MethodPost, "api/v2/users/"+sub+"/recovery-code-regeneration", a.token, nil, &r); err != nil {
+	if err := a.execInto(ctx, http.MethodPost, "api/v2/users/"+sub+"/recovery-code-regeneration", a.readToken(), nil, &r); err != nil {
 		if !a.disableLogging {
 			log.Errorf("auth0: regenerate mfa recovery code: %+v", err)
 		}
@@ -352,18 +361,26 @@ func (a *Auth0) RegenerateMFARecoveryCode(ctx context.Context, sub string) (stri
 	return r.RecoveryCode, nil
 }
 
+// needsFetchToken reports whether the token is absent or close to expiry.
+// The caller must hold a.lock (at least for reading) before calling this.
 func (a *Auth0) needsFetchToken() bool {
 	if a == nil {
 		return false
-	}
-	if a.current == nil {
-		a.current = currentTime
 	}
 	return a.expireAt.IsZero() || a.expireAt.Sub(a.current()) <= time.Hour
 }
 
 func (a *Auth0) updateToken(ctx context.Context) error {
-	if a == nil || !a.needsFetchToken() {
+	if a == nil {
+		return nil
+	}
+
+	// Fast path: check under read lock to avoid write-lock contention on the
+	// common case where the token is still valid.
+	a.lock.RLock()
+	needsRefresh := a.needsFetchToken()
+	a.lock.RUnlock()
+	if !needsRefresh {
 		return nil
 	}
 
@@ -371,6 +388,9 @@ func (a *Auth0) updateToken(ctx context.Context) error {
 		return rerror.NewE(i18n.T("auth0 is not set up"))
 	}
 
+	// Slow path: acquire the write lock, double-check, and fetch a new token.
+	// The write lock serialises concurrent refreshes so only one goroutine
+	// hits the oauth/token endpoint at a time.
 	a.lock.Lock()
 	defer a.lock.Unlock()
 
@@ -390,10 +410,6 @@ func (a *Auth0) updateToken(ctx context.Context) error {
 			log.Errorf("auth0: access token error: %+v", err)
 		}
 		return rerror.NewE(i18n.T("failed to auth"))
-	}
-
-	if a.current == nil {
-		a.current = currentTime
 	}
 
 	if r.Token == "" {
