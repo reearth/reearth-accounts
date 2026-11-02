@@ -156,16 +156,37 @@ func (i *User) SignupOIDC(ctx context.Context, param interfaces.SignupOIDCParam)
 		return nil, err
 	}
 
+	// Determine sub and email.
+	//
+	// AuthVerified=true: the HTTP middleware already validated the caller's JWT;
+	// sub/email come from the signed token claims and are trusted directly.
+	//
+	// AccessToken != "": verify against the issuer's userinfo endpoint; caller-
+	// supplied sub/email are ignored to prevent binding a foreign identity (SEC-03).
+	//
+	// Otherwise (server-side provisioning): caller must supply both sub and email.
+	// This path is protected by the signup secret to prevent arbitrary injection.
 	sub := param.Sub
-	name := param.Name
 	email := param.Email
-	if sub == "" || email == "" {
+	name := param.Name
+	if param.AuthVerified {
+		if sub == "" || email == "" {
+			return nil, rerror.NewE(i18n.T("sub and email are required"))
+		}
+	} else if param.AccessToken != "" {
 		ui, err := i.getUserInfoFromISS(ctx, param.Issuer, param.AccessToken)
 		if err != nil {
 			return nil, err
 		}
 		sub = ui.Sub
 		email = ui.Email
+	} else {
+		if i.signupSecret == "" {
+			return nil, rerror.NewE(i18n.T("access token is required for unauthenticated OIDC signup"))
+		}
+		if sub == "" || email == "" {
+			return nil, rerror.NewE(i18n.T("sub and email are required"))
+		}
 	}
 
 	return Run1(ctx, nil, i.repos, Usecase().Transaction(), func(ctx context.Context) (*user.User, error) {

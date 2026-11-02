@@ -25,13 +25,14 @@ var (
 )
 
 type SignupOIDCParam struct {
-	AccessToken string
-	Issuer      string
-	Sub         string
-	Email       string
-	Name        string
-	Secret      *string
-	User        SignupUserParam
+	AccessToken  string
+	AuthVerified bool // true when identity was already proven by JWT middleware
+	Email        string
+	Issuer       string
+	Name         string
+	Secret       *string
+	Sub          string
+	User         SignupUserParam
 }
 
 type SyncSSOUserParam struct {
