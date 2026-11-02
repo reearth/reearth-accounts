@@ -2,6 +2,7 @@ package app
 
 import (
 	"context"
+	"net/url"
 
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/reearth/reearth-accounts/server/internal/infrastructure/auth0"
@@ -69,8 +70,25 @@ func initPostgresReposAndGateways(ctx context.Context, pool *pgxpool.Pool, conf 
 	return repos, initGateways(ctx, conf)
 }
 
+// isMongoDBTransactionAvailable extends mongox.IsTransactionAvailable to also
+// recognise single-host URIs that carry an explicit replicaSet query parameter
+// (e.g. mongodb://mongo:27017/?replicaSet=rs0). The upstream helper only
+// detects replica sets from the mongodb+srv scheme or comma-separated hosts;
+// misclassifying a transaction-capable deployment as NopTransaction causes
+// multi-step writes (signup, workspace creation) to be non-atomic.
+func isMongoDBTransactionAvailable(uri string) bool {
+	if mongox.IsTransactionAvailable(uri) {
+		return true
+	}
+	u, err := url.Parse(uri)
+	if err != nil {
+		return false
+	}
+	return u.Query().Get("replicaSet") != ""
+}
+
 func initReposAndGateways(ctx context.Context, client *mongo.Client, conf *Config) (*repo.Container, *gateway.Container) {
-	txAvailable := mongox.IsTransactionAvailable(conf.DB)
+	txAvailable := isMongoDBTransactionAvailable(conf.DB)
 
 	repos, err := mongorepo.New(ctx, client.Database(conf.DBName), txAvailable, false, []user.Repo{})
 	if err != nil {
