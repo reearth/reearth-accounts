@@ -537,10 +537,15 @@ func (i *Scim) SyncScimGroup(ctx context.Context, workspaceID workspace.ID, _, g
 			return interfaces.ErrSCIMNotEnabled
 		}
 
-		// Determine role for this group
+		// Determine role for this group.
+		// Owner role is never applied via SCIM group sync: it must be assigned
+		// through the normal member management API so that ErrCannotChangeRoleToOwner
+		// and self-promotion guards are enforced. This also prevents a misconfigured
+		// SCIM config (set before the owner-mapping guard was in place) from silently
+		// escalating members.
 		groupRole := role.RoleReader
 		if mapping := ws.ScimConfig().GroupRoleMapping(); mapping != nil {
-			if r, ok := mapping[groupName]; ok {
+			if r, ok := mapping[groupName]; ok && r != role.RoleOwner {
 				groupRole = r
 			}
 		}
@@ -682,6 +687,12 @@ func (i *Scim) UpdateScimConfig(ctx context.Context, workspaceID workspace.ID, e
 		for grp, r := range groupRoleMapping {
 			if !r.Valid() || r == role.RoleSelf {
 				return nil, fmt.Errorf("%w: invalid role %q for group %q", interfaces.ErrOperationDenied, r, grp)
+			}
+			// Only workspace owners may configure a group→owner mapping.
+			// Maintainers are allowed to manage SCIM but must not be able to
+			// escalate themselves or others to owner via SCIM group sync.
+			if r == role.RoleOwner && !operator.IsOwningWorkspace(workspaceID) {
+				return nil, fmt.Errorf("%w: only workspace owners may map a group to the owner role", interfaces.ErrOperationDenied)
 			}
 		}
 
