@@ -260,11 +260,6 @@ func (i *User) SyncSSOUser(ctx context.Context, param interfaces.SyncSSOUserPara
 			return nil, err
 		}
 
-		// Verification is intentionally left unverified here. It is promoted to
-		// verified only after ResendVerificationEmail succeeds (post-tx), so that
-		// a transient Auth0 failure is retried on the next SyncSSOUser call.
-		u.SetVerification(user.NewVerification())
-
 		if err = i.repos.User.Create(ctx, u); err != nil {
 			if errors.Is(err, user.ErrDuplicatedUser) {
 				return nil, interfaces.ErrUserAlreadyExists
@@ -301,10 +296,17 @@ func (i *User) SyncSSOUser(ctx context.Context, param interfaces.SyncSSOUserPara
 	}
 
 	authenticator := i.gateways.AuthenticatorFor(string(gateway.ProviderAuth0))
-	if authenticator == nil || (u.Verification() != nil && u.Verification().IsVerified()) {
+	if authenticator == nil {
 		return u, nil
 	}
 
+	// Already verified locally — nothing left to do.
+	if u.Verification() != nil && u.Verification().IsVerified() {
+		return u, nil
+	}
+
+	// Always check Auth0's current state: the user may have clicked the link
+	// since our last sync, and we need to pick that up even within the 24-h window.
 	authUser, err := authenticator.GetUser(ctx, param.Sub)
 	if err != nil {
 		log.Warnf("SyncSSOUser: could not fetch Auth0 user, skipping verification email (sub=%s): %v", param.Sub, err)
@@ -312,6 +314,9 @@ func (i *User) SyncSSOUser(ctx context.Context, param interfaces.SyncSSOUserPara
 	}
 
 	if authUser.EmailVerified {
+		if u.Verification() == nil {
+			u.SetVerification(user.NewVerification())
+		}
 		u.Verification().SetVerified(true)
 		if err = i.repos.User.Save(ctx, u); err != nil {
 			log.Warnf("SyncSSOUser: failed to persist verified state (sub=%s): %v", param.Sub, err)
@@ -319,8 +324,23 @@ func (i *User) SyncSSOUser(ctx context.Context, param interfaces.SyncSSOUserPara
 		return u, nil
 	}
 
+	// Auth0 still reports unverified. Only resend if no recent send is recorded
+	// or the previous 24-h window has expired — to avoid spamming the user and
+	// exhausting Auth0 Management API rate-limits on every login.
+	if u.Verification() != nil && !u.Verification().IsExpired() {
+		return u, nil
+	}
+
 	if err = authenticator.ResendVerificationEmail(ctx, param.Sub); err != nil {
 		log.Warnf("SyncSSOUser: verification email failed, will retry on next login (sub=%s): %v", param.Sub, err)
+		return u, nil
+	}
+
+	// Stamp a fresh 24-h window so we don't resend on every subsequent login
+	// while the user still hasn't clicked the verification link.
+	u.SetVerification(user.NewVerification())
+	if err = i.repos.User.Save(ctx, u); err != nil {
+		log.Warnf("SyncSSOUser: failed to save verification send state (sub=%s): %v", param.Sub, err)
 	}
 	return u, nil
 }
