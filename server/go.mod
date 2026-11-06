@@ -11,7 +11,6 @@ require (
 	github.com/avast/retry-go/v4 v4.7.0
 	github.com/cerbos/cerbos-sdk-go v0.3.13
 	github.com/cerbos/cerbos/api/genpb v0.47.0
-	github.com/cloudflare/cloudflare-go v0.119.0
 	github.com/gavv/httpexpect/v2 v2.17.0
 	github.com/go-playground/locales v0.14.1
 	github.com/go-playground/universal-translator v0.18.1

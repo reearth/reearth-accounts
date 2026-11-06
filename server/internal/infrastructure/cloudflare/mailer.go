@@ -6,57 +6,67 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
-
-	cf "github.com/cloudflare/cloudflare-go"
+	"net/url"
+	"strings"
+	"time"
 )
 
-// defaultSendURL is the Cloudflare Email Service endpoint.
-// https://developers.cloudflare.com/email-service/api/send-emails/rest-api/
-const defaultSendURL = "https://api.cloudflare.com/client/v4/accounts/%s/email/sending/send"
+const (
+	defaultSendURL     = "https://api.cloudflare.com/client/v4/accounts/%s/email/sending/send"
+	defaultHTTPTimeout = 10 * time.Second
+)
 
 // Mailer sends transactional email via the Cloudflare Email Service REST API.
+// Independent of reearthx/mailer.Mailer; wiring into gateway.Container requires a thin adapter.
 type Mailer interface {
 	SendMail(ctx context.Context, to []Contact, subject, plainContent, htmlContent string) error
 }
 
-// Contact is a named email address.
 type Contact struct {
 	Email string
 	Name  string
 }
 
-// Config holds the credentials and sender identity for the Cloudflare mailer.
 type Config struct {
 	AccountID   string
 	APIToken    string
+	HTTPTimeout time.Duration // defaults to 10 s when zero
 	SenderEmail string
 	SenderName  string
 }
 
 type mailer struct {
-	conf    *Config
-	api     *cf.API
+	conf    Config
 	client  *http.Client
-	sendURL string // formatted with AccountID; overridable in tests
+	sendURL string
 }
 
-// New creates a Mailer backed by the Cloudflare Email Service.
-// Returns an error if the Cloudflare API client cannot be initialized.
 func New(conf *Config) (Mailer, error) {
-	api, err := cf.NewWithAPIToken(conf.APIToken)
-	if err != nil {
-		return nil, fmt.Errorf("cloudflare mailer: init api client: %w", err)
+	if conf == nil {
+		return nil, fmt.Errorf("cloudflare mailer: conf must not be nil")
+	}
+	if conf.APIToken == "" {
+		return nil, fmt.Errorf("cloudflare mailer: APIToken must not be empty")
+	}
+	if conf.AccountID == "" {
+		return nil, fmt.Errorf("cloudflare mailer: AccountID must not be empty")
+	}
+	if conf.SenderEmail == "" {
+		return nil, fmt.Errorf("cloudflare mailer: SenderEmail must not be empty")
+	}
+
+	timeout := conf.HTTPTimeout
+	if timeout == 0 {
+		timeout = defaultHTTPTimeout
 	}
 
 	return &mailer{
-		conf:    conf,
-		api:     api,
-		client:  &http.Client{},
-		sendURL: fmt.Sprintf(defaultSendURL, conf.AccountID),
+		conf:    *conf,
+		client:  &http.Client{Timeout: timeout},
+		sendURL: fmt.Sprintf(defaultSendURL, url.PathEscape(conf.AccountID)),
 	}, nil
 }
 
-// cfAddress mirrors the Cloudflare Email Service address object.
 type cfAddress struct {
 	Address string `json:"address"`
 	Name    string `json:"name,omitempty"`
@@ -64,24 +74,51 @@ type cfAddress struct {
 
 type cfSendPayload struct {
 	From    cfAddress   `json:"from"`
-	To      []cfAddress `json:"to"`
-	Subject string      `json:"subject"`
 	HTML    string      `json:"html,omitempty"`
+	Subject string      `json:"subject"`
 	Text    string      `json:"text,omitempty"`
+	To      []cfAddress `json:"to"`
 }
 
+type cfResponse struct {
+	Errors  []cfError `json:"errors"`
+	Result  *cfResult `json:"result"`
+	Success bool      `json:"success"`
+}
+
+type cfError struct {
+	Code    int    `json:"code"`
+	Message string `json:"message"`
+}
+
+type cfResult struct {
+	Delivered       []string `json:"delivered"`
+	PermanentBounces []string `json:"permanent_bounces"`
+	Queued          []string `json:"queued"`
+}
+
+// SendMail sends one message per recipient to avoid leaking addresses across recipients.
 func (m *mailer) SendMail(ctx context.Context, to []Contact, subject, plainContent, htmlContent string) error {
-	recipients := make([]cfAddress, 0, len(to))
-	for _, c := range to {
-		recipients = append(recipients, cfAddress{Address: c.Email, Name: c.Name})
+	if len(to) == 0 {
+		return fmt.Errorf("cloudflare mailer: to must not be empty")
 	}
 
+	sender := cfAddress{Address: m.conf.SenderEmail, Name: m.conf.SenderName}
+	for _, c := range to {
+		if err := m.send(ctx, sender, c, subject, plainContent, htmlContent); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func (m *mailer) send(ctx context.Context, from cfAddress, to Contact, subject, plainContent, htmlContent string) error {
 	payload := cfSendPayload{
-		From:    cfAddress{Address: m.conf.SenderEmail, Name: m.conf.SenderName},
-		To:      recipients,
+		From:    from,
+		HTML:    htmlContent,
 		Subject: subject,
 		Text:    plainContent,
-		HTML:    htmlContent,
+		To:      []cfAddress{{Address: to.Email, Name: to.Name}},
 	}
 
 	body, err := json.Marshal(payload)
@@ -102,9 +139,36 @@ func (m *mailer) SendMail(ctx context.Context, to []Contact, subject, plainConte
 	}
 	defer resp.Body.Close()
 
-	if resp.StatusCode >= 300 {
-		return fmt.Errorf("cloudflare mailer: unexpected status %d", resp.StatusCode)
+	var envelope cfResponse
+	decodeErr := json.NewDecoder(resp.Body).Decode(&envelope)
+
+	if resp.StatusCode >= 300 || !envelope.Success {
+		if decodeErr != nil || len(envelope.Errors) == 0 {
+			return fmt.Errorf("cloudflare mailer: status %d: unknown error", resp.StatusCode)
+		}
+		return fmt.Errorf("cloudflare mailer: status %d: %s", resp.StatusCode, formatErrors(envelope.Errors))
+	}
+
+	if decodeErr != nil {
+		return fmt.Errorf("cloudflare mailer: decode response: %w", decodeErr)
+	}
+
+	if r := envelope.Result; r != nil {
+		if len(r.PermanentBounces) > 0 {
+			return fmt.Errorf("cloudflare mailer: permanent bounce for %s", to.Email)
+		}
+		if len(r.Delivered) == 0 && len(r.Queued) == 0 {
+			return fmt.Errorf("cloudflare mailer: %s was neither delivered nor queued", to.Email)
+		}
 	}
 
 	return nil
+}
+
+func formatErrors(errs []cfError) string {
+	parts := make([]string, 0, len(errs))
+	for _, e := range errs {
+		parts = append(parts, fmt.Sprintf("%d: %s", e.Code, e.Message))
+	}
+	return strings.Join(parts, "; ")
 }
