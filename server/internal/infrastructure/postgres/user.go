@@ -242,9 +242,13 @@ func (r *User) SearchByKeyword(ctx context.Context, keyword string) (user.List, 
 	if len(keyword) < 3 {
 		return nil, nil
 	}
-	kw := likeContains(keyword)
-	rows, err := r.c.db(ctx).Query(ctx,
-		`SELECT `+userColumns+` FROM users WHERE name ILIKE $1 OR email ILIKE $1 ORDER BY name LIMIT 10`, kw)
+	// An email only matches as a whole address, so search cannot be used to
+	// enumerate users by domain or address fragment.
+	q, arg := `SELECT `+userColumns+` FROM users WHERE name ILIKE $1 ORDER BY name LIMIT 10`, likeContains(keyword)
+	if strings.Contains(keyword, "@") {
+		q, arg = `SELECT `+userColumns+` FROM users WHERE lower(email) = lower($1) ORDER BY name LIMIT 10`, keyword
+	}
+	rows, err := r.c.db(ctx).Query(ctx, q, arg)
 	if err != nil {
 		return nil, rerror.ErrInternalByWithContext(ctx, err)
 	}

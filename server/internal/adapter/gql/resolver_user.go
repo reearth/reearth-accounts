@@ -22,6 +22,26 @@ func (r *meResolver) Workspaces(ctx context.Context, obj *gqlmodel.Me) ([]*gqlmo
 	return loaders(ctx).Workspace.FindByUser(ctx, obj.ID)
 }
 
+func (r *Resolver) User() UserResolver {
+	return &userResolver{r}
+}
+
+type userResolver struct{ *Resolver }
+
+// Email is shown only to its owner. Every query that returns a User, including
+// anonymous ones, resolves through here. Signup is anonymous but returns the
+// caller's own record, hence OwnRecord.
+func (r *userResolver) Email(ctx context.Context, obj *gqlmodel.User) (string, error) {
+	if obj.OwnRecord() {
+		return obj.Email, nil
+	}
+	viewer := getUser(ctx)
+	if viewer == nil || gqlmodel.ID(viewer.ID().String()) != obj.ID {
+		return "", nil
+	}
+	return obj.Email, nil
+}
+
 func (r *queryResolver) FindUsersByIDs(ctx context.Context, userIds []gqlmodel.ID) ([]*gqlmodel.User, error) {
 	uids, err := gqlmodel.ToIDs[id.User](userIds)
 	if err != nil {

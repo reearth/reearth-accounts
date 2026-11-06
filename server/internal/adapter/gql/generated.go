@@ -42,6 +42,7 @@ type ResolverRoot interface {
 	Me() MeResolver
 	Mutation() MutationResolver
 	Query() QueryResolver
+	User() UserResolver
 	WorkspaceUserMember() WorkspaceUserMemberResolver
 }
 
@@ -303,6 +304,9 @@ type QueryResolver interface {
 	FindByAlias(ctx context.Context, alias string) (*gqlmodel.Workspace, error)
 	FindByUser(ctx context.Context, userID gqlmodel.ID) ([]*gqlmodel.Workspace, error)
 	FindByUserWithPagination(ctx context.Context, userID gqlmodel.ID, pagination gqlmodel.Pagination) (*gqlmodel.WorkspacesWithPagination, error)
+}
+type UserResolver interface {
+	Email(ctx context.Context, obj *gqlmodel.User) (string, error)
 }
 type WorkspaceUserMemberResolver interface {
 	User(ctx context.Context, obj *gqlmodel.WorkspaceUserMember) (*gqlmodel.User, error)
@@ -5722,7 +5726,7 @@ func (ec *executionContext) _User_email(ctx context.Context, field graphql.Colle
 		field,
 		ec.fieldContext_User_email,
 		func(ctx context.Context) (any, error) {
-			return obj.Email, nil
+			return ec.resolvers.User().Email(ctx, obj)
 		},
 		nil,
 		ec.marshalNString2string,
@@ -5735,8 +5739,8 @@ func (ec *executionContext) fieldContext_User_email(_ context.Context, field gra
 	fc = &graphql.FieldContext{
 		Object:     "User",
 		Field:      field,
-		IsMethod:   false,
-		IsResolver: false,
+		IsMethod:   true,
+		IsResolver: true,
 		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
 			return nil, errors.New("field of type String does not have child fields")
 		},
@@ -10775,39 +10779,70 @@ func (ec *executionContext) _User(ctx context.Context, sel ast.SelectionSet, obj
 		case "id":
 			out.Values[i] = ec._User_id(ctx, field, obj)
 			if out.Values[i] == graphql.Null {
-				out.Invalids++
+				atomic.AddUint32(&out.Invalids, 1)
 			}
 		case "name":
 			out.Values[i] = ec._User_name(ctx, field, obj)
 			if out.Values[i] == graphql.Null {
-				out.Invalids++
+				atomic.AddUint32(&out.Invalids, 1)
 			}
 		case "alias":
 			out.Values[i] = ec._User_alias(ctx, field, obj)
 			if out.Values[i] == graphql.Null {
-				out.Invalids++
+				atomic.AddUint32(&out.Invalids, 1)
 			}
 		case "email":
-			out.Values[i] = ec._User_email(ctx, field, obj)
-			if out.Values[i] == graphql.Null {
-				out.Invalids++
+			field := field
+
+			innerFunc := func(ctx context.Context, fs *graphql.FieldSet) (res graphql.Marshaler) {
+				defer func() {
+					if r := recover(); r != nil {
+						ec.Error(ctx, ec.Recover(ctx, r))
+					}
+				}()
+				res = ec._User_email(ctx, field, obj)
+				if res == graphql.Null {
+					atomic.AddUint32(&fs.Invalids, 1)
+				}
+				return res
 			}
+
+			if field.Deferrable != nil {
+				dfs, ok := deferred[field.Deferrable.Label]
+				di := 0
+				if ok {
+					dfs.AddField(field)
+					di = len(dfs.Values) - 1
+				} else {
+					dfs = graphql.NewFieldSet([]graphql.CollectedField{field})
+					deferred[field.Deferrable.Label] = dfs
+				}
+				dfs.Concurrently(di, func(ctx context.Context) graphql.Marshaler {
+					return innerFunc(ctx, dfs)
+				})
+
+				// don't run the out.Concurrently() call below
+				out.Values[i] = graphql.Null
+				continue
+			}
+
+			out.Concurrently(i, func(ctx context.Context) graphql.Marshaler { return innerFunc(ctx, out) })
 		case "host":
 			out.Values[i] = ec._User_host(ctx, field, obj)
 		case "workspace":
 			out.Values[i] = ec._User_workspace(ctx, field, obj)
 			if out.Values[i] == graphql.Null {
-				out.Invalids++
+				atomic.AddUint32(&out.Invalids, 1)
 			}
 		case "auths":
 			out.Values[i] = ec._User_auths(ctx, field, obj)
 			if out.Values[i] == graphql.Null {
-				out.Invalids++
+				atomic.AddUint32(&out.Invalids, 1)
 			}
 		case "metadata":
 			out.Values[i] = ec._User_metadata(ctx, field, obj)
 			if out.Values[i] == graphql.Null {
-				out.Invalids++
+				atomic.AddUint32(&out.Invalids, 1)
 			}
 		case "verification":
 			out.Values[i] = ec._User_verification(ctx, field, obj)

@@ -261,21 +261,6 @@ type UpdateWorkspacePayload struct {
 	Workspace *Workspace `json:"workspace"`
 }
 
-type User struct {
-	ID           ID            `json:"id"`
-	Name         string        `json:"name"`
-	Alias        string        `json:"alias"`
-	Email        string        `json:"email"`
-	Host         *string       `json:"host,omitempty"`
-	Workspace    ID            `json:"workspace"`
-	Auths        []string      `json:"auths"`
-	Metadata     *UserMetadata `json:"metadata"`
-	Verification *Verification `json:"verification,omitempty"`
-}
-
-func (User) IsNode()        {}
-func (this User) GetID() ID { return this.ID }
-
 type UserMetadata struct {
 	Description string `json:"description"`
 	Website     string `json:"website"`

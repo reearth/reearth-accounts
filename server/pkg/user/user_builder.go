@@ -12,10 +12,11 @@ var ErrInvalidName = rerror.NewE(i18n.T("invalid user name"))
 var ErrInvalidAlias = rerror.NewE(i18n.T("invalid alias"))
 
 type Builder struct {
-	u            *User
-	err          error
-	passwordText string
-	email        string
+	u             *User
+	err           error
+	passwordText  string
+	email         string
+	emailOptional bool
 }
 
 func New() *Builder {
@@ -43,8 +44,10 @@ func (b *Builder) Build() (*User, error) {
 		b.u.metadata.theme = ThemeDefault
 	}
 
-	if err := b.u.UpdateEmail(b.email); err != nil {
-		return nil, err
+	if !b.emailOptional || b.email != "" {
+		if err := b.u.UpdateEmail(b.email); err != nil {
+			return nil, err
+		}
 	}
 
 	// Restore explicitly set updatedAt, or set default if not specified
@@ -92,6 +95,15 @@ func (b *Builder) Alias(alias string) *Builder {
 
 func (b *Builder) Email(email string) *Builder {
 	b.email = email
+	return b
+}
+
+// OptionalEmail is for users read back from the accounts API, which returns
+// an empty email for anyone other than the caller. A non-empty value is still
+// validated.
+func (b *Builder) OptionalEmail(email string) *Builder {
+	b.email = email
+	b.emailOptional = true
 	return b
 }
 

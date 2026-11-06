@@ -46,6 +46,16 @@ func ToUser(u *user.User) *User {
 	}
 }
 
+// ToOwnUser converts a user being returned to that same user, such as the
+// result of their own signup, so the email resolver shows the address.
+func ToOwnUser(u *user.User) *User {
+	res := ToUser(u)
+	if res != nil {
+		res.ownRecord = true
+	}
+	return res
+}
+
 func ToUsers(ul user.List) []*User {
 	if ul == nil {
 		return nil

@@ -149,6 +149,17 @@ func StartServerWithGateways(
 	debug bool,
 ) *httpexpect.Expect {
 	t.Helper()
+	return httpexpect.Default(t, startServerURL(t, cfg, repos, gateways, debug))
+}
+
+func startServerURL(
+	t *testing.T,
+	cfg *app.Config,
+	repos *repo.Container,
+	gateways *gateway.Container,
+	debug bool,
+) string {
+	t.Helper()
 
 	if testing.Short() {
 		t.SkipNow()
@@ -200,7 +211,7 @@ func StartServerWithGateways(
 			t.Fatalf("server serve: %v", err)
 		}
 	})
-	return httpexpect.Default(t, "http://"+l.Addr().String())
+	return "http://" + l.Addr().String()
 }
 
 func StartServerWithGateway(
