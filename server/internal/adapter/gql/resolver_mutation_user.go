@@ -77,7 +77,7 @@ func (r *mutationResolver) Signup(ctx context.Context, input gqlmodel.SignupInpu
 		return nil, err
 	}
 
-	return &gqlmodel.UserPayload{User: gqlmodel.ToUser(u)}, nil
+	return &gqlmodel.UserPayload{User: gqlmodel.ToOwnUser(u)}, nil
 }
 
 
@@ -126,7 +126,7 @@ func (r *mutationResolver) SignupOidc(ctx context.Context, input gqlmodel.Signup
 		return nil, err
 	}
 
-	return &gqlmodel.UserPayload{User: gqlmodel.ToUser(u)}, nil
+	return &gqlmodel.UserPayload{User: gqlmodel.ToOwnUser(u)}, nil
 }
 
 func (r *mutationResolver) Logout(ctx context.Context) (*gqlmodel.Me, error) {
@@ -144,7 +144,7 @@ func (r *mutationResolver) VerifyUser(ctx context.Context, input gqlmodel.Verify
 		return nil, err
 	}
 
-	return &gqlmodel.UserPayload{User: gqlmodel.ToUser(u)}, nil
+	return &gqlmodel.UserPayload{User: gqlmodel.ToOwnUser(u)}, nil
 }
 
 // Temporary stub implementation to satisfy gqlgen after migrating GraphQL files from reearthx/account.

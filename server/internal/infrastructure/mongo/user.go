@@ -125,11 +125,13 @@ func (r *User) SearchByKeyword(ctx context.Context, keyword string) (user.List, 
 	if len(keyword) < 3 {
 		return nil, nil
 	}
-	regex := bson.M{"$regex": primitive.Regex{Pattern: regexp.QuoteMeta(keyword), Options: "i"}}
-	return r.find(ctx,
-		bson.M{"$or": []bson.M{{"email": regex}, {"name": regex}}},
-		options.Find().SetLimit(10).SetSort(bson.M{"name": 1}),
-	)
+	// An email only matches as a whole address, so search cannot be used to
+	// enumerate users by domain or address fragment.
+	filter := bson.M{"name": bson.M{"$regex": primitive.Regex{Pattern: regexp.QuoteMeta(keyword), Options: "i"}}}
+	if strings.Contains(keyword, "@") {
+		filter = bson.M{"email": bson.M{"$regex": primitive.Regex{Pattern: "^" + regexp.QuoteMeta(keyword) + "$", Options: "i"}}}
+	}
+	return r.find(ctx, filter, options.Find().SetLimit(10).SetSort(bson.M{"name": 1}))
 }
 
 func (r *User) FindByVerification(ctx context.Context, code string) (*user.User, error) {

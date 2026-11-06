@@ -338,6 +338,17 @@ func testUserSearch(t *testing.T, nc Factory) {
 	require.NoError(t, err)
 	require.Len(t, res, 1)
 	assert.Equal(t, u.ID(), res[0].ID())
+
+	res, err = c.User.SearchByKeyword(ctx, "CHARLIE@example.com")
+	require.NoError(t, err)
+	require.Len(t, res, 1)
+	assert.Equal(t, u.ID(), res[0].ID())
+
+	for _, partial := range []string{"example.com", "charlie@exam", "@example.com"} {
+		res, err = c.User.SearchByKeyword(ctx, partial)
+		require.NoError(t, err)
+		assert.Empty(t, res, partial)
+	}
 }
 
 func testUserPagination(t *testing.T, nc Factory) {

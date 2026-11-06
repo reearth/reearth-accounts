@@ -266,10 +266,13 @@ func (r *User) SearchByKeyword(_ context.Context, keyword string) (user.List, er
 
 	keyword = strings.TrimSpace(strings.ToLower(keyword))
 
-	return rerror.ErrIfNil(r.data.FindAll(func(key user.ID, value *user.User) bool {
-		return strings.Contains(strings.ToLower(value.Email()), keyword) ||
-			strings.Contains(strings.ToLower(value.Name()), keyword)
-	}), rerror.ErrNotFound)
+	isEmail := strings.Contains(keyword, "@")
+	return r.data.FindAll(func(key user.ID, value *user.User) bool {
+		if isEmail {
+			return strings.EqualFold(value.Email(), keyword)
+		}
+		return strings.Contains(strings.ToLower(value.Name()), keyword)
+	}), nil
 }
 
 func (r *User) FindByVerification(_ context.Context, code string) (*user.User, error) {
