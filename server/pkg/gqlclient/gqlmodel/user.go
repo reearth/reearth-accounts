@@ -37,7 +37,7 @@ func ToUser(ctx context.Context, u User) (*user.User, error) {
 		ID(id).
 		Alias(string(u.Alias)).
 		Name(string(u.Name)).
-		Email(string(u.Email)).
+		OptionalEmail(string(u.Email)).
 		Metadata(user.MetadataFrom(
 			string(u.Metadata.PhotoURL),
 			string(u.Metadata.Description),

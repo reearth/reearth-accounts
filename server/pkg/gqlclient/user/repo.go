@@ -159,7 +159,7 @@ func (r *userRepo) FindByID(ctx context.Context, id string) (*user.User, error) 
 	return user.New().
 		ID(uid).
 		Name(string(q.User.Name)).
-		Email(string(q.User.Email)).
+		OptionalEmail(string(q.User.Email)).
 		Workspace(wid).
 		Metadata(gqlmodel.ToUserMetadata(q.User.Metadata)).
 		Build()
@@ -206,7 +206,7 @@ func (r *userRepo) FindByIDs(ctx context.Context, ids []string) ([]*user.User, e
 		userObj, err := user.New().
 			ID(uid).
 			Name(string(u.Name)).
-			Email(string(u.Email)).
+			OptionalEmail(string(u.Email)).
 			Workspace(wid).
 			Auths(auths2).
 			Metadata(gqlmodel.ToUserMetadata(u.Metadata)).
@@ -241,7 +241,7 @@ func (r *userRepo) FindByAlias(ctx context.Context, alias string) (*user.User, e
 		ID(uid).
 		Name(string(q.User.Name)).
 		Alias(string(q.User.Alias)).
-		Email(string(q.User.Email)).
+		OptionalEmail(string(q.User.Email)).
 		Build()
 }
 
@@ -278,7 +278,7 @@ func (r *userRepo) FindByNameOrAlias(ctx context.Context, nameOrAlias string) ([
 			ID(uid).
 			Name(string(u.Name)).
 			Alias(string(u.Alias)).
-			Email(string(u.Email)).
+			OptionalEmail(string(u.Email)).
 			Workspace(wid).
 			Auths(auths2).
 			Metadata(gqlmodel.ToUserMetadata(u.Metadata)).
@@ -312,7 +312,7 @@ func (r *userRepo) FindByNameOrEmail(ctx context.Context, nameOrEmail string) (*
 	return user.New().
 		ID(uid).
 		Name(string(q.User.Name)).
-		Email(string(q.User.Email)).
+		OptionalEmail(string(q.User.Email)).
 		Build()
 }
 

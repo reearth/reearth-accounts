@@ -360,3 +360,17 @@ func TestBuilder_Verification(t *testing.T) {
 // 		assert.Equal(t, customTime, u.UpdatedAt())
 // 	})
 // }
+
+func TestBuilder_OptionalEmail(t *testing.T) {
+	b := func() *Builder { return New().NewID().Name("n").Workspace(NewWorkspaceID()) }
+
+	u, err := b().OptionalEmail("").Build()
+	assert.NoError(t, err)
+	assert.Empty(t, u.Email())
+
+	_, err = b().OptionalEmail("not-an-email").Build()
+	assert.ErrorIs(t, err, ErrInvalidEmail)
+
+	_, err = b().Email("").Build()
+	assert.ErrorIs(t, err, ErrInvalidEmail)
+}

@@ -8,7 +8,9 @@ import (
 
 	httpexpect "github.com/gavv/httpexpect/v2"
 	"github.com/reearth/reearth-accounts/server/internal/app"
+	"github.com/reearth/reearth-accounts/server/internal/infrastructure/memory"
 	"github.com/reearth/reearth-accounts/server/internal/usecase/repo"
+	"github.com/reearth/reearth-accounts/server/pkg/gqlclient"
 	"github.com/reearth/reearth-accounts/server/pkg/id"
 	"github.com/reearth/reearth-accounts/server/pkg/role"
 	"github.com/reearth/reearth-accounts/server/pkg/user"
@@ -97,19 +99,26 @@ func TestUserEmail_HiddenFromOtherSignedInUsers(t *testing.T) {
 }
 
 func TestSearchUser_MatchesWholeEmailOnly(t *testing.T) {
-	e, _ := StartServer(t, &app.Config{}, false, seedEmailVisibility)
-	viewer := uId2
+	for name, useMongo := range map[string]bool{"memory": false, "mongo": true} {
+		t.Run(name, func(t *testing.T) {
+			e, _ := StartServer(t, &app.Config{}, useMongo, seedEmailVisibility)
+			viewer := uId2
 
-	postGQL(t, e, &viewer, `{ searchUser(keyword:"example.com") { id } }`).
-		Value("searchUser").Array().IsEmpty()
-	postGQL(t, e, &viewer, `{ searchUser(keyword:"victim@exam") { id } }`).
-		Value("searchUser").Array().IsEmpty()
+			postGQL(t, e, &viewer, `{ searchUser(keyword:"example.com") { id } }`).
+				Value("searchUser").Array().IsEmpty()
+			postGQL(t, e, &viewer, `{ searchUser(keyword:"victim@exam") { id } }`).
+				Value("searchUser").Array().IsEmpty()
 
-	hits := postGQL(t, e, &viewer, `{ searchUser(keyword:"VICTIM@example.com") { id name email } }`).
-		Value("searchUser").Array()
-	hits.Length().IsEqual(1)
-	hits.Value(0).Object().Value("id").String().IsEqual(uId.String())
-	hits.Value(0).Object().Value("email").String().IsEqual("")
+			hits := postGQL(t, e, &viewer, `{ searchUser(keyword:"VICTIM@example.com") { id name email } }`).
+				Value("searchUser").Array()
+			hits.Length().IsEqual(1)
+			hits.Value(0).Object().Value("id").String().IsEqual(uId.String())
+			hits.Value(0).Object().Value("email").String().IsEqual("")
+
+			postGQL(t, e, &viewer, `{ searchUser(keyword:"vict") { id } }`).
+				Value("searchUser").Array().Length().IsEqual(1)
+		})
+	}
 }
 
 func TestUserEmail_VisibleToOwner(t *testing.T) {
@@ -137,4 +146,58 @@ func TestUserEmail_SignupReturnsOwnEmail(t *testing.T) {
 		Expect().Status(http.StatusOK).JSON().Object().
 		Value("data").Object().Value("signup").Object().Value("user").Object().
 		Value("email").String().IsEqual("newuser@example.com")
+}
+
+type debugUserTransport struct{ userID string }
+
+func (d debugUserTransport) RoundTrip(req *http.Request) (*http.Response, error) {
+	req = req.Clone(req.Context())
+	req.Header.Set("Authorization", "Bearer test")
+	req.Header.Set("X-Reearth-Debug-User", d.userID)
+	return http.DefaultTransport.RoundTrip(req)
+}
+
+// Downstream services read users through pkg/gqlclient, which builds domain
+// users. These lookups must still succeed now that other users' email is "".
+func TestGQLClient_ReadsUsersWithHiddenEmail(t *testing.T) {
+	ctx := context.Background()
+	repos := memory.New()
+	require.NoError(t, seedEmailVisibility(ctx, repos))
+	url := startServerURL(t, &app.Config{}, repos, nil, true)
+	c := gqlclient.NewClient(url, 10, gqlclient.NewAccountsTransport(debugUserTransport{uId2.String()}, "flow-api"))
+
+	u, err := c.UserRepo.FindByID(ctx, uId.String())
+	require.NoError(t, err)
+	require.Equal(t, "victim", u.Name())
+	require.Empty(t, u.Email())
+
+	us, err := c.UserRepo.FindByIDs(ctx, []string{uId.String(), uId2.String()})
+	require.NoError(t, err)
+	require.Len(t, us, 2)
+
+	u, err = c.UserRepo.FindByAlias(ctx, "victim")
+	require.NoError(t, err)
+	require.Empty(t, u.Email())
+
+	us, err = c.UserRepo.FindByNameOrAlias(ctx, "victim")
+	require.NoError(t, err)
+	require.NotEmpty(t, us)
+
+	u, err = c.UserRepo.FindByNameOrEmail(ctx, victimEmail)
+	require.NoError(t, err)
+	require.Equal(t, uId, u.ID())
+
+	ul, total, err := c.UserRepo.FindUsersByIDsWithPagination(ctx, []string{uId.String()}, "", 1, 10)
+	require.NoError(t, err)
+	require.Equal(t, 1, total)
+	require.Empty(t, ul[0].Email())
+
+	_, err = c.WorkspaceRepo.FindByID(ctx, wId.String())
+	require.NoError(t, err)
+	_, err = c.WorkspaceRepo.FindByAlias(ctx, "team-alias")
+	require.NoError(t, err)
+
+	me, err := c.UserRepo.FindMe(ctx)
+	require.NoError(t, err)
+	require.Equal(t, viewerEmail, me.Email())
 }
