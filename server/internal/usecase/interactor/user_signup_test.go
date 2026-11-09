@@ -1272,7 +1272,7 @@ func TestUser_SyncSSOUser(t *testing.T) {
 		assert.NotEqual(t, u1.Name(), u2.Name(), "each user must get a distinct placeholder name to avoid workspace alias collisions")
 	})
 
-	t.Run("retries email on subsequent login when Auth0 email_verified is still false", func(t *testing.T) {
+	t.Run("skips resend within 24h window when Auth0 email_verified is still false", func(t *testing.T) {
 		ctx := context.Background()
 		r := accountmemory.New()
 		setupRoles(ctx, r)
@@ -1285,7 +1285,7 @@ func TestUser_SyncSSOUser(t *testing.T) {
 		}
 
 		uc := NewUser(r, g, nil, "", "")
-		// First call: creates the user and sends the email.
+		// First call: creates the user and sends the email, stamps a 24-h window.
 		_, err := uc.SyncSSOUser(ctx, interfaces.SyncSSOUserParam{
 			Email: "returning@example.com",
 			Name:  "Returning User",
@@ -1297,7 +1297,7 @@ func TestUser_SyncSSOUser(t *testing.T) {
 		// Reset the mock — email_verified still false (user hasn't clicked the link).
 		auth0Mock.resendVerificationEmailCalled = false
 
-		// Second call: Auth0 still unverified → email is retried.
+		// Second call within the 24-h window: Auth0 still unverified → must NOT resend.
 		u, err := uc.SyncSSOUser(ctx, interfaces.SyncSSOUserParam{
 			Email: "returning@example.com",
 			Name:  "Returning User",
@@ -1305,7 +1305,47 @@ func TestUser_SyncSSOUser(t *testing.T) {
 		})
 		assert.NoError(t, err)
 		assert.NotNil(t, u)
-		assert.True(t, auth0Mock.resendVerificationEmailCalled, "email must be retried while Auth0 email_verified remains false")
+		assert.False(t, auth0Mock.resendVerificationEmailCalled, "must not resend within the 24-h window to avoid spamming and Auth0 rate-limits")
+	})
+
+	t.Run("retries resend when verification window has expired", func(t *testing.T) {
+		ctx := context.Background()
+		r := accountmemory.New()
+		setupRoles(ctx, r)
+
+		auth0Mock := &mockAuthenticator{emailVerified: false}
+		g := &gateway.Container{
+			Authenticators: map[gateway.Provider]gateway.Authenticator{
+				gateway.ProviderAuth0: auth0Mock,
+			},
+		}
+
+		uc := NewUser(r, g, nil, "", "")
+		_, err := uc.SyncSSOUser(ctx, interfaces.SyncSSOUserParam{
+			Email: "expired@example.com",
+			Name:  "Expired User",
+			Sub:   "samlp|org123|expired",
+		})
+		assert.NoError(t, err)
+		assert.True(t, auth0Mock.resendVerificationEmailCalled)
+
+		// Simulate the 24-h window expiring by backdating the stored verification.
+		u, findErr := r.User.FindBySub(ctx, "samlp|org123|expired")
+		assert.NoError(t, findErr)
+		u.SetVerification(user.VerificationFrom("code", time.Now().Add(-25*time.Hour), false))
+		assert.NoError(t, r.User.Save(ctx, u))
+
+		auth0Mock.resendVerificationEmailCalled = false
+
+		// Call after expiry: Auth0 still unverified → must resend.
+		u, err = uc.SyncSSOUser(ctx, interfaces.SyncSSOUserParam{
+			Email: "expired@example.com",
+			Name:  "Expired User",
+			Sub:   "samlp|org123|expired",
+		})
+		assert.NoError(t, err)
+		assert.NotNil(t, u)
+		assert.True(t, auth0Mock.resendVerificationEmailCalled, "must resend once the 24-h window expires")
 	})
 
 	t.Run("persists verified state and skips Auth0 calls on subsequent logins", func(t *testing.T) {
