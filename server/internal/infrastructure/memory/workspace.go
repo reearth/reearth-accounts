@@ -176,10 +176,12 @@ func (r *Workspace) FindByIDs(_ context.Context, ids workspace.IDList) (workspac
 		}
 	}
 
-	res := r.data.FindAll(func(key workspace.ID, value *workspace.Workspace) bool {
-		return ids.Has(key)
-	})
-	slices.SortFunc(res, func(a, b *workspace.Workspace) int { return a.ID().Compare(b.ID()) })
+	var res workspace.List
+	for _, id := range ids {
+		if w, ok := r.data.Load(id); ok {
+			res = append(res, w)
+		}
+	}
 	return res, nil
 }
 
