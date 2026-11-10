@@ -25,7 +25,7 @@ func TestAuthTime(t *testing.T) {
 
 	t.Run("claim present", func(t *testing.T) {
 		ctx := withToken(signedToken(t, jwt.MapClaims{"sub": "u", "auth_time": 1700000000}))
-		got := AuthTime(ctx)
+		got := AuthTime(ctx, "")
 		require.NotNil(t, got)
 		assert.True(t, got.Equal(time.Unix(1700000000, 0)))
 	})
@@ -36,29 +36,47 @@ func TestAuthTime(t *testing.T) {
 		"double space after the scheme":     "Bearer  ",
 	} {
 		t.Run(name, func(t *testing.T) {
-			got := AuthTime(withToken(prefix + signedToken(t, jwt.MapClaims{"auth_time": 1700000000})))
+			got := AuthTime(withToken(prefix+signedToken(t, jwt.MapClaims{"auth_time": 1700000000})), "")
 			require.NotNil(t, got)
 			assert.True(t, got.Equal(time.Unix(1700000000, 0)))
 		})
 	}
 
 	t.Run("empty token", func(t *testing.T) {
-		assert.Nil(t, AuthTime(withToken("")))
+		assert.Nil(t, AuthTime(withToken(""), ""))
 	})
 
 	t.Run("claim absent", func(t *testing.T) {
-		assert.Nil(t, AuthTime(withToken(signedToken(t, jwt.MapClaims{"sub": "u"}))))
+		assert.Nil(t, AuthTime(withToken(signedToken(t, jwt.MapClaims{"sub": "u"})), ""))
 	})
 
 	t.Run("claim not a number", func(t *testing.T) {
-		assert.Nil(t, AuthTime(withToken(signedToken(t, jwt.MapClaims{"auth_time": "yesterday"}))))
+		assert.Nil(t, AuthTime(withToken(signedToken(t, jwt.MapClaims{"auth_time": "yesterday"})), ""))
 	})
 
 	t.Run("malformed token", func(t *testing.T) {
-		assert.Nil(t, AuthTime(withToken("not-a-jwt")))
+		assert.Nil(t, AuthTime(withToken("not-a-jwt"), ""))
+	})
+
+	const claim = "https://example.com/auth_time"
+
+	t.Run("configured claim wins over auth_time", func(t *testing.T) {
+		got := AuthTime(withToken(signedToken(t, jwt.MapClaims{claim: 1700000000, "auth_time": 1600000000})), claim)
+		require.NotNil(t, got)
+		assert.True(t, got.Equal(time.Unix(1700000000, 0)))
+	})
+
+	t.Run("configured claim absent falls back to auth_time", func(t *testing.T) {
+		got := AuthTime(withToken(signedToken(t, jwt.MapClaims{"auth_time": 1600000000})), claim)
+		require.NotNil(t, got)
+		assert.True(t, got.Equal(time.Unix(1600000000, 0)))
+	})
+
+	t.Run("neither claim", func(t *testing.T) {
+		assert.Nil(t, AuthTime(withToken(signedToken(t, jwt.MapClaims{"sub": "u"})), claim))
 	})
 
 	t.Run("no auth info", func(t *testing.T) {
-		assert.Nil(t, AuthTime(context.Background()))
+		assert.Nil(t, AuthTime(context.Background(), ""))
 	})
 }

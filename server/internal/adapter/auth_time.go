@@ -8,28 +8,24 @@ import (
 	"github.com/golang-jwt/jwt/v5"
 )
 
-type authTimeClaims struct {
-	AuthTime *jwt.NumericDate `json:"auth_time"`
-	jwt.RegisteredClaims
-}
-
-// AuthTime returns the auth_time claim of the request's token, or nil when
-// there is no token or no readable claim. The claims are read without
+// AuthTime returns the login time from the request's token, or nil when there
+// is no token or no readable claim. It reads the claim named by claim when that
+// is set and holds a number, and the standard auth_time claim otherwise. The claims are read without
 // verifying the signature. In production the JWT middleware has verified the
 // token before this runs. In debug mode the X-Reearth-Debug-Auth-Token header
 // can supply any token, but debug headers already allow impersonating any
 // user, so debug mode is not a security boundary.
-func AuthTime(ctx context.Context) *time.Time {
+func AuthTime(ctx context.Context, claim string) *time.Time {
 	ai := GetAuthInfo(ctx)
 	if ai == nil {
 		return nil
 	}
-	return authTimeFromToken(ai.Token)
+	return authTimeFromToken(ai.Token, claim)
 }
 
 // appx strips only an exact "Bearer " prefix, while the validator accepts the
 // scheme in any case and with any spacing, so the scheme can still be here.
-func authTimeFromToken(header string) *time.Time {
+func authTimeFromToken(header, claim string) *time.Time {
 	var token string
 	switch f := strings.Fields(header); {
 	case len(f) == 1:
@@ -39,10 +35,15 @@ func authTimeFromToken(header string) *time.Time {
 	default:
 		return nil
 	}
-	var claims authTimeClaims
-	if _, _, err := jwt.NewParser().ParseUnverified(token, &claims); err != nil || claims.AuthTime == nil {
+	claims := jwt.MapClaims{}
+	if _, _, err := jwt.NewParser().ParseUnverified(token, claims); err != nil {
 		return nil
 	}
-	t := claims.AuthTime.Time
-	return &t
+	for _, name := range []string{claim, "auth_time"} {
+		if sec, ok := claims[name].(float64); ok && name != "" {
+			t := time.Unix(int64(sec), 0)
+			return &t
+		}
+	}
+	return nil
 }
