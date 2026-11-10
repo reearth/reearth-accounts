@@ -5,6 +5,7 @@ import (
 
 	adminrbac "github.com/reearth/reearth-accounts/server/internal/admin/rbac"
 	"github.com/reearth/reearth-accounts/server/internal/rbac"
+	"github.com/reearth/reearth-accounts/server/internal/rbac/serve"
 	"github.com/reearth/reearthx/cerbos/generator"
 )
 
@@ -18,6 +19,7 @@ func main() {
 	sets := []policySet{
 		{rbac.ServiceName, rbac.DefineResources, rbac.PolicyFileDir},
 		{adminrbac.ServiceName, adminrbac.DefineResources, adminrbac.PolicyFileDir},
+		{serve.ServiceName, serve.DefineResources, serve.PolicyFileDir},
 	}
 
 	for _, s := range sets {
