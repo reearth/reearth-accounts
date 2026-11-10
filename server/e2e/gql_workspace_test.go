@@ -190,7 +190,7 @@ func TestFindByID(t *testing.T) {
 
 func TestFindByIDDropsMissingUserMembers(t *testing.T) {
 	wid := id.NewWorkspaceID()
-	e, _ := StartServer(t, &app.Config{StorageIsLocal: true}, false, seedGhostWorkspace(wid, id.NewIntegrationID()))
+	e, _ := StartServer(t, &app.Config{StorageIsLocal: true}, true, seedGhostWorkspace(wid, id.NewIntegrationID()))
 
 	query := fmt.Sprintf(`query { findByID(id: "%s"){ members {
 		__typename
