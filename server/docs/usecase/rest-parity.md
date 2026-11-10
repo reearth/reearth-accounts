@@ -55,11 +55,11 @@ All four use `RequiredAuth` and call `User.GetMFAStatus`, `User.EnableMFA`, `Use
 
 **Option 2.** Action routes, such as `POST /api/users/me/mfa/enable` and `POST /api/users/me/mfa/disable`. The repo uses this style for `deactivate`, `restore` and `transfer-ownership`. It was rejected because enable, status and disable act on one thing, the user's MFA enrollment, and the sub-resource needs one path instead of three.
 
-Error mapping. The interactor returns `rerror.NewE(i18n.T("no authenticator found"))` when the user has no Auth0 identity. REST maps unknown errors to 500. The fix moves that error to a sentinel, `interfaces.ErrNoAuthenticator`, with the same message, so GraphQL output does not change, and maps it to `400`. Missing user maps to `401` and interactor not-found to `404`, as today.
+Error mapping. The interactor returns `rerror.NewE(i18n.T("no authenticator found"))` when the user has no Auth0 identity. REST maps unknown errors to 500. The fix moves that error to a sentinel, `interfaces.ErrNoAuthenticator`, with the same message, so GraphQL output does not change, and maps it to `400` for `POST` and `DELETE /api/users/me/mfa` and the recovery-code route. `GET /api/users/me/mfa` does not error for a user with no Auth0 identity: `User.GetMFAStatus` returns `200 {"enrolled": false}`, as GraphQL `mfaStatus` does. Missing user maps to `401` and interactor not-found to `404`, as today.
 
 ### Email visibility
 
-**Option 1 (chosen).** The REST user response takes the viewer. `httpmodel.NewUserResponse` gains a viewer argument and blanks `email` unless the viewer is that user, which is the rule in `userResolver.Email`. Every call site must pass a viewer, so a new route cannot forget the rule. Email is kept as an empty string, not omitted, which matches GraphQL and the gqlclient change in #374.
+**Option 1 (chosen).** The REST user response takes the viewer. `httpmodel.NewUserResponse`, `NewUserResponses` and `NewSimpleUserResponse` (used by `by-name-or-email`) gain a viewer argument and blank `email` unless the viewer is that user, which is the rule in `userResolver.Email`. Routes that return the caller's own record without an authenticated viewer (signup, verification) pass an explicit own-record viewer, as GraphQL marks those responses with `ToOwnUser`. Every call site must pass a viewer, so a new route cannot forget the rule. Email is kept as an empty string, not omitted, which matches GraphQL and the gqlclient change in #374.
 
 | Route | Email shown |
 |---|---|
@@ -91,7 +91,7 @@ Recorded 2026-11-10 after review of the open questions.
 An owner can grant `owner` through `POST /api/workspaces/:id/members`, `PATCH /api/workspaces/:id/members/:user_id`, `addUsersToWorkspace` and `updateUserOfWorkspace`. No new route. The rules, for both APIs:
 
 1. Only an owner can grant `owner`, change an owner's role, or remove an owner. "Owner" here is the existing owner-like check (`checkOwnerLikePermission`: workspace owner, or a caller Cerbos allows). The maintainer shortcut (`IsMaintainingWorkspace`) does not apply to these actions. The Cerbos check asks for `transfer_ownership`, since the policy grants the member actions to maintainers. Error: `403`.
-2. A workspace keeps at least one active owner. Demoting or removing the last owner fails, whoever the caller is. Error: `403` (`ErrCannotChangeOwnerRole`, `ErrOwnerCannotLeaveTheWorkspace`). Under concurrent writes this holds because workspace writers read with `FindByIDForUpdate`, which locks the row on PostgreSQL, and because a MongoDB transaction aborts the second writer with a write conflict; MongoDB transactions need a replica set (a `mongodb+srv` URI, several hosts, or a `replicaSet` parameter), so on a standalone MongoDB concurrent owner changes are last-write-wins.
+2. A workspace that has an active owner keeps at least one. Demoting or removing the last owner fails, whoever the caller is. A workspace created with `skip_owner_membership` starts with no owner and stays valid: the rule only stops a change that would remove the last owner, and adding members to it works as before. Error: `403` (`ErrCannotChangeOwnerRole`, `ErrOwnerCannotLeaveTheWorkspace`). Under concurrent writes this holds because workspace writers read with `FindByIDForUpdate`, which locks the row on PostgreSQL, and because a MongoDB transaction aborts the second writer with a write conflict; MongoDB transactions need a replica set (a `mongodb+srv` URI, several hosts, or a `replicaSet` parameter), so on a standalone MongoDB concurrent owner changes are last-write-wins.
 3. An owner can demote themselves or leave while another owner remains. Today an owner can never change their own role.
 4. Integrations cannot be `owner`. Nothing enforced this before, so the workspace member methods now refuse it.
 5. SCIM cannot grant `owner` and does not change an owner's role. It can still deprovision an owner who is not the last one. Group sync cannot tell which group an owner belongs to, so removing an owner from an IdP group does not disable them. Offboard an owner with user-level deprovisioning (`active=false` or `DELETE /Users`).
@@ -143,7 +143,7 @@ The four divergences found in the first comparison are closed. Each change names
 
 ## Test Plan
 
-1. Handler tests in `internal/adapter/http/handlers` for each MFA route with a mock authenticator. Cover success, no user (401) and no Auth0 identity (400).
+1. Handler tests in `internal/adapter/http/handlers` for each MFA route with a mock authenticator. Cover success, no user (401), and no Auth0 identity (`200 {"enrolled": false}` on `GET`, 400 on the other three).
 2. E2e tests that read another user through each lookup route and assert an empty `email`, and read the caller's own record and assert the address. A handler test that calls `sync-sso` as a signed-in user with another user's `sub` and asserts an empty `email`.
 3. `go test ./...`, `golangci-lint run`, `make generate` and `make swag` leave a clean tree.
 
@@ -182,8 +182,9 @@ Measured against `main` at b7d5685. Auth is `RequiredAuth` unless noted, and the
 | `me` | operator user | `GET /api/users/me` | covered, shape fixed by Decision 4.1 and 4.3 |
 | `mfaStatus` | `User.GetMFAStatus` | none | gap, this change |
 | `user`, `findUsersByIDs`, `findUsersByIDsWithPagination`, `findUserByAlias`, `searchUser`, `userByNameOrAlias`, `userByNameOrEmail` | `User.Fetch*`, `User.SearchUser` | `GET /api/users/:id`, `/api/users`, `/search`, `/by-alias`, `/by-name-or-alias`, `/by-name-or-email` | covered, email gap, this change |
-| `findByID`, `findByIDs`, `findByName`, `findByAlias`, `findByUser`, `findByUserWithPagination` | `Workspace.Fetch*` | `GET /api/workspaces/:id`, `GET /api/workspaces?ids|name|alias|user_id` | covered, shape fixed by Decision 4.1 and 4.2 |
-| `signup`, `signupOIDC`, `findOrCreate`, `verifyUser`, `createVerification`, `startPasswordReset`, `passwordReset` | `User.*` | `POST /api/users/signup`, `/signup-oidc`, `/find-or-create` (API key or JWT), `/verify`, `/verifications`, `/password-reset/start`, `/password-reset` | covered |
+| `findByID`, `findByIDs`, `findByName`, `findByAlias`, `findByUser`, `findByUserWithPagination` | `Workspace.Fetch*` | `GET /api/workspaces/:id`, `GET /api/workspaces?ids`, `?name`, `?alias`, `?user_id` | covered, shape fixed by Decision 4.1 and 4.2 |
+| `signup`, `signupOIDC`, `verifyUser`, `createVerification`, `startPasswordReset`, `passwordReset` | `User.*` | `POST /api/users/signup`, `/signup-oidc`, `/verify`, `/verifications`, `/password-reset/start`, `/password-reset` | covered |
+| `findOrCreate` | none (`User.FindOrCreate` is not on `interfaces.User`) | `POST /api/users/find-or-create` (API key or JWT) | stub on both: GraphQL returns null, REST validates and returns `204` |
 | `updateMe`, `deleteMe`, `removeMyAuth`, `logout` | `User.*` | `PATCH`, `DELETE /api/users/me`, `DELETE /api/users/me/auths/:sub`, `POST /api/auth/logout` | covered |
 | `enableMFA`, `disableMFA`, `regenerateMFARecoveryCode` | `User.EnableMFA`, `DisableMFA`, `RegenerateMFARecoveryCode` | none | gap, this change |
 | `createWorkspace`, `updateWorkspace`, `deleteWorkspace` | `Workspace.Create`, `Update`, `Remove` | `POST /api/workspaces`, `PATCH`, `DELETE /api/workspaces/:id` | covered |
