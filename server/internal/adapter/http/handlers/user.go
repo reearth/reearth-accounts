@@ -10,6 +10,7 @@ import (
 	"github.com/reearth/reearth-accounts/server/internal/adapter"
 	"github.com/reearth/reearth-accounts/server/internal/adapter/http/httpmodel"
 	httpinternal "github.com/reearth/reearth-accounts/server/internal/adapter/http/internal"
+	"github.com/reearth/reearth-accounts/server/internal/usecase/gateway"
 	"github.com/reearth/reearth-accounts/server/internal/usecase/interfaces"
 	"github.com/reearth/reearth-accounts/server/pkg/id"
 	"github.com/reearth/reearth-accounts/server/pkg/user"
@@ -20,9 +21,11 @@ import (
 	"github.com/samber/lo"
 )
 
-type UserHandler struct{}
+type UserHandler struct {
+	storage gateway.Storage
+}
 
-func NewUserHandler() *UserHandler { return &UserHandler{} }
+func NewUserHandler(storage gateway.Storage) *UserHandler { return &UserHandler{storage: storage} }
 
 // Me godoc
 // @Tags User
@@ -33,11 +36,12 @@ func NewUserHandler() *UserHandler { return &UserHandler{} }
 // @Failure 401 {object} internal.ErrorResponse
 // @Router /api/users/me [get]
 func (h *UserHandler) Me(c echo.Context) error {
+	ctx := c.Request().Context()
 	u, err := httpinternal.RequireUser(c)
 	if err != nil {
 		return err
 	}
-	return c.JSON(http.StatusOK, httpmodel.NewMeResponse(u))
+	return c.JSON(http.StatusOK, meResponse(ctx, h.storage, u))
 }
 
 // UpdateMe godoc
@@ -61,7 +65,7 @@ func (h *UserHandler) UpdateMe(c echo.Context) error {
 	if err != nil {
 		return err
 	}
-	return c.JSON(http.StatusOK, httpmodel.NewMeResponse(u))
+	return c.JSON(http.StatusOK, meResponse(ctx, h.storage, u))
 }
 
 // DeleteMe godoc
@@ -99,7 +103,7 @@ func (h *UserHandler) RemoveMyAuth(c echo.Context) error {
 	if err != nil {
 		return err
 	}
-	return c.JSON(http.StatusOK, httpmodel.NewMeResponse(u))
+	return c.JSON(http.StatusOK, meResponse(ctx, h.storage, u))
 }
 
 // GetMFAStatus godoc

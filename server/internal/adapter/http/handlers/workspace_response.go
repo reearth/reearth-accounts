@@ -41,24 +41,26 @@ func existingMemberUsers(c echo.Context, ws workspace.List) (httpmodel.ExistingU
 	return existing, nil
 }
 
-func workspaceResponses(c echo.Context, ws workspace.List) ([]*httpmodel.WorkspaceResponse, error) {
+func (h *WorkspaceHandler) workspaceResponses(c echo.Context, ws workspace.List) ([]*httpmodel.WorkspaceResponse, error) {
 	existing, err := existingMemberUsers(c, ws)
 	if err != nil {
 		return nil, err
 	}
-	return httpmodel.NewWorkspaceResponses(ws, existing), nil
+	res := httpmodel.NewWorkspaceResponses(ws, existing)
+	signWorkspacePhotos(c.Request().Context(), h.storage, res)
+	return res, nil
 }
 
-func writeWorkspace(c echo.Context, w *workspace.Workspace) error {
-	existing, err := existingMemberUsers(c, workspace.List{w})
+func (h *WorkspaceHandler) writeWorkspace(c echo.Context, w *workspace.Workspace) error {
+	res, err := h.workspaceResponses(c, workspace.List{w})
 	if err != nil {
 		return err
 	}
-	return c.JSON(http.StatusOK, httpmodel.NewWorkspaceResponse(w, existing))
+	return c.JSON(http.StatusOK, res[0])
 }
 
-func writeWorkspaces(c echo.Context, ws workspace.List) error {
-	res, err := workspaceResponses(c, ws)
+func (h *WorkspaceHandler) writeWorkspaces(c echo.Context, ws workspace.List) error {
+	res, err := h.workspaceResponses(c, ws)
 	if err != nil {
 		return err
 	}

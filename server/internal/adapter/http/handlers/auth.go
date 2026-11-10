@@ -7,14 +7,16 @@ import (
 	"github.com/reearth/reearth-accounts/server/internal/adapter"
 	"github.com/reearth/reearth-accounts/server/internal/adapter/http/httpmodel"
 	httpinternal "github.com/reearth/reearth-accounts/server/internal/adapter/http/internal"
+	"github.com/reearth/reearth-accounts/server/internal/usecase/gateway"
 )
 
 type AuthHandler struct {
 	authConfig adapter.Auth0ConfigProvider
+	storage    gateway.Storage
 }
 
-func NewAuthHandler(authConfig adapter.Auth0ConfigProvider) *AuthHandler {
-	return &AuthHandler{authConfig: authConfig}
+func NewAuthHandler(authConfig adapter.Auth0ConfigProvider, storage gateway.Storage) *AuthHandler {
+	return &AuthHandler{authConfig: authConfig, storage: storage}
 }
 
 // Config godoc
@@ -43,5 +45,5 @@ func (h *AuthHandler) Logout(c echo.Context) error {
 	if err != nil {
 		return err
 	}
-	return c.JSON(http.StatusOK, httpmodel.NewMeResponse(u))
+	return c.JSON(http.StatusOK, meResponse(ctx, h.storage, u))
 }

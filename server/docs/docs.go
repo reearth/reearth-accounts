@@ -2506,6 +2506,7 @@ const docTemplate = `{
                     "type": "string"
                 },
                 "photo_url": {
+                    "description": "A signed URL that expires on MeResponse, so do not store it.\nOn UserResponse it is the stored value.",
                     "type": "string"
                 },
                 "theme": {
@@ -2640,6 +2641,7 @@ const docTemplate = `{
                     "type": "string"
                 },
                 "photo_url": {
+                    "description": "A signed URL that expires, so do not store it.",
                     "type": "string"
                 },
                 "website": {

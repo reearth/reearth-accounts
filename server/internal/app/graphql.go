@@ -13,6 +13,7 @@ import (
 	"github.com/reearth/reearth-accounts/server/internal/adapter"
 	"github.com/reearth/reearth-accounts/server/internal/adapter/gql"
 	"github.com/reearth/reearth-accounts/server/internal/infrastructure/storage"
+	"github.com/reearth/reearth-accounts/server/internal/usecase/gateway"
 	"github.com/reearth/reearthx/log"
 
 	"github.com/labstack/echo/v4"
@@ -29,7 +30,7 @@ const (
 	maxMemorySize     = 100 * 1024 * 1024       // 100MB
 )
 
-func GraphqlAPI(conf *Config, dev bool) echo.HandlerFunc {
+func newPhotoStorage(conf *Config) gateway.Storage {
 	str, err := storage.NewGCPStorage(&storage.Config{
 		IsLocal:          conf.StorageIsLocal,
 		BucketName:       conf.StorageBucketName,
@@ -39,7 +40,10 @@ func GraphqlAPI(conf *Config, dev bool) echo.HandlerFunc {
 	if err != nil {
 		log.Fatal("failed to initialize storage: " + err.Error())
 	}
+	return str
+}
 
+func GraphqlAPI(conf *Config, str gateway.Storage, dev bool) echo.HandlerFunc {
 	schema := gql.NewExecutableSchema(gql.Config{
 		Resolvers: gql.NewResolver(str),
 	})

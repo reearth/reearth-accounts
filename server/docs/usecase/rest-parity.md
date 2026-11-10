@@ -119,7 +119,7 @@ The window is `REEARTH_ACCOUNTS_MFA_RECOVERY_MAX_AUTH_AGE` (a duration). It defa
 
 The four divergences found in the first comparison are closed. Each change names which side moves.
 
-1. **Signed photo URLs. REST moves.** `photo_url` on `GET /api/users/me` and on every workspace response is the signed URL GraphQL returns. The app layer passes the storage gateway into `RouterConfig`, and the REST builders call `GetSignedURL` as `gqlmodel.ToWorkspace` and the `me` resolver do. A signing failure keeps the stored value empty, as GraphQL does.
+1. **Signed photo URLs. REST moves.** `photo_url` on `GET /api/users/me`, on every other route that returns `MeResponse`, and on every workspace response is the signed URL GraphQL returns. The app layer passes the storage gateway into `RouterConfig`, and the REST builders call `GetSignedURL` as `gqlmodel.ToWorkspace` and the `me` resolver do. A signing failure logs and leaves `photo_url` empty, as `ToWorkspace` does. GraphQL's `me` query fails on a signing error instead. REST returns the user with an empty `photo_url`, so one failed signature does not fail the request. Signed URLs expire, so clients must not store them.
 2. **Workspace members. Both move.**
    - REST drops user members whose user record no longer exists, as GraphQL does through its `exists` map.
    - GraphQL returns integration members as `WorkspaceIntegrationMember`. The schema has always declared that type in the `WorkspaceMember` union, and `ToWorkspace` reserves room for integrations but never adds them (since #103). REST already returns them, and REST and GraphQL both manage integrations, so dropping them from REST would leave no way to list them.

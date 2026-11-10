@@ -136,7 +136,8 @@ func initEcho(ctx context.Context, cfg *ServerConfig) *echo.Echo {
 		cacheControl,
 	)
 
-	api.POST("/graphql", GraphqlAPI(cfg.Config, cfg.Config.Dev), middlewares...)
+	photoStorage := newPhotoStorage(cfg.Config)
+	api.POST("/graphql", GraphqlAPI(cfg.Config, photoStorage, cfg.Config.Dev), middlewares...)
 
 	// REST API (additive; GraphQL above is unchanged). Reuses the usecase middleware
 	// and, in non-mock mode, an optional JWT middleware that parses a bearer token into
@@ -156,6 +157,7 @@ func initEcho(ctx context.Context, cfg *ServerConfig) *echo.Echo {
 		UsecaseMiddleware:  usecaseMiddleware,
 		JWTMiddleware:      restJWT,
 		AuthConfigProvider: cfg.Config,
+		Storage:            photoStorage,
 		APIKey:             cfg.Config.RestAPIKey,
 		SyncSSOAPIKey:      cfg.Config.SyncSSOAPIKey,
 		SwaggerUser:        cfg.Config.SwaggerBasicUser,

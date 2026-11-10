@@ -14,9 +14,11 @@ import (
 type UserMetadataResponse struct {
 	Description string `json:"description"`
 	Website     string `json:"website"`
-	PhotoURL    string `json:"photo_url"`
-	Lang        string `json:"lang"`
-	Theme       string `json:"theme"`
+	// A signed URL that expires on MeResponse, so do not store it.
+	// On UserResponse it is the stored value.
+	PhotoURL string `json:"photo_url"`
+	Lang     string `json:"lang"`
+	Theme    string `json:"theme"`
 }
 
 // VerificationResponse mirrors Verification.
