@@ -326,7 +326,7 @@ func (i *Scim) ProvisionScimUser(ctx context.Context, param interfaces.Provision
 		if roleType == "" {
 			roleType = role.RoleReader
 		}
-		if !roleType.Valid() || roleType == role.RoleSelf {
+		if !roleType.Valid() || roleType == role.RoleSelf || roleType == role.RoleOwner {
 			return nil, fmt.Errorf("%w: invalid workspace role %q", interfaces.ErrOperationDenied, roleType)
 		}
 
@@ -383,8 +383,8 @@ func (i *Scim) ProvisionScimUser(ctx context.Context, param interfaces.Provision
 						return nil, err
 					}
 				}
-				// Reconcile role unless demoting the sole active owner.
-				if ws.Members().UserRole(existingUser.ID()) != roleType && !ws.Members().IsOnlyOwner(existingUser.ID()) {
+				// SCIM never changes an owner's role; another owner may have granted it.
+				if currentRole := ws.Members().UserRole(existingUser.ID()); currentRole != roleType && currentRole != role.RoleOwner {
 					if err := ws.Members().UpdateUserRole(existingUser.ID(), roleType); err != nil {
 						return nil, err
 					}
@@ -574,13 +574,13 @@ func (i *Scim) SyncScimGroup(ctx context.Context, workspaceID workspace.ID, _, g
 					if err := ws.Members().SetUserDisabled(uid, false); err != nil {
 						return err
 					}
-					if err := i.updatePermittable(ctx, uid, workspaceID, groupRole); err != nil {
+					if err := i.updatePermittable(ctx, uid, workspaceID, ws.Members().UserRole(uid)); err != nil {
 						return err
 					}
 				}
-				if ws.Members().UserRole(uid) != groupRole {
-					// Guard against demoting the sole owner.
-					if ws.Members().IsOnlyOwner(uid) {
+				if currentRole := ws.Members().UserRole(uid); currentRole != groupRole {
+					// SCIM never changes an owner's role; another owner may have granted it.
+					if currentRole == role.RoleOwner {
 						continue
 					}
 					if err := ws.Members().UpdateUserRole(uid, groupRole); err != nil {
@@ -617,11 +617,11 @@ func (i *Scim) SyncScimGroup(ctx context.Context, workspaceID workspace.ID, _, g
 						return err
 					}
 				}
-				if ws.Members().UserRole(targetUser.ID()) != groupRole {
-					// Guard against demoting the sole owner: skip the role update
-					// but still link the ExternalID and sync Permittable with the
+				if currentRole := ws.Members().UserRole(targetUser.ID()); currentRole != groupRole {
+					// SCIM never changes an owner's role: skip the role update but
+					// still link the ExternalID and sync Permittable with the
 					// retained role so the user can be reconciled on later syncs.
-					if !ws.Members().IsOnlyOwner(targetUser.ID()) {
+					if currentRole != role.RoleOwner {
 						if err := ws.Members().UpdateUserRole(targetUser.ID(), groupRole); err != nil {
 							return err
 						}
@@ -635,8 +635,7 @@ func (i *Scim) SyncScimGroup(ctx context.Context, workspaceID workspace.ID, _, g
 					return err
 				}
 			}
-			// Use the member's effective role (may differ from groupRole when the
-			// sole-owner guard prevented demotion).
+			// Use the member's effective role (an owner keeps owner).
 			if err := i.updatePermittable(ctx, targetUser.ID(), workspaceID, ws.Members().UserRole(targetUser.ID())); err != nil {
 				return err
 			}
