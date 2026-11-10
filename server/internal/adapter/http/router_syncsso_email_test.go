@@ -50,6 +50,7 @@ func TestSyncSSORoute_Email(t *testing.T) {
 	}
 	e := newRESTEcho(adapterhttp.RouterConfig{
 		AuthConfigProvider: stubAuthConfigProvider{},
+		Storage:            noSigning(t),
 		AuthResolver:       resolver,
 		SyncSSOAPIKey:      syncKey,
 		UsecaseMiddleware: func(next echo.HandlerFunc) echo.HandlerFunc {

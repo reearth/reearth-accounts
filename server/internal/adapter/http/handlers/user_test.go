@@ -13,6 +13,7 @@ import (
 	"github.com/reearth/reearth-accounts/server/internal/adapter/http/handlers"
 	"github.com/reearth/reearth-accounts/server/internal/adapter/http/httpmodel"
 	accountmemory "github.com/reearth/reearth-accounts/server/internal/infrastructure/memory"
+	gatewaymock "github.com/reearth/reearth-accounts/server/internal/usecase/gateway/mock"
 	"github.com/reearth/reearth-accounts/server/internal/usecase/interactor"
 	"github.com/reearth/reearth-accounts/server/internal/usecase/interfaces"
 	"github.com/reearth/reearth-accounts/server/pkg/role"
@@ -20,6 +21,7 @@ import (
 	"github.com/reearth/reearth-accounts/server/pkg/workspace"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"go.uber.org/mock/gomock"
 )
 
 func setupUserHandlerTest(t *testing.T) *interfaces.Container {
@@ -48,7 +50,7 @@ func newSyncSSOEchoCtx(t *testing.T, e *echo.Echo, body string, uc *interfaces.C
 // starts with "user-", preserving the intake-form trigger on first login.
 func TestUserHandler_SyncSSOUser_NamePrefix(t *testing.T) {
 	uc := setupUserHandlerTest(t)
-	h := handlers.NewUserHandler(nil, adapter.LoginTimeSource{})
+	h := handlers.NewUserHandler(gatewaymock.NewMockStorage(gomock.NewController(t)), adapter.LoginTimeSource{})
 	e := echo.New()
 
 	body := `{"name":"alice@example.com","email":"alice@example.com","sub":"samlp|org|alice"}`
@@ -68,7 +70,7 @@ func TestUserHandler_SyncSSOUser_NamePrefix(t *testing.T) {
 // workspace alias collision that occurred when the name was always "user-".
 func TestUserHandler_SyncSSOUser_UniqueNames(t *testing.T) {
 	uc := setupUserHandlerTest(t)
-	h := handlers.NewUserHandler(nil, adapter.LoginTimeSource{})
+	h := handlers.NewUserHandler(gatewaymock.NewMockStorage(gomock.NewController(t)), adapter.LoginTimeSource{})
 	e := echo.New()
 
 	provision := func(email, sub string) httpmodel.UserResponse {
@@ -95,7 +97,7 @@ func TestUserHandler_SyncSSOUser_UniqueNames(t *testing.T) {
 
 func TestUserHandler_SyncSSOUser_Email(t *testing.T) {
 	uc := setupUserHandlerTest(t)
-	h := handlers.NewUserHandler(nil, adapter.LoginTimeSource{})
+	h := handlers.NewUserHandler(gatewaymock.NewMockStorage(gomock.NewController(t)), adapter.LoginTimeSource{})
 	e := echo.New()
 	body := `{"name":"victim@example.com","email":"victim@example.com","sub":"samlp|org|victim"}`
 

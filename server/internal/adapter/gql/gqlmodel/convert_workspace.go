@@ -5,6 +5,7 @@ import (
 	"errors"
 
 	"github.com/labstack/gommon/log"
+	"github.com/reearth/reearth-accounts/server/internal/adapter"
 	"github.com/reearth/reearth-accounts/server/internal/usecase/gateway"
 	"github.com/reearth/reearth-accounts/server/pkg/user"
 	"github.com/reearth/reearth-accounts/server/pkg/workspace"
@@ -44,10 +45,8 @@ func ToWorkspace(
 		BillingEmail: t.Metadata().BillingEmail(),
 	}
 
-	log.Infof("[ToWorkspace] convert workspace photo url: %s", t.Metadata().PhotoURL())
-	if t.Metadata() != nil && t.Metadata().PhotoURL() != "" {
-		signedURL, sErr := storage.GetSignedURL(ctx, t.Metadata().PhotoURL())
-		log.Infof("[ToWorkspace] get signed url: %s", signedURL)
+	if t.Metadata() != nil {
+		signedURL, sErr := adapter.SignPhotoURL(ctx, storage, t.Metadata().PhotoURL())
 		if sErr != nil {
 			log.Errorf("[ToWorkspace] failed to get signed url: %s, workspace id: %s", sErr.Error(), t.ID())
 		}

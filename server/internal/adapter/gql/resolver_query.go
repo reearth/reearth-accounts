@@ -20,7 +20,7 @@ func (r *queryResolver) Me(ctx context.Context) (*gqlmodel.Me, error) {
 	}
 
 	if u.Metadata().PhotoURL() != "" {
-		signedURL, err := r.Storage.GetSignedURL(ctx, u.Metadata().PhotoURL())
+		signedURL, err := adapter.SignPhotoURL(ctx, r.Storage, u.Metadata().PhotoURL())
 		if err != nil {
 			return nil, err
 		}
