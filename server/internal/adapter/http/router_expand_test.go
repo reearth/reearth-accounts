@@ -90,7 +90,7 @@ func newExpandEcho(t *testing.T, savePersonal bool) expandFixture {
 				return next(c)
 			}
 		},
-		Storage: storage,
+		Photos: photoSigner(t, storage),
 	})
 	return expandFixture{e: e, db: db, users: users, me: me, other: other, personal: personal, team: team}
 }
