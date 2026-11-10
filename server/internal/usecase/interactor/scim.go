@@ -98,7 +98,7 @@ func (i *Scim) removePermittable(ctx context.Context, workspaceID workspace.ID, 
 
 func (i *Scim) DeleteScimGroup(ctx context.Context, workspaceID workspace.ID, groupName string) error {
 	return Run0(ctx, nil, i.repos, Usecase().Transaction(), func(ctx context.Context) error {
-		ws, err := i.repos.Workspace.FindByID(ctx, workspaceID)
+		ws, err := i.repos.Workspace.FindByIDForUpdate(ctx, workspaceID)
 		if err != nil {
 			return err
 		}
@@ -119,7 +119,7 @@ func (i *Scim) DeleteScimGroup(ctx context.Context, workspaceID workspace.ID, gr
 
 func (i *Scim) DeprovisionScimUser(ctx context.Context, workspaceID workspace.ID, externalID string) error {
 	return Run0(ctx, nil, i.repos, Usecase().Transaction(), func(ctx context.Context) error {
-		ws, err := i.repos.Workspace.FindByID(ctx, workspaceID)
+		ws, err := i.repos.Workspace.FindByIDForUpdate(ctx, workspaceID)
 		if err != nil {
 			return err
 		}
@@ -147,7 +147,7 @@ func (i *Scim) DeprovisionScimUser(ctx context.Context, workspaceID workspace.ID
 
 func (i *Scim) DeprovisionScimUserByUserID(ctx context.Context, workspaceID workspace.ID, userID user.ID) error {
 	return Run0(ctx, nil, i.repos, Usecase().Transaction(), func(ctx context.Context) error {
-		ws, err := i.repos.Workspace.FindByID(ctx, workspaceID)
+		ws, err := i.repos.Workspace.FindByIDForUpdate(ctx, workspaceID)
 		if err != nil {
 			return err
 		}
@@ -314,7 +314,7 @@ func (i *Scim) ListScimUsers(ctx context.Context, workspaceID workspace.ID, filt
 
 func (i *Scim) ProvisionScimUser(ctx context.Context, param interfaces.ProvisionScimUserParam) (*user.User, error) {
 	return Run1(ctx, nil, i.repos, Usecase().Transaction(), func(ctx context.Context) (*user.User, error) {
-		ws, err := i.repos.Workspace.FindByID(ctx, param.WorkspaceID)
+		ws, err := i.repos.Workspace.FindByIDForUpdate(ctx, param.WorkspaceID)
 		if err != nil {
 			return nil, err
 		}
@@ -476,7 +476,7 @@ func (i *Scim) ProvisionScimUser(ctx context.Context, param interfaces.Provision
 
 func (i *Scim) ReactivateScimUserByUserID(ctx context.Context, workspaceID workspace.ID, userID user.ID) error {
 	return Run0(ctx, nil, i.repos, Usecase().Transaction(), func(ctx context.Context) error {
-		ws, err := i.repos.Workspace.FindByID(ctx, workspaceID)
+		ws, err := i.repos.Workspace.FindByIDForUpdate(ctx, workspaceID)
 		if err != nil {
 			return err
 		}
@@ -529,7 +529,7 @@ func (i *Scim) RevokeScimToken(ctx context.Context, workspaceID workspace.ID, op
 // requires persisting a per-member group ID, which is a future enhancement.
 func (i *Scim) SyncScimGroup(ctx context.Context, workspaceID workspace.ID, _, groupName string, members []interfaces.ScimGroupMember) error {
 	return Run0(ctx, nil, i.repos, Usecase().Transaction(), func(ctx context.Context) error {
-		ws, err := i.repos.Workspace.FindByID(ctx, workspaceID)
+		ws, err := i.repos.Workspace.FindByIDForUpdate(ctx, workspaceID)
 		if err != nil {
 			return err
 		}
