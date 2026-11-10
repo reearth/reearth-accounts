@@ -1785,6 +1785,69 @@ func TestUser_DeleteMe_SoleOwnerOfSharedWorkspaceDeleted(t *testing.T) {
 	assert.ErrorIs(t, err, rerror.ErrNotFound)
 }
 
+// beforeLockRepo runs beforeLock just before FindByIDForUpdate reads, standing
+// in for a writer that committed between DeleteMe's FindByUser and its lock.
+type beforeLockRepo struct {
+	workspace.Repo
+	beforeLock func(workspace.ID)
+}
+
+func (r *beforeLockRepo) FindByIDForUpdate(ctx context.Context, wid workspace.ID) (*workspace.Workspace, error) {
+	r.beforeLock(wid)
+	return r.Repo.FindByIDForUpdate(ctx, wid)
+}
+
+func newDeleteMeFixture(t *testing.T) (r *repo.Container, uid user.ID, sharedWID workspace.ID) {
+	t.Helper()
+	ctx := context.Background()
+	r = memory.New()
+	uid = id.NewUserID()
+	personalWID := id.NewWorkspaceID()
+	sharedWID = id.NewWorkspaceID()
+	require.NoError(t, r.User.Save(ctx, user.New().ID(uid).Workspace(personalWID).Name("Test").Email("test@example.com").MustBuild()))
+	require.NoError(t, r.Workspace.Save(ctx, workspace.New().ID(personalWID).Name("Test").Personal(true).
+		Members(map[workspace.UserID]workspace.Member{uid: {Role: role.RoleOwner}}).MustBuild()))
+	require.NoError(t, r.Workspace.Save(ctx, workspace.New().ID(sharedWID).Name("Shared").
+		Members(map[workspace.UserID]workspace.Member{uid: {Role: role.RoleOwner}}).MustBuild()))
+	return r, uid, sharedWID
+}
+
+func TestUser_DeleteMe_SkipsWorkspaceRemovedBeforeLock(t *testing.T) {
+	ctx := context.Background()
+	r, uid, sharedWID := newDeleteMeFixture(t)
+	inner := r.Workspace
+	r.Workspace = &beforeLockRepo{Repo: inner, beforeLock: func(wid workspace.ID) {
+		require.NoError(t, inner.Remove(ctx, wid))
+	}}
+
+	require.NoError(t, NewUser(r, nil, nil, "", "").DeleteMe(ctx, uid, &workspace.Operator{User: &uid}))
+
+	_, err := r.User.FindByID(ctx, uid)
+	assert.ErrorIs(t, err, rerror.ErrNotFound)
+	_, err = inner.FindByID(ctx, sharedWID)
+	assert.ErrorIs(t, err, rerror.ErrNotFound)
+}
+
+func TestUser_DeleteMe_LeavesWhenAnotherOwnerJoinedBeforeLock(t *testing.T) {
+	ctx := context.Background()
+	r, uid, sharedWID := newDeleteMeFixture(t)
+	otherOwner := id.NewUserID()
+	inner := r.Workspace
+	r.Workspace = &beforeLockRepo{Repo: inner, beforeLock: func(wid workspace.ID) {
+		require.NoError(t, inner.Save(ctx, workspace.New().ID(wid).Name("Shared").Members(map[workspace.UserID]workspace.Member{
+			uid:        {Role: role.RoleOwner},
+			otherOwner: {Role: role.RoleOwner},
+		}).MustBuild()))
+	}}
+
+	require.NoError(t, NewUser(r, nil, nil, "", "").DeleteMe(ctx, uid, &workspace.Operator{User: &uid}))
+
+	shared, err := inner.FindByID(ctx, sharedWID)
+	require.NoError(t, err)
+	assert.False(t, shared.Members().HasUser(uid))
+	assert.Equal(t, role.RoleOwner, shared.Members().UserRole(otherOwner))
+}
+
 type failingMailer struct{ err error }
 
 func (f *failingMailer) SendMail(_ context.Context, _ []mailer.Contact, _, _, _ string) error {
