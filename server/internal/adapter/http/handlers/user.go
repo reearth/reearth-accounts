@@ -20,9 +20,13 @@ import (
 	"github.com/samber/lo"
 )
 
-type UserHandler struct{}
+type UserHandler struct {
+	authTimeClaim string
+}
 
-func NewUserHandler() *UserHandler { return &UserHandler{} }
+func NewUserHandler(authTimeClaim string) *UserHandler {
+	return &UserHandler{authTimeClaim: authTimeClaim}
+}
 
 // Me godoc
 // @Tags User
@@ -167,7 +171,7 @@ func (h *UserHandler) DisableMFA(c echo.Context) error {
 // @Router /api/users/me/mfa/recovery-code [post]
 func (h *UserHandler) RegenerateMFARecoveryCode(c echo.Context) error {
 	ctx := c.Request().Context()
-	code, err := httpinternal.Usecases(c).User.RegenerateMFARecoveryCode(ctx, httpinternal.Operator(c), adapter.AuthTime(ctx))
+	code, err := httpinternal.Usecases(c).User.RegenerateMFARecoveryCode(ctx, httpinternal.Operator(c), adapter.AuthTime(ctx, h.authTimeClaim))
 	if err != nil {
 		return err
 	}

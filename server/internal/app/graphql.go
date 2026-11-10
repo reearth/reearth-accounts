@@ -41,7 +41,7 @@ func GraphqlAPI(conf *Config, dev bool) echo.HandlerFunc {
 	}
 
 	schema := gql.NewExecutableSchema(gql.Config{
-		Resolvers: gql.NewResolver(str),
+		Resolvers: gql.NewResolver(str, conf.AuthTimeClaim),
 	})
 
 	srv := handler.New(schema)
