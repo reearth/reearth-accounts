@@ -13,9 +13,11 @@ import (
 	"github.com/reearth/reearth-accounts/server/internal/adapter/http/handlers"
 	"github.com/reearth/reearth-accounts/server/internal/adapter/http/httpmodel"
 	accountmemory "github.com/reearth/reearth-accounts/server/internal/infrastructure/memory"
-	"github.com/reearth/reearth-accounts/server/internal/usecase/interfaces"
 	"github.com/reearth/reearth-accounts/server/internal/usecase/interactor"
+	"github.com/reearth/reearth-accounts/server/internal/usecase/interfaces"
 	"github.com/reearth/reearth-accounts/server/pkg/role"
+	"github.com/reearth/reearth-accounts/server/pkg/user"
+	"github.com/reearth/reearth-accounts/server/pkg/workspace"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -89,4 +91,32 @@ func TestUserHandler_SyncSSOUser_UniqueNames(t *testing.T) {
 	assert.True(t, strings.HasPrefix(bob.Name, "user-"))
 	assert.NotEqual(t, alice.Name, bob.Name,
 		"each provisioned user must get a unique placeholder name to avoid workspace alias collisions")
+}
+
+func TestUserHandler_SyncSSOUser_Email(t *testing.T) {
+	uc := setupUserHandlerTest(t)
+	h := handlers.NewUserHandler()
+	e := echo.New()
+	body := `{"name":"victim@example.com","email":"victim@example.com","sub":"samlp|org|victim"}`
+
+	sync := func(caller *user.User) httpmodel.UserResponse {
+		t.Helper()
+		c, rec := newSyncSSOEchoCtx(t, e, body, uc)
+		if caller != nil {
+			c.SetRequest(c.Request().WithContext(adapter.AttachUser(c.Request().Context(), caller)))
+		}
+		require.NoError(t, h.SyncSSOUser(c))
+		require.Equal(t, http.StatusOK, rec.Code)
+		var resp httpmodel.UserResponse
+		require.NoError(t, json.Unmarshal(rec.Body.Bytes(), &resp))
+		return resp
+	}
+
+	created := sync(nil)
+	assert.Equal(t, "victim@example.com", created.Email, "the API key caller sees the provisioned email")
+
+	other := user.New().NewID().Name("other").Email("other@example.com").Workspace(workspace.NewID()).MustBuild()
+	existing := sync(other)
+	assert.Equal(t, created.ID, existing.ID)
+	assert.Empty(t, existing.Email, "a signed-in caller naming another user's sub must not see that email")
 }
