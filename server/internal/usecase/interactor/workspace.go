@@ -193,7 +193,7 @@ func (i *Workspace) Update(ctx context.Context, param interfaces.UpdateWorkspace
 	}
 
 	return Run1(ctx, operator, i.repos, Usecase().Transaction(), func(ctx context.Context) (*workspace.Workspace, error) {
-		ws, err := i.repos.Workspace.FindByID(ctx, param.ID)
+		ws, err := i.repos.Workspace.FindByIDForUpdate(ctx, param.ID)
 		if err != nil {
 			return nil, applog.ErrorWithCallerLogging(ctx, "failed to find workspace", err)
 		}
@@ -315,7 +315,7 @@ func (i *Workspace) AddUserMember(ctx context.Context, workspaceID workspace.ID,
 	}
 
 	return Run1(ctx, operator, i.repos, Usecase().Transaction(), func(ctx context.Context) (*workspace.Workspace, error) {
-		ws, err := i.repos.Workspace.FindByID(ctx, workspaceID)
+		ws, err := i.repos.Workspace.FindByIDForUpdate(ctx, workspaceID)
 		if err != nil {
 			return nil, applog.ErrorWithCallerLogging(ctx, "failed to fetch workspace", err)
 		}
@@ -369,7 +369,7 @@ func (i *Workspace) AddIntegrationMember(ctx context.Context, wId workspace.ID, 
 	}
 
 	return Run1(ctx, operator, i.repos, Usecase().Transaction().WithOwnableWorkspaces(wId), func(ctx context.Context) (*workspace.Workspace, error) {
-		ws, err := i.repos.Workspace.FindByID(ctx, wId)
+		ws, err := i.repos.Workspace.FindByIDForUpdate(ctx, wId)
 		if err != nil {
 			return nil, err
 		}
@@ -450,7 +450,7 @@ func (i *Workspace) RemoveIntegration(ctx context.Context, wId workspace.ID, iId
 	}
 
 	return Run1(ctx, operator, i.repos, Usecase().WithOwnableWorkspaces(wId).Transaction(), func(ctx context.Context) (*workspace.Workspace, error) {
-		ws, err := i.repos.Workspace.FindByID(ctx, wId)
+		ws, err := i.repos.Workspace.FindByIDForUpdate(ctx, wId)
 		if err != nil {
 			return nil, err
 		}
@@ -476,7 +476,7 @@ func (i *Workspace) RemoveIntegrations(ctx context.Context, wId workspace.ID, iI
 	}
 
 	return Run1(ctx, operator, i.repos, Usecase().WithOwnableWorkspaces(wId).Transaction(), func(ctx context.Context) (*workspace.Workspace, error) {
-		ws, err := i.repos.Workspace.FindByID(ctx, wId)
+		ws, err := i.repos.Workspace.FindByIDForUpdate(ctx, wId)
 		if err != nil {
 			return nil, err
 		}
@@ -586,7 +586,7 @@ func (i *Workspace) UpdateIntegration(ctx context.Context, wId workspace.ID, iId
 	}
 
 	return Run1(ctx, operator, i.repos, Usecase().WithOwnableWorkspaces(wId).Transaction(), func(ctx context.Context) (*workspace.Workspace, error) {
-		ws, err := i.repos.Workspace.FindByID(ctx, wId)
+		ws, err := i.repos.Workspace.FindByIDForUpdate(ctx, wId)
 		if err != nil {
 			return nil, err
 		}
@@ -612,7 +612,7 @@ func (i *Workspace) Remove(ctx context.Context, id workspace.ID, operator *works
 	}
 
 	return Run0(ctx, operator, i.repos, Usecase().Transaction().WithOwnableWorkspaces(id), func(ctx context.Context) error {
-		ws, err := i.repos.Workspace.FindByID(ctx, id)
+		ws, err := i.repos.Workspace.FindByIDForUpdate(ctx, id)
 		if err != nil {
 			return err
 		}
@@ -649,7 +649,7 @@ func (i *Workspace) Deactivate(ctx context.Context, id workspace.ID, operator *w
 	}
 
 	return Run1(ctx, operator, i.repos, Usecase().Transaction(), func(ctx context.Context) (*workspace.Workspace, error) {
-		ws, err := i.repos.Workspace.FindByID(ctx, id)
+		ws, err := i.repos.Workspace.FindByIDForUpdate(ctx, id)
 		if err != nil {
 			return nil, err
 		}
@@ -680,7 +680,7 @@ func (i *Workspace) Restore(ctx context.Context, id workspace.ID, operator *work
 	}
 
 	return Run1(ctx, operator, i.repos, Usecase().Transaction(), func(ctx context.Context) (*workspace.Workspace, error) {
-		ws, err := i.repos.Workspace.FindByID(ctx, id)
+		ws, err := i.repos.Workspace.FindByIDForUpdate(ctx, id)
 		if err != nil {
 			return nil, err
 		}
