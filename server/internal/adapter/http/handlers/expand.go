@@ -7,6 +7,7 @@ import (
 	"strings"
 
 	"github.com/labstack/echo/v4"
+	"github.com/reearth/reearth-accounts/server/internal/adapter/http/httpmodel"
 	httpinternal "github.com/reearth/reearth-accounts/server/internal/adapter/http/internal"
 )
 
@@ -47,6 +48,9 @@ func parseExpansions(raw []string, allowed []Expansion) (expansions, error) {
 	for _, r := range raw {
 		for _, v := range strings.Split(r, ",") {
 			x := Expansion(strings.TrimSpace(v))
+			if x == "" {
+				continue
+			}
 			if !slices.Contains(allowed, x) {
 				return nil, unknownExpansion(x, allowed)
 			}
@@ -75,4 +79,12 @@ func unknownExpansion(x Expansion, allowed []Expansion) error {
 func requestedExpansions(c echo.Context) expansions {
 	set, _ := c.Get(expansionsKey).(expansions)
 	return set
+}
+
+// memberUsersFor reads whether the route's ?expand= asked for members.user.
+func memberUsersFor(c echo.Context) httpmodel.MemberUsers {
+	if !requestedExpansions(c).has(ExpandMemberUsers) {
+		return httpmodel.MemberUsers{}
+	}
+	return httpmodel.MemberUsers{Embed: true, Viewer: httpmodel.ViewerOf(httpinternal.User(c))}
 }

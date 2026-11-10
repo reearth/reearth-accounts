@@ -122,8 +122,8 @@ func RegisterRESTRouter(e *echo.Echo, cfg RouterConfig) {
 	wsExpand := handlers.Expand(handlers.ExpandMemberUsers)
 	api.POST("/workspaces", wh.Create, required, wsExpand)
 	api.GET("/workspaces", wh.List, required, wsExpand) // ?ids= | ?name= | ?alias= | ?user_id=(&page=&page_size=)
-	// Cross-tenant listing for service-to-service callers (e.g. LINKS-Veda). Any
-	// authenticated user can call this, same as GET /workspaces/:id|name|alias
+	// Cross-tenant listing for service-to-service callers (e.g. LINKS-Veda). The
+	// interactor admits only maintainers.
 	api.GET("/workspaces/all", wh.ListAll, required, wsExpand) // ?keyword=&status=active|deleted|all&page=&page_size=
 	api.GET("/workspaces/:id", wh.Get, required, wsExpand)
 	api.PATCH("/workspaces/:id", wh.Update, required, wsExpand)

@@ -13,7 +13,8 @@ type WorkspaceMemberResponse struct {
 	UserID        string `json:"user_id,omitempty"`
 	IntegrationID string `json:"integration_id,omitempty"`
 	Role          string `json:"role"`
-	// User is set only with ?expand=members.user.
+	// User is set only with ?expand=members.user. Its photo_url is the stored
+	// value, and a soft-deleted user appears like a live one, both as in GraphQL.
 	User *MemberUserResponse `json:"user,omitempty"`
 }
 
@@ -41,10 +42,16 @@ type WorkspaceResponse struct {
 	DeletedAt     *time.Time                 `json:"deleted_at,omitempty"`
 }
 
+// MemberUsers says whether a workspace response embeds each member's user,
+// and whose email the embedded users show.
+type MemberUsers struct {
+	Embed  bool
+	Viewer EmailViewer
+}
+
 // NewWorkspaceResponse converts a domain workspace (no signed-URL resolution),
-// dropping user members missing from users, as GraphQL does. A non-nil
-// embedFor embeds each member's user, showing emails as embedFor allows.
-func NewWorkspaceResponse(w *workspace.Workspace, users map[user.ID]*user.User, embedFor *EmailViewer) *WorkspaceResponse {
+// dropping user members missing from users, as GraphQL does.
+func NewWorkspaceResponse(w *workspace.Workspace, users map[user.ID]*user.User, memberUsers MemberUsers) *WorkspaceResponse {
 	if w == nil {
 		return nil
 	}
@@ -57,8 +64,8 @@ func NewWorkspaceResponse(w *workspace.Workspace, users map[user.ID]*user.User, 
 			continue
 		}
 		mr := WorkspaceMemberResponse{UserID: uid.String(), Role: RoleString(m.Role)}
-		if embedFor != nil {
-			mr.User = NewMemberUserResponse(u, *embedFor)
+		if memberUsers.Embed {
+			mr.User = NewMemberUserResponse(u, memberUsers.Viewer)
 		}
 		members = append(members, mr)
 	}
@@ -92,10 +99,10 @@ func NewWorkspaceResponse(w *workspace.Workspace, users map[user.ID]*user.User, 
 }
 
 // NewWorkspaceResponses converts a list.
-func NewWorkspaceResponses(ws workspace.List, users map[user.ID]*user.User, embedFor *EmailViewer) []*WorkspaceResponse {
+func NewWorkspaceResponses(ws workspace.List, users map[user.ID]*user.User, memberUsers MemberUsers) []*WorkspaceResponse {
 	out := make([]*WorkspaceResponse, 0, len(ws))
 	for _, w := range ws {
-		out = append(out, NewWorkspaceResponse(w, users, embedFor))
+		out = append(out, NewWorkspaceResponse(w, users, memberUsers))
 	}
 	return out
 }

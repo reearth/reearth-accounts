@@ -42,31 +42,26 @@ func memberUsers(c echo.Context, ws workspace.List) (map[user.ID]*user.User, err
 	return found, nil
 }
 
-func workspaceResponses(c echo.Context, photos adapter.PhotoSigner, ws workspace.List) ([]*httpmodel.WorkspaceResponse, error) {
+func workspaceResponses(c echo.Context, photos adapter.PhotoSigner, ws workspace.List, embed httpmodel.MemberUsers) ([]*httpmodel.WorkspaceResponse, error) {
 	users, err := memberUsers(c, ws)
 	if err != nil {
 		return nil, err
 	}
-	var embedFor *httpmodel.EmailViewer
-	if requestedExpansions(c).has(ExpandMemberUsers) {
-		v := httpmodel.ViewerOf(httpinternal.User(c))
-		embedFor = &v
-	}
-	res := httpmodel.NewWorkspaceResponses(ws, users, embedFor)
+	res := httpmodel.NewWorkspaceResponses(ws, users, embed)
 	signWorkspacePhotos(c.Request().Context(), photos, res)
 	return res, nil
 }
 
-func (h *WorkspaceHandler) writeWorkspace(c echo.Context, w *workspace.Workspace) error {
-	res, err := workspaceResponses(c, h.photos, workspace.List{w})
+func (h *WorkspaceHandler) writeWorkspace(c echo.Context, w *workspace.Workspace, embed httpmodel.MemberUsers) error {
+	res, err := workspaceResponses(c, h.photos, workspace.List{w}, embed)
 	if err != nil {
 		return err
 	}
 	return c.JSON(http.StatusOK, res[0])
 }
 
-func (h *WorkspaceHandler) writeWorkspaces(c echo.Context, ws workspace.List) error {
-	res, err := workspaceResponses(c, h.photos, ws)
+func (h *WorkspaceHandler) writeWorkspaces(c echo.Context, ws workspace.List, embed httpmodel.MemberUsers) error {
+	res, err := workspaceResponses(c, h.photos, ws, embed)
 	if err != nil {
 		return err
 	}

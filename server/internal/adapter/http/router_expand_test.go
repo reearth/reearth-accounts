@@ -3,10 +3,15 @@ package http_test
 import (
 	"context"
 	"encoding/json"
+	"maps"
 	"net/http"
 	"net/http/httptest"
+	"os"
+	"path/filepath"
+	"slices"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/labstack/echo/v4"
 	"github.com/reearth/reearth-accounts/server/internal/adapter"
@@ -24,6 +29,8 @@ import (
 	"github.com/reearth/reearthx/appx"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"github.com/vektah/gqlparser/v2"
+	"github.com/vektah/gqlparser/v2/ast"
 	"go.uber.org/mock/gomock"
 )
 
@@ -43,25 +50,34 @@ type expandFixture struct {
 	users    *countingUserUsecase
 	me       *user.User
 	other    *user.User
+	gone     *user.User
 	personal *workspace.Workspace
 	team     *workspace.Workspace
 }
 
 // newExpandEcho seeds a personal workspace with a photo and a team workspace.
-// Both list me, other, and a member whose user no longer exists.
+// Both list me, other (with a stored photo, a host and a verification), gone
+// (soft-deleted), and a member whose user no longer exists.
 func newExpandEcho(t *testing.T, savePersonal bool) expandFixture {
 	t.Helper()
 	db := accountmemory.New()
 
 	personalID := workspace.NewID()
 	me := user.New().NewID().Name("me").Email("me@example.com").Workspace(personalID).MustBuild()
-	other := user.New().NewID().Name("other").Email("other@example.com").Workspace(workspace.NewID()).MustBuild()
-	require.NoError(t, db.User.Save(t.Context(), me))
-	require.NoError(t, db.User.Save(t.Context(), other))
+	other := user.New().NewID().Name("other").Email("other@example.com").Workspace(workspace.NewID()).
+		Metadata(user.MetadataFrom("users/other.png", "", "", user.NewMetadata().Lang(), user.ThemeDefault)).
+		Verification(user.VerificationFrom("code", time.Date(2030, 1, 1, 0, 0, 0, 0, time.UTC), true)).
+		MustBuild().WithHost("other.example.com")
+	deletedAt := time.Date(2026, 1, 1, 0, 0, 0, 0, time.UTC)
+	gone := user.New().NewID().Name("gone").Email("gone@example.com").Workspace(workspace.NewID()).DeletedAt(&deletedAt).MustBuild()
+	for _, u := range []*user.User{me, other, gone} {
+		require.NoError(t, db.User.Save(t.Context(), u))
+	}
 
 	members := map[user.ID]workspace.Member{
 		me.ID():      {Role: role.RoleOwner, InvitedBy: me.ID()},
 		other.ID():   {Role: role.RoleReader, InvitedBy: me.ID()},
+		gone.ID():    {Role: role.RoleReader, InvitedBy: me.ID()},
 		user.NewID(): {Role: role.RoleReader, InvitedBy: me.ID()},
 	}
 	personal := workspace.New().ID(personalID).Name("p").Alias("p").Personal(true).Members(members).
@@ -92,7 +108,7 @@ func newExpandEcho(t *testing.T, savePersonal bool) expandFixture {
 		},
 		Photos: photoSigner(t, storage),
 	})
-	return expandFixture{e: e, db: db, users: users, me: me, other: other, personal: personal, team: team}
+	return expandFixture{e: e, db: db, users: users, me: me, other: other, gone: gone, personal: personal, team: team}
 }
 
 func (f expandFixture) do(t *testing.T, method, path, body string) *httptest.ResponseRecorder {
@@ -111,6 +127,19 @@ func (f expandFixture) get(t *testing.T, path string) []byte {
 	return rec.Body.Bytes()
 }
 
+// sortedMembers decodes a workspace with its members sorted by user id, since
+// members come from a map and their order varies between responses.
+func sortedMembers(t *testing.T, raw []byte) map[string]any {
+	t.Helper()
+	var w map[string]any
+	require.NoError(t, json.Unmarshal(raw, &w))
+	members, _ := w["members"].([]any)
+	slices.SortFunc(members, func(a, b any) int {
+		return strings.Compare(a.(map[string]any)["user_id"].(string), b.(map[string]any)["user_id"].(string))
+	})
+	return w
+}
+
 func memberIDs(ms []httpmodel.WorkspaceMemberResponse) []string {
 	out := make([]string, 0, len(ms))
 	for _, m := range ms {
@@ -119,26 +148,62 @@ func memberIDs(ms []httpmodel.WorkspaceMemberResponse) []string {
 	return out
 }
 
-// assertEmbeddedUsers checks every member carries its user, with only the
-// caller's email, and none of the fields GraphQL's User type leaves out.
+// graphqlUserFields lists the fields of the GraphQL User type, read from the
+// schema. Every one is a single word, so REST spells it the same.
+func graphqlUserFields(t *testing.T) []string {
+	t.Helper()
+	paths, err := filepath.Glob("../../../schemas/*.graphql")
+	require.NoError(t, err)
+	var sources []*ast.Source
+	for _, p := range paths {
+		b, err := os.ReadFile(p)
+		require.NoError(t, err)
+		sources = append(sources, &ast.Source{Name: p, Input: string(b)})
+	}
+	schema, gqlErr := gqlparser.LoadSchema(sources...)
+	require.Nil(t, gqlErr)
+	var fields []string
+	for _, f := range schema.Types["User"].Fields {
+		fields = append(fields, f.Name)
+	}
+	return fields
+}
+
+// assertEmbeddedUsers checks every member carries its user with exactly the
+// GraphQL User fields: only the caller's email, the stored photo path, and a
+// soft-deleted user shown like a live one.
 func assertEmbeddedUsers(t *testing.T, f expandFixture, w map[string]json.RawMessage) {
 	t.Helper()
 	var members []map[string]json.RawMessage
 	require.NoError(t, json.Unmarshal(w["members"], &members))
-	emails := map[string]string{}
+	byID := map[string]map[string]any{}
 	for _, m := range members {
 		require.Contains(t, m, "user")
 		var u map[string]any
 		require.NoError(t, json.Unmarshal(m["user"], &u))
-		for _, hidden := range []string{"is_deleted", "deleted_at", "created_at", "platform_roles", "workspaces"} {
-			assert.NotContains(t, u, hidden)
-		}
-		emails[u["id"].(string)] = u["email"].(string)
+		byID[u["id"].(string)] = u
 	}
-	assert.Equal(t, map[string]string{
-		f.me.ID().String():    "me@example.com",
-		f.other.ID().String(): "",
-	}, emails)
+	require.Len(t, byID, 3)
+
+	other := byID[f.other.ID().String()]
+	assert.ElementsMatch(t, graphqlUserFields(t), slices.Collect(maps.Keys(other)))
+	assert.Equal(t, "", other["email"])
+	assert.Equal(t, "users/other.png", other["metadata"].(map[string]any)["photo_url"])
+
+	assert.Equal(t, "me@example.com", byID[f.me.ID().String()]["email"])
+
+	gone := byID[f.gone.ID().String()]
+	assert.Equal(t, map[string]any{
+		"id":        f.gone.ID().String(),
+		"name":      "gone",
+		"alias":     "",
+		"email":     "",
+		"workspace": f.gone.Workspace().String(),
+		"auths":     nil,
+		"metadata": map[string]any{
+			"description": "", "website": "", "photo_url": "", "lang": "und", "theme": "default",
+		},
+	}, gone)
 }
 
 func TestREST_ExpandAbsentAddsNothing(t *testing.T) {
@@ -152,7 +217,7 @@ func TestREST_ExpandAbsentAddsNothing(t *testing.T) {
 		Members []map[string]json.RawMessage `json:"members"`
 	}
 	require.NoError(t, json.Unmarshal(f.get(t, "/api/workspaces/"+f.team.ID().String()), &w))
-	require.Len(t, w.Members, 2)
+	require.Len(t, w.Members, 3)
 	for _, m := range w.Members {
 		assert.NotContains(t, m, "user")
 	}
@@ -166,13 +231,13 @@ func TestREST_ExpandMyWorkspace(t *testing.T) {
 	}
 	require.NoError(t, json.Unmarshal(f.get(t, "/api/users/me?expand=my_workspace"), &me))
 	direct := f.get(t, "/api/workspaces/"+f.personal.ID().String())
-	assert.JSONEq(t, string(direct), string(me.MyWorkspace))
+	assert.Equal(t, sortedMembers(t, direct), sortedMembers(t, me.MyWorkspace))
 
 	var w httpmodel.WorkspaceResponse
 	require.NoError(t, json.Unmarshal(me.MyWorkspace, &w))
 	assert.Equal(t, f.personal.ID().String(), w.ID)
 	assert.Equal(t, "https://signed/p", w.Metadata.PhotoURL)
-	assert.ElementsMatch(t, []string{f.me.ID().String(), f.other.ID().String()}, memberIDs(w.Members))
+	assert.ElementsMatch(t, []string{f.me.ID().String(), f.other.ID().String(), f.gone.ID().String()}, memberIDs(w.Members))
 }
 
 func TestREST_ExpandMyWorkspaceMissingOmitsIt(t *testing.T) {
@@ -250,4 +315,24 @@ func TestREST_ExpandUnknownValueIsRejected(t *testing.T) {
 	stored, err := f.db.Workspace.FindByID(t.Context(), f.team.ID())
 	require.NoError(t, err)
 	assert.Equal(t, "t", stored.Name())
+}
+
+func TestREST_ExpandEmptySegmentsAreIgnored(t *testing.T) {
+	f := newExpandEcho(t, true)
+	wsPath := "/api/workspaces/" + f.team.ID().String()
+
+	for _, q := range []string{"?expand=", "?expand=,", "?expand=%20"} {
+		var w struct {
+			Members []map[string]json.RawMessage `json:"members"`
+		}
+		require.NoError(t, json.Unmarshal(f.get(t, wsPath+q), &w), q)
+		require.Len(t, w.Members, 3, q)
+		for _, m := range w.Members {
+			assert.NotContains(t, m, "user", q)
+		}
+	}
+
+	var w map[string]json.RawMessage
+	require.NoError(t, json.Unmarshal(f.get(t, wsPath+"?expand=members.user,"), &w))
+	assertEmbeddedUsers(t, f, w)
 }

@@ -163,7 +163,9 @@ definitions:
           type: string
         type: array
       email:
-        description: Email is empty unless the caller is this user.
+        description: |-
+          Email is empty unless the caller is this user. Signup, verification,
+          maintainer-only routes and sync-sso called with its API key include it.
         type: string
       host:
         type: string
@@ -477,7 +479,9 @@ definitions:
       user:
         allOf:
         - $ref: '#/definitions/httpmodel.MemberUserResponse'
-        description: User is set only with ?expand=members.user.
+        description: |-
+          User is set only with ?expand=members.user. Its photo_url is the stored
+          value, and a soft-deleted user appears like a live one, both as in GraphQL.
       user_id:
         type: string
     type: object
@@ -1919,7 +1923,7 @@ paths:
             $ref: '#/definitions/internal.ErrorResponse'
       security:
       - BearerAuth: []
-      summary: List all workspaces across all tenants (owner role required)
+      summary: List all workspaces across all tenants (maintainer permission required)
       tags:
       - Workspace
 securityDefinitions:

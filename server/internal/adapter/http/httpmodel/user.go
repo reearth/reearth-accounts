@@ -27,8 +27,10 @@ type VerificationResponse struct {
 	Verified   bool   `json:"verified"`
 }
 
-// UserResponse mirrors the GraphQL User type.
-type UserResponse struct {
+// MemberUserResponse holds exactly the fields of the GraphQL User type. A
+// workspace member's embedded user uses it alone, so, as in GraphQL, it shows
+// no deletion state and its photo_url is the stored value.
+type MemberUserResponse struct {
 	ID    string `json:"id"`
 	Name  string `json:"name"`
 	Alias string `json:"alias"`
@@ -40,9 +42,14 @@ type UserResponse struct {
 	Auths        []string              `json:"auths"`
 	Metadata     *UserMetadataResponse `json:"metadata"`
 	Verification *VerificationResponse `json:"verification,omitempty"`
-	IsDeleted    bool                  `json:"is_deleted"`
-	DeletedAt    *time.Time            `json:"deleted_at,omitempty"`
-	CreatedAt    *time.Time            `json:"created_at,omitempty"`
+}
+
+// UserResponse is the GraphQL User type plus deletion state and timestamps.
+type UserResponse struct {
+	MemberUserResponse
+	IsDeleted bool       `json:"is_deleted"`
+	DeletedAt *time.Time `json:"deleted_at,omitempty"`
+	CreatedAt *time.Time `json:"created_at,omitempty"`
 	// PlatformRoles and Workspaces are only populated by handlers that batch-fetch
 	// Permittable data (e.g. ListAll); other endpoints leave them nil.
 	PlatformRoles []string                `json:"platform_roles,omitempty"`
@@ -72,21 +79,6 @@ type MeResponse struct {
 	// the personal workspace no longer exists, rather than failing the request.
 	MyWorkspace *WorkspaceResponse `json:"my_workspace,omitempty"`
 	Auths       []string           `json:"auths"`
-}
-
-// MemberUserResponse is a workspace member's user. It carries only the fields
-// of the GraphQL User type, so deletion state and timestamps stay hidden.
-type MemberUserResponse struct {
-	ID    string `json:"id"`
-	Name  string `json:"name"`
-	Alias string `json:"alias"`
-	// Email is empty unless the caller is this user.
-	Email        string                `json:"email"`
-	Host         *string               `json:"host,omitempty"`
-	Workspace    string                `json:"workspace"`
-	Auths        []string              `json:"auths"`
-	Metadata     *UserMetadataResponse `json:"metadata"`
-	Verification *VerificationResponse `json:"verification,omitempty"`
 }
 
 // MFAStatusResponse mirrors the GraphQL MFAStatus type.
@@ -152,8 +144,8 @@ func (v EmailViewer) email(uid user.ID, email string) string {
 	return ""
 }
 
-// NewUserResponse converts a domain user to a UserResponse.
-func NewUserResponse(u *user.User, viewer EmailViewer) *UserResponse {
+// NewMemberUserResponse converts a domain user to the GraphQL User fields.
+func NewMemberUserResponse(u *user.User, viewer EmailViewer) *MemberUserResponse {
 	if u == nil {
 		return nil
 	}
@@ -169,7 +161,7 @@ func NewUserResponse(u *user.User, viewer EmailViewer) *UserResponse {
 	if host != "" {
 		hp = &host
 	}
-	return &UserResponse{
+	return &MemberUserResponse{
 		ID:           u.ID().String(),
 		Name:         u.Name(),
 		Alias:        u.Alias(),
@@ -179,28 +171,19 @@ func NewUserResponse(u *user.User, viewer EmailViewer) *UserResponse {
 		Auths:        util.Map(u.Auths(), func(a user.Auth) string { return a.Provider }),
 		Metadata:     metadataResponse(u),
 		Verification: v,
-		IsDeleted:    u.IsDeleted(),
-		DeletedAt:    u.DeletedAt(),
-		CreatedAt:    u.CreatedAt(),
 	}
 }
 
-// NewMemberUserResponse converts a workspace member's user.
-func NewMemberUserResponse(u *user.User, viewer EmailViewer) *MemberUserResponse {
-	r := NewUserResponse(u, viewer)
-	if r == nil {
+// NewUserResponse converts a domain user to a UserResponse.
+func NewUserResponse(u *user.User, viewer EmailViewer) *UserResponse {
+	if u == nil {
 		return nil
 	}
-	return &MemberUserResponse{
-		ID:           r.ID,
-		Name:         r.Name,
-		Alias:        r.Alias,
-		Email:        r.Email,
-		Host:         r.Host,
-		Workspace:    r.Workspace,
-		Auths:        r.Auths,
-		Metadata:     r.Metadata,
-		Verification: r.Verification,
+	return &UserResponse{
+		MemberUserResponse: *NewMemberUserResponse(u, viewer),
+		IsDeleted:          u.IsDeleted(),
+		DeletedAt:          u.DeletedAt(),
+		CreatedAt:          u.CreatedAt(),
 	}
 }
 

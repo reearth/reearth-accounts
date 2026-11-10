@@ -24,7 +24,7 @@ func TestNewWorkspaceResponse_DropsMissingUsers(t *testing.T) {
 		}).
 		MustBuild()
 
-	got := NewWorkspaceResponse(w, map[user.ID]*user.User{owner: ownerUser}, nil)
+	got := NewWorkspaceResponse(w, map[user.ID]*user.User{owner: ownerUser}, MemberUsers{})
 	require.NotNil(t, got)
 	assert.ElementsMatch(t, []WorkspaceMemberResponse{
 		{UserID: owner.String(), Role: "owner"},

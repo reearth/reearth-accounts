@@ -1405,7 +1405,7 @@ const docTemplate = `{
                 "tags": [
                     "Workspace"
                 ],
-                "summary": "List all workspaces across all tenants (owner role required)",
+                "summary": "List all workspaces across all tenants (maintainer permission required)",
                 "parameters": [
                     {
                         "type": "string",
@@ -2428,7 +2428,7 @@ const docTemplate = `{
                     }
                 },
                 "email": {
-                    "description": "Email is empty unless the caller is this user.",
+                    "description": "Email is empty unless the caller is this user. Signup, verification,\nmaintainer-only routes and sync-sso called with its API key include it.",
                     "type": "string"
                 },
                 "host": {
@@ -2886,7 +2886,7 @@ const docTemplate = `{
                     "type": "string"
                 },
                 "user": {
-                    "description": "User is set only with ?expand=members.user.",
+                    "description": "User is set only with ?expand=members.user. Its photo_url is the stored\nvalue, and a soft-deleted user appears like a live one, both as in GraphQL.",
                     "allOf": [
                         {
                             "$ref": "#/definitions/httpmodel.MemberUserResponse"
