@@ -17,6 +17,13 @@ import (
 
 const configPrefix = "reearth"
 
+// Identity providers set these claims on every token, including refreshed
+// ones, so none of them can show that the user logged in recently.
+var reservedAuthTimeClaims = map[string]bool{
+	"aud": true, "azp": true, "exp": true, "iat": true,
+	"iss": true, "jti": true, "nbf": true, "sub": true,
+}
+
 type Config struct {
 	Port     string `default:"8090" envconfig:"PORT"`
 	Dev      bool
@@ -49,7 +56,9 @@ type Config struct {
 	MFARecoveryMaxAuthAge time.Duration `envconfig:"REEARTH_ACCOUNTS_MFA_RECOVERY_MAX_AUTH_AGE"`
 	// AuthTimeClaim names a token claim that carries the login time when the
 	// identity provider cannot set auth_time itself (Auth0 restricts it).
-	// Empty reads only auth_time.
+	// Its value must be a NumericDate (epoch seconds). When the claim is
+	// present but not a number, the login counts as too old. Empty reads only
+	// auth_time. Reserved JWT claims are rejected at startup.
 	AuthTimeClaim string `envconfig:"REEARTH_ACCOUNTS_AUTH_TIME_CLAIM"`
 
 	GraphQL GraphQLConfig
@@ -259,6 +268,9 @@ func ReadConfig(debug bool) (*Config, error) {
 	}
 	if c.MFARecoveryMaxAuthAge < 0 {
 		return nil, fmt.Errorf("REEARTH_ACCOUNTS_MFA_RECOVERY_MAX_AUTH_AGE must not be negative, got %s", c.MFARecoveryMaxAuthAge)
+	}
+	if reservedAuthTimeClaims[c.AuthTimeClaim] {
+		return nil, fmt.Errorf("REEARTH_ACCOUNTS_AUTH_TIME_CLAIM must not be the reserved claim %q, which does not record when the user logged in", c.AuthTimeClaim)
 	}
 
 	if debug {

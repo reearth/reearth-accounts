@@ -22,6 +22,21 @@ func TestReadConfig_MFARecoveryMaxAuthAge(t *testing.T) {
 	assert.EqualError(t, err, "REEARTH_ACCOUNTS_MFA_RECOVERY_MAX_AUTH_AGE must not be negative, got -1m0s")
 }
 
+func TestReadConfig_AuthTimeClaim(t *testing.T) {
+	t.Setenv("SKIP_DOTENV", "1")
+
+	t.Setenv("REEARTH_ACCOUNTS_AUTH_TIME_CLAIM", "https://example.com/auth_time")
+	c, err := ReadConfig(false)
+	require.NoError(t, err)
+	assert.Equal(t, "https://example.com/auth_time", c.AuthTimeClaim)
+
+	for _, claim := range []string{"iat", "exp", "nbf", "sub", "iss", "aud", "jti", "azp"} {
+		t.Setenv("REEARTH_ACCOUNTS_AUTH_TIME_CLAIM", claim)
+		_, err = ReadConfig(false)
+		assert.EqualError(t, err, `REEARTH_ACCOUNTS_AUTH_TIME_CLAIM must not be the reserved claim "`+claim+`", which does not record when the user logged in`)
+	}
+}
+
 func TestConfig_Print_MasksSecrets(t *testing.T) {
 	c := Config{
 		DB:               "mongodb://user:pass@localhost/db",
