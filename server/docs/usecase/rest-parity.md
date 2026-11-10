@@ -38,7 +38,7 @@ The full gap table is in the appendix.
 
 1. Each new route uses `RequiredAuth` and passes `httpinternal.Operator(c)` to the interactor, as the GraphQL resolver passes `getOperator(ctx)`.
 2. Errors render as the existing `ErrorResponse` through `CustomHTTPErrorHandler`.
-3. `docs/swagger.yaml` and `docs/swagger.json` are regenerated with `make swag`.
+3. `docs/swagger.yaml` and `docs/swagger.json` are regenerated with `make swag`. That target fails on `main` because two packages are named `internal`, so the stack fixes it first.
 
 ## Solution Options
 
@@ -66,8 +66,11 @@ Error mapping. The interactor returns `rerror.NewE(i18n.T("no authenticator foun
 | Route | Email shown |
 |---|---|
 | `GET /api/users/:id`, `GET /api/users?ids=`, `GET /api/users/search`, `GET /api/users/by-alias`, `GET /api/users/by-name-or-alias`, `GET /api/users/by-name-or-email` | own record only |
-| `GET /api/users/me`, `PATCH /api/users/me`, signup routes, `find-or-create`, `sync-sso` | always (own record) |
-| `GET /api/users/all`, deactivate, restore, by-sub routes | always (maintainer or owner gated) |
+| `GET /api/users/me`, `PATCH /api/users/me`, signup routes, `POST /api/users/verify` | always (own record) |
+| `GET /api/users/all`, deactivate, restore | always (the interactor admits only maintainers) |
+| `POST /api/users/sync-sso` | always with its API key. A signed-in user also passes this route's gate and can name another user's `sub`, so a JWT caller gets the lookup rule |
+
+`find-or-create` and the by-sub routes return `204` with no body.
 
 `GET /api/users/search` still matches by email, so a caller who already knows an address can still find its owner. GraphQL `searchUser` behaves the same way.
 
@@ -105,7 +108,7 @@ These stay as they are in this change. Each needs its own decision.
 ## Test Plan
 
 1. Handler tests in `internal/adapter/http/handlers` for each MFA route with a mock authenticator. Cover success, no user (401) and no Auth0 identity (400).
-2. Handler and e2e tests (`e2e/rest_user_test.go`) that read another user through each lookup route and assert an empty `email`, and read the caller's own record and assert the address.
+2. E2e tests that read another user through each lookup route and assert an empty `email`, and read the caller's own record and assert the address. A handler test that calls `sync-sso` as a signed-in user with another user's `sub` and asserts an empty `email`.
 3. `go test ./...`, `golangci-lint run`, `make generate` and `make swag` leave a clean tree.
 
 ## Deployment Plan
