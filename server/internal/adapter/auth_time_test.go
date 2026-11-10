@@ -30,6 +30,22 @@ func TestAuthTime(t *testing.T) {
 		assert.True(t, got.Equal(time.Unix(1700000000, 0)))
 	})
 
+	for name, prefix := range map[string]string{
+		"exact Bearer prefix left in place": "Bearer ",
+		"lowercase scheme":                  "bearer ",
+		"double space after the scheme":     "Bearer  ",
+	} {
+		t.Run(name, func(t *testing.T) {
+			got := AuthTime(withToken(prefix + signedToken(t, jwt.MapClaims{"auth_time": 1700000000})))
+			require.NotNil(t, got)
+			assert.True(t, got.Equal(time.Unix(1700000000, 0)))
+		})
+	}
+
+	t.Run("empty token", func(t *testing.T) {
+		assert.Nil(t, AuthTime(withToken("")))
+	})
+
 	t.Run("claim absent", func(t *testing.T) {
 		assert.Nil(t, AuthTime(withToken(signedToken(t, jwt.MapClaims{"sub": "u"}))))
 	})

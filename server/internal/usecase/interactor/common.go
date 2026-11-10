@@ -25,8 +25,10 @@ func NewContainer(
 	config ContainerConfig,
 ) interfaces.Container {
 	cerbos := NewCerbos(r, cerbosAdapter)
-	u := newUser(r, acg, cerbos, config.SignupSecret, config.AuthSrvUIDomain, config.AllowedISS...)
-	u.mfaRecoveryMaxAuthAge = config.MFARecoveryMaxAuthAge
+	u := NewUser(r, acg, cerbos, config.SignupSecret, config.AuthSrvUIDomain,
+		WithAllowedISS(config.AllowedISS...),
+		WithMFARecoveryMaxAuthAge(config.MFARecoveryMaxAuthAge),
+	)
 	return interfaces.Container{
 		Cerbos:      cerbos,
 		Permittable: NewPermittable(r),

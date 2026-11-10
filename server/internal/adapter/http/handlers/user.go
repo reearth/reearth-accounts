@@ -158,6 +158,7 @@ func (h *UserHandler) DisableMFA(c echo.Context) error {
 // RegenerateMFARecoveryCode godoc
 // @Tags User
 // @Summary Replace the current user's MFA recovery code
+// @Description Returns 401 with message recent_login_required and a WWW-Authenticate step-up challenge when the login behind the token is older than the configured window.
 // @Security BearerAuth
 // @Produce json
 // @Success 200 {object} httpmodel.MFARecoveryCodeResponse

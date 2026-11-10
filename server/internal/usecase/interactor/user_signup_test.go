@@ -688,7 +688,7 @@ func TestUser_SignupOIDC_AllowlistRejectsUnknownISS(t *testing.T) {
 	ctx := context.Background()
 	r := accountmemory.New()
 
-	uc := NewUser(r, nil, nil, "", "", "https://trusted.example.com")
+	uc := NewUser(r, nil, nil, "", "", WithAllowedISS("https://trusted.example.com"))
 
 	_, err := uc.SignupOIDC(ctx, interfaces.SignupOIDCParam{
 		Issuer:      "https://evil.example.com",
@@ -731,7 +731,7 @@ func TestUser_SignupOIDC_AllowlistPermitsKnownISS(t *testing.T) {
 	assert.NoError(t, r.Role.Save(ctx, *selfRole))
 	assert.NoError(t, r.Role.Save(ctx, *ownerRole))
 
-	uc := NewUser(r, nil, nil, "", "", srv.URL)
+	uc := NewUser(r, nil, nil, "", "", WithAllowedISS(srv.URL))
 
 	u, err := uc.SignupOIDC(ctx, interfaces.SignupOIDCParam{
 		Issuer:      srv.URL,
@@ -747,7 +747,7 @@ func TestUser_FindOrCreate_AllowlistRejectsUnknownISS(t *testing.T) {
 	ctx := context.Background()
 	r := accountmemory.New()
 
-	uc := NewUser(r, nil, nil, "", "", "https://trusted.example.com").(*User)
+	uc := NewUser(r, nil, nil, "", "", WithAllowedISS("https://trusted.example.com")).(*User)
 
 	_, err := uc.FindOrCreate(ctx, interfaces.UserFindOrCreateParam{
 		Sub:   "sub123",

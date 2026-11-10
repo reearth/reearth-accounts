@@ -1253,7 +1253,8 @@ func TestUser_UpdateMe_SetPasswordError(t *testing.T) {
 // mockAuthenticatorWithError is a mock implementation of the Authenticator interface.
 // All methods succeed by default; set updateUserErr to make UpdateUser fail.
 type mockAuthenticatorWithError struct {
-	updateUserErr error
+	updateUserErr         error
+	recoveryCodeRequested bool
 }
 
 func (m *mockAuthenticatorWithError) UpdateUser(_ context.Context, _ gateway.AuthenticatorUpdateUserParam) (gateway.AuthenticatorUser, error) {
@@ -1278,6 +1279,7 @@ func (m *mockAuthenticatorWithError) GetUser(_ context.Context, _ string) (gatew
 }
 
 func (m *mockAuthenticatorWithError) RegenerateMFARecoveryCode(_ context.Context, _ string) (string, error) {
+	m.recoveryCodeRequested = true
 	return "new-recovery-code", nil
 }
 
@@ -1355,6 +1357,10 @@ func TestUser_RegenerateMFARecoveryCode(t *testing.T) {
 	})
 }
 
+func withNow(now func() time.Time) UserOption {
+	return func(u *User) { u.now = now }
+}
+
 func TestUser_RegenerateMFARecoveryCode_RecentLogin(t *testing.T) {
 	ctx := context.Background()
 	uid := id.NewUserID()
@@ -1366,42 +1372,69 @@ func TestUser_RegenerateMFARecoveryCode_RecentLogin(t *testing.T) {
 		Auths([]user.Auth{{Provider: "auth0", Sub: "auth0|123456"}}).
 		MustBuild()
 	operator := &workspace.Operator{User: &uid}
+	now := time.Date(2026, 11, 10, 12, 0, 0, 0, time.UTC)
+	const window = 5 * time.Minute
 
-	newUC := func(maxAuthAge time.Duration) interfaces.User {
+	newUC := func(maxAuthAge time.Duration) (interfaces.User, *mockAuthenticatorWithError) {
 		r := memory.New()
 		assert.NoError(t, r.User.Save(ctx, u))
-		g := &gateway.Container{Authenticators: map[gateway.Provider]gateway.Authenticator{gateway.ProviderAuth0: &mockAuthenticatorWithError{}}}
-		uc := newUser(r, g, nil, "", "")
-		uc.mfaRecoveryMaxAuthAge = maxAuthAge
-		return uc
+		auth := &mockAuthenticatorWithError{}
+		g := &gateway.Container{Authenticators: map[gateway.Provider]gateway.Authenticator{gateway.ProviderAuth0: auth}}
+		uc := NewUser(r, g, nil, "", "",
+			WithMFARecoveryMaxAuthAge(maxAuthAge),
+			withNow(func() time.Time { return now }),
+		)
+		return uc, auth
 	}
-	ago := func(d time.Duration) *time.Time {
-		t := time.Now().Add(-d)
+	at := func(d time.Duration) *time.Time {
+		t := now.Add(d)
 		return &t
 	}
 
-	t.Run("window off allows a token without auth_time", func(t *testing.T) {
-		code, err := newUC(0).RegenerateMFARecoveryCode(ctx, operator, nil)
-		assert.NoError(t, err)
-		assert.Equal(t, "new-recovery-code", code)
-	})
+	allowed := map[string]struct {
+		window   time.Duration
+		authTime *time.Time
+	}{
+		"window off, no auth_time":         {0, nil},
+		"window off, old login":            {0, at(-24 * time.Hour)},
+		"login within the window":          {window, at(-time.Minute)},
+		"login exactly at the window edge": {window, at(-window)},
+		"auth_time within the skew leeway": {window, at(time.Minute)},
+	}
+	for name, tc := range allowed {
+		t.Run(name, func(t *testing.T) {
+			uc, auth := newUC(tc.window)
+			code, err := uc.RegenerateMFARecoveryCode(ctx, operator, tc.authTime)
+			assert.NoError(t, err)
+			assert.Equal(t, "new-recovery-code", code)
+			assert.True(t, auth.recoveryCodeRequested)
+		})
+	}
 
-	t.Run("window on refuses a token without auth_time", func(t *testing.T) {
-		code, err := newUC(5*time.Minute).RegenerateMFARecoveryCode(ctx, operator, nil)
-		assert.ErrorIs(t, err, interfaces.ErrRecentLoginRequired)
-		assert.Empty(t, code)
-	})
+	refused := map[string]*time.Time{
+		"no auth_time":                nil,
+		"login just over the window":  at(-window - time.Second),
+		"login long ago":              at(-time.Hour),
+		"auth_time beyond the leeway": at(time.Minute + time.Second),
+		"auth_time far in the future": at(24 * time.Hour),
+	}
+	for name, authTime := range refused {
+		t.Run(name, func(t *testing.T) {
+			uc, auth := newUC(window)
+			code, err := uc.RegenerateMFARecoveryCode(ctx, operator, authTime)
+			assert.ErrorIs(t, err, interfaces.ErrRecentLoginRequired)
+			assert.Empty(t, code)
+			assert.False(t, auth.recoveryCodeRequested, "the authenticator must not mint a code")
+		})
+	}
 
-	t.Run("window on refuses a login older than the window", func(t *testing.T) {
-		code, err := newUC(5*time.Minute).RegenerateMFARecoveryCode(ctx, operator, ago(time.Hour))
-		assert.ErrorIs(t, err, interfaces.ErrRecentLoginRequired)
-		assert.Empty(t, code)
-	})
-
-	t.Run("window on allows a login within the window", func(t *testing.T) {
-		code, err := newUC(5*time.Minute).RegenerateMFARecoveryCode(ctx, operator, ago(time.Minute))
-		assert.NoError(t, err)
-		assert.Equal(t, "new-recovery-code", code)
+	t.Run("a user without an authenticator gets no re-login prompt", func(t *testing.T) {
+		r := memory.New()
+		noAuthUID := id.NewUserID()
+		assert.NoError(t, r.User.Save(ctx, user.New().ID(noAuthUID).Workspace(id.NewWorkspaceID()).Name("n").Email("n@example.com").MustBuild()))
+		uc := NewUser(r, &gateway.Container{}, nil, "", "", WithMFARecoveryMaxAuthAge(window))
+		_, err := uc.RegenerateMFARecoveryCode(ctx, &workspace.Operator{User: &noAuthUID}, nil)
+		assert.ErrorIs(t, err, interfaces.ErrNoAuthenticator)
 	})
 }
 

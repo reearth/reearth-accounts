@@ -104,7 +104,7 @@ Rule 1 is also a fix. On `main` a maintainer can demote or remove an owner who i
 
 ### 3. Recovery codes require a recent login
 
-`RegenerateMFARecoveryCode` refuses a session whose login is older than a configured window, for both APIs. The adapter reads the `auth_time` claim from the validated token and passes it to the interactor. Error: `interfaces.ErrRecentLoginRequired`, mapped to `401` in REST, with the same message in GraphQL. A token without the claim counts as too old.
+`RegenerateMFARecoveryCode` refuses a session whose login is older than a configured window, for both APIs. The adapter reads the `auth_time` claim from the validated token and passes it to the interactor. An `auth_time` from any accepted issuer counts, so Auth0 and CIP logins are treated the same. Error: `interfaces.ErrRecentLoginRequired`, with the message `recent login required` in GraphQL. REST answers `401` with message `recent_login_required` and the RFC 9470 header `WWW-Authenticate: Bearer error="insufficient_user_authentication"`. A token without the claim counts as too old, and so does an `auth_time` more than 1 minute in the future. A negative window fails startup.
 
 The window is `REEARTH_ACCOUNTS_MFA_RECOVERY_MAX_AUTH_AGE` (a duration). It defaults to `0`, which turns the check off. Turn it on only after two things are in place, since otherwise no one can regenerate a code:
 

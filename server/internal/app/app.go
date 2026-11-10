@@ -44,6 +44,12 @@ func initEcho(ctx context.Context, cfg *ServerConfig) *echo.Echo {
 	}
 	e.Use(AccessLogger(logger))
 
+	if w := cfg.Config.MFARecoveryMaxAuthAge; w > 0 {
+		log.Infof("MFA recovery step-up window: %s", w)
+	} else {
+		log.Infof("MFA recovery step-up window: off")
+	}
+
 	origins := allowedOrigins(cfg)
 	if len(origins) > 0 {
 		e.Use(

@@ -25,8 +25,9 @@ import (
 )
 
 type fakeMFAAuthenticator struct {
-	disabledSub string
-	enrolled    bool
+	disabledSub   string
+	enrolled      bool
+	recoveryCalls int
 }
 
 func (f *fakeMFAAuthenticator) DisableMFA(_ context.Context, sub string) error {
@@ -47,6 +48,7 @@ func (f *fakeMFAAuthenticator) GetUser(_ context.Context, _ string) (gateway.Aut
 }
 
 func (f *fakeMFAAuthenticator) RegenerateMFARecoveryCode(_ context.Context, _ string) (string, error) {
+	f.recoveryCalls++
 	return "recovery-123", nil
 }
 
@@ -236,8 +238,12 @@ func TestMFARoutes(t *testing.T) {
 		for name, authTime := range map[string]*time.Time{"no auth_time": nil, "old login": &old} {
 			rec := f.doAt(http.MethodPost, path, f.auth0User, authTime)
 			assert.Equal(t, http.StatusUnauthorized, rec.Code, name)
-			assert.Equal(t, "recent login required", decodeJSON(t, rec)["description"], name)
+			assert.Equal(t, `Bearer error="insufficient_user_authentication"`, rec.Header().Get("WWW-Authenticate"), name)
+			body := decodeJSON(t, rec)
+			assert.Equal(t, "recent_login_required", body["message"], name)
+			assert.Equal(t, "recent login required", body["description"], name)
 		}
+		assert.Zero(t, f.auth.recoveryCalls)
 
 		rec := f.doAt(http.MethodPost, path, f.auth0User, &recent)
 		require.Equal(t, http.StatusOK, rec.Code)

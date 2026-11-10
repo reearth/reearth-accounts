@@ -253,6 +253,9 @@ func ReadConfig(debug bool) (*Config, error) {
 	if err := envconfig.Process(configPrefix, &c); err != nil {
 		return nil, err
 	}
+	if c.MFARecoveryMaxAuthAge < 0 {
+		return nil, fmt.Errorf("REEARTH_ACCOUNTS_MFA_RECOVERY_MAX_AUTH_AGE must not be negative, got %s", c.MFARecoveryMaxAuthAge)
+	}
 
 	if debug {
 		c.Dev = true

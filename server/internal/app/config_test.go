@@ -2,10 +2,25 @@ package app
 
 import (
 	"testing"
+	"time"
 
 	"github.com/reearth/reearthx/appx"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
+
+func TestReadConfig_MFARecoveryMaxAuthAge(t *testing.T) {
+	t.Setenv("SKIP_DOTENV", "1")
+
+	t.Setenv("REEARTH_ACCOUNTS_MFA_RECOVERY_MAX_AUTH_AGE", "5m")
+	c, err := ReadConfig(false)
+	require.NoError(t, err)
+	assert.Equal(t, 5*time.Minute, c.MFARecoveryMaxAuthAge)
+
+	t.Setenv("REEARTH_ACCOUNTS_MFA_RECOVERY_MAX_AUTH_AGE", "-1m")
+	_, err = ReadConfig(false)
+	assert.EqualError(t, err, "REEARTH_ACCOUNTS_MFA_RECOVERY_MAX_AUTH_AGE must not be negative, got -1m0s")
+}
 
 func TestConfig_Print_MasksSecrets(t *testing.T) {
 	c := Config{
