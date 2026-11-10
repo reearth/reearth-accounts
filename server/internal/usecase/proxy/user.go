@@ -5,6 +5,7 @@ package proxy
 import (
 	"context"
 	"errors"
+	"time"
 
 	"github.com/reearth/reearth-accounts/server/internal/usecase/gateway"
 	"github.com/reearth/reearth-accounts/server/pkg/user"
@@ -229,7 +230,7 @@ func (u *User) GetMFAStatus(_ context.Context, _ *workspace.Operator) (gateway.M
 	return gateway.MFAStatus{}, errors.New("GetMFAStatus is not supported in proxy mode")
 }
 
-func (u *User) RegenerateMFARecoveryCode(_ context.Context, _ *workspace.Operator) (string, error) {
+func (u *User) RegenerateMFARecoveryCode(_ context.Context, _ *workspace.Operator, _ *time.Time) (string, error) {
 	return "", errors.New("RegenerateMFARecoveryCode is not supported in proxy mode")
 }
 

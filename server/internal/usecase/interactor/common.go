@@ -2,6 +2,7 @@ package interactor
 
 import (
 	"context"
+	"time"
 
 	"github.com/cerbos/cerbos-sdk-go/cerbos"
 	"github.com/reearth/reearth-accounts/server/internal/usecase/gateway"
@@ -10,9 +11,10 @@ import (
 )
 
 type ContainerConfig struct {
-	AllowedISS      []string
-	AuthSrvUIDomain string
-	SignupSecret    string
+	AllowedISS            []string
+	AuthSrvUIDomain       string
+	MFARecoveryMaxAuthAge time.Duration
+	SignupSecret          string
 }
 
 func NewContainer(
@@ -23,12 +25,14 @@ func NewContainer(
 	config ContainerConfig,
 ) interfaces.Container {
 	cerbos := NewCerbos(r, cerbosAdapter)
+	u := newUser(r, acg, cerbos, config.SignupSecret, config.AuthSrvUIDomain, config.AllowedISS...)
+	u.mfaRecoveryMaxAuthAge = config.MFARecoveryMaxAuthAge
 	return interfaces.Container{
 		Cerbos:      cerbos,
 		Permittable: NewPermittable(r),
 		Role:        r.Role,
 		Scim:        NewScim(r, cerbos),
-		User:        NewUser(r, acg, cerbos, config.SignupSecret, config.AuthSrvUIDomain, config.AllowedISS...),
+		User:        u,
 		Workspace:   NewWorkspace(r, enforcer, cerbos),
 	}
 }

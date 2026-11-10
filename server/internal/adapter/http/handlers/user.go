@@ -166,7 +166,7 @@ func (h *UserHandler) DisableMFA(c echo.Context) error {
 // @Router /api/users/me/mfa/recovery-code [post]
 func (h *UserHandler) RegenerateMFARecoveryCode(c echo.Context) error {
 	ctx := c.Request().Context()
-	code, err := httpinternal.Usecases(c).User.RegenerateMFARecoveryCode(ctx, httpinternal.Operator(c))
+	code, err := httpinternal.Usecases(c).User.RegenerateMFARecoveryCode(ctx, httpinternal.Operator(c), adapter.AuthTime(ctx))
 	if err != nil {
 		return err
 	}

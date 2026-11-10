@@ -80,7 +80,6 @@ func (r *mutationResolver) Signup(ctx context.Context, input gqlmodel.SignupInpu
 	return &gqlmodel.UserPayload{User: gqlmodel.ToOwnUser(u)}, nil
 }
 
-
 func (r *mutationResolver) SignupOidc(ctx context.Context, input gqlmodel.SignupOIDCInput) (*gqlmodel.UserPayload, error) {
 	au := adapter.GetAuthInfo(ctx)
 
@@ -186,7 +185,7 @@ func (r *mutationResolver) EnableMfa(ctx context.Context) (*gqlmodel.MFAEnrollRe
 }
 
 func (r *mutationResolver) RegenerateMFARecoveryCode(ctx context.Context) (*gqlmodel.MFARecoveryCodeResult, error) {
-	recoveryCode, err := usecases(ctx).User.RegenerateMFARecoveryCode(ctx, getOperator(ctx))
+	recoveryCode, err := usecases(ctx).User.RegenerateMFARecoveryCode(ctx, getOperator(ctx), adapter.AuthTime(ctx))
 	if err != nil {
 		return nil, err
 	}

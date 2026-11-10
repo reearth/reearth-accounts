@@ -1316,14 +1316,14 @@ func TestUser_RegenerateMFARecoveryCode(t *testing.T) {
 
 	t.Run("ok", func(t *testing.T) {
 		uc, operator := newUC()
-		code, err := uc.RegenerateMFARecoveryCode(ctx, operator)
+		code, err := uc.RegenerateMFARecoveryCode(ctx, operator, nil)
 		assert.NoError(t, err)
 		assert.Equal(t, "new-recovery-code", code)
 	})
 
 	t.Run("nil operator", func(t *testing.T) {
 		uc, _ := newUC()
-		code, err := uc.RegenerateMFARecoveryCode(ctx, nil)
+		code, err := uc.RegenerateMFARecoveryCode(ctx, nil, nil)
 		assert.ErrorIs(t, err, interfaces.ErrInvalidOperator)
 		assert.Empty(t, code)
 	})
@@ -1349,9 +1349,59 @@ func TestUser_RegenerateMFARecoveryCode(t *testing.T) {
 		g := &gateway.Container{Authenticators: map[gateway.Provider]gateway.Authenticator{}}
 		uc := NewUser(r, g, nil, "", "")
 
-		code, err := uc.RegenerateMFARecoveryCode(ctx, &workspace.Operator{User: &noAuthUID})
+		code, err := uc.RegenerateMFARecoveryCode(ctx, &workspace.Operator{User: &noAuthUID}, nil)
 		assert.ErrorIs(t, err, interfaces.ErrNoAuthenticator)
 		assert.Empty(t, code)
+	})
+}
+
+func TestUser_RegenerateMFARecoveryCode_RecentLogin(t *testing.T) {
+	ctx := context.Background()
+	uid := id.NewUserID()
+	u := user.New().
+		ID(uid).
+		Workspace(id.NewWorkspaceID()).
+		Name("Test User").
+		Email("test@example.com").
+		Auths([]user.Auth{{Provider: "auth0", Sub: "auth0|123456"}}).
+		MustBuild()
+	operator := &workspace.Operator{User: &uid}
+
+	newUC := func(maxAuthAge time.Duration) interfaces.User {
+		r := memory.New()
+		assert.NoError(t, r.User.Save(ctx, u))
+		g := &gateway.Container{Authenticators: map[gateway.Provider]gateway.Authenticator{gateway.ProviderAuth0: &mockAuthenticatorWithError{}}}
+		uc := newUser(r, g, nil, "", "")
+		uc.mfaRecoveryMaxAuthAge = maxAuthAge
+		return uc
+	}
+	ago := func(d time.Duration) *time.Time {
+		t := time.Now().Add(-d)
+		return &t
+	}
+
+	t.Run("window off allows a token without auth_time", func(t *testing.T) {
+		code, err := newUC(0).RegenerateMFARecoveryCode(ctx, operator, nil)
+		assert.NoError(t, err)
+		assert.Equal(t, "new-recovery-code", code)
+	})
+
+	t.Run("window on refuses a token without auth_time", func(t *testing.T) {
+		code, err := newUC(5*time.Minute).RegenerateMFARecoveryCode(ctx, operator, nil)
+		assert.ErrorIs(t, err, interfaces.ErrRecentLoginRequired)
+		assert.Empty(t, code)
+	})
+
+	t.Run("window on refuses a login older than the window", func(t *testing.T) {
+		code, err := newUC(5*time.Minute).RegenerateMFARecoveryCode(ctx, operator, ago(time.Hour))
+		assert.ErrorIs(t, err, interfaces.ErrRecentLoginRequired)
+		assert.Empty(t, code)
+	})
+
+	t.Run("window on allows a login within the window", func(t *testing.T) {
+		code, err := newUC(5*time.Minute).RegenerateMFARecoveryCode(ctx, operator, ago(time.Minute))
+		assert.NoError(t, err)
+		assert.Equal(t, "new-recovery-code", code)
 	})
 }
 

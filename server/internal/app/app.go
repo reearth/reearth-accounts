@@ -99,9 +99,10 @@ func initEcho(ctx context.Context, cfg *ServerConfig) *echo.Echo {
 		nil,
 		cfg.CerbosAdapter,
 		interactor.ContainerConfig{
-			AllowedISS:      allowedISS,
-			AuthSrvUIDomain: cfg.Config.HostWeb,
-			SignupSecret:    cfg.Config.SignupSecret,
+			AllowedISS:            allowedISS,
+			AuthSrvUIDomain:       cfg.Config.HostWeb,
+			MFARecoveryMaxAuthAge: cfg.Config.MFARecoveryMaxAuthAge,
+			SignupSecret:          cfg.Config.SignupSecret,
 		})
 
 	// API
@@ -240,4 +241,3 @@ func cacheControl(next echo.HandlerFunc) echo.HandlerFunc {
 		return next(c)
 	}
 }
-

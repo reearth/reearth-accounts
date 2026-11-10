@@ -2,6 +2,7 @@ package interfaces
 
 import (
 	"context"
+	"time"
 
 	"github.com/reearth/reearth-accounts/server/internal/usecase/gateway"
 	"github.com/reearth/reearth-accounts/server/pkg/user"
@@ -23,6 +24,7 @@ var (
 	ErrUserAliasAlreadyExists          = rerror.NewE(i18n.T("user alias already exists"))
 	ErrWorkspaceAliasAlreadyExists     = rerror.NewE(i18n.T("workspace alias already exists"))
 	ErrNoAuthenticator                 = rerror.NewE(i18n.T("no authenticator found"))
+	ErrRecentLoginRequired             = rerror.NewE(i18n.T("recent login required"))
 )
 
 type SignupOIDCParam struct {
@@ -164,5 +166,5 @@ type User interface {
 	DisableMFA(context.Context, *workspace.Operator) error
 	EnableMFA(context.Context, *workspace.Operator) (enrollmentURL string, err error)
 	GetMFAStatus(context.Context, *workspace.Operator) (gateway.MFAStatus, error)
-	RegenerateMFARecoveryCode(context.Context, *workspace.Operator) (recoveryCode string, err error)
+	RegenerateMFARecoveryCode(ctx context.Context, operator *workspace.Operator, authTime *time.Time) (recoveryCode string, err error)
 }

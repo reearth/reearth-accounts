@@ -44,6 +44,10 @@ type Config struct {
 	CIP          CIPConfig `pp:",omitempty"`
 	AuthProvider string    `default:"auth0" envconfig:"REEARTH_ACCOUNTS_AUTH_PROVIDER" pp:",omitempty"`
 
+	// MFARecoveryMaxAuthAge is how recent the token's auth_time must be to
+	// regenerate an MFA recovery code. 0 turns the check off.
+	MFARecoveryMaxAuthAge time.Duration `envconfig:"REEARTH_ACCOUNTS_MFA_RECOVERY_MAX_AUTH_AGE"`
+
 	GraphQL GraphQLConfig
 
 	SignupSecret   string `envconfig:"REEARTH_ACCOUNTS_SIGNUP_SECRET"`

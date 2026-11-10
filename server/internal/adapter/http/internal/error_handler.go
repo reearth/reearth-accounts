@@ -113,6 +113,8 @@ func mapError(err error) *ErrorResponse {
 	case errors.Is(err, ErrUnauthorized),
 		errors.Is(err, interfaces.ErrInvalidOperator):
 		return &ErrorResponse{Status: http.StatusUnauthorized, Message: "unauthorized", Description: "authentication is required"}
+	case errors.Is(err, interfaces.ErrRecentLoginRequired):
+		return &ErrorResponse{Status: http.StatusUnauthorized, Message: "unauthorized", Description: err.Error(), Err: err}
 	case errors.Is(err, interfaces.ErrInvalidUserEmail),
 		errors.Is(err, interfaces.ErrInvalidEmailOrPassword),
 		errors.Is(err, interfaces.ErrUserInvalidPasswordConfirmation),

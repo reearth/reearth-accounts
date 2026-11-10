@@ -5,7 +5,11 @@ import (
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
+	"strconv"
 	"testing"
+	"time"
+
+	"github.com/golang-jwt/jwt/v5"
 
 	"github.com/labstack/echo/v4"
 	"github.com/reearth/reearth-accounts/server/internal/adapter"
@@ -13,7 +17,6 @@ import (
 	"github.com/reearth/reearth-accounts/server/internal/infrastructure/memory"
 	"github.com/reearth/reearth-accounts/server/internal/usecase/gateway"
 	"github.com/reearth/reearth-accounts/server/internal/usecase/interactor"
-	"github.com/reearth/reearth-accounts/server/internal/usecase/interfaces"
 	"github.com/reearth/reearth-accounts/server/pkg/user"
 	"github.com/reearth/reearth-accounts/server/pkg/workspace"
 	"github.com/reearth/reearthx/appx"
@@ -64,6 +67,31 @@ type mfaFixture struct {
 
 func newMFAFixture(t *testing.T) *mfaFixture {
 	t.Helper()
+	return newMFAFixtureWithMaxAuthAge(t, 0)
+}
+
+// The fake JWT middleware stands in for appx: it attaches a token whose
+// auth_time is the X-Test-Auth-Time header, when the header is present.
+func fakeJWTMiddleware(t *testing.T) echo.MiddlewareFunc {
+	return func(next echo.HandlerFunc) echo.HandlerFunc {
+		return func(c echo.Context) error {
+			v := c.Request().Header.Get("X-Test-Auth-Time")
+			if v == "" {
+				return next(c)
+			}
+			authTime, err := strconv.ParseInt(v, 10, 64)
+			require.NoError(t, err)
+			token, err := jwt.NewWithClaims(jwt.SigningMethodHS256, jwt.MapClaims{"auth_time": authTime}).SignedString([]byte("test-key"))
+			require.NoError(t, err)
+			ctx := context.WithValue(c.Request().Context(), adapter.AuthInfoKey, appx.AuthInfo{Token: token})
+			c.SetRequest(c.Request().WithContext(ctx))
+			return next(c)
+		}
+	}
+}
+
+func newMFAFixtureWithMaxAuthAge(t *testing.T, maxAuthAge time.Duration) *mfaFixture {
+	t.Helper()
 	ctx := context.Background()
 	repos := memory.New()
 
@@ -79,7 +107,7 @@ func newMFAFixture(t *testing.T) *mfaFixture {
 
 	fake := &fakeMFAAuthenticator{enrolled: true}
 	gw := &gateway.Container{Authenticators: map[gateway.Provider]gateway.Authenticator{gateway.ProviderAuth0: fake}}
-	uc := &interfaces.Container{User: interactor.NewUser(repos, gw, nil, "", "")}
+	uc := interactor.NewContainer(repos, gw, nil, nil, interactor.ContainerConfig{MFARecoveryMaxAuthAge: maxAuthAge})
 
 	users := map[string]*user.User{
 		auth0User.ID().String(): auth0User,
@@ -95,7 +123,7 @@ func newMFAFixture(t *testing.T) *mfaFixture {
 	}
 	usecases := func(next echo.HandlerFunc) echo.HandlerFunc {
 		return func(c echo.Context) error {
-			c.SetRequest(c.Request().WithContext(adapter.AttachUsecases(c.Request().Context(), uc)))
+			c.SetRequest(c.Request().WithContext(adapter.AttachUsecases(c.Request().Context(), &uc)))
 			return next(c)
 		}
 	}
@@ -104,15 +132,23 @@ func newMFAFixture(t *testing.T) *mfaFixture {
 		AuthConfigProvider: stubAuthConfigProvider{},
 		AuthResolver:       resolver,
 		CacheControl:       cacheControlMiddleware,
+		JWTMiddleware:      fakeJWTMiddleware(t),
 		UsecaseMiddleware:  usecases,
 	})
 	return &mfaFixture{auth: fake, e: e, plainUser: plainUser, auth0User: auth0User}
 }
 
 func (f *mfaFixture) do(method, path string, u *user.User) *httptest.ResponseRecorder {
+	return f.doAt(method, path, u, nil)
+}
+
+func (f *mfaFixture) doAt(method, path string, u *user.User, authTime *time.Time) *httptest.ResponseRecorder {
 	req := httptest.NewRequest(method, path, nil)
 	if u != nil {
 		req.Header.Set("X-Test-User", u.ID().String())
+	}
+	if authTime != nil {
+		req.Header.Set("X-Test-Auth-Time", strconv.FormatInt(authTime.Unix(), 10))
 	}
 	rec := httptest.NewRecorder()
 	f.e.ServeHTTP(rec, req)
@@ -189,5 +225,22 @@ func TestMFARoutes(t *testing.T) {
 			assert.Equal(t, "no authenticator found", decodeJSON(t, rec)["description"], "%s %s", r.method, r.path)
 		}
 		assert.Empty(t, f.auth.disabledSub)
+	})
+
+	t.Run("recovery code needs a recent login when the window is on", func(t *testing.T) {
+		f := newMFAFixtureWithMaxAuthAge(t, 5*time.Minute)
+		old := time.Now().Add(-time.Hour)
+		recent := time.Now().Add(-time.Minute)
+		const path = "/api/users/me/mfa/recovery-code"
+
+		for name, authTime := range map[string]*time.Time{"no auth_time": nil, "old login": &old} {
+			rec := f.doAt(http.MethodPost, path, f.auth0User, authTime)
+			assert.Equal(t, http.StatusUnauthorized, rec.Code, name)
+			assert.Equal(t, "recent login required", decodeJSON(t, rec)["description"], name)
+		}
+
+		rec := f.doAt(http.MethodPost, path, f.auth0User, &recent)
+		require.Equal(t, http.StatusOK, rec.Code)
+		assert.Equal(t, map[string]any{"recovery_code": "recovery-123"}, decodeJSON(t, rec))
 	})
 }
