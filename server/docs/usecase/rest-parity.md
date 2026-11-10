@@ -17,7 +17,7 @@ A comparison of every GraphQL query and mutation with the REST routes on `main` 
 
 1. `mfaStatus`, `enableMFA`, `disableMFA` and `regenerateMFARecoveryCode` have no REST route.
 2. GraphQL shows a user's `email` only to that user (#374). The REST user lookups return every user's email to any signed-in caller. This is a data exposure, not only a parity gap.
-3. A few response fields differ in shape. They are listed under Known divergences and are not changed here.
+3. A few response fields differ in shape. Decision 4 closes them.
 
 The full gap table is in the appendix.
 
@@ -25,14 +25,12 @@ The full gap table is in the appendix.
 
 1. Every GraphQL operation has a REST route that calls the same interactor, so authorization and validation have one implementation.
 2. REST never returns data that GraphQL hides for the same caller.
-3. GraphQL behavior does not change.
+3. GraphQL behavior changes only where a decision below says so.
 
 ## Non-Goals
 
-1. Granting the `owner` role directly. The interactor refuses it for both APIs (`ErrCannotChangeRoleToOwner`), and only ownership transfer can make an owner. Changing that is a rule change, listed under Open Questions.
-2. A machine-to-machine path for workspace and member management. Listed under Open Questions.
-3. Signed `photo_url` values and the other shape differences under Known divergences.
-4. The two GraphQL stubs `removeMultipleUsersFromWorkspace` and `removeIntegrationsFromWorkspace`, which return null. REST already implements both.
+1. A machine-to-machine path for workspace and member management. Listed under Open Questions.
+2. The two GraphQL stubs `removeMultipleUsersFromWorkspace` and `removeIntegrationsFromWorkspace`, which return null. REST already implements both.
 
 ## Functional Requirements
 
@@ -84,26 +82,62 @@ client --REST--> handler --> same interactor as resolver --> repo
                     +--> httpmodel.NewUserResponse(u, viewer)   (email rule)
 ```
 
-## Known divergences
+## Decisions
 
-These stay as they are in this change. Each needs its own decision.
+Recorded 2026-11-10 after review of the open questions.
 
-1. GraphQL `photoURL` on `me` and on workspaces is a signed URL. REST returns the stored value. Storage is built only in `internal/app/graphql.go`, so signing in REST needs the storage gateway wired into the REST router.
-2. GraphQL workspace `members` drops users whose record no longer exists and drops integration members. REST returns every member, integrations included.
-3. GraphQL can expand `myWorkspace` on `me` and `user` on a member. REST returns ids, and the client reads `GET /api/workspaces/:id` or `GET /api/users?ids=`.
-4. GraphQL `checkPermission` without a user returns not found. REST returns `401`.
+### 1. A workspace can have several owners
+
+An owner can grant `owner` through `POST /api/workspaces/:id/members`, `PATCH /api/workspaces/:id/members/:user_id`, `addUsersToWorkspace` and `updateUserOfWorkspace`. No new route. The rules, for both APIs:
+
+1. Only an owner can grant `owner`, change an owner's role, or remove an owner. "Owner" here is the existing owner-like check (`checkOwnerLikePermission`: workspace owner, or a caller Cerbos allows). The maintainer shortcut (`IsMaintainingWorkspace`) does not apply to these actions. Error: `403`.
+2. A workspace keeps at least one active owner. Demoting or removing the last owner fails, whoever the caller is. Error: `403` (`ErrCannotChangeOwnerRole`, `ErrOwnerCannotLeaveTheWorkspace`).
+3. An owner can demote themselves or leave while another owner remains. Today an owner can never change their own role.
+4. Unchanged: personal workspaces cannot change members, integrations cannot be `owner`, SCIM group mapping cannot grant `owner` (#368), `PATCH /api/service/workspaces/:id/members/:user_id` cannot grant `owner`, and `transfer-ownership` still demotes the caller to maintainer.
+
+Rule 1 is also a fix. On `main` a maintainer can demote or remove an owner who is not themselves, including the only owner, which leaves a workspace with no owner.
+
+### 2. Per-project roles will read `resource_id`
+
+`POST /api/permissions/check` keeps ignoring `resource_id` until per-project roles ship. When they do, they read this field name, and GraphQL `CheckPermissionInput` gains the same field. No code change now.
+
+### 3. Recovery codes require a recent login
+
+`RegenerateMFARecoveryCode` refuses a session whose login is older than a configured window, for both APIs. The adapter reads the `auth_time` claim from the validated token and passes it to the interactor. Error: `interfaces.ErrRecentLoginRequired`, mapped to `401` in REST, with the same message in GraphQL. A token without the claim counts as too old.
+
+The window is `REEARTH_ACCOUNTS_MFA_RECOVERY_MAX_AUTH_AGE` (a duration). It defaults to `0`, which turns the check off. Turn it on only after two things are in place, since otherwise no one can regenerate a code:
+
+1. The identity provider puts `auth_time` in the token accounts receives. Firebase (CIP) ID tokens carry it. Auth0 access tokens need a post-login Action to add it. Verify the claim on the tenant before turning the check on.
+2. The web client can force a fresh login before the call (Auth0 `max_age` or `prompt=login`).
+
+`DisableMFA` (SEC-03) is not covered by this decision.
+
+### 4. REST and GraphQL return the same shapes
+
+The four divergences found in the first comparison are closed. Each change names which side moves.
+
+1. **Signed photo URLs. REST moves.** `photo_url` on `GET /api/users/me` and on every workspace response is the signed URL GraphQL returns. The app layer passes the storage gateway into `RouterConfig`, and the REST builders call `GetSignedURL` as `gqlmodel.ToWorkspace` and the `me` resolver do. A signing failure keeps the stored value empty, as GraphQL does.
+2. **Workspace members. Both move.**
+   - REST drops user members whose user record no longer exists, as GraphQL does through its `exists` map.
+   - GraphQL returns integration members as `WorkspaceIntegrationMember`. The schema has always declared that type in the `WorkspaceMember` union, and `ToWorkspace` reserves room for integrations but never adds them (since #103). REST already returns them, and REST and GraphQL both manage integrations, so dropping them from REST would leave no way to list them.
+3. **Expansions. REST moves.** REST gains an opt-in `expand` query parameter, so nothing extra is fetched by default:
+   - `GET /api/users/me?expand=my_workspace` embeds the personal workspace as `my_workspace`.
+   - Workspace routes accept `?expand=members.user`, which embeds each user member's `UserResponse` as `user`. Embedded users follow the email rule above.
+4. **`checkPermission` without a user. GraphQL moves.** GraphQL returns `interfaces.ErrInvalidOperator`, the error other resolvers return when there is no operator, instead of `not found`. REST already returns `401`.
 
 ## Open Questions
 
-1. **Granting `owner`.** Should an owner be able to add a second owner, through `POST /api/workspaces/:id/members` and `PATCH /api/workspaces/:id/members/:user_id` and the matching GraphQL mutations? Today only transfer can, and transfer demotes the caller to maintainer. Serve treats accounts as the owner of this rule and does not need a change to ship.
-2. **Machine-to-machine access.** Accounts has an API key on `find-or-create`, `sync-sso` and `permissions/check`, and `permissions/check` still needs a user. Should accounts accept a non-user caller for workspace and member reads, and if so, which: the existing API key, or an OIDC client-credentials principal? Serve authorizes service callers from its own config until accounts decides (Serve ADR-016, decision 11).
-3. **`resource_id` on `POST /api/permissions/check`.** Serve already sends it on project checks, and accounts ignores it. If per-project roles ship, will they read this field name?
-4. **Recovery code step-up.** `RegenerateMFARecoveryCode` needs only a session (the SEC-04 note in `interactor/user.go`). The REST route inherits that. Should both APIs require a recent login first?
+1. **Machine-to-machine access.** Accounts has an API key on `find-or-create`, `sync-sso` and `permissions/check`, and `permissions/check` still needs a user. Should accounts accept a non-user caller for workspace and member reads, and if so, which: the existing API key, or an OIDC client-credentials principal? Serve authorizes service callers from its own config until accounts decides (Serve ADR-016, decision 11).
 
 ## Potential Impact
 
 1. REST clients that read another user's `email` from the lookup routes get an empty string. Serve does not read it. Other REST clients should check before this ships.
 2. GraphQL `enableMFA`, `disableMFA` and `regenerateMFARecoveryCode` keep the same error message for a user with no Auth0 identity.
+3. Maintainers can no longer demote or remove owners (Decision 1, rule 1). Both APIs change.
+4. GraphQL `members` starts returning `WorkspaceIntegrationMember` entries (Decision 4.2). A client that reads every entry as a user member without checking `__typename` breaks. Check the GraphQL clients of accounts (visualizer, dashboard, CMS) before this ships.
+5. GraphQL `checkPermission` without a user returns `invalid operator` instead of `not found` (Decision 4.4).
+6. REST `photo_url` values become signed URLs that expire. A client that stores them should store the value it uploaded, not the one it read.
+7. With the step-up window set, `regenerateMFARecoveryCode` and `POST /api/users/me/mfa/recovery-code` fail for an old session. The window is off by default.
 
 ## Test Plan
 
@@ -116,7 +150,7 @@ These stay as they are in this change. Each needs its own decision.
 1. Backward compatible for MFA (new routes). Email visibility removes data from REST responses.
 2. Partial deployment is possible. Each PR ships alone.
 3. Notify owners of REST clients that read other users' email.
-4. No configuration change.
+4. One new optional setting, `REEARTH_ACCOUNTS_MFA_RECOVERY_MAX_AUTH_AGE`, off by default (Decision 3).
 5. No DDL or DML.
 
 ## Rollback Plan
@@ -143,10 +177,10 @@ Measured against `main` at b7d5685. Auth is `RequiredAuth` unless noted, and the
 | `node`, `nodes` | `User.FetchByID`, `Workspace.FetchByID` | `GET /api/users/:id`, `GET /api/workspaces/:id`, `?ids=` | covered |
 | `authConfig` | config | `GET /api/auth/config` (public) | covered |
 | `checkPermission` | `Cerbos.CheckPermission` | `POST /api/permissions/check` (JWT or API key, user required) | covered |
-| `me` | operator user | `GET /api/users/me` | covered, divergence 1 and 3 |
+| `me` | operator user | `GET /api/users/me` | covered, shape fixed by Decision 4.1 and 4.3 |
 | `mfaStatus` | `User.GetMFAStatus` | none | gap, this change |
 | `user`, `findUsersByIDs`, `findUsersByIDsWithPagination`, `findUserByAlias`, `searchUser`, `userByNameOrAlias`, `userByNameOrEmail` | `User.Fetch*`, `User.SearchUser` | `GET /api/users/:id`, `/api/users`, `/search`, `/by-alias`, `/by-name-or-alias`, `/by-name-or-email` | covered, email gap, this change |
-| `findByID`, `findByIDs`, `findByName`, `findByAlias`, `findByUser`, `findByUserWithPagination` | `Workspace.Fetch*` | `GET /api/workspaces/:id`, `GET /api/workspaces?ids|name|alias|user_id` | covered, divergence 1 and 2 |
+| `findByID`, `findByIDs`, `findByName`, `findByAlias`, `findByUser`, `findByUserWithPagination` | `Workspace.Fetch*` | `GET /api/workspaces/:id`, `GET /api/workspaces?ids|name|alias|user_id` | covered, shape fixed by Decision 4.1 and 4.2 |
 | `signup`, `signupOIDC`, `findOrCreate`, `verifyUser`, `createVerification`, `startPasswordReset`, `passwordReset` | `User.*` | `POST /api/users/signup`, `/signup-oidc`, `/find-or-create` (API key or JWT), `/verify`, `/verifications`, `/password-reset/start`, `/password-reset` | covered |
 | `updateMe`, `deleteMe`, `removeMyAuth`, `logout` | `User.*` | `PATCH`, `DELETE /api/users/me`, `DELETE /api/users/me/auths/:sub`, `POST /api/auth/logout` | covered |
 | `enableMFA`, `disableMFA`, `regenerateMFARecoveryCode` | `User.EnableMFA`, `DisableMFA`, `RegenerateMFARecoveryCode` | none | gap, this change |
