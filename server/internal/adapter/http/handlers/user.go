@@ -102,6 +102,78 @@ func (h *UserHandler) RemoveMyAuth(c echo.Context) error {
 	return c.JSON(http.StatusOK, httpmodel.NewMeResponse(u))
 }
 
+// GetMFAStatus godoc
+// @Tags User
+// @Summary Get the current user's MFA enrollment
+// @Security BearerAuth
+// @Produce json
+// @Success 200 {object} httpmodel.MFAStatusResponse
+// @Failure 401 {object} internal.ErrorResponse
+// @Router /api/users/me/mfa [get]
+func (h *UserHandler) GetMFAStatus(c echo.Context) error {
+	ctx := c.Request().Context()
+	s, err := httpinternal.Usecases(c).User.GetMFAStatus(ctx, httpinternal.Operator(c))
+	if err != nil {
+		return err
+	}
+	return c.JSON(http.StatusOK, httpmodel.MFAStatusResponse{Enrolled: s.Enrolled})
+}
+
+// EnableMFA godoc
+// @Tags User
+// @Summary Start MFA enrollment for the current user
+// @Security BearerAuth
+// @Produce json
+// @Success 200 {object} httpmodel.MFAEnrollResponse
+// @Failure 400 {object} internal.ErrorResponse
+// @Failure 401 {object} internal.ErrorResponse
+// @Router /api/users/me/mfa [post]
+func (h *UserHandler) EnableMFA(c echo.Context) error {
+	ctx := c.Request().Context()
+	url, err := httpinternal.Usecases(c).User.EnableMFA(ctx, httpinternal.Operator(c))
+	if err != nil {
+		return err
+	}
+	c.Response().Header().Set("Cache-Control", "no-store")
+	return c.JSON(http.StatusOK, httpmodel.MFAEnrollResponse{EnrollmentURL: url})
+}
+
+// DisableMFA godoc
+// @Tags User
+// @Summary Remove MFA enrollment from the current user
+// @Security BearerAuth
+// @Produce json
+// @Success 204
+// @Failure 400 {object} internal.ErrorResponse
+// @Failure 401 {object} internal.ErrorResponse
+// @Router /api/users/me/mfa [delete]
+func (h *UserHandler) DisableMFA(c echo.Context) error {
+	ctx := c.Request().Context()
+	if err := httpinternal.Usecases(c).User.DisableMFA(ctx, httpinternal.Operator(c)); err != nil {
+		return err
+	}
+	return c.NoContent(http.StatusNoContent)
+}
+
+// RegenerateMFARecoveryCode godoc
+// @Tags User
+// @Summary Replace the current user's MFA recovery code
+// @Security BearerAuth
+// @Produce json
+// @Success 200 {object} httpmodel.MFARecoveryCodeResponse
+// @Failure 400 {object} internal.ErrorResponse
+// @Failure 401 {object} internal.ErrorResponse
+// @Router /api/users/me/mfa/recovery-code [post]
+func (h *UserHandler) RegenerateMFARecoveryCode(c echo.Context) error {
+	ctx := c.Request().Context()
+	code, err := httpinternal.Usecases(c).User.RegenerateMFARecoveryCode(ctx, httpinternal.Operator(c))
+	if err != nil {
+		return err
+	}
+	c.Response().Header().Set("Cache-Control", "no-store")
+	return c.JSON(http.StatusOK, httpmodel.MFARecoveryCodeResponse{RecoveryCode: code})
+}
+
 // Deactivate godoc
 // @Tags User
 // @Summary Soft-delete a user (sets deleted_at; maintainer role required)

@@ -67,6 +67,21 @@ type MeResponse struct {
 	Auths          []string              `json:"auths"`
 }
 
+// MFAStatusResponse mirrors the GraphQL MFAStatus type.
+type MFAStatusResponse struct {
+	Enrolled bool `json:"enrolled"`
+}
+
+// MFAEnrollResponse mirrors the GraphQL MFAEnrollResult type.
+type MFAEnrollResponse struct {
+	EnrollmentURL string `json:"enrollment_url"`
+}
+
+// MFARecoveryCodeResponse mirrors the GraphQL MFARecoveryCodeResult type.
+type MFARecoveryCodeResponse struct {
+	RecoveryCode string `json:"recovery_code"`
+}
+
 // SimpleUserResponse mirrors the user.Simple shape used by userByNameOrEmail.
 type SimpleUserResponse struct {
 	ID    string `json:"id"`
