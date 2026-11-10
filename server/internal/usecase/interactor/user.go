@@ -754,22 +754,31 @@ func NewUserQuery(primary user.Repo, repos ...user.Repo) *UserQuery {
 	}
 }
 
+// FetchByID returns a list aligned with ids, holding nil for a user no repo
+// has. Repos differ in whether they align or compact their results, so the
+// result is matched by user ID, never by position.
 func (q *UserQuery) FetchByID(ctx context.Context, ids user.IDList) (user.List, error) {
-	us := make(user.List, len(ids))
+	found := make(map[user.ID]*user.User, len(ids))
 	for _, r := range q.repos {
-		u, err := r.FindByIDs(ctx, ids)
+		us, err := r.FindByIDs(ctx, ids)
 		if err != nil {
 			return nil, err
 		}
-
-		for i, uu := range u {
-			if uu != nil && us[i] == nil {
-				us[i] = uu
+		for _, u := range us {
+			if u == nil {
+				continue
+			}
+			if _, ok := found[u.ID()]; !ok {
+				found[u.ID()] = u
 			}
 		}
 	}
 
-	return us, nil
+	res := make(user.List, len(ids))
+	for i, id := range ids {
+		res[i] = found[id]
+	}
+	return res, nil
 }
 
 func (q *UserQuery) FetchByIDsWithPagination(ctx context.Context, ids user.IDList, alias *string, paginationParam interfaces.FetchByIDsWithPaginationParam) (interfaces.FetchByIDsWithPaginationResult, error) {
