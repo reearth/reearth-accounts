@@ -137,12 +137,15 @@ func initEcho(ctx context.Context, cfg *ServerConfig) *echo.Echo {
 		cacheControl,
 	)
 
-	photoStorage := newPhotoStorage(cfg.Config)
+	photos, err := adapter.NewPhotoSigner(newPhotoStorage(cfg.Config))
+	if err != nil {
+		log.Fatalc(ctx, err)
+	}
 	loginTime, err := adapter.NewLoginTimeSource(cfg.Config.AuthTimeClaim)
 	if err != nil {
 		log.Panicc(ctx, fmt.Errorf("REEARTH_ACCOUNTS_AUTH_TIME_CLAIM: %w", err))
 	}
-	api.POST("/graphql", GraphqlAPI(cfg.Config, photoStorage, loginTime, cfg.Config.Dev), middlewares...)
+	api.POST("/graphql", GraphqlAPI(cfg.Config, photos, loginTime, cfg.Config.Dev), middlewares...)
 
 	// REST API (additive; GraphQL above is unchanged). Reuses the usecase middleware
 	// and, in non-mock mode, an optional JWT middleware that parses a bearer token into
@@ -163,7 +166,7 @@ func initEcho(ctx context.Context, cfg *ServerConfig) *echo.Echo {
 		JWTMiddleware:      restJWT,
 		LoginTime:          loginTime,
 		AuthConfigProvider: cfg.Config,
-		Storage:            photoStorage,
+		Photos:             photos,
 		APIKey:             cfg.Config.RestAPIKey,
 		SyncSSOAPIKey:      cfg.Config.SyncSSOAPIKey,
 		SwaggerUser:        cfg.Config.SwaggerBasicUser,

@@ -28,7 +28,7 @@ func (r *mutationResolver) CreateWorkspace(ctx context.Context, input gqlmodel.C
 		return nil, err
 	}
 
-	converted, err := gqlmodel.ToWorkspace(ctx, w, exists, r.Storage)
+	converted, err := gqlmodel.ToWorkspace(ctx, w, exists, r.Photos)
 	if err != nil {
 		log.Errorf("failed to convert workspace: %s", err.Error())
 		return nil, err
@@ -75,7 +75,7 @@ func (r *mutationResolver) UpdateWorkspace(ctx context.Context, input gqlmodel.U
 		return nil, err
 	}
 
-	converted, err := gqlmodel.ToWorkspace(ctx, w, exists, r.Storage)
+	converted, err := gqlmodel.ToWorkspace(ctx, w, exists, r.Photos)
 	if err != nil {
 		log.Errorf("failed to convert workspace: %s", err.Error())
 		return nil, err
@@ -107,7 +107,7 @@ func (r *mutationResolver) AddUsersToWorkspace(ctx context.Context, input gqlmod
 		return nil, err
 	}
 
-	converted, err := gqlmodel.ToWorkspace(ctx, w, exists, r.Storage)
+	converted, err := gqlmodel.ToWorkspace(ctx, w, exists, r.Photos)
 	if err != nil {
 		log.Errorf("failed to convert workspace: %s", err.Error())
 		return nil, err
@@ -132,7 +132,7 @@ func (r *mutationResolver) AddIntegrationToWorkspace(ctx context.Context, input 
 		return nil, err
 	}
 
-	converted, err := gqlmodel.ToWorkspace(ctx, w, exists, r.Storage)
+	converted, err := gqlmodel.ToWorkspace(ctx, w, exists, r.Photos)
 	if err != nil {
 		log.Errorf("failed to convert workspace: %s", err.Error())
 		return nil, err
@@ -157,7 +157,7 @@ func (r *mutationResolver) RemoveUserFromWorkspace(ctx context.Context, input gq
 		return nil, err
 	}
 
-	converted, err := gqlmodel.ToWorkspace(ctx, w, exists, r.Storage)
+	converted, err := gqlmodel.ToWorkspace(ctx, w, exists, r.Photos)
 	if err != nil {
 		log.Errorf("failed to convert workspace: %s", err.Error())
 		return nil, err
@@ -189,7 +189,7 @@ func (r *mutationResolver) RemoveIntegrationFromWorkspace(ctx context.Context, i
 		return nil, err
 	}
 
-	converted, err := gqlmodel.ToWorkspace(ctx, w, exists, r.Storage)
+	converted, err := gqlmodel.ToWorkspace(ctx, w, exists, r.Photos)
 	if err != nil {
 		log.Errorf("failed to convert workspace: %s", err.Error())
 		return nil, err
@@ -221,7 +221,7 @@ func (r *mutationResolver) UpdateUserOfWorkspace(ctx context.Context, input gqlm
 		return nil, err
 	}
 
-	converted, err := gqlmodel.ToWorkspace(ctx, w, exists, r.Storage)
+	converted, err := gqlmodel.ToWorkspace(ctx, w, exists, r.Photos)
 	if err != nil {
 		log.Errorf("failed to convert workspace: %s", err.Error())
 		return nil, err
@@ -246,7 +246,7 @@ func (r *mutationResolver) UpdateIntegrationOfWorkspace(ctx context.Context, inp
 		return nil, err
 	}
 
-	converted, err := gqlmodel.ToWorkspace(ctx, w, exists, r.Storage)
+	converted, err := gqlmodel.ToWorkspace(ctx, w, exists, r.Photos)
 	if err != nil {
 		log.Errorf("failed to convert workspace: %s", err.Error())
 		return nil, err
@@ -275,7 +275,7 @@ func (r *mutationResolver) TransferWorkspaceOwnership(ctx context.Context, input
 		return nil, err
 	}
 
-	converted, err := gqlmodel.ToWorkspace(ctx, w, exists, r.Storage)
+	converted, err := gqlmodel.ToWorkspace(ctx, w, exists, r.Photos)
 	if err != nil {
 		log.Errorf("failed to convert workspace: %s", err.Error())
 	}

@@ -6,7 +6,6 @@ import (
 	"errors"
 
 	"github.com/reearth/reearth-accounts/server/internal/adapter"
-	"github.com/reearth/reearth-accounts/server/internal/usecase/gateway"
 )
 
 // THIS CODE IS A STARTING POINT ONLY. IT WILL NOT BE UPDATED WITH SCHEMA CHANGES.
@@ -16,12 +15,12 @@ var ErrUnauthorized = errors.New("unauthorized")
 
 type Resolver struct {
 	LoginTime adapter.LoginTimeSource
-	Storage   gateway.Storage
+	Photos    adapter.PhotoSigner
 }
 
-func NewResolver(storage gateway.Storage, loginTime adapter.LoginTimeSource) ResolverRoot {
+func NewResolver(photos adapter.PhotoSigner, loginTime adapter.LoginTimeSource) ResolverRoot {
 	return &Resolver{
 		LoginTime: loginTime,
-		Storage:   storage,
+		Photos:    photos,
 	}
 }

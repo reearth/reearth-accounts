@@ -4,6 +4,7 @@ import (
 	"context"
 	"testing"
 
+	"github.com/reearth/reearth-accounts/server/internal/adapter"
 	"github.com/reearth/reearth-accounts/server/internal/adapter/gql/gqlmodel"
 	"github.com/reearth/reearth-accounts/server/internal/usecase/interfaces"
 	"github.com/reearth/reearth-accounts/server/pkg/user"
@@ -40,7 +41,7 @@ func TestWorkspaceLoader_Fetch_AlignsWithKeys(t *testing.T) {
 	b := workspace.New().NewID().Name("b").MustBuild()
 	keys := []gqlmodel.ID{gqlmodel.IDFrom(b.ID()), gqlmodel.IDFrom(workspace.NewID()), gqlmodel.IDFrom(a.ID())}
 
-	got, errs := NewWorkspaceLoader(reorderingWorkspaceUsecase{res: workspace.List{a, nil, b}}, nil).Fetch(context.Background(), keys)
+	got, errs := NewWorkspaceLoader(reorderingWorkspaceUsecase{res: workspace.List{a, nil, b}}, adapter.PhotoSigner{}).Fetch(context.Background(), keys)
 	require.Empty(t, errs)
 	require.Len(t, got, 3)
 	assert.Equal(t, "b", got[0].Name)

@@ -137,7 +137,7 @@ func newMFAFixtureWithLoginTime(t *testing.T, maxAuthAge time.Duration, tokenCla
 
 	e := newRESTEcho(adapterhttp.RouterConfig{
 		AuthConfigProvider: stubAuthConfigProvider{},
-		Storage:            noSigning(t),
+		Photos:             noSigning(t),
 		AuthResolver:       resolver,
 		CacheControl:       cacheControlMiddleware,
 		JWTMiddleware:      fakeJWTMiddleware(t, tokenClaim),

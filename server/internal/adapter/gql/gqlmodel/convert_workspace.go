@@ -4,11 +4,10 @@ import (
 	"context"
 	"errors"
 
-	"github.com/labstack/gommon/log"
 	"github.com/reearth/reearth-accounts/server/internal/adapter"
-	"github.com/reearth/reearth-accounts/server/internal/usecase/gateway"
 	"github.com/reearth/reearth-accounts/server/pkg/user"
 	"github.com/reearth/reearth-accounts/server/pkg/workspace"
+	"github.com/reearth/reearthx/log"
 	"github.com/sourcegraph/conc/pool"
 )
 
@@ -16,7 +15,7 @@ func ToWorkspace(
 	ctx context.Context,
 	t *workspace.Workspace,
 	exists map[user.ID]struct{},
-	storage gateway.Storage,
+	photos adapter.PhotoSigner,
 ) (*Workspace, error) {
 	if t == nil {
 		log.Error("workspace is nil")
@@ -46,9 +45,9 @@ func ToWorkspace(
 	}
 
 	if t.Metadata() != nil {
-		signedURL, sErr := adapter.SignPhotoURL(ctx, storage, t.Metadata().PhotoURL())
+		signedURL, sErr := photos.Sign(ctx, t.Metadata().PhotoURL())
 		if sErr != nil {
-			log.Errorf("[ToWorkspace] failed to get signed url: %s, workspace id: %s", sErr.Error(), t.ID())
+			log.Errorfc(ctx, "gql: failed to sign photo url for workspace %s: %v", t.ID(), sErr)
 		}
 		metadata.PhotoURL = signedURL
 	}
@@ -67,7 +66,7 @@ func ToWorkspaces(
 	ctx context.Context,
 	ws workspace.List,
 	exists map[user.ID]struct{},
-	storage gateway.Storage,
+	photos adapter.PhotoSigner,
 ) []*Workspace {
 	if ws == nil {
 		return nil
@@ -81,7 +80,7 @@ func ToWorkspaces(
 	for i, w := range ws {
 		i, w := i, w
 		p.Go(func() {
-			converted, err := ToWorkspace(ctx, w, exists, storage)
+			converted, err := ToWorkspace(ctx, w, exists, photos)
 			if err != nil {
 				log.Errorf("failed to convert workspace: %s", err.Error())
 				return

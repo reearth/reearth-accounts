@@ -5,20 +5,20 @@ import (
 	"strings"
 
 	"github.com/labstack/echo/v4"
+	"github.com/reearth/reearth-accounts/server/internal/adapter"
 	"github.com/reearth/reearth-accounts/server/internal/adapter/http/httpmodel"
 	httpinternal "github.com/reearth/reearth-accounts/server/internal/adapter/http/internal"
-	"github.com/reearth/reearth-accounts/server/internal/usecase/gateway"
 	"github.com/reearth/reearth-accounts/server/internal/usecase/interfaces"
 	"github.com/reearth/reearth-accounts/server/pkg/id"
 	"github.com/reearth/reearth-accounts/server/pkg/workspace"
 )
 
 type WorkspaceHandler struct {
-	storage gateway.Storage
+	photos adapter.PhotoSigner
 }
 
-func NewWorkspaceHandler(storage gateway.Storage) *WorkspaceHandler {
-	return &WorkspaceHandler{storage: storage}
+func NewWorkspaceHandler(photos adapter.PhotoSigner) *WorkspaceHandler {
+	return &WorkspaceHandler{photos: photos}
 }
 
 func badRequest(msg string) error {
@@ -155,7 +155,7 @@ func (h *WorkspaceHandler) List(c echo.Context) error {
 			if err != nil {
 				return err
 			}
-			items, err := workspaceResponses(c, h.storage, res.Workspaces)
+			items, err := workspaceResponses(c, h.photos, res.Workspaces)
 			if err != nil {
 				return err
 			}
@@ -212,7 +212,7 @@ func (h *WorkspaceHandler) ListAll(c echo.Context) error {
 	if err != nil {
 		return err
 	}
-	items, err := workspaceResponses(c, h.storage, res.Workspaces)
+	items, err := workspaceResponses(c, h.photos, res.Workspaces)
 	if err != nil {
 		return err
 	}
