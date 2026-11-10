@@ -9,7 +9,6 @@ import (
 	"github.com/reearth/reearth-accounts/server/internal/adapter"
 	"github.com/reearth/reearth-accounts/server/internal/adapter/http/handlers"
 	httpinternal "github.com/reearth/reearth-accounts/server/internal/adapter/http/internal"
-	"github.com/reearth/reearth-accounts/server/internal/usecase/gateway"
 	echoSwagger "github.com/swaggo/echo-swagger"
 )
 
@@ -29,8 +28,8 @@ type RouterConfig struct {
 	APIKey string
 	// SyncSSOAPIKey is the dedicated M2M key for the sync-sso route.
 	SyncSSOAPIKey string
-	// Storage signs photo URLs. Required.
-	Storage gateway.Storage
+	// Photos signs photo URLs.
+	Photos adapter.PhotoSigner
 	// Swagger basic-auth (optional).
 	SwaggerUser, SwaggerPass string
 	// LoginTime reads the login time for the recovery code step-up check.
@@ -43,10 +42,6 @@ type RouterConfig struct {
 // RegisterRESTRouter mounts all /api/* REST routes additively. It MUST be called after
 // the GraphQL route is registered; it shares the same Echo instance and global middleware.
 func RegisterRESTRouter(e *echo.Echo, cfg RouterConfig) {
-	if cfg.Storage == nil {
-		panic("adapterhttp: RouterConfig.Storage is required to sign photo URLs")
-	}
-
 	// Errors from REST handlers render as structured ErrorResponse JSON.
 	// Wrapped so the existing GraphQL HTTPErrorHandler is preserved for non-REST paths.
 	prev := e.HTTPErrorHandler
@@ -86,7 +81,7 @@ func RegisterRESTRouter(e *echo.Echo, cfg RouterConfig) {
 	api.POST("/auth/logout", ah.Logout, required) // JWT
 
 	// --- Users ---
-	uh := handlers.NewUserHandler(cfg.Storage, cfg.LoginTime)
+	uh := handlers.NewUserHandler(cfg.Photos, cfg.LoginTime)
 	api.GET("/users/me", uh.Me, required)
 	api.PATCH("/users/me", uh.UpdateMe, required)
 	api.DELETE("/users/me", uh.DeleteMe, required)
@@ -123,7 +118,7 @@ func RegisterRESTRouter(e *echo.Echo, cfg RouterConfig) {
 	api.PUT("/users/by-sub/:sub/platform-roles", uh.SetPlatformRolesBySub, required)
 
 	// --- Workspaces ---
-	wh := handlers.NewWorkspaceHandler(cfg.Storage)
+	wh := handlers.NewWorkspaceHandler(cfg.Photos)
 	api.POST("/workspaces", wh.Create, required)
 	api.GET("/workspaces", wh.List, required) // ?ids= | ?name= | ?alias= | ?user_id=(&page=&page_size=)
 	// Cross-tenant listing for service-to-service callers (e.g. LINKS-Veda). Any

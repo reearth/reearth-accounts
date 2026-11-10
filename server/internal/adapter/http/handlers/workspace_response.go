@@ -51,7 +51,7 @@ func (h *WorkspaceHandler) workspaceResponses(c echo.Context, ws workspace.List)
 		return nil, err
 	}
 	res := httpmodel.NewWorkspaceResponses(ws, userExists)
-	signWorkspacePhotos(c.Request().Context(), h.storage, res)
+	signWorkspacePhotos(c.Request().Context(), h.photos, res)
 	return res, nil
 }
 

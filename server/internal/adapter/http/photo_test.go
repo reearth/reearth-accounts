@@ -71,7 +71,7 @@ func newPhotoEcho(t *testing.T, storage gateway.Storage, mePhoto string) (*echo.
 				return next(c)
 			}
 		},
-		Storage: storage,
+		Photos: photoSigner(t, storage),
 	})
 	return e, photoFixture{me: me, withPhoto: withPhoto, noPhoto: noPhoto}
 }

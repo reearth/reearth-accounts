@@ -10,7 +10,6 @@ import (
 	"github.com/reearth/reearth-accounts/server/internal/adapter"
 	"github.com/reearth/reearth-accounts/server/internal/adapter/http/httpmodel"
 	httpinternal "github.com/reearth/reearth-accounts/server/internal/adapter/http/internal"
-	"github.com/reearth/reearth-accounts/server/internal/usecase/gateway"
 	"github.com/reearth/reearth-accounts/server/internal/usecase/interfaces"
 	"github.com/reearth/reearth-accounts/server/pkg/id"
 	"github.com/reearth/reearth-accounts/server/pkg/user"
@@ -23,11 +22,11 @@ import (
 
 type UserHandler struct {
 	loginTime adapter.LoginTimeSource
-	storage   gateway.Storage
+	photos    adapter.PhotoSigner
 }
 
-func NewUserHandler(storage gateway.Storage, loginTime adapter.LoginTimeSource) *UserHandler {
-	return &UserHandler{loginTime: loginTime, storage: storage}
+func NewUserHandler(photos adapter.PhotoSigner, loginTime adapter.LoginTimeSource) *UserHandler {
+	return &UserHandler{loginTime: loginTime, photos: photos}
 }
 
 // Me godoc
@@ -45,7 +44,7 @@ func (h *UserHandler) Me(c echo.Context) error {
 	if err != nil {
 		return err
 	}
-	res, err := meResponse(ctx, h.storage, u)
+	res, err := meResponse(ctx, h.photos, u)
 	if err != nil {
 		return err
 	}
