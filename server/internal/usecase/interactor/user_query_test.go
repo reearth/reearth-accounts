@@ -2,6 +2,7 @@ package interactor
 
 import (
 	"context"
+	"errors"
 	"testing"
 
 	"github.com/reearth/reearth-accounts/server/pkg/user"
@@ -36,4 +37,24 @@ func TestUserQuery_FetchByID_AlignsWithIDs(t *testing.T) {
 	got, err := q.FetchByID(context.Background(), user.IDList{a.ID(), missing, c.ID(), b.ID()})
 	require.NoError(t, err)
 	assert.Equal(t, user.List{a, nil, c, b}, got)
+}
+
+type failingUserRepo struct {
+	user.Repo
+}
+
+func (failingUserRepo) FindByIDs(context.Context, user.IDList) (user.List, error) {
+	return nil, errors.New("unreachable repo")
+}
+
+func TestUserQuery_FetchByID_StopsOnceAllFound(t *testing.T) {
+	a := user.New().NewID().Name("a").Email("a@example.com").Workspace(workspace.NewID()).MustBuild()
+
+	q := NewUserQuery(compactingUserRepo{users: user.List{a}}, failingUserRepo{})
+	got, err := q.FetchByID(context.Background(), user.IDList{a.ID()})
+	require.NoError(t, err)
+	assert.Equal(t, user.List{a}, got)
+
+	_, err = q.FetchByID(context.Background(), user.IDList{a.ID(), user.NewID()})
+	assert.EqualError(t, err, "unreachable repo")
 }

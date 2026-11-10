@@ -37,14 +37,22 @@ func (c *WorkspaceLoader) Fetch(ctx context.Context, ids []gqlmodel.ID) ([]*gqlm
 		return nil, []error{err}
 	}
 
-	workspaces := make([]*gqlmodel.Workspace, 0, len(ws))
+	byID := make(map[id.WorkspaceID]*gqlmodel.Workspace, len(ws))
 	for _, w := range ws {
+		if w == nil {
+			continue
+		}
 		converted, err := gqlmodel.ToWorkspace(ctx, w, exists, c.storage)
 		if err != nil {
 			log.Errorf("failed to convert workspace: %s", err.Error())
 			continue
 		}
-		workspaces = append(workspaces, converted)
+		byID[w.ID()] = converted
+	}
+
+	workspaces := make([]*gqlmodel.Workspace, len(uids))
+	for i, wid := range uids {
+		workspaces[i] = byID[wid]
 	}
 	return workspaces, nil
 }
