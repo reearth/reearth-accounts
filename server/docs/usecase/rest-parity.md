@@ -126,7 +126,7 @@ The four divergences found in the first comparison are closed. Each change names
 3. **Expansions. REST moves.** REST gains an opt-in `expand` query parameter, so nothing extra is fetched by default:
    - `GET /api/users/me?expand=my_workspace` embeds the personal workspace as `my_workspace`.
    - Workspace routes accept `?expand=members.user`, which embeds each user member's `UserResponse` as `user`. Embedded users follow the email rule above.
-4. **`checkPermission` without a user. GraphQL moves.** GraphQL returns `interfaces.ErrInvalidOperator`, the error other resolvers return when there is no operator, instead of `not found`. REST already returns `401`.
+4. **`checkPermission` without a user. Already consistent over HTTP.** The GraphQL auth middleware answers `401` before any resolver runs when there is no user, as REST does. The resolver's own fallback returned `not found`, which no request can reach. It now returns `interfaces.ErrInvalidOperator`, as other resolvers do.
 
 ## Open Questions
 
@@ -138,9 +138,8 @@ The four divergences found in the first comparison are closed. Each change names
 2. GraphQL `enableMFA`, `disableMFA` and `regenerateMFARecoveryCode` keep the same error message for a user with no Auth0 identity.
 3. Maintainers can no longer demote or remove owners (Decision 1, rule 1). Both APIs change.
 4. GraphQL `members` starts returning `WorkspaceIntegrationMember` entries (Decision 4.2). A client that reads every entry as a user member without checking `__typename` breaks. Check the GraphQL clients of accounts (visualizer, dashboard, CMS) before this ships.
-5. GraphQL `checkPermission` without a user returns `invalid operator` instead of `not found` (Decision 4.4).
-6. REST `photo_url` values become signed URLs that expire. A client that stores them should store the value it uploaded, not the one it read.
-7. With the step-up window set, `regenerateMFARecoveryCode` and `POST /api/users/me/mfa/recovery-code` fail for an old session. The window is off by default.
+5. REST `photo_url` values become signed URLs that expire. A client that stores them should store the value it uploaded, not the one it read.
+6. With the step-up window set, `regenerateMFARecoveryCode` and `POST /api/users/me/mfa/recovery-code` fail for an old session. The window is off by default.
 
 ## Test Plan
 
