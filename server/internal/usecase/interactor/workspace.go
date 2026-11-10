@@ -403,7 +403,7 @@ func (i *Workspace) RemoveMultipleUserMembers(ctx context.Context, id workspace.
 	}
 
 	return Run1(ctx, operator, i.repos, Usecase().Transaction(), func(ctx context.Context) (*workspace.Workspace, error) {
-		ws, err := i.repos.Workspace.FindByID(ctx, id)
+		ws, err := i.repos.Workspace.FindByIDForUpdate(ctx, id)
 		if err != nil {
 			return nil, err
 		}
@@ -502,7 +502,7 @@ func (i *Workspace) UpdateUserMember(ctx context.Context, id workspace.ID, u wor
 	}
 
 	return Run1(ctx, operator, i.repos, Usecase().Transaction(), func(ctx context.Context) (*workspace.Workspace, error) {
-		ws, err := i.repos.Workspace.FindByID(ctx, id)
+		ws, err := i.repos.Workspace.FindByIDForUpdate(ctx, id)
 		if err != nil {
 			return nil, err
 		}
@@ -549,7 +549,7 @@ func (i *Workspace) UpdateUserMemberViaService(ctx context.Context, id workspace
 	}
 
 	return Run1(ctx, operator, i.repos, Usecase().Transaction(), func(ctx context.Context) (*workspace.Workspace, error) {
-		ws, err := i.repos.Workspace.FindByID(ctx, id)
+		ws, err := i.repos.Workspace.FindByIDForUpdate(ctx, id)
 		if err != nil {
 			return nil, err
 		}
@@ -709,7 +709,7 @@ func (i *Workspace) TransferOwnership(ctx context.Context, workspaceID workspace
 	}
 
 	return Run1(ctx, operator, i.repos, Usecase().Transaction().WithOwnableWorkspaces(workspaceID), func(ctx context.Context) (*workspace.Workspace, error) {
-		ws, err := i.repos.Workspace.FindByID(ctx, workspaceID)
+		ws, err := i.repos.Workspace.FindByIDForUpdate(ctx, workspaceID)
 		if err != nil {
 			return nil, err
 		}
