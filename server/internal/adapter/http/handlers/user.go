@@ -22,12 +22,12 @@ import (
 )
 
 type UserHandler struct {
-	storage       gateway.Storage
-	authTimeClaim string
+	loginTime adapter.LoginTimeSource
+	storage   gateway.Storage
 }
 
-func NewUserHandler(storage gateway.Storage, authTimeClaim string) *UserHandler {
-	return &UserHandler{storage: storage, authTimeClaim: authTimeClaim}
+func NewUserHandler(storage gateway.Storage, loginTime adapter.LoginTimeSource) *UserHandler {
+	return &UserHandler{loginTime: loginTime, storage: storage}
 }
 
 // Me godoc
@@ -179,7 +179,7 @@ func (h *UserHandler) DisableMFA(c echo.Context) error {
 // @Router /api/users/me/mfa/recovery-code [post]
 func (h *UserHandler) RegenerateMFARecoveryCode(c echo.Context) error {
 	ctx := c.Request().Context()
-	code, err := httpinternal.Usecases(c).User.RegenerateMFARecoveryCode(ctx, httpinternal.Operator(c), adapter.AuthTime(ctx, h.authTimeClaim))
+	code, err := httpinternal.Usecases(c).User.RegenerateMFARecoveryCode(ctx, httpinternal.Operator(c), h.loginTime.Read(ctx))
 	if err != nil {
 		return err
 	}

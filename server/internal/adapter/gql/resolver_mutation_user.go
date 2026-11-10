@@ -185,7 +185,7 @@ func (r *mutationResolver) EnableMfa(ctx context.Context) (*gqlmodel.MFAEnrollRe
 }
 
 func (r *mutationResolver) RegenerateMFARecoveryCode(ctx context.Context) (*gqlmodel.MFARecoveryCodeResult, error) {
-	recoveryCode, err := usecases(ctx).User.RegenerateMFARecoveryCode(ctx, getOperator(ctx), adapter.AuthTime(ctx, r.AuthTimeClaim))
+	recoveryCode, err := usecases(ctx).User.RegenerateMFARecoveryCode(ctx, getOperator(ctx), r.LoginTime.Read(ctx))
 	if err != nil {
 		return nil, err
 	}
