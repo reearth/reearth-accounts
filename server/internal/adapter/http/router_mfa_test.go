@@ -258,7 +258,9 @@ func TestMFARoutes(t *testing.T) {
 
 	t.Run("recovery code reads the configured auth time claim", func(t *testing.T) {
 		const claim = "https://example.com/auth_time"
-		f := newMFAFixtureWithLoginTime(t, 5*time.Minute, claim, adapter.LoginTimeSource{Claim: claim})
+		loginTime, err := adapter.NewLoginTimeSource(claim)
+		require.NoError(t, err)
+		f := newMFAFixtureWithLoginTime(t, 5*time.Minute, claim, loginTime)
 		old := time.Now().Add(-time.Hour)
 		recent := time.Now().Add(-time.Minute)
 		const path = "/api/users/me/mfa/recovery-code"
