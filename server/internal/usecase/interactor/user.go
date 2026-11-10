@@ -6,6 +6,8 @@ import (
 	_ "embed"
 	"errors"
 	htmlTmpl "html/template"
+	"slices"
+	"strings"
 	"time"
 
 	"github.com/reearth/reearth-accounts/server/internal/rbac"
@@ -458,7 +460,18 @@ func (i *User) DeleteMe(ctx context.Context, userID user.ID, operator *workspace
 		updatedWorkspaces := make([]*workspace.Workspace, 0, len(workspaces))
 		deletedWorkspaces := []user.WorkspaceID{}
 
+		// Lock in ID order so two users deleting themselves cannot deadlock.
+		slices.SortFunc(workspaces, func(a, b *workspace.Workspace) int { return strings.Compare(a.ID().String(), b.ID().String()) })
 		for _, ws := range workspaces {
+			if !ws.IsPersonal() {
+				ws, err = i.repos.Workspace.FindByIDForUpdate(ctx, ws.ID())
+				if errors.Is(err, rerror.ErrNotFound) {
+					continue
+				}
+				if err != nil {
+					return err
+				}
+			}
 			if !ws.IsPersonal() && !ws.Members().IsOnlyOwner(u.ID()) {
 				if err := ws.Members().Leave(u.ID()); err != nil {
 					if errors.Is(err, workspace.ErrTargetUserNotInTheWorkspace) {
