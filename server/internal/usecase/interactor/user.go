@@ -772,6 +772,9 @@ func (q *UserQuery) FetchByID(ctx context.Context, ids user.IDList) (user.List, 
 				found[u.ID()] = u
 			}
 		}
+		if len(found) == len(ids) {
+			break
+		}
 	}
 
 	res := make(user.List, len(ids))

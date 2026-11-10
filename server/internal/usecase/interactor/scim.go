@@ -298,18 +298,17 @@ func (i *Scim) ListScimUsers(ctx context.Context, workspaceID workspace.ID, filt
 		return nil, err
 	}
 
-	// Apply userName (email) filter post-fetch
-	if filterAttr == "username" {
-		filtered := users[:0]
-		for _, u := range users {
-			if strings.EqualFold(u.Email(), filterVal) {
-				filtered = append(filtered, u)
-			}
+	res := make([]*user.User, 0, len(users))
+	for _, u := range users {
+		if u == nil {
+			continue
 		}
-		users = filtered
+		if filterAttr == "username" && !strings.EqualFold(u.Email(), filterVal) {
+			continue
+		}
+		res = append(res, u)
 	}
-
-	return users, nil
+	return res, nil
 }
 
 func (i *Scim) ProvisionScimUser(ctx context.Context, param interfaces.ProvisionScimUserParam) (*user.User, error) {

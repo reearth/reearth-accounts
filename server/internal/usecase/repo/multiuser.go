@@ -59,13 +59,19 @@ func (u MultiUser) FindByID(ctx context.Context, id user.ID) (*user.User, error)
 	})
 }
 
+// FindByIDs returns a list aligned with ids, holding the first repo's user
+// for each id and nil where no repo has it.
 func (u MultiUser) FindByIDs(ctx context.Context, ids user.IDList) (user.List, error) {
-	res := user.List{}
+	res := make(user.List, len(ids))
 	for _, r := range u {
-		if r, err := r.FindByIDs(ctx, ids); err != nil {
+		found, err := r.FindByIDs(ctx, ids)
+		if err != nil {
 			return nil, err
-		} else {
-			res = append(res, r...)
+		}
+		for i, f := range found {
+			if i < len(res) && res[i] == nil {
+				res[i] = f
+			}
 		}
 	}
 	return res, nil

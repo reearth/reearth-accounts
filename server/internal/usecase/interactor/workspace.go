@@ -134,11 +134,11 @@ func (i *Workspace) Create(ctx context.Context, alias, name, description string,
 	}
 
 	firstUsers, err := i.userquery.FetchByID(ctx, []user.ID{firstUser})
-	if err != nil || len(firstUsers) == 0 {
-		if err == nil {
-			return nil, rerror.ErrNotFound
-		}
+	if err != nil {
 		return nil, err
+	}
+	if firstUsers[0] == nil {
+		return nil, rerror.ErrNotFound
 	}
 
 	return Run1(ctx, operator, i.repos, Usecase().Transaction(), func(ctx context.Context) (*workspace.Workspace, error) {

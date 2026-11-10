@@ -84,6 +84,16 @@ func TestWorkspace_Create(t *testing.T) {
 	assert.Equal(t, wantErr, err)
 }
 
+func TestWorkspace_Create_FirstUserNotFound(t *testing.T) {
+	ctx := context.Background()
+	db := memory.New()
+	op := &workspace.Operator{User: lo.ToPtr(user.NewID())}
+
+	ws, err := NewWorkspace(db, nil, nil).Create(ctx, "alias", "name", "", user.NewID(), false, op)
+	assert.Nil(t, ws)
+	assert.ErrorIs(t, err, rerror.ErrNotFound)
+}
+
 func TestWorkspace_Create_SkipOwnerMembership(t *testing.T) {
 	ctx := context.Background()
 

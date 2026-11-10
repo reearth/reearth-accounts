@@ -42,12 +42,11 @@ func TestMongoConformance(t *testing.T) {
 		repos, err := mongorepo.New(ctx, db, false, false, nil)
 		require.NoError(t, err)
 		return repos, Caps{
-			EnforcesFilter:   true,
-			EnforcesLimit:    true,
-			OrderedFindByIDs: true,
-			RealPagination:   true,
-			SubstringSearch:  true,
-			UniqueEmail:      true,
+			EnforcesFilter:  true,
+			EnforcesLimit:   true,
+			RealPagination:  true,
+			SubstringSearch: true,
+			UniqueEmail:     true,
 		}, func() { _ = db.Drop(ctx) }
 	})
 }

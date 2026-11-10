@@ -24,7 +24,6 @@ type Caps struct {
 	CaseInsensitiveEmail bool
 	EnforcesFilter       bool
 	EnforcesLimit        bool
-	OrderedFindByIDs     bool
 	RealPagination       bool
 	RealTransactions     bool
 	SubstringSearch      bool
@@ -308,11 +307,8 @@ func testUserDuplicateEmail(t *testing.T, nc Factory) {
 }
 
 func testUserFindByIDsOrdering(t *testing.T, nc Factory) {
-	c, caps, done := nc(t)
+	c, _, done := nc(t)
 	defer done()
-	if !caps.OrderedFindByIDs {
-		t.Skip("backend does not preserve FindByIDs ordering with nil holes")
-	}
 	ctx := context.Background()
 	a := newUser(t, "a", "a1@example.com")
 	b := newUser(t, "b", "b1@example.com")
@@ -448,15 +444,10 @@ func testWorkspaceFindByIDs(t *testing.T, nc Factory) {
 	require.NoError(t, c.Workspace.Create(ctx, a))
 	require.NoError(t, c.Workspace.Create(ctx, b))
 
-	got, err := c.Workspace.FindByIDs(ctx, id.WorkspaceIDList{a.ID(), id.NewWorkspaceID(), b.ID()})
+	got, err := c.Workspace.FindByIDs(ctx, id.WorkspaceIDList{b.ID(), id.NewWorkspaceID(), a.ID()})
 	require.NoError(t, err)
 	require.Len(t, got, 2)
-	found := map[id.WorkspaceID]bool{}
-	for _, w := range got {
-		require.NotNil(t, w)
-		found[w.ID()] = true
-	}
-	assert.True(t, found[a.ID()] && found[b.ID()])
+	assert.Equal(t, []id.WorkspaceID{b.ID(), a.ID()}, []id.WorkspaceID{got[0].ID(), got[1].ID()})
 }
 
 func testWorkspaceFindByUser(t *testing.T, nc Factory) {
