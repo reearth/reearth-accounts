@@ -27,9 +27,11 @@ type VerificationResponse struct {
 
 // UserResponse mirrors the GraphQL User type.
 type UserResponse struct {
-	ID           string                `json:"id"`
-	Name         string                `json:"name"`
-	Alias        string                `json:"alias"`
+	ID    string `json:"id"`
+	Name  string `json:"name"`
+	Alias string `json:"alias"`
+	// Email is empty unless the caller is this user. Signup, verification,
+	// maintainer-only routes and sync-sso called with its API key include it.
 	Email        string                `json:"email"`
 	Host         *string               `json:"host,omitempty"`
 	Workspace    string                `json:"workspace"`
@@ -84,8 +86,9 @@ type MFARecoveryCodeResponse struct {
 
 // SimpleUserResponse mirrors the user.Simple shape used by userByNameOrEmail.
 type SimpleUserResponse struct {
-	ID    string `json:"id"`
-	Name  string `json:"name"`
+	ID   string `json:"id"`
+	Name string `json:"name"`
+	// Email is empty unless the caller is this user.
 	Email string `json:"email"`
 }
 
@@ -100,8 +103,37 @@ func metadataResponse(u *user.User) *UserMetadataResponse {
 	}
 }
 
+// EmailViewer decides whose email a user response carries. GraphQL shows a
+// user's email only to that user (userResolver.Email), and REST follows it.
+type EmailViewer struct {
+	all  bool
+	self *user.ID
+}
+
+// ViewerOf shows the caller's own email only. A nil caller sees none.
+func ViewerOf(caller *user.User) EmailViewer {
+	if caller == nil {
+		return EmailViewer{}
+	}
+	uid := caller.ID()
+	return EmailViewer{self: &uid}
+}
+
+// UnrestrictedViewer shows every email. Use it only where the route already
+// limits who gets the record: signup and verification return the caller's own
+// record, the sync-sso API key is a trusted service, and the interactor admits
+// only maintainers.
+func UnrestrictedViewer() EmailViewer { return EmailViewer{all: true} }
+
+func (v EmailViewer) email(uid user.ID, email string) string {
+	if v.all || (v.self != nil && *v.self == uid) {
+		return email
+	}
+	return ""
+}
+
 // NewUserResponse converts a domain user to a UserResponse.
-func NewUserResponse(u *user.User) *UserResponse {
+func NewUserResponse(u *user.User, viewer EmailViewer) *UserResponse {
 	if u == nil {
 		return nil
 	}
@@ -121,7 +153,7 @@ func NewUserResponse(u *user.User) *UserResponse {
 		ID:           u.ID().String(),
 		Name:         u.Name(),
 		Alias:        u.Alias(),
-		Email:        u.Email(),
+		Email:        viewer.email(u.ID(), u.Email()),
 		Host:         hp,
 		Workspace:    u.Workspace().String(),
 		Auths:        util.Map(u.Auths(), func(a user.Auth) string { return a.Provider }),
@@ -134,10 +166,10 @@ func NewUserResponse(u *user.User) *UserResponse {
 }
 
 // NewUserResponses converts a domain user list.
-func NewUserResponses(ul user.List) []*UserResponse {
+func NewUserResponses(ul user.List, viewer EmailViewer) []*UserResponse {
 	out := make([]*UserResponse, 0, len(ul))
 	for _, u := range ul {
-		out = append(out, NewUserResponse(u))
+		out = append(out, NewUserResponse(u, viewer))
 	}
 	return out
 }
@@ -228,11 +260,11 @@ func NewMeResponse(u *user.User) *MeResponse {
 }
 
 // NewSimpleUserResponse converts a *user.Simple.
-func NewSimpleUserResponse(u *user.Simple) *SimpleUserResponse {
+func NewSimpleUserResponse(u *user.Simple, viewer EmailViewer) *SimpleUserResponse {
 	if u == nil {
 		return nil
 	}
-	return &SimpleUserResponse{ID: u.ID.String(), Name: u.Name, Email: u.Email}
+	return &SimpleUserResponse{ID: u.ID.String(), Name: u.Name, Email: viewer.email(u.ID, u.Email)}
 }
 
 // --- Request DTOs ---

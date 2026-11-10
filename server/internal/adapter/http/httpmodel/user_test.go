@@ -72,3 +72,28 @@ func TestApplyPermittables(t *testing.T) {
 		}, got[0].Workspaces)
 	})
 }
+
+func TestNewUserResponse_Email(t *testing.T) {
+	alice := user.New().NewID().Name("alice").Email("alice@example.com").Workspace(workspace.NewID()).MustBuild()
+	bob := user.New().NewID().Name("bob").Email("bob@example.com").Workspace(workspace.NewID()).MustBuild()
+	simpleAlice := &user.Simple{ID: alice.ID(), Name: alice.Name(), Email: alice.Email()}
+
+	tests := []struct {
+		name   string
+		viewer EmailViewer
+		want   string
+	}{
+		{"owner sees own email", ViewerOf(alice), "alice@example.com"},
+		{"other user sees none", ViewerOf(bob), ""},
+		{"anonymous sees none", ViewerOf(nil), ""},
+		{"zero viewer sees none", EmailViewer{}, ""},
+		{"unrestricted route", UnrestrictedViewer(), "alice@example.com"},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			assert.Equal(t, tt.want, NewUserResponse(alice, tt.viewer).Email)
+			assert.Equal(t, tt.want, NewUserResponses(user.List{alice}, tt.viewer)[0].Email)
+			assert.Equal(t, tt.want, NewSimpleUserResponse(simpleAlice, tt.viewer).Email)
+		})
+	}
+}
