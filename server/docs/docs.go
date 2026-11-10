@@ -148,6 +148,12 @@ const docTemplate = `{
                         "schema": {
                             "$ref": "#/definitions/httpmodel.UpdateMemberRequest"
                         }
+                    },
+                    {
+                        "type": "string",
+                        "description": "comma-separated expansions; allowed: members.user",
+                        "name": "expand",
+                        "in": "query"
                     }
                 ],
                 "responses": {
@@ -155,6 +161,12 @@ const docTemplate = `{
                         "description": "OK",
                         "schema": {
                             "$ref": "#/definitions/httpmodel.WorkspaceResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/internal.ErrorResponse"
                         }
                     }
                 }
@@ -560,11 +572,25 @@ const docTemplate = `{
                     "User"
                 ],
                 "summary": "Get current user",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "comma-separated expansions; allowed: my_workspace",
+                        "name": "expand",
+                        "in": "query"
+                    }
+                ],
                 "responses": {
                     "200": {
                         "description": "OK",
                         "schema": {
                             "$ref": "#/definitions/httpmodel.MeResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/internal.ErrorResponse"
                         }
                     },
                     "401": {
@@ -1291,6 +1317,12 @@ const docTemplate = `{
                         "description": "page size (default 50, max 100)",
                         "name": "page_size",
                         "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "description": "comma-separated expansions; allowed: members.user",
+                        "name": "expand",
+                        "in": "query"
                     }
                 ],
                 "responses": {
@@ -1301,6 +1333,12 @@ const docTemplate = `{
                             "items": {
                                 "$ref": "#/definitions/httpmodel.WorkspaceResponse"
                             }
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/internal.ErrorResponse"
                         }
                     }
                 }
@@ -1330,6 +1368,12 @@ const docTemplate = `{
                         "schema": {
                             "$ref": "#/definitions/httpmodel.CreateWorkspaceRequest"
                         }
+                    },
+                    {
+                        "type": "string",
+                        "description": "comma-separated expansions; allowed: members.user",
+                        "name": "expand",
+                        "in": "query"
                     }
                 ],
                 "responses": {
@@ -1337,6 +1381,12 @@ const docTemplate = `{
                         "description": "OK",
                         "schema": {
                             "$ref": "#/definitions/httpmodel.WorkspaceResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/internal.ErrorResponse"
                         }
                     }
                 }
@@ -1379,6 +1429,12 @@ const docTemplate = `{
                         "type": "integer",
                         "description": "page size (default 50, max 100)",
                         "name": "page_size",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "description": "comma-separated expansions; allowed: members.user",
+                        "name": "expand",
                         "in": "query"
                     }
                 ],
@@ -1425,6 +1481,12 @@ const docTemplate = `{
                         "name": "id",
                         "in": "path",
                         "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "comma-separated expansions; allowed: members.user",
+                        "name": "expand",
+                        "in": "query"
                     }
                 ],
                 "responses": {
@@ -1432,6 +1494,12 @@ const docTemplate = `{
                         "description": "OK",
                         "schema": {
                             "$ref": "#/definitions/httpmodel.WorkspaceResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/internal.ErrorResponse"
                         }
                     },
                     "404": {
@@ -1499,6 +1567,12 @@ const docTemplate = `{
                         "schema": {
                             "$ref": "#/definitions/httpmodel.UpdateWorkspaceRequest"
                         }
+                    },
+                    {
+                        "type": "string",
+                        "description": "comma-separated expansions; allowed: members.user",
+                        "name": "expand",
+                        "in": "query"
                     }
                 ],
                 "responses": {
@@ -1506,6 +1580,12 @@ const docTemplate = `{
                         "description": "OK",
                         "schema": {
                             "$ref": "#/definitions/httpmodel.WorkspaceResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/internal.ErrorResponse"
                         }
                     }
                 }
@@ -1532,6 +1612,12 @@ const docTemplate = `{
                         "name": "id",
                         "in": "path",
                         "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "comma-separated expansions; allowed: members.user",
+                        "name": "expand",
+                        "in": "query"
                     }
                 ],
                 "responses": {
@@ -1539,6 +1625,12 @@ const docTemplate = `{
                         "description": "OK",
                         "schema": {
                             "$ref": "#/definitions/httpmodel.WorkspaceResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/internal.ErrorResponse"
                         }
                     }
                 }
@@ -1577,6 +1669,12 @@ const docTemplate = `{
                         "schema": {
                             "$ref": "#/definitions/httpmodel.AddIntegrationRequest"
                         }
+                    },
+                    {
+                        "type": "string",
+                        "description": "comma-separated expansions; allowed: members.user",
+                        "name": "expand",
+                        "in": "query"
                     }
                 ],
                 "responses": {
@@ -1584,6 +1682,12 @@ const docTemplate = `{
                         "description": "OK",
                         "schema": {
                             "$ref": "#/definitions/httpmodel.WorkspaceResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/internal.ErrorResponse"
                         }
                     }
                 }
@@ -1620,6 +1724,12 @@ const docTemplate = `{
                         "schema": {
                             "$ref": "#/definitions/httpmodel.RemoveIntegrationsRequest"
                         }
+                    },
+                    {
+                        "type": "string",
+                        "description": "comma-separated expansions; allowed: members.user",
+                        "name": "expand",
+                        "in": "query"
                     }
                 ],
                 "responses": {
@@ -1627,6 +1737,12 @@ const docTemplate = `{
                         "description": "OK",
                         "schema": {
                             "$ref": "#/definitions/httpmodel.WorkspaceResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/internal.ErrorResponse"
                         }
                     }
                 }
@@ -1660,6 +1776,12 @@ const docTemplate = `{
                         "name": "integration_id",
                         "in": "path",
                         "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "comma-separated expansions; allowed: members.user",
+                        "name": "expand",
+                        "in": "query"
                     }
                 ],
                 "responses": {
@@ -1667,6 +1789,12 @@ const docTemplate = `{
                         "description": "OK",
                         "schema": {
                             "$ref": "#/definitions/httpmodel.WorkspaceResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/internal.ErrorResponse"
                         }
                     }
                 }
@@ -1710,6 +1838,12 @@ const docTemplate = `{
                         "schema": {
                             "$ref": "#/definitions/httpmodel.UpdateIntegrationRequest"
                         }
+                    },
+                    {
+                        "type": "string",
+                        "description": "comma-separated expansions; allowed: members.user",
+                        "name": "expand",
+                        "in": "query"
                     }
                 ],
                 "responses": {
@@ -1717,6 +1851,12 @@ const docTemplate = `{
                         "description": "OK",
                         "schema": {
                             "$ref": "#/definitions/httpmodel.WorkspaceResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/internal.ErrorResponse"
                         }
                     }
                 }
@@ -1755,6 +1895,12 @@ const docTemplate = `{
                         "schema": {
                             "$ref": "#/definitions/httpmodel.AddMembersRequest"
                         }
+                    },
+                    {
+                        "type": "string",
+                        "description": "comma-separated expansions; allowed: members.user",
+                        "name": "expand",
+                        "in": "query"
                     }
                 ],
                 "responses": {
@@ -1762,6 +1908,12 @@ const docTemplate = `{
                         "description": "OK",
                         "schema": {
                             "$ref": "#/definitions/httpmodel.WorkspaceResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/internal.ErrorResponse"
                         }
                     }
                 }
@@ -1798,6 +1950,12 @@ const docTemplate = `{
                         "schema": {
                             "$ref": "#/definitions/httpmodel.RemoveMembersRequest"
                         }
+                    },
+                    {
+                        "type": "string",
+                        "description": "comma-separated expansions; allowed: members.user",
+                        "name": "expand",
+                        "in": "query"
                     }
                 ],
                 "responses": {
@@ -1805,6 +1963,12 @@ const docTemplate = `{
                         "description": "OK",
                         "schema": {
                             "$ref": "#/definitions/httpmodel.WorkspaceResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/internal.ErrorResponse"
                         }
                     }
                 }
@@ -1838,6 +2002,12 @@ const docTemplate = `{
                         "name": "user_id",
                         "in": "path",
                         "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "comma-separated expansions; allowed: members.user",
+                        "name": "expand",
+                        "in": "query"
                     }
                 ],
                 "responses": {
@@ -1845,6 +2015,12 @@ const docTemplate = `{
                         "description": "OK",
                         "schema": {
                             "$ref": "#/definitions/httpmodel.WorkspaceResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/internal.ErrorResponse"
                         }
                     }
                 }
@@ -1888,6 +2064,12 @@ const docTemplate = `{
                         "schema": {
                             "$ref": "#/definitions/httpmodel.UpdateMemberRequest"
                         }
+                    },
+                    {
+                        "type": "string",
+                        "description": "comma-separated expansions; allowed: members.user",
+                        "name": "expand",
+                        "in": "query"
                     }
                 ],
                 "responses": {
@@ -1895,6 +2077,12 @@ const docTemplate = `{
                         "description": "OK",
                         "schema": {
                             "$ref": "#/definitions/httpmodel.WorkspaceResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/internal.ErrorResponse"
                         }
                     }
                 }
@@ -1921,6 +2109,12 @@ const docTemplate = `{
                         "name": "id",
                         "in": "path",
                         "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "comma-separated expansions; allowed: members.user",
+                        "name": "expand",
+                        "in": "query"
                     }
                 ],
                 "responses": {
@@ -1928,6 +2122,12 @@ const docTemplate = `{
                         "description": "OK",
                         "schema": {
                             "$ref": "#/definitions/httpmodel.WorkspaceResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/internal.ErrorResponse"
                         }
                     }
                 }
@@ -1966,6 +2166,12 @@ const docTemplate = `{
                         "schema": {
                             "$ref": "#/definitions/httpmodel.TransferOwnershipRequest"
                         }
+                    },
+                    {
+                        "type": "string",
+                        "description": "comma-separated expansions; allowed: members.user",
+                        "name": "expand",
+                        "in": "query"
                     }
                 ],
                 "responses": {
@@ -1973,6 +2179,12 @@ const docTemplate = `{
                         "description": "OK",
                         "schema": {
                             "$ref": "#/definitions/httpmodel.WorkspaceResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/internal.ErrorResponse"
                         }
                     }
                 }
@@ -2166,6 +2378,14 @@ const docTemplate = `{
                 "metadata": {
                     "$ref": "#/definitions/httpmodel.UserMetadataResponse"
                 },
+                "my_workspace": {
+                    "description": "MyWorkspace is set only with ?expand=my_workspace. It stays absent when\nthe personal workspace no longer exists, rather than failing the request.",
+                    "allOf": [
+                        {
+                            "$ref": "#/definitions/httpmodel.WorkspaceResponse"
+                        }
+                    ]
+                },
                 "my_workspace_id": {
                     "type": "string"
                 },
@@ -2191,6 +2411,42 @@ const docTemplate = `{
                     ]
                 },
                 "user_id": {
+                    "type": "string"
+                }
+            }
+        },
+        "httpmodel.MemberUserResponse": {
+            "type": "object",
+            "properties": {
+                "alias": {
+                    "type": "string"
+                },
+                "auths": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
+                },
+                "email": {
+                    "description": "Email is empty unless the caller is this user.",
+                    "type": "string"
+                },
+                "host": {
+                    "type": "string"
+                },
+                "id": {
+                    "type": "string"
+                },
+                "metadata": {
+                    "$ref": "#/definitions/httpmodel.UserMetadataResponse"
+                },
+                "name": {
+                    "type": "string"
+                },
+                "verification": {
+                    "$ref": "#/definitions/httpmodel.VerificationResponse"
+                },
+                "workspace": {
                     "type": "string"
                 }
             }
@@ -2628,6 +2884,14 @@ const docTemplate = `{
                 },
                 "role": {
                     "type": "string"
+                },
+                "user": {
+                    "description": "User is set only with ?expand=members.user.",
+                    "allOf": [
+                        {
+                            "$ref": "#/definitions/httpmodel.MemberUserResponse"
+                        }
+                    ]
                 },
                 "user_id": {
                     "type": "string"

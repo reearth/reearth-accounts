@@ -68,7 +68,25 @@ type MeResponse struct {
 	Host           *string               `json:"host,omitempty"`
 	LatestLogoutAt *time.Time            `json:"latest_logout_at,omitempty"`
 	MyWorkspaceID  string                `json:"my_workspace_id"`
-	Auths          []string              `json:"auths"`
+	// MyWorkspace is set only with ?expand=my_workspace. It stays absent when
+	// the personal workspace no longer exists, rather than failing the request.
+	MyWorkspace *WorkspaceResponse `json:"my_workspace,omitempty"`
+	Auths       []string           `json:"auths"`
+}
+
+// MemberUserResponse is a workspace member's user. It carries only the fields
+// of the GraphQL User type, so deletion state and timestamps stay hidden.
+type MemberUserResponse struct {
+	ID    string `json:"id"`
+	Name  string `json:"name"`
+	Alias string `json:"alias"`
+	// Email is empty unless the caller is this user.
+	Email        string                `json:"email"`
+	Host         *string               `json:"host,omitempty"`
+	Workspace    string                `json:"workspace"`
+	Auths        []string              `json:"auths"`
+	Metadata     *UserMetadataResponse `json:"metadata"`
+	Verification *VerificationResponse `json:"verification,omitempty"`
 }
 
 // MFAStatusResponse mirrors the GraphQL MFAStatus type.
@@ -164,6 +182,25 @@ func NewUserResponse(u *user.User, viewer EmailViewer) *UserResponse {
 		IsDeleted:    u.IsDeleted(),
 		DeletedAt:    u.DeletedAt(),
 		CreatedAt:    u.CreatedAt(),
+	}
+}
+
+// NewMemberUserResponse converts a workspace member's user.
+func NewMemberUserResponse(u *user.User, viewer EmailViewer) *MemberUserResponse {
+	r := NewUserResponse(u, viewer)
+	if r == nil {
+		return nil
+	}
+	return &MemberUserResponse{
+		ID:           r.ID,
+		Name:         r.Name,
+		Alias:        r.Alias,
+		Email:        r.Email,
+		Host:         r.Host,
+		Workspace:    r.Workspace,
+		Auths:        r.Auths,
+		Metadata:     r.Metadata,
+		Verification: r.Verification,
 	}
 }
 

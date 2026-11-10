@@ -128,6 +128,12 @@ definitions:
         type: string
       metadata:
         $ref: '#/definitions/httpmodel.UserMetadataResponse'
+      my_workspace:
+        allOf:
+        - $ref: '#/definitions/httpmodel.WorkspaceResponse'
+        description: |-
+          MyWorkspace is set only with ?expand=my_workspace. It stays absent when
+          the personal workspace no longer exists, rather than failing the request.
       my_workspace_id:
         type: string
       name:
@@ -147,6 +153,30 @@ definitions:
     required:
     - role
     - user_id
+    type: object
+  httpmodel.MemberUserResponse:
+    properties:
+      alias:
+        type: string
+      auths:
+        items:
+          type: string
+        type: array
+      email:
+        description: Email is empty unless the caller is this user.
+        type: string
+      host:
+        type: string
+      id:
+        type: string
+      metadata:
+        $ref: '#/definitions/httpmodel.UserMetadataResponse'
+      name:
+        type: string
+      verification:
+        $ref: '#/definitions/httpmodel.VerificationResponse'
+      workspace:
+        type: string
     type: object
   httpmodel.MessageResponse:
     properties:
@@ -444,6 +474,10 @@ definitions:
         type: string
       role:
         type: string
+      user:
+        allOf:
+        - $ref: '#/definitions/httpmodel.MemberUserResponse'
+        description: User is set only with ?expand=members.user.
       user_id:
         type: string
     type: object
@@ -590,6 +624,10 @@ paths:
         required: true
         schema:
           $ref: '#/definitions/httpmodel.UpdateMemberRequest'
+      - description: 'comma-separated expansions; allowed: members.user'
+        in: query
+        name: expand
+        type: string
       produces:
       - application/json
       responses:
@@ -597,6 +635,10 @@ paths:
           description: OK
           schema:
             $ref: '#/definitions/httpmodel.WorkspaceResponse'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/internal.ErrorResponse'
       security:
       - BearerAuth: []
       summary: Update a member's role, bypassing the self-promotion guard
@@ -944,6 +986,11 @@ paths:
       tags:
       - User
     get:
+      parameters:
+      - description: 'comma-separated expansions; allowed: my_workspace'
+        in: query
+        name: expand
+        type: string
       produces:
       - application/json
       responses:
@@ -951,6 +998,10 @@ paths:
           description: OK
           schema:
             $ref: '#/definitions/httpmodel.MeResponse'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/internal.ErrorResponse'
         "401":
           description: Unauthorized
           schema:
@@ -1313,6 +1364,10 @@ paths:
         in: query
         name: page_size
         type: integer
+      - description: 'comma-separated expansions; allowed: members.user'
+        in: query
+        name: expand
+        type: string
       produces:
       - application/json
       responses:
@@ -1323,6 +1378,10 @@ paths:
             items:
               $ref: '#/definitions/httpmodel.WorkspaceResponse'
             type: array
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/internal.ErrorResponse'
       security:
       - BearerAuth: []
       summary: List workspaces by a single selector (ids|name|alias|user_id)
@@ -1338,6 +1397,10 @@ paths:
         required: true
         schema:
           $ref: '#/definitions/httpmodel.CreateWorkspaceRequest'
+      - description: 'comma-separated expansions; allowed: members.user'
+        in: query
+        name: expand
+        type: string
       produces:
       - application/json
       responses:
@@ -1345,6 +1408,10 @@ paths:
           description: OK
           schema:
             $ref: '#/definitions/httpmodel.WorkspaceResponse'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/internal.ErrorResponse'
       security:
       - BearerAuth: []
       summary: Create a workspace
@@ -1373,6 +1440,10 @@ paths:
         name: id
         required: true
         type: string
+      - description: 'comma-separated expansions; allowed: members.user'
+        in: query
+        name: expand
+        type: string
       produces:
       - application/json
       responses:
@@ -1380,6 +1451,10 @@ paths:
           description: OK
           schema:
             $ref: '#/definitions/httpmodel.WorkspaceResponse'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/internal.ErrorResponse'
         "404":
           description: Not Found
           schema:
@@ -1404,6 +1479,10 @@ paths:
         required: true
         schema:
           $ref: '#/definitions/httpmodel.UpdateWorkspaceRequest'
+      - description: 'comma-separated expansions; allowed: members.user'
+        in: query
+        name: expand
+        type: string
       produces:
       - application/json
       responses:
@@ -1411,6 +1490,10 @@ paths:
           description: OK
           schema:
             $ref: '#/definitions/httpmodel.WorkspaceResponse'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/internal.ErrorResponse'
       security:
       - BearerAuth: []
       summary: Update a workspace
@@ -1424,6 +1507,10 @@ paths:
         name: id
         required: true
         type: string
+      - description: 'comma-separated expansions; allowed: members.user'
+        in: query
+        name: expand
+        type: string
       produces:
       - application/json
       responses:
@@ -1431,6 +1518,10 @@ paths:
           description: OK
           schema:
             $ref: '#/definitions/httpmodel.WorkspaceResponse'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/internal.ErrorResponse'
       security:
       - BearerAuth: []
       summary: Soft-delete a workspace (sets deleted_at; owner-only)
@@ -1452,6 +1543,10 @@ paths:
         required: true
         schema:
           $ref: '#/definitions/httpmodel.RemoveIntegrationsRequest'
+      - description: 'comma-separated expansions; allowed: members.user'
+        in: query
+        name: expand
+        type: string
       produces:
       - application/json
       responses:
@@ -1459,6 +1554,10 @@ paths:
           description: OK
           schema:
             $ref: '#/definitions/httpmodel.WorkspaceResponse'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/internal.ErrorResponse'
       security:
       - BearerAuth: []
       summary: Remove multiple integration members
@@ -1479,6 +1578,10 @@ paths:
         required: true
         schema:
           $ref: '#/definitions/httpmodel.AddIntegrationRequest'
+      - description: 'comma-separated expansions; allowed: members.user'
+        in: query
+        name: expand
+        type: string
       produces:
       - application/json
       responses:
@@ -1486,6 +1589,10 @@ paths:
           description: OK
           schema:
             $ref: '#/definitions/httpmodel.WorkspaceResponse'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/internal.ErrorResponse'
       security:
       - BearerAuth: []
       summary: Add an integration member
@@ -1504,6 +1611,10 @@ paths:
         name: integration_id
         required: true
         type: string
+      - description: 'comma-separated expansions; allowed: members.user'
+        in: query
+        name: expand
+        type: string
       produces:
       - application/json
       responses:
@@ -1511,6 +1622,10 @@ paths:
           description: OK
           schema:
             $ref: '#/definitions/httpmodel.WorkspaceResponse'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/internal.ErrorResponse'
       security:
       - BearerAuth: []
       summary: Remove an integration member
@@ -1536,6 +1651,10 @@ paths:
         required: true
         schema:
           $ref: '#/definitions/httpmodel.UpdateIntegrationRequest'
+      - description: 'comma-separated expansions; allowed: members.user'
+        in: query
+        name: expand
+        type: string
       produces:
       - application/json
       responses:
@@ -1543,6 +1662,10 @@ paths:
           description: OK
           schema:
             $ref: '#/definitions/httpmodel.WorkspaceResponse'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/internal.ErrorResponse'
       security:
       - BearerAuth: []
       summary: Update an integration member's role
@@ -1564,6 +1687,10 @@ paths:
         required: true
         schema:
           $ref: '#/definitions/httpmodel.RemoveMembersRequest'
+      - description: 'comma-separated expansions; allowed: members.user'
+        in: query
+        name: expand
+        type: string
       produces:
       - application/json
       responses:
@@ -1571,6 +1698,10 @@ paths:
           description: OK
           schema:
             $ref: '#/definitions/httpmodel.WorkspaceResponse'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/internal.ErrorResponse'
       security:
       - BearerAuth: []
       summary: Remove multiple user members
@@ -1591,6 +1722,10 @@ paths:
         required: true
         schema:
           $ref: '#/definitions/httpmodel.AddMembersRequest'
+      - description: 'comma-separated expansions; allowed: members.user'
+        in: query
+        name: expand
+        type: string
       produces:
       - application/json
       responses:
@@ -1598,6 +1733,10 @@ paths:
           description: OK
           schema:
             $ref: '#/definitions/httpmodel.WorkspaceResponse'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/internal.ErrorResponse'
       security:
       - BearerAuth: []
       summary: Add user members to a workspace
@@ -1616,6 +1755,10 @@ paths:
         name: user_id
         required: true
         type: string
+      - description: 'comma-separated expansions; allowed: members.user'
+        in: query
+        name: expand
+        type: string
       produces:
       - application/json
       responses:
@@ -1623,6 +1766,10 @@ paths:
           description: OK
           schema:
             $ref: '#/definitions/httpmodel.WorkspaceResponse'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/internal.ErrorResponse'
       security:
       - BearerAuth: []
       summary: Remove a user member
@@ -1648,6 +1795,10 @@ paths:
         required: true
         schema:
           $ref: '#/definitions/httpmodel.UpdateMemberRequest'
+      - description: 'comma-separated expansions; allowed: members.user'
+        in: query
+        name: expand
+        type: string
       produces:
       - application/json
       responses:
@@ -1655,6 +1806,10 @@ paths:
           description: OK
           schema:
             $ref: '#/definitions/httpmodel.WorkspaceResponse'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/internal.ErrorResponse'
       security:
       - BearerAuth: []
       summary: Update a user member's role
@@ -1668,6 +1823,10 @@ paths:
         name: id
         required: true
         type: string
+      - description: 'comma-separated expansions; allowed: members.user'
+        in: query
+        name: expand
+        type: string
       produces:
       - application/json
       responses:
@@ -1675,6 +1834,10 @@ paths:
           description: OK
           schema:
             $ref: '#/definitions/httpmodel.WorkspaceResponse'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/internal.ErrorResponse'
       security:
       - BearerAuth: []
       summary: Restore a soft-deleted workspace (clears deleted_at; owner-only)
@@ -1696,6 +1859,10 @@ paths:
         required: true
         schema:
           $ref: '#/definitions/httpmodel.TransferOwnershipRequest'
+      - description: 'comma-separated expansions; allowed: members.user'
+        in: query
+        name: expand
+        type: string
       produces:
       - application/json
       responses:
@@ -1703,6 +1870,10 @@ paths:
           description: OK
           schema:
             $ref: '#/definitions/httpmodel.WorkspaceResponse'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/internal.ErrorResponse'
       security:
       - BearerAuth: []
       summary: Transfer workspace ownership
@@ -1727,6 +1898,10 @@ paths:
         in: query
         name: page_size
         type: integer
+      - description: 'comma-separated expansions; allowed: members.user'
+        in: query
+        name: expand
+        type: string
       produces:
       - application/json
       responses:

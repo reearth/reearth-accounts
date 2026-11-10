@@ -6,12 +6,13 @@ import (
 	"github.com/labstack/echo/v4"
 	"github.com/reearth/reearth-accounts/server/internal/adapter/http/httpmodel"
 	httpinternal "github.com/reearth/reearth-accounts/server/internal/adapter/http/internal"
+	"github.com/reearth/reearth-accounts/server/internal/usecase/gateway"
 	"github.com/reearth/reearth-accounts/server/pkg/user"
 	"github.com/reearth/reearth-accounts/server/pkg/workspace"
 )
 
-// memberUserExists looks up every user member of ws in one query.
-func memberUserExists(c echo.Context, ws workspace.List) (func(user.ID) bool, error) {
+// memberUsers looks up every user member of ws in one query.
+func memberUsers(c echo.Context, ws workspace.List) (map[user.ID]*user.User, error) {
 	uniq := map[user.ID]struct{}{}
 	for _, w := range ws {
 		if w == nil {
@@ -21,13 +22,9 @@ func memberUserExists(c echo.Context, ws workspace.List) (func(user.ID) bool, er
 			uniq[uid] = struct{}{}
 		}
 	}
-	existing := map[user.ID]struct{}{}
-	has := func(id user.ID) bool {
-		_, ok := existing[id]
-		return ok
-	}
+	found := map[user.ID]*user.User{}
 	if len(uniq) == 0 {
-		return has, nil
+		return found, nil
 	}
 	ids := make(user.IDList, 0, len(uniq))
 	for uid := range uniq {
@@ -39,24 +36,29 @@ func memberUserExists(c echo.Context, ws workspace.List) (func(user.ID) bool, er
 	}
 	for _, u := range ul {
 		if u != nil {
-			existing[u.ID()] = struct{}{}
+			found[u.ID()] = u
 		}
 	}
-	return has, nil
+	return found, nil
 }
 
-func (h *WorkspaceHandler) workspaceResponses(c echo.Context, ws workspace.List) ([]*httpmodel.WorkspaceResponse, error) {
-	userExists, err := memberUserExists(c, ws)
+func workspaceResponses(c echo.Context, storage gateway.Storage, ws workspace.List) ([]*httpmodel.WorkspaceResponse, error) {
+	users, err := memberUsers(c, ws)
 	if err != nil {
 		return nil, err
 	}
-	res := httpmodel.NewWorkspaceResponses(ws, userExists)
-	signWorkspacePhotos(c.Request().Context(), h.storage, res)
+	var embedFor *httpmodel.EmailViewer
+	if requestedExpansions(c).has(ExpandMemberUsers) {
+		v := httpmodel.ViewerOf(httpinternal.User(c))
+		embedFor = &v
+	}
+	res := httpmodel.NewWorkspaceResponses(ws, users, embedFor)
+	signWorkspacePhotos(c.Request().Context(), storage, res)
 	return res, nil
 }
 
 func (h *WorkspaceHandler) writeWorkspace(c echo.Context, w *workspace.Workspace) error {
-	res, err := h.workspaceResponses(c, workspace.List{w})
+	res, err := workspaceResponses(c, h.storage, workspace.List{w})
 	if err != nil {
 		return err
 	}
@@ -64,7 +66,7 @@ func (h *WorkspaceHandler) writeWorkspace(c echo.Context, w *workspace.Workspace
 }
 
 func (h *WorkspaceHandler) writeWorkspaces(c echo.Context, ws workspace.List) error {
-	res, err := h.workspaceResponses(c, ws)
+	res, err := workspaceResponses(c, h.storage, ws)
 	if err != nil {
 		return err
 	}
