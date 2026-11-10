@@ -348,11 +348,11 @@ func (i *User) DisableMFA(ctx context.Context, operator *workspace.Operator) err
 		}
 		a := u.Auths().GetByProvider(user.ProviderAuth0)
 		if a == nil {
-			return rerror.NewE(i18n.T("no authenticator found"))
+			return interfaces.ErrNoAuthenticator
 		}
 		authenticator := i.gateways.AuthenticatorFor(a.Provider)
 		if authenticator == nil {
-			return rerror.NewE(i18n.T("no authenticator found"))
+			return interfaces.ErrNoAuthenticator
 		}
 		return authenticator.DisableMFA(ctx, a.Sub)
 	})
@@ -369,11 +369,11 @@ func (i *User) EnableMFA(ctx context.Context, operator *workspace.Operator) (str
 		}
 		a := u.Auths().GetByProvider(user.ProviderAuth0)
 		if a == nil {
-			return "", rerror.NewE(i18n.T("no authenticator found"))
+			return "", interfaces.ErrNoAuthenticator
 		}
 		authenticator := i.gateways.AuthenticatorFor(a.Provider)
 		if authenticator == nil {
-			return "", rerror.NewE(i18n.T("no authenticator found"))
+			return "", interfaces.ErrNoAuthenticator
 		}
 		return authenticator.EnableMFA(ctx, a.Sub)
 	})
@@ -423,11 +423,11 @@ func (i *User) RegenerateMFARecoveryCode(ctx context.Context, operator *workspac
 		}
 		a := u.Auths().GetByProvider(user.ProviderAuth0)
 		if a == nil {
-			return "", rerror.NewE(i18n.T("no authenticator found"))
+			return "", interfaces.ErrNoAuthenticator
 		}
 		authenticator := i.gateways.AuthenticatorFor(a.Provider)
 		if authenticator == nil {
-			return "", rerror.NewE(i18n.T("no authenticator found"))
+			return "", interfaces.ErrNoAuthenticator
 		}
 		return authenticator.RegenerateMFARecoveryCode(ctx, a.Sub)
 	})

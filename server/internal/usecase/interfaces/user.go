@@ -22,6 +22,7 @@ var (
 	ErrUserAlreadyExists               = rerror.NewE(i18n.T("user already exists"))
 	ErrUserAliasAlreadyExists          = rerror.NewE(i18n.T("user alias already exists"))
 	ErrWorkspaceAliasAlreadyExists     = rerror.NewE(i18n.T("workspace alias already exists"))
+	ErrNoAuthenticator                 = rerror.NewE(i18n.T("no authenticator found"))
 )
 
 type SignupOIDCParam struct {

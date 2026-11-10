@@ -95,6 +95,21 @@ definitions:
     - sub
     - token
     type: object
+  httpmodel.MFAEnrollResponse:
+    properties:
+      enrollment_url:
+        type: string
+    type: object
+  httpmodel.MFARecoveryCodeResponse:
+    properties:
+      recovery_code:
+        type: string
+    type: object
+  httpmodel.MFAStatusResponse:
+    properties:
+      enrolled:
+        type: boolean
+    type: object
   httpmodel.MeResponse:
     properties:
       alias:
@@ -985,6 +1000,86 @@ paths:
       security:
       - BearerAuth: []
       summary: Remove an auth provider from the current user
+      tags:
+      - User
+  /api/users/me/mfa:
+    delete:
+      produces:
+      - application/json
+      responses:
+        "204":
+          description: No Content
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/internal.ErrorResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/internal.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Remove MFA enrollment from the current user
+      tags:
+      - User
+    get:
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/httpmodel.MFAStatusResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/internal.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Get the current user's MFA enrollment
+      tags:
+      - User
+    post:
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/httpmodel.MFAEnrollResponse'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/internal.ErrorResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/internal.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Start MFA enrollment for the current user
+      tags:
+      - User
+  /api/users/me/mfa/recovery-code:
+    post:
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/httpmodel.MFARecoveryCodeResponse'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/internal.ErrorResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/internal.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Replace the current user's MFA recovery code
       tags:
       - User
   /api/users/password-reset:
