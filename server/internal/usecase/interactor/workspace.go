@@ -403,7 +403,7 @@ func (i *Workspace) RemoveMultipleUserMembers(ctx context.Context, id workspace.
 	}
 
 	return Run1(ctx, operator, i.repos, Usecase().Transaction(), func(ctx context.Context) (*workspace.Workspace, error) {
-		ws, err := i.repos.Workspace.FindByID(ctx, id)
+		ws, err := i.repos.Workspace.FindByIDForUpdate(ctx, id)
 		if err != nil {
 			return nil, err
 		}
@@ -502,7 +502,7 @@ func (i *Workspace) UpdateUserMember(ctx context.Context, id workspace.ID, u wor
 	}
 
 	return Run1(ctx, operator, i.repos, Usecase().Transaction(), func(ctx context.Context) (*workspace.Workspace, error) {
-		ws, err := i.repos.Workspace.FindByID(ctx, id)
+		ws, err := i.repos.Workspace.FindByIDForUpdate(ctx, id)
 		if err != nil {
 			return nil, err
 		}
@@ -549,7 +549,7 @@ func (i *Workspace) UpdateUserMemberViaService(ctx context.Context, id workspace
 	}
 
 	return Run1(ctx, operator, i.repos, Usecase().Transaction(), func(ctx context.Context) (*workspace.Workspace, error) {
-		ws, err := i.repos.Workspace.FindByID(ctx, id)
+		ws, err := i.repos.Workspace.FindByIDForUpdate(ctx, id)
 		if err != nil {
 			return nil, err
 		}
@@ -558,15 +558,13 @@ func (i *Workspace) UpdateUserMemberViaService(ctx context.Context, id workspace
 			return nil, workspace.ErrCannotModifyPersonalWorkspace
 		}
 
-		// Prevent leaving the workspace without any owners.
-		if ws.Members().IsOnlyOwner(u) {
-			return nil, interfaces.ErrCannotChangeOwnerRole
+		touchesOwner := ws.Members().UserRole(u) == role.RoleOwner
+		if err := i.checkMemberPermission(ctx, ws, operator, rbac.ActionEditMember, touchesOwner); err != nil {
+			return nil, err
 		}
 
-		if !operator.IsMaintainingWorkspace(id) {
-			if err := i.checkOwnerLikePermission(ctx, ws, operator, rbac.ActionEditMember); err != nil {
-				return nil, err
-			}
+		if ws.Members().IsOnlyOwner(u) {
+			return nil, interfaces.ErrCannotChangeOwnerRole
 		}
 
 		if err := i.changeMemberRole(ctx, ws, u, newRole); err != nil {
@@ -711,7 +709,7 @@ func (i *Workspace) TransferOwnership(ctx context.Context, workspaceID workspace
 	}
 
 	return Run1(ctx, operator, i.repos, Usecase().Transaction().WithOwnableWorkspaces(workspaceID), func(ctx context.Context) (*workspace.Workspace, error) {
-		ws, err := i.repos.Workspace.FindByID(ctx, workspaceID)
+		ws, err := i.repos.Workspace.FindByIDForUpdate(ctx, workspaceID)
 		if err != nil {
 			return nil, err
 		}
@@ -724,7 +722,9 @@ func (i *Workspace) TransferOwnership(ctx context.Context, workspaceID workspace
 			return nil, workspace.ErrTargetUserNotInTheWorkspace
 		}
 
-		if ws.Members().UserRole(newOwnerID) == role.RoleReader {
+		// A self or disabled target would leave no active owner once the caller is demoted.
+		target := ws.Members().User(newOwnerID)
+		if newOwnerID == *operator.User || target.Disabled || target.Role == role.RoleReader {
 			return nil, workspace.ErrCannotChangeRoleToOwner
 		}
 

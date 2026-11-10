@@ -94,7 +94,9 @@ An owner can grant `owner` through `POST /api/workspaces/:id/members`, `PATCH /a
 2. A workspace keeps at least one active owner. Demoting or removing the last owner fails, whoever the caller is. Error: `403` (`ErrCannotChangeOwnerRole`, `ErrOwnerCannotLeaveTheWorkspace`).
 3. An owner can demote themselves or leave while another owner remains. Today an owner can never change their own role.
 4. Integrations cannot be `owner`. Nothing enforced this before, so the workspace member methods now refuse it.
-5. Unchanged: personal workspaces cannot change members, SCIM group mapping cannot grant `owner` (#368), `PATCH /api/service/workspaces/:id/members/:user_id` cannot grant `owner`, and `transfer-ownership` still demotes the caller to maintainer.
+5. SCIM cannot grant `owner` and does not change an owner's role. It can still deprovision an owner who is not the last one. Group sync cannot tell which group an owner belongs to, so removing an owner from an IdP group does not disable them. Offboard an owner with user-level deprovisioning (`active=false` or `DELETE /Users`).
+6. `transfer-ownership` refuses the caller and disabled members as the target, since the caller is then demoted and no active owner would remain. Error: `400` (`ErrCannotChangeRoleToOwner`).
+7. Unchanged: personal workspaces cannot change members, `PATCH /api/service/workspaces/:id/members/:user_id` cannot grant `owner` (rule 1 applies to changing an owner there), and `transfer-ownership` still demotes the caller to maintainer.
 
 Rule 1 is also a fix. On `main` a maintainer can demote or remove an owner who is not themselves, including the only owner, which leaves a workspace with no owner.
 

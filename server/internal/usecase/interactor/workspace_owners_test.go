@@ -31,6 +31,21 @@ var maintainerCerbos = actionCerbos{
 	rbac.ActionDeleteMember: true,
 }
 
+var ownerCerbos = actionCerbos{
+	rbac.ActionAddMember:         true,
+	rbac.ActionEditMember:        true,
+	rbac.ActionDeleteMember:      true,
+	rbac.ActionTransferOwnership: true,
+}
+
+var ownerCerbosCases = []struct {
+	name   string
+	cerbos interfaces.Cerbos
+}{
+	{name: "without Cerbos"},
+	{name: "with Cerbos granting owner actions", cerbos: ownerCerbos},
+}
+
 type ownersFixture struct {
 	db     *repo.Container
 	wid    workspace.ID
@@ -85,6 +100,15 @@ func strangerOp() *workspace.Operator {
 	return &workspace.Operator{User: lo.ToPtr(id.NewUserID())}
 }
 
+func (f ownersFixture) disable(t *testing.T, u user.ID) {
+	t.Helper()
+	ctx := context.Background()
+	ws, err := f.db.Workspace.FindByID(ctx, f.wid)
+	require.NoError(t, err)
+	require.NoError(t, ws.Members().SetUserDisabled(u, true))
+	require.NoError(t, f.db.Workspace.Save(ctx, ws))
+}
+
 func (f ownersFixture) members(t *testing.T) *workspace.Members {
 	t.Helper()
 	ws, err := f.db.Workspace.FindByID(context.Background(), f.wid)
@@ -95,19 +119,44 @@ func (f ownersFixture) members(t *testing.T) *workspace.Members {
 func TestWorkspace_SeveralOwners_OnlyOwnerManagesOwners(t *testing.T) {
 	ctx := context.Background()
 
-	t.Run("owner adds a second owner", func(t *testing.T) {
-		f := newOwnersFixture(t, false)
-		_, err := NewWorkspace(f.db, nil, nil).AddUserMember(ctx, f.wid, map[user.ID]role.RoleType{f.newbie: role.RoleOwner}, f.ownerOp(f.owner))
-		require.NoError(t, err)
-		assert.Equal(t, role.RoleOwner, f.members(t).UserRole(f.newbie))
-	})
+	for _, tc := range ownerCerbosCases {
+		t.Run("owner "+tc.name, func(t *testing.T) {
+			t.Run("adds a second owner", func(t *testing.T) {
+				f := newOwnersFixture(t, false)
+				_, err := NewWorkspace(f.db, nil, tc.cerbos).AddUserMember(ctx, f.wid, map[user.ID]role.RoleType{f.newbie: role.RoleOwner}, f.ownerOp(f.owner))
+				require.NoError(t, err)
+				assert.Equal(t, role.RoleOwner, f.members(t).UserRole(f.newbie))
+			})
 
-	t.Run("owner promotes a member to owner", func(t *testing.T) {
-		f := newOwnersFixture(t, false)
-		_, err := NewWorkspace(f.db, nil, nil).UpdateUserMember(ctx, f.wid, f.reader, role.RoleOwner, f.ownerOp(f.owner))
-		require.NoError(t, err)
-		assert.Equal(t, role.RoleOwner, f.members(t).UserRole(f.reader))
-	})
+			t.Run("promotes a member to owner", func(t *testing.T) {
+				f := newOwnersFixture(t, false)
+				_, err := NewWorkspace(f.db, nil, tc.cerbos).UpdateUserMember(ctx, f.wid, f.reader, role.RoleOwner, f.ownerOp(f.owner))
+				require.NoError(t, err)
+				assert.Equal(t, role.RoleOwner, f.members(t).UserRole(f.reader))
+			})
+
+			t.Run("demotes another owner", func(t *testing.T) {
+				f := newOwnersFixture(t, true)
+				_, err := NewWorkspace(f.db, nil, tc.cerbos).UpdateUserMember(ctx, f.wid, f.owner2, role.RoleMaintainer, f.ownerOp(f.owner))
+				require.NoError(t, err)
+				assert.Equal(t, role.RoleMaintainer, f.members(t).UserRole(f.owner2))
+			})
+
+			t.Run("demotes another owner through the service route", func(t *testing.T) {
+				f := newOwnersFixture(t, true)
+				_, err := NewWorkspace(f.db, nil, tc.cerbos).UpdateUserMemberViaService(ctx, f.wid, f.owner2, role.RoleMaintainer, f.ownerOp(f.owner))
+				require.NoError(t, err)
+				assert.Equal(t, role.RoleMaintainer, f.members(t).UserRole(f.owner2))
+			})
+
+			t.Run("removes another owner", func(t *testing.T) {
+				f := newOwnersFixture(t, true)
+				_, err := NewWorkspace(f.db, nil, tc.cerbos).RemoveUserMember(ctx, f.wid, f.owner2, f.ownerOp(f.owner))
+				require.NoError(t, err)
+				assert.False(t, f.members(t).HasUser(f.owner2))
+			})
+		})
+	}
 
 	for _, tc := range []struct {
 		name   string
@@ -139,6 +188,19 @@ func TestWorkspace_SeveralOwners_OnlyOwnerManagesOwners(t *testing.T) {
 				assert.Equal(t, role.RoleOwner, f.members(t).UserRole(f.owner2))
 			})
 
+			t.Run("cannot demote an owner through the service route", func(t *testing.T) {
+				f := newOwnersFixture(t, true)
+				_, err := NewWorkspace(f.db, nil, tc.cerbos).UpdateUserMemberViaService(ctx, f.wid, f.owner2, role.RoleReader, f.maintainerOp())
+				assert.ErrorIs(t, err, tc.want)
+				assert.Equal(t, role.RoleOwner, f.members(t).UserRole(f.owner2))
+			})
+
+			t.Run("is denied before learning the target is the sole owner", func(t *testing.T) {
+				f := newOwnersFixture(t, false)
+				_, err := NewWorkspace(f.db, nil, tc.cerbos).UpdateUserMemberViaService(ctx, f.wid, f.owner, role.RoleReader, f.maintainerOp())
+				assert.ErrorIs(t, err, tc.want)
+			})
+
 			t.Run("cannot remove an owner", func(t *testing.T) {
 				f := newOwnersFixture(t, true)
 				_, err := NewWorkspace(f.db, nil, tc.cerbos).RemoveUserMember(ctx, f.wid, f.owner2, f.maintainerOp())
@@ -166,39 +228,40 @@ func TestWorkspace_SeveralOwners_OnlyOwnerManagesOwners(t *testing.T) {
 			})
 		})
 	}
-
-	t.Run("owner demotes another owner", func(t *testing.T) {
-		f := newOwnersFixture(t, true)
-		_, err := NewWorkspace(f.db, nil, nil).UpdateUserMember(ctx, f.wid, f.owner2, role.RoleMaintainer, f.ownerOp(f.owner))
-		require.NoError(t, err)
-		assert.Equal(t, role.RoleMaintainer, f.members(t).UserRole(f.owner2))
-	})
-
-	t.Run("owner removes another owner", func(t *testing.T) {
-		f := newOwnersFixture(t, true)
-		_, err := NewWorkspace(f.db, nil, nil).RemoveUserMember(ctx, f.wid, f.owner2, f.ownerOp(f.owner))
-		require.NoError(t, err)
-		assert.False(t, f.members(t).HasUser(f.owner2))
-	})
 }
 
 func TestWorkspace_SeveralOwners_KeepsOneOwner(t *testing.T) {
 	ctx := context.Background()
 	allowAll := &fakeCerbos{allowed: true}
 
-	t.Run("owner demotes themselves while another owner remains", func(t *testing.T) {
-		f := newOwnersFixture(t, true)
-		_, err := NewWorkspace(f.db, nil, nil).UpdateUserMember(ctx, f.wid, f.owner, role.RoleMaintainer, f.ownerOp(f.owner))
-		require.NoError(t, err)
-		assert.Equal(t, role.RoleMaintainer, f.members(t).UserRole(f.owner))
-	})
+	for _, tc := range ownerCerbosCases {
+		t.Run("owner "+tc.name, func(t *testing.T) {
+			t.Run("demotes themselves while another owner remains", func(t *testing.T) {
+				f := newOwnersFixture(t, true)
+				_, err := NewWorkspace(f.db, nil, tc.cerbos).UpdateUserMember(ctx, f.wid, f.owner, role.RoleMaintainer, f.ownerOp(f.owner))
+				require.NoError(t, err)
+				assert.Equal(t, role.RoleMaintainer, f.members(t).UserRole(f.owner))
+			})
 
-	t.Run("owner leaves while another owner remains", func(t *testing.T) {
-		f := newOwnersFixture(t, true)
-		_, err := NewWorkspace(f.db, nil, nil).RemoveUserMember(ctx, f.wid, f.owner, f.ownerOp(f.owner))
-		require.NoError(t, err)
-		assert.False(t, f.members(t).HasUser(f.owner))
-	})
+			t.Run("leaves while another owner remains", func(t *testing.T) {
+				f := newOwnersFixture(t, true)
+				_, err := NewWorkspace(f.db, nil, tc.cerbos).RemoveUserMember(ctx, f.wid, f.owner, f.ownerOp(f.owner))
+				require.NoError(t, err)
+				assert.False(t, f.members(t).HasUser(f.owner))
+			})
+
+			t.Run("cannot step down while the other owner is disabled", func(t *testing.T) {
+				f := newOwnersFixture(t, true)
+				f.disable(t, f.owner2)
+				uc := NewWorkspace(f.db, nil, tc.cerbos)
+				_, err := uc.UpdateUserMember(ctx, f.wid, f.owner, role.RoleMaintainer, f.ownerOp(f.owner))
+				assert.ErrorIs(t, err, interfaces.ErrCannotChangeOwnerRole)
+				_, err = uc.RemoveUserMember(ctx, f.wid, f.owner, f.ownerOp(f.owner))
+				assert.ErrorIs(t, err, interfaces.ErrOwnerCannotLeaveTheWorkspace)
+				assert.Equal(t, role.RoleOwner, f.members(t).UserRole(f.owner))
+			})
+		})
+	}
 
 	t.Run("sole owner cannot demote themselves", func(t *testing.T) {
 		f := newOwnersFixture(t, false)
@@ -254,5 +317,33 @@ func TestWorkspace_SeveralOwners_IntegrationCannotBeOwner(t *testing.T) {
 		_, err = uc.UpdateIntegration(ctx, f.wid, iid, role.RoleOwner, f.ownerOp(f.owner))
 		assert.ErrorIs(t, err, workspace.ErrCannotChangeRoleToOwner)
 		assert.Equal(t, role.RoleWriter, f.members(t).Integration(iid).Role)
+	})
+}
+
+func TestWorkspace_SeveralOwners_TransferOwnership(t *testing.T) {
+	ctx := context.Background()
+
+	t.Run("to self is refused", func(t *testing.T) {
+		f := newOwnersFixture(t, false)
+		_, err := NewWorkspace(f.db, nil, nil).TransferOwnership(ctx, f.wid, f.owner, f.ownerOp(f.owner))
+		assert.ErrorIs(t, err, workspace.ErrCannotChangeRoleToOwner)
+		assert.Equal(t, role.RoleOwner, f.members(t).UserRole(f.owner))
+	})
+
+	t.Run("to a disabled member is refused", func(t *testing.T) {
+		f := newOwnersFixture(t, false)
+		f.disable(t, f.maint)
+		_, err := NewWorkspace(f.db, nil, nil).TransferOwnership(ctx, f.wid, f.maint, f.ownerOp(f.owner))
+		assert.ErrorIs(t, err, workspace.ErrCannotChangeRoleToOwner)
+		assert.Equal(t, role.RoleOwner, f.members(t).UserRole(f.owner))
+		assert.Equal(t, role.RoleMaintainer, f.members(t).UserRole(f.maint))
+	})
+
+	t.Run("to an active maintainer succeeds", func(t *testing.T) {
+		f := newOwnersFixture(t, false)
+		_, err := NewWorkspace(f.db, nil, nil).TransferOwnership(ctx, f.wid, f.maint, f.ownerOp(f.owner))
+		require.NoError(t, err)
+		assert.Equal(t, role.RoleOwner, f.members(t).UserRole(f.maint))
+		assert.Equal(t, role.RoleMaintainer, f.members(t).UserRole(f.owner))
 	})
 }

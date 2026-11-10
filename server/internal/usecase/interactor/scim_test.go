@@ -13,6 +13,7 @@ import (
 	"github.com/reearth/reearth-accounts/server/pkg/role"
 	"github.com/reearth/reearth-accounts/server/pkg/user"
 	"github.com/reearth/reearth-accounts/server/pkg/workspace"
+	"github.com/reearth/reearthx/rerror"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -421,4 +422,106 @@ func TestGenerateScimToken(t *testing.T) {
 	hash2 := saved2.ScimConfig().TokenHash()
 	assert.NotEmpty(t, hash2)
 	assert.NotEqual(t, hash1, hash2)
+}
+
+func newScimWorkspaceWithCoOwner(ctx context.Context, t *testing.T, db *repo.Container, coOwnerMember workspace.Member) (*workspace.Workspace, *user.User) {
+	t.Helper()
+	ownerID := user.NewID()
+	coOwner := user.New().NewID().Name("co-owner").Email("co-owner@example.com").Workspace(user.NewWorkspaceID()).MustBuild()
+	require.NoError(t, db.User.Save(ctx, coOwner))
+
+	cfg := workspace.NewScimConfig()
+	cfg.SetEnabled(true)
+	cfg.SetGroupRoleMapping(map[string]role.RoleType{"engineers": role.RoleWriter})
+	coOwnerMember.Role = role.RoleOwner
+	coOwnerMember.InvitedBy = ownerID
+	ws := workspace.New().
+		NewID().
+		Name("enterprise").
+		Alias("enterprise").
+		Members(map[user.ID]workspace.Member{
+			ownerID:      {Role: role.RoleOwner, InvitedBy: ownerID},
+			coOwner.ID(): coOwnerMember,
+		}).
+		ScimConfig(cfg).
+		MustBuild()
+	require.NoError(t, db.Workspace.Save(ctx, ws))
+	return ws, coOwner
+}
+
+func TestScim_KeepsCoOwnerRole(t *testing.T) {
+	ctx := context.Background()
+
+	t.Run("provision", func(t *testing.T) {
+		db := accountmemory.New()
+		seedRoles(ctx, t, db)
+		ws, coOwner := newScimWorkspaceWithCoOwner(ctx, t, db, workspace.Member{})
+
+		_, err := NewScim(db, nil).ProvisionScimUser(ctx, interfaces.ProvisionScimUserParam{
+			Email:       coOwner.Email(),
+			ExternalID:  "ext-co-owner",
+			Name:        "co-owner",
+			Role:        role.RoleReader,
+			WorkspaceID: ws.ID(),
+		})
+		require.NoError(t, err)
+
+		saved, err := db.Workspace.FindByID(ctx, ws.ID())
+		require.NoError(t, err)
+		assert.Equal(t, role.RoleOwner, saved.Members().UserRole(coOwner.ID()))
+	})
+
+	for _, tc := range []struct {
+		name   string
+		member workspace.Member
+		wire   func(u user.ID) interfaces.ScimGroupMember
+	}{
+		{
+			name:   "group sync by user ID",
+			member: workspace.Member{},
+			wire: func(u user.ID) interfaces.ScimGroupMember {
+				return interfaces.ScimGroupMember{ExternalID: "ext-co-owner", UserID: &u}
+			},
+		},
+		{
+			name:   "group sync by external ID",
+			member: workspace.Member{ExternalID: "ext-co-owner"},
+			wire: func(user.ID) interfaces.ScimGroupMember {
+				return interfaces.ScimGroupMember{ExternalID: "ext-co-owner"}
+			},
+		},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			db := accountmemory.New()
+			seedRoles(ctx, t, db)
+			ws, coOwner := newScimWorkspaceWithCoOwner(ctx, t, db, tc.member)
+
+			err := NewScim(db, nil).SyncScimGroup(ctx, ws.ID(), "group-id", "engineers", []interfaces.ScimGroupMember{tc.wire(coOwner.ID())})
+			require.NoError(t, err)
+
+			saved, err := db.Workspace.FindByID(ctx, ws.ID())
+			require.NoError(t, err)
+			assert.Equal(t, role.RoleOwner, saved.Members().UserRole(coOwner.ID()))
+		})
+	}
+}
+
+func TestProvisionScimUser_RefusesOwnerRole(t *testing.T) {
+	ctx := context.Background()
+	db := accountmemory.New()
+	seedRoles(ctx, t, db)
+	ws := newScimEnabledWorkspace(user.NewID())
+	require.NoError(t, db.Workspace.Save(ctx, ws))
+
+	_, err := NewScim(db, nil).ProvisionScimUser(ctx, interfaces.ProvisionScimUserParam{
+		Email:       "eve@example.com",
+		ExternalID:  "ext-eve",
+		Name:        "Eve",
+		Role:        role.RoleOwner,
+		WorkspaceID: ws.ID(),
+	})
+	assert.ErrorIs(t, err, interfaces.ErrOperationDenied)
+
+	_, err = db.User.FindByEmail(ctx, "eve@example.com")
+	assert.ErrorIs(t, err, rerror.ErrNotFound)
 }
