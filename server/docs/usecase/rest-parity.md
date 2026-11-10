@@ -65,7 +65,7 @@ Error mapping. The interactor returns `rerror.NewE(i18n.T("no authenticator foun
 |---|---|
 | `GET /api/users/:id`, `GET /api/users?ids=`, `GET /api/users/search`, `GET /api/users/by-alias`, `GET /api/users/by-name-or-alias`, `GET /api/users/by-name-or-email` | own record only |
 | `GET /api/users/me`, `PATCH /api/users/me`, signup routes, `POST /api/users/verify` | always (own record) |
-| `GET /api/users/all`, deactivate, restore | always (the interactor admits only maintainers) |
+| `GET /api/users/all`, deactivate, restore | always. The interactor admits only callers with a platform `maintainer` or `owner` role, and GraphQL has no equivalent. Admin tooling such as the LINKS-Veda user list reads the email here |
 | `POST /api/users/sync-sso` | always with its API key. A signed-in user also passes this route's gate and can name another user's `sub`, so a JWT caller gets the lookup rule |
 
 `find-or-create` and the by-sub routes return `204` with no body.
@@ -134,7 +134,7 @@ The four divergences found in the first comparison are closed. Each change names
 
 ## Potential Impact
 
-1. REST clients that read another user's `email` from the lookup routes get an empty string. Serve does not read it. Other REST clients should check before this ships.
+1. REST clients that read another user's `email` from the lookup routes get an empty string. Serve does not read it. LINKS-Veda does: its admin teams page and admin user search read member emails from `GET /api/users?ids=` and `GET /api/users/search`, and its team page shows member emails to team members the same way. LINKS-Veda must move the admin pages to `GET /api/users/all` and decide what its team page shows before this ships, as with #374.
 2. GraphQL `enableMFA`, `disableMFA` and `regenerateMFARecoveryCode` keep the same error message for a user with no Auth0 identity.
 3. Maintainers can no longer demote or remove owners (Decision 1, rule 1). Both APIs change.
 4. GraphQL `members` starts returning `WorkspaceIntegrationMember` entries (Decision 4.2). A client that reads every entry as a user member without checking `__typename` breaks. Check the GraphQL clients of accounts (visualizer, dashboard, CMS) before this ships.
