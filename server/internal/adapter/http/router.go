@@ -33,8 +33,8 @@ type RouterConfig struct {
 	Storage gateway.Storage
 	// Swagger basic-auth (optional).
 	SwaggerUser, SwaggerPass string
-	// AuthTimeClaim is the configured login-time claim (see adapter.AuthTime).
-	AuthTimeClaim string
+	// LoginTime reads the login time for the recovery code step-up check.
+	LoginTime adapter.LoginTimeSource
 	// Debug enables serving /swagger without credentials (debug/dev only); in
 	// production Swagger is served only when basic-auth credentials are configured.
 	Debug bool
@@ -82,7 +82,7 @@ func RegisterRESTRouter(e *echo.Echo, cfg RouterConfig) {
 	api.POST("/auth/logout", ah.Logout, required) // JWT
 
 	// --- Users ---
-	uh := handlers.NewUserHandler(cfg.Storage, cfg.AuthTimeClaim)
+	uh := handlers.NewUserHandler(cfg.Storage, cfg.LoginTime)
 	api.GET("/users/me", uh.Me, required, handlers.Expand(handlers.ExpandMyWorkspace))
 	api.PATCH("/users/me", uh.UpdateMe, required)
 	api.DELETE("/users/me", uh.DeleteMe, required)

@@ -1,7 +1,6 @@
 package http_test
 
 import (
-	"cmp"
 	"context"
 	"encoding/json"
 	"net/http"
@@ -95,10 +94,10 @@ func fakeJWTMiddleware(t *testing.T, claim string) echo.MiddlewareFunc {
 
 func newMFAFixtureWithMaxAuthAge(t *testing.T, maxAuthAge time.Duration) *mfaFixture {
 	t.Helper()
-	return newMFAFixtureWithAuthTimeClaim(t, maxAuthAge, "")
+	return newMFAFixtureWithLoginTime(t, maxAuthAge, "auth_time", adapter.LoginTimeSource{})
 }
 
-func newMFAFixtureWithAuthTimeClaim(t *testing.T, maxAuthAge time.Duration, authTimeClaim string) *mfaFixture {
+func newMFAFixtureWithLoginTime(t *testing.T, maxAuthAge time.Duration, tokenClaim string, loginTime adapter.LoginTimeSource) *mfaFixture {
 	t.Helper()
 	ctx := context.Background()
 	repos := memory.New()
@@ -140,9 +139,9 @@ func newMFAFixtureWithAuthTimeClaim(t *testing.T, maxAuthAge time.Duration, auth
 		AuthConfigProvider: stubAuthConfigProvider{},
 		AuthResolver:       resolver,
 		CacheControl:       cacheControlMiddleware,
-		JWTMiddleware:      fakeJWTMiddleware(t, cmp.Or(authTimeClaim, "auth_time")),
+		JWTMiddleware:      fakeJWTMiddleware(t, tokenClaim),
+		LoginTime:          loginTime,
 		UsecaseMiddleware:  usecases,
-		AuthTimeClaim:      authTimeClaim,
 	})
 	return &mfaFixture{auth: fake, e: e, plainUser: plainUser, auth0User: auth0User}
 }
@@ -258,7 +257,8 @@ func TestMFARoutes(t *testing.T) {
 	})
 
 	t.Run("recovery code reads the configured auth time claim", func(t *testing.T) {
-		f := newMFAFixtureWithAuthTimeClaim(t, 5*time.Minute, "https://example.com/auth_time")
+		const claim = "https://example.com/auth_time"
+		f := newMFAFixtureWithLoginTime(t, 5*time.Minute, claim, adapter.LoginTimeSource{Claim: claim})
 		old := time.Now().Add(-time.Hour)
 		recent := time.Now().Add(-time.Minute)
 		const path = "/api/users/me/mfa/recovery-code"
