@@ -10,19 +10,13 @@ import (
 
 	"github.com/joho/godotenv"
 	"github.com/kelseyhightower/envconfig"
+	"github.com/reearth/reearth-accounts/server/internal/adapter"
 	"github.com/reearth/reearth-accounts/server/pkg/workspace"
 	"github.com/reearth/reearthx/appx"
 	"github.com/reearth/reearthx/log"
 )
 
 const configPrefix = "reearth"
-
-// Identity providers set these claims on every token, including refreshed
-// ones, so none of them can show that the user logged in recently.
-var reservedAuthTimeClaims = map[string]bool{
-	"aud": true, "azp": true, "exp": true, "iat": true,
-	"iss": true, "jti": true, "nbf": true, "sub": true,
-}
 
 type Config struct {
 	Port     string `default:"8090" envconfig:"PORT"`
@@ -58,7 +52,8 @@ type Config struct {
 	// identity provider cannot set auth_time itself (Auth0 restricts it).
 	// Its value must be a NumericDate (epoch seconds). When the claim is
 	// present but not a number, the login counts as too old. Empty reads only
-	// auth_time. Reserved JWT claims are rejected at startup.
+	// auth_time. Claims that do not record the login time (iat, exp, sub,
+	// and the others adapter.NewLoginTimeSource lists) fail startup.
 	AuthTimeClaim string `envconfig:"REEARTH_ACCOUNTS_AUTH_TIME_CLAIM"`
 
 	GraphQL GraphQLConfig
@@ -269,8 +264,8 @@ func ReadConfig(debug bool) (*Config, error) {
 	if c.MFARecoveryMaxAuthAge < 0 {
 		return nil, fmt.Errorf("REEARTH_ACCOUNTS_MFA_RECOVERY_MAX_AUTH_AGE must not be negative, got %s", c.MFARecoveryMaxAuthAge)
 	}
-	if reservedAuthTimeClaims[c.AuthTimeClaim] {
-		return nil, fmt.Errorf("REEARTH_ACCOUNTS_AUTH_TIME_CLAIM must not be the reserved claim %q, which does not record when the user logged in", c.AuthTimeClaim)
+	if _, err := adapter.NewLoginTimeSource(c.AuthTimeClaim); err != nil {
+		return nil, fmt.Errorf("REEARTH_ACCOUNTS_AUTH_TIME_CLAIM: %w", err)
 	}
 
 	if debug {
