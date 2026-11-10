@@ -10,8 +10,8 @@ import (
 	"github.com/reearth/reearth-accounts/server/pkg/workspace"
 )
 
-// existingMemberUsers looks up every user member of ws in one query.
-func existingMemberUsers(c echo.Context, ws workspace.List) (httpmodel.ExistingUsers, error) {
+// memberUserExists looks up every user member of ws in one query.
+func memberUserExists(c echo.Context, ws workspace.List) (func(user.ID) bool, error) {
 	uniq := map[user.ID]struct{}{}
 	for _, w := range ws {
 		if w == nil {
@@ -21,9 +21,13 @@ func existingMemberUsers(c echo.Context, ws workspace.List) (httpmodel.ExistingU
 			uniq[uid] = struct{}{}
 		}
 	}
-	existing := httpmodel.ExistingUsers{}
+	existing := map[user.ID]struct{}{}
+	has := func(id user.ID) bool {
+		_, ok := existing[id]
+		return ok
+	}
 	if len(uniq) == 0 {
-		return existing, nil
+		return has, nil
 	}
 	ids := make(user.IDList, 0, len(uniq))
 	for uid := range uniq {
@@ -38,23 +42,23 @@ func existingMemberUsers(c echo.Context, ws workspace.List) (httpmodel.ExistingU
 			existing[u.ID()] = struct{}{}
 		}
 	}
-	return existing, nil
+	return has, nil
 }
 
 func workspaceResponses(c echo.Context, ws workspace.List) ([]*httpmodel.WorkspaceResponse, error) {
-	existing, err := existingMemberUsers(c, ws)
+	userExists, err := memberUserExists(c, ws)
 	if err != nil {
 		return nil, err
 	}
-	return httpmodel.NewWorkspaceResponses(ws, existing), nil
+	return httpmodel.NewWorkspaceResponses(ws, userExists), nil
 }
 
 func writeWorkspace(c echo.Context, w *workspace.Workspace) error {
-	existing, err := existingMemberUsers(c, workspace.List{w})
+	userExists, err := memberUserExists(c, workspace.List{w})
 	if err != nil {
 		return err
 	}
-	return c.JSON(http.StatusOK, httpmodel.NewWorkspaceResponse(w, existing))
+	return c.JSON(http.StatusOK, httpmodel.NewWorkspaceResponse(w, userExists))
 }
 
 func writeWorkspaces(c echo.Context, ws workspace.List) error {

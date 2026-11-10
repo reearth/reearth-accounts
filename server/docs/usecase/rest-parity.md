@@ -117,12 +117,13 @@ The window is `REEARTH_ACCOUNTS_MFA_RECOVERY_MAX_AUTH_AGE` (a duration). It defa
 
 ### 4. REST and GraphQL return the same shapes
 
-The four divergences found in the first comparison are closed. Each change names which side moves.
+The four divergences found in the first comparison are resolved. Each change names which side moves. Item 2 keeps one intentional difference.
 
 1. **Signed photo URLs. REST moves.** `photo_url` on `GET /api/users/me` and on every workspace response is the signed URL GraphQL returns. The app layer passes the storage gateway into `RouterConfig`, and the REST builders call `GetSignedURL` as `gqlmodel.ToWorkspace` and the `me` resolver do. A signing failure keeps the stored value empty, as GraphQL does.
-2. **Workspace members. Both move.**
-   - REST drops user members whose user record no longer exists, as GraphQL does through its `exists` map.
-   - GraphQL returns integration members as `WorkspaceIntegrationMember`. The schema has always declared that type in the `WorkspaceMember` union, and `ToWorkspace` reserves room for integrations but never adds them (since #103). REST already returns them, and REST and GraphQL both manage integrations, so dropping them from REST would leave no way to list them.
+2. **Workspace members. REST moves.**
+   - REST drops members whose user no longer exists, as GraphQL does.
+   - GraphQL keeps omitting integration members. The repo's `pkg/gqlclient`, which other services use, reads every member as a user and would fail on a workspace with an integration.
+   - REST keeps returning integration members. This difference is intentional.
 3. **Expansions. REST moves.** REST gains an opt-in `expand` query parameter, so nothing extra is fetched by default:
    - `GET /api/users/me?expand=my_workspace` embeds the personal workspace as `my_workspace`.
    - Workspace routes accept `?expand=members.user`, which embeds each user member's `UserResponse` as `user`. Embedded users follow the email rule above.
@@ -137,9 +138,8 @@ The four divergences found in the first comparison are closed. Each change names
 1. REST clients that read another user's `email` from the lookup routes get an empty string. Serve does not read it. Other REST clients should check before this ships.
 2. GraphQL `enableMFA`, `disableMFA` and `regenerateMFARecoveryCode` keep the same error message for a user with no Auth0 identity.
 3. Maintainers can no longer demote or remove owners (Decision 1, rule 1). Both APIs change.
-4. GraphQL `members` starts returning `WorkspaceIntegrationMember` entries (Decision 4.2). A client that reads every entry as a user member without checking `__typename` breaks. Check the GraphQL clients of accounts (visualizer, dashboard, CMS) before this ships.
-5. REST `photo_url` values become signed URLs that expire. A client that stores them should store the value it uploaded, not the one it read.
-6. With the step-up window set, `regenerateMFARecoveryCode` and `POST /api/users/me/mfa/recovery-code` fail for an old session. The window is off by default.
+4. REST `photo_url` values become signed URLs that expire. A client that stores them should store the value it uploaded, not the one it read.
+5. With the step-up window set, `regenerateMFARecoveryCode` and `POST /api/users/me/mfa/recovery-code` fail for an old session. The window is off by default.
 
 ## Test Plan
 

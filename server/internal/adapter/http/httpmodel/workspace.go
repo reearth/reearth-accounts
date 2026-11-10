@@ -38,12 +38,9 @@ type WorkspaceResponse struct {
 	DeletedAt     *time.Time                 `json:"deleted_at,omitempty"`
 }
 
-// ExistingUsers holds the member user IDs that still have a user record.
-type ExistingUsers map[user.ID]struct{}
-
 // NewWorkspaceResponse converts a domain workspace (no signed-URL resolution),
-// dropping user members missing from existing, as GraphQL does.
-func NewWorkspaceResponse(w *workspace.Workspace, existing ExistingUsers) *WorkspaceResponse {
+// dropping user members for which userExists is false, as GraphQL does.
+func NewWorkspaceResponse(w *workspace.Workspace, userExists func(user.ID) bool) *WorkspaceResponse {
 	if w == nil {
 		return nil
 	}
@@ -51,7 +48,7 @@ func NewWorkspaceResponse(w *workspace.Workspace, existing ExistingUsers) *Works
 	integrations := w.Members().Integrations()
 	members := make([]WorkspaceMemberResponse, 0, len(users)+len(integrations))
 	for u, m := range users {
-		if _, ok := existing[u]; !ok {
+		if !userExists(u) {
 			continue
 		}
 		members = append(members, WorkspaceMemberResponse{UserID: u.String(), Role: RoleString(m.Role)})
@@ -86,10 +83,10 @@ func NewWorkspaceResponse(w *workspace.Workspace, existing ExistingUsers) *Works
 }
 
 // NewWorkspaceResponses converts a list.
-func NewWorkspaceResponses(ws workspace.List, existing ExistingUsers) []*WorkspaceResponse {
+func NewWorkspaceResponses(ws workspace.List, userExists func(user.ID) bool) []*WorkspaceResponse {
 	out := make([]*WorkspaceResponse, 0, len(ws))
 	for _, w := range ws {
-		out = append(out, NewWorkspaceResponse(w, existing))
+		out = append(out, NewWorkspaceResponse(w, userExists))
 	}
 	return out
 }

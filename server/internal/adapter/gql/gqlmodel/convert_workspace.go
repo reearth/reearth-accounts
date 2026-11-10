@@ -36,14 +36,6 @@ func ToWorkspace(
 			Role:   ToRole(m.Role),
 		})
 	}
-	for i, m := range integrationsMap {
-		members = append(members, &WorkspaceIntegrationMember{
-			IntegrationID: IDFrom(i),
-			Role:          ToRole(m.Role),
-			Active:        !m.Disabled,
-			InvitedByID:   IDFrom(m.InvitedBy),
-		})
-	}
 
 	metadata := WorkspaceMetadata{
 		Description:  t.Metadata().Description(),
