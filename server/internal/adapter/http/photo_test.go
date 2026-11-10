@@ -5,6 +5,7 @@ import (
 	"errors"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 
 	"github.com/labstack/echo/v4"
@@ -37,14 +38,15 @@ func newPhotoEcho(t *testing.T, storage gateway.Storage, mePhoto string) (*echo.
 	db := accountmemory.New()
 
 	uid := user.NewID()
+	personal := workspace.NewID()
 	me := user.New().ID(uid).Name("me").Email("me@example.com").
-		Workspace(user.NewWorkspaceID()).
+		Workspace(personal).
 		Metadata(user.MetadataFrom(mePhoto, "", "", user.NewMetadata().Lang(), user.ThemeDefault)).
 		MustBuild()
 	require.NoError(t, db.User.Save(t.Context(), me))
 
 	members := map[user.ID]workspace.Member{uid: {Role: role.RoleOwner, InvitedBy: uid}}
-	withPhoto := workspace.New().NewID().Name("a").Alias("a").Members(members).
+	withPhoto := workspace.New().ID(personal).Name("a").Alias("a").Members(members).
 		Metadata(workspace.MetadataFrom("", "", "", "", "workspaces/a.png")).MustBuild()
 	noPhoto := workspace.New().NewID().Name("b").Alias("b").Members(members).MustBuild()
 	require.NoError(t, db.Workspace.Save(t.Context(), withPhoto))
@@ -109,14 +111,41 @@ func TestREST_MeEmptyPhotoURLIsNotSigned(t *testing.T) {
 	assert.Empty(t, res.Metadata.PhotoURL)
 }
 
-func TestREST_MeSigningErrorEmptiesPhotoURL(t *testing.T) {
+func TestREST_MeSigningErrorFails(t *testing.T) {
 	storage := gatewaymock.NewMockStorage(gomock.NewController(t))
 	storage.EXPECT().GetSignedURL(gomock.Any(), "users/me.png").Return("", errors.New("gcs down"))
 	e, _ := newPhotoEcho(t, storage, "users/me.png")
 
-	var res httpmodel.MeResponse
-	getJSON(t, e, "/api/users/me", &res)
-	assert.Empty(t, res.Metadata.PhotoURL)
+	rec := httptest.NewRecorder()
+	e.ServeHTTP(rec, httptest.NewRequest(http.MethodGet, "/api/users/me", nil))
+	assert.Equal(t, http.StatusInternalServerError, rec.Code, rec.Body.String())
+	assert.NotContains(t, rec.Body.String(), "users/me.png")
+}
+
+func TestREST_OtherMeRoutesReturnStoredPhotoURL(t *testing.T) {
+	routes := []struct {
+		method, path, body, want string
+	}{
+		{http.MethodPatch, "/api/users/me", `{"photo_url":"https://example.com/photo.jpg"}`, "https://example.com/photo.jpg"},
+		{http.MethodDelete, "/api/users/me/auths/auth0", "", "users/me.png"},
+		{http.MethodPost, "/api/auth/logout", "", "users/me.png"},
+	}
+	for _, r := range routes {
+		t.Run(r.method+" "+r.path, func(t *testing.T) {
+			storage := gatewaymock.NewMockStorage(gomock.NewController(t))
+			e, _ := newPhotoEcho(t, storage, "users/me.png")
+
+			req := httptest.NewRequest(r.method, r.path, strings.NewReader(r.body))
+			req.Header.Set(echo.HeaderContentType, echo.MIMEApplicationJSON)
+			rec := httptest.NewRecorder()
+			e.ServeHTTP(rec, req)
+			require.Equal(t, http.StatusOK, rec.Code, rec.Body.String())
+
+			var res httpmodel.MeResponse
+			require.NoError(t, json.Unmarshal(rec.Body.Bytes(), &res))
+			assert.Equal(t, r.want, res.Metadata.PhotoURL)
+		})
+	}
 }
 
 func TestREST_WorkspacePhotoURLIsSigned(t *testing.T) {

@@ -37,6 +37,7 @@ func NewUserHandler(storage gateway.Storage, authTimeClaim string) *UserHandler 
 // @Produce json
 // @Success 200 {object} httpmodel.MeResponse
 // @Failure 401 {object} internal.ErrorResponse
+// @Failure 500 {object} internal.ErrorResponse
 // @Router /api/users/me [get]
 func (h *UserHandler) Me(c echo.Context) error {
 	ctx := c.Request().Context()
@@ -44,7 +45,11 @@ func (h *UserHandler) Me(c echo.Context) error {
 	if err != nil {
 		return err
 	}
-	return c.JSON(http.StatusOK, meResponse(ctx, h.storage, u))
+	res, err := meResponse(ctx, h.storage, u)
+	if err != nil {
+		return err
+	}
+	return c.JSON(http.StatusOK, res)
 }
 
 // UpdateMe godoc
@@ -68,7 +73,7 @@ func (h *UserHandler) UpdateMe(c echo.Context) error {
 	if err != nil {
 		return err
 	}
-	return c.JSON(http.StatusOK, meResponse(ctx, h.storage, u))
+	return c.JSON(http.StatusOK, httpmodel.NewMeResponse(u))
 }
 
 // DeleteMe godoc
@@ -106,7 +111,7 @@ func (h *UserHandler) RemoveMyAuth(c echo.Context) error {
 	if err != nil {
 		return err
 	}
-	return c.JSON(http.StatusOK, meResponse(ctx, h.storage, u))
+	return c.JSON(http.StatusOK, httpmodel.NewMeResponse(u))
 }
 
 // GetMFAStatus godoc

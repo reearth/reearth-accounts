@@ -119,7 +119,7 @@ The window is `REEARTH_ACCOUNTS_MFA_RECOVERY_MAX_AUTH_AGE` (a duration). It defa
 
 The four divergences found in the first comparison are resolved. Each change names which side moves. Item 2 keeps one intentional difference.
 
-1. **Signed photo URLs. REST moves.** `photo_url` on `GET /api/users/me`, on every other route that returns `MeResponse`, and on every workspace response is the signed URL GraphQL returns. The app layer passes the storage gateway into `RouterConfig`, and the REST builders call `GetSignedURL` as `gqlmodel.ToWorkspace` and the `me` resolver do. A signing failure logs and leaves `photo_url` empty, as `ToWorkspace` does. GraphQL's `me` query fails on a signing error instead. REST returns the user with an empty `photo_url`, so one failed signature does not fail the request. Signed URLs expire, so clients must not store them.
+1. **Signed photo URLs. REST moves.** REST signs `photo_url` exactly where GraphQL does. `GET /api/users/me` returns the signed URL, as the `me` query does, and fails with `500` when signing fails, as `me` returns the error. `PATCH /api/users/me`, `DELETE /api/users/me/auths/:sub` and `POST /api/auth/logout` return the stored value, as `updateMe`, `removeMyAuth` and `logout` do. Every workspace response carries the signed URL, as `gqlmodel.ToWorkspace` does, and a signing failure logs and leaves `photo_url` empty. The app layer passes the storage gateway into `RouterConfig`. Signed URLs expire, so clients must not store them.
 2. **Workspace members. REST moves.**
    - REST drops members whose user no longer exists, as GraphQL does.
    - GraphQL keeps omitting integration members. The repo's `pkg/gqlclient`, which other services use, reads every member as a user and would fail on a workspace with an integration.
@@ -138,7 +138,7 @@ The four divergences found in the first comparison are resolved. Each change nam
 1. REST clients that read another user's `email` from the lookup routes get an empty string. Serve does not read it. Other REST clients should check before this ships.
 2. GraphQL `enableMFA`, `disableMFA` and `regenerateMFARecoveryCode` keep the same error message for a user with no Auth0 identity.
 3. Maintainers can no longer demote or remove owners (Decision 1, rule 1). Both APIs change.
-4. REST `photo_url` values become signed URLs that expire. A client that stores them should store the value it uploaded, not the one it read.
+4. REST `photo_url` on `GET /api/users/me` and on workspace responses becomes a signed URL that expires. A client that stores it should store the value it uploaded, not the one it read.
 5. With the step-up window set, `regenerateMFARecoveryCode` and `POST /api/users/me/mfa/recovery-code` fail for an old session. The window is off by default.
 
 ## Test Plan

@@ -12,26 +12,30 @@ import (
 
 const maxSignConcurrency = 10
 
-// signPhotoURL returns what GraphQL's ToWorkspace returns for a stored photo:
-// the signed URL, or empty when signing fails.
-func signPhotoURL(ctx context.Context, storage gateway.Storage, stored string) string {
+func signPhotoURL(ctx context.Context, storage gateway.Storage, stored string) (string, error) {
 	if stored == "" || storage == nil {
-		return stored
+		return stored, nil
 	}
-	signed, err := storage.GetSignedURL(ctx, stored)
-	if err != nil {
-		log.Errorfc(ctx, "rest: failed to sign photo url: %v", err)
-	}
-	return signed
+	return storage.GetSignedURL(ctx, stored)
 }
 
-func meResponse(ctx context.Context, storage gateway.Storage, u *user.User) *httpmodel.MeResponse {
+// meResponse signs the photo and fails when signing fails, as the GraphQL me
+// query does.
+func meResponse(ctx context.Context, storage gateway.Storage, u *user.User) (*httpmodel.MeResponse, error) {
 	res := httpmodel.NewMeResponse(u)
-	if res != nil {
-		res.Metadata.PhotoURL = signPhotoURL(ctx, storage, res.Metadata.PhotoURL)
+	if res == nil {
+		return nil, nil
 	}
-	return res
+	signed, err := signPhotoURL(ctx, storage, res.Metadata.PhotoURL)
+	if err != nil {
+		return nil, err
+	}
+	res.Metadata.PhotoURL = signed
+	return res, nil
 }
+
+// signWorkspacePhotos logs a signing failure and leaves that photo_url empty,
+// as GraphQL's ToWorkspace does.
 
 func signWorkspacePhotos(ctx context.Context, storage gateway.Storage, res []*httpmodel.WorkspaceResponse) {
 	p := pool.New().WithMaxGoroutines(maxSignConcurrency)
@@ -40,7 +44,11 @@ func signWorkspacePhotos(ctx context.Context, storage gateway.Storage, res []*ht
 			continue
 		}
 		p.Go(func() {
-			r.Metadata.PhotoURL = signPhotoURL(ctx, storage, r.Metadata.PhotoURL)
+			signed, err := signPhotoURL(ctx, storage, r.Metadata.PhotoURL)
+			if err != nil {
+				log.Errorfc(ctx, "rest: failed to sign photo url: %v", err)
+			}
+			r.Metadata.PhotoURL = signed
 		})
 	}
 	p.Wait()

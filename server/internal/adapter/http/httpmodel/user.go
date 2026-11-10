@@ -14,8 +14,8 @@ import (
 type UserMetadataResponse struct {
 	Description string `json:"description"`
 	Website     string `json:"website"`
-	// A signed URL that expires on MeResponse, so do not store it.
-	// On UserResponse it is the stored value.
+	// A signed URL that expires on GET /api/users/me, so do not store it.
+	// Every other response carries the stored value.
 	PhotoURL string `json:"photo_url"`
 	Lang     string `json:"lang"`
 	Theme    string `json:"theme"`
