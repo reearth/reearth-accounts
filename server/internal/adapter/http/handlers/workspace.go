@@ -47,7 +47,7 @@ func (h *WorkspaceHandler) Create(c echo.Context) error {
 	if err != nil {
 		return err
 	}
-	return c.JSON(http.StatusOK, httpmodel.NewWorkspaceResponse(w))
+	return writeWorkspace(c, w)
 }
 
 // Get godoc
@@ -69,7 +69,7 @@ func (h *WorkspaceHandler) Get(c echo.Context) error {
 	if err != nil {
 		return err
 	}
-	return c.JSON(http.StatusOK, httpmodel.NewWorkspaceResponse(w))
+	return writeWorkspace(c, w)
 }
 
 // List godoc
@@ -116,19 +116,19 @@ func (h *WorkspaceHandler) List(c echo.Context) error {
 		if err != nil {
 			return err
 		}
-		return c.JSON(http.StatusOK, httpmodel.NewWorkspaceResponses(ws))
+		return writeWorkspaces(c, ws)
 	case name != "":
 		w, err := uc.FetchByName(ctx, name)
 		if err != nil {
 			return err
 		}
-		return c.JSON(http.StatusOK, httpmodel.NewWorkspaceResponse(w))
+		return writeWorkspace(c, w)
 	case alias != "":
 		w, err := uc.FetchByAlias(ctx, alias)
 		if err != nil {
 			return err
 		}
-		return c.JSON(http.StatusOK, httpmodel.NewWorkspaceResponse(w))
+		return writeWorkspace(c, w)
 	default: // user_id
 		uid, err := id.UserIDFrom(userID)
 		if err != nil {
@@ -144,13 +144,17 @@ func (h *WorkspaceHandler) List(c echo.Context) error {
 			if err != nil {
 				return err
 			}
-			return c.JSON(http.StatusOK, httpinternal.NewPageResult(httpmodel.NewWorkspaceResponses(res.Workspaces), page, size, res.TotalCount))
+			items, err := workspaceResponses(c, res.Workspaces)
+			if err != nil {
+				return err
+			}
+			return c.JSON(http.StatusOK, httpinternal.NewPageResult(items, page, size, res.TotalCount))
 		}
 		ws, err := uc.FindByUser(ctx, uid, op)
 		if err != nil {
 			return err
 		}
-		return c.JSON(http.StatusOK, httpmodel.NewWorkspaceResponses(ws))
+		return writeWorkspaces(c, ws)
 	}
 }
 
@@ -196,7 +200,11 @@ func (h *WorkspaceHandler) ListAll(c echo.Context) error {
 	if err != nil {
 		return err
 	}
-	return c.JSON(http.StatusOK, httpinternal.NewPageResult(httpmodel.NewWorkspaceResponses(res.Workspaces), page, size, res.TotalCount))
+	items, err := workspaceResponses(c, res.Workspaces)
+	if err != nil {
+		return err
+	}
+	return c.JSON(http.StatusOK, httpinternal.NewPageResult(items, page, size, res.TotalCount))
 }
 
 // Update godoc
@@ -225,7 +233,7 @@ func (h *WorkspaceHandler) Update(c echo.Context) error {
 	if err != nil {
 		return err
 	}
-	return c.JSON(http.StatusOK, httpmodel.NewWorkspaceResponse(w))
+	return writeWorkspace(c, w)
 }
 
 // Delete godoc
@@ -265,7 +273,7 @@ func (h *WorkspaceHandler) Deactivate(c echo.Context) error {
 	if err != nil {
 		return err
 	}
-	return c.JSON(http.StatusOK, httpmodel.NewWorkspaceResponse(w))
+	return writeWorkspace(c, w)
 }
 
 // Restore godoc
@@ -286,7 +294,7 @@ func (h *WorkspaceHandler) Restore(c echo.Context) error {
 	if err != nil {
 		return err
 	}
-	return c.JSON(http.StatusOK, httpmodel.NewWorkspaceResponse(w))
+	return writeWorkspace(c, w)
 }
 
 // AddMembers godoc
@@ -317,7 +325,7 @@ func (h *WorkspaceHandler) AddMembers(c echo.Context) error {
 	if err != nil {
 		return err
 	}
-	return c.JSON(http.StatusOK, httpmodel.NewWorkspaceResponse(w))
+	return writeWorkspace(c, w)
 }
 
 // UpdateMember godoc
@@ -349,7 +357,7 @@ func (h *WorkspaceHandler) UpdateMember(c echo.Context) error {
 	if err != nil {
 		return err
 	}
-	return c.JSON(http.StatusOK, httpmodel.NewWorkspaceResponse(w))
+	return writeWorkspace(c, w)
 }
 
 // UpdateMemberViaService godoc
@@ -381,7 +389,7 @@ func (h *WorkspaceHandler) UpdateMemberViaService(c echo.Context) error {
 	if err != nil {
 		return err
 	}
-	return c.JSON(http.StatusOK, httpmodel.NewWorkspaceResponse(w))
+	return writeWorkspace(c, w)
 }
 
 // RemoveMember godoc
@@ -407,7 +415,7 @@ func (h *WorkspaceHandler) RemoveMember(c echo.Context) error {
 	if err != nil {
 		return err
 	}
-	return c.JSON(http.StatusOK, httpmodel.NewWorkspaceResponse(w))
+	return writeWorkspace(c, w)
 }
 
 // RemoveMembers godoc
@@ -438,7 +446,7 @@ func (h *WorkspaceHandler) RemoveMembers(c echo.Context) error {
 	if err != nil {
 		return err
 	}
-	return c.JSON(http.StatusOK, httpmodel.NewWorkspaceResponse(w))
+	return writeWorkspace(c, w)
 }
 
 // AddIntegration godoc
@@ -469,7 +477,7 @@ func (h *WorkspaceHandler) AddIntegration(c echo.Context) error {
 	if err != nil {
 		return err
 	}
-	return c.JSON(http.StatusOK, httpmodel.NewWorkspaceResponse(w))
+	return writeWorkspace(c, w)
 }
 
 // UpdateIntegration godoc
@@ -501,7 +509,7 @@ func (h *WorkspaceHandler) UpdateIntegration(c echo.Context) error {
 	if err != nil {
 		return err
 	}
-	return c.JSON(http.StatusOK, httpmodel.NewWorkspaceResponse(w))
+	return writeWorkspace(c, w)
 }
 
 // RemoveIntegration godoc
@@ -527,7 +535,7 @@ func (h *WorkspaceHandler) RemoveIntegration(c echo.Context) error {
 	if err != nil {
 		return err
 	}
-	return c.JSON(http.StatusOK, httpmodel.NewWorkspaceResponse(w))
+	return writeWorkspace(c, w)
 }
 
 // RemoveIntegrations godoc
@@ -562,7 +570,7 @@ func (h *WorkspaceHandler) RemoveIntegrations(c echo.Context) error {
 	if err != nil {
 		return err
 	}
-	return c.JSON(http.StatusOK, httpmodel.NewWorkspaceResponse(w))
+	return writeWorkspace(c, w)
 }
 
 // TransferOwnership godoc
@@ -593,7 +601,7 @@ func (h *WorkspaceHandler) TransferOwnership(c echo.Context) error {
 	if err != nil {
 		return err
 	}
-	return c.JSON(http.StatusOK, httpmodel.NewWorkspaceResponse(w))
+	return writeWorkspace(c, w)
 }
 
 func parseWorkspaceIDs(ss []string) (id.WorkspaceIDList, error) {

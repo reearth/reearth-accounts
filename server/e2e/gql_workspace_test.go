@@ -188,6 +188,33 @@ func TestFindByID(t *testing.T) {
 	o.Value("name").String().IsEqual("e2e")
 }
 
+func TestFindByIDReturnsIntegrationMembers(t *testing.T) {
+	e, _ := StartServer(t, &app.Config{StorageIsLocal: true}, true, baseSeederWorkspace)
+
+	query := fmt.Sprintf(`query { findByID(id: "%s"){ members {
+		__typename
+		... on WorkspaceUserMember { userId role }
+		... on WorkspaceIntegrationMember { integrationId role active invitedById }
+	}}}`, wId)
+	jsonData, err := json.Marshal(GraphQLRequest{Query: query})
+	assert.NoError(t, err)
+
+	members := e.POST("/api/graphql").
+		WithHeader("authorization", "Bearer test").
+		WithHeader("Content-Type", "application/json").
+		WithHeader("X-Reearth-Debug-User", uId.String()).
+		WithBytes(jsonData).
+		Expect().Status(http.StatusOK).
+		JSON().Object().Value("data").Object().Value("findByID").Object().
+		Value("members").Array().Raw()
+
+	assert.ElementsMatch(t, []any{
+		map[string]any{"__typename": "WorkspaceUserMember", "userId": uId.String(), "role": "owner"},
+		map[string]any{"__typename": "WorkspaceIntegrationMember", "integrationId": iId.String(), "role": "owner", "active": true, "invitedById": uId2.String()},
+		map[string]any{"__typename": "WorkspaceIntegrationMember", "integrationId": iId3.String(), "role": "reader", "active": true, "invitedById": uId.String()},
+	}, members)
+}
+
 func TestCreateWorkspace(t *testing.T) {
 	e, _ := StartServer(t, &app.Config{}, true, baseSeederWorkspace)
 

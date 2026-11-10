@@ -1,10 +1,16 @@
 package e2e
 
 import (
+	"context"
 	"net/http"
 	"testing"
 
 	"github.com/reearth/reearth-accounts/server/internal/app"
+	"github.com/reearth/reearth-accounts/server/internal/usecase/repo"
+	"github.com/reearth/reearth-accounts/server/pkg/id"
+	"github.com/reearth/reearth-accounts/server/pkg/role"
+	"github.com/reearth/reearth-accounts/server/pkg/workspace"
+	"github.com/reearth/reearthx/idx"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -71,6 +77,59 @@ func TestREST_WorkspaceListByUser(t *testing.T) {
 	exp, _ := StartServer(t, cfg, false, seedDemoUser)
 	exp.GET("/api/workspaces").WithQuery("user_id", restDemoUID.String()).
 		Expect().Status(http.StatusOK).JSON().Array().NotEmpty()
+}
+
+func TestREST_WorkspaceDropsMissingUserMembers(t *testing.T) {
+	wid := id.NewWorkspaceID()
+	ghostUID := id.NewUserID()
+	iid := id.NewIntegrationID()
+	seed := func(ctx context.Context, r *repo.Container) error {
+		if err := seedDemoUser(ctx, r); err != nil {
+			return err
+		}
+		return r.Workspace.Save(ctx, workspace.New().ID(wid).
+			Name("Ghost Team").
+			Alias("ghost-team").
+			Members(map[idx.ID[id.User]]workspace.Member{
+				restDemoUID: {Role: role.RoleOwner, InvitedBy: restDemoUID},
+				ghostUID:    {Role: role.RoleWriter, InvitedBy: restDemoUID},
+			}).
+			Integrations(map[idx.ID[id.Integration]]workspace.Member{
+				iid: {Role: role.RoleReader, InvitedBy: restDemoUID},
+			}).
+			MustBuild())
+	}
+	exp, _ := StartServer(t, &app.Config{Mock_Auth: true}, false, seed)
+
+	want := []map[string]any{
+		{"user_id": restDemoUID.String(), "role": "owner"},
+		{"integration_id": iid.String(), "role": "reader"},
+	}
+
+	got := exp.GET("/api/workspaces/" + wid.String()).
+		Expect().Status(http.StatusOK).JSON().Object().
+		Value("members").Array().Raw()
+	assert.ElementsMatch(t, want, membersOf(got))
+
+	list := exp.GET("/api/workspaces").WithQuery("user_id", restDemoUID.String()).
+		Expect().Status(http.StatusOK).JSON().Array().Raw()
+	found := false
+	for _, w := range list {
+		ws := w.(map[string]any)
+		if ws["id"] == wid.String() {
+			found = true
+			assert.ElementsMatch(t, want, membersOf(ws["members"].([]any)))
+		}
+	}
+	assert.True(t, found, "expected the workspace in the user's list")
+}
+
+func membersOf(raw []any) []map[string]any {
+	out := make([]map[string]any, 0, len(raw))
+	for _, m := range raw {
+		out = append(out, m.(map[string]any))
+	}
+	return out
 }
 
 func TestREST_WorkspaceListBadSelector(t *testing.T) {
