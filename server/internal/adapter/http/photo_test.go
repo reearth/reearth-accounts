@@ -183,15 +183,3 @@ func TestREST_WorkspaceSigningErrorEmptiesPhotoURL(t *testing.T) {
 		f.noPhoto.ID().String():   "",
 	}, photosByID(res))
 }
-
-func TestREST_NilStorageKeepsStoredPhotoURL(t *testing.T) {
-	e, f := newPhotoEcho(t, nil, "users/me.png")
-
-	var me httpmodel.MeResponse
-	getJSON(t, e, "/api/users/me", &me)
-	assert.Equal(t, "users/me.png", me.Metadata.PhotoURL)
-
-	var ws httpmodel.WorkspaceResponse
-	getJSON(t, e, "/api/workspaces/"+f.withPhoto.ID().String(), &ws)
-	assert.Equal(t, "workspaces/a.png", ws.Metadata.PhotoURL)
-}

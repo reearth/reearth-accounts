@@ -29,7 +29,7 @@ type RouterConfig struct {
 	APIKey string
 	// SyncSSOAPIKey is the dedicated M2M key for the sync-sso route.
 	SyncSSOAPIKey string
-	// Storage signs photo URLs. Nil leaves them as stored.
+	// Storage signs photo URLs. Required.
 	Storage gateway.Storage
 	// Swagger basic-auth (optional).
 	SwaggerUser, SwaggerPass string
@@ -43,6 +43,10 @@ type RouterConfig struct {
 // RegisterRESTRouter mounts all /api/* REST routes additively. It MUST be called after
 // the GraphQL route is registered; it shares the same Echo instance and global middleware.
 func RegisterRESTRouter(e *echo.Echo, cfg RouterConfig) {
+	if cfg.Storage == nil {
+		panic("adapterhttp: RouterConfig.Storage is required to sign photo URLs")
+	}
+
 	// Errors from REST handlers render as structured ErrorResponse JSON.
 	// Wrapped so the existing GraphQL HTTPErrorHandler is preserved for non-REST paths.
 	prev := e.HTTPErrorHandler
