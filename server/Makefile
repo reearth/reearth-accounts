@@ -91,7 +91,10 @@ update-schema-json:
 	go run ./tools/cmd/ergen -schema ./internal/infrastructure/mongo/schema -mongodoc ./internal/infrastructure/mongo/mongodoc -output ./internal/infrastructure/mongo/schema/ER.md
 
 swag:
-	go run github.com/swaggo/swag/cmd/swag init --generalInfo internal/adapter/http/doc.go --dir ./,internal/adapter/http --output ./docs --parseDependency --parseInternal
+	@# Exclude the admin API: its presentation/internal package shares the name
+	@# `internal` with adapter/http/internal, and swag then cannot resolve
+	@# internal.ErrorResponse. The admin spec has its own target (swag-admin).
+	go run github.com/swaggo/swag/cmd/swag init --generalInfo internal/adapter/http/doc.go --dir ./,internal/adapter/http --exclude ./internal/admin --output ./docs --parseDependency --parseInternal
 
 wire-admin:
 	go run github.com/goforj/wire/cmd/wire gen ./internal/admin/di
