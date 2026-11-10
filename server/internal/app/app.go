@@ -136,7 +136,8 @@ func initEcho(ctx context.Context, cfg *ServerConfig) *echo.Echo {
 		cacheControl,
 	)
 
-	api.POST("/graphql", GraphqlAPI(cfg.Config, cfg.Config.Dev), middlewares...)
+	loginTime := adapter.LoginTimeSource{Claim: cfg.Config.AuthTimeClaim}
+	api.POST("/graphql", GraphqlAPI(cfg.Config, loginTime, cfg.Config.Dev), middlewares...)
 
 	// REST API (additive; GraphQL above is unchanged). Reuses the usecase middleware
 	// and, in non-mock mode, an optional JWT middleware that parses a bearer token into
@@ -155,12 +156,12 @@ func initEcho(ctx context.Context, cfg *ServerConfig) *echo.Echo {
 		CacheControl:       cacheControl,
 		UsecaseMiddleware:  usecaseMiddleware,
 		JWTMiddleware:      restJWT,
+		LoginTime:          loginTime,
 		AuthConfigProvider: cfg.Config,
 		APIKey:             cfg.Config.RestAPIKey,
 		SyncSSOAPIKey:      cfg.Config.SyncSSOAPIKey,
 		SwaggerUser:        cfg.Config.SwaggerBasicUser,
 		SwaggerPass:        cfg.Config.SwaggerBasicPass,
-		AuthTimeClaim:      cfg.Config.AuthTimeClaim,
 		Debug:              cfg.Debug || cfg.Config.Dev,
 	})
 
