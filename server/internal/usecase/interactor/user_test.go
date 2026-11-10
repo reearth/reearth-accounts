@@ -1350,7 +1350,7 @@ func TestUser_RegenerateMFARecoveryCode(t *testing.T) {
 		uc := NewUser(r, g, nil, "", "")
 
 		code, err := uc.RegenerateMFARecoveryCode(ctx, &workspace.Operator{User: &noAuthUID})
-		assert.Error(t, err)
+		assert.ErrorIs(t, err, interfaces.ErrNoAuthenticator)
 		assert.Empty(t, code)
 	})
 }

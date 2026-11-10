@@ -122,6 +122,7 @@ func mapError(err error) *ErrorResponse {
 		errors.Is(err, interfaces.ErrInvalidPhotoURL),
 		errors.Is(err, interfaces.ErrNotVerifiedUser),
 		errors.Is(err, interfaces.ErrTooManyWorkspaceIDs),
+		errors.Is(err, interfaces.ErrNoAuthenticator),
 		errors.Is(err, workspace.ErrCannotChangeRoleToOwner):
 		return &ErrorResponse{Status: http.StatusBadRequest, Message: "bad request", Description: err.Error(), Err: err}
 	default:
