@@ -90,10 +90,11 @@ Recorded 2026-11-10 after review of the open questions.
 
 An owner can grant `owner` through `POST /api/workspaces/:id/members`, `PATCH /api/workspaces/:id/members/:user_id`, `addUsersToWorkspace` and `updateUserOfWorkspace`. No new route. The rules, for both APIs:
 
-1. Only an owner can grant `owner`, change an owner's role, or remove an owner. "Owner" here is the existing owner-like check (`checkOwnerLikePermission`: workspace owner, or a caller Cerbos allows). The maintainer shortcut (`IsMaintainingWorkspace`) does not apply to these actions. Error: `403`.
+1. Only an owner can grant `owner`, change an owner's role, or remove an owner. "Owner" here is the existing owner-like check (`checkOwnerLikePermission`: workspace owner, or a caller Cerbos allows). The maintainer shortcut (`IsMaintainingWorkspace`) does not apply to these actions. The Cerbos check asks for `transfer_ownership`, since the policy grants the member actions to maintainers. Error: `403`.
 2. A workspace keeps at least one active owner. Demoting or removing the last owner fails, whoever the caller is. Error: `403` (`ErrCannotChangeOwnerRole`, `ErrOwnerCannotLeaveTheWorkspace`).
 3. An owner can demote themselves or leave while another owner remains. Today an owner can never change their own role.
-4. Unchanged: personal workspaces cannot change members, integrations cannot be `owner`, SCIM group mapping cannot grant `owner` (#368), `PATCH /api/service/workspaces/:id/members/:user_id` cannot grant `owner`, and `transfer-ownership` still demotes the caller to maintainer.
+4. Integrations cannot be `owner`. Nothing enforced this before, so the workspace member methods now refuse it.
+5. Unchanged: personal workspaces cannot change members, SCIM group mapping cannot grant `owner` (#368), `PATCH /api/service/workspaces/:id/members/:user_id` cannot grant `owner`, and `transfer-ownership` still demotes the caller to maintainer.
 
 Rule 1 is also a fix. On `main` a maintainer can demote or remove an owner who is not themselves, including the only owner, which leaves a workspace with no owner.
 

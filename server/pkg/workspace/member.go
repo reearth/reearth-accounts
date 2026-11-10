@@ -223,18 +223,21 @@ func (m *Members) UpdateUserRole(u UserID, role role.RoleType) error {
 	return nil
 }
 
-func (m *Members) UpdateIntegrationRole(iId IntegrationID, role role.RoleType) error {
+func (m *Members) UpdateIntegrationRole(iId IntegrationID, r role.RoleType) error {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 
-	if !role.Valid() {
+	if r == role.RoleOwner {
+		return ErrCannotChangeRoleToOwner
+	}
+	if !r.Valid() {
 		return nil
 	}
 	if _, ok := m.integrations[iId]; !ok {
 		return ErrTargetUserNotInTheWorkspace
 	}
 	mm := m.integrations[iId]
-	mm.Role = role
+	mm.Role = r
 	m.integrations[iId] = mm
 	return nil
 }
@@ -268,6 +271,9 @@ func (m *Members) AddIntegration(iid IntegrationID, roleType role.RoleType, i Us
 	m.mu.Lock()
 	defer m.mu.Unlock()
 
+	if roleType == role.RoleOwner {
+		return ErrCannotChangeRoleToOwner
+	}
 	if _, ok := m.integrations[iid]; ok {
 		return ErrUserAlreadyJoined
 	}
