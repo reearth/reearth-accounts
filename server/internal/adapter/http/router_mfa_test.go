@@ -1,6 +1,7 @@
 package http_test
 
 import (
+	"cmp"
 	"context"
 	"encoding/json"
 	"net/http"
@@ -72,9 +73,9 @@ func newMFAFixture(t *testing.T) *mfaFixture {
 	return newMFAFixtureWithMaxAuthAge(t, 0)
 }
 
-// The fake JWT middleware stands in for appx: it attaches a token whose
-// auth_time is the X-Test-Auth-Time header, when the header is present.
-func fakeJWTMiddleware(t *testing.T) echo.MiddlewareFunc {
+// The fake JWT middleware stands in for appx: it attaches a token whose claim
+// holds the X-Test-Auth-Time header, when the header is present.
+func fakeJWTMiddleware(t *testing.T, claim string) echo.MiddlewareFunc {
 	return func(next echo.HandlerFunc) echo.HandlerFunc {
 		return func(c echo.Context) error {
 			v := c.Request().Header.Get("X-Test-Auth-Time")
@@ -83,7 +84,7 @@ func fakeJWTMiddleware(t *testing.T) echo.MiddlewareFunc {
 			}
 			authTime, err := strconv.ParseInt(v, 10, 64)
 			require.NoError(t, err)
-			token, err := jwt.NewWithClaims(jwt.SigningMethodHS256, jwt.MapClaims{"auth_time": authTime}).SignedString([]byte("test-key"))
+			token, err := jwt.NewWithClaims(jwt.SigningMethodHS256, jwt.MapClaims{claim: authTime}).SignedString([]byte("test-key"))
 			require.NoError(t, err)
 			ctx := context.WithValue(c.Request().Context(), adapter.AuthInfoKey, appx.AuthInfo{Token: token})
 			c.SetRequest(c.Request().WithContext(ctx))
@@ -93,6 +94,11 @@ func fakeJWTMiddleware(t *testing.T) echo.MiddlewareFunc {
 }
 
 func newMFAFixtureWithMaxAuthAge(t *testing.T, maxAuthAge time.Duration) *mfaFixture {
+	t.Helper()
+	return newMFAFixtureWithAuthTimeClaim(t, maxAuthAge, "")
+}
+
+func newMFAFixtureWithAuthTimeClaim(t *testing.T, maxAuthAge time.Duration, authTimeClaim string) *mfaFixture {
 	t.Helper()
 	ctx := context.Background()
 	repos := memory.New()
@@ -134,8 +140,9 @@ func newMFAFixtureWithMaxAuthAge(t *testing.T, maxAuthAge time.Duration) *mfaFix
 		AuthConfigProvider: stubAuthConfigProvider{},
 		AuthResolver:       resolver,
 		CacheControl:       cacheControlMiddleware,
-		JWTMiddleware:      fakeJWTMiddleware(t),
+		JWTMiddleware:      fakeJWTMiddleware(t, cmp.Or(authTimeClaim, "auth_time")),
 		UsecaseMiddleware:  usecases,
+		AuthTimeClaim:      authTimeClaim,
 	})
 	return &mfaFixture{auth: fake, e: e, plainUser: plainUser, auth0User: auth0User}
 }
@@ -248,5 +255,16 @@ func TestMFARoutes(t *testing.T) {
 		rec := f.doAt(http.MethodPost, path, f.auth0User, &recent)
 		require.Equal(t, http.StatusOK, rec.Code)
 		assert.Equal(t, map[string]any{"recovery_code": "recovery-123"}, decodeJSON(t, rec))
+	})
+
+	t.Run("recovery code reads the configured auth time claim", func(t *testing.T) {
+		f := newMFAFixtureWithAuthTimeClaim(t, 5*time.Minute, "https://example.com/auth_time")
+		old := time.Now().Add(-time.Hour)
+		recent := time.Now().Add(-time.Minute)
+		const path = "/api/users/me/mfa/recovery-code"
+
+		assert.Equal(t, http.StatusUnauthorized, f.doAt(http.MethodPost, path, f.auth0User, &old).Code)
+		assert.Equal(t, http.StatusOK, f.doAt(http.MethodPost, path, f.auth0User, &recent).Code)
+		assert.Equal(t, 1, f.auth.recoveryCalls)
 	})
 }

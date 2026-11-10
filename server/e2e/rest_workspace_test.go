@@ -79,11 +79,10 @@ func TestREST_WorkspaceListByUser(t *testing.T) {
 		Expect().Status(http.StatusOK).JSON().Array().NotEmpty()
 }
 
-func TestREST_WorkspaceDropsMissingUserMembers(t *testing.T) {
-	wid := id.NewWorkspaceID()
-	ghostUID := id.NewUserID()
-	iid := id.NewIntegrationID()
-	seed := func(ctx context.Context, r *repo.Container) error {
+// seedGhostWorkspace seeds the demo user and a workspace whose members are
+// the demo user, a user with no user record, and an integration.
+func seedGhostWorkspace(wid id.WorkspaceID, iid id.IntegrationID) Seeder {
+	return func(ctx context.Context, r *repo.Container) error {
 		if err := seedDemoUser(ctx, r); err != nil {
 			return err
 		}
@@ -91,15 +90,20 @@ func TestREST_WorkspaceDropsMissingUserMembers(t *testing.T) {
 			Name("Ghost Team").
 			Alias("ghost-team").
 			Members(map[idx.ID[id.User]]workspace.Member{
-				restDemoUID: {Role: role.RoleOwner, InvitedBy: restDemoUID},
-				ghostUID:    {Role: role.RoleWriter, InvitedBy: restDemoUID},
+				restDemoUID:    {Role: role.RoleOwner, InvitedBy: restDemoUID},
+				id.NewUserID(): {Role: role.RoleWriter, InvitedBy: restDemoUID},
 			}).
 			Integrations(map[idx.ID[id.Integration]]workspace.Member{
 				iid: {Role: role.RoleReader, InvitedBy: restDemoUID},
 			}).
 			MustBuild())
 	}
-	exp, _ := StartServer(t, &app.Config{Mock_Auth: true}, false, seed)
+}
+
+func TestREST_WorkspaceDropsMissingUserMembers(t *testing.T) {
+	wid := id.NewWorkspaceID()
+	iid := id.NewIntegrationID()
+	exp, _ := StartServer(t, &app.Config{Mock_Auth: true}, false, seedGhostWorkspace(wid, iid))
 
 	want := []map[string]any{
 		{"user_id": restDemoUID.String(), "role": "owner"},

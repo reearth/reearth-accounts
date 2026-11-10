@@ -47,6 +47,10 @@ type Config struct {
 	// MFARecoveryMaxAuthAge is how recent the token's auth_time must be to
 	// regenerate an MFA recovery code. 0 turns the check off.
 	MFARecoveryMaxAuthAge time.Duration `envconfig:"REEARTH_ACCOUNTS_MFA_RECOVERY_MAX_AUTH_AGE"`
+	// AuthTimeClaim names a token claim that carries the login time when the
+	// identity provider cannot set auth_time itself (Auth0 restricts it).
+	// Empty reads only auth_time.
+	AuthTimeClaim string `envconfig:"REEARTH_ACCOUNTS_AUTH_TIME_CLAIM"`
 
 	GraphQL GraphQLConfig
 

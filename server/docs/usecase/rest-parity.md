@@ -106,23 +106,24 @@ Rule 1 is also a fix. On `main` a maintainer can demote or remove an owner who i
 
 ### 3. Recovery codes require a recent login
 
-`RegenerateMFARecoveryCode` refuses a session whose login is older than a configured window, for both APIs. The adapter reads the `auth_time` claim from the validated token and passes it to the interactor. An `auth_time` from any accepted issuer counts, so Auth0 and CIP logins are treated the same. Error: `interfaces.ErrRecentLoginRequired`, with the message `recent login required` in GraphQL. REST answers `401` with message `recent_login_required` and the RFC 9470 header `WWW-Authenticate: Bearer error="insufficient_user_authentication"`. A token without the claim counts as too old, and so does an `auth_time` more than 1 minute in the future. A negative window fails startup.
+`RegenerateMFARecoveryCode` refuses a session whose login is older than a configured window, for both APIs. The adapter reads the login time from the validated token and passes it to the interactor. It reads the claim named by `REEARTH_ACCOUNTS_AUTH_TIME_CLAIM` when that is set and present, and the standard `auth_time` claim otherwise. An `auth_time` from any accepted issuer counts, so Auth0 and CIP logins are treated the same. Error: `interfaces.ErrRecentLoginRequired`, with the message `recent login required` in GraphQL. REST answers `401` with message `recent_login_required` and the RFC 9470 header `WWW-Authenticate: Bearer error="insufficient_user_authentication"`. A token without a login time counts as too old, and so does a login time more than 1 minute in the future. A negative window fails startup.
 
 The window is `REEARTH_ACCOUNTS_MFA_RECOVERY_MAX_AUTH_AGE` (a duration). It defaults to `0`, which turns the check off. Turn it on only after two things are in place, since otherwise no one can regenerate a code:
 
-1. The identity provider puts `auth_time` in the token accounts receives. Firebase (CIP) ID tokens carry it. Auth0 access tokens need a post-login Action to add it. Verify the claim on the tenant before turning the check on.
+1. The identity provider puts `auth_time` in the token accounts receives. Firebase (CIP) ID tokens carry `auth_time`. Auth0 restricts `auth_time`, so a post-login Action sets a namespaced claim (for example `https://your-domain/auth_time`) from the authentication time, and `REEARTH_ACCOUNTS_AUTH_TIME_CLAIM` names it. Verify the claim on the tenant before turning the check on.
 2. The web client can force a fresh login before the call (Auth0 `max_age` or `prompt=login`).
 
 `DisableMFA` (SEC-03) is not covered by this decision.
 
 ### 4. REST and GraphQL return the same shapes
 
-The four divergences found in the first comparison are closed. Each change names which side moves.
+The four divergences found in the first comparison are resolved. Each change names which side moves. Item 2 keeps one intentional difference.
 
 1. **Signed photo URLs. REST moves.** `photo_url` on `GET /api/users/me`, on every other route that returns `MeResponse`, and on every workspace response is the signed URL GraphQL returns. The app layer passes the storage gateway into `RouterConfig`, and the REST builders call `GetSignedURL` as `gqlmodel.ToWorkspace` and the `me` resolver do. A signing failure logs and leaves `photo_url` empty, as `ToWorkspace` does. GraphQL's `me` query fails on a signing error instead. REST returns the user with an empty `photo_url`, so one failed signature does not fail the request. Signed URLs expire, so clients must not store them.
-2. **Workspace members. Both move.**
-   - REST drops user members whose user record no longer exists, as GraphQL does through its `exists` map.
-   - GraphQL returns integration members as `WorkspaceIntegrationMember`. The schema has always declared that type in the `WorkspaceMember` union, and `ToWorkspace` reserves room for integrations but never adds them (since #103). REST already returns them, and REST and GraphQL both manage integrations, so dropping them from REST would leave no way to list them.
+2. **Workspace members. REST moves.**
+   - REST drops members whose user no longer exists, as GraphQL does.
+   - GraphQL keeps omitting integration members. The repo's `pkg/gqlclient`, which other services use, reads every member as a user and would fail on a workspace with an integration.
+   - REST keeps returning integration members. This difference is intentional.
 3. **Expansions. REST moves.** REST gains an opt-in `expand` query parameter, so nothing extra is fetched by default:
    - `GET /api/users/me?expand=my_workspace` embeds the personal workspace as `my_workspace`.
    - Workspace routes accept `?expand=members.user`, which embeds each user member's `UserResponse` as `user`. Embedded users follow the email rule above.
@@ -137,9 +138,8 @@ The four divergences found in the first comparison are closed. Each change names
 1. REST clients that read another user's `email` from the lookup routes get an empty string. Serve does not read it. Other REST clients should check before this ships.
 2. GraphQL `enableMFA`, `disableMFA` and `regenerateMFARecoveryCode` keep the same error message for a user with no Auth0 identity.
 3. Maintainers can no longer demote or remove owners (Decision 1, rule 1). Both APIs change.
-4. GraphQL `members` starts returning `WorkspaceIntegrationMember` entries (Decision 4.2). A client that reads every entry as a user member without checking `__typename` breaks. Check the GraphQL clients of accounts (visualizer, dashboard, CMS) before this ships.
-5. REST `photo_url` values become signed URLs that expire. A client that stores them should store the value it uploaded, not the one it read.
-6. With the step-up window set, `regenerateMFARecoveryCode` and `POST /api/users/me/mfa/recovery-code` fail for an old session. The window is off by default.
+4. REST `photo_url` values become signed URLs that expire. A client that stores them should store the value it uploaded, not the one it read.
+5. With the step-up window set, `regenerateMFARecoveryCode` and `POST /api/users/me/mfa/recovery-code` fail for an old session. The window is off by default.
 
 ## Test Plan
 
@@ -152,7 +152,7 @@ The four divergences found in the first comparison are closed. Each change names
 1. Backward compatible for MFA (new routes). Email visibility removes data from REST responses.
 2. Partial deployment is possible. Each PR ships alone.
 3. Notify owners of REST clients that read other users' email.
-4. One new optional setting, `REEARTH_ACCOUNTS_MFA_RECOVERY_MAX_AUTH_AGE`, off by default (Decision 3).
+4. Two new optional settings, `REEARTH_ACCOUNTS_MFA_RECOVERY_MAX_AUTH_AGE` (off by default) and `REEARTH_ACCOUNTS_AUTH_TIME_CLAIM` (empty by default), both from Decision 3.
 5. No DDL or DML.
 
 ## Rollback Plan

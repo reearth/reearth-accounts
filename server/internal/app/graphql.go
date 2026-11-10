@@ -45,7 +45,7 @@ func newPhotoStorage(conf *Config) gateway.Storage {
 
 func GraphqlAPI(conf *Config, str gateway.Storage, dev bool) echo.HandlerFunc {
 	schema := gql.NewExecutableSchema(gql.Config{
-		Resolvers: gql.NewResolver(str),
+		Resolvers: gql.NewResolver(str, conf.AuthTimeClaim),
 	})
 
 	srv := handler.New(schema)
