@@ -174,7 +174,7 @@ func (i *Scim) DeprovisionScimUserByUserID(ctx context.Context, workspaceID work
 
 func (i *Scim) GenerateScimToken(ctx context.Context, workspaceID workspace.ID, operator *workspace.Operator) (string, error) {
 	return Run1(ctx, operator, i.repos, Usecase().Transaction().WithMaintainableWorkspaces(workspaceID), func(ctx context.Context) (string, error) {
-		ws, err := i.repos.Workspace.FindByID(ctx, workspaceID)
+		ws, err := i.repos.Workspace.FindByIDForUpdate(ctx, workspaceID)
 		if err != nil {
 			return "", err
 		}
@@ -504,7 +504,7 @@ func (i *Scim) ReactivateScimUserByUserID(ctx context.Context, workspaceID works
 
 func (i *Scim) RevokeScimToken(ctx context.Context, workspaceID workspace.ID, operator *workspace.Operator) error {
 	return Run0(ctx, operator, i.repos, Usecase().Transaction().WithMaintainableWorkspaces(workspaceID), func(ctx context.Context) error {
-		ws, err := i.repos.Workspace.FindByID(ctx, workspaceID)
+		ws, err := i.repos.Workspace.FindByIDForUpdate(ctx, workspaceID)
 		if err != nil {
 			return err
 		}
@@ -678,7 +678,7 @@ func (i *Scim) SyncScimGroup(ctx context.Context, workspaceID workspace.ID, _, g
 
 func (i *Scim) UpdateScimConfig(ctx context.Context, workspaceID workspace.ID, enabled bool, groupRoleMapping map[string]role.RoleType, operator *workspace.Operator) (*workspace.ScimConfig, error) {
 	return Run1(ctx, operator, i.repos, Usecase().Transaction().WithMaintainableWorkspaces(workspaceID), func(ctx context.Context) (*workspace.ScimConfig, error) {
-		ws, err := i.repos.Workspace.FindByID(ctx, workspaceID)
+		ws, err := i.repos.Workspace.FindByIDForUpdate(ctx, workspaceID)
 		if err != nil {
 			return nil, err
 		}
@@ -742,7 +742,7 @@ func (i *Scim) SetWorkspaceScimAvailable(ctx context.Context, workspaceID worksp
 			return false, err
 		}
 
-		ws, err := i.repos.Workspace.FindByID(ctx, workspaceID)
+		ws, err := i.repos.Workspace.FindByIDForUpdate(ctx, workspaceID)
 		if err != nil {
 			return false, err
 		}
