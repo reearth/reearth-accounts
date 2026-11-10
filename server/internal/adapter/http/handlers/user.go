@@ -21,11 +21,11 @@ import (
 )
 
 type UserHandler struct {
-	authTimeClaim string
+	loginTime adapter.LoginTimeSource
 }
 
-func NewUserHandler(authTimeClaim string) *UserHandler {
-	return &UserHandler{authTimeClaim: authTimeClaim}
+func NewUserHandler(loginTime adapter.LoginTimeSource) *UserHandler {
+	return &UserHandler{loginTime: loginTime}
 }
 
 // Me godoc
@@ -171,7 +171,7 @@ func (h *UserHandler) DisableMFA(c echo.Context) error {
 // @Router /api/users/me/mfa/recovery-code [post]
 func (h *UserHandler) RegenerateMFARecoveryCode(c echo.Context) error {
 	ctx := c.Request().Context()
-	code, err := httpinternal.Usecases(c).User.RegenerateMFARecoveryCode(ctx, httpinternal.Operator(c), adapter.AuthTime(ctx, h.authTimeClaim))
+	code, err := httpinternal.Usecases(c).User.RegenerateMFARecoveryCode(ctx, httpinternal.Operator(c), h.loginTime.Read(ctx))
 	if err != nil {
 		return err
 	}
