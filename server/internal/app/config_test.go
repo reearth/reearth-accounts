@@ -30,11 +30,9 @@ func TestReadConfig_AuthTimeClaim(t *testing.T) {
 	require.NoError(t, err)
 	assert.Equal(t, "https://example.com/auth_time", c.AuthTimeClaim)
 
-	for _, claim := range []string{"iat", "exp", "nbf", "sub", "iss", "aud", "jti", "azp"} {
-		t.Setenv("REEARTH_ACCOUNTS_AUTH_TIME_CLAIM", claim)
-		_, err = ReadConfig(false)
-		assert.EqualError(t, err, `REEARTH_ACCOUNTS_AUTH_TIME_CLAIM must not be the reserved claim "`+claim+`", which does not record when the user logged in`)
-	}
+	t.Setenv("REEARTH_ACCOUNTS_AUTH_TIME_CLAIM", " iat ")
+	_, err = ReadConfig(false)
+	assert.EqualError(t, err, `REEARTH_ACCOUNTS_AUTH_TIME_CLAIM: login time claim must not be the reserved claim "iat", which does not record when the user logged in`)
 }
 
 func TestConfig_Print_MasksSecrets(t *testing.T) {

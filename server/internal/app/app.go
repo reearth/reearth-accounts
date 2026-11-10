@@ -3,6 +3,7 @@ package app
 import (
 	"context"
 	"errors"
+	"fmt"
 	"net/http"
 	"net/http/pprof"
 
@@ -137,7 +138,10 @@ func initEcho(ctx context.Context, cfg *ServerConfig) *echo.Echo {
 	)
 
 	photoStorage := newPhotoStorage(cfg.Config)
-	loginTime := adapter.LoginTimeSource{Claim: cfg.Config.AuthTimeClaim}
+	loginTime, err := adapter.NewLoginTimeSource(cfg.Config.AuthTimeClaim)
+	if err != nil {
+		log.Panicc(ctx, fmt.Errorf("REEARTH_ACCOUNTS_AUTH_TIME_CLAIM: %w", err))
+	}
 	api.POST("/graphql", GraphqlAPI(cfg.Config, photoStorage, loginTime, cfg.Config.Dev), middlewares...)
 
 	// REST API (additive; GraphQL above is unchanged). Reuses the usecase middleware
