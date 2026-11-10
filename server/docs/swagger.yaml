@@ -71,6 +71,13 @@ definitions:
         type: string
       name:
         type: string
+      skip_owner_membership:
+        description: |-
+          SkipOwnerMembership, if true, creates the workspace without joining the
+          caller as owner (for callers that manage membership themselves, e.g.
+          LINKS-Veda). Defaults to false, preserving the normal create-and-own flow.
+          REST-only; not exposed via GraphQL.
+        type: boolean
     required:
     - alias
     - name
@@ -161,6 +168,13 @@ definitions:
     required:
     - user_ids
     type: object
+  httpmodel.SetPlatformRolesBySubRequest:
+    properties:
+      role_names:
+        items:
+          type: string
+        type: array
+    type: object
   httpmodel.SignupOIDCRequest:
     properties:
       email:
@@ -223,6 +237,31 @@ definitions:
     required:
     - email
     type: object
+  httpmodel.SyncSSOUserRequest:
+    properties:
+      email:
+        type: string
+      id:
+        type: string
+      lang:
+        type: string
+      name:
+        type: string
+      sub:
+        type: string
+      theme:
+        enum:
+        - default
+        - dark
+        - light
+        type: string
+      workspace_id:
+        type: string
+    required:
+    - email
+    - name
+    - sub
+    type: object
   httpmodel.TransferOwnershipRequest:
     properties:
       new_owner_id:
@@ -281,6 +320,11 @@ definitions:
     required:
     - role
     type: object
+  httpmodel.UpdateUserBySubRequest:
+    properties:
+      name:
+        type: string
+    type: object
   httpmodel.UpdateWorkspaceRequest:
     properties:
       alias:
@@ -315,25 +359,51 @@ definitions:
         items:
           type: string
         type: array
+      created_at:
+        type: string
+      deleted_at:
+        type: string
       email:
         type: string
       host:
         type: string
       id:
         type: string
+      is_deleted:
+        type: boolean
       metadata:
         $ref: '#/definitions/httpmodel.UserMetadataResponse'
       name:
         type: string
+      platform_roles:
+        description: |-
+          PlatformRoles and Workspaces are only populated by handlers that batch-fetch
+          Permittable data (e.g. ListAll); other endpoints leave them nil.
+        items:
+          type: string
+        type: array
       verification:
         $ref: '#/definitions/httpmodel.VerificationResponse'
       workspace:
         type: string
+      workspaces:
+        items:
+          $ref: '#/definitions/httpmodel.UserWorkspaceResponse'
+        type: array
+    type: object
+  httpmodel.UserWorkspaceResponse:
+    properties:
+      alias:
+        type: string
+      name:
+        type: string
+      role:
+        type: string
+      workspace_id:
+        type: string
     type: object
   httpmodel.VerificationResponse:
     properties:
-      code:
-        type: string
       expiration:
         type: string
       verified:
@@ -372,6 +442,12 @@ definitions:
     properties:
       alias:
         type: string
+      created_at:
+        type: string
+      created_by:
+        type: string
+      deleted_at:
+        type: string
       id:
         type: string
       members:
@@ -383,6 +459,8 @@ definitions:
       name:
         type: string
       personal:
+        type: boolean
+      scim_available:
         type: boolean
     type: object
   internal.ErrorResponse:
@@ -468,6 +546,39 @@ paths:
       summary: Check a permission for the current user
       tags:
       - Permission
+  /api/service/workspaces/{id}/members/{user_id}:
+    patch:
+      consumes:
+      - application/json
+      parameters:
+      - description: workspace ID
+        in: path
+        name: id
+        required: true
+        type: string
+      - description: user ID
+        in: path
+        name: user_id
+        required: true
+        type: string
+      - description: new role
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/httpmodel.UpdateMemberRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/httpmodel.WorkspaceResponse'
+      security:
+      - BearerAuth: []
+      summary: Update a member's role, bypassing the self-promotion guard
+      tags:
+      - Workspace
   /api/users:
     get:
       description: 'Default form returns an array of users. When page, page_size,
@@ -527,6 +638,101 @@ paths:
       security:
       - BearerAuth: []
       summary: Get a user by ID
+      tags:
+      - User
+  /api/users/{id}/deactivate:
+    post:
+      parameters:
+      - description: user ID
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/httpmodel.UserResponse'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/internal.ErrorResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/internal.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Soft-delete a user (sets deleted_at; maintainer role required)
+      tags:
+      - User
+  /api/users/{id}/restore:
+    post:
+      parameters:
+      - description: user ID
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/httpmodel.UserResponse'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/internal.ErrorResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/internal.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Restore a soft-deleted user (clears deleted_at; maintainer role required)
+      tags:
+      - User
+  /api/users/all:
+    get:
+      parameters:
+      - description: keyword filter (matches name, alias, or email)
+        in: query
+        name: keyword
+        type: string
+      - description: active (default), deleted, or all
+        in: query
+        name: status
+        type: string
+      - description: page (default 1)
+        in: query
+        name: page
+        type: integer
+      - description: page size (default 50, max 100)
+        in: query
+        name: page_size
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/httpmodel.UserResponse'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/internal.ErrorResponse'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/internal.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: List all users across all tenants (owner role required)
       tags:
       - User
   /api/users/by-alias:
@@ -597,6 +803,82 @@ paths:
       security:
       - BearerAuth: []
       summary: Find a user by name or email
+      tags:
+      - User
+  /api/users/by-sub/{sub}:
+    patch:
+      consumes:
+      - application/json
+      parameters:
+      - description: Firebase auth sub
+        in: path
+        name: sub
+        required: true
+        type: string
+      - description: fields to update
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/httpmodel.UpdateUserBySubRequest'
+      produces:
+      - application/json
+      responses:
+        "204":
+          description: No Content
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/internal.ErrorResponse'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/internal.ErrorResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/internal.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Update a user's fields by Firebase sub (maintainer role required)
+      tags:
+      - User
+  /api/users/by-sub/{sub}/platform-roles:
+    put:
+      consumes:
+      - application/json
+      parameters:
+      - description: Firebase auth sub
+        in: path
+        name: sub
+        required: true
+        type: string
+      - description: role names
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/httpmodel.SetPlatformRolesBySubRequest'
+      produces:
+      - application/json
+      responses:
+        "204":
+          description: No Content
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/internal.ErrorResponse'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/internal.ErrorResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/internal.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Replace a user's global platform roles (maintainer role required)
       tags:
       - User
   /api/users/find-or-create:
@@ -819,6 +1101,35 @@ paths:
       summary: Sign up via OIDC
       tags:
       - User
+  /api/users/sync-sso:
+    post:
+      consumes:
+      - application/json
+      parameters:
+      - description: SSO user fields
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/httpmodel.SyncSSOUserRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/httpmodel.UserResponse'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/internal.ErrorResponse'
+        "409":
+          description: Conflict
+          schema:
+            $ref: '#/definitions/internal.ErrorResponse'
+      summary: Sync (provision) a SAML SSO user into accounts
+      tags:
+      - User
   /api/users/verifications:
     post:
       consumes:
@@ -911,7 +1222,7 @@ paths:
       consumes:
       - application/json
       parameters:
-      - description: workspace fields
+      - description: workspace fields (skip_owner_membership defaults to false)
         in: body
         name: body
         required: true
@@ -993,6 +1304,26 @@ paths:
       security:
       - BearerAuth: []
       summary: Update a workspace
+      tags:
+      - Workspace
+  /api/workspaces/{id}/deactivate:
+    post:
+      parameters:
+      - description: workspace ID
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/httpmodel.WorkspaceResponse'
+      security:
+      - BearerAuth: []
+      summary: Soft-delete a workspace (sets deleted_at; owner-only)
       tags:
       - Workspace
   /api/workspaces/{id}/integrations:
@@ -1219,6 +1550,26 @@ paths:
       summary: Update a user member's role
       tags:
       - Workspace
+  /api/workspaces/{id}/restore:
+    post:
+      parameters:
+      - description: workspace ID
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/httpmodel.WorkspaceResponse'
+      security:
+      - BearerAuth: []
+      summary: Restore a soft-deleted workspace (clears deleted_at; owner-only)
+      tags:
+      - Workspace
   /api/workspaces/{id}/transfer-ownership:
     post:
       consumes:
@@ -1245,6 +1596,45 @@ paths:
       security:
       - BearerAuth: []
       summary: Transfer workspace ownership
+      tags:
+      - Workspace
+  /api/workspaces/all:
+    get:
+      parameters:
+      - description: keyword filter (matches name or alias)
+        in: query
+        name: keyword
+        type: string
+      - description: active (default), deleted, or all
+        in: query
+        name: status
+        type: string
+      - description: page (default 1)
+        in: query
+        name: page
+        type: integer
+      - description: page size (default 50, max 100)
+        in: query
+        name: page_size
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/httpmodel.WorkspaceResponse'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/internal.ErrorResponse'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/internal.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: List all workspaces across all tenants (owner role required)
       tags:
       - Workspace
 securityDefinitions:

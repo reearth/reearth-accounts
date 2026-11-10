@@ -108,6 +108,58 @@ const docTemplate = `{
                 }
             }
         },
+        "/api/service/workspaces/{id}/members/{user_id}": {
+            "patch": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Workspace"
+                ],
+                "summary": "Update a member's role, bypassing the self-promotion guard",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "workspace ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "user ID",
+                        "name": "user_id",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "description": "new role",
+                        "name": "body",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/httpmodel.UpdateMemberRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/httpmodel.WorkspaceResponse"
+                        }
+                    }
+                }
+            }
+        },
         "/api/users": {
             "get": {
                 "security": [
@@ -157,6 +209,68 @@ const docTemplate = `{
                             "items": {
                                 "$ref": "#/definitions/httpmodel.UserResponse"
                             }
+                        }
+                    }
+                }
+            }
+        },
+        "/api/users/all": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "User"
+                ],
+                "summary": "List all users across all tenants (owner role required)",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "keyword filter (matches name, alias, or email)",
+                        "name": "keyword",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "description": "active (default), deleted, or all",
+                        "name": "status",
+                        "in": "query"
+                    },
+                    {
+                        "type": "integer",
+                        "description": "page (default 1)",
+                        "name": "page",
+                        "in": "query"
+                    },
+                    {
+                        "type": "integer",
+                        "description": "page size (default 50, max 100)",
+                        "name": "page_size",
+                        "in": "query"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/httpmodel.UserResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/internal.ErrorResponse"
+                        }
+                    },
+                    "403": {
+                        "description": "Forbidden",
+                        "schema": {
+                            "$ref": "#/definitions/internal.ErrorResponse"
                         }
                     }
                 }
@@ -265,6 +379,126 @@ const docTemplate = `{
                         "description": "OK",
                         "schema": {
                             "$ref": "#/definitions/httpmodel.SimpleUserResponse"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/internal.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/api/users/by-sub/{sub}": {
+            "patch": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "User"
+                ],
+                "summary": "Update a user's fields by Firebase sub (maintainer role required)",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Firebase auth sub",
+                        "name": "sub",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "description": "fields to update",
+                        "name": "body",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/httpmodel.UpdateUserBySubRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "204": {
+                        "description": "No Content"
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/internal.ErrorResponse"
+                        }
+                    },
+                    "403": {
+                        "description": "Forbidden",
+                        "schema": {
+                            "$ref": "#/definitions/internal.ErrorResponse"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/internal.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/api/users/by-sub/{sub}/platform-roles": {
+            "put": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "User"
+                ],
+                "summary": "Replace a user's global platform roles (maintainer role required)",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Firebase auth sub",
+                        "name": "sub",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "description": "role names",
+                        "name": "body",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/httpmodel.SetPlatformRolesBySubRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "204": {
+                        "description": "No Content"
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/internal.ErrorResponse"
+                        }
+                    },
+                    "403": {
+                        "description": "Forbidden",
+                        "schema": {
+                            "$ref": "#/definitions/internal.ErrorResponse"
                         }
                     },
                     "404": {
@@ -628,6 +862,51 @@ const docTemplate = `{
                 }
             }
         },
+        "/api/users/sync-sso": {
+            "post": {
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "User"
+                ],
+                "summary": "Sync (provision) a SAML SSO user into accounts",
+                "parameters": [
+                    {
+                        "description": "SSO user fields",
+                        "name": "body",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/httpmodel.SyncSSOUserRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/httpmodel.UserResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/internal.ErrorResponse"
+                        }
+                    },
+                    "409": {
+                        "description": "Conflict",
+                        "schema": {
+                            "$ref": "#/definitions/internal.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
         "/api/users/verifications": {
             "post": {
                 "consumes": [
@@ -733,6 +1012,96 @@ const docTemplate = `{
                 }
             }
         },
+        "/api/users/{id}/deactivate": {
+            "post": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "User"
+                ],
+                "summary": "Soft-delete a user (sets deleted_at; maintainer role required)",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "user ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/httpmodel.UserResponse"
+                        }
+                    },
+                    "403": {
+                        "description": "Forbidden",
+                        "schema": {
+                            "$ref": "#/definitions/internal.ErrorResponse"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/internal.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/api/users/{id}/restore": {
+            "post": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "User"
+                ],
+                "summary": "Restore a soft-deleted user (clears deleted_at; maintainer role required)",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "user ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/httpmodel.UserResponse"
+                        }
+                    },
+                    "403": {
+                        "description": "Forbidden",
+                        "schema": {
+                            "$ref": "#/definitions/internal.ErrorResponse"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/internal.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
         "/api/workspaces": {
             "get": {
                 "security": [
@@ -816,7 +1185,7 @@ const docTemplate = `{
                 "summary": "Create a workspace",
                 "parameters": [
                     {
-                        "description": "workspace fields",
+                        "description": "workspace fields (skip_owner_membership defaults to false)",
                         "name": "body",
                         "in": "body",
                         "required": true,
@@ -830,6 +1199,68 @@ const docTemplate = `{
                         "description": "OK",
                         "schema": {
                             "$ref": "#/definitions/httpmodel.WorkspaceResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/api/workspaces/all": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Workspace"
+                ],
+                "summary": "List all workspaces across all tenants (owner role required)",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "keyword filter (matches name or alias)",
+                        "name": "keyword",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "description": "active (default), deleted, or all",
+                        "name": "status",
+                        "in": "query"
+                    },
+                    {
+                        "type": "integer",
+                        "description": "page (default 1)",
+                        "name": "page",
+                        "in": "query"
+                    },
+                    {
+                        "type": "integer",
+                        "description": "page size (default 50, max 100)",
+                        "name": "page_size",
+                        "in": "query"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/httpmodel.WorkspaceResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/internal.ErrorResponse"
+                        }
+                    },
+                    "403": {
+                        "description": "Forbidden",
+                        "schema": {
+                            "$ref": "#/definitions/internal.ErrorResponse"
                         }
                     }
                 }
@@ -930,6 +1361,39 @@ const docTemplate = `{
                         "schema": {
                             "$ref": "#/definitions/httpmodel.UpdateWorkspaceRequest"
                         }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/httpmodel.WorkspaceResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/api/workspaces/{id}/deactivate": {
+            "post": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Workspace"
+                ],
+                "summary": "Soft-delete a workspace (sets deleted_at; owner-only)",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "workspace ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
                     }
                 ],
                 "responses": {
@@ -1298,6 +1762,39 @@ const docTemplate = `{
                 }
             }
         },
+        "/api/workspaces/{id}/restore": {
+            "post": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Workspace"
+                ],
+                "summary": "Restore a soft-deleted workspace (clears deleted_at; owner-only)",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "workspace ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/httpmodel.WorkspaceResponse"
+                        }
+                    }
+                }
+            }
+        },
         "/api/workspaces/{id}/transfer-ownership": {
             "post": {
                 "security": [
@@ -1454,6 +1951,10 @@ const docTemplate = `{
                 },
                 "name": {
                     "type": "string"
+                },
+                "skip_owner_membership": {
+                    "description": "SkipOwnerMembership, if true, creates the workspace without joining the\ncaller as owner (for callers that manage membership themselves, e.g.\nLINKS-Veda). Defaults to false, preserving the normal create-and-own flow.\nREST-only; not exposed via GraphQL.",
+                    "type": "boolean"
                 }
             }
         },
@@ -1585,6 +2086,17 @@ const docTemplate = `{
                 }
             }
         },
+        "httpmodel.SetPlatformRolesBySubRequest": {
+            "type": "object",
+            "properties": {
+                "role_names": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
+                }
+            }
+        },
         "httpmodel.SignupOIDCRequest": {
             "type": "object",
             "properties": {
@@ -1678,6 +2190,42 @@ const docTemplate = `{
                 }
             }
         },
+        "httpmodel.SyncSSOUserRequest": {
+            "type": "object",
+            "required": [
+                "email",
+                "name",
+                "sub"
+            ],
+            "properties": {
+                "email": {
+                    "type": "string"
+                },
+                "id": {
+                    "type": "string"
+                },
+                "lang": {
+                    "type": "string"
+                },
+                "name": {
+                    "type": "string"
+                },
+                "sub": {
+                    "type": "string"
+                },
+                "theme": {
+                    "type": "string",
+                    "enum": [
+                        "default",
+                        "dark",
+                        "light"
+                    ]
+                },
+                "workspace_id": {
+                    "type": "string"
+                }
+            }
+        },
         "httpmodel.TransferOwnershipRequest": {
             "type": "object",
             "required": [
@@ -1763,6 +2311,14 @@ const docTemplate = `{
                 }
             }
         },
+        "httpmodel.UpdateUserBySubRequest": {
+            "type": "object",
+            "properties": {
+                "name": {
+                    "type": "string"
+                }
+            }
+        },
         "httpmodel.UpdateWorkspaceRequest": {
             "type": "object",
             "properties": {
@@ -1815,6 +2371,12 @@ const docTemplate = `{
                         "type": "string"
                     }
                 },
+                "created_at": {
+                    "type": "string"
+                },
+                "deleted_at": {
+                    "type": "string"
+                },
                 "email": {
                     "type": "string"
                 },
@@ -1824,16 +2386,49 @@ const docTemplate = `{
                 "id": {
                     "type": "string"
                 },
+                "is_deleted": {
+                    "type": "boolean"
+                },
                 "metadata": {
                     "$ref": "#/definitions/httpmodel.UserMetadataResponse"
                 },
                 "name": {
                     "type": "string"
                 },
+                "platform_roles": {
+                    "description": "PlatformRoles and Workspaces are only populated by handlers that batch-fetch\nPermittable data (e.g. ListAll); other endpoints leave them nil.",
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
+                },
                 "verification": {
                     "$ref": "#/definitions/httpmodel.VerificationResponse"
                 },
                 "workspace": {
+                    "type": "string"
+                },
+                "workspaces": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/httpmodel.UserWorkspaceResponse"
+                    }
+                }
+            }
+        },
+        "httpmodel.UserWorkspaceResponse": {
+            "type": "object",
+            "properties": {
+                "alias": {
+                    "type": "string"
+                },
+                "name": {
+                    "type": "string"
+                },
+                "role": {
+                    "type": "string"
+                },
+                "workspace_id": {
                     "type": "string"
                 }
             }
@@ -1841,9 +2436,6 @@ const docTemplate = `{
         "httpmodel.VerificationResponse": {
             "type": "object",
             "properties": {
-                "code": {
-                    "type": "string"
-                },
                 "expiration": {
                     "type": "string"
                 },
@@ -1903,6 +2495,15 @@ const docTemplate = `{
                 "alias": {
                     "type": "string"
                 },
+                "created_at": {
+                    "type": "string"
+                },
+                "created_by": {
+                    "type": "string"
+                },
+                "deleted_at": {
+                    "type": "string"
+                },
                 "id": {
                     "type": "string"
                 },
@@ -1919,6 +2520,9 @@ const docTemplate = `{
                     "type": "string"
                 },
                 "personal": {
+                    "type": "boolean"
+                },
+                "scim_available": {
                     "type": "boolean"
                 }
             }
