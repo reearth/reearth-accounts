@@ -125,8 +125,8 @@ The four divergences found in the first comparison are resolved. Each change nam
    - GraphQL keeps omitting integration members. The repo's `pkg/gqlclient`, which other services use, reads every member as a user and would fail on a workspace with an integration.
    - REST keeps returning integration members. This difference is intentional.
 3. **Expansions. REST moves.** REST gains an opt-in `expand` query parameter, so nothing extra is fetched by default:
-   - `GET /api/users/me?expand=my_workspace` embeds the personal workspace as `my_workspace`.
-   - Workspace routes accept `?expand=members.user`, which embeds each user member's `UserResponse` as `user`. Embedded users follow the email rule above.
+   - `GET /api/users/me?expand=my_workspace` embeds the personal workspace as `my_workspace`. It is built by the same code as `GET /api/workspaces/:id`, so its photo is signed and members whose user is missing are dropped.
+   - Workspace routes accept `?expand=members.user`, which embeds each user member's user as `user`. The embedded user is a `MemberUserResponse` with only the fields GraphQL `User` exposes: `id`, `name`, `alias`, `email`, `host`, `workspace`, `auths`, `metadata` and `verification`. It has no `is_deleted`, `deleted_at`, `created_at`, `platform_roles` or `workspaces`. Its `email` follows the email rule above. Its `metadata.photo_url` is the stored value, not signed, as GraphQL returns it for a `User`.
 4. **`checkPermission` without a user. Already consistent over HTTP.** The GraphQL auth middleware answers `401` before any resolver runs when there is no user, as REST does. The resolver's own fallback returned `not found`, which no request can reach. It now returns `interfaces.ErrInvalidOperator`, as other resolvers do.
 
 ## Open Questions
