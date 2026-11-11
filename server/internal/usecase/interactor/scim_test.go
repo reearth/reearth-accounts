@@ -388,7 +388,7 @@ func TestGenerateScimToken(t *testing.T) {
 
 	op := &workspace.Operator{
 		User:                   &ownerID,
-		MaintainableWorkspaces: []workspace.ID{ws.ID()},
+		OwningWorkspaces: []workspace.ID{ws.ID()},
 	}
 
 	uc := NewScim(db, nil)

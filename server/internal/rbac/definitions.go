@@ -28,6 +28,7 @@ const (
 	ActionEditMember        = "edit_member"
 	ActionList              = "list"
 	ActionManage            = "manage"
+	ActionManageScim        = "manage_scim"
 	ActionRead              = "read"
 	ActionReadMember        = "read_member"
 	ActionSearch            = "search"
@@ -119,6 +120,7 @@ var resourceRules = []ResourceRule{
 			ActionEditAlias:         {Roles: []string{roleOwner}},
 			ActionList:              {Roles: []string{roleSelf, roleReader, roleWriter, roleMaintainer, roleOwner}},
 			ActionManage:            {Roles: []string{roleMaintainer, roleOwner}},
+			ActionManageScim:        {Roles: []string{roleOwner}},
 			ActionRead:              {Roles: []string{roleReader, roleWriter, roleMaintainer, roleOwner}},
 			ActionTransferOwnership: {Roles: []string{roleOwner}},
 			ActionValidate:          {Roles: []string{roleReader, roleWriter, roleMaintainer, roleOwner}},
