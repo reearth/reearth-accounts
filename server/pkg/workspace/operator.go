@@ -7,7 +7,9 @@ import (
 )
 
 type Operator struct {
-	User                   *id.UserID
+	User *id.UserID
+	// Integration is set, and User is nil, for a service caller (ADR-0002).
+	Integration            *id.IntegrationID
 	ReadableWorkspaces     id.WorkspaceIDList
 	WritableWorkspaces     id.WorkspaceIDList
 	OwningWorkspaces       id.WorkspaceIDList

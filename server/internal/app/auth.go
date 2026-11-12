@@ -247,6 +247,18 @@ func identityProviderAuthMiddleware(cfg *ServerConfig) func(http.Handler) http.H
 				ai = a
 			}
 
+			if op, err := resolveServiceOperator(ctx, cfg, &ai); err != nil {
+				status := http.StatusInternalServerError
+				if errors.Is(err, errServiceCallerRejected) {
+					status = http.StatusUnauthorized
+				}
+				http.Error(w, http.StatusText(status), status)
+				return
+			} else if op != nil {
+				next.ServeHTTP(w, req.WithContext(adapter.AttachOperator(ctx, op)))
+				return
+			}
+
 			if canUseDebugHeaders(cfg) {
 				if newCtx, dai := injectDebugAuthInfo(ctx, req); dai != nil {
 					ctx = newCtx
