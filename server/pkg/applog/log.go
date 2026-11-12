@@ -7,6 +7,7 @@ import (
 	"context"
 
 	"github.com/reearth/reearthx/log"
+	"go.opentelemetry.io/otel/trace"
 )
 
 type level int
@@ -44,12 +45,29 @@ func kv(fields []Field) []any {
 	return res
 }
 
+// traceFields links the entry to the current span. With a GCP project known,
+// it uses the Cloud Logging keys so the entry shows under its trace.
+func traceFields(ctx context.Context) []any {
+	sc := trace.SpanContextFromContext(ctx)
+	if !sc.IsValid() {
+		return nil
+	}
+	if t := log.GoogleTraceFromTraceID(sc.TraceID().String(), ""); t != "" {
+		return []any{
+			"logging.googleapis.com/trace", t,
+			"logging.googleapis.com/spanId", sc.SpanID().String(),
+			"logging.googleapis.com/trace_sampled", sc.IsSampled(),
+		}
+	}
+	return []any{"trace_id", sc.TraceID().String(), "span_id", sc.SpanID().String()}
+}
+
 func write(ctx context.Context, depth int, lv level, msg string, fields []Field) {
 	if ctx == nil {
 		ctx = context.Background()
 	}
 	l := base(ctx).AddCallerSkip(depth + 2)
-	args := kv(fields)
+	args := append(kv(fields), traceFields(ctx)...)
 	switch lv {
 	case levelDebug:
 		l.Debugw(msg, args...)

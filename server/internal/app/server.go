@@ -1,8 +1,10 @@
 package app
 
 import (
+	"cloud.google.com/go/compute/metadata"
 	"context"
 	"errors"
+	"github.com/reearth/reearthx/log"
 	"net"
 	"net/http"
 	"os"
@@ -39,6 +41,7 @@ func Start(debug bool) {
 		applog.Fatal(ctx, "failed to read config", applog.Err(cerr))
 	}
 	applog.Info(ctx, "config", applog.Config(conf.Print()))
+	log.GCPProject = gcpProject(ctx, conf)
 
 	// Init OpenTelemetry tracer
 	if conf.OtelEnabled {
@@ -270,4 +273,19 @@ func chainMongoMonitors(monitors ...*event.CommandMonitor) *event.CommandMonitor
 			}
 		},
 	}
+}
+
+// gcpProject names the project that log entries link their trace to. Cloud
+// Run does not set GOOGLE_CLOUD_PROJECT, so on Cloud Run it asks the metadata
+// server.
+func gcpProject(ctx context.Context, conf *Config) string {
+	if conf.GCPProject != "" || os.Getenv("K_SERVICE") == "" {
+		return conf.GCPProject
+	}
+	id, err := metadata.ProjectIDWithContext(ctx)
+	if err != nil {
+		applog.Warn(ctx, "log entries will not link to traces: GCP project unknown", applog.Err(err))
+		return ""
+	}
+	return id
 }
