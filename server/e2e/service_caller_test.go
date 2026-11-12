@@ -196,4 +196,3 @@ func TestServiceCaller_GraphQL(t *testing.T) {
 			Expect().Status(http.StatusUnauthorized)
 	})
 }
-
