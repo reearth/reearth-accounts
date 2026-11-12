@@ -23,7 +23,6 @@ import (
 )
 
 func TestSyncSSORoute_Email(t *testing.T) {
-	const syncKey = "sync-key"
 	ctx := context.Background()
 	repos := memory.New()
 	require.NoError(t, repos.Role.Save(ctx, *role.New().NewID().Name(interfaces.RoleSelf).MustBuild()))
@@ -34,6 +33,10 @@ func TestSyncSSORoute_Email(t *testing.T) {
 	require.NoError(t, repos.User.Save(ctx, other))
 
 	resolver := func(c echo.Context, _ *appx.AuthInfo) (*user.User, *workspace.Operator, error) {
+		if c.Request().Header.Get("X-Test-Service") != "" {
+			iid := id.NewIntegrationID()
+			return nil, &workspace.Operator{Integration: &iid}, nil
+		}
 		uid := c.Request().Header.Get("X-Test-User")
 		if uid == "" {
 			return nil, nil, nil
@@ -52,7 +55,6 @@ func TestSyncSSORoute_Email(t *testing.T) {
 		AuthConfigProvider: stubAuthConfigProvider{},
 		Photos:             noSigning(t),
 		AuthResolver:       resolver,
-		SyncSSOAPIKey:      syncKey,
 		UsecaseMiddleware: func(next echo.HandlerFunc) echo.HandlerFunc {
 			return func(c echo.Context) error {
 				c.SetRequest(c.Request().WithContext(adapter.AttachUsecases(c.Request().Context(), uc)))
@@ -73,8 +75,8 @@ func TestSyncSSORoute_Email(t *testing.T) {
 		return decodeJSON(t, rec)
 	}
 
-	created := sync(echo.HeaderAuthorization, "Bearer "+syncKey)
-	assert.Equal(t, "victim@example.com", created["email"], "the sync-sso API key caller sees the email")
+	created := sync("X-Test-Service", "1")
+	assert.Equal(t, "victim@example.com", created["email"], "the service caller sees the email")
 
 	byOther := sync("X-Test-User", other.ID().String())
 	assert.Equal(t, created["id"], byOther["id"])

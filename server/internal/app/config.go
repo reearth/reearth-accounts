@@ -76,8 +76,6 @@ type Config struct {
 	StorageEmulatorEndpoint string `envconfig:"REEARTH_ACCOUNTS_STORAGE_EMULATOR_ENDPOINT"`
 
 	// REST
-	RestAPIKey       string `envconfig:"REEARTH_ACCOUNTS_REST_API_KEY"`
-	SyncSSOAPIKey    string `envconfig:"REEARTH_ACCOUNTS_SYNC_SSO_API_KEY"`
 	SwaggerBasicUser string `envconfig:"REEARTH_ACCOUNTS_SWAGGER_BASIC_USER"`
 	SwaggerBasicPass string `envconfig:"REEARTH_ACCOUNTS_SWAGGER_BASIC_PASS"`
 
@@ -292,8 +290,8 @@ func (c Config) Print() string {
 	// fmt's "%+v" ignores the `pp:",omitempty"` tags used elsewhere in this
 	// struct, so every secret field must be listed here explicitly.
 	for _, secret := range []string{
-		c.DB, c.RestAPIKey, c.SwaggerBasicPass,
-		c.Auth0.ClientSecret, c.SignupSecret, c.SyncSSOAPIKey,
+		c.DB, c.SwaggerBasicPass,
+		c.Auth0.ClientSecret, c.SignupSecret,
 	} {
 		if secret == "" {
 			continue

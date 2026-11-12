@@ -21,6 +21,7 @@ import (
 	"github.com/reearth/reearthx/appx"
 	"github.com/reearth/reearthx/idx"
 	"github.com/samber/lo"
+	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	jose "gopkg.in/go-jose/go-jose.v2"
 )
@@ -280,30 +281,28 @@ func flipLastChar(s string) string {
 	return s[:len(s)-1] + "A"
 }
 
-// TestREST_M2M_APIKey_BypassesJWTValidation guards the JWT-skip-on-API-key path.
-// With JWT middleware on the /api group, a bearer that isn't a JWT (the M2M API
-// key isn't) would otherwise be rejected by the JWT validator before APIKeyOrAuth
-// could admit it. This test asserts the wrapper lets API-key bearers through to
-// the handler while still rejecting arbitrary non-JWT bearers.
-func TestREST_M2M_APIKey_BypassesJWTValidation(t *testing.T) {
-	_, cleanup := installRealJWT(t)
-	defer cleanup()
+// TestREST_ServiceCallerReplacesStaticKeys covers the routes the static M2M keys
+// used to guard: a service caller reaches them and a non-JWT bearer, such as a
+// former static key, is rejected (ADR-0002 decision 7.1).
+func TestREST_ServiceCallerReplacesStaticKeys(t *testing.T) {
+	exp, idp := startServiceCallerServer(t)
+	body := map[string]any{"sub": "m2m-sub", "iss": "m2m-iss", "token": "m2m-token"}
 
-	cfg := realAuthConfig()
-	cfg.RestAPIKey = "test-m2m-api-key-12345"
-	exp, _ := StartServer(t, cfg, false, nil)
-
-	// Matching API key bypasses JWT validation -> reaches the find-or-create
-	// stub (which returns 204).
 	exp.POST("/api/users/find-or-create").
-		WithHeader("Authorization", "Bearer "+cfg.RestAPIKey).
-		WithJSON(map[string]any{"sub": "m2m-sub", "iss": "m2m-iss", "token": "m2m-token"}).
+		WithHeader("Authorization", "Bearer "+idp.clientToken(t, "svc-flow")).
+		WithJSON(body).
 		Expect().Status(http.StatusNoContent)
 
-	// A non-JWT bearer that does NOT match the API key is still rejected by the
-	// JWT middleware (regression guard for the bypass condition).
-	exp.POST("/api/users/find-or-create").
-		WithHeader("Authorization", "Bearer not-the-api-key").
-		WithJSON(map[string]any{"sub": "m2m-sub", "iss": "m2m-iss", "token": "m2m-token"}).
-		Expect().Status(http.StatusUnauthorized)
+	syncStatus := exp.POST("/api/users/sync-sso").
+		WithHeader("Authorization", "Bearer "+idp.clientToken(t, "svc-flow")).
+		WithJSON(map[string]any{"name": "sso@e2e.com", "email": "sso@e2e.com", "sub": "samlp|org|sso"}).
+		Expect().Raw().StatusCode
+	assert.NotEqual(t, http.StatusUnauthorized, syncStatus, "a service caller passes the sync-sso gate")
+
+	for _, path := range []string{"/api/users/find-or-create", "/api/users/sync-sso"} {
+		exp.POST(path).
+			WithHeader("Authorization", "Bearer test-m2m-api-key-12345").
+			WithJSON(body).
+			Expect().Status(http.StatusUnauthorized)
+	}
 }

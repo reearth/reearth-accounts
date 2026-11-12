@@ -167,8 +167,6 @@ func initEcho(ctx context.Context, cfg *ServerConfig) *echo.Echo {
 		LoginTime:          loginTime,
 		AuthConfigProvider: cfg.Config,
 		Photos:             photos,
-		APIKey:             cfg.Config.RestAPIKey,
-		SyncSSOAPIKey:      cfg.Config.SyncSSOAPIKey,
 		SwaggerUser:        cfg.Config.SwaggerBasicUser,
 		SwaggerPass:        cfg.Config.SwaggerBasicPass,
 		Debug:              cfg.Debug || cfg.Config.Dev,
