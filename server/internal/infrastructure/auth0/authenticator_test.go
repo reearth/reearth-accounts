@@ -8,6 +8,8 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"strings"
+	"sync"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -285,6 +287,88 @@ func TestAuth0_UpdateUser_EmailVerified(t *testing.T) {
 	_, hasEmail := capturedBody["email"]
 	assert.False(t, hasName, "name should not be sent when not set")
 	assert.False(t, hasEmail, "email should not be sent when not set")
+}
+
+// TestAuth0_TokenCache_ConcurrentRefresh verifies two properties of the
+// double-checked-locking pattern introduced by REL-04:
+//
+//  1. Only one goroutine hits the token endpoint even when many concurrent
+//     callers all see an expired token at the same time (the write-lock
+//     double-check coalesces them).
+//  2. There is no data race on a.token / a.expireAt (`go test -race`).
+func TestAuth0_TokenCache_ConcurrentRefresh(t *testing.T) {
+	var fetchCount int64
+
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		if r.Method == http.MethodPost && r.URL.Path == "/oauth/token" {
+			atomic.AddInt64(&fetchCount, 1)
+			_ = json.NewEncoder(w).Encode(map[string]interface{}{
+				"access_token": token,
+				"expires_in":   expiresIn,
+			})
+			return
+		}
+		w.WriteHeader(http.StatusNotFound)
+	}))
+	defer srv.Close()
+
+	a := New(srv.URL+"/", clientID, clientSecret, 0)
+	a.current = func() time.Time { return current }
+	a.disableLogging = true
+
+	const goroutines = 50
+	var wg sync.WaitGroup
+	wg.Add(goroutines)
+	for range goroutines {
+		go func() {
+			defer wg.Done()
+			assert.NoError(t, a.updateToken(context.Background()))
+			// Reading the cached token concurrently must not race.
+			_ = a.readToken()
+		}()
+	}
+	wg.Wait()
+
+	assert.Equal(t, int64(1), atomic.LoadInt64(&fetchCount),
+		"only one goroutine should fetch the token; the rest should be coalesced by the write-lock double-check")
+	assert.Equal(t, token, a.readToken())
+}
+
+// TestAuth0_TokenCache_ValidTokenSkipsFetch verifies the fast-path: when the
+// cached token is still fresh, updateToken returns immediately without making
+// any network request.
+func TestAuth0_TokenCache_ValidTokenSkipsFetch(t *testing.T) {
+	var fetchCount int64
+
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.Method == http.MethodPost && r.URL.Path == "/oauth/token" {
+			atomic.AddInt64(&fetchCount, 1)
+			w.Header().Set("Content-Type", "application/json")
+			_ = json.NewEncoder(w).Encode(map[string]interface{}{
+				"access_token": token,
+				"expires_in":   expiresIn,
+			})
+			return
+		}
+		w.WriteHeader(http.StatusNotFound)
+	}))
+	defer srv.Close()
+
+	a := New(srv.URL+"/", clientID, clientSecret, 0)
+	a.current = func() time.Time { return current }
+	a.disableLogging = true
+
+	// First call fetches a fresh token.
+	assert.NoError(t, a.updateToken(context.Background()))
+	assert.Equal(t, int64(1), atomic.LoadInt64(&fetchCount))
+
+	// Subsequent calls with the clock unchanged must not hit the network.
+	for range 10 {
+		assert.NoError(t, a.updateToken(context.Background()))
+	}
+	assert.Equal(t, int64(1), atomic.LoadInt64(&fetchCount),
+		"a valid cached token must never trigger a second fetch")
 }
 
 type RoundTripFunc func(req *http.Request) *http.Response
