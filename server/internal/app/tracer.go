@@ -5,7 +5,7 @@ import (
 	"sort"
 
 	"github.com/99designs/gqlgen/graphql"
-	"github.com/reearth/reearthx/log"
+	"github.com/reearth/reearth-accounts/server/pkg/applog"
 	"go.opentelemetry.io/otel"
 	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/codes"
@@ -81,14 +81,13 @@ func detailedOperationTracer() graphql.OperationMiddleware {
 				span.SetAttributes(attribute.Int("graphql.errors.count", len(response.Errors)))
 				// GraphQL errors include expected client-side failures (validation, auth, not found).
 				// Log at Debug to avoid noisy WARN for non-actionable errors.
-				log.Debugfc(ctx, "graphql: operation '%s' completed with %d errors", spanName, len(response.Errors))
+				applog.Debug(ctx, "graphql: operation completed with errors", applog.Operation(spanName), applog.Count(len(response.Errors)))
 			} else {
 				span.SetStatus(codes.Ok, "GraphQL operation completed successfully")
-				log.Debugfc(ctx, "graphql: operation '%s' completed successfully", spanName)
+				applog.Debug(ctx, "graphql: operation completed", applog.Operation(spanName))
 			}
 
 			return response
 		}
 	}
 }
-
