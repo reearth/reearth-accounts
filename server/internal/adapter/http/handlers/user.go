@@ -20,9 +20,13 @@ import (
 	"github.com/samber/lo"
 )
 
-type UserHandler struct{}
+type UserHandler struct {
+	loginTime adapter.LoginTimeSource
+}
 
-func NewUserHandler() *UserHandler { return &UserHandler{} }
+func NewUserHandler(loginTime adapter.LoginTimeSource) *UserHandler {
+	return &UserHandler{loginTime: loginTime}
+}
 
 // Me godoc
 // @Tags User
@@ -158,6 +162,7 @@ func (h *UserHandler) DisableMFA(c echo.Context) error {
 // RegenerateMFARecoveryCode godoc
 // @Tags User
 // @Summary Replace the current user's MFA recovery code
+// @Description Returns 401 with message recent_login_required and a WWW-Authenticate step-up challenge when the login behind the token is older than the configured window.
 // @Security BearerAuth
 // @Produce json
 // @Success 200 {object} httpmodel.MFARecoveryCodeResponse
@@ -166,7 +171,7 @@ func (h *UserHandler) DisableMFA(c echo.Context) error {
 // @Router /api/users/me/mfa/recovery-code [post]
 func (h *UserHandler) RegenerateMFARecoveryCode(c echo.Context) error {
 	ctx := c.Request().Context()
-	code, err := httpinternal.Usecases(c).User.RegenerateMFARecoveryCode(ctx, httpinternal.Operator(c))
+	code, err := httpinternal.Usecases(c).User.RegenerateMFARecoveryCode(ctx, httpinternal.Operator(c), h.loginTime.Read(ctx))
 	if err != nil {
 		return err
 	}

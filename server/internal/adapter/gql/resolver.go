@@ -5,6 +5,7 @@ package gql
 import (
 	"errors"
 
+	"github.com/reearth/reearth-accounts/server/internal/adapter"
 	"github.com/reearth/reearth-accounts/server/internal/usecase/gateway"
 )
 
@@ -14,11 +15,13 @@ var ErrNotImplemented = errors.New("not impleneted yet")
 var ErrUnauthorized = errors.New("unauthorized")
 
 type Resolver struct {
-	Storage gateway.Storage
+	LoginTime adapter.LoginTimeSource
+	Storage   gateway.Storage
 }
 
-func NewResolver(storage gateway.Storage) ResolverRoot {
+func NewResolver(storage gateway.Storage, loginTime adapter.LoginTimeSource) ResolverRoot {
 	return &Resolver{
-		Storage: storage,
+		LoginTime: loginTime,
+		Storage:   storage,
 	}
 }

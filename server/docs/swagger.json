@@ -777,6 +777,7 @@
                         "BearerAuth": []
                     }
                 ],
+                "description": "Returns 401 with message recent_login_required and a WWW-Authenticate step-up challenge when the login behind the token is older than the configured window.",
                 "produces": [
                     "application/json"
                 ],

@@ -10,6 +10,7 @@ import (
 
 	"github.com/joho/godotenv"
 	"github.com/kelseyhightower/envconfig"
+	"github.com/reearth/reearth-accounts/server/internal/adapter"
 	"github.com/reearth/reearth-accounts/server/pkg/workspace"
 	"github.com/reearth/reearthx/appx"
 	"github.com/reearth/reearthx/log"
@@ -43,6 +44,17 @@ type Config struct {
 
 	CIP          CIPConfig `pp:",omitempty"`
 	AuthProvider string    `default:"auth0" envconfig:"REEARTH_ACCOUNTS_AUTH_PROVIDER" pp:",omitempty"`
+
+	// MFARecoveryMaxAuthAge is how recent the token's auth_time must be to
+	// regenerate an MFA recovery code. 0 turns the check off.
+	MFARecoveryMaxAuthAge time.Duration `envconfig:"REEARTH_ACCOUNTS_MFA_RECOVERY_MAX_AUTH_AGE"`
+	// AuthTimeClaim names a token claim that carries the login time when the
+	// identity provider cannot set auth_time itself (Auth0 restricts it).
+	// Its value must be a NumericDate (epoch seconds). When the claim is
+	// present but not a number, the login counts as too old. Empty reads only
+	// auth_time. Claims that do not record the login time (iat, exp, sub,
+	// and the others adapter.NewLoginTimeSource lists) fail startup.
+	AuthTimeClaim string `envconfig:"REEARTH_ACCOUNTS_AUTH_TIME_CLAIM"`
 
 	GraphQL GraphQLConfig
 
@@ -248,6 +260,12 @@ func ReadConfig(debug bool) (*Config, error) {
 	var c Config
 	if err := envconfig.Process(configPrefix, &c); err != nil {
 		return nil, err
+	}
+	if c.MFARecoveryMaxAuthAge < 0 {
+		return nil, fmt.Errorf("REEARTH_ACCOUNTS_MFA_RECOVERY_MAX_AUTH_AGE must not be negative, got %s", c.MFARecoveryMaxAuthAge)
+	}
+	if _, err := adapter.NewLoginTimeSource(c.AuthTimeClaim); err != nil {
+		return nil, fmt.Errorf("REEARTH_ACCOUNTS_AUTH_TIME_CLAIM: %w", err)
 	}
 
 	if debug {

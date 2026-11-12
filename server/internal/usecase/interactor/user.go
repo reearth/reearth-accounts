@@ -27,13 +27,15 @@ import (
 )
 
 type User struct {
-	repos           *repo.Container
-	gateways        *gateway.Container
-	cerbos          interfaces.Cerbos
-	signupSecret    string
-	authSrvUIDomain string
-	allowedISS      []string
-	query           interfaces.UserQuery
+	repos                 *repo.Container
+	gateways              *gateway.Container
+	cerbos                interfaces.Cerbos
+	signupSecret          string
+	authSrvUIDomain       string
+	allowedISS            []string
+	mfaRecoveryMaxAuthAge time.Duration
+	now                   func() time.Time
+	query                 interfaces.UserQuery
 }
 
 var (
@@ -44,22 +46,38 @@ var (
 	}
 )
 
-func NewUser(r *repo.Container, g *gateway.Container, cerbos interfaces.Cerbos, signupSecret, authSrcUIDomain string, allowedISS ...string) interfaces.User {
+type UserOption func(*User)
+
+func WithAllowedISS(iss ...string) UserOption {
+	return func(u *User) { u.allowedISS = iss }
+}
+
+// WithMFARecoveryMaxAuthAge sets how recent the login behind the token must be
+// to regenerate an MFA recovery code. 0 turns the check off.
+func WithMFARecoveryMaxAuthAge(d time.Duration) UserOption {
+	return func(u *User) { u.mfaRecoveryMaxAuthAge = d }
+}
+
+func NewUser(r *repo.Container, g *gateway.Container, cerbos interfaces.Cerbos, signupSecret, authSrcUIDomain string, opts ...UserOption) interfaces.User {
 	var repos []user.Repo
 	if r != nil {
 		repos = []user.Repo{r.User}
 	}
-	return &User{
+	u := &User{
 		repos:           r,
 		gateways:        g,
 		cerbos:          cerbos,
 		signupSecret:    signupSecret,
 		authSrvUIDomain: authSrcUIDomain,
-		allowedISS:      allowedISS,
+		now:             time.Now,
 		query: &UserQuery{
 			repos: repos,
 		},
 	}
+	for _, opt := range opts {
+		opt(u)
+	}
+	return u
 }
 
 func NewMultiUser(r *repo.Container, g *gateway.Container, cerbos interfaces.Cerbos, signupSecret, authSrcUIDomain string, users []user.Repo, allowedISS ...string) interfaces.User {
@@ -70,6 +88,7 @@ func NewMultiUser(r *repo.Container, g *gateway.Container, cerbos interfaces.Cer
 		signupSecret:    signupSecret,
 		authSrvUIDomain: authSrcUIDomain,
 		allowedISS:      allowedISS,
+		now:             time.Now,
 		query: &UserQuery{
 			repos: append([]user.Repo{r.User}, users...),
 		},
@@ -402,19 +421,16 @@ func (i *User) GetMFAStatus(ctx context.Context, operator *workspace.Operator) (
 	})
 }
 
-// SEC-04: regenerating the MFA recovery code here only requires a valid
-// operator/session, with no password confirmation, current-MFA challenge, or
-// recent-auth check. This is worse than the SEC-03 gap on UpdateMe/DisableMFA
-// above: those merely lower protection, whereas this mints and returns a
-// long-lived credential that bypasses MFA on future logins, so a hijacked
-// session/access token alone is enough to walk away with persistent
-// second-factor bypass. A password-based re-auth check was tried (#322) and
-// rejected: it can only gate accounts with a "reearth" (password) auth
-// record, and password-based auth is being phased out and is no longer
-// present on most accounts, so it wouldn't meaningfully close this gap going
-// forward. The real fix needs a step-up mechanism through the identity
-// provider (Auth0), which is planned separately and not covered here.
-func (i *User) RegenerateMFARecoveryCode(ctx context.Context, operator *workspace.Operator) (string, error) {
+// SEC-04: a recovery code is a long-lived credential that bypasses MFA, so a
+// hijacked session alone must not be enough to mint one. A password re-auth
+// check was tried (#322) and rejected because most accounts no longer have a
+// password. The gap is closed by step-up through the identity provider: the
+// call is refused unless the token's auth_time falls within
+// mfaRecoveryMaxAuthAge (REEARTH_ACCOUNTS_MFA_RECOVERY_MAX_AUTH_AGE). The
+// window is 0 by default, which leaves the gap open, because it can only be
+// turned on once the IdP emits auth_time and the web client can force a
+// fresh login.
+func (i *User) RegenerateMFARecoveryCode(ctx context.Context, operator *workspace.Operator, authTime *time.Time) (string, error) {
 	if operator == nil || operator.User == nil {
 		return "", interfaces.ErrInvalidOperator
 	}
@@ -431,8 +447,26 @@ func (i *User) RegenerateMFARecoveryCode(ctx context.Context, operator *workspac
 		if authenticator == nil {
 			return "", interfaces.ErrNoAuthenticator
 		}
+		if !i.loggedInRecently(authTime) {
+			return "", interfaces.ErrRecentLoginRequired
+		}
 		return authenticator.RegenerateMFARecoveryCode(ctx, a.Sub)
 	})
+}
+
+// authTimeLeeway tolerates clock skew between the identity provider and this
+// server. An auth_time further in the future than this is not trusted.
+const authTimeLeeway = time.Minute
+
+func (i *User) loggedInRecently(authTime *time.Time) bool {
+	if i.mfaRecoveryMaxAuthAge <= 0 {
+		return true
+	}
+	if authTime == nil {
+		return false
+	}
+	now := i.now()
+	return !authTime.After(now.Add(authTimeLeeway)) && now.Sub(*authTime) <= i.mfaRecoveryMaxAuthAge
 }
 
 func (i *User) DeleteMe(ctx context.Context, userID user.ID, operator *workspace.Operator) (err error) {

@@ -5,7 +5,11 @@ import (
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
+	"strconv"
 	"testing"
+	"time"
+
+	"github.com/golang-jwt/jwt/v5"
 
 	"github.com/labstack/echo/v4"
 	"github.com/reearth/reearth-accounts/server/internal/adapter"
@@ -13,7 +17,6 @@ import (
 	"github.com/reearth/reearth-accounts/server/internal/infrastructure/memory"
 	"github.com/reearth/reearth-accounts/server/internal/usecase/gateway"
 	"github.com/reearth/reearth-accounts/server/internal/usecase/interactor"
-	"github.com/reearth/reearth-accounts/server/internal/usecase/interfaces"
 	"github.com/reearth/reearth-accounts/server/pkg/user"
 	"github.com/reearth/reearth-accounts/server/pkg/workspace"
 	"github.com/reearth/reearthx/appx"
@@ -22,8 +25,9 @@ import (
 )
 
 type fakeMFAAuthenticator struct {
-	disabledSub string
-	enrolled    bool
+	disabledSub   string
+	enrolled      bool
+	recoveryCalls int
 }
 
 func (f *fakeMFAAuthenticator) DisableMFA(_ context.Context, sub string) error {
@@ -44,6 +48,7 @@ func (f *fakeMFAAuthenticator) GetUser(_ context.Context, _ string) (gateway.Aut
 }
 
 func (f *fakeMFAAuthenticator) RegenerateMFARecoveryCode(_ context.Context, _ string) (string, error) {
+	f.recoveryCalls++
 	return "recovery-123", nil
 }
 
@@ -64,6 +69,36 @@ type mfaFixture struct {
 
 func newMFAFixture(t *testing.T) *mfaFixture {
 	t.Helper()
+	return newMFAFixtureWithMaxAuthAge(t, 0)
+}
+
+// The fake JWT middleware stands in for appx: it attaches a token whose claim
+// holds the X-Test-Auth-Time header, when the header is present.
+func fakeJWTMiddleware(t *testing.T, claim string) echo.MiddlewareFunc {
+	return func(next echo.HandlerFunc) echo.HandlerFunc {
+		return func(c echo.Context) error {
+			v := c.Request().Header.Get("X-Test-Auth-Time")
+			if v == "" {
+				return next(c)
+			}
+			authTime, err := strconv.ParseInt(v, 10, 64)
+			require.NoError(t, err)
+			token, err := jwt.NewWithClaims(jwt.SigningMethodHS256, jwt.MapClaims{claim: authTime}).SignedString([]byte("test-key"))
+			require.NoError(t, err)
+			ctx := context.WithValue(c.Request().Context(), adapter.AuthInfoKey, appx.AuthInfo{Token: token})
+			c.SetRequest(c.Request().WithContext(ctx))
+			return next(c)
+		}
+	}
+}
+
+func newMFAFixtureWithMaxAuthAge(t *testing.T, maxAuthAge time.Duration) *mfaFixture {
+	t.Helper()
+	return newMFAFixtureWithLoginTime(t, maxAuthAge, "auth_time", adapter.LoginTimeSource{})
+}
+
+func newMFAFixtureWithLoginTime(t *testing.T, maxAuthAge time.Duration, tokenClaim string, loginTime adapter.LoginTimeSource) *mfaFixture {
+	t.Helper()
 	ctx := context.Background()
 	repos := memory.New()
 
@@ -79,7 +114,7 @@ func newMFAFixture(t *testing.T) *mfaFixture {
 
 	fake := &fakeMFAAuthenticator{enrolled: true}
 	gw := &gateway.Container{Authenticators: map[gateway.Provider]gateway.Authenticator{gateway.ProviderAuth0: fake}}
-	uc := &interfaces.Container{User: interactor.NewUser(repos, gw, nil, "", "")}
+	uc := interactor.NewContainer(repos, gw, nil, nil, interactor.ContainerConfig{MFARecoveryMaxAuthAge: maxAuthAge})
 
 	users := map[string]*user.User{
 		auth0User.ID().String(): auth0User,
@@ -95,7 +130,7 @@ func newMFAFixture(t *testing.T) *mfaFixture {
 	}
 	usecases := func(next echo.HandlerFunc) echo.HandlerFunc {
 		return func(c echo.Context) error {
-			c.SetRequest(c.Request().WithContext(adapter.AttachUsecases(c.Request().Context(), uc)))
+			c.SetRequest(c.Request().WithContext(adapter.AttachUsecases(c.Request().Context(), &uc)))
 			return next(c)
 		}
 	}
@@ -104,15 +139,24 @@ func newMFAFixture(t *testing.T) *mfaFixture {
 		AuthConfigProvider: stubAuthConfigProvider{},
 		AuthResolver:       resolver,
 		CacheControl:       cacheControlMiddleware,
+		JWTMiddleware:      fakeJWTMiddleware(t, tokenClaim),
+		LoginTime:          loginTime,
 		UsecaseMiddleware:  usecases,
 	})
 	return &mfaFixture{auth: fake, e: e, plainUser: plainUser, auth0User: auth0User}
 }
 
 func (f *mfaFixture) do(method, path string, u *user.User) *httptest.ResponseRecorder {
+	return f.doAt(method, path, u, nil)
+}
+
+func (f *mfaFixture) doAt(method, path string, u *user.User, authTime *time.Time) *httptest.ResponseRecorder {
 	req := httptest.NewRequest(method, path, nil)
 	if u != nil {
 		req.Header.Set("X-Test-User", u.ID().String())
+	}
+	if authTime != nil {
+		req.Header.Set("X-Test-Auth-Time", strconv.FormatInt(authTime.Unix(), 10))
 	}
 	rec := httptest.NewRecorder()
 	f.e.ServeHTTP(rec, req)
@@ -189,5 +233,40 @@ func TestMFARoutes(t *testing.T) {
 			assert.Equal(t, "no authenticator found", decodeJSON(t, rec)["description"], "%s %s", r.method, r.path)
 		}
 		assert.Empty(t, f.auth.disabledSub)
+	})
+
+	t.Run("recovery code needs a recent login when the window is on", func(t *testing.T) {
+		f := newMFAFixtureWithMaxAuthAge(t, 5*time.Minute)
+		old := time.Now().Add(-time.Hour)
+		recent := time.Now().Add(-time.Minute)
+		const path = "/api/users/me/mfa/recovery-code"
+
+		for name, authTime := range map[string]*time.Time{"no auth_time": nil, "old login": &old} {
+			rec := f.doAt(http.MethodPost, path, f.auth0User, authTime)
+			assert.Equal(t, http.StatusUnauthorized, rec.Code, name)
+			assert.Equal(t, `Bearer error="insufficient_user_authentication"`, rec.Header().Get("WWW-Authenticate"), name)
+			body := decodeJSON(t, rec)
+			assert.Equal(t, "recent_login_required", body["message"], name)
+			assert.Equal(t, "recent login required", body["description"], name)
+		}
+		assert.Zero(t, f.auth.recoveryCalls)
+
+		rec := f.doAt(http.MethodPost, path, f.auth0User, &recent)
+		require.Equal(t, http.StatusOK, rec.Code)
+		assert.Equal(t, map[string]any{"recovery_code": "recovery-123"}, decodeJSON(t, rec))
+	})
+
+	t.Run("recovery code reads the configured auth time claim", func(t *testing.T) {
+		const claim = "https://example.com/auth_time"
+		loginTime, err := adapter.NewLoginTimeSource(claim)
+		require.NoError(t, err)
+		f := newMFAFixtureWithLoginTime(t, 5*time.Minute, claim, loginTime)
+		old := time.Now().Add(-time.Hour)
+		recent := time.Now().Add(-time.Minute)
+		const path = "/api/users/me/mfa/recovery-code"
+
+		assert.Equal(t, http.StatusUnauthorized, f.doAt(http.MethodPost, path, f.auth0User, &old).Code)
+		assert.Equal(t, http.StatusOK, f.doAt(http.MethodPost, path, f.auth0User, &recent).Code)
+		assert.Equal(t, 1, f.auth.recoveryCalls)
 	})
 }

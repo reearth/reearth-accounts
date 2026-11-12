@@ -29,7 +29,7 @@ const (
 	maxMemorySize     = 100 * 1024 * 1024       // 100MB
 )
 
-func GraphqlAPI(conf *Config, dev bool) echo.HandlerFunc {
+func GraphqlAPI(conf *Config, loginTime adapter.LoginTimeSource, dev bool) echo.HandlerFunc {
 	str, err := storage.NewGCPStorage(&storage.Config{
 		IsLocal:          conf.StorageIsLocal,
 		BucketName:       conf.StorageBucketName,
@@ -41,7 +41,7 @@ func GraphqlAPI(conf *Config, dev bool) echo.HandlerFunc {
 	}
 
 	schema := gql.NewExecutableSchema(gql.Config{
-		Resolvers: gql.NewResolver(str),
+		Resolvers: gql.NewResolver(str, loginTime),
 	})
 
 	srv := handler.New(schema)

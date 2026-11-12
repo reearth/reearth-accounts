@@ -24,6 +24,7 @@ type ErrorResponse struct {
 	Message     string               `json:"message"`
 	Description string               `json:"description"`
 	Err         error                `json:"-"`
+	Challenge   string               `json:"-"`
 	FieldErrors []FieldErrorResponse `json:"field_errors,omitempty"`
 }
 
@@ -63,6 +64,9 @@ func CustomHTTPErrorHandler(err error, c echo.Context) {
 		} else {
 			log.Warnfc(ctx, "rest: %d %s: %v", resp.Status, resp.Message, resp.Err)
 		}
+	}
+	if resp.Challenge != "" {
+		c.Response().Header().Set(echo.HeaderWWWAuthenticate, resp.Challenge)
 	}
 	if jsonErr := c.JSON(resp.Status, resp); jsonErr != nil {
 		log.Errorfc(c.Request().Context(), "rest: failed to write error response: %v", jsonErr)
@@ -113,6 +117,15 @@ func mapError(err error) *ErrorResponse {
 	case errors.Is(err, ErrUnauthorized),
 		errors.Is(err, interfaces.ErrInvalidOperator):
 		return &ErrorResponse{Status: http.StatusUnauthorized, Message: "unauthorized", Description: "authentication is required"}
+	case errors.Is(err, interfaces.ErrRecentLoginRequired):
+		// RFC 9470 step-up challenge: the token is valid, but its login is too old.
+		return &ErrorResponse{
+			Status:      http.StatusUnauthorized,
+			Message:     "recent_login_required",
+			Description: err.Error(),
+			Err:         err,
+			Challenge:   `Bearer error="insufficient_user_authentication"`,
+		}
 	case errors.Is(err, interfaces.ErrInvalidUserEmail),
 		errors.Is(err, interfaces.ErrInvalidEmailOrPassword),
 		errors.Is(err, interfaces.ErrUserInvalidPasswordConfirmation),
