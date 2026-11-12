@@ -67,6 +67,9 @@ func GraphqlAPI(conf *Config, photos adapter.PhotoSigner, loginTime adapter.Logi
 	if conf.GraphQL.ComplexityLimit > 0 {
 		srv.Use(extension.FixedComplexityLimit(conf.GraphQL.ComplexityLimit))
 	}
+	if conf.GraphQL.DepthLimit > 0 {
+		srv.Use(depthLimit{max: conf.GraphQL.DepthLimit})
+	}
 
 	srv.Use(extension.AutomaticPersistedQuery{
 		Cache: lru.New[string](30),
