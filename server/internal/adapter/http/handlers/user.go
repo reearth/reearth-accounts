@@ -194,7 +194,7 @@ func (h *UserHandler) Deactivate(c echo.Context) error {
 	if err != nil {
 		return err
 	}
-	return c.JSON(http.StatusOK, httpmodel.NewUserResponse(u))
+	return c.JSON(http.StatusOK, httpmodel.NewUserResponse(u, httpmodel.UnrestrictedViewer()))
 }
 
 // Restore godoc
@@ -217,7 +217,7 @@ func (h *UserHandler) Restore(c echo.Context) error {
 	if err != nil {
 		return err
 	}
-	return c.JSON(http.StatusOK, httpmodel.NewUserResponse(u))
+	return c.JSON(http.StatusOK, httpmodel.NewUserResponse(u, httpmodel.UnrestrictedViewer()))
 }
 
 // Get godoc
@@ -243,7 +243,7 @@ func (h *UserHandler) Get(c echo.Context) error {
 		return rerror.ErrNotFound
 	}
 
-	userResponses := httpmodel.NewUserResponses(res)
+	userResponses := httpmodel.NewUserResponses(res, httpmodel.ViewerOf(httpinternal.User(c)))
 
 	// platform_roles/workspaces expose cross-tenant role and membership info, so
 	// only enrich when the caller is requesting their own record.
@@ -297,14 +297,14 @@ func (h *UserHandler) List(c echo.Context) error {
 		if err != nil {
 			return err
 		}
-		return c.JSON(http.StatusOK, httpinternal.NewPageResult(httpmodel.NewUserResponses(res.Users), page, size, res.TotalCount))
+		return c.JSON(http.StatusOK, httpinternal.NewPageResult(httpmodel.NewUserResponses(res.Users, httpmodel.ViewerOf(httpinternal.User(c))), page, size, res.TotalCount))
 	}
 
 	res, err := uc.FetchByID(ctx, ids)
 	if err != nil {
 		return err
 	}
-	return c.JSON(http.StatusOK, httpmodel.NewUserResponses(res))
+	return c.JSON(http.StatusOK, httpmodel.NewUserResponses(res, httpmodel.ViewerOf(httpinternal.User(c))))
 }
 
 // ListAll godoc
@@ -350,7 +350,7 @@ func (h *UserHandler) ListAll(c echo.Context) error {
 		return err
 	}
 
-	userResponses := httpmodel.NewUserResponses(res.Users)
+	userResponses := httpmodel.NewUserResponses(res.Users, httpmodel.UnrestrictedViewer())
 	if err := applyPermittablesToResponses(ctx, c, userResponses, res.Users); err != nil {
 		return err
 	}
@@ -437,7 +437,7 @@ func (h *UserHandler) Search(c echo.Context) error {
 	if err != nil {
 		return err
 	}
-	return c.JSON(http.StatusOK, httpmodel.NewUserResponses(res))
+	return c.JSON(http.StatusOK, httpmodel.NewUserResponses(res, httpmodel.ViewerOf(httpinternal.User(c))))
 }
 
 // FindByAlias godoc
@@ -459,7 +459,7 @@ func (h *UserHandler) FindByAlias(c echo.Context) error {
 	if err != nil {
 		return err
 	}
-	return c.JSON(http.StatusOK, httpmodel.NewUserResponse(res))
+	return c.JSON(http.StatusOK, httpmodel.NewUserResponse(res, httpmodel.ViewerOf(httpinternal.User(c))))
 }
 
 // FindByNameOrEmail godoc
@@ -481,7 +481,7 @@ func (h *UserHandler) FindByNameOrEmail(c echo.Context) error {
 	if err != nil {
 		return err
 	}
-	return c.JSON(http.StatusOK, httpmodel.NewSimpleUserResponse(res))
+	return c.JSON(http.StatusOK, httpmodel.NewSimpleUserResponse(res, httpmodel.ViewerOf(httpinternal.User(c))))
 }
 
 // FindByNameOrAlias godoc
@@ -502,7 +502,7 @@ func (h *UserHandler) FindByNameOrAlias(c echo.Context) error {
 	if err != nil {
 		return err
 	}
-	return c.JSON(http.StatusOK, httpmodel.NewUserResponses(res))
+	return c.JSON(http.StatusOK, httpmodel.NewUserResponses(res, httpmodel.ViewerOf(httpinternal.User(c))))
 }
 
 // Signup godoc
@@ -544,7 +544,7 @@ func (h *UserHandler) Signup(c echo.Context) error {
 	if err != nil {
 		return err
 	}
-	return c.JSON(http.StatusOK, httpmodel.NewUserResponse(u))
+	return c.JSON(http.StatusOK, httpmodel.NewUserResponse(u, httpmodel.UnrestrictedViewer()))
 }
 
 // SignupOIDC godoc
@@ -591,7 +591,7 @@ func (h *UserHandler) SignupOIDC(c echo.Context) error {
 	if err != nil {
 		return err
 	}
-	return c.JSON(http.StatusOK, httpmodel.NewUserResponse(u))
+	return c.JSON(http.StatusOK, httpmodel.NewUserResponse(u, httpmodel.UnrestrictedViewer()))
 }
 
 // SyncSSOUser godoc
@@ -631,7 +631,13 @@ func (h *UserHandler) SyncSSOUser(c echo.Context) error {
 	if err != nil {
 		return err
 	}
-	return c.JSON(http.StatusOK, httpmodel.NewUserResponse(u))
+	// A signed-in user also passes this route's gate and may name another
+	// user's sub, which returns that existing user.
+	viewer := httpmodel.UnrestrictedViewer()
+	if caller := httpinternal.User(c); caller != nil {
+		viewer = httpmodel.ViewerOf(caller)
+	}
+	return c.JSON(http.StatusOK, httpmodel.NewUserResponse(u, viewer))
 }
 
 // CreateVerification godoc
@@ -672,7 +678,7 @@ func (h *UserHandler) VerifyUser(c echo.Context) error {
 	if err != nil {
 		return err
 	}
-	return c.JSON(http.StatusOK, httpmodel.NewUserResponse(u))
+	return c.JSON(http.StatusOK, httpmodel.NewUserResponse(u, httpmodel.UnrestrictedViewer()))
 }
 
 // StartPasswordReset godoc

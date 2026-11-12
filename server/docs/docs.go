@@ -2324,6 +2324,7 @@ const docTemplate = `{
             "type": "object",
             "properties": {
                 "email": {
+                    "description": "Email is empty unless the caller is this user.",
                     "type": "string"
                 },
                 "id": {
@@ -2533,6 +2534,7 @@ const docTemplate = `{
                     "type": "string"
                 },
                 "email": {
+                    "description": "Email is empty unless the caller is this user. Signup, verification,\nmaintainer-only routes and sync-sso called with its API key include it.",
                     "type": "string"
                 },
                 "host": {

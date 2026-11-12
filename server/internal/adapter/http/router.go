@@ -91,8 +91,8 @@ func RegisterRESTRouter(e *echo.Echo, cfg RouterConfig) {
 	api.GET("/users/by-name-or-email", uh.FindByNameOrEmail, required)
 	api.GET("/users/by-name-or-alias", uh.FindByNameOrAlias, required)
 	api.GET("/users", uh.List, required) // ?ids= | ?ids=&alias=&page=&page_size=
-	// Cross-tenant listing for service-to-service callers (e.g. LINKS-Veda). Any
-	// authenticated user can call this, same rationale as GET /workspaces/all.
+	// Cross-tenant listing for service-to-service callers (e.g. LINKS-Veda). The
+	// interactor admits only maintainers, and the response includes every email.
 	api.GET("/users/all", uh.ListAll, required) // ?keyword=&status=active|deleted|all&page=&page_size=
 	api.GET("/users/:id", uh.Get, required)
 	api.POST("/users/:id/deactivate", uh.Deactivate, required) // soft delete (maintainer-only)

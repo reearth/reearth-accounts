@@ -2317,6 +2317,7 @@
             "type": "object",
             "properties": {
                 "email": {
+                    "description": "Email is empty unless the caller is this user.",
                     "type": "string"
                 },
                 "id": {
@@ -2526,6 +2527,7 @@
                     "type": "string"
                 },
                 "email": {
+                    "description": "Email is empty unless the caller is this user. Signup, verification,\nmaintainer-only routes and sync-sso called with its API key include it.",
                     "type": "string"
                 },
                 "host": {
