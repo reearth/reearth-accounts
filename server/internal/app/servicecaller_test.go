@@ -186,12 +186,19 @@ func TestServiceCallerAuth(t *testing.T) {
 		assert.Nil(t, op.Integration)
 	})
 
+	t.Run("user token with non-string claims is unchanged", func(t *testing.T) {
+		rr, op := callWith(h, idp.sign(t, jwt.MapClaims{"sub": f.userSub, "gty": []string{"refresh_token", "password"}, "client_id": 42}))
+		require.Equal(t, http.StatusOK, rr.Code)
+		assert.Equal(t, f.userID, *op.User)
+	})
+
 	mixed := map[string]jwt.MapClaims{
-		"client credentials grant with a user subject": {"sub": f.userSub, "azp": "svc-flow", "gty": "client-credentials"},
-		"client subject with a user grant":             {"sub": "svc-flow@clients", "azp": "svc-flow", "gty": "password"},
-		"client credentials token with an email":       {"sub": "svc-flow@clients", "azp": "svc-flow", "gty": "client-credentials", "email": "u1@example.com"},
-		"azp and client_id disagree":                   {"sub": "svc-flow@clients", "azp": "svc-flow", "client_id": "svc-other", "gty": "client-credentials"},
-		"client credentials token without a client id": {"sub": "svc-flow@clients", "gty": "client-credentials"},
+		"client credentials token with a non-string azp": {"sub": "svc-flow@clients", "azp": 7, "gty": "client-credentials"},
+		"client credentials grant with a user subject":   {"sub": f.userSub, "azp": "svc-flow", "gty": "client-credentials"},
+		"client subject with a user grant":               {"sub": "svc-flow@clients", "azp": "svc-flow", "gty": "password"},
+		"client credentials token with an email":         {"sub": "svc-flow@clients", "azp": "svc-flow", "gty": "client-credentials", "email": "u1@example.com"},
+		"azp and client_id disagree":                     {"sub": "svc-flow@clients", "azp": "svc-flow", "client_id": "svc-other", "gty": "client-credentials"},
+		"client credentials token without a client id":   {"sub": "svc-flow@clients", "gty": "client-credentials"},
 	}
 	for name, claims := range mixed {
 		t.Run("rejects "+name, func(t *testing.T) {
@@ -250,4 +257,17 @@ func TestServiceCallersDecode(t *testing.T) {
 	require.NoError(t, s.Decode(callersJSON("https://idp/", "c1", iid)))
 	assert.Error(t, s.checkIssuers([]appx.JWTProvider{{ISS: "https://idp"}}), "issuer must match exactly")
 	assert.NoError(t, s.checkIssuers([]appx.JWTProvider{{ISS: "https://idp/"}}))
+}
+
+func TestServiceCallersDisabledLeavesUserTokensAlone(t *testing.T) {
+	idp := newTestIdP(t)
+	f := newServiceFixture(t)
+	h := authStack(t, serviceConfig(t, f.repos, []*testIdP{idp}, ""))
+
+	rr, op := callWith(h, idp.sign(t, jwt.MapClaims{"sub": f.userSub, "gty": []string{"password"}}))
+	require.Equal(t, http.StatusOK, rr.Code)
+	assert.Equal(t, f.userID, *op.User)
+
+	rr, _ = callWith(h, idp.sign(t, clientClaims("svc-flow")))
+	assert.Equal(t, http.StatusUnauthorized, rr.Code, "an unregistered client still has no user")
 }
