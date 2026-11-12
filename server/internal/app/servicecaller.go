@@ -89,12 +89,18 @@ type ServiceCaller struct {
 	Integration id.IntegrationID
 }
 
-type tokenClaims struct {
-	Sub      string `json:"sub"`
-	Gty      string `json:"gty"`
-	Azp      string `json:"azp"`
-	ClientID string `json:"client_id"`
-	Email    string `json:"email"`
+// tokenClaims holds the raw claims of a token appx has already verified. Claims
+// are read leniently: a user token may carry non-string values (Auth0 can send
+// gty as an array) and must still reach the user path.
+type tokenClaims map[string]json.RawMessage
+
+// str returns the claim as a string; ok is false when it is present but not a string.
+func (c tokenClaims) str(name string) (v string, ok bool) {
+	raw, present := c[name]
+	if !present {
+		return "", true
+	}
+	return v, json.Unmarshal(raw, &v) == nil
 }
 
 // resolve classifies a token appx has already validated (issuer, signature,
@@ -104,34 +110,42 @@ type tokenClaims struct {
 // registered for its exact issuer; anything else is errServiceCallerRejected
 // (ADR-0002 decision 2).
 func (s ServiceCallers) resolve(ai appx.AuthInfo) (*ServiceCaller, error) {
-	if ai.Token == "" {
+	if len(s) == 0 || ai.Token == "" {
 		return nil, nil
 	}
 	c, err := decodeTokenClaims(ai.Token)
 	if err != nil {
-		return nil, errServiceCallerRejected
+		return nil, nil
 	}
-	if c.Gty != grantTypeClientCredentials && !strings.HasSuffix(c.Sub, clientSubjectSuffix) {
+	sub, subOK := c.str("sub")
+	gty, gtyOK := c.str("gty")
+	if !(gtyOK && gty == grantTypeClientCredentials) && !(subOK && strings.HasSuffix(sub, clientSubjectSuffix)) {
 		return nil, nil
 	}
 
-	clientID := c.Azp
-	if c.ClientID != "" {
-		if clientID != "" && clientID != c.ClientID {
+	azp, azpOK := c.str("azp")
+	clientIDClaim, cidOK := c.str("client_id")
+	email, emailOK := c.str("email")
+	if !subOK || !gtyOK || !azpOK || !cidOK || !emailOK {
+		return nil, errServiceCallerRejected
+	}
+	clientID := azp
+	if clientIDClaim != "" {
+		if clientID != "" && clientID != clientIDClaim {
 			return nil, errServiceCallerRejected
 		}
-		clientID = c.ClientID
+		clientID = clientIDClaim
 	}
 	if clientID == "" {
 		return nil, errServiceCallerRejected
 	}
-	if c.Gty != "" && c.Gty != grantTypeClientCredentials {
+	if gty != "" && gty != grantTypeClientCredentials {
 		return nil, errServiceCallerRejected
 	}
-	if c.Sub != clientID+clientSubjectSuffix && c.Sub != clientID {
+	if sub != clientID+clientSubjectSuffix && sub != clientID {
 		return nil, errServiceCallerRejected
 	}
-	if c.Email != "" || ai.Email != "" {
+	if email != "" || ai.Email != "" {
 		return nil, errServiceCallerRejected
 	}
 
@@ -143,15 +157,15 @@ func (s ServiceCallers) resolve(ai appx.AuthInfo) (*ServiceCaller, error) {
 }
 
 func decodeTokenClaims(token string) (tokenClaims, error) {
-	var c tokenClaims
 	parts := strings.Split(token, ".")
 	if len(parts) != 3 {
-		return c, errors.New("not a JWS compact token")
+		return nil, errors.New("not a JWS compact token")
 	}
 	payload, err := base64.RawURLEncoding.DecodeString(parts[1])
 	if err != nil {
-		return c, err
+		return nil, err
 	}
+	var c tokenClaims
 	err = json.Unmarshal(payload, &c)
 	return c, err
 }

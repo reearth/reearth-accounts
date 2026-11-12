@@ -6,8 +6,10 @@ import (
 	"crypto/rsa"
 	"encoding/json"
 	"fmt"
+	"io"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"sync"
 	"sync/atomic"
 	"testing"
@@ -175,4 +177,64 @@ func TestTransport_AddsServiceTokenOnlyWithoutUser(t *testing.T) {
 	require.NoError(t, err)
 
 	assert.Equal(t, []string{"Bearer token-1", "Bearer user-token"}, seen)
+}
+
+func TestSource_WaiterHonoursItsOwnContext(t *testing.T) {
+	key, _ := rsa.GenerateKey(rand.Reader, 2048)
+	release := make(chan struct{})
+	hang := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		<-release
+	}))
+	defer hang.Close()
+	defer close(release)
+	s, err := New(Config{TokenURL: hang.URL, ClientID: "c", Audience: "a", Key: key, HTTPClient: &http.Client{}})
+	require.NoError(t, err)
+
+	go func() { _, _ = s.Token(context.Background()) }()
+	time.Sleep(50 * time.Millisecond)
+
+	ctx, cancel := context.WithTimeout(context.Background(), 200*time.Millisecond)
+	defer cancel()
+	done := make(chan error, 1)
+	go func() {
+		_, err := s.Token(ctx)
+		done <- err
+	}()
+	select {
+	case err := <-done:
+		assert.ErrorIs(t, err, context.DeadlineExceeded)
+	case <-time.After(time.Second):
+		t.Fatal("waiter blocked past its own deadline")
+	}
+}
+
+func TestSource_CachesShortLivedTokens(t *testing.T) {
+	s, idp := newSource(t)
+	idp.expiresIn = 60 // equal to the default RefreshEarly
+	for range 3 {
+		_, err := s.Token(context.Background())
+		require.NoError(t, err)
+	}
+	assert.Equal(t, int32(1), idp.fetches.Load())
+}
+
+type closeTracker struct {
+	io.Reader
+	closed bool
+}
+
+func (c *closeTracker) Close() error { c.closed = true; return nil }
+
+func TestTransport_ClosesBodyWhenTokenFails(t *testing.T) {
+	key, _ := rsa.GenerateKey(rand.Reader, 2048)
+	other, _ := rsa.GenerateKey(rand.Reader, 2048)
+	idp := newFakeIdP(t, &other.PublicKey)
+	s, err := New(Config{TokenURL: idp.tokenURL(), ClientID: "c", Audience: "a", Key: key})
+	require.NoError(t, err)
+
+	body := &closeTracker{Reader: strings.NewReader("{}")}
+	req, _ := http.NewRequest(http.MethodPost, "http://accounts.invalid", body)
+	_, err = (&Transport{Source: s}).RoundTrip(req)
+	assert.Error(t, err)
+	assert.True(t, body.closed)
 }

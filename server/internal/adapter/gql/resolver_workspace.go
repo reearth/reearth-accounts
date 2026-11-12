@@ -27,7 +27,7 @@ func (r *queryResolver) FindByID(ctx context.Context, workpaceId gqlmodel.ID) (*
 		return nil, gqlerror.ReturnAccountsError(ctx, err)
 	}
 
-	w, err := usecases(ctx).Workspace.FetchByID(ctx, wid)
+	w, err := usecases(ctx).Workspace.FetchByID(ctx, wid, getOperator(ctx))
 	if err != nil {
 		log.Errorf("[FindByID] failed to fetch workspace by id: %s, workspace id: %v", err.Error(), wid)
 		return nil, gqlerror.ReturnAccountsError(ctx, err)
@@ -71,7 +71,7 @@ func (r *queryResolver) FindByIDs(ctx context.Context, workpaceIds []gqlmodel.ID
 }
 
 func (r *queryResolver) FindByName(ctx context.Context, name string) (*gqlmodel.Workspace, error) {
-	w, err := usecases(ctx).Workspace.FetchByName(ctx, name)
+	w, err := usecases(ctx).Workspace.FetchByName(ctx, name, getOperator(ctx))
 	if err != nil {
 		return nil, err
 	}
@@ -92,7 +92,7 @@ func (r *queryResolver) FindByName(ctx context.Context, name string) (*gqlmodel.
 }
 
 func (r *queryResolver) FindByAlias(ctx context.Context, alias string) (*gqlmodel.Workspace, error) {
-	w, err := usecases(ctx).Workspace.FetchByAlias(ctx, alias)
+	w, err := usecases(ctx).Workspace.FetchByAlias(ctx, alias, getOperator(ctx))
 	if err != nil {
 		log.Errorf("[FindByAlias] failed to fetch workspace: %s, alias: %s", err.Error(), alias)
 		return nil, err
@@ -145,7 +145,7 @@ func (r *queryResolver) FindByUserWithPagination(ctx context.Context, userID gql
 	res, err := usecases(ctx).Workspace.FetchByUserWithPagination(ctx, uid, interfaces.FetchByUserWithPaginationParam{
 		Page: int64(pagination.Page),
 		Size: int64(pagination.Size),
-	})
+	}, getOperator(ctx))
 	if err != nil {
 		log.Errorf("[FindByUserWithPagination] failed to find workspaces by user with pagination: %s, user id: %v", err.Error(), userID)
 		return nil, gqlerror.ReturnAccountsError(ctx, err)

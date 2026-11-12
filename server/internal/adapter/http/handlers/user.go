@@ -51,7 +51,7 @@ func (h *UserHandler) Me(c echo.Context) error {
 		return err
 	}
 	if requestedExpansions(c).has(ExpandMyWorkspace) {
-		w, err := httpinternal.Usecases(c).Workspace.FetchByID(ctx, u.Workspace())
+		w, err := httpinternal.Usecases(c).Workspace.FetchByID(ctx, u.Workspace(), httpinternal.Operator(c))
 		if err != nil && !errors.Is(err, rerror.ErrNotFound) {
 			return err
 		}
