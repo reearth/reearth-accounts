@@ -5,6 +5,11 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"go.opentelemetry.io/otel"
+	"go.opentelemetry.io/otel/attribute"
+	"go.opentelemetry.io/otel/codes"
+	semconv "go.opentelemetry.io/otel/semconv/v1.26.0"
+	"go.opentelemetry.io/otel/trace"
 	"io"
 	"net/http"
 	"strings"
@@ -430,6 +435,9 @@ func (a *Auth0) exec(ctx context.Context, method, path, token string, b interfac
 		return
 	}
 
+	ctx, span := startSpan(ctx, method, path)
+	defer func() { endSpan(span, err) }()
+
 	var body io.Reader = nil
 	if b != nil {
 		if b2, ok := b.([]byte); ok {
@@ -459,6 +467,7 @@ func (a *Auth0) exec(ctx context.Context, method, path, token string, b interfac
 	if err != nil {
 		return
 	}
+	span.SetAttributes(semconv.HTTPResponseStatusCode(resp.StatusCode))
 
 	defer func() {
 		_ = resp.Body.Close()
@@ -486,10 +495,13 @@ func (a *Auth0) exec(ctx context.Context, method, path, token string, b interfac
 
 // execInto is like exec but unmarshals the response into target (any type, including
 // slices). Pass nil for target on endpoints that return 204 No Content.
-func (a *Auth0) execInto(ctx context.Context, method, path, token string, b, target any) error {
+func (a *Auth0) execInto(ctx context.Context, method, path, token string, b, target any) (err error) {
 	if a == nil || a.domain == "" {
 		return rerror.NewE(i18n.T("auth0: domain is not set"))
 	}
+
+	ctx, span := startSpan(ctx, method, path)
+	defer func() { endSpan(span, err) }()
 
 	var body io.Reader
 	if b != nil {
@@ -515,6 +527,7 @@ func (a *Auth0) execInto(ctx context.Context, method, path, token string, b, tar
 		return err
 	}
 	defer func() { _ = resp.Body.Close() }()
+	span.SetAttributes(semconv.HTTPResponseStatusCode(resp.StatusCode))
 
 	if resp.StatusCode == http.StatusNoContent {
 		return nil
@@ -544,6 +557,29 @@ func (a *Auth0) execInto(ctx context.Context, method, path, token string, b, tar
 	}
 
 	return nil
+}
+
+var tracer = otel.Tracer("github.com/reearth/reearth-accounts/server/internal/infrastructure/auth0")
+
+// startSpan starts a client span for an Auth0 call. It names the route, not
+// the URL, so the span never carries an Auth0 user ID.
+func startSpan(ctx context.Context, method, path string) (context.Context, trace.Span) {
+	route := auth0Route(path)
+	return tracer.Start(ctx, "auth0 "+method+" "+route,
+		trace.WithSpanKind(trace.SpanKindClient),
+		trace.WithAttributes(
+			semconv.HTTPRequestMethodKey.String(method),
+			attribute.String("auth0.route", route),
+		),
+	)
+}
+
+// endSpan does not record the error text: Auth0 messages can quote user input.
+func endSpan(span trace.Span, err error) {
+	if err != nil {
+		span.SetStatus(codes.Error, "auth0 request failed")
+	}
+	span.End()
 }
 
 // auth0Route replaces the user ID in a Management API path with a

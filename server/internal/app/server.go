@@ -10,12 +10,11 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/cerbos/cerbos-sdk-go/cerbos"
-	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/labstack/echo/v4"
 	infraCerbos "github.com/reearth/reearth-accounts/server/internal/infrastructure/cerbos"
 	mongorepo "github.com/reearth/reearth-accounts/server/internal/infrastructure/mongo"
 	"github.com/reearth/reearth-accounts/server/internal/infrastructure/mongo/migration"
+	"github.com/reearth/reearth-accounts/server/internal/infrastructure/postgres"
 	pgmigration "github.com/reearth/reearth-accounts/server/internal/infrastructure/postgres/migration"
 	"github.com/reearth/reearth-accounts/server/internal/usecase/gateway"
 	"github.com/reearth/reearth-accounts/server/internal/usecase/repo"
@@ -74,7 +73,7 @@ func Start(debug bool) {
 		// 30s startup budget covers connect+ping+migrate.
 		pgCtx, cancel := context.WithTimeout(ctx, 30*time.Second)
 		defer cancel()
-		pool, perr := pgxpool.New(pgCtx, conf.DB)
+		pool, perr := postgres.NewPool(pgCtx, conf.DB)
 		if perr != nil {
 			applog.Fatal(ctx, "postgres pool init error", applog.Err(perr))
 		}
@@ -146,12 +145,7 @@ func Start(debug bool) {
 	}
 
 	// Cerbos
-	var opts []cerbos.Opt
-	if !conf.CerbosUseSSL {
-		opts = append(opts, cerbos.WithPlaintext(), cerbos.WithTLSInsecure())
-	}
-
-	cerbosClient, err := cerbos.New(conf.CerbosHost, opts...)
+	cerbosClient, err := infraCerbos.NewClient(conf.CerbosHost, conf.CerbosUseSSL)
 	if err != nil {
 		applog.Fatal(ctx, "Failed to create cerbos client", applog.Err(err))
 	}
