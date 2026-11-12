@@ -6,6 +6,8 @@ import (
 	_ "embed"
 	"errors"
 	htmlTmpl "html/template"
+	"slices"
+	"strings"
 	"time"
 
 	"github.com/reearth/reearth-accounts/server/internal/rbac"
@@ -186,7 +188,7 @@ func (i *User) UpdateMe(ctx context.Context, p interfaces.UpdateMeParam, operato
 			return nil, err
 		}
 
-		ws, err = i.repos.Workspace.FindByID(ctx, u.Workspace())
+		ws, err = i.repos.Workspace.FindByIDForUpdate(ctx, u.Workspace())
 		if err != nil && !errors.Is(err, rerror.ErrNotFound) {
 			return nil, err
 		}
@@ -458,20 +460,33 @@ func (i *User) DeleteMe(ctx context.Context, userID user.ID, operator *workspace
 		updatedWorkspaces := make([]*workspace.Workspace, 0, len(workspaces))
 		deletedWorkspaces := []user.WorkspaceID{}
 
-		for _, ws := range workspaces {
-			if !ws.IsPersonal() && !ws.Members().IsOnlyOwner(u.ID()) {
-				if err := ws.Members().Leave(u.ID()); err != nil {
-					if errors.Is(err, workspace.ErrTargetUserNotInTheWorkspace) {
-						// User already removed by a concurrent change; nothing to save
-						continue
-					}
-					return err
-				}
-				updatedWorkspaces = append(updatedWorkspaces, ws)
+		// Lock in ID order so two users deleting themselves cannot deadlock.
+		sorted := slices.Clone(workspaces)
+		slices.SortFunc(sorted, func(a, b *workspace.Workspace) int { return strings.Compare(a.ID().String(), b.ID().String()) })
+		for _, ws := range sorted {
+			if ws.IsPersonal() {
+				deletedWorkspaces = append(deletedWorkspaces, ws.ID())
 				continue
 			}
-
-			deletedWorkspaces = append(deletedWorkspaces, ws.ID())
+			locked, err := i.repos.Workspace.FindByIDForUpdate(ctx, ws.ID())
+			if errors.Is(err, rerror.ErrNotFound) {
+				continue
+			}
+			if err != nil {
+				return err
+			}
+			if locked.Members().IsOnlyOwner(u.ID()) {
+				deletedWorkspaces = append(deletedWorkspaces, locked.ID())
+				continue
+			}
+			if err := locked.Members().Leave(u.ID()); err != nil {
+				if errors.Is(err, workspace.ErrTargetUserNotInTheWorkspace) {
+					// User already removed by a concurrent change; nothing to save
+					continue
+				}
+				return err
+			}
+			updatedWorkspaces = append(updatedWorkspaces, locked)
 		}
 
 		// Save workspaces

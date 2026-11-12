@@ -947,13 +947,15 @@ func TestWorkspace_AddMember(t *testing.T) {
 	w3 := workspace.New().ID(id3).Name("W3").Members(map[user.ID]workspace.Member{userID: {Role: role.RoleOwner}}).Personal(true).MustBuild()
 	id4 := id.NewWorkspaceID()
 	w4 := workspace.New().ID(id4).Name("W4").Members(map[user.ID]workspace.Member{id.NewUserID(): {Role: role.RoleOwner}}).Personal(false).MustBuild()
+	id5 := id.NewWorkspaceID()
+	w5 := workspace.New().ID(id5).Name("W5").Members(map[user.ID]workspace.Member{userID: {Role: role.RoleOwner}}).Personal(false).MustBuild()
 
 	u := user.New().NewID().Name("aaa").Email("a@b.c").MustBuild()
 
 	op := &workspace.Operator{
 		User:               &userID,
 		ReadableWorkspaces: []workspace.ID{id1, id2},
-		OwningWorkspaces:   []workspace.ID{id1, id2, id3},
+		OwningWorkspaces:   []workspace.ID{id1, id2, id3, id5},
 	}
 
 	tests := []struct {
@@ -992,21 +994,24 @@ func TestWorkspace_AddMember(t *testing.T) {
 			}, nil, false),
 		},
 		{
-			name:       "owner cannot add a member directly as owner; must use TransferOwnership",
-			seeds:      workspace.List{w2},
+			name:       "owner adds a member as a second owner",
+			seeds:      workspace.List{w5},
 			usersSeeds: []*user.User{u},
 			args: struct {
 				wId      workspace.ID
 				users    map[user.ID]role.RoleType
 				operator *workspace.Operator
 			}{
-				wId: w2.ID(),
+				wId: w5.ID(),
 				users: map[user.ID]role.RoleType{
 					u.ID(): role.RoleOwner,
 				},
 				operator: op,
 			},
-			wantErr: workspace.ErrCannotChangeRoleToOwner,
+			want: workspace.NewMembersWith(map[user.ID]workspace.Member{
+				userID: {Role: role.RoleOwner},
+				u.ID(): {Role: role.RoleOwner, InvitedBy: userID},
+			}, nil, false),
 		},
 		{
 			name:       "add a non existing member",
@@ -1255,7 +1260,7 @@ func TestWorkspace_RemoveMember(t *testing.T) {
 	op := &workspace.Operator{
 		User:                   &userID,
 		ReadableWorkspaces:     []workspace.ID{id1, id2},
-		OwningWorkspaces:       []workspace.ID{id1},
+		OwningWorkspaces:       []workspace.ID{id1, id4},
 		MaintainableWorkspaces: []workspace.ID{id2, id3, id4},
 	}
 
@@ -1321,7 +1326,7 @@ func TestWorkspace_RemoveMember(t *testing.T) {
 			want:    workspace.NewMembersWith(map[user.ID]workspace.Member{userID: {Role: role.RoleOwner}}, map[id.IntegrationID]workspace.Member{}, false),
 		},
 		{
-			name:       "Remove single member",
+			name:       "sole owner cannot leave",
 			seeds:      workspace.List{w4},
 			usersSeeds: []*user.User{u},
 			args: struct {
@@ -1662,11 +1667,13 @@ func TestWorkspace_UpdateMember(t *testing.T) {
 	w6 := workspace.New().ID(id6).Name("W6").Members(map[user.ID]workspace.Member{userID: {Role: role.RoleOwner}, u.ID(): {Role: role.RoleReader}}).Personal(false).MustBuild()
 	id7 := id.NewWorkspaceID()
 	w7 := workspace.New().ID(id7).Name("W7").Members(map[user.ID]workspace.Member{userID: {Role: role.RoleOwner}, u.ID(): {Role: role.RoleMaintainer}}).Personal(false).MustBuild()
+	id8 := id.NewWorkspaceID()
+	w8 := workspace.New().ID(id8).Name("W8").Members(map[user.ID]workspace.Member{userID: {Role: role.RoleOwner}, u.ID(): {Role: role.RoleReader}}).Personal(false).MustBuild()
 
 	op := &workspace.Operator{
 		User:               &userID,
 		ReadableWorkspaces: []workspace.ID{id1, id2},
-		OwningWorkspaces:   []workspace.ID{id1, id2, id3, id4, id5, id6},
+		OwningWorkspaces:   []workspace.ID{id1, id2, id3, id4, id5, id6, id8},
 	}
 
 	tests := []struct {
@@ -1738,7 +1745,7 @@ func TestWorkspace_UpdateMember(t *testing.T) {
 			want:    workspace.NewMembersWith(map[user.ID]workspace.Member{userID: {Role: role.RoleOwner}}, map[id.IntegrationID]workspace.Member{}, true),
 		},
 		{
-			name:       "Owner cannot change own role",
+			name:       "sole owner cannot demote themselves",
 			seeds:      workspace.List{w4},
 			usersSeeds: []*user.User{u},
 			args: struct {
@@ -1756,7 +1763,7 @@ func TestWorkspace_UpdateMember(t *testing.T) {
 			want:    workspace.NewMembersWith(map[user.ID]workspace.Member{userID: {Role: role.RoleOwner}, u.ID(): {Role: role.RoleReader}}, nil, false),
 		},
 		{
-			name:       "Cannot set role to owner even for own already-owned role",
+			name:       "owner setting their own role to owner is a no-op",
 			seeds:      workspace.List{w5},
 			usersSeeds: []*user.User{u},
 			args: struct {
@@ -1770,11 +1777,11 @@ func TestWorkspace_UpdateMember(t *testing.T) {
 				role:     role.RoleOwner,
 				operator: op,
 			},
-			wantErr: workspace.ErrCannotChangeRoleToOwner,
+			want: workspace.NewMembersWith(map[user.ID]workspace.Member{userID: {Role: role.RoleOwner}, u.ID(): {Role: role.RoleReader}}, nil, false),
 		},
 		{
-			name:       "Owner cannot grant owner role to another member; must use TransferOwnership",
-			seeds:      workspace.List{w2},
+			name:       "owner grants owner to another member",
+			seeds:      workspace.List{w8},
 			usersSeeds: []*user.User{u},
 			args: struct {
 				wId      workspace.ID
@@ -1782,12 +1789,12 @@ func TestWorkspace_UpdateMember(t *testing.T) {
 				role     role.RoleType
 				operator *workspace.Operator
 			}{
-				wId:      id2,
+				wId:      id8,
 				uId:      u.ID(),
 				role:     role.RoleOwner,
 				operator: op,
 			},
-			wantErr: workspace.ErrCannotChangeRoleToOwner,
+			want: workspace.NewMembersWith(map[user.ID]workspace.Member{userID: {Role: role.RoleOwner}, u.ID(): {Role: role.RoleOwner}}, nil, false),
 		},
 		{
 			name:       "Non-owner (writer) cannot edit member roles — denied before self-promote check",
@@ -2713,12 +2720,11 @@ func TestWorkspace_MemberManagement_CerbosFallback(t *testing.T) {
 			MaintainableWorkspaces: []workspace.ID{wid},
 		}
 
-		// A real maintainer already has edit_member, so nothing (Cerbos included)
-		// should let them grant themselves Owner through UpdateUserMember: the
-		// owner role can only be granted via TransferOwnership.
+		// Even when Cerbos lets the caller manage owners, a maintainer cannot
+		// grant themselves Owner.
 		workspaceUC := NewWorkspace(db, nil, &fakeCerbos{allowed: true})
 		_, err := workspaceUC.UpdateUserMember(ctx, wid, operatorID, role.RoleOwner, op)
-		assert.ErrorIs(t, err, workspace.ErrCannotChangeRoleToOwner)
+		assert.ErrorIs(t, err, interfaces.ErrCannotSelfPromote)
 	})
 
 	t.Run("UpdateUserMemberViaService: a Maintainer can set their own role (below Owner), bypassing the self-promotion guard", func(t *testing.T) {

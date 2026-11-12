@@ -193,7 +193,7 @@ func (i *Workspace) Update(ctx context.Context, param interfaces.UpdateWorkspace
 	}
 
 	return Run1(ctx, operator, i.repos, Usecase().Transaction(), func(ctx context.Context) (*workspace.Workspace, error) {
-		ws, err := i.repos.Workspace.FindByID(ctx, param.ID)
+		ws, err := i.repos.Workspace.FindByIDForUpdate(ctx, param.ID)
 		if err != nil {
 			return nil, applog.ErrorWithCallerLogging(ctx, "failed to find workspace", err)
 		}
@@ -315,7 +315,7 @@ func (i *Workspace) AddUserMember(ctx context.Context, workspaceID workspace.ID,
 	}
 
 	return Run1(ctx, operator, i.repos, Usecase().Transaction(), func(ctx context.Context) (*workspace.Workspace, error) {
-		ws, err := i.repos.Workspace.FindByID(ctx, workspaceID)
+		ws, err := i.repos.Workspace.FindByIDForUpdate(ctx, workspaceID)
 		if err != nil {
 			return nil, applog.ErrorWithCallerLogging(ctx, "failed to fetch workspace", err)
 		}
@@ -324,14 +324,9 @@ func (i *Workspace) AddUserMember(ctx context.Context, workspaceID workspace.ID,
 			return nil, workspace.ErrCannotModifyPersonalWorkspace
 		}
 
-		if slices.Contains(slices.Collect(maps.Values(users)), role.RoleOwner) {
-			return nil, workspace.ErrCannotChangeRoleToOwner
-		}
-
-		if !operator.IsMaintainingWorkspace(workspaceID) {
-			if err := i.checkOwnerLikePermission(ctx, ws, operator, rbac.ActionAddMember); err != nil {
-				return nil, err
-			}
+		grantsOwner := slices.Contains(slices.Collect(maps.Values(users)), role.RoleOwner)
+		if err := i.checkMemberPermission(ctx, ws, operator, rbac.ActionAddMember, grantsOwner); err != nil {
+			return nil, err
 		}
 
 		if i.enforceMemberCount != nil {
@@ -374,7 +369,7 @@ func (i *Workspace) AddIntegrationMember(ctx context.Context, wId workspace.ID, 
 	}
 
 	return Run1(ctx, operator, i.repos, Usecase().Transaction().WithOwnableWorkspaces(wId), func(ctx context.Context) (*workspace.Workspace, error) {
-		ws, err := i.repos.Workspace.FindByID(ctx, wId)
+		ws, err := i.repos.Workspace.FindByIDForUpdate(ctx, wId)
 		if err != nil {
 			return nil, err
 		}
@@ -408,7 +403,7 @@ func (i *Workspace) RemoveMultipleUserMembers(ctx context.Context, id workspace.
 	}
 
 	return Run1(ctx, operator, i.repos, Usecase().Transaction(), func(ctx context.Context) (*workspace.Workspace, error) {
-		ws, err := i.repos.Workspace.FindByID(ctx, id)
+		ws, err := i.repos.Workspace.FindByIDForUpdate(ctx, id)
 		if err != nil {
 			return nil, err
 		}
@@ -417,16 +412,15 @@ func (i *Workspace) RemoveMultipleUserMembers(ctx context.Context, id workspace.
 			return nil, workspace.ErrCannotModifyPersonalWorkspace
 		}
 
-		if !operator.IsMaintainingWorkspace(id) {
-			if err := i.checkOwnerLikePermission(ctx, ws, operator, rbac.ActionDeleteMember); err != nil {
-				return nil, err
-			}
+		removesOwner := slices.ContainsFunc(userIds, func(uId workspace.UserID) bool {
+			return ws.Members().UserRole(uId) == role.RoleOwner
+		})
+		if err := i.checkMemberPermission(ctx, ws, operator, rbac.ActionDeleteMember, removesOwner); err != nil {
+			return nil, err
 		}
 
 		for _, uId := range userIds {
-			isSelfLeave := *operator.User == uId
-
-			if isSelfLeave && ws.Members().IsOnlyOwner(uId) {
+			if ws.Members().IsOnlyOwner(uId) {
 				return nil, interfaces.ErrOwnerCannotLeaveTheWorkspace
 			}
 
@@ -456,7 +450,7 @@ func (i *Workspace) RemoveIntegration(ctx context.Context, wId workspace.ID, iId
 	}
 
 	return Run1(ctx, operator, i.repos, Usecase().WithOwnableWorkspaces(wId).Transaction(), func(ctx context.Context) (*workspace.Workspace, error) {
-		ws, err := i.repos.Workspace.FindByID(ctx, wId)
+		ws, err := i.repos.Workspace.FindByIDForUpdate(ctx, wId)
 		if err != nil {
 			return nil, err
 		}
@@ -482,7 +476,7 @@ func (i *Workspace) RemoveIntegrations(ctx context.Context, wId workspace.ID, iI
 	}
 
 	return Run1(ctx, operator, i.repos, Usecase().WithOwnableWorkspaces(wId).Transaction(), func(ctx context.Context) (*workspace.Workspace, error) {
-		ws, err := i.repos.Workspace.FindByID(ctx, wId)
+		ws, err := i.repos.Workspace.FindByIDForUpdate(ctx, wId)
 		if err != nil {
 			return nil, err
 		}
@@ -508,7 +502,7 @@ func (i *Workspace) UpdateUserMember(ctx context.Context, id workspace.ID, u wor
 	}
 
 	return Run1(ctx, operator, i.repos, Usecase().Transaction(), func(ctx context.Context) (*workspace.Workspace, error) {
-		ws, err := i.repos.Workspace.FindByID(ctx, id)
+		ws, err := i.repos.Workspace.FindByIDForUpdate(ctx, id)
 		if err != nil {
 			return nil, err
 		}
@@ -517,25 +511,18 @@ func (i *Workspace) UpdateUserMember(ctx context.Context, id workspace.ID, u wor
 			return nil, workspace.ErrCannotModifyPersonalWorkspace
 		}
 
-		if newRole == role.RoleOwner {
-			return nil, workspace.ErrCannotChangeRoleToOwner
-		}
-
 		currentRole := ws.Members().UserRole(u)
-
-		if !operator.IsMaintainingWorkspace(id) {
-			if err := i.checkOwnerLikePermission(ctx, ws, operator, rbac.ActionEditMember); err != nil {
-				return nil, err
-			}
+		touchesOwner := newRole == role.RoleOwner || currentRole == role.RoleOwner
+		if err := i.checkMemberPermission(ctx, ws, operator, rbac.ActionEditMember, touchesOwner); err != nil {
+			return nil, err
 		}
 
-		if u == *operator.User {
-			if !currentRole.Includes(newRole) {
-				return nil, interfaces.ErrCannotSelfPromote
-			}
-			if currentRole == role.RoleOwner {
-				return nil, interfaces.ErrCannotChangeOwnerRole
-			}
+		if u == *operator.User && !currentRole.Includes(newRole) {
+			return nil, interfaces.ErrCannotSelfPromote
+		}
+
+		if newRole != role.RoleOwner && ws.Members().IsOnlyOwner(u) {
+			return nil, interfaces.ErrCannotChangeOwnerRole
 		}
 
 		if err := i.changeMemberRole(ctx, ws, u, newRole); err != nil {
@@ -562,7 +549,7 @@ func (i *Workspace) UpdateUserMemberViaService(ctx context.Context, id workspace
 	}
 
 	return Run1(ctx, operator, i.repos, Usecase().Transaction(), func(ctx context.Context) (*workspace.Workspace, error) {
-		ws, err := i.repos.Workspace.FindByID(ctx, id)
+		ws, err := i.repos.Workspace.FindByIDForUpdate(ctx, id)
 		if err != nil {
 			return nil, err
 		}
@@ -571,15 +558,13 @@ func (i *Workspace) UpdateUserMemberViaService(ctx context.Context, id workspace
 			return nil, workspace.ErrCannotModifyPersonalWorkspace
 		}
 
-		// Prevent leaving the workspace without any owners.
-		if ws.Members().IsOnlyOwner(u) {
-			return nil, interfaces.ErrCannotChangeOwnerRole
+		touchesOwner := ws.Members().UserRole(u) == role.RoleOwner
+		if err := i.checkMemberPermission(ctx, ws, operator, rbac.ActionEditMember, touchesOwner); err != nil {
+			return nil, err
 		}
 
-		if !operator.IsMaintainingWorkspace(id) {
-			if err := i.checkOwnerLikePermission(ctx, ws, operator, rbac.ActionEditMember); err != nil {
-				return nil, err
-			}
+		if ws.Members().IsOnlyOwner(u) {
+			return nil, interfaces.ErrCannotChangeOwnerRole
 		}
 
 		if err := i.changeMemberRole(ctx, ws, u, newRole); err != nil {
@@ -601,7 +586,7 @@ func (i *Workspace) UpdateIntegration(ctx context.Context, wId workspace.ID, iId
 	}
 
 	return Run1(ctx, operator, i.repos, Usecase().WithOwnableWorkspaces(wId).Transaction(), func(ctx context.Context) (*workspace.Workspace, error) {
-		ws, err := i.repos.Workspace.FindByID(ctx, wId)
+		ws, err := i.repos.Workspace.FindByIDForUpdate(ctx, wId)
 		if err != nil {
 			return nil, err
 		}
@@ -627,7 +612,7 @@ func (i *Workspace) Remove(ctx context.Context, id workspace.ID, operator *works
 	}
 
 	return Run0(ctx, operator, i.repos, Usecase().Transaction().WithOwnableWorkspaces(id), func(ctx context.Context) error {
-		ws, err := i.repos.Workspace.FindByID(ctx, id)
+		ws, err := i.repos.Workspace.FindByIDForUpdate(ctx, id)
 		if err != nil {
 			return err
 		}
@@ -664,7 +649,7 @@ func (i *Workspace) Deactivate(ctx context.Context, id workspace.ID, operator *w
 	}
 
 	return Run1(ctx, operator, i.repos, Usecase().Transaction(), func(ctx context.Context) (*workspace.Workspace, error) {
-		ws, err := i.repos.Workspace.FindByID(ctx, id)
+		ws, err := i.repos.Workspace.FindByIDForUpdate(ctx, id)
 		if err != nil {
 			return nil, err
 		}
@@ -695,7 +680,7 @@ func (i *Workspace) Restore(ctx context.Context, id workspace.ID, operator *work
 	}
 
 	return Run1(ctx, operator, i.repos, Usecase().Transaction(), func(ctx context.Context) (*workspace.Workspace, error) {
-		ws, err := i.repos.Workspace.FindByID(ctx, id)
+		ws, err := i.repos.Workspace.FindByIDForUpdate(ctx, id)
 		if err != nil {
 			return nil, err
 		}
@@ -724,7 +709,7 @@ func (i *Workspace) TransferOwnership(ctx context.Context, workspaceID workspace
 	}
 
 	return Run1(ctx, operator, i.repos, Usecase().Transaction().WithOwnableWorkspaces(workspaceID), func(ctx context.Context) (*workspace.Workspace, error) {
-		ws, err := i.repos.Workspace.FindByID(ctx, workspaceID)
+		ws, err := i.repos.Workspace.FindByIDForUpdate(ctx, workspaceID)
 		if err != nil {
 			return nil, err
 		}
@@ -737,7 +722,9 @@ func (i *Workspace) TransferOwnership(ctx context.Context, workspaceID workspace
 			return nil, workspace.ErrTargetUserNotInTheWorkspace
 		}
 
-		if ws.Members().UserRole(newOwnerID) == role.RoleReader {
+		// A self or disabled target would leave no active owner once the caller is demoted.
+		target := ws.Members().User(newOwnerID)
+		if newOwnerID == *operator.User || target.Disabled || target.Role == role.RoleReader {
 			return nil, workspace.ErrCannotChangeRoleToOwner
 		}
 
@@ -903,6 +890,19 @@ func (i *Workspace) bulkUpdatePermittable(ctx context.Context, workspaceID works
 	}
 
 	return i.permittableRepo.SaveMany(ctx, toSave)
+}
+
+// checkMemberPermission lets a maintainer manage members, except for changes
+// that grant or take away the owner role, which only an owner may make.
+func (i *Workspace) checkMemberPermission(ctx context.Context, ws *workspace.Workspace, operator *workspace.Operator, action string, touchesOwner bool) error {
+	if touchesOwner {
+		// Cerbos also grants the member actions to maintainers, so ask with an owner-only action.
+		return i.checkOwnerLikePermission(ctx, ws, operator, rbac.ActionTransferOwnership)
+	}
+	if operator.IsMaintainingWorkspace(ws.ID()) {
+		return nil
+	}
+	return i.checkOwnerLikePermission(ctx, ws, operator, action)
 }
 
 // checkOwnerLikePermission checks the given action via Cerbos (workspace-scoped
