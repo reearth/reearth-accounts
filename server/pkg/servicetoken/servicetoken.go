@@ -43,21 +43,29 @@ type Config struct {
 	KeyID         string
 	SigningMethod jwt.SigningMethod
 	// RefreshEarly is how long before expiry a cached token is replaced.
-	// Defaults to one minute.
+	// Defaults to one minute, and is capped at half the token's lifetime.
 	RefreshEarly time.Duration
 	HTTPClient   *http.Client
 }
 
 // Source returns a valid access token, fetching one only when none is cached or
 // the cached one is about to expire. It is safe for concurrent use; concurrent
-// callers share a single fetch.
+// callers share a single fetch, and each waits only as long as its own context
+// allows.
 type Source struct {
 	cfg Config
 	now func() time.Time
 
-	mu      sync.Mutex
-	token   string
-	expires time.Time
+	mu        sync.Mutex
+	token     string
+	refreshAt time.Time
+	inflight  *fetchCall
+}
+
+type fetchCall struct {
+	done  chan struct{}
+	token string
+	err   error
 }
 
 func New(cfg Config) (*Source, error) {
@@ -93,17 +101,40 @@ func defaultSigningMethod(k crypto.Signer) (jwt.SigningMethod, error) {
 // Token returns a cached token or fetches a new one.
 func (s *Source) Token(ctx context.Context) (string, error) {
 	s.mu.Lock()
-	defer s.mu.Unlock()
-	if s.token != "" && s.now().Before(s.expires.Add(-s.cfg.RefreshEarly)) {
-		return s.token, nil
+	if s.token != "" && s.now().Before(s.refreshAt) {
+		tok := s.token
+		s.mu.Unlock()
+		return tok, nil
 	}
+	call := s.inflight
+	if call == nil {
+		call = &fetchCall{done: make(chan struct{})}
+		s.inflight = call
+		// The fetch outlives the caller that started it, so a cancelled caller
+		// does not fail the others waiting on it.
+		go s.run(context.WithoutCancel(ctx), call)
+	}
+	s.mu.Unlock()
+
+	select {
+	case <-call.done:
+		return call.token, call.err
+	case <-ctx.Done():
+		return "", ctx.Err()
+	}
+}
+
+func (s *Source) run(ctx context.Context, call *fetchCall) {
 	tok, expiresIn, err := s.fetch(ctx)
-	if err != nil {
-		return "", err
+	s.mu.Lock()
+	if err == nil {
+		s.token = tok
+		s.refreshAt = s.now().Add(expiresIn - min(s.cfg.RefreshEarly, expiresIn/2))
 	}
-	s.token = tok
-	s.expires = s.now().Add(expiresIn)
-	return tok, nil
+	s.inflight = nil
+	s.mu.Unlock()
+	call.token, call.err = tok, err
+	close(call.done)
 }
 
 func (s *Source) fetch(ctx context.Context) (string, time.Duration, error) {
@@ -190,6 +221,9 @@ func (t *Transport) RoundTrip(req *http.Request) (*http.Response, error) {
 	}
 	tok, err := t.Source.Token(req.Context())
 	if err != nil {
+		if req.Body != nil {
+			_ = req.Body.Close()
+		}
 		return nil, err
 	}
 	req2 := req.Clone(req.Context())
