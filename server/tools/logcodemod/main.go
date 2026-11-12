@@ -69,7 +69,8 @@ var rules = map[string]string{
 	"roleName": "Role", "roleNames": "Roles", "param.Action": "Action",
 	"result.Actions": "Actions", "allowed": "Allowed",
 
-	"authenticator.go|path": "Path(auth0Route(%s))", // Auth0 paths embed the user ID "resp.StatusCode": "Status", "resp.Status": "Status", "status": "Status",
+	"authenticator.go|path": "Path(auth0Route(%s))", // Auth0 paths embed the user ID
+	"resp.StatusCode":       "Status", "resp.Status": "Status", "status": "Status",
 	"code": "Code", "resp.Message": "Reason", "len(ids)": "Count", "len(response.Errors)": "Count",
 	"spanName": "Operation",
 
