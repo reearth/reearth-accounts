@@ -43,7 +43,7 @@ func initEcho(ctx context.Context, cfg *ServerConfig) *echo.Echo {
 	} else {
 		applog.Info(ctx, "OpenTelemetry tracing disabled", applog.Service(string(otelapp.OtelAccountsServiceName)))
 	}
-	e.Use(AccessLogger(logger))
+	e.Use(RequestLogger())
 
 	if w := cfg.Config.MFARecoveryMaxAuthAge; w > 0 {
 		applog.Info(ctx, "MFA recovery step-up window", applog.Window(w))

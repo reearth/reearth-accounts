@@ -62,6 +62,7 @@ func GraphqlAPI(conf *Config, photos adapter.PhotoSigner, loginTime adapter.Logi
 
 	// tracing with detailed operation tracking
 	srv.AroundOperations(detailedOperationTracer())
+	srv.AroundOperations(recordGraphQLOperation)
 
 	if conf.GraphQL.ComplexityLimit > 0 {
 		srv.Use(extension.FixedComplexityLimit(conf.GraphQL.ComplexityLimit))
