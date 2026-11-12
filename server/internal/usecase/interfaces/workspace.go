@@ -54,10 +54,10 @@ type UpdateWorkspaceParam struct {
 
 type Workspace interface {
 	Fetch(context.Context, workspace.IDList, *workspace.Operator) (workspace.List, error)
-	FetchByID(context.Context, workspace.ID) (*workspace.Workspace, error)
-	FetchByName(context.Context, string) (*workspace.Workspace, error)
-	FetchByAlias(context.Context, string) (*workspace.Workspace, error)
-	FetchByUserWithPagination(context.Context, user.ID, FetchByUserWithPaginationParam) (FetchByUserWithPaginationResult, error)
+	FetchByID(context.Context, workspace.ID, *workspace.Operator) (*workspace.Workspace, error)
+	FetchByName(context.Context, string, *workspace.Operator) (*workspace.Workspace, error)
+	FetchByAlias(context.Context, string, *workspace.Operator) (*workspace.Workspace, error)
+	FetchByUserWithPagination(context.Context, user.ID, FetchByUserWithPaginationParam, *workspace.Operator) (FetchByUserWithPaginationResult, error)
 	// FindAll lists workspaces across all tenants, unfiltered by any operator's
 	// readable-workspace set. Restricted to the maintainer role (see
 	// checkMaintainerPermission) since it exposes every workspace across every tenant.

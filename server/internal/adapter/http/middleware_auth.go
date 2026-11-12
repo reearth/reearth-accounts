@@ -44,6 +44,26 @@ func RequiredAuth(resolve AuthResolver) echo.MiddlewareFunc {
 	}
 }
 
+// RequiredUser is RequiredAuth for routes a service caller may not use, such as the
+// user directory: a service caller is scoped to its integration's workspaces
+// (ADR-0002 decision 4).
+func RequiredUser(resolve AuthResolver) echo.MiddlewareFunc {
+	return func(next echo.HandlerFunc) echo.HandlerFunc {
+		return func(c echo.Context) error {
+			ctx := c.Request().Context()
+			u, op, err := resolve(c, adapter.GetAuthInfo(ctx))
+			if err != nil {
+				return err
+			}
+			if u == nil {
+				return httpinternal.ErrUnauthorized
+			}
+			c.SetRequest(c.Request().WithContext(attach(ctx, u, op)))
+			return next(c)
+		}
+	}
+}
+
 // OptionalAuth attaches User+Operator when the request resolves to a user, and
 // proceeds anonymously when the resolver succeeds but finds no user. Genuine resolver
 // errors (e.g. a datastore outage) are propagated so they surface as 5xx rather than

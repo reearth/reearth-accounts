@@ -32,7 +32,7 @@ func (w *Workspace) Fetch(ctx context.Context, ids workspace.IDList, op *workspa
 	return WorkspaceByIDsResponseTo(WorkspaceByIDs(ctx, w.gql, ids.Strings()))
 }
 
-func (w *Workspace) FetchByID(ctx context.Context, id workspace.ID) (*workspace.Workspace, error) {
+func (w *Workspace) FetchByID(ctx context.Context, id workspace.ID, _ *workspace.Operator) (*workspace.Workspace, error) {
 	res, err := FindByID(ctx, w.gql, id.String())
 	if err != nil {
 		return nil, err
@@ -40,7 +40,7 @@ func (w *Workspace) FetchByID(ctx context.Context, id workspace.ID) (*workspace.
 	return ToWorkspace(res.FindByID.FragmentWorkspace)
 }
 
-func (w *Workspace) FetchByName(ctx context.Context, name string) (*workspace.Workspace, error) {
+func (w *Workspace) FetchByName(ctx context.Context, name string, _ *workspace.Operator) (*workspace.Workspace, error) {
 	res, err := FindByName(ctx, w.gql, name)
 	if err != nil {
 		return nil, err
@@ -48,7 +48,7 @@ func (w *Workspace) FetchByName(ctx context.Context, name string) (*workspace.Wo
 	return ToWorkspace(res.FindByName.FragmentWorkspace)
 }
 
-func (w *Workspace) FetchByAlias(ctx context.Context, alias string) (*workspace.Workspace, error) {
+func (w *Workspace) FetchByAlias(ctx context.Context, alias string, _ *workspace.Operator) (*workspace.Workspace, error) {
 	res, err := FindByAlias(ctx, w.gql, alias)
 	if err != nil {
 		return nil, err
@@ -68,7 +68,7 @@ func (w *Workspace) FindByUser(ctx context.Context, userID accountid.UserID, op 
 	return ToWorkspaces(ws)
 }
 
-func (w *Workspace) FetchByUserWithPagination(ctx context.Context, userID accountid.UserID, param interfaces.FetchByUserWithPaginationParam) (interfaces.FetchByUserWithPaginationResult, error) {
+func (w *Workspace) FetchByUserWithPagination(ctx context.Context, userID accountid.UserID, param interfaces.FetchByUserWithPaginationParam, _ *workspace.Operator) (interfaces.FetchByUserWithPaginationResult, error) {
 	res, err := FindByUserWithPagination(ctx, w.gql, userID.String(), int(param.Page), int(param.Size))
 	if err != nil {
 		return interfaces.FetchByUserWithPaginationResult{}, err
