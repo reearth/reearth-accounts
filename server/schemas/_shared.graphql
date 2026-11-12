@@ -1,4 +1,10 @@
 
+"""
+Marks a Query or Mutation field as callable without a token. Every other field
+requires authentication. The auth middleware reads this directive at startup.
+"""
+directive @public on FIELD_DEFINITION
+
 interface Node {
   id: ID!
 }

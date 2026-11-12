@@ -122,7 +122,7 @@ input DeleteMeInput {
 
 extend type Query {
   findUserByAlias(alias: String!): User
-  findUsersByIDsWithPagination(ids: [ID!]!, alias: String, pagination: Pagination!): UsersWithPagination!
+  findUsersByIDsWithPagination(ids: [ID!]!, alias: String, pagination: Pagination!): UsersWithPagination! @public
   findUsersByIDs(ids: [ID!]!): [User!]!
   me: Me
   mfaStatus: MFAStatus!
@@ -145,7 +145,7 @@ type DeleteMePayload {
 }
 
 extend type Mutation {
-  createVerification(input: CreateVerificationInput!): Boolean
+  createVerification(input: CreateVerificationInput!): Boolean @public
   deleteMe(input: DeleteMeInput!): DeleteMePayload
   disableMFA: Boolean!
   enableMFA: MFAEnrollResult!
@@ -154,9 +154,9 @@ extend type Mutation {
   passwordReset(input: PasswordResetInput!): Boolean
   regenerateMFARecoveryCode: MFARecoveryCodeResult!
   removeMyAuth(input: RemoveMyAuthInput!): UpdateMePayload
-  signup(input: SignupInput!): UserPayload
-  signupOIDC(input: SignupOIDCInput!): UserPayload
-  startPasswordReset(input: StartPasswordResetInput!): Boolean
+  signup(input: SignupInput!): UserPayload @public
+  signupOIDC(input: SignupOIDCInput!): UserPayload @public
+  startPasswordReset(input: StartPasswordResetInput!): Boolean @public
   updateMe(input: UpdateMeInput!): UpdateMePayload
   verifyUser(input: VerifyUserInput!): UserPayload
 }

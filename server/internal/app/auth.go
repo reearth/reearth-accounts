@@ -52,21 +52,6 @@ type graphqlRequest struct {
 	Variables     map[string]any `json:"variables"`
 }
 
-// bypassedFields is the set of top-level GraphQL field names that are
-// allowed without authentication. Field names must be lowercase.
-var bypassedFields = map[string]struct{}{
-	"authconfig":                   {},
-	"createverification":           {},
-	"findbyalias":                  {},
-	"findbyid":                     {},
-	"findbyids":                    {},
-	"findusersbyidswithpagination": {},
-	"signup":                       {},
-	"signupoidc":                   {},
-	"signupsso":                    {},
-	"startpasswordreset":           {},
-}
-
 func isBypassed(req *http.Request) bool {
 	if req.Method != http.MethodPost {
 		return false
@@ -105,7 +90,7 @@ func isBypassed(req *http.Request) bool {
 	// the majority of authenticated requests.
 	queryLower := strings.ToLower(gqlReq.Query)
 	hasCandidate := false
-	for field := range bypassedFields {
+	for field := range publicFields {
 		if strings.Contains(queryLower, field) {
 			hasCandidate = true
 			break
@@ -141,8 +126,7 @@ func isBypassed(req *http.Request) bool {
 		targetOp = doc.Operations[0]
 	}
 
-	// Require every top-level field in the selected operation to be in the
-	// bypass allowlist.
+	// Require every top-level field in the selected operation to be @public.
 	if len(targetOp.SelectionSet) == 0 {
 		return false
 	}
@@ -151,7 +135,7 @@ func isBypassed(req *http.Request) bool {
 		if !ok {
 			return false
 		}
-		if _, allowed := bypassedFields[strings.ToLower(field.Name)]; !allowed {
+		if _, allowed := publicFields[strings.ToLower(field.Name)]; !allowed {
 			return false
 		}
 	}
