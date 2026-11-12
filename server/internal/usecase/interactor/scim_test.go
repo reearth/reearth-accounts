@@ -525,3 +525,29 @@ func TestProvisionScimUser_RefusesOwnerRole(t *testing.T) {
 	_, err = db.User.FindByEmail(ctx, "eve@example.com")
 	assert.ErrorIs(t, err, rerror.ErrNotFound)
 }
+
+func TestListScimUsers_SkipsMembersWithoutAUser(t *testing.T) {
+	ctx := context.Background()
+	db := accountmemory.New()
+
+	owner := user.New().NewID().Name("owner").Email("owner@example.com").Workspace(workspace.NewID()).MustBuild()
+	require.NoError(t, db.User.Save(ctx, owner))
+	ghost := user.NewID()
+	ws := workspace.New().
+		NewID().
+		Name("enterprise").
+		Alias("enterprise").
+		Members(map[user.ID]workspace.Member{
+			owner.ID(): {Role: role.RoleOwner, InvitedBy: owner.ID()},
+			ghost:      {Role: role.RoleReader, InvitedBy: owner.ID()},
+		}).
+		MustBuild()
+	require.NoError(t, db.Workspace.Save(ctx, ws))
+
+	uc := NewScim(db, nil)
+	for _, filter := range []string{"", `userName eq "owner@example.com"`} {
+		got, err := uc.ListScimUsers(ctx, ws.ID(), filter)
+		require.NoError(t, err, filter)
+		assert.Equal(t, []*user.User{owner}, got, filter)
+	}
+}

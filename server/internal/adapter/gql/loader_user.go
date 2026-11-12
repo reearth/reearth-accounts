@@ -47,8 +47,7 @@ func (c *UserLoader) FetchByID(ctx context.Context, userID gqlmodel.ID) (*gqlmod
 	if err != nil {
 		return nil, err
 	}
-
-	if len(users) == 0 {
+	if users[0] == nil {
 		return nil, nil
 	}
 

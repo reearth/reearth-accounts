@@ -54,9 +54,9 @@ func buildExistingUserSetFromWorkspaces(
 	}
 
 	exists := make(map[user.ID]struct{}, len(ul))
-	for i, u := range ul {
+	for _, u := range ul {
 		if u != nil {
-			exists[ids[i]] = struct{}{}
+			exists[u.ID()] = struct{}{}
 		}
 	}
 	return exists, nil

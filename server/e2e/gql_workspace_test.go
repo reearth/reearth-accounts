@@ -188,6 +188,32 @@ func TestFindByID(t *testing.T) {
 	o.Value("name").String().IsEqual("e2e")
 }
 
+func TestFindByIDDropsMissingUserMembers(t *testing.T) {
+	wid := id.NewWorkspaceID()
+	e, _ := StartServer(t, &app.Config{StorageIsLocal: true}, false, seedGhostWorkspace(wid, id.NewIntegrationID()))
+
+	query := fmt.Sprintf(`query { findByID(id: "%s"){ members {
+		__typename
+		... on WorkspaceUserMember { userId role }
+		... on WorkspaceIntegrationMember { integrationId role }
+	}}}`, wid)
+	jsonData, err := json.Marshal(GraphQLRequest{Query: query})
+	assert.NoError(t, err)
+
+	members := e.POST("/api/graphql").
+		WithHeader("authorization", "Bearer test").
+		WithHeader("Content-Type", "application/json").
+		WithHeader("X-Reearth-Debug-User", restDemoUID.String()).
+		WithBytes(jsonData).
+		Expect().Status(http.StatusOK).
+		JSON().Object().Value("data").Object().Value("findByID").Object().
+		Value("members").Array().Raw()
+
+	assert.Equal(t, []any{
+		map[string]any{"__typename": "WorkspaceUserMember", "userId": restDemoUID.String(), "role": "owner"},
+	}, members)
+}
+
 func TestCreateWorkspace(t *testing.T) {
 	e, _ := StartServer(t, &app.Config{}, true, baseSeederWorkspace)
 

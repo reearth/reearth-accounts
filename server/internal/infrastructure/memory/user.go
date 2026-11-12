@@ -95,10 +95,10 @@ func (r *User) FindByIDs(_ context.Context, ids user.IDList) (user.List, error) 
 		return nil, r.err
 	}
 
-	res := r.data.FindAll(func(key user.ID, value *user.User) bool {
-		return ids.Has(key)
-	})
-
+	res := make(user.List, len(ids))
+	for i, id := range ids {
+		res[i], _ = r.data.Load(id)
+	}
 	return res, nil
 }
 

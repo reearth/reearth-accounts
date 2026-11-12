@@ -38,8 +38,9 @@ type WorkspaceResponse struct {
 	DeletedAt     *time.Time                 `json:"deleted_at,omitempty"`
 }
 
-// NewWorkspaceResponse converts a domain workspace (no signed-URL resolution).
-func NewWorkspaceResponse(w *workspace.Workspace) *WorkspaceResponse {
+// NewWorkspaceResponse converts a domain workspace (no signed-URL resolution),
+// dropping user members for which userExists is false, as GraphQL does.
+func NewWorkspaceResponse(w *workspace.Workspace, userExists func(user.ID) bool) *WorkspaceResponse {
 	if w == nil {
 		return nil
 	}
@@ -47,6 +48,9 @@ func NewWorkspaceResponse(w *workspace.Workspace) *WorkspaceResponse {
 	integrations := w.Members().Integrations()
 	members := make([]WorkspaceMemberResponse, 0, len(users)+len(integrations))
 	for u, m := range users {
+		if !userExists(u) {
+			continue
+		}
 		members = append(members, WorkspaceMemberResponse{UserID: u.String(), Role: RoleString(m.Role)})
 	}
 	for i, m := range integrations {
@@ -79,10 +83,10 @@ func NewWorkspaceResponse(w *workspace.Workspace) *WorkspaceResponse {
 }
 
 // NewWorkspaceResponses converts a list.
-func NewWorkspaceResponses(ws workspace.List) []*WorkspaceResponse {
+func NewWorkspaceResponses(ws workspace.List, userExists func(user.ID) bool) []*WorkspaceResponse {
 	out := make([]*WorkspaceResponse, 0, len(ws))
 	for _, w := range ws {
-		out = append(out, NewWorkspaceResponse(w))
+		out = append(out, NewWorkspaceResponse(w, userExists))
 	}
 	return out
 }
