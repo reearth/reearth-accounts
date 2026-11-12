@@ -16,6 +16,7 @@ Keep it short. State the decision and its consequences, not the history of the d
 | ADR | Title | Status |
 |---|---|---|
 | [0001](0001-rest-parity-with-graphql.md) | REST parity with GraphQL | Proposed |
+| [0003](0003-personal-data-protection.md) | Personal data protection in the accounts API | Proposed |
 
 ## Template
 
