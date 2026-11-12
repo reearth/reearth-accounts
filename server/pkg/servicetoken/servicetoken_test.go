@@ -1,0 +1,178 @@
+package servicetoken
+
+import (
+	"context"
+	"crypto/rand"
+	"crypto/rsa"
+	"encoding/json"
+	"fmt"
+	"net/http"
+	"net/http/httptest"
+	"sync"
+	"sync/atomic"
+	"testing"
+	"time"
+
+	"github.com/golang-jwt/jwt/v5"
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
+)
+
+type fakeIdP struct {
+	t         *testing.T
+	key       *rsa.PublicKey
+	srv       *httptest.Server
+	fetches   atomic.Int32
+	expiresIn int64
+
+	mu         sync.Mutex
+	assertions []jwt.MapClaims
+	headers    []map[string]any
+	forms      []map[string]string
+}
+
+func newFakeIdP(t *testing.T, key *rsa.PublicKey) *fakeIdP {
+	f := &fakeIdP{t: t, key: key, expiresIn: 3600}
+	f.srv = httptest.NewServer(http.HandlerFunc(f.serve))
+	t.Cleanup(f.srv.Close)
+	return f
+}
+
+func (f *fakeIdP) tokenURL() string { return f.srv.URL + "/oauth/token" }
+
+func (f *fakeIdP) serve(w http.ResponseWriter, r *http.Request) {
+	n := f.fetches.Add(1)
+	time.Sleep(20 * time.Millisecond) // widen the window for concurrent callers
+	if err := r.ParseForm(); err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+	tok, err := jwt.Parse(r.PostForm.Get("client_assertion"), func(*jwt.Token) (any, error) { return f.key, nil },
+		jwt.WithValidMethods([]string{"RS256"}), jwt.WithoutClaimsValidation())
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusUnauthorized)
+		return
+	}
+	f.mu.Lock()
+	f.assertions = append(f.assertions, tok.Claims.(jwt.MapClaims))
+	f.headers = append(f.headers, tok.Header)
+	form := map[string]string{}
+	for k := range r.PostForm {
+		form[k] = r.PostForm.Get(k)
+	}
+	f.forms = append(f.forms, form)
+	f.mu.Unlock()
+	_ = json.NewEncoder(w).Encode(map[string]any{
+		"access_token": fmt.Sprintf("token-%d", n),
+		"token_type":   "Bearer",
+		"expires_in":   f.expiresIn,
+	})
+}
+
+func newSource(t *testing.T) (*Source, *fakeIdP) {
+	t.Helper()
+	key, err := rsa.GenerateKey(rand.Reader, 2048)
+	require.NoError(t, err)
+	idp := newFakeIdP(t, &key.PublicKey)
+	s, err := New(Config{TokenURL: idp.tokenURL(), ClientID: "svc-flow", Audience: "https://accounts", Key: key, KeyID: "k1"})
+	require.NoError(t, err)
+	return s, idp
+}
+
+func TestSource_ConcurrentCallersShareOneFetch(t *testing.T) {
+	s, idp := newSource(t)
+	var wg sync.WaitGroup
+	got := make([]string, 50)
+	for i := range got {
+		wg.Add(1)
+		go func(i int) {
+			defer wg.Done()
+			tok, err := s.Token(context.Background())
+			assert.NoError(t, err)
+			got[i] = tok
+		}(i)
+	}
+	wg.Wait()
+	assert.Equal(t, int32(1), idp.fetches.Load())
+	for _, tok := range got {
+		assert.Equal(t, "token-1", tok)
+	}
+}
+
+func TestSource_RefetchesShortlyBeforeExpiry(t *testing.T) {
+	s, idp := newSource(t)
+	now := time.Now()
+	s.now = func() time.Time { return now }
+
+	tok, err := s.Token(context.Background())
+	require.NoError(t, err)
+	assert.Equal(t, "token-1", tok)
+
+	now = now.Add(58 * time.Minute)
+	tok, _ = s.Token(context.Background())
+	assert.Equal(t, "token-1", tok, "still cached two minutes before expiry")
+
+	now = now.Add(90 * time.Second)
+	tok, _ = s.Token(context.Background())
+	assert.Equal(t, "token-2", tok, "refetched inside the refresh window")
+	assert.Equal(t, int32(2), idp.fetches.Load())
+}
+
+func TestSource_AssertionClaims(t *testing.T) {
+	s, idp := newSource(t)
+	before := time.Now().Add(-time.Second)
+	_, err := s.Token(context.Background())
+	require.NoError(t, err)
+	s.token = "" // force a second fetch to compare jti
+	_, err = s.Token(context.Background())
+	require.NoError(t, err)
+
+	require.Len(t, idp.assertions, 2)
+	c := idp.assertions[0]
+	assert.Equal(t, "svc-flow", c["iss"])
+	assert.Equal(t, "svc-flow", c["sub"])
+	assert.Equal(t, []any{idp.tokenURL()}, c["aud"])
+	exp, err := c.GetExpirationTime()
+	require.NoError(t, err)
+	assert.True(t, exp.After(before) && exp.Before(time.Now().Add(assertionLifetime+time.Second)))
+	assert.NotEmpty(t, c["jti"])
+	assert.NotEqual(t, c["jti"], idp.assertions[1]["jti"], "jti is unique per request")
+	assert.Equal(t, "k1", idp.headers[0]["kid"])
+
+	f := idp.forms[0]
+	assert.Equal(t, "client_credentials", f["grant_type"])
+	assert.Equal(t, clientAssertionType, f["client_assertion_type"])
+	assert.Equal(t, "https://accounts", f["audience"])
+	assert.NotContains(t, f, "client_secret")
+}
+
+func TestSource_TokenEndpointError(t *testing.T) {
+	key, _ := rsa.GenerateKey(rand.Reader, 2048)
+	other, _ := rsa.GenerateKey(rand.Reader, 2048)
+	idp := newFakeIdP(t, &other.PublicKey) // rejects assertions signed by key
+	s, err := New(Config{TokenURL: idp.tokenURL(), ClientID: "c", Audience: "a", Key: key})
+	require.NoError(t, err)
+	_, err = s.Token(context.Background())
+	assert.ErrorContains(t, err, "401")
+}
+
+func TestTransport_AddsServiceTokenOnlyWithoutUser(t *testing.T) {
+	s, _ := newSource(t)
+	var seen []string
+	api := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		seen = append(seen, r.Header.Get("Authorization"))
+	}))
+	defer api.Close()
+	c := &http.Client{Transport: &Transport{Source: s}}
+
+	req, _ := http.NewRequest(http.MethodPost, api.URL, nil)
+	_, err := c.Do(req)
+	require.NoError(t, err)
+
+	req, _ = http.NewRequest(http.MethodPost, api.URL, nil)
+	req.Header.Set("Authorization", "Bearer user-token")
+	_, err = c.Do(req)
+	require.NoError(t, err)
+
+	assert.Equal(t, []string{"Bearer token-1", "Bearer user-token"}, seen)
+}
