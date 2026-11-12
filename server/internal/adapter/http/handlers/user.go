@@ -56,7 +56,7 @@ func (h *UserHandler) Me(c echo.Context) error {
 			return err
 		}
 		if w != nil {
-			ws, err := workspaceResponses(c, h.photos, workspace.List{w}, httpmodel.MemberUsers{})
+			ws, err := workspaceResponses(c, h.photos, workspace.List{w}, httpmodel.MemberUsers{}, httpmodel.ViewerOf(u))
 			if err != nil {
 				return err
 			}

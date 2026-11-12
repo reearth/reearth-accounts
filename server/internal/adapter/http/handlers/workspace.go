@@ -155,7 +155,7 @@ func (h *WorkspaceHandler) List(c echo.Context) error {
 			if err != nil {
 				return err
 			}
-			items, err := workspaceResponses(c, h.photos, res.Workspaces, memberUsersFor(c))
+			items, err := workspaceResponses(c, h.photos, res.Workspaces, memberUsersFor(c), httpmodel.ViewerOf(httpinternal.User(c)))
 			if err != nil {
 				return err
 			}
@@ -212,7 +212,7 @@ func (h *WorkspaceHandler) ListAll(c echo.Context) error {
 	if err != nil {
 		return err
 	}
-	items, err := workspaceResponses(c, h.photos, res.Workspaces, memberUsersFor(c))
+	items, err := workspaceResponses(c, h.photos, res.Workspaces, memberUsersFor(c), httpmodel.UnrestrictedViewer())
 	if err != nil {
 		return err
 	}
