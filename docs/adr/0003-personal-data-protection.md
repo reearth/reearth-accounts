@@ -1,6 +1,6 @@
 # ADR-0003: Personal data protection in the accounts API
 
-- **Status:** Proposed
+- **Status:** Accepted
 - **Date:** 2026-11-12
 - **Deciders:** @pyshx
 
