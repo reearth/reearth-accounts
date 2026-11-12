@@ -12,6 +12,7 @@ import (
 	"github.com/labstack/echo/v4/middleware"
 	"github.com/reearth/reearth-accounts/server/internal/adapter"
 	adapterhttp "github.com/reearth/reearth-accounts/server/internal/adapter/http"
+	"github.com/reearth/reearth-accounts/server/internal/adapter/ratelimit"
 	scimadapter "github.com/reearth/reearth-accounts/server/internal/adapter/scim"
 	otelapp "github.com/reearth/reearth-accounts/server/internal/app/otel"
 	"github.com/reearth/reearth-accounts/server/internal/usecase/interactor"
@@ -145,7 +146,8 @@ func initEcho(ctx context.Context, cfg *ServerConfig) *echo.Echo {
 	if err != nil {
 		log.Panicc(ctx, fmt.Errorf("REEARTH_ACCOUNTS_AUTH_TIME_CLAIM: %w", err))
 	}
-	api.POST("/graphql", GraphqlAPI(cfg.Config, photos, loginTime, cfg.Config.Dev), middlewares...)
+	lookups := ratelimit.New(cfg.Config.UserLookupLimit)
+	api.POST("/graphql", GraphqlAPI(cfg.Config, photos, loginTime, lookups, cfg.Config.Dev), middlewares...)
 
 	// REST API (additive; GraphQL above is unchanged). Reuses the usecase middleware
 	// and, in non-mock mode, an optional JWT middleware that parses a bearer token into
@@ -167,6 +169,7 @@ func initEcho(ctx context.Context, cfg *ServerConfig) *echo.Echo {
 		LoginTime:          loginTime,
 		AuthConfigProvider: cfg.Config,
 		Photos:             photos,
+		UserLookupLimit:    lookups,
 		APIKey:             cfg.Config.RestAPIKey,
 		SyncSSOAPIKey:      cfg.Config.SyncSSOAPIKey,
 		SwaggerUser:        cfg.Config.SwaggerBasicUser,

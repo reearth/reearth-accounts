@@ -9,6 +9,7 @@ import (
 	"github.com/reearth/reearth-accounts/server/internal/adapter"
 	"github.com/reearth/reearth-accounts/server/internal/adapter/http/handlers"
 	httpinternal "github.com/reearth/reearth-accounts/server/internal/adapter/http/internal"
+	"github.com/reearth/reearth-accounts/server/internal/adapter/ratelimit"
 	echoSwagger "github.com/swaggo/echo-swagger"
 )
 
@@ -30,6 +31,8 @@ type RouterConfig struct {
 	SyncSSOAPIKey string
 	// Photos signs photo URLs.
 	Photos adapter.PhotoSigner
+	// UserLookupLimit caps user lookups per viewer. Nil allows everything.
+	UserLookupLimit *ratelimit.Limiter
 	// Swagger basic-auth (optional).
 	SwaggerUser, SwaggerPass string
 	// LoginTime reads the login time for the recovery code step-up check.
@@ -72,6 +75,7 @@ func RegisterRESTRouter(e *echo.Echo, cfg RouterConfig) {
 	optional := OptionalAuth(cfg.AuthResolver)
 	apikeyOrAuth := APIKeyOrAuth(cfg.APIKey)
 	syncSSOApikeyOrAuth := APIKeyOrAuth(cfg.SyncSSOAPIKey)
+	lookup := UserLookupLimit(cfg.UserLookupLimit)
 
 	api := e.Group("/api", base...)
 
@@ -90,15 +94,15 @@ func RegisterRESTRouter(e *echo.Echo, cfg RouterConfig) {
 	api.POST("/users/me/mfa", uh.EnableMFA, required)
 	api.DELETE("/users/me/mfa", uh.DisableMFA, required)
 	api.POST("/users/me/mfa/recovery-code", uh.RegenerateMFARecoveryCode, required)
-	api.GET("/users/search", uh.Search, required)
-	api.GET("/users/by-alias", uh.FindByAlias, required)
-	api.GET("/users/by-name-or-email", uh.FindByNameOrEmail, required)
-	api.GET("/users/by-name-or-alias", uh.FindByNameOrAlias, required)
-	api.GET("/users", uh.List, required) // ?ids= | ?ids=&alias=&page=&page_size=
+	api.GET("/users/search", uh.Search, required, lookup)
+	api.GET("/users/by-alias", uh.FindByAlias, required, lookup)
+	api.GET("/users/by-name-or-email", uh.FindByNameOrEmail, required, lookup)
+	api.GET("/users/by-name-or-alias", uh.FindByNameOrAlias, required, lookup)
+	api.GET("/users", uh.List, required, lookup) // ?ids= | ?ids=&alias=&page=&page_size=
 	// Cross-tenant listing for service-to-service callers (e.g. LINKS-Veda). The
 	// interactor admits only maintainers, and the response includes every email.
 	api.GET("/users/all", uh.ListAll, required) // ?keyword=&status=active|deleted|all&page=&page_size=
-	api.GET("/users/:id", uh.Get, required)
+	api.GET("/users/:id", uh.Get, required, lookup)
 	api.POST("/users/:id/deactivate", uh.Deactivate, required) // soft delete (maintainer-only)
 	api.POST("/users/:id/restore", uh.Restore, required)       // undo deactivate (maintainer-only)
 	api.POST("/users/signup", uh.Signup, optional)

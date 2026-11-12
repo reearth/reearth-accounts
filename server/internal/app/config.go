@@ -11,6 +11,7 @@ import (
 	"github.com/joho/godotenv"
 	"github.com/kelseyhightower/envconfig"
 	"github.com/reearth/reearth-accounts/server/internal/adapter"
+	"github.com/reearth/reearth-accounts/server/internal/adapter/ratelimit"
 	"github.com/reearth/reearth-accounts/server/pkg/workspace"
 	"github.com/reearth/reearthx/appx"
 	"github.com/reearth/reearthx/log"
@@ -57,6 +58,9 @@ type Config struct {
 	AuthTimeClaim string `envconfig:"REEARTH_ACCOUNTS_AUTH_TIME_CLAIM"`
 
 	GraphQL GraphQLConfig
+
+	// UserLookupLimit caps user lookups per viewer (ADR-0003 decision 6).
+	UserLookupLimit ratelimit.Config
 
 	SignupSecret   string `envconfig:"REEARTH_ACCOUNTS_SIGNUP_SECRET"`
 	HostWeb        string
