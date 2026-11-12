@@ -501,3 +501,65 @@ func (e Theme) MarshalJSON() ([]byte, error) {
 	e.MarshalGQL(&buf)
 	return buf.Bytes(), nil
 }
+
+// Who may read a field that carries user data. The owner is the user the
+// enclosing object describes. A hidden field returns its empty value.
+type VisibilityLevel string
+
+const (
+	// Anyone who can reach the object.
+	VisibilityLevelPublic VisibilityLevel = "PUBLIC"
+	// Only the owner.
+	VisibilityLevelSelf VisibilityLevel = "SELF"
+	// The owner, and users who are members of a workspace the owner is a member of.
+	VisibilityLevelWorkspace VisibilityLevel = "WORKSPACE"
+)
+
+var AllVisibilityLevel = []VisibilityLevel{
+	VisibilityLevelPublic,
+	VisibilityLevelSelf,
+	VisibilityLevelWorkspace,
+}
+
+func (e VisibilityLevel) IsValid() bool {
+	switch e {
+	case VisibilityLevelPublic, VisibilityLevelSelf, VisibilityLevelWorkspace:
+		return true
+	}
+	return false
+}
+
+func (e VisibilityLevel) String() string {
+	return string(e)
+}
+
+func (e *VisibilityLevel) UnmarshalGQL(v any) error {
+	str, ok := v.(string)
+	if !ok {
+		return fmt.Errorf("enums must be strings")
+	}
+
+	*e = VisibilityLevel(str)
+	if !e.IsValid() {
+		return fmt.Errorf("%s is not a valid VisibilityLevel", str)
+	}
+	return nil
+}
+
+func (e VisibilityLevel) MarshalGQL(w io.Writer) {
+	fmt.Fprint(w, strconv.Quote(e.String()))
+}
+
+func (e *VisibilityLevel) UnmarshalJSON(b []byte) error {
+	s, err := strconv.Unquote(string(b))
+	if err != nil {
+		return err
+	}
+	return e.UnmarshalGQL(s)
+}
+
+func (e VisibilityLevel) MarshalJSON() ([]byte, error) {
+	var buf bytes.Buffer
+	e.MarshalGQL(&buf)
+	return buf.Bytes(), nil
+}
