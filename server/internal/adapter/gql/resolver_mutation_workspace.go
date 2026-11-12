@@ -11,6 +11,10 @@ import (
 )
 
 func (r *mutationResolver) CreateWorkspace(ctx context.Context, input gqlmodel.CreateWorkspaceInput) (*gqlmodel.CreateWorkspacePayload, error) {
+	u := getUser(ctx)
+	if u == nil {
+		return nil, interfaces.ErrInvalidOperator
+	}
 	description := ""
 	if input.Description != nil {
 		description = *input.Description
@@ -18,7 +22,7 @@ func (r *mutationResolver) CreateWorkspace(ctx context.Context, input gqlmodel.C
 
 	// skipOwnerMembership is REST-only (e.g. LINKS-Veda); GraphQL always joins the
 	// caller as owner.
-	w, err := usecases(ctx).Workspace.Create(ctx, input.Alias, input.Name, description, getUser(ctx).ID(), false, getOperator(ctx))
+	w, err := usecases(ctx).Workspace.Create(ctx, input.Alias, input.Name, description, u.ID(), false, getOperator(ctx))
 	if err != nil {
 		return nil, err
 	}

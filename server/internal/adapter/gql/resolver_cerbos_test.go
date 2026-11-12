@@ -15,3 +15,10 @@ func TestCheckPermission_NoUser(t *testing.T) {
 	assert.Nil(t, res)
 	assert.ErrorIs(t, err, interfaces.ErrInvalidOperator)
 }
+
+func TestCreateWorkspace_NoUser(t *testing.T) {
+	r := &mutationResolver{&Resolver{}}
+	res, err := r.CreateWorkspace(context.Background(), gqlmodel.CreateWorkspaceInput{Alias: "a", Name: "n"})
+	assert.Nil(t, res)
+	assert.ErrorIs(t, err, interfaces.ErrInvalidOperator)
+}
