@@ -49,7 +49,7 @@ func TestApplyPermittables(t *testing.T) {
 		roleNames := map[string]string{roleA.String(): "owner"}
 		wsInfo := map[string]WorkspaceInfo{wsA.String(): {Name: "My Workspace", Alias: "my-workspace"}}
 
-		got := []*UserResponse{{ID: userA.String()}, {ID: userB.String()}}
+		got := []*UserResponse{{MemberUserResponse: MemberUserResponse{ID: userA.String()}}, {MemberUserResponse: MemberUserResponse{ID: userB.String()}}}
 		ApplyPermittables(got, permittable.List{pa}, roleNames, wsInfo)
 
 		assert.Equal(t, []string{"owner"}, got[0].PlatformRoles)
@@ -63,7 +63,7 @@ func TestApplyPermittables(t *testing.T) {
 	})
 
 	t.Run("falls back to raw ids when maps are nil or missing entries", func(t *testing.T) {
-		got := []*UserResponse{{ID: userA.String()}}
+		got := []*UserResponse{{MemberUserResponse: MemberUserResponse{ID: userA.String()}}}
 		ApplyPermittables(got, permittable.List{pa}, nil, nil)
 
 		assert.Equal(t, []string{roleA.String()}, got[0].PlatformRoles)

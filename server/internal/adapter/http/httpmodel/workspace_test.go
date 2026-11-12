@@ -11,7 +11,8 @@ import (
 )
 
 func TestNewWorkspaceResponse_DropsMissingUsers(t *testing.T) {
-	owner, ghost := user.NewID(), user.NewID()
+	ownerUser := user.New().NewID().Name("owner").Email("owner@example.com").Workspace(workspace.NewID()).MustBuild()
+	owner, ghost := ownerUser.ID(), user.NewID()
 	integration := workspace.NewIntegrationID()
 	w := workspace.New().NewID().Name("team").Alias("team").
 		Members(map[user.ID]workspace.Member{
@@ -23,7 +24,7 @@ func TestNewWorkspaceResponse_DropsMissingUsers(t *testing.T) {
 		}).
 		MustBuild()
 
-	got := NewWorkspaceResponse(w, func(id user.ID) bool { return id == owner })
+	got := NewWorkspaceResponse(w, map[user.ID]*user.User{owner: ownerUser}, MemberUsers{})
 	require.NotNil(t, got)
 	assert.ElementsMatch(t, []WorkspaceMemberResponse{
 		{UserID: owner.String(), Role: "owner"},
