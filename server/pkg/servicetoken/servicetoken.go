@@ -28,6 +28,9 @@ const (
 	clientAssertionType = "urn:ietf:params:oauth:client-assertion-type:jwt-bearer"
 	assertionLifetime   = 5 * time.Minute
 	defaultRefreshEarly = time.Minute
+	// fetchTimeout bounds one token fetch, so a hung identity provider cannot
+	// hold the shared in-flight fetch forever when HTTPClient has no timeout.
+	fetchTimeout = 30 * time.Second
 )
 
 type Config struct {
@@ -53,8 +56,9 @@ type Config struct {
 // callers share a single fetch, and each waits only as long as its own context
 // allows.
 type Source struct {
-	cfg Config
-	now func() time.Time
+	cfg          Config
+	now          func() time.Time
+	fetchTimeout time.Duration
 
 	mu        sync.Mutex
 	token     string
@@ -85,7 +89,7 @@ func New(cfg Config) (*Source, error) {
 	if cfg.HTTPClient == nil {
 		cfg.HTTPClient = &http.Client{Timeout: 10 * time.Second}
 	}
-	return &Source{cfg: cfg, now: time.Now}, nil
+	return &Source{cfg: cfg, now: time.Now, fetchTimeout: fetchTimeout}, nil
 }
 
 func defaultSigningMethod(k crypto.Signer) (jwt.SigningMethod, error) {
@@ -125,6 +129,8 @@ func (s *Source) Token(ctx context.Context) (string, error) {
 }
 
 func (s *Source) run(ctx context.Context, call *fetchCall) {
+	ctx, cancel := context.WithTimeout(ctx, s.fetchTimeout)
+	defer cancel()
 	tok, expiresIn, err := s.fetch(ctx)
 	s.mu.Lock()
 	if err == nil {

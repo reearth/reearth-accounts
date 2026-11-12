@@ -238,3 +238,34 @@ func TestTransport_ClosesBodyWhenTokenFails(t *testing.T) {
 	assert.Error(t, err)
 	assert.True(t, body.closed)
 }
+
+func TestSource_HungFetchDoesNotWedgeTheSource(t *testing.T) {
+	key, err := rsa.GenerateKey(rand.Reader, 2048)
+	require.NoError(t, err)
+	idp := newFakeIdP(t, &key.PublicKey)
+	var hits atomic.Int32
+	release := make(chan struct{})
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if hits.Add(1) == 1 {
+			select {
+			case <-release:
+			case <-r.Context().Done():
+			}
+			return
+		}
+		idp.serve(w, r)
+	}))
+	defer srv.Close()
+	defer close(release)
+
+	s, err := New(Config{TokenURL: srv.URL, ClientID: "svc-flow", Audience: "https://accounts", Key: key, HTTPClient: &http.Client{}})
+	require.NoError(t, err)
+	s.fetchTimeout = 100 * time.Millisecond
+
+	_, err = s.Token(context.Background())
+	assert.ErrorIs(t, err, context.DeadlineExceeded)
+	tok, err := s.Token(context.Background())
+	require.NoError(t, err)
+	assert.NotEmpty(t, tok)
+	assert.Equal(t, int32(2), hits.Load())
+}
