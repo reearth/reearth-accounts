@@ -58,6 +58,7 @@ var publicFieldCalls = map[string]GraphQLRequest{
 	"findByIDs":                    {Query: `query($ids: [ID!]!) { findByIDs(ids: $ids) { id } }`, Variables: map[string]any{"ids": []string{wId.String()}}},
 	"findByAlias":                  {Query: `{ findByAlias(alias: "nope") { id } }`},
 	"findUsersByIDsWithPagination": {Query: `query($ids: [ID!]!) { findUsersByIDsWithPagination(ids: $ids, pagination: {page: 1, size: 10}) { totalCount } }`, Variables: map[string]any{"ids": []string{uId.String()}}},
+	"publicWorkspace":              {Query: `{ publicWorkspace(alias: "nope") { id } }`},
 	"createVerification":           {Query: `mutation { createVerification(input: {email: "nobody@example.com"}) }`},
 	"startPasswordReset":           {Query: `mutation { startPasswordReset(input: {email: "nobody@example.com"}) }`},
 	"signup":                       {Query: `mutation { signup(input: {name: "anon", email: "anon@example.com", password: "Passw0rd!Passw0rd"}) { user { id } } }`},

@@ -145,6 +145,21 @@ type PasswordResetInput struct {
 	Token    string `json:"token"`
 }
 
+// A workspace as an anonymous caller may see it. It leaves out member roles,
+// emails and user IDs (ADR-0003 decision 2).
+type PublicWorkspace struct {
+	ID      ID                       `json:"id"`
+	Name    string                   `json:"name"`
+	Alias   string                   `json:"alias"`
+	Members []*PublicWorkspaceMember `json:"members"`
+}
+
+type PublicWorkspaceMember struct {
+	Name     string `json:"name"`
+	Alias    string `json:"alias"`
+	PhotoURL string `json:"photoURL"`
+}
+
 type Query struct {
 }
 

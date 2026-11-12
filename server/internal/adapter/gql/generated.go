@@ -135,6 +135,19 @@ type ComplexityRoot struct {
 		VerifyUser                       func(childComplexity int, input gqlmodel.VerifyUserInput) int
 	}
 
+	PublicWorkspace struct {
+		Alias   func(childComplexity int) int
+		ID      func(childComplexity int) int
+		Members func(childComplexity int) int
+		Name    func(childComplexity int) int
+	}
+
+	PublicWorkspaceMember struct {
+		Alias    func(childComplexity int) int
+		Name     func(childComplexity int) int
+		PhotoURL func(childComplexity int) int
+	}
+
 	Query struct {
 		AuthConfig                   func(childComplexity int) int
 		CheckPermission              func(childComplexity int, input gqlmodel.CheckPermissionInput) int
@@ -151,6 +164,7 @@ type ComplexityRoot struct {
 		MfaStatus                    func(childComplexity int) int
 		Node                         func(childComplexity int, id gqlmodel.ID, typeArg gqlmodel.NodeType) int
 		Nodes                        func(childComplexity int, id []gqlmodel.ID, typeArg gqlmodel.NodeType) int
+		PublicWorkspace              func(childComplexity int, id *gqlmodel.ID, alias *string) int
 		SearchUser                   func(childComplexity int, keyword string) int
 		User                         func(childComplexity int, id gqlmodel.ID) int
 		UserByNameOrAlias            func(childComplexity int, nameOrAlias string) int
@@ -304,6 +318,7 @@ type QueryResolver interface {
 	FindByAlias(ctx context.Context, alias string) (*gqlmodel.Workspace, error)
 	FindByUser(ctx context.Context, userID gqlmodel.ID) ([]*gqlmodel.Workspace, error)
 	FindByUserWithPagination(ctx context.Context, userID gqlmodel.ID, pagination gqlmodel.Pagination) (*gqlmodel.WorkspacesWithPagination, error)
+	PublicWorkspace(ctx context.Context, id *gqlmodel.ID, alias *string) (*gqlmodel.PublicWorkspace, error)
 }
 type WorkspaceUserMemberResolver interface {
 	User(ctx context.Context, obj *gqlmodel.WorkspaceUserMember) (*gqlmodel.User, error)
@@ -761,6 +776,50 @@ func (e *executableSchema) Complexity(ctx context.Context, typeName, field strin
 
 		return e.complexity.Mutation.VerifyUser(childComplexity, args["input"].(gqlmodel.VerifyUserInput)), true
 
+	case "PublicWorkspace.alias":
+		if e.complexity.PublicWorkspace.Alias == nil {
+			break
+		}
+
+		return e.complexity.PublicWorkspace.Alias(childComplexity), true
+	case "PublicWorkspace.id":
+		if e.complexity.PublicWorkspace.ID == nil {
+			break
+		}
+
+		return e.complexity.PublicWorkspace.ID(childComplexity), true
+	case "PublicWorkspace.members":
+		if e.complexity.PublicWorkspace.Members == nil {
+			break
+		}
+
+		return e.complexity.PublicWorkspace.Members(childComplexity), true
+	case "PublicWorkspace.name":
+		if e.complexity.PublicWorkspace.Name == nil {
+			break
+		}
+
+		return e.complexity.PublicWorkspace.Name(childComplexity), true
+
+	case "PublicWorkspaceMember.alias":
+		if e.complexity.PublicWorkspaceMember.Alias == nil {
+			break
+		}
+
+		return e.complexity.PublicWorkspaceMember.Alias(childComplexity), true
+	case "PublicWorkspaceMember.name":
+		if e.complexity.PublicWorkspaceMember.Name == nil {
+			break
+		}
+
+		return e.complexity.PublicWorkspaceMember.Name(childComplexity), true
+	case "PublicWorkspaceMember.photoURL":
+		if e.complexity.PublicWorkspaceMember.PhotoURL == nil {
+			break
+		}
+
+		return e.complexity.PublicWorkspaceMember.PhotoURL(childComplexity), true
+
 	case "Query.authConfig":
 		if e.complexity.Query.AuthConfig == nil {
 			break
@@ -911,6 +970,17 @@ func (e *executableSchema) Complexity(ctx context.Context, typeName, field strin
 		}
 
 		return e.complexity.Query.Nodes(childComplexity, args["id"].([]gqlmodel.ID), args["type"].(gqlmodel.NodeType)), true
+	case "Query.publicWorkspace":
+		if e.complexity.Query.PublicWorkspace == nil {
+			break
+		}
+
+		args, err := ec.field_Query_publicWorkspace_args(ctx, rawArgs)
+		if err != nil {
+			return 0, false
+		}
+
+		return e.complexity.Query.PublicWorkspace(childComplexity, args["id"].(*gqlmodel.ID), args["alias"].(*string)), true
 	case "Query.searchUser":
 		if e.complexity.Query.SearchUser == nil {
 			break
@@ -1687,6 +1757,23 @@ type WorkspaceMetadata {
     photoURL: String!
 }
 
+"""
+A workspace as an anonymous caller may see it. It leaves out member roles,
+emails and user IDs (ADR-0003 decision 2).
+"""
+type PublicWorkspace {
+    id: ID!
+    name: String!
+    alias: String!
+    members: [PublicWorkspaceMember!]!
+}
+
+type PublicWorkspaceMember {
+    name: String! @visibility(level: PUBLIC)
+    alias: String! @visibility(level: PUBLIC)
+    photoURL: String! @visibility(level: PUBLIC)
+}
+
 type WorkspacesWithPagination {
     workspaces: [Workspace!]!
     totalCount: Int!
@@ -1822,6 +1909,8 @@ extend type Query {
     findByAlias(alias: String!): Workspace @public
     findByUser(userId: ID!): [Workspace]
     findByUserWithPagination(userId: ID!, pagination: Pagination!): WorkspacesWithPagination!
+    "Looks a workspace up by exactly one of id or alias. Returns null when none matches."
+    publicWorkspace(id: ID, alias: String): PublicWorkspace @public
 }
 
 extend type Mutation {
@@ -2263,6 +2352,22 @@ func (ec *executionContext) field_Query_nodes_args(ctx context.Context, rawArgs 
 		return nil, err
 	}
 	args["type"] = arg1
+	return args, nil
+}
+
+func (ec *executionContext) field_Query_publicWorkspace_args(ctx context.Context, rawArgs map[string]any) (map[string]any, error) {
+	var err error
+	args := map[string]any{}
+	arg0, err := graphql.ProcessArgField(ctx, rawArgs, "id", ec.unmarshalOID2ᚖgithubᚗcomᚋreearthᚋreearthᚑaccountsᚋserverᚋinternalᚋadapterᚋgqlᚋgqlmodelᚐID)
+	if err != nil {
+		return nil, err
+	}
+	args["id"] = arg0
+	arg1, err := graphql.ProcessArgField(ctx, rawArgs, "alias", ec.unmarshalOString2ᚖstring)
+	if err != nil {
+		return nil, err
+	}
+	args["alias"] = arg1
 	return args, nil
 }
 
@@ -4474,6 +4579,271 @@ func (ec *executionContext) fieldContext_Mutation_transferWorkspaceOwnership(ctx
 	return fc, nil
 }
 
+func (ec *executionContext) _PublicWorkspace_id(ctx context.Context, field graphql.CollectedField, obj *gqlmodel.PublicWorkspace) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		ec.fieldContext_PublicWorkspace_id,
+		func(ctx context.Context) (any, error) {
+			return obj.ID, nil
+		},
+		nil,
+		ec.marshalNID2githubᚗcomᚋreearthᚋreearthᚑaccountsᚋserverᚋinternalᚋadapterᚋgqlᚋgqlmodelᚐID,
+		true,
+		true,
+	)
+}
+
+func (ec *executionContext) fieldContext_PublicWorkspace_id(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "PublicWorkspace",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type ID does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _PublicWorkspace_name(ctx context.Context, field graphql.CollectedField, obj *gqlmodel.PublicWorkspace) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		ec.fieldContext_PublicWorkspace_name,
+		func(ctx context.Context) (any, error) {
+			return obj.Name, nil
+		},
+		nil,
+		ec.marshalNString2string,
+		true,
+		true,
+	)
+}
+
+func (ec *executionContext) fieldContext_PublicWorkspace_name(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "PublicWorkspace",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type String does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _PublicWorkspace_alias(ctx context.Context, field graphql.CollectedField, obj *gqlmodel.PublicWorkspace) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		ec.fieldContext_PublicWorkspace_alias,
+		func(ctx context.Context) (any, error) {
+			return obj.Alias, nil
+		},
+		nil,
+		ec.marshalNString2string,
+		true,
+		true,
+	)
+}
+
+func (ec *executionContext) fieldContext_PublicWorkspace_alias(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "PublicWorkspace",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type String does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _PublicWorkspace_members(ctx context.Context, field graphql.CollectedField, obj *gqlmodel.PublicWorkspace) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		ec.fieldContext_PublicWorkspace_members,
+		func(ctx context.Context) (any, error) {
+			return obj.Members, nil
+		},
+		nil,
+		ec.marshalNPublicWorkspaceMember2ᚕᚖgithubᚗcomᚋreearthᚋreearthᚑaccountsᚋserverᚋinternalᚋadapterᚋgqlᚋgqlmodelᚐPublicWorkspaceMemberᚄ,
+		true,
+		true,
+	)
+}
+
+func (ec *executionContext) fieldContext_PublicWorkspace_members(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "PublicWorkspace",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			switch field.Name {
+			case "name":
+				return ec.fieldContext_PublicWorkspaceMember_name(ctx, field)
+			case "alias":
+				return ec.fieldContext_PublicWorkspaceMember_alias(ctx, field)
+			case "photoURL":
+				return ec.fieldContext_PublicWorkspaceMember_photoURL(ctx, field)
+			}
+			return nil, fmt.Errorf("no field named %q was found under type PublicWorkspaceMember", field.Name)
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _PublicWorkspaceMember_name(ctx context.Context, field graphql.CollectedField, obj *gqlmodel.PublicWorkspaceMember) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		ec.fieldContext_PublicWorkspaceMember_name,
+		func(ctx context.Context) (any, error) {
+			return obj.Name, nil
+		},
+		func(ctx context.Context, next graphql.Resolver) graphql.Resolver {
+			directive0 := next
+
+			directive1 := func(ctx context.Context) (any, error) {
+				level, err := ec.unmarshalNVisibilityLevel2githubᚗcomᚋreearthᚋreearthᚑaccountsᚋserverᚋinternalᚋadapterᚋgqlᚋgqlmodelᚐVisibilityLevel(ctx, "PUBLIC")
+				if err != nil {
+					var zeroVal string
+					return zeroVal, err
+				}
+				if ec.directives.Visibility == nil {
+					var zeroVal string
+					return zeroVal, errors.New("directive visibility is not implemented")
+				}
+				return ec.directives.Visibility(ctx, obj, directive0, level)
+			}
+
+			next = directive1
+			return next
+		},
+		ec.marshalNString2string,
+		true,
+		true,
+	)
+}
+
+func (ec *executionContext) fieldContext_PublicWorkspaceMember_name(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "PublicWorkspaceMember",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type String does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _PublicWorkspaceMember_alias(ctx context.Context, field graphql.CollectedField, obj *gqlmodel.PublicWorkspaceMember) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		ec.fieldContext_PublicWorkspaceMember_alias,
+		func(ctx context.Context) (any, error) {
+			return obj.Alias, nil
+		},
+		func(ctx context.Context, next graphql.Resolver) graphql.Resolver {
+			directive0 := next
+
+			directive1 := func(ctx context.Context) (any, error) {
+				level, err := ec.unmarshalNVisibilityLevel2githubᚗcomᚋreearthᚋreearthᚑaccountsᚋserverᚋinternalᚋadapterᚋgqlᚋgqlmodelᚐVisibilityLevel(ctx, "PUBLIC")
+				if err != nil {
+					var zeroVal string
+					return zeroVal, err
+				}
+				if ec.directives.Visibility == nil {
+					var zeroVal string
+					return zeroVal, errors.New("directive visibility is not implemented")
+				}
+				return ec.directives.Visibility(ctx, obj, directive0, level)
+			}
+
+			next = directive1
+			return next
+		},
+		ec.marshalNString2string,
+		true,
+		true,
+	)
+}
+
+func (ec *executionContext) fieldContext_PublicWorkspaceMember_alias(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "PublicWorkspaceMember",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type String does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _PublicWorkspaceMember_photoURL(ctx context.Context, field graphql.CollectedField, obj *gqlmodel.PublicWorkspaceMember) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		ec.fieldContext_PublicWorkspaceMember_photoURL,
+		func(ctx context.Context) (any, error) {
+			return obj.PhotoURL, nil
+		},
+		func(ctx context.Context, next graphql.Resolver) graphql.Resolver {
+			directive0 := next
+
+			directive1 := func(ctx context.Context) (any, error) {
+				level, err := ec.unmarshalNVisibilityLevel2githubᚗcomᚋreearthᚋreearthᚑaccountsᚋserverᚋinternalᚋadapterᚋgqlᚋgqlmodelᚐVisibilityLevel(ctx, "PUBLIC")
+				if err != nil {
+					var zeroVal string
+					return zeroVal, err
+				}
+				if ec.directives.Visibility == nil {
+					var zeroVal string
+					return zeroVal, errors.New("directive visibility is not implemented")
+				}
+				return ec.directives.Visibility(ctx, obj, directive0, level)
+			}
+
+			next = directive1
+			return next
+		},
+		ec.marshalNString2string,
+		true,
+		true,
+	)
+}
+
+func (ec *executionContext) fieldContext_PublicWorkspaceMember_photoURL(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "PublicWorkspaceMember",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type String does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
 func (ec *executionContext) _Query_node(ctx context.Context, field graphql.CollectedField) (ret graphql.Marshaler) {
 	return graphql.ResolveField(
 		ctx,
@@ -5461,6 +5831,57 @@ func (ec *executionContext) fieldContext_Query_findByUserWithPagination(ctx cont
 	}()
 	ctx = graphql.WithFieldContext(ctx, fc)
 	if fc.Args, err = ec.field_Query_findByUserWithPagination_args(ctx, field.ArgumentMap(ec.Variables)); err != nil {
+		ec.Error(ctx, err)
+		return fc, err
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _Query_publicWorkspace(ctx context.Context, field graphql.CollectedField) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		ec.fieldContext_Query_publicWorkspace,
+		func(ctx context.Context) (any, error) {
+			fc := graphql.GetFieldContext(ctx)
+			return ec.resolvers.Query().PublicWorkspace(ctx, fc.Args["id"].(*gqlmodel.ID), fc.Args["alias"].(*string))
+		},
+		nil,
+		ec.marshalOPublicWorkspace2ᚖgithubᚗcomᚋreearthᚋreearthᚑaccountsᚋserverᚋinternalᚋadapterᚋgqlᚋgqlmodelᚐPublicWorkspace,
+		true,
+		false,
+	)
+}
+
+func (ec *executionContext) fieldContext_Query_publicWorkspace(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "Query",
+		Field:      field,
+		IsMethod:   true,
+		IsResolver: true,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			switch field.Name {
+			case "id":
+				return ec.fieldContext_PublicWorkspace_id(ctx, field)
+			case "name":
+				return ec.fieldContext_PublicWorkspace_name(ctx, field)
+			case "alias":
+				return ec.fieldContext_PublicWorkspace_alias(ctx, field)
+			case "members":
+				return ec.fieldContext_PublicWorkspace_members(ctx, field)
+			}
+			return nil, fmt.Errorf("no field named %q was found under type PublicWorkspace", field.Name)
+		},
+	}
+	defer func() {
+		if r := recover(); r != nil {
+			err = ec.Recover(ctx, r)
+			ec.Error(ctx, err)
+		}
+	}()
+	ctx = graphql.WithFieldContext(ctx, fc)
+	if fc.Args, err = ec.field_Query_publicWorkspace_args(ctx, field.ArgumentMap(ec.Variables)); err != nil {
 		ec.Error(ctx, err)
 		return fc, err
 	}
@@ -10665,6 +11086,109 @@ func (ec *executionContext) _Mutation(ctx context.Context, sel ast.SelectionSet)
 	return out
 }
 
+var publicWorkspaceImplementors = []string{"PublicWorkspace"}
+
+func (ec *executionContext) _PublicWorkspace(ctx context.Context, sel ast.SelectionSet, obj *gqlmodel.PublicWorkspace) graphql.Marshaler {
+	fields := graphql.CollectFields(ec.OperationContext, sel, publicWorkspaceImplementors)
+
+	out := graphql.NewFieldSet(fields)
+	deferred := make(map[string]*graphql.FieldSet)
+	for i, field := range fields {
+		switch field.Name {
+		case "__typename":
+			out.Values[i] = graphql.MarshalString("PublicWorkspace")
+		case "id":
+			out.Values[i] = ec._PublicWorkspace_id(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "name":
+			out.Values[i] = ec._PublicWorkspace_name(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "alias":
+			out.Values[i] = ec._PublicWorkspace_alias(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "members":
+			out.Values[i] = ec._PublicWorkspace_members(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		default:
+			panic("unknown field " + strconv.Quote(field.Name))
+		}
+	}
+	out.Dispatch(ctx)
+	if out.Invalids > 0 {
+		return graphql.Null
+	}
+
+	atomic.AddInt32(&ec.deferred, int32(len(deferred)))
+
+	for label, dfs := range deferred {
+		ec.processDeferredGroup(graphql.DeferredGroup{
+			Label:    label,
+			Path:     graphql.GetPath(ctx),
+			FieldSet: dfs,
+			Context:  ctx,
+		})
+	}
+
+	return out
+}
+
+var publicWorkspaceMemberImplementors = []string{"PublicWorkspaceMember"}
+
+func (ec *executionContext) _PublicWorkspaceMember(ctx context.Context, sel ast.SelectionSet, obj *gqlmodel.PublicWorkspaceMember) graphql.Marshaler {
+	fields := graphql.CollectFields(ec.OperationContext, sel, publicWorkspaceMemberImplementors)
+
+	out := graphql.NewFieldSet(fields)
+	deferred := make(map[string]*graphql.FieldSet)
+	for i, field := range fields {
+		switch field.Name {
+		case "__typename":
+			out.Values[i] = graphql.MarshalString("PublicWorkspaceMember")
+		case "name":
+			out.Values[i] = ec._PublicWorkspaceMember_name(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "alias":
+			out.Values[i] = ec._PublicWorkspaceMember_alias(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "photoURL":
+			out.Values[i] = ec._PublicWorkspaceMember_photoURL(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		default:
+			panic("unknown field " + strconv.Quote(field.Name))
+		}
+	}
+	out.Dispatch(ctx)
+	if out.Invalids > 0 {
+		return graphql.Null
+	}
+
+	atomic.AddInt32(&ec.deferred, int32(len(deferred)))
+
+	for label, dfs := range deferred {
+		ec.processDeferredGroup(graphql.DeferredGroup{
+			Label:    label,
+			Path:     graphql.GetPath(ctx),
+			FieldSet: dfs,
+			Context:  ctx,
+		})
+	}
+
+	return out
+}
+
 var queryImplementors = []string{"Query"}
 
 func (ec *executionContext) _Query(ctx context.Context, sel ast.SelectionSet) graphql.Marshaler {
@@ -11060,6 +11584,25 @@ func (ec *executionContext) _Query(ctx context.Context, sel ast.SelectionSet) gr
 				if res == graphql.Null {
 					atomic.AddUint32(&fs.Invalids, 1)
 				}
+				return res
+			}
+
+			rrm := func(ctx context.Context) graphql.Marshaler {
+				return ec.OperationContext.RootResolverMiddleware(ctx,
+					func(ctx context.Context) graphql.Marshaler { return innerFunc(ctx, out) })
+			}
+
+			out.Concurrently(i, func(ctx context.Context) graphql.Marshaler { return rrm(innerCtx) })
+		case "publicWorkspace":
+			field := field
+
+			innerFunc := func(ctx context.Context, _ *graphql.FieldSet) (res graphql.Marshaler) {
+				defer func() {
+					if r := recover(); r != nil {
+						ec.Error(ctx, ec.Recover(ctx, r))
+					}
+				}()
+				res = ec._Query_publicWorkspace(ctx, field)
 				return res
 			}
 
@@ -12457,6 +13000,60 @@ func (ec *executionContext) unmarshalNPasswordResetInput2githubᚗcomᚋreearth�
 	return res, graphql.ErrorOnPath(ctx, err)
 }
 
+func (ec *executionContext) marshalNPublicWorkspaceMember2ᚕᚖgithubᚗcomᚋreearthᚋreearthᚑaccountsᚋserverᚋinternalᚋadapterᚋgqlᚋgqlmodelᚐPublicWorkspaceMemberᚄ(ctx context.Context, sel ast.SelectionSet, v []*gqlmodel.PublicWorkspaceMember) graphql.Marshaler {
+	ret := make(graphql.Array, len(v))
+	var wg sync.WaitGroup
+	isLen1 := len(v) == 1
+	if !isLen1 {
+		wg.Add(len(v))
+	}
+	for i := range v {
+		i := i
+		fc := &graphql.FieldContext{
+			Index:  &i,
+			Result: &v[i],
+		}
+		ctx := graphql.WithFieldContext(ctx, fc)
+		f := func(i int) {
+			defer func() {
+				if r := recover(); r != nil {
+					ec.Error(ctx, ec.Recover(ctx, r))
+					ret = nil
+				}
+			}()
+			if !isLen1 {
+				defer wg.Done()
+			}
+			ret[i] = ec.marshalNPublicWorkspaceMember2ᚖgithubᚗcomᚋreearthᚋreearthᚑaccountsᚋserverᚋinternalᚋadapterᚋgqlᚋgqlmodelᚐPublicWorkspaceMember(ctx, sel, v[i])
+		}
+		if isLen1 {
+			f(i)
+		} else {
+			go f(i)
+		}
+
+	}
+	wg.Wait()
+
+	for _, e := range ret {
+		if e == graphql.Null {
+			return graphql.Null
+		}
+	}
+
+	return ret
+}
+
+func (ec *executionContext) marshalNPublicWorkspaceMember2ᚖgithubᚗcomᚋreearthᚋreearthᚑaccountsᚋserverᚋinternalᚋadapterᚋgqlᚋgqlmodelᚐPublicWorkspaceMember(ctx context.Context, sel ast.SelectionSet, v *gqlmodel.PublicWorkspaceMember) graphql.Marshaler {
+	if v == nil {
+		if !graphql.HasFieldError(ctx, graphql.GetFieldContext(ctx)) {
+			graphql.AddErrorf(ctx, "the requested element is null which the schema does not allow")
+		}
+		return graphql.Null
+	}
+	return ec._PublicWorkspaceMember(ctx, sel, v)
+}
+
 func (ec *executionContext) unmarshalNRemoveIntegrationFromWorkspaceInput2githubᚗcomᚋreearthᚋreearthᚑaccountsᚋserverᚋinternalᚋadapterᚋgqlᚋgqlmodelᚐRemoveIntegrationFromWorkspaceInput(ctx context.Context, v any) (gqlmodel.RemoveIntegrationFromWorkspaceInput, error) {
 	res, err := ec.unmarshalInputRemoveIntegrationFromWorkspaceInput(ctx, v)
 	return res, graphql.ErrorOnPath(ctx, err)
@@ -13250,6 +13847,13 @@ func (ec *executionContext) marshalONode2ᚕgithubᚗcomᚋreearthᚋreearthᚑa
 	wg.Wait()
 
 	return ret
+}
+
+func (ec *executionContext) marshalOPublicWorkspace2ᚖgithubᚗcomᚋreearthᚋreearthᚑaccountsᚋserverᚋinternalᚋadapterᚋgqlᚋgqlmodelᚐPublicWorkspace(ctx context.Context, sel ast.SelectionSet, v *gqlmodel.PublicWorkspace) graphql.Marshaler {
+	if v == nil {
+		return graphql.Null
+	}
+	return ec._PublicWorkspace(ctx, sel, v)
 }
 
 func (ec *executionContext) marshalORemoveIntegrationsFromWorkspacePayload2ᚖgithubᚗcomᚋreearthᚋreearthᚑaccountsᚋserverᚋinternalᚋadapterᚋgqlᚋgqlmodelᚐRemoveIntegrationsFromWorkspacePayload(ctx context.Context, sel ast.SelectionSet, v *gqlmodel.RemoveIntegrationsFromWorkspacePayload) graphql.Marshaler {

@@ -32,6 +32,23 @@ type WorkspaceMetadata {
     photoURL: String!
 }
 
+"""
+A workspace as an anonymous caller may see it. It leaves out member roles,
+emails and user IDs (ADR-0003 decision 2).
+"""
+type PublicWorkspace {
+    id: ID!
+    name: String!
+    alias: String!
+    members: [PublicWorkspaceMember!]!
+}
+
+type PublicWorkspaceMember {
+    name: String! @visibility(level: PUBLIC)
+    alias: String! @visibility(level: PUBLIC)
+    photoURL: String! @visibility(level: PUBLIC)
+}
+
 type WorkspacesWithPagination {
     workspaces: [Workspace!]!
     totalCount: Int!
@@ -167,6 +184,8 @@ extend type Query {
     findByAlias(alias: String!): Workspace @public
     findByUser(userId: ID!): [Workspace]
     findByUserWithPagination(userId: ID!, pagination: Pagination!): WorkspacesWithPagination!
+    "Looks a workspace up by exactly one of id or alias. Returns null when none matches."
+    publicWorkspace(id: ID, alias: String): PublicWorkspace @public
 }
 
 extend type Mutation {
