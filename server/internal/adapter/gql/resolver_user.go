@@ -43,6 +43,9 @@ func (r *userResolver) Email(ctx context.Context, obj *gqlmodel.User) (string, e
 }
 
 func (r *queryResolver) FindUsersByIDs(ctx context.Context, userIds []gqlmodel.ID) ([]*gqlmodel.User, error) {
+	if err := denyServiceCaller(ctx); err != nil {
+		return nil, err
+	}
 	uids, err := gqlmodel.ToIDs[id.User](userIds)
 	if err != nil {
 		return nil, err
@@ -57,6 +60,9 @@ func (r *queryResolver) FindUsersByIDs(ctx context.Context, userIds []gqlmodel.I
 }
 
 func (r *queryResolver) FindUsersByIDsWithPagination(ctx context.Context, userIds []gqlmodel.ID, alias *string, pagination gqlmodel.Pagination) (*gqlmodel.UsersWithPagination, error) {
+	if err := denyServiceCaller(ctx); err != nil {
+		return nil, err
+	}
 	uids, err := gqlmodel.ToIDs[id.User](userIds)
 	if err != nil {
 		return nil, err

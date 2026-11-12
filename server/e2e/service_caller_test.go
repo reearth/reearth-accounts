@@ -175,6 +175,8 @@ func TestServiceCaller_REST(t *testing.T) {
 			Status(http.StatusOK).JSON().Object()
 		page.Value("items").Array().Length().IsEqual(1)
 		page.Value("pagination").Object().HasValue("total", 2)
+		get(flow, "/api/workspaces", map[string]string{"user_id": svcOwnerUID.String(), "page": "184467440737095518", "page_size": "50"}).
+			Status(http.StatusOK).JSON().Object().Value("items").Array().IsEmpty()
 		get(lonely, "/api/workspaces", map[string]string{"user_id": svcOwnerUID.String(), "page": "1"}).
 			Status(http.StatusOK).JSON().Object().Value("pagination").Object().HasValue("total", 0)
 	})
@@ -233,6 +235,7 @@ func TestServiceCaller_GraphQL(t *testing.T) {
 			`{ searchUser(keyword: "svc") { id } }`,
 			`query($u: ID!) { user(id: $u) { id } }`,
 			`{ userByNameOrEmail(nameOrEmail: "svc-owner") { id } }`,
+			`query($u: ID!) { findUsersByIDs(ids: [$u]) { id } }`,
 		} {
 			gql(e, flow, q, map[string]any{"u": svcOwnerUID.String()}).Value("errors").Array().NotEmpty()
 		}
