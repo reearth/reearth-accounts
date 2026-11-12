@@ -2,7 +2,6 @@ package migration
 
 import (
 	"context"
-	"strings"
 
 	"github.com/reearth/reearth-accounts/server/internal/infrastructure/mongo/mongodoc"
 	"github.com/reearth/reearth-accounts/server/pkg/applog"
@@ -84,24 +83,4 @@ func SyncUserNameToWorkspace(ctx context.Context, c DBClient) error {
 			return nil
 		},
 	})
-}
-
-func maskEmail(email string) string {
-	parts := strings.Split(email, "@")
-	if len(parts) != 2 {
-		return email
-	}
-
-	localPart := parts[0]
-	domain := parts[1]
-
-	if len(localPart) == 0 {
-		return email
-	}
-
-	if len(localPart) == 1 {
-		return localPart[0:1] + "***@" + domain
-	}
-
-	return localPart[0:1] + "***@" + domain
 }

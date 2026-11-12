@@ -209,11 +209,11 @@ func NewServer(ctx context.Context, cfg *ServerConfig) *WebServer {
 func (w *WebServer) Run(ctx context.Context) {
 	defer applog.Info(ctx, "Server shutdown")
 
-	debugLog := ""
+	msg := "server started"
 	if w.appServer.Debug {
-		debugLog += " with debug mode"
+		msg = "server started with debug mode"
 	}
-	applog.Info(ctx, "server started", applog.Address(w.address))
+	applog.Info(ctx, msg, applog.Address(w.address))
 
 	go func() {
 		if err := w.appServer.StartH2CServer(w.address, &http2.Server{}); err != nil && !errors.Is(err, http.ErrServerClosed) {
