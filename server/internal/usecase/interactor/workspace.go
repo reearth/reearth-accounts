@@ -95,9 +95,9 @@ func (i *Workspace) FetchByUserWithPagination(ctx context.Context, userID worksp
 		if err != nil {
 			return interfaces.FetchByUserWithPaginationResult{}, err
 		}
-		off, limit := int(p.Offset.Offset), int(p.Offset.Limit)
+		start, end := pageBounds(p.Offset.Offset, p.Offset.Limit, len(ws))
 		return interfaces.FetchByUserWithPaginationResult{
-			Workspaces: ws[min(off, len(ws)):min(off+limit, len(ws))],
+			Workspaces: ws[start:end],
 			TotalCount: len(ws),
 		}, nil
 	}
@@ -111,6 +111,15 @@ func (i *Workspace) FetchByUserWithPagination(ctx context.Context, userID worksp
 		Workspaces: workspace.List(workspaces),
 		TotalCount: int(pageInfo.TotalCount),
 	}, nil
+}
+
+// pageBounds clamps an offset page to [0, n]; a huge page number can overflow
+// the offset ToPagination computes.
+func pageBounds(offset, limit int64, n int) (int, int) {
+	if offset < 0 || offset >= int64(n) || limit <= 0 {
+		return n, n
+	}
+	return int(offset), int(min(offset+limit, int64(n)))
 }
 
 // scopeForService hides a workspace from a service caller that is not a member
