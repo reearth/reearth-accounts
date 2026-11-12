@@ -293,11 +293,17 @@ func TestREST_ServiceCallerReplacesStaticKeys(t *testing.T) {
 		WithJSON(body).
 		Expect().Status(http.StatusNoContent)
 
+	ssoBody := map[string]any{"name": "sso@e2e.com", "email": "sso@e2e.com", "sub": "samlp|org|sso"}
 	syncStatus := exp.POST("/api/users/sync-sso").
-		WithHeader("Authorization", "Bearer "+idp.clientToken(t, "svc-flow")).
-		WithJSON(map[string]any{"name": "sso@e2e.com", "email": "sso@e2e.com", "sub": "samlp|org|sso"}).
+		WithHeader("Authorization", "Bearer "+idp.clientToken(t, "svc-hook")).
+		WithJSON(ssoBody).
 		Expect().Raw().StatusCode
-	assert.NotEqual(t, http.StatusUnauthorized, syncStatus, "a service caller passes the sync-sso gate")
+	assert.NotContains(t, []int{http.StatusUnauthorized, http.StatusForbidden}, syncStatus, "a sync_sso service caller passes the gate")
+
+	exp.POST("/api/users/sync-sso").
+		WithHeader("Authorization", "Bearer "+idp.clientToken(t, "svc-flow")).
+		WithJSON(ssoBody).
+		Expect().Status(http.StatusForbidden)
 
 	for _, path := range []string{"/api/users/find-or-create", "/api/users/sync-sso"} {
 		exp.POST(path).

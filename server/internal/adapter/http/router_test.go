@@ -95,10 +95,13 @@ func TestRegisterRESTRouter_NoCacheControlWithoutMiddleware(t *testing.T) {
 // guard admit a user or a service caller and reject a bearer the resolver does
 // not accept, such as a former static key (ADR-0002 decision 7.1).
 func TestServiceRoutes_AuthGate(t *testing.T) {
-	iid := id.NewIntegrationID()
+	hook, other := id.NewIntegrationID(), id.NewIntegrationID()
 	resolver := func(c echo.Context, _ *appx.AuthInfo) (*user.User, *workspace.Operator, error) {
-		if c.Request().Header.Get(echo.HeaderAuthorization) == "Bearer service-token" {
-			return nil, &workspace.Operator{Integration: &iid}, nil
+		switch c.Request().Header.Get(echo.HeaderAuthorization) {
+		case "Bearer service-token":
+			return nil, &workspace.Operator{Integration: &hook}, nil
+		case "Bearer other-service-token":
+			return nil, &workspace.Operator{Integration: &other}, nil
 		}
 		return nil, nil, nil
 	}
@@ -106,6 +109,7 @@ func TestServiceRoutes_AuthGate(t *testing.T) {
 		AuthConfigProvider: stubAuthConfigProvider{},
 		Photos:             noSigning(t),
 		AuthResolver:       resolver,
+		SyncSSOAllowed:     func(op *workspace.Operator) bool { return *op.Integration == hook },
 	})
 
 	do := func(path, authHeader string) int {
@@ -123,6 +127,9 @@ func TestServiceRoutes_AuthGate(t *testing.T) {
 		assert.Equal(t, http.StatusUnauthorized, do(path, "Bearer former-static-key"), "%s: a static key is no longer accepted", path)
 	}
 	for _, path := range []string{"/api/users/sync-sso", "/api/users/find-or-create"} {
-		assert.NotEqual(t, http.StatusUnauthorized, do(path, "Bearer service-token"), "%s: a service caller passes the gate", path)
+		code := do(path, "Bearer service-token")
+		assert.NotContains(t, []int{http.StatusUnauthorized, http.StatusForbidden}, code, "%s: an allowed service caller passes the gate", path)
 	}
+	assert.Equal(t, http.StatusForbidden, do("/api/users/sync-sso", "Bearer other-service-token"), "sync-sso admits only allowed service callers")
+	assert.NotEqual(t, http.StatusForbidden, do("/api/users/find-or-create", "Bearer other-service-token"))
 }

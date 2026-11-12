@@ -9,6 +9,7 @@ import (
 	"github.com/reearth/reearth-accounts/server/internal/adapter"
 	"github.com/reearth/reearth-accounts/server/internal/adapter/http/handlers"
 	httpinternal "github.com/reearth/reearth-accounts/server/internal/adapter/http/internal"
+	"github.com/reearth/reearth-accounts/server/pkg/workspace"
 	echoSwagger "github.com/swaggo/echo-swagger"
 )
 
@@ -24,6 +25,8 @@ type RouterConfig struct {
 	JWTMiddleware echo.MiddlewareFunc
 	// AuthConfigProvider exposes Auth0 settings for GET /api/auth/config.
 	AuthConfigProvider adapter.Auth0ConfigProvider
+	// SyncSSOAllowed reports whether a service caller may use sync-sso.
+	SyncSSOAllowed func(*workspace.Operator) bool
 	// Photos signs photo URLs.
 	Photos adapter.PhotoSigner
 	// Swagger basic-auth (optional).
@@ -95,7 +98,7 @@ func RegisterRESTRouter(e *echo.Echo, cfg RouterConfig) {
 	api.POST("/users/signup", uh.Signup, optional)
 	api.POST("/users/signup-oidc", uh.SignupOIDC, optional)
 	// Called by the identity provider's post-login hook as a service caller.
-	api.POST("/users/sync-sso", uh.SyncSSOUser, required)
+	api.POST("/users/sync-sso", uh.SyncSSOUser, required, userOrService(cfg.SyncSSOAllowed))
 	api.POST("/users/verifications", uh.CreateVerification, optional)
 	api.POST("/users/verify", uh.VerifyUser)
 	api.POST("/users/password-reset/start", uh.StartPasswordReset)
@@ -173,4 +176,20 @@ func RegisterRESTRouter(e *echo.Echo, cfg RouterConfig) {
 func pathHasPrefix(c echo.Context, prefix string) bool {
 	p := c.Request().URL.Path
 	return len(p) >= len(prefix) && p[:len(prefix)] == prefix
+}
+
+// userOrService admits a user, or a service caller that allow accepts. Other
+// service callers get 403.
+func userOrService(allow func(*workspace.Operator) bool) echo.MiddlewareFunc {
+	return func(next echo.HandlerFunc) echo.HandlerFunc {
+		return func(c echo.Context) error {
+			if httpinternal.User(c) != nil {
+				return next(c)
+			}
+			if op := httpinternal.Operator(c); op.IsService() && allow != nil && allow(op) {
+				return next(c)
+			}
+			return httpinternal.ErrForbidden
+		}
+	}
 }

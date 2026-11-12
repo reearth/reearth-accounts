@@ -133,7 +133,7 @@ func ViewerOf(caller *user.User) EmailViewer {
 
 // UnrestrictedViewer shows every email. Use it only where the route already
 // limits who gets the record: signup and verification return the caller's own
-// record, the sync-sso API key is a trusted service, and the interactor admits
+// record, sync-sso admits only signed-in users and service callers registered with sync_sso, and the interactor admits
 // only maintainers.
 func UnrestrictedViewer() EmailViewer { return EmailViewer{all: true} }
 

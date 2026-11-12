@@ -55,6 +55,7 @@ func TestSyncSSORoute_Email(t *testing.T) {
 		AuthConfigProvider: stubAuthConfigProvider{},
 		Photos:             noSigning(t),
 		AuthResolver:       resolver,
+		SyncSSOAllowed:     func(*workspace.Operator) bool { return true },
 		UsecaseMiddleware: func(next echo.HandlerFunc) echo.HandlerFunc {
 			return func(c echo.Context) error {
 				c.SetRequest(c.Request().WithContext(adapter.AttachUsecases(c.Request().Context(), uc)))
