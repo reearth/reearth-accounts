@@ -1,6 +1,6 @@
 # ADR-0002: Service callers for the accounts API
 
-- **Status:** Proposed
+- **Status:** Accepted
 - **Date:** 2026-11-10
 - **Deciders:** @pyshx
 

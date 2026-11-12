@@ -16,7 +16,7 @@ Keep it short. State the decision and its consequences, not the history of the d
 | ADR | Title | Status |
 |---|---|---|
 | [0001](0001-rest-parity-with-graphql.md) | REST parity with GraphQL | Proposed |
-| [0002](0002-service-callers.md) | Service callers for the accounts API | Proposed |
+| [0002](0002-service-callers.md) | Service callers for the accounts API | Accepted |
 
 ## Template
 
