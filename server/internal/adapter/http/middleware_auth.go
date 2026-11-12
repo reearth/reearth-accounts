@@ -1,6 +1,8 @@
 package http
 
 import (
+	"context"
+
 	"github.com/labstack/echo/v4"
 	"github.com/reearth/reearth-accounts/server/internal/adapter"
 	httpinternal "github.com/reearth/reearth-accounts/server/internal/adapter/http/internal"
@@ -17,12 +19,13 @@ import (
 // The resolver MUST handle every authentication mode itself: it receives the parsed
 // AuthInfo (nil when no token is present) and returns (nil, nil, nil) for an
 // unauthenticated request (no token / mock user not seeded / user not found), a
-// non-nil user for a resolved request, or a non-nil error for an unexpected failure.
+// non-nil user for a resolved request, (nil, operator, nil) for a service caller
+// (ADR-0002), or a non-nil error for an unexpected failure.
 // This lets mock-auth mode (which has no AuthInfo) still resolve the fixed mock user.
 type AuthResolver func(c echo.Context, ai *appx.AuthInfo) (*user.User, *workspace.Operator, error)
 
 // RequiredAuth attaches User+Operator to context; returns 401 when the request cannot
-// be resolved to a user. The resolver is always invoked (even with nil AuthInfo) so
+// be resolved to a user or a service caller. The resolver is always invoked (even with nil AuthInfo) so
 // mock-auth mode resolves the fixed mock user.
 func RequiredAuth(resolve AuthResolver) echo.MiddlewareFunc {
 	return func(next echo.HandlerFunc) echo.HandlerFunc {
@@ -32,12 +35,10 @@ func RequiredAuth(resolve AuthResolver) echo.MiddlewareFunc {
 			if err != nil {
 				return err
 			}
-			if u == nil {
+			if u == nil && op == nil {
 				return httpinternal.ErrUnauthorized
 			}
-			ctx = adapter.AttachUser(ctx, u)
-			ctx = adapter.AttachOperator(ctx, op)
-			c.SetRequest(c.Request().WithContext(ctx))
+			c.SetRequest(c.Request().WithContext(attach(ctx, u, op)))
 			return next(c)
 		}
 	}
@@ -56,12 +57,17 @@ func OptionalAuth(resolve AuthResolver) echo.MiddlewareFunc {
 			if err != nil {
 				return err
 			}
-			if u != nil {
-				ctx = adapter.AttachUser(ctx, u)
-				ctx = adapter.AttachOperator(ctx, op)
-				c.SetRequest(c.Request().WithContext(ctx))
+			if u != nil || op != nil {
+				c.SetRequest(c.Request().WithContext(attach(ctx, u, op)))
 			}
 			return next(c)
 		}
 	}
+}
+
+func attach(ctx context.Context, u *user.User, op *workspace.Operator) context.Context {
+	if u != nil {
+		ctx = adapter.AttachUser(ctx, u)
+	}
+	return adapter.AttachOperator(ctx, op)
 }

@@ -188,7 +188,7 @@ func (i *Workspace) Create(ctx context.Context, alias, name, description string,
 }
 
 func (i *Workspace) Update(ctx context.Context, param interfaces.UpdateWorkspaceParam, operator *workspace.Operator) (_ *workspace.Workspace, err error) {
-	if operator.User == nil {
+	if !actsAsUserOrService(operator) {
 		return nil, interfaces.ErrInvalidOperator
 	}
 
@@ -202,30 +202,8 @@ func (i *Workspace) Update(ctx context.Context, param interfaces.UpdateWorkspace
 			return nil, workspace.ErrCannotModifyPersonalWorkspace
 		}
 
-		// Check permission via Cerbos or fallback to role-based check
-		var cerbosChecked bool
-		if i.cerbos != nil {
-			result, cErr := i.cerbos.CheckPermission(ctx, *operator.User, interfaces.CheckPermissionParam{
-				Service:        rbac.ServiceName,
-				Resource:       rbac.ResourceWorkspace,
-				Action:         rbac.ActionEdit,
-				WorkspaceAlias: ws.Alias(),
-			})
-			if cErr != nil {
-				return nil, applog.ErrorWithCallerLogging(ctx, "failed to check permission", cErr)
-			}
-			if result != nil {
-				cerbosChecked = true
-				if !result.Allowed {
-					return nil, interfaces.ErrPermissionDenied
-				}
-			}
-		}
-
-		if !cerbosChecked {
-			if ws.Members().UserRole(*operator.User) != role.RoleOwner {
-				return nil, interfaces.ErrOperationDenied
-			}
+		if err := i.checkOwnerLikePermission(ctx, ws, operator, rbac.ActionEdit); err != nil {
+			return nil, err
 		}
 
 		// Update name if provided
@@ -246,7 +224,7 @@ func (i *Workspace) Update(ctx context.Context, param interfaces.UpdateWorkspace
 			if aliasVal != ws.Alias() {
 				// When Cerbos is configured, check edit_alias permission separately for finer-grained control.
 				// When Cerbos is not configured, alias editing is allowed by the general edit permission (owner-only) check above.
-				if i.cerbos != nil {
+				if i.cerbos != nil && operator.User != nil {
 					result, cErr := i.cerbos.CheckPermission(ctx, *operator.User, interfaces.CheckPermissionParam{
 						Service:        rbac.ServiceName,
 						Resource:       rbac.ResourceWorkspace,
@@ -394,7 +372,7 @@ func (i *Workspace) RemoveUserMember(ctx context.Context, id workspace.ID, u wor
 }
 
 func (i *Workspace) RemoveMultipleUserMembers(ctx context.Context, id workspace.ID, userIds workspace.UserIDList, operator *workspace.Operator) (_ *workspace.Workspace, err error) {
-	if operator.User == nil {
+	if !actsAsUserOrService(operator) {
 		return nil, interfaces.ErrInvalidOperator
 	}
 
@@ -445,7 +423,7 @@ func (i *Workspace) RemoveMultipleUserMembers(ctx context.Context, id workspace.
 }
 
 func (i *Workspace) RemoveIntegration(ctx context.Context, wId workspace.ID, iId workspace.IntegrationID, operator *workspace.Operator) (_ *workspace.Workspace, err error) {
-	if operator.User == nil {
+	if !actsAsUserOrService(operator) {
 		return nil, interfaces.ErrInvalidOperator
 	}
 
@@ -471,7 +449,7 @@ func (i *Workspace) RemoveIntegration(ctx context.Context, wId workspace.ID, iId
 }
 
 func (i *Workspace) RemoveIntegrations(ctx context.Context, wId workspace.ID, iIDs workspace.IntegrationIDList, operator *workspace.Operator) (_ *workspace.Workspace, err error) {
-	if operator.User == nil {
+	if !actsAsUserOrService(operator) {
 		return nil, interfaces.ErrInvalidOperator
 	}
 
@@ -497,7 +475,7 @@ func (i *Workspace) RemoveIntegrations(ctx context.Context, wId workspace.ID, iI
 }
 
 func (i *Workspace) UpdateUserMember(ctx context.Context, id workspace.ID, u workspace.UserID, newRole role.RoleType, operator *workspace.Operator) (_ *workspace.Workspace, err error) {
-	if operator.User == nil {
+	if !actsAsUserOrService(operator) {
 		return nil, interfaces.ErrInvalidOperator
 	}
 
@@ -517,7 +495,7 @@ func (i *Workspace) UpdateUserMember(ctx context.Context, id workspace.ID, u wor
 			return nil, err
 		}
 
-		if u == *operator.User && !currentRole.Includes(newRole) {
+		if operator.User != nil && u == *operator.User && !currentRole.Includes(newRole) {
 			return nil, interfaces.ErrCannotSelfPromote
 		}
 
@@ -541,7 +519,7 @@ func (i *Workspace) UpdateUserMember(ctx context.Context, id workspace.ID, u wor
 
 // UpdateUserMemberViaService sets a member's role without the self-promotion guard applied in UpdateUserMember
 func (i *Workspace) UpdateUserMemberViaService(ctx context.Context, id workspace.ID, u workspace.UserID, newRole role.RoleType, operator *workspace.Operator) (_ *workspace.Workspace, err error) {
-	if operator.User == nil {
+	if !actsAsUserOrService(operator) {
 		return nil, interfaces.ErrInvalidOperator
 	}
 	if newRole == role.RoleOwner {
@@ -581,7 +559,7 @@ func (i *Workspace) UpdateUserMemberViaService(ctx context.Context, id workspace
 }
 
 func (i *Workspace) UpdateIntegration(ctx context.Context, wId workspace.ID, iId workspace.IntegrationID, role role.RoleType, operator *workspace.Operator) (_ *workspace.Workspace, err error) {
-	if operator.User == nil {
+	if !actsAsUserOrService(operator) {
 		return nil, interfaces.ErrInvalidOperator
 	}
 
@@ -607,7 +585,7 @@ func (i *Workspace) UpdateIntegration(ctx context.Context, wId workspace.ID, iId
 }
 
 func (i *Workspace) Remove(ctx context.Context, id workspace.ID, operator *workspace.Operator) error {
-	if operator.User == nil {
+	if !actsAsUserOrService(operator) {
 		return interfaces.ErrInvalidOperator
 	}
 
@@ -644,7 +622,7 @@ func (i *Workspace) Remove(ctx context.Context, id workspace.ID, operator *works
 // Remove, so a trusted global-owner account (e.g. LINKS-Veda) can deactivate
 // workspaces it manages without being a member.
 func (i *Workspace) Deactivate(ctx context.Context, id workspace.ID, operator *workspace.Operator) (*workspace.Workspace, error) {
-	if operator.User == nil {
+	if !actsAsUserOrService(operator) {
 		return nil, interfaces.ErrInvalidOperator
 	}
 
@@ -675,7 +653,7 @@ func (i *Workspace) Deactivate(ctx context.Context, id workspace.ID, operator *w
 // Restore reverses Deactivate (clears deleted_at). Same permission model as
 // Deactivate.
 func (i *Workspace) Restore(ctx context.Context, id workspace.ID, operator *workspace.Operator) (*workspace.Workspace, error) {
-	if operator.User == nil {
+	if !actsAsUserOrService(operator) {
 		return nil, interfaces.ErrInvalidOperator
 	}
 
@@ -910,7 +888,9 @@ func (i *Workspace) checkMemberPermission(ctx context.Context, ws *workspace.Wor
 // workspaces it created without members) or falls back to the operator's real
 // ownership when Cerbos isn't configured.
 func (i *Workspace) checkOwnerLikePermission(ctx context.Context, ws *workspace.Workspace, operator *workspace.Operator, action string) error {
-	if i.cerbos != nil {
+	// Cerbos principals are users; a service caller is judged by its integration's
+	// workspace role alone (ADR-0002 decision 5).
+	if i.cerbos != nil && operator.User != nil {
 		result, cErr := i.cerbos.CheckPermission(ctx, *operator.User, interfaces.CheckPermissionParam{
 			Service:        rbac.ServiceName,
 			Resource:       rbac.ResourceWorkspace,
@@ -979,4 +959,11 @@ func (i *Workspace) checkMaintainerPermission(ctx context.Context, operator *wor
 	}
 
 	return interfaces.ErrPermissionDenied
+}
+
+// actsAsUserOrService admits a user operator or a service caller (ADR-0002
+// decision 5). Operations that record a user, such as a creator or an inviter,
+// still require a user.
+func actsAsUserOrService(operator *workspace.Operator) bool {
+	return operator != nil && (operator.User != nil || operator.IsService())
 }
