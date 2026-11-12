@@ -22,10 +22,11 @@ import (
 
 type UserHandler struct {
 	loginTime adapter.LoginTimeSource
+	photos    adapter.PhotoSigner
 }
 
-func NewUserHandler(loginTime adapter.LoginTimeSource) *UserHandler {
-	return &UserHandler{loginTime: loginTime}
+func NewUserHandler(photos adapter.PhotoSigner, loginTime adapter.LoginTimeSource) *UserHandler {
+	return &UserHandler{loginTime: loginTime, photos: photos}
 }
 
 // Me godoc
@@ -35,13 +36,19 @@ func NewUserHandler(loginTime adapter.LoginTimeSource) *UserHandler {
 // @Produce json
 // @Success 200 {object} httpmodel.MeResponse
 // @Failure 401 {object} internal.ErrorResponse
+// @Failure 500 {object} internal.ErrorResponse
 // @Router /api/users/me [get]
 func (h *UserHandler) Me(c echo.Context) error {
+	ctx := c.Request().Context()
 	u, err := httpinternal.RequireUser(c)
 	if err != nil {
 		return err
 	}
-	return c.JSON(http.StatusOK, httpmodel.NewMeResponse(u))
+	res, err := meResponse(ctx, h.photos, u)
+	if err != nil {
+		return err
+	}
+	return c.JSON(http.StatusOK, res)
 }
 
 // UpdateMe godoc

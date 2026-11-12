@@ -21,7 +21,8 @@ type WorkspaceMetadataResponse struct {
 	Website      string `json:"website"`
 	Location     string `json:"location"`
 	BillingEmail string `json:"billing_email"`
-	PhotoURL     string `json:"photo_url"`
+	// A signed URL that expires, so do not store it.
+	PhotoURL string `json:"photo_url"`
 }
 
 // WorkspaceResponse mirrors the GraphQL Workspace type.

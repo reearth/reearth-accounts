@@ -572,6 +572,12 @@ const docTemplate = `{
                         "schema": {
                             "$ref": "#/definitions/internal.ErrorResponse"
                         }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/internal.ErrorResponse"
+                        }
                     }
                 }
             },
@@ -2506,6 +2512,7 @@ const docTemplate = `{
                     "type": "string"
                 },
                 "photo_url": {
+                    "description": "A signed URL that expires on GET /api/users/me, so do not store it.\nEvery other response carries the stored value.",
                     "type": "string"
                 },
                 "theme": {
@@ -2640,6 +2647,7 @@ const docTemplate = `{
                     "type": "string"
                 },
                 "photo_url": {
+                    "description": "A signed URL that expires, so do not store it.",
                     "type": "string"
                 },
                 "website": {

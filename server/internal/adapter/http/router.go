@@ -28,6 +28,8 @@ type RouterConfig struct {
 	APIKey string
 	// SyncSSOAPIKey is the dedicated M2M key for the sync-sso route.
 	SyncSSOAPIKey string
+	// Photos signs photo URLs.
+	Photos adapter.PhotoSigner
 	// Swagger basic-auth (optional).
 	SwaggerUser, SwaggerPass string
 	// LoginTime reads the login time for the recovery code step-up check.
@@ -79,7 +81,7 @@ func RegisterRESTRouter(e *echo.Echo, cfg RouterConfig) {
 	api.POST("/auth/logout", ah.Logout, required) // JWT
 
 	// --- Users ---
-	uh := handlers.NewUserHandler(cfg.LoginTime)
+	uh := handlers.NewUserHandler(cfg.Photos, cfg.LoginTime)
 	api.GET("/users/me", uh.Me, required)
 	api.PATCH("/users/me", uh.UpdateMe, required)
 	api.DELETE("/users/me", uh.DeleteMe, required)
@@ -116,7 +118,7 @@ func RegisterRESTRouter(e *echo.Echo, cfg RouterConfig) {
 	api.PUT("/users/by-sub/:sub/platform-roles", uh.SetPlatformRolesBySub, required)
 
 	// --- Workspaces ---
-	wh := handlers.NewWorkspaceHandler()
+	wh := handlers.NewWorkspaceHandler(cfg.Photos)
 	api.POST("/workspaces", wh.Create, required)
 	api.GET("/workspaces", wh.List, required) // ?ids= | ?name= | ?alias= | ?user_id=(&page=&page_size=)
 	// Cross-tenant listing for service-to-service callers (e.g. LINKS-Veda). Any

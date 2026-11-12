@@ -5,6 +5,7 @@ import (
 	"strings"
 
 	"github.com/labstack/echo/v4"
+	"github.com/reearth/reearth-accounts/server/internal/adapter"
 	"github.com/reearth/reearth-accounts/server/internal/adapter/http/httpmodel"
 	httpinternal "github.com/reearth/reearth-accounts/server/internal/adapter/http/internal"
 	"github.com/reearth/reearth-accounts/server/internal/usecase/interfaces"
@@ -12,9 +13,13 @@ import (
 	"github.com/reearth/reearth-accounts/server/pkg/workspace"
 )
 
-type WorkspaceHandler struct{}
+type WorkspaceHandler struct {
+	photos adapter.PhotoSigner
+}
 
-func NewWorkspaceHandler() *WorkspaceHandler { return &WorkspaceHandler{} }
+func NewWorkspaceHandler(photos adapter.PhotoSigner) *WorkspaceHandler {
+	return &WorkspaceHandler{photos: photos}
+}
 
 func badRequest(msg string) error {
 	return httpinternal.NewError(http.StatusBadRequest, msg, nil)
@@ -47,7 +52,7 @@ func (h *WorkspaceHandler) Create(c echo.Context) error {
 	if err != nil {
 		return err
 	}
-	return writeWorkspace(c, w)
+	return h.writeWorkspace(c, w)
 }
 
 // Get godoc
@@ -69,7 +74,7 @@ func (h *WorkspaceHandler) Get(c echo.Context) error {
 	if err != nil {
 		return err
 	}
-	return writeWorkspace(c, w)
+	return h.writeWorkspace(c, w)
 }
 
 // List godoc
@@ -116,19 +121,19 @@ func (h *WorkspaceHandler) List(c echo.Context) error {
 		if err != nil {
 			return err
 		}
-		return writeWorkspaces(c, ws)
+		return h.writeWorkspaces(c, ws)
 	case name != "":
 		w, err := uc.FetchByName(ctx, name)
 		if err != nil {
 			return err
 		}
-		return writeWorkspace(c, w)
+		return h.writeWorkspace(c, w)
 	case alias != "":
 		w, err := uc.FetchByAlias(ctx, alias)
 		if err != nil {
 			return err
 		}
-		return writeWorkspace(c, w)
+		return h.writeWorkspace(c, w)
 	default: // user_id
 		uid, err := id.UserIDFrom(userID)
 		if err != nil {
@@ -144,7 +149,7 @@ func (h *WorkspaceHandler) List(c echo.Context) error {
 			if err != nil {
 				return err
 			}
-			items, err := workspaceResponses(c, res.Workspaces)
+			items, err := h.workspaceResponses(c, res.Workspaces)
 			if err != nil {
 				return err
 			}
@@ -154,7 +159,7 @@ func (h *WorkspaceHandler) List(c echo.Context) error {
 		if err != nil {
 			return err
 		}
-		return writeWorkspaces(c, ws)
+		return h.writeWorkspaces(c, ws)
 	}
 }
 
@@ -200,7 +205,7 @@ func (h *WorkspaceHandler) ListAll(c echo.Context) error {
 	if err != nil {
 		return err
 	}
-	items, err := workspaceResponses(c, res.Workspaces)
+	items, err := h.workspaceResponses(c, res.Workspaces)
 	if err != nil {
 		return err
 	}
@@ -233,7 +238,7 @@ func (h *WorkspaceHandler) Update(c echo.Context) error {
 	if err != nil {
 		return err
 	}
-	return writeWorkspace(c, w)
+	return h.writeWorkspace(c, w)
 }
 
 // Delete godoc
@@ -273,7 +278,7 @@ func (h *WorkspaceHandler) Deactivate(c echo.Context) error {
 	if err != nil {
 		return err
 	}
-	return writeWorkspace(c, w)
+	return h.writeWorkspace(c, w)
 }
 
 // Restore godoc
@@ -294,7 +299,7 @@ func (h *WorkspaceHandler) Restore(c echo.Context) error {
 	if err != nil {
 		return err
 	}
-	return writeWorkspace(c, w)
+	return h.writeWorkspace(c, w)
 }
 
 // AddMembers godoc
@@ -325,7 +330,7 @@ func (h *WorkspaceHandler) AddMembers(c echo.Context) error {
 	if err != nil {
 		return err
 	}
-	return writeWorkspace(c, w)
+	return h.writeWorkspace(c, w)
 }
 
 // UpdateMember godoc
@@ -357,7 +362,7 @@ func (h *WorkspaceHandler) UpdateMember(c echo.Context) error {
 	if err != nil {
 		return err
 	}
-	return writeWorkspace(c, w)
+	return h.writeWorkspace(c, w)
 }
 
 // UpdateMemberViaService godoc
@@ -389,7 +394,7 @@ func (h *WorkspaceHandler) UpdateMemberViaService(c echo.Context) error {
 	if err != nil {
 		return err
 	}
-	return writeWorkspace(c, w)
+	return h.writeWorkspace(c, w)
 }
 
 // RemoveMember godoc
@@ -415,7 +420,7 @@ func (h *WorkspaceHandler) RemoveMember(c echo.Context) error {
 	if err != nil {
 		return err
 	}
-	return writeWorkspace(c, w)
+	return h.writeWorkspace(c, w)
 }
 
 // RemoveMembers godoc
@@ -446,7 +451,7 @@ func (h *WorkspaceHandler) RemoveMembers(c echo.Context) error {
 	if err != nil {
 		return err
 	}
-	return writeWorkspace(c, w)
+	return h.writeWorkspace(c, w)
 }
 
 // AddIntegration godoc
@@ -477,7 +482,7 @@ func (h *WorkspaceHandler) AddIntegration(c echo.Context) error {
 	if err != nil {
 		return err
 	}
-	return writeWorkspace(c, w)
+	return h.writeWorkspace(c, w)
 }
 
 // UpdateIntegration godoc
@@ -509,7 +514,7 @@ func (h *WorkspaceHandler) UpdateIntegration(c echo.Context) error {
 	if err != nil {
 		return err
 	}
-	return writeWorkspace(c, w)
+	return h.writeWorkspace(c, w)
 }
 
 // RemoveIntegration godoc
@@ -535,7 +540,7 @@ func (h *WorkspaceHandler) RemoveIntegration(c echo.Context) error {
 	if err != nil {
 		return err
 	}
-	return writeWorkspace(c, w)
+	return h.writeWorkspace(c, w)
 }
 
 // RemoveIntegrations godoc
@@ -570,7 +575,7 @@ func (h *WorkspaceHandler) RemoveIntegrations(c echo.Context) error {
 	if err != nil {
 		return err
 	}
-	return writeWorkspace(c, w)
+	return h.writeWorkspace(c, w)
 }
 
 // TransferOwnership godoc
@@ -601,7 +606,7 @@ func (h *WorkspaceHandler) TransferOwnership(c echo.Context) error {
 	if err != nil {
 		return err
 	}
-	return writeWorkspace(c, w)
+	return h.writeWorkspace(c, w)
 }
 
 func parseWorkspaceIDs(ss []string) (id.WorkspaceIDList, error) {

@@ -361,6 +361,9 @@ definitions:
       lang:
         type: string
       photo_url:
+        description: |-
+          A signed URL that expires on GET /api/users/me, so do not store it.
+          Every other response carries the stored value.
         type: string
       theme:
         type: string
@@ -453,6 +456,7 @@ definitions:
       location:
         type: string
       photo_url:
+        description: A signed URL that expires, so do not store it.
         type: string
       website:
         type: string
@@ -949,6 +953,10 @@ paths:
             $ref: '#/definitions/httpmodel.MeResponse'
         "401":
           description: Unauthorized
+          schema:
+            $ref: '#/definitions/internal.ErrorResponse'
+        "500":
+          description: Internal Server Error
           schema:
             $ref: '#/definitions/internal.ErrorResponse'
       security:

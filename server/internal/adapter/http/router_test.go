@@ -6,11 +6,16 @@ import (
 	"testing"
 
 	"github.com/labstack/echo/v4"
+	"github.com/reearth/reearth-accounts/server/internal/adapter"
 	adapterhttp "github.com/reearth/reearth-accounts/server/internal/adapter/http"
+	"github.com/reearth/reearth-accounts/server/internal/usecase/gateway"
+	gatewaymock "github.com/reearth/reearth-accounts/server/internal/usecase/gateway/mock"
 	"github.com/reearth/reearth-accounts/server/pkg/user"
 	"github.com/reearth/reearth-accounts/server/pkg/workspace"
 	"github.com/reearth/reearthx/appx"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
+	"go.uber.org/mock/gomock"
 )
 
 // stubAuthResolver always returns unauthenticated (no user resolved).
@@ -20,14 +25,14 @@ func stubAuthResolver(_ echo.Context, _ *appx.AuthInfo) (*user.User, *workspace.
 
 type stubAuthConfigProvider struct{}
 
-func (stubAuthConfigProvider) GetAuth0Domain() string    { return "" }
-func (stubAuthConfigProvider) GetAuth0Audience() string  { return "" }
+func (stubAuthConfigProvider) GetAuth0Domain() string      { return "" }
+func (stubAuthConfigProvider) GetAuth0Audience() string    { return "" }
 func (stubAuthConfigProvider) GetAuth0WebClientID() string { return "" }
-func (stubAuthConfigProvider) GetAuthProvider() string   { return "auth0" }
-func (stubAuthConfigProvider) GetCIPAPIKey() string      { return "" }
-func (stubAuthConfigProvider) GetCIPAuthDomain() string  { return "" }
-func (stubAuthConfigProvider) GetCIPProjectID() string   { return "" }
-func (stubAuthConfigProvider) GetCIPTenantID() string    { return "" }
+func (stubAuthConfigProvider) GetAuthProvider() string     { return "auth0" }
+func (stubAuthConfigProvider) GetCIPAPIKey() string        { return "" }
+func (stubAuthConfigProvider) GetCIPAuthDomain() string    { return "" }
+func (stubAuthConfigProvider) GetCIPProjectID() string     { return "" }
+func (stubAuthConfigProvider) GetCIPTenantID() string      { return "" }
 
 func cacheControlMiddleware(next echo.HandlerFunc) echo.HandlerFunc {
 	return func(c echo.Context) error {
@@ -42,9 +47,23 @@ func newRESTEcho(cfg adapterhttp.RouterConfig) *echo.Echo {
 	return e
 }
 
+// noSigning is a signer for a test that must not sign a photo URL: any call
+// fails the test.
+func noSigning(t *testing.T) adapter.PhotoSigner {
+	return photoSigner(t, gatewaymock.NewMockStorage(gomock.NewController(t)))
+}
+
+func photoSigner(t *testing.T, storage gateway.Storage) adapter.PhotoSigner {
+	t.Helper()
+	p, err := adapter.NewPhotoSigner(storage)
+	require.NoError(t, err)
+	return p
+}
+
 func TestRegisterRESTRouter_CacheControlHeader(t *testing.T) {
 	e := newRESTEcho(adapterhttp.RouterConfig{
 		AuthConfigProvider: stubAuthConfigProvider{},
+		Photos:             noSigning(t),
 		CacheControl:       cacheControlMiddleware,
 	})
 
@@ -59,6 +78,7 @@ func TestRegisterRESTRouter_CacheControlHeader(t *testing.T) {
 func TestRegisterRESTRouter_NoCacheControlWithoutMiddleware(t *testing.T) {
 	e := newRESTEcho(adapterhttp.RouterConfig{
 		AuthConfigProvider: stubAuthConfigProvider{},
+		Photos:             noSigning(t),
 		// CacheControl deliberately omitted
 	})
 
@@ -78,6 +98,7 @@ func TestSyncSSORoute_AuthGate(t *testing.T) {
 
 	e := newRESTEcho(adapterhttp.RouterConfig{
 		AuthConfigProvider: stubAuthConfigProvider{},
+		Photos:             noSigning(t),
 		AuthResolver:       stubAuthResolver,
 		APIKey:             restKey,
 		SyncSSOAPIKey:      syncKey,
@@ -105,6 +126,7 @@ func TestSyncSSORoute_KeyIsolation(t *testing.T) {
 
 	e := newRESTEcho(adapterhttp.RouterConfig{
 		AuthConfigProvider: stubAuthConfigProvider{},
+		Photos:             noSigning(t),
 		AuthResolver:       stubAuthResolver,
 		SyncSSOAPIKey:      syncKey,
 		// APIKey (RestAPIKey) deliberately omitted

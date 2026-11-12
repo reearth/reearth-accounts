@@ -4,7 +4,6 @@ import (
 	"context"
 
 	"github.com/reearth/reearth-accounts/server/internal/adapter"
-	"github.com/reearth/reearth-accounts/server/internal/usecase/gateway"
 	"github.com/reearth/reearth-accounts/server/internal/usecase/interfaces"
 	"github.com/reearth/reearth-accounts/server/pkg/user"
 	"github.com/reearth/reearth-accounts/server/pkg/workspace"
@@ -17,8 +16,8 @@ const (
 	contextDataloaders ContextKey = "dataloaders"
 )
 
-func AttachUsecases(ctx context.Context, u *interfaces.Container, storage gateway.Storage, enableDataLoaders bool) context.Context {
-	loaders := NewLoaders(u, storage)
+func AttachUsecases(ctx context.Context, u *interfaces.Container, photos adapter.PhotoSigner, enableDataLoaders bool) context.Context {
+	loaders := NewLoaders(u, photos)
 	dataloaders := loaders.DataLoadersWith(ctx, enableDataLoaders)
 
 	ctx = adapter.AttachUsecases(ctx, u)
