@@ -470,7 +470,7 @@ func (a *Auth0) exec(ctx context.Context, method, path, token string, b interfac
 	}
 
 	if !a.disableLogging {
-		applog.Info(ctx, "auth0: response", applog.Path(path), applog.Status(resp.StatusCode))
+		applog.Info(ctx, "auth0: response", applog.Path(auth0Route(path)), applog.Status(resp.StatusCode))
 	}
 
 	if err = json.Unmarshal(respb, &r); err != nil {
@@ -526,7 +526,7 @@ func (a *Auth0) execInto(ctx context.Context, method, path, token string, b, tar
 	}
 
 	if !a.disableLogging {
-		applog.Info(ctx, "auth0: response", applog.Path(path), applog.Status(resp.StatusCode))
+		applog.Info(ctx, "auth0: response", applog.Path(auth0Route(path)), applog.Status(resp.StatusCode))
 	}
 
 	if resp.StatusCode >= 300 {
@@ -545,6 +545,18 @@ func (a *Auth0) execInto(ctx context.Context, method, path, token string, b, tar
 
 	return nil
 }
+
+// auth0Route replaces the user ID in a Management API path with a
+// placeholder, since Auth0 user IDs identify a person's account.
+func auth0Route(path string) string {
+	path = strings.TrimPrefix(path, "/")
+	if strings.HasPrefix(path, usersPathPrefix) {
+		return usersPathPrefix + "{id}"
+	}
+	return path
+}
+
+const usersPathPrefix = "api/v2/users/"
 
 func urlFromDomain(path string) string {
 	if path == "" {

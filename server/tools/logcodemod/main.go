@@ -69,7 +69,7 @@ var rules = map[string]string{
 	"roleName": "Role", "roleNames": "Roles", "param.Action": "Action",
 	"result.Actions": "Actions", "allowed": "Allowed",
 
-	"path": "Path", "resp.StatusCode": "Status", "resp.Status": "Status", "status": "Status",
+	"authenticator.go|path": "Path(auth0Route(%s))", // Auth0 paths embed the user ID "resp.StatusCode": "Status", "resp.Status": "Status", "status": "Status",
 	"code": "Code", "resp.Message": "Reason", "len(ids)": "Count", "len(response.Errors)": "Count",
 	"spanName": "Operation",
 
@@ -328,6 +328,10 @@ func convert(fset *token.FileSet, src []byte, path, method string, call *ast.Cal
 			return "", false, "no rule for argument " + text, false
 		}
 		if ctor == drop {
+			continue
+		}
+		if strings.Contains(ctor, "%s") {
+			fields = append(fields, "applog."+fmt.Sprintf(ctor, inner))
 			continue
 		}
 		fields = append(fields, fmt.Sprintf("applog.%s(%s)", ctor, inner))
