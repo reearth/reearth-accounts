@@ -150,8 +150,47 @@ func TestServiceCaller_REST(t *testing.T) {
 			Expect().Status(http.StatusForbidden)
 	})
 
-	t.Run("user-only routes stay closed to a service", func(t *testing.T) {
-		e.GET("/api/users/me").WithHeader("Authorization", flow).Expect().Status(http.StatusUnauthorized)
+	t.Run("every workspace read path is scoped", func(t *testing.T) {
+		get := func(auth, path string, q map[string]string) *httpexpect.Response {
+			r := e.GET(path).WithHeader("Authorization", auth)
+			for k, v := range q {
+				r = r.WithQuery(k, v)
+			}
+			return r.Expect()
+		}
+		get(flow, "/api/workspaces/"+svcWsOwned.String(), nil).Status(http.StatusOK)
+		get(flow, "/api/workspaces/"+svcWsNotAMember.String(), nil).Status(http.StatusNotFound)
+		get(lonely, "/api/workspaces/"+svcWsOwned.String(), map[string]string{"expand": "members.user"}).Status(http.StatusNotFound)
+		get(lonely, "/api/workspaces", map[string]string{"name": "ws-" + svcWsOwned.String()}).Status(http.StatusNotFound)
+		get(lonely, "/api/workspaces", map[string]string{"alias": "a-" + svcWsOwned.String()}).Status(http.StatusNotFound)
+		get(lonely, "/api/workspaces", map[string]string{"ids": svcWsOwned.String() + "," + svcWsNotAMember.String()}).
+			Status(http.StatusOK).JSON().Array().IsEmpty()
+		ids := get(flow, "/api/workspaces", map[string]string{"ids": svcWsOwned.String() + "," + svcWsNotAMember.String()}).
+			Status(http.StatusOK).JSON().Array()
+		require.Equal(t, []string{svcWsOwned.String()}, idsOf(ids))
+
+		page := get(flow, "/api/workspaces", map[string]string{"user_id": svcOwnerUID.String(), "page": "1", "page_size": "1"}).
+			Status(http.StatusOK).JSON().Object()
+		page.Value("items").Array().Length().IsEqual(1)
+		page.Value("pagination").Object().HasValue("total", 2)
+		get(lonely, "/api/workspaces", map[string]string{"user_id": svcOwnerUID.String(), "page": "1"}).
+			Status(http.StatusOK).JSON().Object().Value("pagination").Object().HasValue("total", 0)
+	})
+
+	t.Run("the user directory stays closed to a service", func(t *testing.T) {
+		for path, q := range map[string][2]string{
+			"/api/users/me":                      {},
+			"/api/users/search":                  {"keyword", "svc"},
+			"/api/users/by-name-or-email":        {"nameOrEmail", "svc-owner"},
+			"/api/users/" + svcOwnerUID.String(): {},
+			"/api/users":                         {"ids", svcOwnerUID.String()},
+		} {
+			r := e.GET(path).WithHeader("Authorization", flow)
+			if q[0] != "" {
+				r = r.WithQuery(q[0], q[1])
+			}
+			r.Expect().Status(http.StatusUnauthorized)
+		}
 	})
 
 	t.Run("unregistered client is 401", func(t *testing.T) {
@@ -177,6 +216,24 @@ func TestServiceCaller_GraphQL(t *testing.T) {
 		arr := gql(e, flow, findByUser, map[string]any{"u": svcOwnerUID.String()}).
 			Value("data").Object().Value("findByUser").Array()
 		require.ElementsMatch(t, []string{svcWsOwned.String(), svcWsWritable.String()}, idsOf(arr))
+	})
+
+	t.Run("paginated read is scoped", func(t *testing.T) {
+		const q = `query($u: ID!) { findByUserWithPagination(userId: $u, pagination: {page: 1, size: 10}) { totalCount } }`
+		gql(e, flow, q, map[string]any{"u": svcOwnerUID.String()}).
+			Value("data").Object().Value("findByUserWithPagination").Object().HasValue("totalCount", 2)
+		gql(e, "Bearer "+idp.clientToken(t, "svc-lonely"), q, map[string]any{"u": svcOwnerUID.String()}).
+			Value("data").Object().Value("findByUserWithPagination").Object().HasValue("totalCount", 0)
+	})
+
+	t.Run("the user directory stays closed to a service", func(t *testing.T) {
+		for _, q := range []string{
+			`{ searchUser(keyword: "svc") { id } }`,
+			`query($u: ID!) { user(id: $u) { id } }`,
+			`{ userByNameOrEmail(nameOrEmail: "svc-owner") { id } }`,
+		} {
+			gql(e, flow, q, map[string]any{"u": svcOwnerUID.String()}).Value("errors").Array().NotEmpty()
+		}
 	})
 
 	t.Run("write allowed by the owner role", func(t *testing.T) {

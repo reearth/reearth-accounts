@@ -62,19 +62,25 @@ func (i *Workspace) Fetch(ctx context.Context, ids workspace.IDList, operator *w
 	if len(ids) > maxFetchWorkspaceIDs {
 		return nil, interfaces.ErrTooManyWorkspaceIDs
 	}
-	return i.repos.Workspace.FindByIDs(ctx, ids)
+	ws, err := i.repos.Workspace.FindByIDs(ctx, ids)
+	if err != nil || !operator.IsService() {
+		return ws, err
+	}
+	return lo.Filter(ws, func(w *workspace.Workspace, _ int) bool {
+		return w != nil && operator.IsReadableWorkspace(w.ID())
+	}), nil
 }
 
-func (i *Workspace) FetchByID(ctx context.Context, id workspace.ID) (*workspace.Workspace, error) {
-	return i.repos.Workspace.FindByID(ctx, id)
+func (i *Workspace) FetchByID(ctx context.Context, id workspace.ID, operator *workspace.Operator) (*workspace.Workspace, error) {
+	return scopeForService(i.repos.Workspace.FindByID(ctx, id))(operator)
 }
 
-func (i *Workspace) FetchByName(ctx context.Context, name string) (*workspace.Workspace, error) {
-	return i.repos.Workspace.FindByName(ctx, name)
+func (i *Workspace) FetchByName(ctx context.Context, name string, operator *workspace.Operator) (*workspace.Workspace, error) {
+	return scopeForService(i.repos.Workspace.FindByName(ctx, name))(operator)
 }
 
-func (i *Workspace) FetchByAlias(ctx context.Context, alias string) (*workspace.Workspace, error) {
-	return i.repos.Workspace.FindByAlias(ctx, alias)
+func (i *Workspace) FetchByAlias(ctx context.Context, alias string, operator *workspace.Operator) (*workspace.Workspace, error) {
+	return scopeForService(i.repos.Workspace.FindByAlias(ctx, alias))(operator)
 }
 
 func (i *Workspace) FindByUser(ctx context.Context, id workspace.UserID, operator *workspace.Operator) (workspace.List, error) {
@@ -82,8 +88,21 @@ func (i *Workspace) FindByUser(ctx context.Context, id workspace.UserID, operato
 	return filterWorkspaces(res, operator, err, true, true)
 }
 
-func (i *Workspace) FetchByUserWithPagination(ctx context.Context, userID workspace.UserID, input interfaces.FetchByUserWithPaginationParam) (interfaces.FetchByUserWithPaginationResult, error) {
-	workspaces, pageInfo, err := i.repos.Workspace.FindByUserWithPagination(ctx, userID, pagination.ToPagination(input.Page, input.Size))
+func (i *Workspace) FetchByUserWithPagination(ctx context.Context, userID workspace.UserID, input interfaces.FetchByUserWithPaginationParam, operator *workspace.Operator) (interfaces.FetchByUserWithPaginationResult, error) {
+	p := pagination.ToPagination(input.Page, input.Size)
+	if operator.IsService() {
+		ws, err := i.FindByUser(ctx, userID, operator)
+		if err != nil {
+			return interfaces.FetchByUserWithPaginationResult{}, err
+		}
+		off, limit := int(p.Offset.Offset), int(p.Offset.Limit)
+		return interfaces.FetchByUserWithPaginationResult{
+			Workspaces: ws[min(off, len(ws)):min(off+limit, len(ws))],
+			TotalCount: len(ws),
+		}, nil
+	}
+
+	workspaces, pageInfo, err := i.repos.Workspace.FindByUserWithPagination(ctx, userID, p)
 	if err != nil {
 		return interfaces.FetchByUserWithPaginationResult{}, err
 	}
@@ -92,6 +111,20 @@ func (i *Workspace) FetchByUserWithPagination(ctx context.Context, userID worksp
 		Workspaces: workspace.List(workspaces),
 		TotalCount: int(pageInfo.TotalCount),
 	}, nil
+}
+
+// scopeForService hides a workspace from a service caller that is not a member
+// of it (ADR-0002 decision 4). Lookups by users stay unscoped.
+func scopeForService(ws *workspace.Workspace, err error) func(*workspace.Operator) (*workspace.Workspace, error) {
+	return func(operator *workspace.Operator) (*workspace.Workspace, error) {
+		if err != nil || !operator.IsService() {
+			return ws, err
+		}
+		if ws == nil || !operator.IsReadableWorkspace(ws.ID()) {
+			return nil, rerror.ErrNotFound
+		}
+		return ws, nil
+	}
 }
 
 // FindAll lists workspaces across all tenants, unfiltered by any operator's
