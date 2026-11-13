@@ -8,11 +8,11 @@ import (
 	"fmt"
 	"strings"
 
+	"github.com/reearth/reearth-accounts/server/pkg/applog"
 	"github.com/reearth/reearth-accounts/server/pkg/id"
 	"github.com/reearth/reearth-accounts/server/pkg/role"
 	"github.com/reearth/reearth-accounts/server/pkg/workspace"
 	"github.com/reearth/reearthx/appx"
-	"github.com/reearth/reearthx/log"
 	"github.com/reearth/reearthx/rerror"
 )
 
@@ -196,7 +196,7 @@ func resolveServiceOperator(ctx context.Context, cfg *ServerConfig, ai *appx.Aut
 	}
 	sc, err := cfg.Config.ServiceCallers.resolve(*ai)
 	if err != nil {
-		log.Warnfc(ctx, "auth: rejected client credentials token iss=%s sub=%s", ai.Iss, ai.Sub)
+		applog.Warn(ctx, "auth: rejected client credentials token", applog.Issuer(ai.Iss), applog.Subject(ai.Sub))
 		return nil, err
 	}
 	if sc == nil {
@@ -206,6 +206,6 @@ func resolveServiceOperator(ctx context.Context, cfg *ServerConfig, ai *appx.Aut
 	if err != nil {
 		return nil, err
 	}
-	log.Infofc(ctx, "auth: service caller client_id=%s integration=%s", sc.ClientID, sc.Integration)
+	applog.Info(ctx, "auth: service caller", applog.CallerClientID(sc.ClientID), applog.IntegrationID(sc.Integration))
 	return op, nil
 }

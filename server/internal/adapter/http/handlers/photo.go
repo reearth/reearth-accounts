@@ -5,8 +5,8 @@ import (
 
 	"github.com/reearth/reearth-accounts/server/internal/adapter"
 	"github.com/reearth/reearth-accounts/server/internal/adapter/http/httpmodel"
+	"github.com/reearth/reearth-accounts/server/pkg/applog"
 	"github.com/reearth/reearth-accounts/server/pkg/user"
-	"github.com/reearth/reearthx/log"
 	"github.com/sourcegraph/conc/pool"
 )
 
@@ -39,7 +39,7 @@ func signWorkspacePhotos(ctx context.Context, photos adapter.PhotoSigner, res []
 		p.Go(func() {
 			signed, err := photos.Sign(ctx, m.PhotoURL)
 			if err != nil {
-				log.Errorfc(ctx, "rest: failed to sign photo url: %v", err)
+				applog.Error(ctx, "rest: failed to sign photo url", applog.Err(err))
 			}
 			m.PhotoURL = signed
 		})

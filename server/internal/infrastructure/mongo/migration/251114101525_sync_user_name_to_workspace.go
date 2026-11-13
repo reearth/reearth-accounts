@@ -2,10 +2,9 @@ package migration
 
 import (
 	"context"
-	"log"
-	"strings"
 
 	"github.com/reearth/reearth-accounts/server/internal/infrastructure/mongo/mongodoc"
+	"github.com/reearth/reearth-accounts/server/pkg/applog"
 	"github.com/reearth/reearthx/mongox"
 	"go.mongodb.org/mongo-driver/bson"
 )
@@ -68,14 +67,14 @@ func SyncUserNameToWorkspace(ctx context.Context, c DBClient) error {
 
 				// Only update if names differ
 				if wsDoc.Name != userName {
-					log.Println("updating workspace name:", wsDoc.ID, "from", maskEmail(wsDoc.Name), "to", userName)
+					applog.Info(ctx, "updating workspace name", applog.WorkspaceID(wsDoc.ID))
 					wsDoc.Name = userName
 					ids = append(ids, wsDoc.ID)
 					newRows = append(newRows, wsDoc)
 				}
 			}
 
-			log.Println("count of updated workspaces:", len(ids))
+			applog.Info(ctx, "count of updated workspaces", applog.Count(len(ids)))
 
 			// Only save if there are records to update
 			if len(ids) > 0 {
@@ -84,24 +83,4 @@ func SyncUserNameToWorkspace(ctx context.Context, c DBClient) error {
 			return nil
 		},
 	})
-}
-
-func maskEmail(email string) string {
-	parts := strings.Split(email, "@")
-	if len(parts) != 2 {
-		return email
-	}
-
-	localPart := parts[0]
-	domain := parts[1]
-
-	if len(localPart) == 0 {
-		return email
-	}
-
-	if len(localPart) == 1 {
-		return localPart[0:1] + "***@" + domain
-	}
-
-	return localPart[0:1] + "***@" + domain
 }

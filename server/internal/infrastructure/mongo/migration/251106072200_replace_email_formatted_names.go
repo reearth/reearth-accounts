@@ -2,10 +2,10 @@ package migration
 
 import (
 	"context"
-	"log"
 	"regexp"
 
 	"github.com/reearth/reearth-accounts/server/internal/infrastructure/mongo/mongodoc"
+	"github.com/reearth/reearth-accounts/server/pkg/applog"
 	"github.com/reearth/reearth-accounts/server/pkg/id"
 	"github.com/reearth/reearthx/mongox"
 	"go.mongodb.org/mongo-driver/bson"
@@ -48,7 +48,7 @@ func ReplaceEmailFormattedNames(ctx context.Context, c DBClient) error {
 				}
 			}
 
-			log.Println("count of ids: ", len(ids))
+			applog.Info(ctx, "count of ids", applog.Count(len(ids)))
 
 			// Only save if there are records to update
 			if len(ids) > 0 {

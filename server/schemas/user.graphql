@@ -1,39 +1,39 @@
 type User implements Node {
-  id: ID!
-  name: String!
-  alias: String!
-  email: String!
-  host: String
-  workspace: ID!
-  auths: [String!]!
-  metadata: UserMetadata!
-  verification: Verification
+  id: ID! @visibility(level: PUBLIC)
+  name: String! @visibility(level: PUBLIC)
+  alias: String! @visibility(level: PUBLIC)
+  email: String! @visibility(level: SELF)
+  host: String @visibility(level: PUBLIC)
+  workspace: ID! @visibility(level: PUBLIC)
+  auths: [String!]! @visibility(level: PUBLIC)
+  metadata: UserMetadata! @visibility(level: PUBLIC)
+  verification: Verification @visibility(level: PUBLIC)
 }
 
 type Me {
-  id: ID!
-  name: String!
-  alias: String!
-  email: String!
-  metadata: UserMetadata!
-  host: String
-  latestLogoutAt: DateTime
-  myWorkspaceId: ID!
-  auths: [String!]!
-  myWorkspace: Workspace!
+  id: ID! @visibility(level: SELF)
+  name: String! @visibility(level: SELF)
+  alias: String! @visibility(level: SELF)
+  email: String! @visibility(level: SELF)
+  metadata: UserMetadata! @visibility(level: SELF)
+  host: String @visibility(level: SELF)
+  latestLogoutAt: DateTime @visibility(level: SELF)
+  myWorkspaceId: ID! @visibility(level: SELF)
+  auths: [String!]! @visibility(level: SELF)
+  myWorkspace: Workspace! @visibility(level: SELF)
 }
 
 type UserMetadata {
-  description: String!
-  website: String!
-  photoURL: String!
-  lang: Lang!
-  theme: Theme!
+  description: String! @visibility(level: PUBLIC)
+  website: String! @visibility(level: PUBLIC)
+  photoURL: String! @visibility(level: PUBLIC)
+  lang: Lang! @visibility(level: PUBLIC)
+  theme: Theme! @visibility(level: PUBLIC)
 }
 
 type Verification {
-  expiration: String!
-  verified: Boolean!
+  expiration: String! @visibility(level: PUBLIC)
+  verified: Boolean! @visibility(level: PUBLIC)
 }
 
 type MFAEnrollResult {
@@ -122,7 +122,7 @@ input DeleteMeInput {
 
 extend type Query {
   findUserByAlias(alias: String!): User
-  findUsersByIDsWithPagination(ids: [ID!]!, alias: String, pagination: Pagination!): UsersWithPagination!
+  findUsersByIDsWithPagination(ids: [ID!]!, alias: String, pagination: Pagination!): UsersWithPagination! @public
   findUsersByIDs(ids: [ID!]!): [User!]!
   me: Me
   mfaStatus: MFAStatus!
@@ -145,7 +145,7 @@ type DeleteMePayload {
 }
 
 extend type Mutation {
-  createVerification(input: CreateVerificationInput!): Boolean
+  createVerification(input: CreateVerificationInput!): Boolean @public
   deleteMe(input: DeleteMeInput!): DeleteMePayload
   disableMFA: Boolean!
   enableMFA: MFAEnrollResult!
@@ -154,9 +154,9 @@ extend type Mutation {
   passwordReset(input: PasswordResetInput!): Boolean
   regenerateMFARecoveryCode: MFARecoveryCodeResult!
   removeMyAuth(input: RemoveMyAuthInput!): UpdateMePayload
-  signup(input: SignupInput!): UserPayload
-  signupOIDC(input: SignupOIDCInput!): UserPayload
-  startPasswordReset(input: StartPasswordResetInput!): Boolean
+  signup(input: SignupInput!): UserPayload @public
+  signupOIDC(input: SignupOIDCInput!): UserPayload @public
+  startPasswordReset(input: StartPasswordResetInput!): Boolean @public
   updateMe(input: UpdateMeInput!): UpdateMePayload
   verifyUser(input: VerifyUserInput!): UserPayload
 }
