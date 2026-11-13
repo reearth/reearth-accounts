@@ -277,6 +277,7 @@ func ReadConfig(debug bool) (*Config, error) {
 
 type GraphQLConfig struct {
 	ComplexityLimit int `default:"6000"`
+	DepthLimit      int `default:"10"`
 }
 
 func (c Config) Print() string {
