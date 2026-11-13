@@ -74,7 +74,7 @@ func (h *WorkspaceHandler) Get(c echo.Context) error {
 	if err != nil {
 		return badRequest("invalid workspace id")
 	}
-	w, err := httpinternal.Usecases(c).Workspace.FetchByID(ctx, wid)
+	w, err := httpinternal.Usecases(c).Workspace.FetchByID(ctx, wid, httpinternal.Operator(c))
 	if err != nil {
 		return err
 	}
@@ -129,13 +129,13 @@ func (h *WorkspaceHandler) List(c echo.Context) error {
 		}
 		return h.writeWorkspaces(c, ws, memberUsersFor(c))
 	case name != "":
-		w, err := uc.FetchByName(ctx, name)
+		w, err := uc.FetchByName(ctx, name, op)
 		if err != nil {
 			return err
 		}
 		return h.writeWorkspace(c, w, memberUsersFor(c))
 	case alias != "":
-		w, err := uc.FetchByAlias(ctx, alias)
+		w, err := uc.FetchByAlias(ctx, alias, op)
 		if err != nil {
 			return err
 		}
@@ -151,7 +151,7 @@ func (h *WorkspaceHandler) List(c echo.Context) error {
 				return err
 			}
 			page, size := pp.Normalized()
-			res, err := uc.FetchByUserWithPagination(ctx, uid, interfaces.FetchByUserWithPaginationParam{Page: int64(page), Size: int64(size)})
+			res, err := uc.FetchByUserWithPagination(ctx, uid, interfaces.FetchByUserWithPaginationParam{Page: int64(page), Size: int64(size)}, op)
 			if err != nil {
 				return err
 			}

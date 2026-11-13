@@ -196,6 +196,13 @@ func restAuthResolver(cfg *ServerConfig) adapterhttp.AuthResolver {
 		if cfg.Config.Mock_Auth {
 			u, err = cfg.Repos.User.FindByName(ctx, FIXED_MOCK_USERNAME)
 		} else {
+			op, svcErr := resolveServiceOperator(ctx, cfg, ai)
+			if errors.Is(svcErr, errServiceCallerRejected) {
+				return nil, nil, echo.NewHTTPError(http.StatusUnauthorized)
+			}
+			if svcErr != nil || op != nil {
+				return nil, op, svcErr
+			}
 			if ai == nil || ai.Sub == "" {
 				return nil, nil, nil
 			}

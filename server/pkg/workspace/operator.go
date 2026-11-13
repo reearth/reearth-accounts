@@ -17,6 +17,11 @@ type Operator struct {
 	DefaultPolicy          *PolicyID
 }
 
+// IsService reports whether the operator is a service caller with no user.
+func (o *Operator) IsService() bool {
+	return o != nil && o.User == nil && o.Integration != nil
+}
+
 func (o *Operator) Workspaces(r role.RoleType) id.WorkspaceIDList {
 	if o == nil {
 		return nil
