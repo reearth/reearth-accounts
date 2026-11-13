@@ -58,13 +58,13 @@ func (r *queryResolver) PublicWorkspace(ctx context.Context, wid *gqlmodel.ID, a
 
 func fetchPublicWorkspace(ctx context.Context, wid *gqlmodel.ID, alias *string) (*workspace.Workspace, error) {
 	if alias != nil {
-		return usecases(ctx).Workspace.FetchByAlias(ctx, *alias)
+		return usecases(ctx).Workspace.FetchByAlias(ctx, *alias, getOperator(ctx))
 	}
 	i, err := gqlmodel.ToID[id.Workspace](*wid)
 	if err != nil {
 		return nil, rerror.ErrNotFound
 	}
-	return usecases(ctx).Workspace.FetchByID(ctx, i)
+	return usecases(ctx).Workspace.FetchByID(ctx, i, getOperator(ctx))
 }
 
 func photoURL(u *user.User) string {

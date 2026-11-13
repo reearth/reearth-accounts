@@ -202,7 +202,7 @@ func TestServiceCaller_REST(t *testing.T) {
 	})
 }
 
-func gql(e *httpexpect.Expect, auth, query string, vars map[string]any) *httpexpect.Object {
+func serviceGQL(e *httpexpect.Expect, auth, query string, vars map[string]any) *httpexpect.Object {
 	return e.POST("/api/graphql").WithHeader("Authorization", auth).
 		WithJSON(GraphQLRequest{Query: query, Variables: vars}).
 		Expect().Status(http.StatusOK).JSON().Object()
@@ -215,16 +215,16 @@ func TestServiceCaller_GraphQL(t *testing.T) {
 	const rename = `mutation($w: ID!, $n: String!) { updateWorkspace(input: {workspaceId: $w, name: $n}) { workspace { id name } } }`
 
 	t.Run("read is scoped to the integration's workspaces", func(t *testing.T) {
-		arr := gql(e, flow, findByUser, map[string]any{"u": svcOwnerUID.String()}).
+		arr := serviceGQL(e, flow, findByUser, map[string]any{"u": svcOwnerUID.String()}).
 			Value("data").Object().Value("findByUser").Array()
 		require.ElementsMatch(t, []string{svcWsOwned.String(), svcWsWritable.String()}, idsOf(arr))
 	})
 
 	t.Run("paginated read is scoped", func(t *testing.T) {
 		const q = `query($u: ID!) { findByUserWithPagination(userId: $u, pagination: {page: 1, size: 10}) { totalCount } }`
-		gql(e, flow, q, map[string]any{"u": svcOwnerUID.String()}).
+		serviceGQL(e, flow, q, map[string]any{"u": svcOwnerUID.String()}).
 			Value("data").Object().Value("findByUserWithPagination").Object().HasValue("totalCount", 2)
-		gql(e, "Bearer "+idp.clientToken(t, "svc-lonely"), q, map[string]any{"u": svcOwnerUID.String()}).
+		serviceGQL(e, "Bearer "+idp.clientToken(t, "svc-lonely"), q, map[string]any{"u": svcOwnerUID.String()}).
 			Value("data").Object().Value("findByUserWithPagination").Object().HasValue("totalCount", 0)
 	})
 
@@ -235,18 +235,18 @@ func TestServiceCaller_GraphQL(t *testing.T) {
 			`{ userByNameOrEmail(nameOrEmail: "svc-owner") { id } }`,
 			`query($u: ID!) { findUsersByIDs(ids: [$u]) { id } }`,
 		} {
-			gql(e, flow, q, map[string]any{"u": svcOwnerUID.String()}).Value("errors").Array().NotEmpty()
+			serviceGQL(e, flow, q, map[string]any{"u": svcOwnerUID.String()}).Value("errors").Array().NotEmpty()
 		}
 	})
 
 	t.Run("write allowed by the owner role", func(t *testing.T) {
-		gql(e, flow, rename, map[string]any{"w": svcWsOwned.String(), "n": "gql renamed"}).
+		serviceGQL(e, flow, rename, map[string]any{"w": svcWsOwned.String(), "n": "gql renamed"}).
 			Value("data").Object().Value("updateWorkspace").Object().
 			Value("workspace").Object().HasValue("name", "gql renamed")
 	})
 
 	t.Run("write denied by the writer role", func(t *testing.T) {
-		gql(e, flow, rename, map[string]any{"w": svcWsWritable.String(), "n": "nope"}).
+		serviceGQL(e, flow, rename, map[string]any{"w": svcWsWritable.String(), "n": "nope"}).
 			Value("errors").Array().NotEmpty()
 	})
 
