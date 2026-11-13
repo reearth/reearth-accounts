@@ -21,7 +21,6 @@ import (
 	"github.com/reearth/reearth-accounts/server/pkg/role"
 	"github.com/reearth/reearth-accounts/server/pkg/user"
 	"github.com/reearth/reearth-accounts/server/pkg/workspace"
-	"github.com/reearth/reearthx/log"
 	"github.com/reearth/reearthx/rerror"
 )
 
@@ -46,7 +45,7 @@ func (i *Scim) findRole(ctx context.Context, roleName string) (*role.Role, error
 	r, err := i.roleRepo.FindByName(ctx, roleName)
 	if err != nil {
 		if errors.Is(err, rerror.ErrNotFound) && os.Getenv("REEARTH_MOCK_AUTH") == "true" {
-			log.Infof("[MockAuth] Auto-creating role: %s", roleName)
+			applog.Info(ctx, "[MockAuth] Auto-creating role", applog.Role(roleName))
 			newRole := role.New().NewID().Name(roleName).MustBuild()
 			if saveErr := i.roleRepo.Save(ctx, *newRole); saveErr != nil {
 				return nil, applog.ErrorWithCallerLogging(ctx, "failed to auto-create role", saveErr)
