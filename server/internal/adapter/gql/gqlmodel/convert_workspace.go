@@ -38,10 +38,12 @@ func ToWorkspace(
 	}
 
 	metadata := WorkspaceMetadata{
-		Description:  t.Metadata().Description(),
-		Website:      t.Metadata().Website(),
-		Location:     t.Metadata().Location(),
-		BillingEmail: t.Metadata().BillingEmail(),
+		Description: t.Metadata().Description(),
+		Website:     t.Metadata().Website(),
+		Location:    t.Metadata().Location(),
+	}
+	if viewer := adapter.User(ctx); viewer != nil && t.Members().HasUser(viewer.ID()) {
+		metadata.BillingEmail = t.Metadata().BillingEmail()
 	}
 
 	if t.Metadata() != nil {

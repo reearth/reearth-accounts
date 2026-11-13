@@ -50,8 +50,9 @@ type MemberUsers struct {
 }
 
 // NewWorkspaceResponse converts a domain workspace (no signed-URL resolution),
-// dropping user members missing from users, as GraphQL does.
-func NewWorkspaceResponse(w *workspace.Workspace, users map[user.ID]*user.User, memberUsers MemberUsers) *WorkspaceResponse {
+// dropping user members missing from users, as GraphQL does. billing decides
+// who sees the billing email.
+func NewWorkspaceResponse(w *workspace.Workspace, users map[user.ID]*user.User, memberUsers MemberUsers, billing EmailViewer) *WorkspaceResponse {
 	if w == nil {
 		return nil
 	}
@@ -77,7 +78,7 @@ func NewWorkspaceResponse(w *workspace.Workspace, users map[user.ID]*user.User, 
 		Description:  md.Description(),
 		Website:      md.Website(),
 		Location:     md.Location(),
-		BillingEmail: md.BillingEmail(),
+		BillingEmail: billing.billingEmail(w),
 		PhotoURL:     md.PhotoURL(),
 	}
 	res := &WorkspaceResponse{
@@ -98,11 +99,20 @@ func NewWorkspaceResponse(w *workspace.Workspace, users map[user.ID]*user.User, 
 	return res
 }
 
+// billingEmail shows a workspace's billing email only to its members, as
+// GraphQL does, unless the route already limits who gets the record.
+func (v EmailViewer) billingEmail(w *workspace.Workspace) string {
+	if v.all || (v.self != nil && w.Members().HasUser(*v.self)) {
+		return w.Metadata().BillingEmail()
+	}
+	return ""
+}
+
 // NewWorkspaceResponses converts a list.
-func NewWorkspaceResponses(ws workspace.List, users map[user.ID]*user.User, memberUsers MemberUsers) []*WorkspaceResponse {
+func NewWorkspaceResponses(ws workspace.List, users map[user.ID]*user.User, memberUsers MemberUsers, billing EmailViewer) []*WorkspaceResponse {
 	out := make([]*WorkspaceResponse, 0, len(ws))
 	for _, w := range ws {
-		out = append(out, NewWorkspaceResponse(w, users, memberUsers))
+		out = append(out, NewWorkspaceResponse(w, users, memberUsers, billing))
 	}
 	return out
 }

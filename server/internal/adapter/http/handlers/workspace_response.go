@@ -42,18 +42,18 @@ func memberUsers(c echo.Context, ws workspace.List) (map[user.ID]*user.User, err
 	return found, nil
 }
 
-func workspaceResponses(c echo.Context, photos adapter.PhotoSigner, ws workspace.List, embed httpmodel.MemberUsers) ([]*httpmodel.WorkspaceResponse, error) {
+func workspaceResponses(c echo.Context, photos adapter.PhotoSigner, ws workspace.List, embed httpmodel.MemberUsers, billing httpmodel.EmailViewer) ([]*httpmodel.WorkspaceResponse, error) {
 	users, err := memberUsers(c, ws)
 	if err != nil {
 		return nil, err
 	}
-	res := httpmodel.NewWorkspaceResponses(ws, users, embed)
+	res := httpmodel.NewWorkspaceResponses(ws, users, embed, billing)
 	signWorkspacePhotos(c.Request().Context(), photos, res)
 	return res, nil
 }
 
 func (h *WorkspaceHandler) writeWorkspace(c echo.Context, w *workspace.Workspace, embed httpmodel.MemberUsers) error {
-	res, err := workspaceResponses(c, h.photos, workspace.List{w}, embed)
+	res, err := workspaceResponses(c, h.photos, workspace.List{w}, embed, httpmodel.ViewerOf(httpinternal.User(c)))
 	if err != nil {
 		return err
 	}
@@ -61,7 +61,7 @@ func (h *WorkspaceHandler) writeWorkspace(c echo.Context, w *workspace.Workspace
 }
 
 func (h *WorkspaceHandler) writeWorkspaces(c echo.Context, ws workspace.List, embed httpmodel.MemberUsers) error {
-	res, err := workspaceResponses(c, h.photos, ws, embed)
+	res, err := workspaceResponses(c, h.photos, ws, embed, httpmodel.ViewerOf(httpinternal.User(c)))
 	if err != nil {
 		return err
 	}
