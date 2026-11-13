@@ -33,7 +33,9 @@ func (r *queryResolver) FindUsersByIDs(ctx context.Context, userIds []gqlmodel.I
 		return nil, err
 	}
 
-	return gqlmodel.ToUsers(res), nil
+	users := gqlmodel.ToUsers(res)
+	gqlmodel.SignUserPhotoURLs(ctx, users, r.Storage)
+	return users, nil
 }
 
 func (r *queryResolver) FindUsersByIDsWithPagination(ctx context.Context, userIds []gqlmodel.ID, alias *string, pagination gqlmodel.Pagination) (*gqlmodel.UsersWithPagination, error) {
