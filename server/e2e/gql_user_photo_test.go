@@ -133,3 +133,11 @@ func TestGQL_MeSignsPhotoURL(t *testing.T) {
 	data = photoQuery(t, e, f.noPhoto, `{ me { metadata { photoURL } } }`)
 	assert.Empty(t, photoOf(data["me"]))
 }
+
+// assertSignedPhoto checks for a locally signed URL without matching the stored
+// value, which the signer escapes when it is itself an absolute URL.
+func assertSignedPhoto(t *testing.T, got string) {
+	t.Helper()
+	assert.True(t, strings.HasPrefix(got, "https://"), "want a signed URL, got %q", got)
+	assert.Contains(t, got, "Signature=")
+}

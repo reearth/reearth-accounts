@@ -444,7 +444,7 @@ func TestUpdateMe_Website(t *testing.T) {
 }
 
 func TestUpdateMe_PhotoURL(t *testing.T) {
-	e, r := StartServer(t, &app.Config{}, true, baseSeederOneUser)
+	e, r := StartServer(t, &app.Config{StorageIsLocal: true}, true, baseSeederOneUser)
 
 	query := `mutation { updateMe(input: {photoURL: "https://example.com/photo.jpg"}){ me{ id metadata { photoURL } } }}`
 	request := GraphQLRequest{
@@ -458,8 +458,7 @@ func TestUpdateMe_PhotoURL(t *testing.T) {
 		WithHeader("Content-Type", "application/json").
 		WithHeader("X-Reearth-Debug-User", uId.String()).
 		WithBytes(jsonData).Expect().Status(http.StatusOK).JSON().Object().Value("data").Object().Value("updateMe").Object().Value("me").Object()
-	// The response signs the stored value, and GCS is unavailable in the test env.
-	o.Value("metadata").Object().Value("photoURL").String().IsEqual("")
+	assertSignedPhoto(t, o.Value("metadata").Object().Value("photoURL").String().Raw())
 
 	// Verify workspace metadata is also updated (personal workspace)
 	ws, err := r.Workspace.FindByID(context.Background(), wId)
@@ -468,7 +467,7 @@ func TestUpdateMe_PhotoURL(t *testing.T) {
 }
 
 func TestUpdateMe_AllMetadataFields(t *testing.T) {
-	e, r := StartServer(t, &app.Config{}, true, baseSeederOneUser)
+	e, r := StartServer(t, &app.Config{StorageIsLocal: true}, true, baseSeederOneUser)
 
 	query := `mutation {
 		updateMe(input: {
@@ -499,8 +498,7 @@ func TestUpdateMe_AllMetadataFields(t *testing.T) {
 	o.Value("alias").String().IsEqual("fullalias")
 	o.Value("metadata").Object().Value("description").String().IsEqual("Full description")
 	o.Value("metadata").Object().Value("website").String().IsEqual("https://fullsite.com")
-	// The response signs the stored value, and GCS is unavailable in the test env.
-	o.Value("metadata").Object().Value("photoURL").String().IsEqual("")
+	assertSignedPhoto(t, o.Value("metadata").Object().Value("photoURL").String().Raw())
 
 	// Verify user in database
 	u, err := r.User.FindByID(context.Background(), uId)
