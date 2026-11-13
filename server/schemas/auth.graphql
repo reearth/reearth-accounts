@@ -33,5 +33,5 @@ extend type Query {
   Get authentication configuration for client applications.
   This endpoint does not require authentication and returns public auth configuration.
   """
-  authConfig: AuthConfig
+  authConfig: AuthConfig @public
 }

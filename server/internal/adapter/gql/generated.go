@@ -1388,6 +1388,12 @@ func (ec *executionContext) introspectType(name string) (*introspection.Type, er
 
 var sources = []*ast.Source{
 	{Name: "../../../schemas/_shared.graphql", Input: `
+"""
+Marks a Query or Mutation field as callable without a token. Every other field
+requires authentication. The auth middleware reads this directive at startup.
+"""
+directive @public on FIELD_DEFINITION
+
 interface Node {
   id: ID!
 }
@@ -1454,7 +1460,7 @@ extend type Query {
   Get authentication configuration for client applications.
   This endpoint does not require authentication and returns public auth configuration.
   """
-  authConfig: AuthConfig
+  authConfig: AuthConfig @public
 }
 `, BuiltIn: false},
 	{Name: "../../../schemas/cerbos.graphql", Input: `input CheckPermissionInput {
@@ -1596,7 +1602,7 @@ input DeleteMeInput {
 
 extend type Query {
   findUserByAlias(alias: String!): User
-  findUsersByIDsWithPagination(ids: [ID!]!, alias: String, pagination: Pagination!): UsersWithPagination!
+  findUsersByIDsWithPagination(ids: [ID!]!, alias: String, pagination: Pagination!): UsersWithPagination! @public
   findUsersByIDs(ids: [ID!]!): [User!]!
   me: Me
   mfaStatus: MFAStatus!
@@ -1619,7 +1625,7 @@ type DeleteMePayload {
 }
 
 extend type Mutation {
-  createVerification(input: CreateVerificationInput!): Boolean
+  createVerification(input: CreateVerificationInput!): Boolean @public
   deleteMe(input: DeleteMeInput!): DeleteMePayload
   disableMFA: Boolean!
   enableMFA: MFAEnrollResult!
@@ -1628,9 +1634,9 @@ extend type Mutation {
   passwordReset(input: PasswordResetInput!): Boolean
   regenerateMFARecoveryCode: MFARecoveryCodeResult!
   removeMyAuth(input: RemoveMyAuthInput!): UpdateMePayload
-  signup(input: SignupInput!): UserPayload
-  signupOIDC(input: SignupOIDCInput!): UserPayload
-  startPasswordReset(input: StartPasswordResetInput!): Boolean
+  signup(input: SignupInput!): UserPayload @public
+  signupOIDC(input: SignupOIDCInput!): UserPayload @public
+  startPasswordReset(input: StartPasswordResetInput!): Boolean @public
   updateMe(input: UpdateMeInput!): UpdateMePayload
   verifyUser(input: VerifyUserInput!): UserPayload
 }
@@ -1798,10 +1804,10 @@ type DeleteWorkspacePayload {
 
 # TODO: rename it to findWorkspace** as a prefix to avoid conflict with other entities
 extend type Query {
-    findByID(id: ID!): Workspace!
-    findByIDs(ids: [ID!]!): [Workspace!]!
+    findByID(id: ID!): Workspace! @public
+    findByIDs(ids: [ID!]!): [Workspace!]! @public
     findByName(name: String!): Workspace
-    findByAlias(alias: String!): Workspace
+    findByAlias(alias: String!): Workspace @public
     findByUser(userId: ID!): [Workspace]
     findByUserWithPagination(userId: ID!, pagination: Pagination!): WorkspacesWithPagination!
 }

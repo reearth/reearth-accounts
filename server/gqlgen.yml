@@ -11,6 +11,9 @@ exec:
   filename: internal/adapter/gql/generated.go
 model:
   filename: internal/adapter/gql/gqlmodel/models_gen.go
+directives:
+  public:
+    skip_runtime: true
 models:
   Me:
     fields:

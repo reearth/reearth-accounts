@@ -161,10 +161,10 @@ type DeleteWorkspacePayload {
 
 # TODO: rename it to findWorkspace** as a prefix to avoid conflict with other entities
 extend type Query {
-    findByID(id: ID!): Workspace!
-    findByIDs(ids: [ID!]!): [Workspace!]!
+    findByID(id: ID!): Workspace! @public
+    findByIDs(ids: [ID!]!): [Workspace!]! @public
     findByName(name: String!): Workspace
-    findByAlias(alias: String!): Workspace
+    findByAlias(alias: String!): Workspace @public
     findByUser(userId: ID!): [Workspace]
     findByUserWithPagination(userId: ID!, pagination: Pagination!): WorkspacesWithPagination!
 }
