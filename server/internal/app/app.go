@@ -3,7 +3,6 @@ package app
 import (
 	"context"
 	"errors"
-	"fmt"
 	"net/http"
 	"net/http/pprof"
 
@@ -16,6 +15,7 @@ import (
 	scimadapter "github.com/reearth/reearth-accounts/server/internal/adapter/scim"
 	otelapp "github.com/reearth/reearth-accounts/server/internal/app/otel"
 	"github.com/reearth/reearth-accounts/server/internal/usecase/interactor"
+	"github.com/reearth/reearth-accounts/server/pkg/applog"
 	"github.com/reearth/reearth-accounts/server/pkg/user"
 	"github.com/reearth/reearth-accounts/server/pkg/workspace"
 	"github.com/reearth/reearthx/appx"
@@ -25,7 +25,7 @@ import (
 
 func initEcho(ctx context.Context, cfg *ServerConfig) *echo.Echo {
 	if cfg.Config == nil {
-		log.Fatalc(ctx, "ServerConfig.Config is nil")
+		applog.Fatal(ctx, "ServerConfig.Config is nil")
 	}
 
 	e := echo.New()
@@ -39,17 +39,17 @@ func initEcho(ctx context.Context, cfg *ServerConfig) *echo.Echo {
 	logger := log.NewEcho()
 	e.Logger = logger
 	if cfg.Config.OtelEnabled {
-		log.Infof("OpenTelemetry tracing enabled for %s", string(otelapp.OtelAccountsServiceName))
+		applog.Info(ctx, "OpenTelemetry tracing enabled", applog.Service(string(otelapp.OtelAccountsServiceName)))
 		e.Use(otelapp.Middleware(string(otelapp.OtelAccountsServiceName)))
 	} else {
-		log.Infof("OpenTelemetry tracing disabled for %s", string(otelapp.OtelAccountsServiceName))
+		applog.Info(ctx, "OpenTelemetry tracing disabled", applog.Service(string(otelapp.OtelAccountsServiceName)))
 	}
-	e.Use(AccessLogger(logger))
+	e.Use(RequestLogger())
 
 	if w := cfg.Config.MFARecoveryMaxAuthAge; w > 0 {
-		log.Infof("MFA recovery step-up window: %s", w)
+		applog.Info(ctx, "MFA recovery step-up window", applog.Window(w))
 	} else {
-		log.Infof("MFA recovery step-up window: off")
+		applog.Info(ctx, "MFA recovery step-up window: off")
 	}
 
 	origins := allowedOrigins(cfg)
@@ -76,8 +76,8 @@ func initEcho(ctx context.Context, cfg *ServerConfig) *echo.Echo {
 			return
 		}
 
-		code, msg := errorMessage(err, func(f string, args ...interface{}) {
-			c.Echo().Logger.Errorf(f, args...)
+		code, msg := errorMessage(err, func(internal error) {
+			applog.Error(c.Request().Context(), "echo internal error", applog.Err(internal))
 		})
 		if err := c.JSON(code, map[string]string{
 			"error": msg,
@@ -91,7 +91,7 @@ func initEcho(ctx context.Context, cfg *ServerConfig) *echo.Echo {
 		e.GET("/graphql", echo.WrapHandler(
 			playground.Handler("reearth-cloud", "/api/graphql"),
 		))
-		log.Printf("gql: GraphQL Playground is available")
+		applog.Info(ctx, "gql: GraphQL Playground is available")
 	}
 
 	allowedISS := make([]string, 0)
@@ -127,7 +127,7 @@ func initEcho(ctx context.Context, cfg *ServerConfig) *echo.Echo {
 	if !cfg.Config.Mock_Auth {
 		jwt, err := appx.AuthMiddleware(cfg.Config.Auths(), adapter.AuthInfoKey, true)
 		if err != nil {
-			log.Panicc(ctx, err)
+			applog.Panic(ctx, "jwt middleware", applog.Err(err))
 		}
 		middlewares = append(middlewares, echo.WrapMiddleware(jwt))
 	}
@@ -140,11 +140,11 @@ func initEcho(ctx context.Context, cfg *ServerConfig) *echo.Echo {
 
 	photos, err := adapter.NewPhotoSigner(newPhotoStorage(cfg.Config))
 	if err != nil {
-		log.Fatalc(ctx, err)
+		applog.Fatal(ctx, "photo signer", applog.Err(err))
 	}
 	loginTime, err := adapter.NewLoginTimeSource(cfg.Config.AuthTimeClaim)
 	if err != nil {
-		log.Panicc(ctx, fmt.Errorf("REEARTH_ACCOUNTS_AUTH_TIME_CLAIM: %w", err))
+		applog.Panic(ctx, "invalid REEARTH_ACCOUNTS_AUTH_TIME_CLAIM", applog.Err(err))
 	}
 	lookups := ratelimit.New(cfg.Config.UserLookupLimit)
 	api.POST("/graphql", GraphqlAPI(cfg.Config, photos, loginTime, lookups, cfg.Config.Dev), middlewares...)
@@ -157,7 +157,7 @@ func initEcho(ctx context.Context, cfg *ServerConfig) *echo.Echo {
 	if !cfg.Config.Mock_Auth {
 		jwt, err := appx.AuthMiddleware(cfg.Config.Auths(), adapter.AuthInfoKey, true)
 		if err != nil {
-			log.Panicc(ctx, err)
+			applog.Panic(ctx, "rest jwt middleware", applog.Err(err))
 		}
 		restJWT = echo.WrapMiddleware(jwt)
 	}
@@ -226,7 +226,7 @@ func allowedOrigins(cfg *ServerConfig) []string {
 	return origins
 }
 
-func errorMessage(err error, log func(string, ...interface{})) (int, string) {
+func errorMessage(err error, logInternal func(error)) (int, string) {
 	code := http.StatusBadRequest
 	msg := err.Error()
 
@@ -240,7 +240,7 @@ func errorMessage(err error, log func(string, ...interface{})) (int, string) {
 			msg = "error"
 		}
 		if err2.Internal != nil {
-			log("echo internal err: %+v", err2)
+			logInternal(err2)
 		}
 	} else if errors.Is(err, rerror.ErrNotFound) {
 		code = http.StatusNotFound

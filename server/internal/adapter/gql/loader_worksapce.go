@@ -3,11 +3,11 @@ package gql
 import (
 	"context"
 
-	"github.com/labstack/gommon/log"
 	"github.com/reearth/reearth-accounts/server/internal/adapter"
 	"github.com/reearth/reearth-accounts/server/internal/adapter/gql/gqldataloader"
 	"github.com/reearth/reearth-accounts/server/internal/adapter/gql/gqlmodel"
 	"github.com/reearth/reearth-accounts/server/internal/usecase/interfaces"
+	"github.com/reearth/reearth-accounts/server/pkg/applog"
 	"github.com/reearth/reearth-accounts/server/pkg/id"
 	"github.com/reearth/reearthx/util"
 )
@@ -44,7 +44,7 @@ func (c *WorkspaceLoader) Fetch(ctx context.Context, ids []gqlmodel.ID) ([]*gqlm
 		}
 		converted, err := gqlmodel.ToWorkspace(ctx, w, exists, c.photos)
 		if err != nil {
-			log.Errorf("failed to convert workspace: %s", err.Error())
+			applog.Error(ctx, "failed to convert workspace", applog.Err(err))
 			continue
 		}
 		byID[w.ID()] = converted
@@ -77,7 +77,7 @@ func (c *WorkspaceLoader) FindByUser(ctx context.Context, uid gqlmodel.ID) ([]*g
 	for _, w := range ws {
 		converted, err := gqlmodel.ToWorkspace(ctx, w, exists, c.photos)
 		if err != nil {
-			log.Errorf("failed to convert workspace: %s", err.Error())
+			applog.Error(ctx, "failed to convert workspace", applog.Err(err))
 			continue
 		}
 		workspaces = append(workspaces, converted)

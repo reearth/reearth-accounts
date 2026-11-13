@@ -60,7 +60,7 @@ func TestLogMessagesMatchFunctionPurpose(t *testing.T) {
 	_ = ReturnAccountsWarn(ctx, e)
 	atWarn := logBuf.String()
 
-	assert.Contains(t, atError, "error with caller logging")
+	assert.Contains(t, atError, "request failed")
 	assert.Contains(t, atWarn, "transport failure")
 	assert.Contains(t, atError, "ERROR")
 	assert.Contains(t, atWarn, "WARN")

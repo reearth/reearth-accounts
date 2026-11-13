@@ -7,6 +7,7 @@ import (
 	"io"
 	"net/http"
 	"net/http/httptest"
+	"os"
 	"strings"
 	"sync"
 	"sync/atomic"
@@ -15,6 +16,7 @@ import (
 
 	"github.com/reearth/reearth-accounts/server/internal/usecase/gateway"
 
+	"github.com/reearth/reearthx/log"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -38,6 +40,25 @@ var (
 func TestURLFromDomain(t *testing.T) {
 	assert.Equal(t, "https://a/", urlFromDomain("a"))
 	assert.Equal(t, "https://a/", urlFromDomain("a/"))
+}
+
+func TestAuth0_ResponseLogOmitsUserID(t *testing.T) {
+	const sub = "auth0|log-probe-subject"
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		_, _ = w.Write([]byte(`{}`))
+	}))
+	defer srv.Close()
+
+	var buf bytes.Buffer
+	log.SetOutput(&buf)
+	defer log.SetOutput(os.Stdout)
+
+	a := &Auth0{domain: srv.URL, client: srv.Client()}
+	_, err := a.exec(context.Background(), http.MethodGet, "api/v2/users/"+sub, "", nil)
+	assert.NoError(t, err)
+
+	assert.Contains(t, buf.String(), "api/v2/users/{id}")
+	assert.NotContains(t, buf.String(), sub)
 }
 
 func TestAuth0(t *testing.T) {

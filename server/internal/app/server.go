@@ -3,7 +3,6 @@ package app
 import (
 	"context"
 	"errors"
-	"fmt"
 	"net"
 	"net/http"
 	"os"
@@ -11,18 +10,17 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/cerbos/cerbos-sdk-go/cerbos"
-	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/labstack/echo/v4"
 	infraCerbos "github.com/reearth/reearth-accounts/server/internal/infrastructure/cerbos"
 	mongorepo "github.com/reearth/reearth-accounts/server/internal/infrastructure/mongo"
 	"github.com/reearth/reearth-accounts/server/internal/infrastructure/mongo/migration"
+	"github.com/reearth/reearth-accounts/server/internal/infrastructure/postgres"
 	pgmigration "github.com/reearth/reearth-accounts/server/internal/infrastructure/postgres/migration"
 	"github.com/reearth/reearth-accounts/server/internal/usecase/gateway"
 	"github.com/reearth/reearth-accounts/server/internal/usecase/repo"
+	"github.com/reearth/reearth-accounts/server/pkg/applog"
 
 	otelapp "github.com/reearth/reearth-accounts/server/internal/app/otel"
-	"github.com/reearth/reearthx/log"
 	"github.com/reearth/reearthx/mongox"
 	"go.mongodb.org/mongo-driver/event"
 	"go.mongodb.org/mongo-driver/mongo"
@@ -38,9 +36,9 @@ func Start(debug bool) {
 	// Load config
 	conf, cerr := ReadConfig(debug)
 	if cerr != nil {
-		log.Fatal(cerr)
+		applog.Fatal(ctx, "failed to read config", applog.Err(cerr))
 	}
-	log.Infof("config: %s", conf.Print())
+	applog.Info(ctx, "config", applog.Config(conf.Print()))
 
 	// Init OpenTelemetry tracer
 	if conf.OtelEnabled {
@@ -56,13 +54,13 @@ func Start(debug bool) {
 			ServiceName:        otelapp.OtelAccountsServiceName,
 		})
 		if terr != nil {
-			log.Warnfc(ctx, "failed to init tracer: %v", terr)
+			applog.Warn(ctx, "failed to init tracer", applog.Err(terr))
 		} else {
 			defer func() {
 				shutdownCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 				defer cancel()
 				if serr := tp.Shutdown(shutdownCtx); serr != nil {
-					log.Errorfc(ctx, "failed to shutdown tracer: %s", serr.Error())
+					applog.Error(ctx, "failed to shutdown tracer", applog.Err(serr))
 				}
 			}()
 		}
@@ -75,15 +73,15 @@ func Start(debug bool) {
 		// 30s startup budget covers connect+ping+migrate.
 		pgCtx, cancel := context.WithTimeout(ctx, 30*time.Second)
 		defer cancel()
-		pool, perr := pgxpool.New(pgCtx, conf.DB)
+		pool, perr := postgres.NewPool(pgCtx, conf.DB)
 		if perr != nil {
-			log.Fatalc(ctx, fmt.Sprintf("postgres pool init error: %+v", perr))
+			applog.Fatal(ctx, "postgres pool init error", applog.Err(perr))
 		}
 		if perr := pool.Ping(pgCtx); perr != nil {
-			log.Fatalc(ctx, fmt.Sprintf("postgres ping error: %+v", perr))
+			applog.Fatal(ctx, "postgres ping error", applog.Err(perr))
 		}
 		if merr := pgmigration.Migrate(pgCtx, pool); merr != nil {
-			log.Fatalc(ctx, fmt.Sprintf("postgres migration error: %+v", merr))
+			applog.Fatal(ctx, "postgres migration error", applog.Err(merr))
 		}
 		repos, gateways = initPostgresReposAndGateways(ctx, pool, conf)
 	} else {
@@ -92,8 +90,7 @@ func Start(debug bool) {
 		if debug || os.Getenv("REEARTH_ACCOUNTS_DEV") == "true" {
 			debugMonitor = &event.CommandMonitor{
 				Failed: func(ctx context.Context, evt *event.CommandFailedEvent) {
-					log.Errorf("MongoDB Command Failed: %s - Duration: %v - Error: %s",
-						evt.CommandName, evt.Duration, evt.Failure)
+					applog.Error(ctx, "MongoDB Command Failed", applog.Command(evt.CommandName), applog.DurationMS(evt.Duration), applog.ErrMessage(evt.Failure))
 				},
 				Succeeded: func(ctx context.Context, evt *event.CommandSucceededEvent) {
 					// Only log slow queries or critical operations
@@ -101,8 +98,7 @@ func Start(debug bool) {
 						evt.CommandName == "createIndexes" ||
 						evt.CommandName == "dropIndexes" ||
 						evt.CommandName == "drop" {
-						log.Debugf("MongoDB Command: %s - Duration: %v - Reply: %v",
-							evt.CommandName, evt.Duration, evt.Reply)
+						applog.Debug(ctx, "MongoDB Command", applog.Command(evt.CommandName), applog.DurationMS(evt.Duration))
 					}
 				},
 			}
@@ -120,7 +116,7 @@ func Start(debug bool) {
 				SetConnectTimeout(time.Second*10).
 				SetMonitor(chainMongoMonitors(debugMonitor, otelMonitor)))
 		if err != nil {
-			log.Fatalc(ctx, fmt.Sprintf("repo initialization error: %+v", err))
+			applog.Fatal(ctx, "repo initialization error", applog.Err(err))
 		}
 
 		// Init repositories
@@ -134,29 +130,24 @@ func Start(debug bool) {
 
 			lock, lockErr := mongorepo.NewLock(db.Collection("locks"))
 			if lockErr != nil {
-				log.Fatalf("failed to create lock: %v", lockErr)
+				applog.Fatal(ctx, "failed to create lock", applog.Err(lockErr))
 			}
 
 			if migrationErr := runMigration(ctx, repos); migrationErr != nil {
-				log.Fatal(migrationErr)
+				applog.Fatal(ctx, "failed to run data migration", applog.Err(migrationErr))
 			}
 
 			if migrationErr := migration.Do(ctx, clientx, mongorepo.NewConfig(db.Collection("config"), lock)); migrationErr != nil {
-				log.Fatalf("failed to run migration: %v", migrationErr)
+				applog.Fatal(ctx, "failed to run migration", applog.Err(migrationErr))
 			}
 			return
 		}
 	}
 
 	// Cerbos
-	var opts []cerbos.Opt
-	if !conf.CerbosUseSSL {
-		opts = append(opts, cerbos.WithPlaintext(), cerbos.WithTLSInsecure())
-	}
-
-	cerbosClient, err := cerbos.New(conf.CerbosHost, opts...)
+	cerbosClient, err := infraCerbos.NewClient(conf.CerbosHost, conf.CerbosUseSSL)
 	if err != nil {
-		log.Fatalf("Failed to create cerbos client: %v", err)
+		applog.Fatal(ctx, "Failed to create cerbos client", applog.Err(err))
 	}
 	cerbosAdapter := infraCerbos.NewCerbosAdapter(cerbosClient)
 
@@ -210,17 +201,17 @@ func NewServer(ctx context.Context, cfg *ServerConfig) *WebServer {
 }
 
 func (w *WebServer) Run(ctx context.Context) {
-	defer log.Infoc(ctx, "Server shutdown")
+	defer applog.Info(ctx, "Server shutdown")
 
-	debugLog := ""
+	msg := "server started"
 	if w.appServer.Debug {
-		debugLog += " with debug mode"
+		msg = "server started with debug mode"
 	}
-	log.Infof("server started%s at http://%s\n", debugLog, w.address)
+	applog.Info(ctx, msg, applog.Address(w.address))
 
 	go func() {
 		if err := w.appServer.StartH2CServer(w.address, &http2.Server{}); err != nil && !errors.Is(err, http.ErrServerClosed) {
-			log.Fatalc(ctx, err.Error())
+			applog.Fatal(ctx, "server stopped", applog.Err(err))
 		}
 	}()
 
@@ -231,7 +222,7 @@ func (w *WebServer) Run(ctx context.Context) {
 	shutdownCtx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 	if err := w.Shutdown(shutdownCtx); err != nil {
-		log.Errorf("server shutdown: %v", err)
+		applog.Error(ctx, "server shutdown", applog.Err(err))
 	}
 }
 

@@ -9,8 +9,8 @@ import (
 	"sync"
 	"time"
 
+	"github.com/reearth/reearth-accounts/server/pkg/applog"
 	"github.com/reearth/reearth-accounts/server/pkg/user"
-	"github.com/reearth/reearthx/log"
 	"golang.org/x/time/rate"
 )
 
@@ -65,7 +65,7 @@ func (l *Limiter) Allow(ctx context.Context, viewer, op string, n int) bool {
 	if l.take(viewer, n) {
 		return true
 	}
-	log.Warnfc(ctx, "user lookup rate limit exceeded: viewer=%s op=%s lookups=%d enforced=%t", viewer, op, n, l.enforce)
+	applog.Warn(ctx, "user lookup rate limit exceeded", applog.LimitKey(viewer), applog.Operation(op), applog.Count(n), applog.Enforced(l.enforce))
 	return !l.enforce
 }
 
