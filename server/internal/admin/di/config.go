@@ -9,13 +9,13 @@ import (
 	"time"
 
 	"github.com/cerbos/cerbos-sdk-go/cerbos"
-	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/joho/godotenv"
 	"github.com/kelseyhightower/envconfig"
 	"github.com/reearth/reearth-accounts/server/internal/admin/auth/session"
 	"github.com/reearth/reearth-accounts/server/internal/admin/gateway/google"
 	authhandler "github.com/reearth/reearth-accounts/server/internal/admin/presentation/handler/auth"
 	"github.com/reearth/reearth-accounts/server/internal/admin/usecase/authuc"
+	infraCerbos "github.com/reearth/reearth-accounts/server/internal/infrastructure/cerbos"
 	mongorepo "github.com/reearth/reearth-accounts/server/internal/infrastructure/mongo"
 	"github.com/reearth/reearth-accounts/server/internal/infrastructure/postgres"
 	"github.com/reearth/reearth-accounts/server/internal/usecase/repo"
@@ -220,7 +220,7 @@ func provideRepoContainer(cfg *Config) (*repo.Container, func(), error) {
 	if cfg.resolveDBDriver() == "postgres" {
 		ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 		defer cancel()
-		pool, err := pgxpool.New(ctx, cfg.DB)
+		pool, err := postgres.NewPool(ctx, cfg.DB)
 		if err != nil {
 			return nil, nil, fmt.Errorf("postgres pool init: %w", err)
 		}
@@ -279,11 +279,7 @@ func provideCerbosClient(cfg *Config) (*cerbos.GRPCClient, error) {
 		applog.Warn(context.Background(), "cerbos host not configured; admin permission checks will be skipped")
 		return nil, nil
 	}
-	var opts []cerbos.Opt
-	if !cfg.CerbosUseSSL {
-		opts = append(opts, cerbos.WithPlaintext(), cerbos.WithTLSInsecure())
-	}
-	client, err := cerbos.New(cfg.CerbosHost, opts...)
+	client, err := infraCerbos.NewClient(cfg.CerbosHost, cfg.CerbosUseSSL)
 	if err != nil {
 		return nil, fmt.Errorf("create cerbos client: %w", err)
 	}

@@ -27,6 +27,8 @@ const (
 // requestRecord collects what inner handlers learn about a request, so the
 // request logger can write one entry when the request ends.
 type requestRecord struct {
+	caller string
+
 	mu            sync.Mutex
 	operation     string
 	operationType string
@@ -52,7 +54,7 @@ func RequestLogger() echo.MiddlewareFunc {
 				c.Response().Header().Set(echo.HeaderXRequestID, reqID)
 			}
 
-			rec := &requestRecord{}
+			rec := &requestRecord{caller: callerLabel(req.Header.Get(internalServiceHeader))}
 			ctx := applog.With(req.Context(), applog.RequestID(reqID))
 			ctx = context.WithValue(ctx, requestRecordKey{}, rec)
 			c.SetRequest(req.WithContext(ctx))
@@ -94,8 +96,8 @@ func requestFields(c echo.Context, ctx context.Context, rec *requestRecord, late
 	if u := adapter.User(ctx); u != nil {
 		fields = append(fields, applog.ViewerID(u.ID().String()))
 	}
-	if caller := callerLabel(c.Request().Header.Get(internalServiceHeader)); caller != "" {
-		fields = append(fields, applog.Caller(caller))
+	if rec.caller != "" {
+		fields = append(fields, applog.Caller(rec.caller))
 	}
 	if ai := adapter.GetAuthInfo(ctx); ai != nil && strings.HasSuffix(ai.Sub, m2mSubSuffix) {
 		fields = append(fields, applog.CallerClientID(strings.TrimSuffix(ai.Sub, m2mSubSuffix)))
@@ -122,6 +124,13 @@ func newRequestID() string {
 	var b [16]byte
 	_, _ = rand.Read(b[:])
 	return hex.EncodeToString(b[:])
+}
+
+func callerFrom(ctx context.Context) string {
+	if rec, ok := ctx.Value(requestRecordKey{}).(*requestRecord); ok {
+		return rec.caller
+	}
+	return ""
 }
 
 // recordGraphQLOperation is a gqlgen operation middleware that tells the
