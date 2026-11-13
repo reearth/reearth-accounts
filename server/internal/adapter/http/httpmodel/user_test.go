@@ -4,12 +4,24 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/reearth/reearth-accounts/server/internal/adapter"
+	gatewaymock "github.com/reearth/reearth-accounts/server/internal/usecase/gateway/mock"
 	"github.com/reearth/reearth-accounts/server/pkg/id"
 	"github.com/reearth/reearth-accounts/server/pkg/permittable"
 	"github.com/reearth/reearth-accounts/server/pkg/user"
 	"github.com/reearth/reearth-accounts/server/pkg/workspace"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
+	"go.uber.org/mock/gomock"
 )
+
+// unusedPhotos fails the test if any photo is signed.
+func unusedPhotos(t *testing.T) adapter.PhotoSigner {
+	t.Helper()
+	p, err := adapter.NewPhotoSigner(gatewaymock.NewMockStorage(gomock.NewController(t)))
+	require.NoError(t, err)
+	return p
+}
 
 func TestSanitizeUsername(t *testing.T) {
 	t.Run("email input is replaced with user- prefixed unique string", func(t *testing.T) {
@@ -91,8 +103,8 @@ func TestNewUserResponse_Email(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			assert.Equal(t, tt.want, NewUserResponse(alice, tt.viewer).Email)
-			assert.Equal(t, tt.want, NewUserResponses(user.List{alice}, tt.viewer)[0].Email)
+			assert.Equal(t, tt.want, NewUserResponse(t.Context(), unusedPhotos(t), alice, tt.viewer).Email)
+			assert.Equal(t, tt.want, NewUserResponses(t.Context(), unusedPhotos(t), user.List{alice}, tt.viewer)[0].Email)
 			assert.Equal(t, tt.want, NewSimpleUserResponse(simpleAlice, tt.viewer).Email)
 		})
 	}

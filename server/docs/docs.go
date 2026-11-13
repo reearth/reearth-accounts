@@ -2768,7 +2768,7 @@ const docTemplate = `{
                     "type": "string"
                 },
                 "photo_url": {
-                    "description": "A signed URL that expires on GET /api/users/me, so do not store it.\nEvery other response carries the stored value.",
+                    "description": "A signed URL that expires, so do not store it.",
                     "type": "string"
                 },
                 "theme": {
@@ -2886,7 +2886,7 @@ const docTemplate = `{
                     "type": "string"
                 },
                 "user": {
-                    "description": "User is set only with ?expand=members.user. Its photo_url is the stored\nvalue, and a soft-deleted user appears like a live one, both as in GraphQL.",
+                    "description": "User is set only with ?expand=members.user. A soft-deleted user appears\nlike a live one, as in GraphQL.",
                     "allOf": [
                         {
                             "$ref": "#/definitions/httpmodel.MemberUserResponse"

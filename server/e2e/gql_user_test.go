@@ -458,7 +458,8 @@ func TestUpdateMe_PhotoURL(t *testing.T) {
 		WithHeader("Content-Type", "application/json").
 		WithHeader("X-Reearth-Debug-User", uId.String()).
 		WithBytes(jsonData).Expect().Status(http.StatusOK).JSON().Object().Value("data").Object().Value("updateMe").Object().Value("me").Object()
-	o.Value("metadata").Object().Value("photoURL").String().IsEqual("https://example.com/photo.jpg")
+	// The response signs the stored value, and GCS is unavailable in the test env.
+	o.Value("metadata").Object().Value("photoURL").String().IsEqual("")
 
 	// Verify workspace metadata is also updated (personal workspace)
 	ws, err := r.Workspace.FindByID(context.Background(), wId)
@@ -498,7 +499,8 @@ func TestUpdateMe_AllMetadataFields(t *testing.T) {
 	o.Value("alias").String().IsEqual("fullalias")
 	o.Value("metadata").Object().Value("description").String().IsEqual("Full description")
 	o.Value("metadata").Object().Value("website").String().IsEqual("https://fullsite.com")
-	o.Value("metadata").Object().Value("photoURL").String().IsEqual("https://fullsite.com/avatar.png")
+	// The response signs the stored value, and GCS is unavailable in the test env.
+	o.Value("metadata").Object().Value("photoURL").String().IsEqual("")
 
 	// Verify user in database
 	u, err := r.User.FindByID(context.Background(), uId)

@@ -11,10 +11,11 @@ import (
 
 type AuthHandler struct {
 	authConfig adapter.Auth0ConfigProvider
+	photos     adapter.PhotoSigner
 }
 
-func NewAuthHandler(authConfig adapter.Auth0ConfigProvider) *AuthHandler {
-	return &AuthHandler{authConfig: authConfig}
+func NewAuthHandler(authConfig adapter.Auth0ConfigProvider, photos adapter.PhotoSigner) *AuthHandler {
+	return &AuthHandler{authConfig: authConfig, photos: photos}
 }
 
 // Config godoc
@@ -43,5 +44,5 @@ func (h *AuthHandler) Logout(c echo.Context) error {
 	if err != nil {
 		return err
 	}
-	return c.JSON(http.StatusOK, httpmodel.NewMeResponse(u))
+	return c.JSON(http.StatusOK, httpmodel.NewMeResponse(ctx, h.photos, u))
 }

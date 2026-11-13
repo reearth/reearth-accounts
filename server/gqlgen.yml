@@ -23,6 +23,10 @@ models:
     fields:
       email:
         resolver: true
+  UserMetadata:
+    fields:
+      photoURL:
+        resolver: true
   WorkspaceUserMember:
     fields:
       user:

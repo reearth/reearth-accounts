@@ -1,8 +1,10 @@
 package httpmodel
 
 import (
+	"context"
 	"time"
 
+	"github.com/reearth/reearth-accounts/server/internal/adapter"
 	"github.com/reearth/reearth-accounts/server/internal/usecase/interfaces"
 	"github.com/reearth/reearth-accounts/server/pkg/dregexp"
 	"github.com/reearth/reearth-accounts/server/pkg/permittable"
@@ -14,8 +16,7 @@ import (
 type UserMetadataResponse struct {
 	Description string `json:"description"`
 	Website     string `json:"website"`
-	// A signed URL that expires on GET /api/users/me, so do not store it.
-	// Every other response carries the stored value.
+	// A signed URL that expires, so do not store it.
 	PhotoURL string `json:"photo_url"`
 	Lang     string `json:"lang"`
 	Theme    string `json:"theme"`
@@ -29,7 +30,7 @@ type VerificationResponse struct {
 
 // MemberUserResponse holds exactly the fields of the GraphQL User type. A
 // workspace member's embedded user uses it alone, so, as in GraphQL, it shows
-// no deletion state and its photo_url is the stored value.
+// no deletion state.
 type MemberUserResponse struct {
 	ID    string `json:"id"`
 	Name  string `json:"name"`
@@ -144,8 +145,9 @@ func (v EmailViewer) email(uid user.ID, email string) string {
 	return ""
 }
 
-// NewMemberUserResponse converts a domain user to the GraphQL User fields.
-func NewMemberUserResponse(u *user.User, viewer EmailViewer) *MemberUserResponse {
+// newMemberUserResponse converts a domain user to the GraphQL User fields,
+// leaving the photo unsigned.
+func newMemberUserResponse(u *user.User, viewer EmailViewer) *MemberUserResponse {
 	if u == nil {
 		return nil
 	}
@@ -174,25 +176,30 @@ func NewMemberUserResponse(u *user.User, viewer EmailViewer) *MemberUserResponse
 	}
 }
 
-// NewUserResponse converts a domain user to a UserResponse.
-func NewUserResponse(u *user.User, viewer EmailViewer) *UserResponse {
-	if u == nil {
-		return nil
-	}
-	return &UserResponse{
-		MemberUserResponse: *NewMemberUserResponse(u, viewer),
-		IsDeleted:          u.IsDeleted(),
-		DeletedAt:          u.DeletedAt(),
-		CreatedAt:          u.CreatedAt(),
-	}
+// NewUserResponse converts a domain user to a UserResponse with a signed photo.
+func NewUserResponse(ctx context.Context, photos adapter.PhotoSigner, u *user.User, viewer EmailViewer) *UserResponse {
+	return NewUserResponses(ctx, photos, user.List{u}, viewer)[0]
 }
 
-// NewUserResponses converts a domain user list.
-func NewUserResponses(ul user.List, viewer EmailViewer) []*UserResponse {
+// NewUserResponses converts a domain user list, signing every photo.
+func NewUserResponses(ctx context.Context, photos adapter.PhotoSigner, ul user.List, viewer EmailViewer) []*UserResponse {
 	out := make([]*UserResponse, 0, len(ul))
+	var urls []*string
 	for _, u := range ul {
-		out = append(out, NewUserResponse(u, viewer))
+		if u == nil {
+			out = append(out, nil)
+			continue
+		}
+		r := &UserResponse{
+			MemberUserResponse: *newMemberUserResponse(u, viewer),
+			IsDeleted:          u.IsDeleted(),
+			DeletedAt:          u.DeletedAt(),
+			CreatedAt:          u.CreatedAt(),
+		}
+		urls = append(urls, &r.Metadata.PhotoURL)
+		out = append(out, r)
 	}
+	photos.SignAll(ctx, urls)
 	return out
 }
 
@@ -253,8 +260,8 @@ func ApplyPermittables(responses []*UserResponse, perms permittable.List, roleNa
 	}
 }
 
-// NewMeResponse converts a domain user to a MeResponse.
-func NewMeResponse(u *user.User) *MeResponse {
+// NewMeResponse converts a domain user to a MeResponse with a signed photo.
+func NewMeResponse(ctx context.Context, photos adapter.PhotoSigner, u *user.User) *MeResponse {
 	if u == nil {
 		return nil
 	}
@@ -268,7 +275,7 @@ func NewMeResponse(u *user.User) *MeResponse {
 	if host != "" {
 		hp = &host
 	}
-	return &MeResponse{
+	res := &MeResponse{
 		ID:             u.ID().String(),
 		Name:           u.Name(),
 		Alias:          u.Alias(),
@@ -279,6 +286,8 @@ func NewMeResponse(u *user.User) *MeResponse {
 		MyWorkspaceID:  u.Workspace().String(),
 		Auths:          util.Map(u.Auths(), func(a user.Auth) string { return a.Provider }),
 	}
+	photos.SignAll(ctx, []*string{&res.Metadata.PhotoURL})
+	return res
 }
 
 // NewSimpleUserResponse converts a *user.Simple.

@@ -29,8 +29,10 @@ import (
 
 type photoFixture struct {
 	me        *user.User
+	other     *user.User
+	noPhoto   *user.User
 	withPhoto *workspace.Workspace
-	noPhoto   *workspace.Workspace
+	noPhotoWS *workspace.Workspace
 }
 
 func newPhotoEcho(t *testing.T, storage gateway.Storage, mePhoto string) (*echo.Echo, photoFixture) {
@@ -44,6 +46,12 @@ func newPhotoEcho(t *testing.T, storage gateway.Storage, mePhoto string) (*echo.
 		Metadata(user.MetadataFrom(mePhoto, "", "", user.NewMetadata().Lang(), user.ThemeDefault)).
 		MustBuild()
 	require.NoError(t, db.User.Save(t.Context(), me))
+	other := user.New().NewID().Name("other").Email("other@example.com").Workspace(workspace.NewID()).
+		Metadata(user.MetadataFrom("users/other.png", "", "", user.NewMetadata().Lang(), user.ThemeDefault)).
+		MustBuild()
+	require.NoError(t, db.User.Save(t.Context(), other))
+	noPhotoUser := user.New().NewID().Name("plain").Email("plain@example.com").Workspace(workspace.NewID()).MustBuild()
+	require.NoError(t, db.User.Save(t.Context(), noPhotoUser))
 
 	members := map[user.ID]workspace.Member{uid: {Role: role.RoleOwner, InvitedBy: uid}}
 	withPhoto := workspace.New().ID(personal).Name("a").Alias("a").Members(members).
@@ -73,7 +81,7 @@ func newPhotoEcho(t *testing.T, storage gateway.Storage, mePhoto string) (*echo.
 		},
 		Photos: photoSigner(t, storage),
 	})
-	return e, photoFixture{me: me, withPhoto: withPhoto, noPhoto: noPhoto}
+	return e, photoFixture{me: me, other: other, noPhoto: noPhotoUser, withPhoto: withPhoto, noPhotoWS: noPhoto}
 }
 
 func getJSON(t *testing.T, e *echo.Echo, path string, out any) {
@@ -111,28 +119,33 @@ func TestREST_MeEmptyPhotoURLIsNotSigned(t *testing.T) {
 	assert.Empty(t, res.Metadata.PhotoURL)
 }
 
-func TestREST_MeSigningErrorFails(t *testing.T) {
+func TestREST_MeSigningErrorEmptiesPhotoURL(t *testing.T) {
 	storage := gatewaymock.NewMockStorage(gomock.NewController(t))
 	storage.EXPECT().GetSignedURL(gomock.Any(), "users/me.png").Return("", errors.New("gcs down"))
 	e, _ := newPhotoEcho(t, storage, "users/me.png")
 
 	rec := httptest.NewRecorder()
 	e.ServeHTTP(rec, httptest.NewRequest(http.MethodGet, "/api/users/me", nil))
-	assert.Equal(t, http.StatusInternalServerError, rec.Code, rec.Body.String())
+	require.Equal(t, http.StatusOK, rec.Code, rec.Body.String())
 	assert.NotContains(t, rec.Body.String(), "users/me.png")
+	var res httpmodel.MeResponse
+	require.NoError(t, json.Unmarshal(rec.Body.Bytes(), &res))
+	assert.Empty(t, res.Metadata.PhotoURL)
 }
 
-func TestREST_OtherMeRoutesReturnStoredPhotoURL(t *testing.T) {
+func TestREST_OtherMeRoutesSignPhotoURL(t *testing.T) {
 	routes := []struct {
 		method, path, body, want string
 	}{
-		{http.MethodPatch, "/api/users/me", `{"photo_url":"https://example.com/photo.jpg"}`, "https://example.com/photo.jpg"},
-		{http.MethodDelete, "/api/users/me/auths/auth0", "", "users/me.png"},
-		{http.MethodPost, "/api/auth/logout", "", "users/me.png"},
+		{http.MethodPatch, "/api/users/me", `{"photo_url":"users/new.png"}`, "https://signed/new"},
+		{http.MethodDelete, "/api/users/me/auths/auth0", "", "https://signed/me"},
+		{http.MethodPost, "/api/auth/logout", "", "https://signed/me"},
 	}
 	for _, r := range routes {
 		t.Run(r.method+" "+r.path, func(t *testing.T) {
 			storage := gatewaymock.NewMockStorage(gomock.NewController(t))
+			storage.EXPECT().GetSignedURL(gomock.Any(), "users/me.png").Return("https://signed/me", nil).AnyTimes()
+			storage.EXPECT().GetSignedURL(gomock.Any(), "users/new.png").Return("https://signed/new", nil).AnyTimes()
 			e, _ := newPhotoEcho(t, storage, "users/me.png")
 
 			req := httptest.NewRequest(r.method, r.path, strings.NewReader(r.body))
@@ -164,10 +177,10 @@ func TestREST_WorkspaceListPhotoURLsAreSigned(t *testing.T) {
 	e, f := newPhotoEcho(t, storage, "")
 
 	var res []httpmodel.WorkspaceResponse
-	getJSON(t, e, "/api/workspaces?ids="+f.withPhoto.ID().String()+","+f.noPhoto.ID().String(), &res)
+	getJSON(t, e, "/api/workspaces?ids="+f.withPhoto.ID().String()+","+f.noPhotoWS.ID().String(), &res)
 	assert.Equal(t, map[string]string{
 		f.withPhoto.ID().String(): "https://signed/a",
-		f.noPhoto.ID().String():   "",
+		f.noPhotoWS.ID().String(): "",
 	}, photosByID(res))
 }
 
@@ -180,6 +193,27 @@ func TestREST_WorkspaceSigningErrorEmptiesPhotoURL(t *testing.T) {
 	getJSON(t, e, "/api/workspaces?user_id="+f.me.ID().String(), &res)
 	assert.Equal(t, map[string]string{
 		f.withPhoto.ID().String(): "",
-		f.noPhoto.ID().String():   "",
+		f.noPhotoWS.ID().String(): "",
 	}, photosByID(res))
+}
+
+func TestREST_UserLookupsSignPhotoURL(t *testing.T) {
+	storage := gatewaymock.NewMockStorage(gomock.NewController(t))
+	storage.EXPECT().GetSignedURL(gomock.Any(), "users/other.png").Return("https://signed/other", nil).AnyTimes()
+	e, f := newPhotoEcho(t, storage, "")
+
+	var one httpmodel.UserResponse
+	getJSON(t, e, "/api/users/"+f.other.ID().String(), &one)
+	assert.Equal(t, "https://signed/other", one.Metadata.PhotoURL)
+
+	var list []httpmodel.UserResponse
+	getJSON(t, e, "/api/users?ids="+f.other.ID().String()+","+f.noPhoto.ID().String(), &list)
+	got := map[string]string{}
+	for _, u := range list {
+		got[u.ID] = u.Metadata.PhotoURL
+	}
+	assert.Equal(t, map[string]string{
+		f.other.ID().String():   "https://signed/other",
+		f.noPhoto.ID().String(): "",
+	}, got)
 }

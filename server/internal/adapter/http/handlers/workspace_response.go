@@ -47,9 +47,7 @@ func workspaceResponses(c echo.Context, photos adapter.PhotoSigner, ws workspace
 	if err != nil {
 		return nil, err
 	}
-	res := httpmodel.NewWorkspaceResponses(ws, users, embed)
-	signWorkspacePhotos(c.Request().Context(), photos, res)
-	return res, nil
+	return httpmodel.NewWorkspaceResponses(c.Request().Context(), photos, ws, users, embed), nil
 }
 
 func (h *WorkspaceHandler) writeWorkspace(c echo.Context, w *workspace.Workspace, embed httpmodel.MemberUsers) error {

@@ -1,8 +1,10 @@
 package httpmodel
 
 import (
+	"context"
 	"time"
 
+	"github.com/reearth/reearth-accounts/server/internal/adapter"
 	"github.com/reearth/reearth-accounts/server/pkg/role"
 	"github.com/reearth/reearth-accounts/server/pkg/user"
 	"github.com/reearth/reearth-accounts/server/pkg/workspace"
@@ -13,8 +15,8 @@ type WorkspaceMemberResponse struct {
 	UserID        string `json:"user_id,omitempty"`
 	IntegrationID string `json:"integration_id,omitempty"`
 	Role          string `json:"role"`
-	// User is set only with ?expand=members.user. Its photo_url is the stored
-	// value, and a soft-deleted user appears like a live one, both as in GraphQL.
+	// User is set only with ?expand=members.user. A soft-deleted user appears
+	// like a live one, as in GraphQL.
 	User *MemberUserResponse `json:"user,omitempty"`
 }
 
@@ -49,9 +51,34 @@ type MemberUsers struct {
 	Viewer EmailViewer
 }
 
-// NewWorkspaceResponse converts a domain workspace (no signed-URL resolution),
+// NewWorkspaceResponse converts a domain workspace with signed photos,
 // dropping user members missing from users, as GraphQL does.
-func NewWorkspaceResponse(w *workspace.Workspace, users map[user.ID]*user.User, memberUsers MemberUsers) *WorkspaceResponse {
+func NewWorkspaceResponse(ctx context.Context, photos adapter.PhotoSigner, w *workspace.Workspace, users map[user.ID]*user.User, memberUsers MemberUsers) *WorkspaceResponse {
+	return NewWorkspaceResponses(ctx, photos, workspace.List{w}, users, memberUsers)[0]
+}
+
+// NewWorkspaceResponses converts a list, signing every workspace and embedded
+// member photo together.
+func NewWorkspaceResponses(ctx context.Context, photos adapter.PhotoSigner, ws workspace.List, users map[user.ID]*user.User, memberUsers MemberUsers) []*WorkspaceResponse {
+	out := make([]*WorkspaceResponse, 0, len(ws))
+	var urls []*string
+	for _, w := range ws {
+		r := newWorkspaceResponse(w, users, memberUsers)
+		if r != nil {
+			urls = append(urls, &r.Metadata.PhotoURL)
+			for i := range r.Members {
+				if r.Members[i].User != nil {
+					urls = append(urls, &r.Members[i].User.Metadata.PhotoURL)
+				}
+			}
+		}
+		out = append(out, r)
+	}
+	photos.SignAll(ctx, urls)
+	return out
+}
+
+func newWorkspaceResponse(w *workspace.Workspace, users map[user.ID]*user.User, memberUsers MemberUsers) *WorkspaceResponse {
 	if w == nil {
 		return nil
 	}
@@ -65,7 +92,7 @@ func NewWorkspaceResponse(w *workspace.Workspace, users map[user.ID]*user.User, 
 		}
 		mr := WorkspaceMemberResponse{UserID: uid.String(), Role: RoleString(m.Role)}
 		if memberUsers.Embed {
-			mr.User = NewMemberUserResponse(u, memberUsers.Viewer)
+			mr.User = newMemberUserResponse(u, memberUsers.Viewer)
 		}
 		members = append(members, mr)
 	}
@@ -96,15 +123,6 @@ func NewWorkspaceResponse(w *workspace.Workspace, users map[user.ID]*user.User, 
 		res.CreatedBy = &s
 	}
 	return res
-}
-
-// NewWorkspaceResponses converts a list.
-func NewWorkspaceResponses(ws workspace.List, users map[user.ID]*user.User, memberUsers MemberUsers) []*WorkspaceResponse {
-	out := make([]*WorkspaceResponse, 0, len(ws))
-	for _, w := range ws {
-		out = append(out, NewWorkspaceResponse(w, users, memberUsers))
-	}
-	return out
 }
 
 // --- Request DTOs ---

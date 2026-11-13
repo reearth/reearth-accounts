@@ -6,6 +6,7 @@ import (
 	"github.com/reearth/reearth-accounts/server/internal/adapter/gql/gqlmodel"
 	"github.com/reearth/reearth-accounts/server/internal/usecase/interfaces"
 	"github.com/reearth/reearth-accounts/server/pkg/id"
+	"github.com/reearth/reearthx/log"
 )
 
 func (r *Resolver) Me() MeResolver {
@@ -40,6 +41,22 @@ func (r *userResolver) Email(ctx context.Context, obj *gqlmodel.User) (string, e
 		return "", nil
 	}
 	return obj.Email, nil
+}
+
+func (r *Resolver) UserMetadata() UserMetadataResolver {
+	return &userMetadataResolver{r}
+}
+
+type userMetadataResolver struct{ *Resolver }
+
+// PhotoURL signs the stored photo for me and for every query that returns a
+// User. A signing failure is logged and returns no photo.
+func (r *userMetadataResolver) PhotoURL(ctx context.Context, obj *gqlmodel.UserMetadata) (string, error) {
+	signed, err := r.Photos.Sign(ctx, obj.PhotoURL)
+	if err != nil {
+		log.Errorfc(ctx, "gql: failed to sign user photo url: %v", err)
+	}
+	return signed, nil
 }
 
 func (r *queryResolver) FindUsersByIDs(ctx context.Context, userIds []gqlmodel.ID) ([]*gqlmodel.User, error) {
