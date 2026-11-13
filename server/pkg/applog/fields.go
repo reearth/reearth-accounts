@@ -59,6 +59,11 @@ func Action(v string) Field { return field("action", v) }
 func Actions(v any) Field   { return field("actions", v) }
 func Allowed(v bool) Field  { return field("allowed", v) }
 
+// Rate limiting. LimitKey is the bucket key: user:<id>, or ip:<client IP> for an anonymous caller.
+
+func LimitKey(v string) Field { return field("limit_key", v) }
+func Enforced(v bool) Field   { return field("enforced", v) }
+
 // Outcomes and counters.
 
 func Path(v string) Field   { return field("path", v) }
