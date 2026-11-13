@@ -4,7 +4,7 @@ import (
 	"context"
 
 	"github.com/hasura/go-graphql-client"
-	"github.com/labstack/gommon/log"
+	"github.com/reearth/reearth-accounts/server/pkg/applog"
 	"github.com/reearth/reearth-accounts/server/pkg/gqlclient/gqlerror"
 	"github.com/reearth/reearth-accounts/server/pkg/role"
 	"github.com/reearth/reearth-accounts/server/pkg/workspace"
@@ -22,7 +22,7 @@ type Workspace struct {
 func ToWorkspace(ctx context.Context, w Workspace) (*workspace.Workspace, error) {
 	id, err := workspace.IDFrom(string(w.ID))
 	if err != nil {
-		log.Errorf("[ToWorkspace] failed to convert workspace id: %s", w.ID)
+		applog.Error(ctx, "[ToWorkspace] failed to convert workspace id", applog.WorkspaceID(w.ID))
 		return nil, gqlerror.ReturnAccountsError(ctx, err)
 	}
 
@@ -30,7 +30,7 @@ func ToWorkspace(ctx context.Context, w Workspace) (*workspace.Workspace, error)
 	for _, m := range w.Members {
 		userID, err := workspace.UserIDFrom(string(m.UserMember.UserID))
 		if err != nil {
-			log.Errorf("[ToWorkspace] failed to convert user id: %s", m.UserMember.UserID)
+			applog.Error(ctx, "[ToWorkspace] failed to convert user id", applog.UserID(m.UserMember.UserID))
 			return nil, gqlerror.ReturnAccountsError(ctx, err)
 		}
 		members[userID] = workspace.Member{
@@ -58,7 +58,7 @@ func ToWorkspaces(ctx context.Context, gqlWorkspaces []Workspace) workspace.List
 	workspaces := make(workspace.List, 0, len(gqlWorkspaces))
 	for _, w := range gqlWorkspaces {
 		if ws, err := ToWorkspace(ctx, w); err != nil {
-			log.Errorf("failed to convert workspace: %s", err.Error())
+			applog.Error(ctx, "failed to convert workspace", applog.Err(err))
 			continue
 		} else if ws != nil {
 			workspaces = append(workspaces, ws)

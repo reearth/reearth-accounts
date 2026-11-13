@@ -11,11 +11,11 @@ import (
 	"github.com/reearth/reearth-accounts/server/internal/adapter/http/httpmodel"
 	httpinternal "github.com/reearth/reearth-accounts/server/internal/adapter/http/internal"
 	"github.com/reearth/reearth-accounts/server/internal/usecase/interfaces"
+	"github.com/reearth/reearth-accounts/server/pkg/applog"
 	"github.com/reearth/reearth-accounts/server/pkg/id"
 	"github.com/reearth/reearth-accounts/server/pkg/user"
 	"github.com/reearth/reearth-accounts/server/pkg/workspace"
 	"github.com/reearth/reearthx/appx"
-	"github.com/reearth/reearthx/log"
 	"github.com/reearth/reearthx/rerror"
 	"github.com/samber/lo"
 )
@@ -408,7 +408,7 @@ func applyPermittablesToResponses(ctx context.Context, c echo.Context, userRespo
 	if uc := httpinternal.Usecases(c); uc.Role != nil {
 		roles, roleErr := uc.Role.FindAll(ctx)
 		if roleErr != nil {
-			log.Errorfc(ctx, "failed to fetch roles for name resolution, falling back to raw IDs: %v", roleErr)
+			applog.Error(ctx, "failed to fetch roles for name resolution, falling back to raw IDs", applog.Err(roleErr))
 		}
 		for _, r := range roles {
 			roleNames[r.ID().String()] = r.Name()

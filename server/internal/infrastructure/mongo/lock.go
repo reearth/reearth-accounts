@@ -8,7 +8,7 @@ import (
 	"github.com/avast/retry-go/v4"
 	"github.com/google/uuid"
 	"github.com/reearth/reearth-accounts/server/internal/usecase/repo"
-	"github.com/reearth/reearthx/log"
+	"github.com/reearth/reearth-accounts/server/pkg/applog"
 	"github.com/reearth/reearthx/rerror"
 	lock "github.com/square/mongo-lock"
 	"go.mongodb.org/mongo-driver/mongo"
@@ -40,18 +40,18 @@ func (r *Lock) Lock(ctx context.Context, name string) error {
 	}
 
 	lockID := uuid.NewString()
-	log.Debugfc(ctx, "lock: trying to lock: id=%s, name=%s, host=%s", name, lockID, r.hostid)
+	applog.Debug(ctx, "lock: trying to lock", applog.LockName(name), applog.LockID(lockID), applog.Host(r.hostid))
 
 	if err := retry.Do(
 		func() error { return r.l.XLock(ctx, name, lockID, r.details()) },
 		retry.RetryIf(func(err error) bool { return errors.Is(err, lock.ErrAlreadyLocked) }),
 	); err != nil {
-		log.Debugfc(ctx, "lock: failed to lock: name=%s, id=%s, host=%s, err=%s", name, lockID, r.hostid, err)
+		applog.Debug(ctx, "lock: failed to lock", applog.LockName(name), applog.LockID(lockID), applog.Host(r.hostid), applog.Err(err))
 		return repo.ErrFailedToLock
 	}
 
 	r.setLockID(name, lockID)
-	log.Debugfc(ctx, "lock: locked: name=%s, id=%s, host=%s", name, lockID, r.hostid)
+	applog.Debug(ctx, "lock: locked", applog.LockName(name), applog.LockID(lockID), applog.Host(r.hostid))
 	return nil
 }
 
@@ -74,7 +74,7 @@ func (r *Lock) Unlock(ctx context.Context, name string) error {
 		return rerror.ErrInternalByWithContext(ctx, err)
 	}
 
-	log.Debugfc(ctx, "lock: unlocked: name=%s, id=%s, host=%s", name, lockID, r.hostid)
+	applog.Debug(ctx, "lock: unlocked", applog.LockName(name), applog.LockID(lockID), applog.Host(r.hostid))
 	return nil
 }
 

@@ -18,13 +18,13 @@ import (
 
 	"github.com/reearth/reearth-accounts/server/internal/usecase/gateway"
 	"github.com/reearth/reearth-accounts/server/internal/usecase/interfaces"
+	"github.com/reearth/reearth-accounts/server/pkg/applog"
 	"github.com/reearth/reearth-accounts/server/pkg/id"
 	"github.com/reearth/reearth-accounts/server/pkg/permittable"
 	"github.com/reearth/reearth-accounts/server/pkg/role"
 	"github.com/reearth/reearth-accounts/server/pkg/user"
 	"github.com/reearth/reearth-accounts/server/pkg/workspace"
 	"github.com/reearth/reearthx/i18n"
-	"github.com/reearth/reearthx/log"
 	"github.com/reearth/reearthx/mailer"
 	"github.com/reearth/reearthx/rerror"
 	"github.com/samber/lo"
@@ -66,11 +66,11 @@ func init() {
 	var err error
 	authTextTMPL, err = textTmpl.New("passwordReset").Parse(authTextTMPLStr)
 	if err != nil {
-		log.Panicf("password reset email template parse error: %s\n", err)
+		applog.Panic(context.Background(), "password reset email template parse error", applog.Err(err))
 	}
 	authHTMLTMPL, err = htmlTmpl.New("passwordReset").Parse(autHTMLTMPLStr)
 	if err != nil {
-		log.Panicf("password reset email template parse error: %s\n", err)
+		applog.Panic(context.Background(), "password reset email template parse error", applog.Err(err))
 	}
 }
 
@@ -80,15 +80,15 @@ func (i *User) Signup(ctx context.Context, param interfaces.SignupParam) (u *use
 	}
 
 	return Run1(ctx, nil, i.repos, Usecase().Transaction(), func(ctx context.Context) (*user.User, error) {
-		log.Debugfc(ctx, "[Signup] Inside transaction")
+		applog.Debug(ctx, "[Signup] Inside transaction")
 		// Check for duplicate email
 		eu, err := i.repos.User.FindByEmail(ctx, param.Email)
 		if err != nil && !errors.Is(err, rerror.ErrNotFound) {
-			log.Errorfc(ctx, "[Signup] Error finding user by email: %v", err)
+			applog.Error(ctx, "[Signup] Error finding user by email", applog.Err(err))
 			return nil, err
 		}
 		if eu != nil {
-			log.Warnfc(ctx, "[Signup] User already exists with email: %s", param.Email)
+			applog.Warn(ctx, "[Signup] User already exists with email")
 			return nil, interfaces.ErrUserAlreadyExists
 		}
 
@@ -309,7 +309,7 @@ func (i *User) SyncSSOUser(ctx context.Context, param interfaces.SyncSSOUserPara
 	// since our last sync, and we need to pick that up even within the 24-h window.
 	authUser, err := authenticator.GetUser(ctx, param.Sub)
 	if err != nil {
-		log.Warnf("SyncSSOUser: could not fetch Auth0 user, skipping verification email (sub=%s): %v", param.Sub, err)
+		applog.Warn(ctx, "SyncSSOUser: could not fetch Auth0 user, skipping verification email", applog.Err(err))
 		return u, nil
 	}
 
@@ -319,7 +319,7 @@ func (i *User) SyncSSOUser(ctx context.Context, param interfaces.SyncSSOUserPara
 		}
 		u.Verification().SetVerified(true)
 		if err = i.repos.User.Save(ctx, u); err != nil {
-			log.Warnf("SyncSSOUser: failed to persist verified state (sub=%s): %v", param.Sub, err)
+			applog.Warn(ctx, "SyncSSOUser: failed to persist verified state", applog.Err(err))
 		}
 		return u, nil
 	}
@@ -332,7 +332,7 @@ func (i *User) SyncSSOUser(ctx context.Context, param interfaces.SyncSSOUserPara
 	}
 
 	if err = authenticator.ResendVerificationEmail(ctx, param.Sub); err != nil {
-		log.Warnf("SyncSSOUser: verification email failed, will retry on next login (sub=%s): %v", param.Sub, err)
+		applog.Warn(ctx, "SyncSSOUser: verification email failed, will retry on next login", applog.Err(err))
 		return u, nil
 	}
 
@@ -340,7 +340,7 @@ func (i *User) SyncSSOUser(ctx context.Context, param interfaces.SyncSSOUserPara
 	// while the user still hasn't clicked the verification link.
 	u.SetVerification(user.NewVerification())
 	if err = i.repos.User.Save(ctx, u); err != nil {
-		log.Warnf("SyncSSOUser: failed to save verification send state (sub=%s): %v", param.Sub, err)
+		applog.Warn(ctx, "SyncSSOUser: failed to save verification send state", applog.Err(err))
 	}
 	return u, nil
 }
@@ -581,7 +581,7 @@ func (i *User) findOrCreateRole(ctx context.Context, roleName string, mockAuth b
 
 	// If role not found and mockAuth is enabled, create it
 	if errors.Is(err, rerror.ErrNotFound) && mockAuth {
-		log.Infof("[MockAuth] Auto-creating role: %s", roleName)
+		applog.Info(ctx, "[MockAuth] Auto-creating role", applog.Role(roleName))
 		newRole := role.New().NewID().Name(roleName).MustBuild()
 		if err := i.repos.Role.Save(ctx, *newRole); err != nil {
 			return nil, fmt.Errorf("failed to auto-create role %s: %w", roleName, err)
@@ -603,12 +603,12 @@ func (i *User) CreateVerification(ctx context.Context, email string) error {
 		}
 
 		if u.Verification().IsVerified() {
-			log.Warnc(ctx, "user is already verified")
+			applog.Warn(ctx, "user is already verified")
 			return nil
 		}
 
 		if !u.Verification().IsExpired() {
-			log.Warnc(ctx, "user verification is not expired")
+			applog.Warn(ctx, "user verification is not expired")
 			return nil
 		}
 

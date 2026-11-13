@@ -5,17 +5,17 @@ import (
 	"fmt"
 
 	"github.com/reearth/reearth-accounts/server/internal/usecase/repo"
+	"github.com/reearth/reearth-accounts/server/pkg/applog"
 	"github.com/reearth/reearth-accounts/server/pkg/id"
 	"github.com/reearth/reearth-accounts/server/pkg/permittable"
 	"github.com/reearth/reearth-accounts/server/pkg/role"
 	"github.com/reearth/reearth-accounts/server/pkg/user"
 	"github.com/reearth/reearth-accounts/server/pkg/workspace"
-	"github.com/reearth/reearthx/log"
 	"github.com/reearth/reearthx/rerror"
 )
 
 func runMigration(ctx context.Context, repos *repo.Container) error {
-	log.Info("Starting migration...")
+	applog.Info(ctx, "Starting migration...")
 
 	// check and create maintainer role
 	roles, err := repos.Role.FindAll(ctx)
@@ -27,7 +27,7 @@ func runMigration(ctx context.Context, repos *repo.Container) error {
 	for _, r := range roles {
 		if r.Name() == "maintainer" {
 			maintainerRole = r
-			log.Info("Found maintainer role")
+			applog.Info(ctx, "Found maintainer role")
 			break
 		}
 	}
@@ -47,7 +47,7 @@ func runMigration(ctx context.Context, repos *repo.Container) error {
 		}
 
 		maintainerRole = r
-		log.Info("Created maintainer role")
+		applog.Info(ctx, "Created maintainer role")
 	}
 
 	// get all users
@@ -62,7 +62,7 @@ func runMigration(ctx context.Context, repos *repo.Container) error {
 	for _, u := range users {
 		workspaces, err := repos.Workspace.FindByUser(ctx, u.ID())
 		if err != nil {
-			log.Errorf("Failed to get workspaces for user %s: %v", u.ID, err)
+			applog.Error(ctx, "Failed to get workspaces for user", applog.UserID(u.ID), applog.Err(err))
 			continue
 		}
 
@@ -74,12 +74,12 @@ func runMigration(ctx context.Context, repos *repo.Container) error {
 
 			// Process workspace members and integrations
 			if err := processWorkspaceMembers(ctx, repos, w, maintainerRole.ID()); err != nil {
-				log.Errorf("Failed to process workspace %s: %v", w.ID(), err)
+				applog.Error(ctx, "Failed to process workspace", applog.WorkspaceID(w.ID()), applog.Err(err))
 			}
 		}
 	}
 
-	log.Info("Migration completed successfully")
+	applog.Info(ctx, "Migration completed successfully")
 	return nil
 }
 
@@ -89,7 +89,7 @@ func processWorkspaceMembers(ctx context.Context, repos *repo.Container, w *work
 	// Process users
 	for _, userID := range members.UserIDs() {
 		if err := ensureMaintainerRole(ctx, repos, userID, maintainerRoleID); err != nil {
-			log.Errorf("Failed to process user %s: %v", userID, err)
+			applog.Error(ctx, "Failed to process user", applog.UserID(userID), applog.Err(err))
 		}
 	}
 
@@ -97,11 +97,11 @@ func processWorkspaceMembers(ctx context.Context, repos *repo.Container, w *work
 	for _, integrationID := range members.IntegrationIDs() {
 		userID, err := user.IDFrom(integrationID.String())
 		if err != nil {
-			log.Errorf("Failed to process integration %s: %v", integrationID, err)
+			applog.Error(ctx, "Failed to process integration", applog.IntegrationID(integrationID), applog.Err(err))
 			continue
 		}
 		if err := ensureMaintainerRole(ctx, repos, userID, maintainerRoleID); err != nil {
-			log.Errorf("Failed to process integration %s: %v", integrationID, err)
+			applog.Error(ctx, "Failed to process integration", applog.IntegrationID(integrationID), applog.Err(err))
 		}
 	}
 

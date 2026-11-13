@@ -3,10 +3,9 @@ package gqlerror
 import (
 	"context"
 	"errors"
-	"runtime"
 	"strings"
 
-	"github.com/reearth/reearthx/log"
+	"github.com/reearth/reearth-accounts/server/pkg/applog"
 )
 
 type AccountsError error
@@ -18,21 +17,19 @@ func IsUnauthorized(err error) bool {
 }
 
 func ReturnAccountsError(ctx context.Context, err error) AccountsError {
-	_, file, line, _ := runtime.Caller(1)
 	if strings.Contains(err.Error(), "401") {
-		log.Warnfc(ctx, "[Warn] unauthorized at %s:%d %+v", file, line, err)
+		applog.WarnDepth(ctx, 1, "accounts: unauthorized", applog.Err(err))
 		return ErrUnauthorized
 	}
-	log.Errorfc(ctx, "[Error] error with caller logging at %s:%d %+v", file, line, err)
+	applog.ErrorDepth(ctx, 1, "accounts: request failed", applog.Err(err))
 	return err
 }
 
 func ReturnAccountsWarn(ctx context.Context, err error) AccountsError {
-	_, file, line, _ := runtime.Caller(1)
 	if strings.Contains(err.Error(), "401") {
-		log.Warnfc(ctx, "[Warn] unauthorized at %s:%d %+v", file, line, err)
+		applog.WarnDepth(ctx, 1, "accounts: unauthorized", applog.Err(err))
 		return ErrUnauthorized
 	}
-	log.Warnfc(ctx, "[Warn] transport failure at %s:%d %+v", file, line, err)
+	applog.WarnDepth(ctx, 1, "accounts: transport failure", applog.Err(err))
 	return err
 }

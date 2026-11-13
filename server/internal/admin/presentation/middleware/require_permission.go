@@ -6,7 +6,7 @@ import (
 	"github.com/labstack/echo/v4"
 	"github.com/reearth/reearth-accounts/server/internal/admin/presentation/internal"
 	"github.com/reearth/reearth-accounts/server/internal/admin/usecase/authz"
-	"github.com/reearth/reearthx/log"
+	"github.com/reearth/reearth-accounts/server/pkg/applog"
 )
 
 // RequirePermission builds middleware that authorizes the current admin against
@@ -24,7 +24,7 @@ func RequirePermission(chk *authz.Checker, resource, action string) echo.Middlew
 			}
 			ok, err := chk.Allowed(c.Request().Context(), u.ID(), u.Role(), resource, action)
 			if err != nil {
-				log.Errorfc(c.Request().Context(), "[admin] permission check failed: %v", err)
+				applog.Error(c.Request().Context(), "[admin] permission check failed", applog.Err(err))
 				return echo.NewHTTPError(http.StatusInternalServerError)
 			}
 			if !ok {
