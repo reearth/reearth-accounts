@@ -4,8 +4,8 @@ import (
 	"context"
 
 	"github.com/hasura/go-graphql-client"
+	"github.com/reearth/reearth-accounts/server/pkg/applog"
 	"github.com/reearth/reearth-accounts/server/pkg/user"
-	"github.com/reearth/reearthx/log"
 	"golang.org/x/text/language"
 )
 
@@ -23,13 +23,13 @@ type User struct {
 func ToUser(ctx context.Context, u User) (*user.User, error) {
 	id, err := user.IDFrom(string(u.ID))
 	if err != nil {
-		log.Errorf("[ToUser] failed to convert user id: %s", u.ID)
+		applog.Error(ctx, "[ToUser] failed to convert user id", applog.UserID(u.ID))
 		return nil, err
 	}
 
 	workspaceID, err := user.WorkspaceIDFrom(string(u.Workspace))
 	if err != nil {
-		log.Errorf("[ToUser] failed to convert workspace id: %s", u.Workspace)
+		applog.Error(ctx, "[ToUser] failed to convert workspace id", applog.WorkspaceID(u.Workspace))
 		return nil, err
 	}
 
@@ -53,7 +53,7 @@ func ToUsers(ctx context.Context, gqlUsers []User) user.List {
 	users := make(user.List, 0, len(gqlUsers))
 	for _, u := range gqlUsers {
 		if usr, err := ToUser(ctx, u); err != nil {
-			log.Errorf("[ToUsers] failed to convert user: %s", err)
+			applog.Error(ctx, "[ToUsers] failed to convert user", applog.Err(err))
 			continue
 		} else {
 			users = append(users, usr)
