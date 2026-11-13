@@ -9,19 +9,19 @@ import (
 	"time"
 
 	"github.com/cerbos/cerbos-sdk-go/cerbos"
-	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/joho/godotenv"
 	"github.com/kelseyhightower/envconfig"
 	"github.com/reearth/reearth-accounts/server/internal/admin/auth/session"
 	"github.com/reearth/reearth-accounts/server/internal/admin/gateway/google"
 	authhandler "github.com/reearth/reearth-accounts/server/internal/admin/presentation/handler/auth"
 	"github.com/reearth/reearth-accounts/server/internal/admin/usecase/authuc"
+	infraCerbos "github.com/reearth/reearth-accounts/server/internal/infrastructure/cerbos"
 	mongorepo "github.com/reearth/reearth-accounts/server/internal/infrastructure/mongo"
 	"github.com/reearth/reearth-accounts/server/internal/infrastructure/postgres"
 	"github.com/reearth/reearth-accounts/server/internal/usecase/repo"
+	"github.com/reearth/reearth-accounts/server/pkg/applog"
 	"github.com/reearth/reearth-accounts/server/pkg/user"
 	"github.com/reearth/reearthx/appx"
-	"github.com/reearth/reearthx/log"
 	"github.com/reearth/reearthx/mongox"
 	"go.mongodb.org/mongo-driver/mongo"
 	"go.mongodb.org/mongo-driver/mongo/options"
@@ -148,22 +148,22 @@ func (c *Config) Print() {
 	if masked.SessionSecret != "" {
 		masked.SessionSecret = "***"
 	}
-	log.Infof("admin config: %+v", masked)
+	applog.Info(context.Background(), "admin config", applog.Config(masked))
 }
 
 // LoadConfig is the root Wire provider for configuration.
 func LoadConfig() *Config {
 	if os.Getenv("SKIP_DOTENV") == "" {
 		if err := godotenv.Load(".env"); err != nil && !os.IsNotExist(err) {
-			log.Warnf("failed to load .env: %v", err)
+			applog.Warn(context.Background(), "failed to load .env", applog.Err(err))
 		} else if err == nil {
-			log.Infof("config: .env loaded")
+			applog.Info(context.Background(), "config: .env loaded")
 		}
 	}
 
 	var cfg Config
 	if err := envconfig.Process("reearth", &cfg); err != nil {
-		log.Fatalf("Error config setup: %v", err)
+		applog.Fatal(context.Background(), "Error config setup", applog.Err(err))
 	}
 	cfg.Print()
 	return &cfg
@@ -177,7 +177,7 @@ func provideGoogleVerifier(cfg *Config) (google.Verifier, error) {
 		if cfg.IsProduction() {
 			return nil, fmt.Errorf("REEARTH_ACCOUNTS_ADMIN_GOOGLE_OAUTH_CLIENT_ID is required in production")
 		}
-		log.Warnf("admin Google OAuth client ID not configured; Google sign-in will reject all tokens")
+		applog.Warn(context.Background(), "admin Google OAuth client ID not configured; Google sign-in will reject all tokens")
 	}
 	return google.NewVerifier(cfg.GoogleOAuthClientID), nil
 }
@@ -194,7 +194,7 @@ func provideSessionManager(cfg *Config) (*session.Manager, error) {
 		if cfg.IsProduction() {
 			return nil, fmt.Errorf("REEARTH_ACCOUNTS_ADMIN_SESSION_SECRET is required in production")
 		}
-		log.Warnf("admin session secret not configured; Google sign-in will fail until REEARTH_ACCOUNTS_ADMIN_SESSION_SECRET is set")
+		applog.Warn(context.Background(), "admin session secret not configured; Google sign-in will fail until REEARTH_ACCOUNTS_ADMIN_SESSION_SECRET is set")
 	}
 	return session.NewManager(cfg.SessionSecret, cfg.SessionTTL), nil
 }
@@ -220,7 +220,7 @@ func provideRepoContainer(cfg *Config) (*repo.Container, func(), error) {
 	if cfg.resolveDBDriver() == "postgres" {
 		ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 		defer cancel()
-		pool, err := pgxpool.New(ctx, cfg.DB)
+		pool, err := postgres.NewPool(ctx, cfg.DB)
 		if err != nil {
 			return nil, nil, fmt.Errorf("postgres pool init: %w", err)
 		}
@@ -252,7 +252,7 @@ func provideRepoContainer(cfg *Config) (*repo.Container, func(), error) {
 	// warns instead of refusing to start.
 	txAvailable := mongox.IsTransactionAvailable(cfg.DB)
 	if !txAvailable {
-		log.Warnf("[admin] mongo transactions are disabled for this DB URI; workspace ownership transfer will not be atomic")
+		applog.Warn(ctx, "[admin] mongo transactions are disabled for this DB URI; workspace ownership transfer will not be atomic")
 	}
 	repos, err := mongorepo.New(context.Background(), client.Database(cfg.DBName), txAvailable, false, []user.Repo{})
 	if err != nil {
@@ -276,14 +276,10 @@ func provideCerbosClient(cfg *Config) (*cerbos.GRPCClient, error) {
 		if cfg.IsProduction() {
 			return nil, fmt.Errorf("CERBOS_HOST is required in production: admin authorization cannot be disabled")
 		}
-		log.Warnf("cerbos host not configured; admin permission checks will be skipped")
+		applog.Warn(context.Background(), "cerbos host not configured; admin permission checks will be skipped")
 		return nil, nil
 	}
-	var opts []cerbos.Opt
-	if !cfg.CerbosUseSSL {
-		opts = append(opts, cerbos.WithPlaintext(), cerbos.WithTLSInsecure())
-	}
-	client, err := cerbos.New(cfg.CerbosHost, opts...)
+	client, err := infraCerbos.NewClient(cfg.CerbosHost, cfg.CerbosUseSSL)
 	if err != nil {
 		return nil, fmt.Errorf("create cerbos client: %w", err)
 	}

@@ -2,19 +2,16 @@ package app
 
 import (
 	"context"
-	"sort"
 
 	"github.com/99designs/gqlgen/graphql"
-	"github.com/reearth/reearthx/log"
+	"github.com/reearth/reearth-accounts/server/internal/adapter"
+	"github.com/reearth/reearth-accounts/server/pkg/applog"
 	"go.opentelemetry.io/otel"
 	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/codes"
+	semconv "go.opentelemetry.io/otel/semconv/v1.26.0"
 	"go.opentelemetry.io/otel/trace"
 )
-
-// maxVariableNamesRecorded caps the number of GraphQL variable names recorded
-// per span so a malicious or noisy query cannot blow up trace payload size.
-const maxVariableNamesRecorded = 16
 
 // detailedOperationTracer creates a middleware that traces GraphQL operations with detailed attributes
 func detailedOperationTracer() graphql.OperationMiddleware {
@@ -43,28 +40,17 @@ func detailedOperationTracer() graphql.OperationMiddleware {
 			),
 		)
 
-		// Raw query is intentionally not recorded: inline literals may contain PII.
-		// Variable values are also not recorded. Variable names are recorded as a
-		// single bounded list to avoid unbounded high-cardinality attribute keys
-		// (GraphQL variable names are user-controlled).
-		if n := len(opCtx.Variables); n > 0 {
-			span.SetAttributes(attribute.Int("graphql.variables.count", n))
-			// Cap collection up front: variable names are user-controlled, so
-			// allocating a slice of size n and sorting all of it would let a
-			// caller amplify CPU/allocations by sending many variables.
-			capLen := n
-			if capLen > maxVariableNamesRecorded {
-				capLen = maxVariableNamesRecorded
-			}
-			names := make([]string, 0, capLen)
-			for key := range opCtx.Variables {
-				if len(names) >= maxVariableNamesRecorded {
-					break
-				}
-				names = append(names, key)
-			}
-			sort.Strings(names)
-			span.SetAttributes(attribute.StringSlice("graphql.variables.names", names))
+		// The raw query and variables are not recorded: inline literals and
+		// variable values may contain personal data.
+		span.SetAttributes(
+			attribute.StringSlice("graphql.operation.fields", topLevelFields(opCtx.Operation.SelectionSet, opCtx.Doc, nil)),
+			attribute.Int("graphql.variables.count", len(opCtx.Variables)),
+		)
+		if u := adapter.User(ctx); u != nil {
+			span.SetAttributes(semconv.EnduserID(u.ID().String()))
+		}
+		if caller := callerFrom(ctx); caller != "" {
+			span.SetAttributes(attribute.String("accounts.caller", caller))
 		}
 
 		res := next(ctx)
@@ -81,14 +67,13 @@ func detailedOperationTracer() graphql.OperationMiddleware {
 				span.SetAttributes(attribute.Int("graphql.errors.count", len(response.Errors)))
 				// GraphQL errors include expected client-side failures (validation, auth, not found).
 				// Log at Debug to avoid noisy WARN for non-actionable errors.
-				log.Debugfc(ctx, "graphql: operation '%s' completed with %d errors", spanName, len(response.Errors))
+				applog.Debug(ctx, "graphql: operation completed with errors", applog.Operation(spanName), applog.Count(len(response.Errors)))
 			} else {
 				span.SetStatus(codes.Ok, "GraphQL operation completed successfully")
-				log.Debugfc(ctx, "graphql: operation '%s' completed successfully", spanName)
+				applog.Debug(ctx, "graphql: operation completed", applog.Operation(spanName))
 			}
 
 			return response
 		}
 	}
 }
-
