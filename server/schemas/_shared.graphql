@@ -5,6 +5,21 @@ requires authentication. The auth middleware reads this directive at startup.
 """
 directive @public on FIELD_DEFINITION
 
+"""
+Who may read a field that carries user data. The owner is the user the
+enclosing object describes. A hidden field returns its empty value.
+"""
+enum VisibilityLevel {
+  "Anyone who can reach the object."
+  PUBLIC
+  "Only the owner."
+  SELF
+  "The owner, and users who are members of a workspace the owner is a member of."
+  WORKSPACE
+}
+
+directive @visibility(level: VisibilityLevel!) on FIELD_DEFINITION
+
 interface Node {
   id: ID!
 }

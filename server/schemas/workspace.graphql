@@ -10,10 +10,10 @@ type Workspace implements Node {
 union WorkspaceMember = WorkspaceUserMember | WorkspaceIntegrationMember
 
 type WorkspaceUserMember {
-    userId: ID!
-    role: Role!
-    host: String
-    user: User
+    userId: ID! @visibility(level: PUBLIC)
+    role: Role! @visibility(level: PUBLIC)
+    host: String @visibility(level: PUBLIC)
+    user: User @visibility(level: PUBLIC)
 }
 
 type WorkspaceIntegrationMember {
