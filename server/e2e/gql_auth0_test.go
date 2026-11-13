@@ -6,7 +6,10 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"testing"
+	"time"
 
+	"github.com/gavv/httpexpect/v2"
+	"github.com/golang-jwt/jwt/v5"
 	"github.com/reearth/reearth-accounts/server/internal/app"
 	"github.com/reearth/reearth-accounts/server/internal/infrastructure/auth0"
 	"github.com/reearth/reearth-accounts/server/internal/usecase/repo"
@@ -16,6 +19,7 @@ import (
 	"github.com/reearth/reearth-accounts/server/pkg/workspace"
 	"github.com/reearth/reearthx/idx"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 const auth0Sub = "auth0|e2etestuser"
@@ -77,6 +81,8 @@ func newMockAuth0Server(t *testing.T) *httptest.Server {
 				"name":    name,
 				"email":   email,
 			})
+		case r.Method == http.MethodPost && r.URL.Path == "/api/v2/users/"+auth0Sub+"/recovery-code-regeneration":
+			_ = json.NewEncoder(w).Encode(map[string]interface{}{"recovery_code": "recovery-123"})
 		default:
 			http.NotFound(w, r)
 		}
@@ -103,4 +109,59 @@ func TestUpdateMe_Auth0User_UpdatesName(t *testing.T) {
 		Expect().Status(http.StatusOK).
 		JSON().Object().Value("data").Object().Value("updateMe").Object().Value("me").Object()
 	o.Value("name").String().IsEqual("renameduser")
+}
+
+func TestRegenerateMFARecoveryCode_RequiresRecentLogin(t *testing.T) {
+	mockSrv := newMockAuth0Server(t)
+	defer mockSrv.Close()
+
+	authenticator := auth0.New(mockSrv.URL, "clientid", "clientsecret", 0)
+	e, _ := StartServerWithAuthenticator(t, &app.Config{MFARecoveryMaxAuthAge: 5 * time.Minute}, false, seedAuth0User, authenticator)
+
+	jsonData, err := json.Marshal(GraphQLRequest{Query: `mutation { regenerateMFARecoveryCode { recoveryCode } }`})
+	assert.NoError(t, err)
+
+	errs := e.POST("/api/graphql").
+		WithHeader("authorization", "Bearer test").
+		WithHeader("Content-Type", "application/json").
+		WithHeader("X-Reearth-Debug-User", uId.String()).
+		WithBytes(jsonData).
+		Expect().Status(http.StatusOK).
+		JSON().Object().Value("errors").Array()
+	errs.Length().IsEqual(1)
+	errs.Value(0).Object().Value("message").String().IsEqual("recent login required")
+}
+
+func TestRegenerateMFARecoveryCode_ReadsConfiguredClaim(t *testing.T) {
+	mockSrv := newMockAuth0Server(t)
+	defer mockSrv.Close()
+
+	const claim = "https://example.com/auth_time"
+	authenticator := auth0.New(mockSrv.URL, "clientid", "clientsecret", 0)
+	e, _ := StartServerWithAuthenticator(t, &app.Config{MFARecoveryMaxAuthAge: 5 * time.Minute, AuthTimeClaim: claim}, false, seedAuth0User, authenticator)
+
+	jsonData, err := json.Marshal(GraphQLRequest{Query: `mutation { regenerateMFARecoveryCode { recoveryCode } }`})
+	require.NoError(t, err)
+
+	regenerate := func(loginTime time.Time) *httpexpect.Object {
+		token, err := jwt.NewWithClaims(jwt.SigningMethodHS256, jwt.MapClaims{"sub": auth0Sub, claim: loginTime.Unix()}).SignedString([]byte("test-key"))
+		require.NoError(t, err)
+		return e.POST("/api/graphql").
+			WithHeader("authorization", "Bearer test").
+			WithHeader("Content-Type", "application/json").
+			WithHeader("X-Reearth-Debug-User", uId.String()).
+			WithHeader("X-Reearth-Debug-Auth-Sub", auth0Sub).
+			WithHeader("X-Reearth-Debug-Auth-Token", token).
+			WithBytes(jsonData).
+			Expect().Status(http.StatusOK).
+			JSON().Object()
+	}
+
+	stale := regenerate(time.Now().Add(-time.Hour)).Value("errors").Array()
+	stale.Length().IsEqual(1)
+	stale.Value(0).Object().Value("message").String().IsEqual("recent login required")
+
+	regenerate(time.Now().Add(-time.Minute)).
+		Value("data").Object().Value("regenerateMFARecoveryCode").Object().
+		Value("recoveryCode").String().IsEqual("recovery-123")
 }

@@ -13,6 +13,7 @@ import (
 	"github.com/reearth/reearth-accounts/server/internal/adapter/http/handlers"
 	"github.com/reearth/reearth-accounts/server/internal/adapter/http/httpmodel"
 	accountmemory "github.com/reearth/reearth-accounts/server/internal/infrastructure/memory"
+	gatewaymock "github.com/reearth/reearth-accounts/server/internal/usecase/gateway/mock"
 	"github.com/reearth/reearth-accounts/server/internal/usecase/interactor"
 	"github.com/reearth/reearth-accounts/server/internal/usecase/interfaces"
 	"github.com/reearth/reearth-accounts/server/pkg/role"
@@ -20,7 +21,15 @@ import (
 	"github.com/reearth/reearth-accounts/server/pkg/workspace"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"go.uber.org/mock/gomock"
 )
+
+func noSigning(t *testing.T) adapter.PhotoSigner {
+	t.Helper()
+	p, err := adapter.NewPhotoSigner(gatewaymock.NewMockStorage(gomock.NewController(t)))
+	require.NoError(t, err)
+	return p
+}
 
 func setupUserHandlerTest(t *testing.T) *interfaces.Container {
 	t.Helper()
@@ -48,7 +57,7 @@ func newSyncSSOEchoCtx(t *testing.T, e *echo.Echo, body string, uc *interfaces.C
 // starts with "user-", preserving the intake-form trigger on first login.
 func TestUserHandler_SyncSSOUser_NamePrefix(t *testing.T) {
 	uc := setupUserHandlerTest(t)
-	h := handlers.NewUserHandler()
+	h := handlers.NewUserHandler(noSigning(t), adapter.LoginTimeSource{})
 	e := echo.New()
 
 	body := `{"name":"alice@example.com","email":"alice@example.com","sub":"samlp|org|alice"}`
@@ -68,7 +77,7 @@ func TestUserHandler_SyncSSOUser_NamePrefix(t *testing.T) {
 // workspace alias collision that occurred when the name was always "user-".
 func TestUserHandler_SyncSSOUser_UniqueNames(t *testing.T) {
 	uc := setupUserHandlerTest(t)
-	h := handlers.NewUserHandler()
+	h := handlers.NewUserHandler(noSigning(t), adapter.LoginTimeSource{})
 	e := echo.New()
 
 	provision := func(email, sub string) httpmodel.UserResponse {
@@ -95,7 +104,7 @@ func TestUserHandler_SyncSSOUser_UniqueNames(t *testing.T) {
 
 func TestUserHandler_SyncSSOUser_Email(t *testing.T) {
 	uc := setupUserHandlerTest(t)
-	h := handlers.NewUserHandler()
+	h := handlers.NewUserHandler(noSigning(t), adapter.LoginTimeSource{})
 	e := echo.New()
 	body := `{"name":"victim@example.com","email":"victim@example.com","sub":"samlp|org|victim"}`
 

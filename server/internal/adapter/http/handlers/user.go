@@ -20,24 +20,50 @@ import (
 	"github.com/samber/lo"
 )
 
-type UserHandler struct{}
+type UserHandler struct {
+	loginTime adapter.LoginTimeSource
+	photos    adapter.PhotoSigner
+}
 
-func NewUserHandler() *UserHandler { return &UserHandler{} }
+func NewUserHandler(photos adapter.PhotoSigner, loginTime adapter.LoginTimeSource) *UserHandler {
+	return &UserHandler{loginTime: loginTime, photos: photos}
+}
 
 // Me godoc
 // @Tags User
 // @Summary Get current user
 // @Security BearerAuth
+// @Param expand query string false "comma-separated expansions; allowed: my_workspace"
 // @Produce json
 // @Success 200 {object} httpmodel.MeResponse
+// @Failure 400 {object} internal.ErrorResponse
 // @Failure 401 {object} internal.ErrorResponse
+// @Failure 500 {object} internal.ErrorResponse
 // @Router /api/users/me [get]
 func (h *UserHandler) Me(c echo.Context) error {
+	ctx := c.Request().Context()
 	u, err := httpinternal.RequireUser(c)
 	if err != nil {
 		return err
 	}
-	return c.JSON(http.StatusOK, httpmodel.NewMeResponse(u))
+	res, err := meResponse(ctx, h.photos, u)
+	if err != nil {
+		return err
+	}
+	if requestedExpansions(c).has(ExpandMyWorkspace) {
+		w, err := httpinternal.Usecases(c).Workspace.FetchByID(ctx, u.Workspace())
+		if err != nil && !errors.Is(err, rerror.ErrNotFound) {
+			return err
+		}
+		if w != nil {
+			ws, err := workspaceResponses(c, h.photos, workspace.List{w}, httpmodel.MemberUsers{})
+			if err != nil {
+				return err
+			}
+			res.MyWorkspace = ws[0]
+		}
+	}
+	return c.JSON(http.StatusOK, res)
 }
 
 // UpdateMe godoc
@@ -158,6 +184,7 @@ func (h *UserHandler) DisableMFA(c echo.Context) error {
 // RegenerateMFARecoveryCode godoc
 // @Tags User
 // @Summary Replace the current user's MFA recovery code
+// @Description Returns 401 with message recent_login_required and a WWW-Authenticate step-up challenge when the login behind the token is older than the configured window.
 // @Security BearerAuth
 // @Produce json
 // @Success 200 {object} httpmodel.MFARecoveryCodeResponse
@@ -166,7 +193,7 @@ func (h *UserHandler) DisableMFA(c echo.Context) error {
 // @Router /api/users/me/mfa/recovery-code [post]
 func (h *UserHandler) RegenerateMFARecoveryCode(c echo.Context) error {
 	ctx := c.Request().Context()
-	code, err := httpinternal.Usecases(c).User.RegenerateMFARecoveryCode(ctx, httpinternal.Operator(c))
+	code, err := httpinternal.Usecases(c).User.RegenerateMFARecoveryCode(ctx, httpinternal.Operator(c), h.loginTime.Read(ctx))
 	if err != nil {
 		return err
 	}

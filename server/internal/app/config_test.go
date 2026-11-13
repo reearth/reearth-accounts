@@ -2,10 +2,38 @@ package app
 
 import (
 	"testing"
+	"time"
 
 	"github.com/reearth/reearthx/appx"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
+
+func TestReadConfig_MFARecoveryMaxAuthAge(t *testing.T) {
+	t.Setenv("SKIP_DOTENV", "1")
+
+	t.Setenv("REEARTH_ACCOUNTS_MFA_RECOVERY_MAX_AUTH_AGE", "5m")
+	c, err := ReadConfig(false)
+	require.NoError(t, err)
+	assert.Equal(t, 5*time.Minute, c.MFARecoveryMaxAuthAge)
+
+	t.Setenv("REEARTH_ACCOUNTS_MFA_RECOVERY_MAX_AUTH_AGE", "-1m")
+	_, err = ReadConfig(false)
+	assert.EqualError(t, err, "REEARTH_ACCOUNTS_MFA_RECOVERY_MAX_AUTH_AGE must not be negative, got -1m0s")
+}
+
+func TestReadConfig_AuthTimeClaim(t *testing.T) {
+	t.Setenv("SKIP_DOTENV", "1")
+
+	t.Setenv("REEARTH_ACCOUNTS_AUTH_TIME_CLAIM", "https://example.com/auth_time")
+	c, err := ReadConfig(false)
+	require.NoError(t, err)
+	assert.Equal(t, "https://example.com/auth_time", c.AuthTimeClaim)
+
+	t.Setenv("REEARTH_ACCOUNTS_AUTH_TIME_CLAIM", " iat ")
+	_, err = ReadConfig(false)
+	assert.EqualError(t, err, `REEARTH_ACCOUNTS_AUTH_TIME_CLAIM: login time claim must not be the reserved claim "iat", which does not record when the user logged in`)
+}
 
 func TestConfig_Print_MasksSecrets(t *testing.T) {
 	c := Config{

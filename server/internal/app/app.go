@@ -3,6 +3,7 @@ package app
 import (
 	"context"
 	"errors"
+	"fmt"
 	"net/http"
 	"net/http/pprof"
 
@@ -43,6 +44,12 @@ func initEcho(ctx context.Context, cfg *ServerConfig) *echo.Echo {
 		log.Infof("OpenTelemetry tracing disabled for %s", string(otelapp.OtelAccountsServiceName))
 	}
 	e.Use(AccessLogger(logger))
+
+	if w := cfg.Config.MFARecoveryMaxAuthAge; w > 0 {
+		log.Infof("MFA recovery step-up window: %s", w)
+	} else {
+		log.Infof("MFA recovery step-up window: off")
+	}
 
 	origins := allowedOrigins(cfg)
 	if len(origins) > 0 {
@@ -99,9 +106,10 @@ func initEcho(ctx context.Context, cfg *ServerConfig) *echo.Echo {
 		nil,
 		cfg.CerbosAdapter,
 		interactor.ContainerConfig{
-			AllowedISS:      allowedISS,
-			AuthSrvUIDomain: cfg.Config.HostWeb,
-			SignupSecret:    cfg.Config.SignupSecret,
+			AllowedISS:            allowedISS,
+			AuthSrvUIDomain:       cfg.Config.HostWeb,
+			MFARecoveryMaxAuthAge: cfg.Config.MFARecoveryMaxAuthAge,
+			SignupSecret:          cfg.Config.SignupSecret,
 		})
 
 	// API
@@ -129,7 +137,15 @@ func initEcho(ctx context.Context, cfg *ServerConfig) *echo.Echo {
 		cacheControl,
 	)
 
-	api.POST("/graphql", GraphqlAPI(cfg.Config, cfg.Config.Dev), middlewares...)
+	photos, err := adapter.NewPhotoSigner(newPhotoStorage(cfg.Config))
+	if err != nil {
+		log.Fatalc(ctx, err)
+	}
+	loginTime, err := adapter.NewLoginTimeSource(cfg.Config.AuthTimeClaim)
+	if err != nil {
+		log.Panicc(ctx, fmt.Errorf("REEARTH_ACCOUNTS_AUTH_TIME_CLAIM: %w", err))
+	}
+	api.POST("/graphql", GraphqlAPI(cfg.Config, photos, loginTime, cfg.Config.Dev), middlewares...)
 
 	// REST API (additive; GraphQL above is unchanged). Reuses the usecase middleware
 	// and, in non-mock mode, an optional JWT middleware that parses a bearer token into
@@ -148,7 +164,9 @@ func initEcho(ctx context.Context, cfg *ServerConfig) *echo.Echo {
 		CacheControl:       cacheControl,
 		UsecaseMiddleware:  usecaseMiddleware,
 		JWTMiddleware:      restJWT,
+		LoginTime:          loginTime,
 		AuthConfigProvider: cfg.Config,
+		Photos:             photos,
 		APIKey:             cfg.Config.RestAPIKey,
 		SyncSSOAPIKey:      cfg.Config.SyncSSOAPIKey,
 		SwaggerUser:        cfg.Config.SwaggerBasicUser,
@@ -240,4 +258,3 @@ func cacheControl(next echo.HandlerFunc) echo.HandlerFunc {
 		return next(c)
 	}
 }
-

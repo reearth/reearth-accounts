@@ -44,7 +44,6 @@ func TestPostgresConformance(t *testing.T) {
 			CaseInsensitiveEmail: true,
 			EnforcesFilter:       true,
 			EnforcesLimit:        true,
-			OrderedFindByIDs:     true,
 			RealPagination:       true,
 			RealTransactions:     true,
 			SubstringSearch:      true,

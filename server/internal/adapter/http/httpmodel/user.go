@@ -14,9 +14,11 @@ import (
 type UserMetadataResponse struct {
 	Description string `json:"description"`
 	Website     string `json:"website"`
-	PhotoURL    string `json:"photo_url"`
-	Lang        string `json:"lang"`
-	Theme       string `json:"theme"`
+	// A signed URL that expires on GET /api/users/me, so do not store it.
+	// Every other response carries the stored value.
+	PhotoURL string `json:"photo_url"`
+	Lang     string `json:"lang"`
+	Theme    string `json:"theme"`
 }
 
 // VerificationResponse mirrors Verification.
@@ -25,8 +27,10 @@ type VerificationResponse struct {
 	Verified   bool   `json:"verified"`
 }
 
-// UserResponse mirrors the GraphQL User type.
-type UserResponse struct {
+// MemberUserResponse holds exactly the fields of the GraphQL User type. A
+// workspace member's embedded user uses it alone, so, as in GraphQL, it shows
+// no deletion state and its photo_url is the stored value.
+type MemberUserResponse struct {
 	ID    string `json:"id"`
 	Name  string `json:"name"`
 	Alias string `json:"alias"`
@@ -38,9 +42,14 @@ type UserResponse struct {
 	Auths        []string              `json:"auths"`
 	Metadata     *UserMetadataResponse `json:"metadata"`
 	Verification *VerificationResponse `json:"verification,omitempty"`
-	IsDeleted    bool                  `json:"is_deleted"`
-	DeletedAt    *time.Time            `json:"deleted_at,omitempty"`
-	CreatedAt    *time.Time            `json:"created_at,omitempty"`
+}
+
+// UserResponse is the GraphQL User type plus deletion state and timestamps.
+type UserResponse struct {
+	MemberUserResponse
+	IsDeleted bool       `json:"is_deleted"`
+	DeletedAt *time.Time `json:"deleted_at,omitempty"`
+	CreatedAt *time.Time `json:"created_at,omitempty"`
 	// PlatformRoles and Workspaces are only populated by handlers that batch-fetch
 	// Permittable data (e.g. ListAll); other endpoints leave them nil.
 	PlatformRoles []string                `json:"platform_roles,omitempty"`
@@ -66,7 +75,10 @@ type MeResponse struct {
 	Host           *string               `json:"host,omitempty"`
 	LatestLogoutAt *time.Time            `json:"latest_logout_at,omitempty"`
 	MyWorkspaceID  string                `json:"my_workspace_id"`
-	Auths          []string              `json:"auths"`
+	// MyWorkspace is set only with ?expand=my_workspace. It stays absent when
+	// the personal workspace no longer exists, rather than failing the request.
+	MyWorkspace *WorkspaceResponse `json:"my_workspace,omitempty"`
+	Auths       []string           `json:"auths"`
 }
 
 // MFAStatusResponse mirrors the GraphQL MFAStatus type.
@@ -132,8 +144,8 @@ func (v EmailViewer) email(uid user.ID, email string) string {
 	return ""
 }
 
-// NewUserResponse converts a domain user to a UserResponse.
-func NewUserResponse(u *user.User, viewer EmailViewer) *UserResponse {
+// NewMemberUserResponse converts a domain user to the GraphQL User fields.
+func NewMemberUserResponse(u *user.User, viewer EmailViewer) *MemberUserResponse {
 	if u == nil {
 		return nil
 	}
@@ -149,7 +161,7 @@ func NewUserResponse(u *user.User, viewer EmailViewer) *UserResponse {
 	if host != "" {
 		hp = &host
 	}
-	return &UserResponse{
+	return &MemberUserResponse{
 		ID:           u.ID().String(),
 		Name:         u.Name(),
 		Alias:        u.Alias(),
@@ -159,9 +171,19 @@ func NewUserResponse(u *user.User, viewer EmailViewer) *UserResponse {
 		Auths:        util.Map(u.Auths(), func(a user.Auth) string { return a.Provider }),
 		Metadata:     metadataResponse(u),
 		Verification: v,
-		IsDeleted:    u.IsDeleted(),
-		DeletedAt:    u.DeletedAt(),
-		CreatedAt:    u.CreatedAt(),
+	}
+}
+
+// NewUserResponse converts a domain user to a UserResponse.
+func NewUserResponse(u *user.User, viewer EmailViewer) *UserResponse {
+	if u == nil {
+		return nil
+	}
+	return &UserResponse{
+		MemberUserResponse: *NewMemberUserResponse(u, viewer),
+		IsDeleted:          u.IsDeleted(),
+		DeletedAt:          u.DeletedAt(),
+		CreatedAt:          u.CreatedAt(),
 	}
 }
 

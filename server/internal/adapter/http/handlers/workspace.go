@@ -5,6 +5,7 @@ import (
 	"strings"
 
 	"github.com/labstack/echo/v4"
+	"github.com/reearth/reearth-accounts/server/internal/adapter"
 	"github.com/reearth/reearth-accounts/server/internal/adapter/http/httpmodel"
 	httpinternal "github.com/reearth/reearth-accounts/server/internal/adapter/http/internal"
 	"github.com/reearth/reearth-accounts/server/internal/usecase/interfaces"
@@ -12,9 +13,13 @@ import (
 	"github.com/reearth/reearth-accounts/server/pkg/workspace"
 )
 
-type WorkspaceHandler struct{}
+type WorkspaceHandler struct {
+	photos adapter.PhotoSigner
+}
 
-func NewWorkspaceHandler() *WorkspaceHandler { return &WorkspaceHandler{} }
+func NewWorkspaceHandler(photos adapter.PhotoSigner) *WorkspaceHandler {
+	return &WorkspaceHandler{photos: photos}
+}
 
 func badRequest(msg string) error {
 	return httpinternal.NewError(http.StatusBadRequest, msg, nil)
@@ -27,7 +32,9 @@ func badRequest(msg string) error {
 // @Accept json
 // @Produce json
 // @Param body body httpmodel.CreateWorkspaceRequest true "workspace fields (skip_owner_membership defaults to false)"
+// @Param expand query string false "comma-separated expansions; allowed: members.user"
 // @Success 200 {object} httpmodel.WorkspaceResponse
+// @Failure 400 {object} internal.ErrorResponse
 // @Router /api/workspaces [post]
 func (h *WorkspaceHandler) Create(c echo.Context) error {
 	ctx := c.Request().Context()
@@ -47,7 +54,7 @@ func (h *WorkspaceHandler) Create(c echo.Context) error {
 	if err != nil {
 		return err
 	}
-	return c.JSON(http.StatusOK, httpmodel.NewWorkspaceResponse(w))
+	return h.writeWorkspace(c, w, memberUsersFor(c))
 }
 
 // Get godoc
@@ -55,8 +62,10 @@ func (h *WorkspaceHandler) Create(c echo.Context) error {
 // @Summary Get a workspace by ID
 // @Security BearerAuth
 // @Param id path string true "workspace ID"
+// @Param expand query string false "comma-separated expansions; allowed: members.user"
 // @Produce json
 // @Success 200 {object} httpmodel.WorkspaceResponse
+// @Failure 400 {object} internal.ErrorResponse
 // @Failure 404 {object} internal.ErrorResponse
 // @Router /api/workspaces/{id} [get]
 func (h *WorkspaceHandler) Get(c echo.Context) error {
@@ -69,7 +78,7 @@ func (h *WorkspaceHandler) Get(c echo.Context) error {
 	if err != nil {
 		return err
 	}
-	return c.JSON(http.StatusOK, httpmodel.NewWorkspaceResponse(w))
+	return h.writeWorkspace(c, w, memberUsersFor(c))
 }
 
 // List godoc
@@ -83,8 +92,10 @@ func (h *WorkspaceHandler) Get(c echo.Context) error {
 // @Param user_id query string false "user ID (optionally paginated)"
 // @Param page query int false "page (default 1)"
 // @Param page_size query int false "page size (default 50, max 100)"
+// @Param expand query string false "comma-separated expansions; allowed: members.user"
 // @Produce json
 // @Success 200 {array} httpmodel.WorkspaceResponse "array for ids/user_id; a single object for name/alias; a paginated object when paginating by user_id (see description)"
+// @Failure 400 {object} internal.ErrorResponse
 // @Router /api/workspaces [get]
 func (h *WorkspaceHandler) List(c echo.Context) error {
 	ctx := c.Request().Context()
@@ -116,19 +127,19 @@ func (h *WorkspaceHandler) List(c echo.Context) error {
 		if err != nil {
 			return err
 		}
-		return c.JSON(http.StatusOK, httpmodel.NewWorkspaceResponses(ws))
+		return h.writeWorkspaces(c, ws, memberUsersFor(c))
 	case name != "":
 		w, err := uc.FetchByName(ctx, name)
 		if err != nil {
 			return err
 		}
-		return c.JSON(http.StatusOK, httpmodel.NewWorkspaceResponse(w))
+		return h.writeWorkspace(c, w, memberUsersFor(c))
 	case alias != "":
 		w, err := uc.FetchByAlias(ctx, alias)
 		if err != nil {
 			return err
 		}
-		return c.JSON(http.StatusOK, httpmodel.NewWorkspaceResponse(w))
+		return h.writeWorkspace(c, w, memberUsersFor(c))
 	default: // user_id
 		uid, err := id.UserIDFrom(userID)
 		if err != nil {
@@ -144,24 +155,29 @@ func (h *WorkspaceHandler) List(c echo.Context) error {
 			if err != nil {
 				return err
 			}
-			return c.JSON(http.StatusOK, httpinternal.NewPageResult(httpmodel.NewWorkspaceResponses(res.Workspaces), page, size, res.TotalCount))
+			items, err := workspaceResponses(c, h.photos, res.Workspaces, memberUsersFor(c))
+			if err != nil {
+				return err
+			}
+			return c.JSON(http.StatusOK, httpinternal.NewPageResult(items, page, size, res.TotalCount))
 		}
 		ws, err := uc.FindByUser(ctx, uid, op)
 		if err != nil {
 			return err
 		}
-		return c.JSON(http.StatusOK, httpmodel.NewWorkspaceResponses(ws))
+		return h.writeWorkspaces(c, ws, memberUsersFor(c))
 	}
 }
 
 // ListAll godoc
 // @Tags Workspace
-// @Summary List all workspaces across all tenants (owner role required)
+// @Summary List all workspaces across all tenants (maintainer permission required)
 // @Security BearerAuth
 // @Param keyword query string false "keyword filter (matches name or alias)"
 // @Param status query string false "active (default), deleted, or all"
 // @Param page query int false "page (default 1)"
 // @Param page_size query int false "page size (default 50, max 100)"
+// @Param expand query string false "comma-separated expansions; allowed: members.user"
 // @Produce json
 // @Success 200 {object} httpmodel.WorkspaceResponse
 // @Failure 400 {object} internal.ErrorResponse
@@ -196,7 +212,11 @@ func (h *WorkspaceHandler) ListAll(c echo.Context) error {
 	if err != nil {
 		return err
 	}
-	return c.JSON(http.StatusOK, httpinternal.NewPageResult(httpmodel.NewWorkspaceResponses(res.Workspaces), page, size, res.TotalCount))
+	items, err := workspaceResponses(c, h.photos, res.Workspaces, memberUsersFor(c))
+	if err != nil {
+		return err
+	}
+	return c.JSON(http.StatusOK, httpinternal.NewPageResult(items, page, size, res.TotalCount))
 }
 
 // Update godoc
@@ -207,7 +227,9 @@ func (h *WorkspaceHandler) ListAll(c echo.Context) error {
 // @Produce json
 // @Param id path string true "workspace ID"
 // @Param body body httpmodel.UpdateWorkspaceRequest true "fields to update"
+// @Param expand query string false "comma-separated expansions; allowed: members.user"
 // @Success 200 {object} httpmodel.WorkspaceResponse
+// @Failure 400 {object} internal.ErrorResponse
 // @Router /api/workspaces/{id} [patch]
 func (h *WorkspaceHandler) Update(c echo.Context) error {
 	ctx := c.Request().Context()
@@ -225,7 +247,7 @@ func (h *WorkspaceHandler) Update(c echo.Context) error {
 	if err != nil {
 		return err
 	}
-	return c.JSON(http.StatusOK, httpmodel.NewWorkspaceResponse(w))
+	return h.writeWorkspace(c, w, memberUsersFor(c))
 }
 
 // Delete godoc
@@ -253,7 +275,9 @@ func (h *WorkspaceHandler) Delete(c echo.Context) error {
 // @Security BearerAuth
 // @Produce json
 // @Param id path string true "workspace ID"
+// @Param expand query string false "comma-separated expansions; allowed: members.user"
 // @Success 200 {object} httpmodel.WorkspaceResponse
+// @Failure 400 {object} internal.ErrorResponse
 // @Router /api/workspaces/{id}/deactivate [post]
 func (h *WorkspaceHandler) Deactivate(c echo.Context) error {
 	ctx := c.Request().Context()
@@ -265,7 +289,7 @@ func (h *WorkspaceHandler) Deactivate(c echo.Context) error {
 	if err != nil {
 		return err
 	}
-	return c.JSON(http.StatusOK, httpmodel.NewWorkspaceResponse(w))
+	return h.writeWorkspace(c, w, memberUsersFor(c))
 }
 
 // Restore godoc
@@ -274,7 +298,9 @@ func (h *WorkspaceHandler) Deactivate(c echo.Context) error {
 // @Security BearerAuth
 // @Produce json
 // @Param id path string true "workspace ID"
+// @Param expand query string false "comma-separated expansions; allowed: members.user"
 // @Success 200 {object} httpmodel.WorkspaceResponse
+// @Failure 400 {object} internal.ErrorResponse
 // @Router /api/workspaces/{id}/restore [post]
 func (h *WorkspaceHandler) Restore(c echo.Context) error {
 	ctx := c.Request().Context()
@@ -286,7 +312,7 @@ func (h *WorkspaceHandler) Restore(c echo.Context) error {
 	if err != nil {
 		return err
 	}
-	return c.JSON(http.StatusOK, httpmodel.NewWorkspaceResponse(w))
+	return h.writeWorkspace(c, w, memberUsersFor(c))
 }
 
 // AddMembers godoc
@@ -297,7 +323,9 @@ func (h *WorkspaceHandler) Restore(c echo.Context) error {
 // @Produce json
 // @Param id path string true "workspace ID"
 // @Param body body httpmodel.AddMembersRequest true "users to add"
+// @Param expand query string false "comma-separated expansions; allowed: members.user"
 // @Success 200 {object} httpmodel.WorkspaceResponse
+// @Failure 400 {object} internal.ErrorResponse
 // @Router /api/workspaces/{id}/members [post]
 func (h *WorkspaceHandler) AddMembers(c echo.Context) error {
 	ctx := c.Request().Context()
@@ -317,7 +345,7 @@ func (h *WorkspaceHandler) AddMembers(c echo.Context) error {
 	if err != nil {
 		return err
 	}
-	return c.JSON(http.StatusOK, httpmodel.NewWorkspaceResponse(w))
+	return h.writeWorkspace(c, w, memberUsersFor(c))
 }
 
 // UpdateMember godoc
@@ -329,7 +357,9 @@ func (h *WorkspaceHandler) AddMembers(c echo.Context) error {
 // @Param id path string true "workspace ID"
 // @Param user_id path string true "user ID"
 // @Param body body httpmodel.UpdateMemberRequest true "new role"
+// @Param expand query string false "comma-separated expansions; allowed: members.user"
 // @Success 200 {object} httpmodel.WorkspaceResponse
+// @Failure 400 {object} internal.ErrorResponse
 // @Router /api/workspaces/{id}/members/{user_id} [patch]
 func (h *WorkspaceHandler) UpdateMember(c echo.Context) error {
 	ctx := c.Request().Context()
@@ -349,7 +379,7 @@ func (h *WorkspaceHandler) UpdateMember(c echo.Context) error {
 	if err != nil {
 		return err
 	}
-	return c.JSON(http.StatusOK, httpmodel.NewWorkspaceResponse(w))
+	return h.writeWorkspace(c, w, memberUsersFor(c))
 }
 
 // UpdateMemberViaService godoc
@@ -361,7 +391,9 @@ func (h *WorkspaceHandler) UpdateMember(c echo.Context) error {
 // @Param id path string true "workspace ID"
 // @Param user_id path string true "user ID"
 // @Param body body httpmodel.UpdateMemberRequest true "new role"
+// @Param expand query string false "comma-separated expansions; allowed: members.user"
 // @Success 200 {object} httpmodel.WorkspaceResponse
+// @Failure 400 {object} internal.ErrorResponse
 // @Router /api/service/workspaces/{id}/members/{user_id} [patch]
 func (h *WorkspaceHandler) UpdateMemberViaService(c echo.Context) error {
 	ctx := c.Request().Context()
@@ -381,7 +413,7 @@ func (h *WorkspaceHandler) UpdateMemberViaService(c echo.Context) error {
 	if err != nil {
 		return err
 	}
-	return c.JSON(http.StatusOK, httpmodel.NewWorkspaceResponse(w))
+	return h.writeWorkspace(c, w, memberUsersFor(c))
 }
 
 // RemoveMember godoc
@@ -390,8 +422,10 @@ func (h *WorkspaceHandler) UpdateMemberViaService(c echo.Context) error {
 // @Security BearerAuth
 // @Param id path string true "workspace ID"
 // @Param user_id path string true "user ID"
+// @Param expand query string false "comma-separated expansions; allowed: members.user"
 // @Produce json
 // @Success 200 {object} httpmodel.WorkspaceResponse
+// @Failure 400 {object} internal.ErrorResponse
 // @Router /api/workspaces/{id}/members/{user_id} [delete]
 func (h *WorkspaceHandler) RemoveMember(c echo.Context) error {
 	ctx := c.Request().Context()
@@ -407,7 +441,7 @@ func (h *WorkspaceHandler) RemoveMember(c echo.Context) error {
 	if err != nil {
 		return err
 	}
-	return c.JSON(http.StatusOK, httpmodel.NewWorkspaceResponse(w))
+	return h.writeWorkspace(c, w, memberUsersFor(c))
 }
 
 // RemoveMembers godoc
@@ -418,7 +452,9 @@ func (h *WorkspaceHandler) RemoveMember(c echo.Context) error {
 // @Produce json
 // @Param id path string true "workspace ID"
 // @Param body body httpmodel.RemoveMembersRequest true "user IDs"
+// @Param expand query string false "comma-separated expansions; allowed: members.user"
 // @Success 200 {object} httpmodel.WorkspaceResponse
+// @Failure 400 {object} internal.ErrorResponse
 // @Router /api/workspaces/{id}/members [delete]
 func (h *WorkspaceHandler) RemoveMembers(c echo.Context) error {
 	ctx := c.Request().Context()
@@ -438,7 +474,7 @@ func (h *WorkspaceHandler) RemoveMembers(c echo.Context) error {
 	if err != nil {
 		return err
 	}
-	return c.JSON(http.StatusOK, httpmodel.NewWorkspaceResponse(w))
+	return h.writeWorkspace(c, w, memberUsersFor(c))
 }
 
 // AddIntegration godoc
@@ -449,7 +485,9 @@ func (h *WorkspaceHandler) RemoveMembers(c echo.Context) error {
 // @Produce json
 // @Param id path string true "workspace ID"
 // @Param body body httpmodel.AddIntegrationRequest true "integration and role"
+// @Param expand query string false "comma-separated expansions; allowed: members.user"
 // @Success 200 {object} httpmodel.WorkspaceResponse
+// @Failure 400 {object} internal.ErrorResponse
 // @Router /api/workspaces/{id}/integrations [post]
 func (h *WorkspaceHandler) AddIntegration(c echo.Context) error {
 	ctx := c.Request().Context()
@@ -469,7 +507,7 @@ func (h *WorkspaceHandler) AddIntegration(c echo.Context) error {
 	if err != nil {
 		return err
 	}
-	return c.JSON(http.StatusOK, httpmodel.NewWorkspaceResponse(w))
+	return h.writeWorkspace(c, w, memberUsersFor(c))
 }
 
 // UpdateIntegration godoc
@@ -481,7 +519,9 @@ func (h *WorkspaceHandler) AddIntegration(c echo.Context) error {
 // @Param id path string true "workspace ID"
 // @Param integration_id path string true "integration ID"
 // @Param body body httpmodel.UpdateIntegrationRequest true "new role"
+// @Param expand query string false "comma-separated expansions; allowed: members.user"
 // @Success 200 {object} httpmodel.WorkspaceResponse
+// @Failure 400 {object} internal.ErrorResponse
 // @Router /api/workspaces/{id}/integrations/{integration_id} [patch]
 func (h *WorkspaceHandler) UpdateIntegration(c echo.Context) error {
 	ctx := c.Request().Context()
@@ -501,7 +541,7 @@ func (h *WorkspaceHandler) UpdateIntegration(c echo.Context) error {
 	if err != nil {
 		return err
 	}
-	return c.JSON(http.StatusOK, httpmodel.NewWorkspaceResponse(w))
+	return h.writeWorkspace(c, w, memberUsersFor(c))
 }
 
 // RemoveIntegration godoc
@@ -510,8 +550,10 @@ func (h *WorkspaceHandler) UpdateIntegration(c echo.Context) error {
 // @Security BearerAuth
 // @Param id path string true "workspace ID"
 // @Param integration_id path string true "integration ID"
+// @Param expand query string false "comma-separated expansions; allowed: members.user"
 // @Produce json
 // @Success 200 {object} httpmodel.WorkspaceResponse
+// @Failure 400 {object} internal.ErrorResponse
 // @Router /api/workspaces/{id}/integrations/{integration_id} [delete]
 func (h *WorkspaceHandler) RemoveIntegration(c echo.Context) error {
 	ctx := c.Request().Context()
@@ -527,7 +569,7 @@ func (h *WorkspaceHandler) RemoveIntegration(c echo.Context) error {
 	if err != nil {
 		return err
 	}
-	return c.JSON(http.StatusOK, httpmodel.NewWorkspaceResponse(w))
+	return h.writeWorkspace(c, w, memberUsersFor(c))
 }
 
 // RemoveIntegrations godoc
@@ -538,7 +580,9 @@ func (h *WorkspaceHandler) RemoveIntegration(c echo.Context) error {
 // @Produce json
 // @Param id path string true "workspace ID"
 // @Param body body httpmodel.RemoveIntegrationsRequest true "integration IDs"
+// @Param expand query string false "comma-separated expansions; allowed: members.user"
 // @Success 200 {object} httpmodel.WorkspaceResponse
+// @Failure 400 {object} internal.ErrorResponse
 // @Router /api/workspaces/{id}/integrations [delete]
 func (h *WorkspaceHandler) RemoveIntegrations(c echo.Context) error {
 	ctx := c.Request().Context()
@@ -562,7 +606,7 @@ func (h *WorkspaceHandler) RemoveIntegrations(c echo.Context) error {
 	if err != nil {
 		return err
 	}
-	return c.JSON(http.StatusOK, httpmodel.NewWorkspaceResponse(w))
+	return h.writeWorkspace(c, w, memberUsersFor(c))
 }
 
 // TransferOwnership godoc
@@ -573,7 +617,9 @@ func (h *WorkspaceHandler) RemoveIntegrations(c echo.Context) error {
 // @Produce json
 // @Param id path string true "workspace ID"
 // @Param body body httpmodel.TransferOwnershipRequest true "new owner ID"
+// @Param expand query string false "comma-separated expansions; allowed: members.user"
 // @Success 200 {object} httpmodel.WorkspaceResponse
+// @Failure 400 {object} internal.ErrorResponse
 // @Router /api/workspaces/{id}/transfer-ownership [post]
 func (h *WorkspaceHandler) TransferOwnership(c echo.Context) error {
 	ctx := c.Request().Context()
@@ -593,7 +639,7 @@ func (h *WorkspaceHandler) TransferOwnership(c echo.Context) error {
 	if err != nil {
 		return err
 	}
-	return c.JSON(http.StatusOK, httpmodel.NewWorkspaceResponse(w))
+	return h.writeWorkspace(c, w, memberUsersFor(c))
 }
 
 func parseWorkspaceIDs(ss []string) (id.WorkspaceIDList, error) {

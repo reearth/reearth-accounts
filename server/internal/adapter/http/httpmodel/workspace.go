@@ -13,6 +13,9 @@ type WorkspaceMemberResponse struct {
 	UserID        string `json:"user_id,omitempty"`
 	IntegrationID string `json:"integration_id,omitempty"`
 	Role          string `json:"role"`
+	// User is set only with ?expand=members.user. Its photo_url is the stored
+	// value, and a soft-deleted user appears like a live one, both as in GraphQL.
+	User *MemberUserResponse `json:"user,omitempty"`
 }
 
 // WorkspaceMetadataResponse mirrors WorkspaceMetadata.
@@ -21,7 +24,8 @@ type WorkspaceMetadataResponse struct {
 	Website      string `json:"website"`
 	Location     string `json:"location"`
 	BillingEmail string `json:"billing_email"`
-	PhotoURL     string `json:"photo_url"`
+	// A signed URL that expires, so do not store it.
+	PhotoURL string `json:"photo_url"`
 }
 
 // WorkspaceResponse mirrors the GraphQL Workspace type.
@@ -38,16 +42,32 @@ type WorkspaceResponse struct {
 	DeletedAt     *time.Time                 `json:"deleted_at,omitempty"`
 }
 
-// NewWorkspaceResponse converts a domain workspace (no signed-URL resolution).
-func NewWorkspaceResponse(w *workspace.Workspace) *WorkspaceResponse {
+// MemberUsers says whether a workspace response embeds each member's user,
+// and whose email the embedded users show.
+type MemberUsers struct {
+	Embed  bool
+	Viewer EmailViewer
+}
+
+// NewWorkspaceResponse converts a domain workspace (no signed-URL resolution),
+// dropping user members missing from users, as GraphQL does.
+func NewWorkspaceResponse(w *workspace.Workspace, users map[user.ID]*user.User, memberUsers MemberUsers) *WorkspaceResponse {
 	if w == nil {
 		return nil
 	}
-	users := w.Members().Users()
+	memberRoles := w.Members().Users()
 	integrations := w.Members().Integrations()
-	members := make([]WorkspaceMemberResponse, 0, len(users)+len(integrations))
-	for u, m := range users {
-		members = append(members, WorkspaceMemberResponse{UserID: u.String(), Role: RoleString(m.Role)})
+	members := make([]WorkspaceMemberResponse, 0, len(memberRoles)+len(integrations))
+	for uid, m := range memberRoles {
+		u, ok := users[uid]
+		if !ok {
+			continue
+		}
+		mr := WorkspaceMemberResponse{UserID: uid.String(), Role: RoleString(m.Role)}
+		if memberUsers.Embed {
+			mr.User = NewMemberUserResponse(u, memberUsers.Viewer)
+		}
+		members = append(members, mr)
 	}
 	for i, m := range integrations {
 		members = append(members, WorkspaceMemberResponse{IntegrationID: i.String(), Role: RoleString(m.Role)})
@@ -79,10 +99,10 @@ func NewWorkspaceResponse(w *workspace.Workspace) *WorkspaceResponse {
 }
 
 // NewWorkspaceResponses converts a list.
-func NewWorkspaceResponses(ws workspace.List) []*WorkspaceResponse {
+func NewWorkspaceResponses(ws workspace.List, users map[user.ID]*user.User, memberUsers MemberUsers) []*WorkspaceResponse {
 	out := make([]*WorkspaceResponse, 0, len(ws))
 	for _, w := range ws {
-		out = append(out, NewWorkspaceResponse(w))
+		out = append(out, NewWorkspaceResponse(w, users, memberUsers))
 	}
 	return out
 }

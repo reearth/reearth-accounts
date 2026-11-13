@@ -28,8 +28,12 @@ type RouterConfig struct {
 	APIKey string
 	// SyncSSOAPIKey is the dedicated M2M key for the sync-sso route.
 	SyncSSOAPIKey string
+	// Photos signs photo URLs.
+	Photos adapter.PhotoSigner
 	// Swagger basic-auth (optional).
 	SwaggerUser, SwaggerPass string
+	// LoginTime reads the login time for the recovery code step-up check.
+	LoginTime adapter.LoginTimeSource
 	// Debug enables serving /swagger without credentials (debug/dev only); in
 	// production Swagger is served only when basic-auth credentials are configured.
 	Debug bool
@@ -77,8 +81,8 @@ func RegisterRESTRouter(e *echo.Echo, cfg RouterConfig) {
 	api.POST("/auth/logout", ah.Logout, required) // JWT
 
 	// --- Users ---
-	uh := handlers.NewUserHandler()
-	api.GET("/users/me", uh.Me, required)
+	uh := handlers.NewUserHandler(cfg.Photos, cfg.LoginTime)
+	api.GET("/users/me", uh.Me, required, handlers.Expand(handlers.ExpandMyWorkspace))
 	api.PATCH("/users/me", uh.UpdateMe, required)
 	api.DELETE("/users/me", uh.DeleteMe, required)
 	api.DELETE("/users/me/auths/:sub", uh.RemoveMyAuth, required)
@@ -114,26 +118,27 @@ func RegisterRESTRouter(e *echo.Echo, cfg RouterConfig) {
 	api.PUT("/users/by-sub/:sub/platform-roles", uh.SetPlatformRolesBySub, required)
 
 	// --- Workspaces ---
-	wh := handlers.NewWorkspaceHandler()
-	api.POST("/workspaces", wh.Create, required)
-	api.GET("/workspaces", wh.List, required) // ?ids= | ?name= | ?alias= | ?user_id=(&page=&page_size=)
-	// Cross-tenant listing for service-to-service callers (e.g. LINKS-Veda). Any
-	// authenticated user can call this, same as GET /workspaces/:id|name|alias
-	api.GET("/workspaces/all", wh.ListAll, required) // ?keyword=&status=active|deleted|all&page=&page_size=
-	api.GET("/workspaces/:id", wh.Get, required)
-	api.PATCH("/workspaces/:id", wh.Update, required)
+	wh := handlers.NewWorkspaceHandler(cfg.Photos)
+	wsExpand := handlers.Expand(handlers.ExpandMemberUsers)
+	api.POST("/workspaces", wh.Create, required, wsExpand)
+	api.GET("/workspaces", wh.List, required, wsExpand) // ?ids= | ?name= | ?alias= | ?user_id=(&page=&page_size=)
+	// Cross-tenant listing for service-to-service callers (e.g. LINKS-Veda). The
+	// interactor admits only maintainers.
+	api.GET("/workspaces/all", wh.ListAll, required, wsExpand) // ?keyword=&status=active|deleted|all&page=&page_size=
+	api.GET("/workspaces/:id", wh.Get, required, wsExpand)
+	api.PATCH("/workspaces/:id", wh.Update, required, wsExpand)
 	api.DELETE("/workspaces/:id", wh.Delete, required)
-	api.POST("/workspaces/:id/deactivate", wh.Deactivate, required) // soft delete (owner-only)
-	api.POST("/workspaces/:id/restore", wh.Restore, required)       // undo deactivate (owner-only)
-	api.POST("/workspaces/:id/members", wh.AddMembers, required)
-	api.PATCH("/workspaces/:id/members/:user_id", wh.UpdateMember, required)
-	api.DELETE("/workspaces/:id/members/:user_id", wh.RemoveMember, required)
-	api.DELETE("/workspaces/:id/members", wh.RemoveMembers, required)
-	api.POST("/workspaces/:id/integrations", wh.AddIntegration, required)
-	api.PATCH("/workspaces/:id/integrations/:integration_id", wh.UpdateIntegration, required)
-	api.DELETE("/workspaces/:id/integrations/:integration_id", wh.RemoveIntegration, required)
-	api.DELETE("/workspaces/:id/integrations", wh.RemoveIntegrations, required)
-	api.POST("/workspaces/:id/transfer-ownership", wh.TransferOwnership, required)
+	api.POST("/workspaces/:id/deactivate", wh.Deactivate, required, wsExpand) // soft delete (owner-only)
+	api.POST("/workspaces/:id/restore", wh.Restore, required, wsExpand)       // undo deactivate (owner-only)
+	api.POST("/workspaces/:id/members", wh.AddMembers, required, wsExpand)
+	api.PATCH("/workspaces/:id/members/:user_id", wh.UpdateMember, required, wsExpand)
+	api.DELETE("/workspaces/:id/members/:user_id", wh.RemoveMember, required, wsExpand)
+	api.DELETE("/workspaces/:id/members", wh.RemoveMembers, required, wsExpand)
+	api.POST("/workspaces/:id/integrations", wh.AddIntegration, required, wsExpand)
+	api.PATCH("/workspaces/:id/integrations/:integration_id", wh.UpdateIntegration, required, wsExpand)
+	api.DELETE("/workspaces/:id/integrations/:integration_id", wh.RemoveIntegration, required, wsExpand)
+	api.DELETE("/workspaces/:id/integrations", wh.RemoveIntegrations, required, wsExpand)
+	api.POST("/workspaces/:id/transfer-ownership", wh.TransferOwnership, required, wsExpand)
 
 	// --- Workspace SCIM admin ---
 	sh := handlers.NewWorkspaceScimHandler()
@@ -147,7 +152,7 @@ func RegisterRESTRouter(e *echo.Echo, cfg RouterConfig) {
 	// --- Service routes ---
 	// JWT required; the caller must hold Maintainer or Owner in the target workspace
 	// This can bypass the self-promotion guard that PATCH .../members/:user_id enforces.
-	api.PATCH("/service/workspaces/:id/members/:user_id", wh.UpdateMemberViaService, required)
+	api.PATCH("/service/workspaces/:id/members/:user_id", wh.UpdateMemberViaService, required, wsExpand)
 
 	// --- Permission ---
 	ph := handlers.NewPermissionHandler()
