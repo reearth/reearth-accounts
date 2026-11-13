@@ -86,6 +86,10 @@ type Config struct {
 	SwaggerBasicUser string `envconfig:"REEARTH_ACCOUNTS_SWAGGER_BASIC_USER"`
 	SwaggerBasicPass string `envconfig:"REEARTH_ACCOUNTS_SWAGGER_BASIC_PASS"`
 
+	// ServiceCallers registers the OAuth clients that may call accounts with no
+	// user behind them (ADR-0002).
+	ServiceCallers ServiceCallers `envconfig:"REEARTH_ACCOUNTS_SERVICE_CALLERS" pp:",omitempty"`
+
 	// HTTP server timeouts
 	ServerIdleTimeout       time.Duration `envconfig:"REEARTH_ACCOUNTS_SERVER_IDLE_TIMEOUT" default:"120s"`
 	ServerReadHeaderTimeout time.Duration `envconfig:"REEARTH_ACCOUNTS_SERVER_READ_HEADER_TIMEOUT" default:"10s"`
@@ -271,6 +275,10 @@ func ReadConfig(debug bool) (*Config, error) {
 	}
 	if _, err := adapter.NewLoginTimeSource(c.AuthTimeClaim); err != nil {
 		return nil, fmt.Errorf("REEARTH_ACCOUNTS_AUTH_TIME_CLAIM: %w", err)
+	}
+
+	if err := c.ServiceCallers.checkIssuers(c.Auths()); err != nil {
+		return nil, fmt.Errorf("REEARTH_ACCOUNTS_SERVICE_CALLERS: %w", err)
 	}
 
 	if debug {
