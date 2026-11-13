@@ -8,7 +8,7 @@ import (
 	"strings"
 
 	"github.com/hasura/go-graphql-client"
-	"github.com/labstack/gommon/log"
+	"github.com/reearth/reearth-accounts/server/pkg/applog"
 	"github.com/reearth/reearth-accounts/server/pkg/gqlclient/gqlerror"
 	"github.com/reearth/reearth-accounts/server/pkg/gqlclient/gqlmodel"
 	"github.com/reearth/reearth-accounts/server/pkg/gqlclient/gqlutil"
@@ -103,13 +103,13 @@ func (r *userRepo) FindMe(ctx context.Context) (*user.User, error) {
 
 	id, err := user.IDFrom(string(q.Me.ID))
 	if err != nil {
-		log.Errorf("[FindMe] failed to convert user id: %s", q.Me.ID)
+		applog.Error(ctx, "[FindMe] failed to convert user id", applog.UserID(q.Me.ID))
 		return nil, gqlerror.ReturnAccountsError(ctx, err)
 	}
 
 	wid, err := user.WorkspaceIDFrom(string(q.Me.MyWorkspaceID))
 	if err != nil {
-		log.Errorf("[FindMe] failed to convert workspace id: %s", q.Me.MyWorkspaceID)
+		applog.Error(ctx, "[FindMe] failed to convert workspace id", applog.WorkspaceID(q.Me.MyWorkspaceID))
 		return nil, gqlerror.ReturnAccountsError(ctx, err)
 	}
 
@@ -146,13 +146,13 @@ func (r *userRepo) FindByID(ctx context.Context, id string) (*user.User, error) 
 
 	uid, err := user.IDFrom(string(q.User.ID))
 	if err != nil {
-		log.Errorf("[FindByID] failed to convert user id: %s", q.User.ID)
+		applog.Error(ctx, "[FindByID] failed to convert user id", applog.UserID(q.User.ID))
 		return nil, gqlerror.ReturnAccountsError(ctx, err)
 	}
 
 	wid, err := user.WorkspaceIDFrom(string(q.User.Workspace))
 	if err != nil {
-		log.Errorf("[FindByID] failed to convert workspace id: %s", q.User.Workspace)
+		applog.Error(ctx, "[FindByID] failed to convert workspace id", applog.WorkspaceID(q.User.Workspace))
 		return nil, gqlerror.ReturnAccountsError(ctx, err)
 	}
 
@@ -187,13 +187,13 @@ func (r *userRepo) FindByIDs(ctx context.Context, ids []string) ([]*user.User, e
 	for _, u := range q.Users {
 		uid, err := user.IDFrom(string(u.ID))
 		if err != nil {
-			log.Errorf("[FindByIDs] failed to convert user id: %s", u.ID)
+			applog.Error(ctx, "[FindByIDs] failed to convert user id", applog.UserID(u.ID))
 			return nil, gqlerror.ReturnAccountsError(ctx, err)
 		}
 
 		wid, err := user.WorkspaceIDFrom(string(u.Workspace))
 		if err != nil {
-			log.Errorf("[FindByIDs] failed to convert workspace id: %s", u.Workspace)
+			applog.Error(ctx, "[FindByIDs] failed to convert workspace id", applog.WorkspaceID(u.Workspace))
 			return nil, gqlerror.ReturnAccountsError(ctx, err)
 		}
 
@@ -233,7 +233,7 @@ func (r *userRepo) FindByAlias(ctx context.Context, alias string) (*user.User, e
 
 	uid, err := user.IDFrom(string(q.User.ID))
 	if err != nil {
-		log.Errorf("[FindByAlias] failed to convert user id: %s", q.User.ID)
+		applog.Error(ctx, "[FindByAlias] failed to convert user id", applog.UserID(q.User.ID))
 		return nil, gqlerror.ReturnAccountsError(ctx, err)
 	}
 
@@ -258,13 +258,13 @@ func (r *userRepo) FindByNameOrAlias(ctx context.Context, nameOrAlias string) ([
 	for _, u := range q.Users {
 		uid, err := user.IDFrom(string(u.ID))
 		if err != nil {
-			log.Errorf("[FindByNameOrAlias] failed to convert user id: %s", u.ID)
+			applog.Error(ctx, "[FindByNameOrAlias] failed to convert user id", applog.UserID(u.ID))
 			return nil, gqlerror.ReturnAccountsError(ctx, err)
 		}
 
 		wid, err := user.WorkspaceIDFrom(string(u.Workspace))
 		if err != nil {
-			log.Errorf("[FindByNameOrAlias] failed to convert workspace id: %s", u.Workspace)
+			applog.Error(ctx, "[FindByNameOrAlias] failed to convert workspace id", applog.WorkspaceID(u.Workspace))
 			return nil, gqlerror.ReturnAccountsError(ctx, err)
 		}
 
@@ -305,7 +305,7 @@ func (r *userRepo) FindByNameOrEmail(ctx context.Context, nameOrEmail string) (*
 
 	uid, err := user.IDFrom(string(q.User.ID))
 	if err != nil {
-		log.Errorf("[FindByNameOrEmail] failed to convert user id: %s", q.User.ID)
+		applog.Error(ctx, "[FindByNameOrEmail] failed to convert user id", applog.UserID(q.User.ID))
 		return nil, gqlerror.ReturnAccountsError(ctx, err)
 	}
 
@@ -345,13 +345,13 @@ func (r *userRepo) Logout(ctx context.Context) (*user.User, error) {
 
 	id, err := user.IDFrom(string(m.Logout.ID))
 	if err != nil {
-		log.Errorf("[Logout] failed to convert user id: %s", m.Logout.ID)
+		applog.Error(ctx, "[Logout] failed to convert user id", applog.UserID(m.Logout.ID))
 		return nil, gqlerror.ReturnAccountsError(ctx, err)
 	}
 
 	wid, err := user.WorkspaceIDFrom(string(m.Logout.MyWorkspaceID))
 	if err != nil {
-		log.Errorf("[Logout] failed to convert workspace id: %s", m.Logout.MyWorkspaceID)
+		applog.Error(ctx, "[Logout] failed to convert workspace id", applog.WorkspaceID(m.Logout.MyWorkspaceID))
 		return nil, gqlerror.ReturnAccountsError(ctx, err)
 	}
 
@@ -450,13 +450,13 @@ func (r *userRepo) UpdateMe(ctx context.Context, input UpdateMeInput) (*user.Use
 
 	id, err := user.IDFrom(string(m.UpdateMe.Me.ID))
 	if err != nil {
-		log.Errorf("[UpdateMe] failed to convert user id: %s", m.UpdateMe.Me.ID)
+		applog.Error(ctx, "[UpdateMe] failed to convert user id", applog.UserID(m.UpdateMe.Me.ID))
 		return nil, gqlerror.ReturnAccountsError(ctx, err)
 	}
 
 	wid, err := user.WorkspaceIDFrom(string(m.UpdateMe.Me.MyWorkspaceID))
 	if err != nil {
-		log.Errorf("[UpdateMe] failed to convert workspace id: %s", m.UpdateMe.Me.MyWorkspaceID)
+		applog.Error(ctx, "[UpdateMe] failed to convert workspace id", applog.WorkspaceID(m.UpdateMe.Me.MyWorkspaceID))
 		return nil, gqlerror.ReturnAccountsError(ctx, err)
 	}
 
@@ -491,7 +491,7 @@ func (r *userRepo) SignupOIDC(ctx context.Context, name string, email string, su
 
 	uid, err := user.IDFrom(string(m.SignupOIDC.User.ID))
 	if err != nil {
-		log.Errorf("[SignupOIDC] failed to convert user id: %s", m.SignupOIDC.User.ID)
+		applog.Error(ctx, "[SignupOIDC] failed to convert user id", applog.UserID(m.SignupOIDC.User.ID))
 		return nil, gqlerror.ReturnAccountsError(ctx, err)
 	}
 
@@ -526,7 +526,7 @@ func (r *userRepo) Signup(ctx context.Context, userID, name, email, password, se
 
 	uid, err := user.IDFrom(string(m.Signup.User.ID))
 	if err != nil {
-		log.Errorf("[Signup] failed to convert user id: %s", m.Signup.User.ID)
+		applog.Error(ctx, "[Signup] failed to convert user id", applog.UserID(m.Signup.User.ID))
 		return nil, gqlerror.ReturnAccountsError(ctx, err)
 	}
 
@@ -553,7 +553,7 @@ func (r *userRepo) SignupNoID(ctx context.Context, name, email, password, secret
 
 	uid, err := user.IDFrom(string(m.Signup.User.ID))
 	if err != nil {
-		log.Errorf("[SignupNoID] failed to convert user id: %s", m.Signup.User.ID)
+		applog.Error(ctx, "[SignupNoID] failed to convert user id", applog.UserID(m.Signup.User.ID))
 		return nil, gqlerror.ReturnAccountsError(ctx, err)
 	}
 
@@ -595,13 +595,13 @@ func (r *userRepo) RemoveMyAuth(ctx context.Context, auth string) (*user.User, e
 
 	id, err := user.IDFrom(string(m.RemoveMyAuth.Me.ID))
 	if err != nil {
-		log.Errorf("[RemoveMyAuth] failed to convert user id: %s", m.RemoveMyAuth.Me.ID)
+		applog.Error(ctx, "[RemoveMyAuth] failed to convert user id", applog.UserID(m.RemoveMyAuth.Me.ID))
 		return nil, gqlerror.ReturnAccountsError(ctx, err)
 	}
 
 	wid, err := user.WorkspaceIDFrom(string(m.RemoveMyAuth.Me.MyWorkspaceID))
 	if err != nil {
-		log.Errorf("[RemoveMyAuth] failed to convert workspace id: %s", m.RemoveMyAuth.Me.MyWorkspaceID)
+		applog.Error(ctx, "[RemoveMyAuth] failed to convert workspace id", applog.WorkspaceID(m.RemoveMyAuth.Me.MyWorkspaceID))
 		return nil, gqlerror.ReturnAccountsError(ctx, err)
 	}
 
@@ -642,13 +642,13 @@ func (r *userRepo) VerifyUser(ctx context.Context, code string) (*user.User, err
 
 	uid, err := user.IDFrom(string(m.VerifyUser.User.ID))
 	if err != nil {
-		log.Errorf("[VerifyUser] failed to convert user id: %s", m.VerifyUser.User.ID)
+		applog.Error(ctx, "[VerifyUser] failed to convert user id", applog.UserID(m.VerifyUser.User.ID))
 		return nil, gqlerror.ReturnAccountsError(ctx, err)
 	}
 
 	wid, err := user.WorkspaceIDFrom(string(m.VerifyUser.User.Workspace))
 	if err != nil {
-		log.Errorf("[VerifyUser] failed to convert workspace id: %s", m.VerifyUser.User.Workspace)
+		applog.Error(ctx, "[VerifyUser] failed to convert workspace id", applog.WorkspaceID(m.VerifyUser.User.Workspace))
 		return nil, gqlerror.ReturnAccountsError(ctx, err)
 	}
 

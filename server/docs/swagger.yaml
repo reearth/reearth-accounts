@@ -431,8 +431,9 @@ definitions:
         type: string
       platform_roles:
         description: |-
-          PlatformRoles and Workspaces are only populated by handlers that batch-fetch
-          Permittable data (e.g. ListAll); other endpoints leave them nil.
+          PlatformRoles and Workspaces are populated by GET /api/users/all and by
+          GET /api/users/{id} when callers request their own record. Other endpoints
+          leave them nil.
         items:
           type: string
         type: array
@@ -543,6 +544,33 @@ definitions:
         type: string
       message:
         type: string
+    type: object
+  internal.PageResult-httpmodel_UserResponse:
+    properties:
+      items:
+        items:
+          $ref: '#/definitions/httpmodel.UserResponse'
+        type: array
+      pagination:
+        $ref: '#/definitions/internal.Pagination'
+    type: object
+  internal.PageResult-httpmodel_WorkspaceResponse:
+    properties:
+      items:
+        items:
+          $ref: '#/definitions/httpmodel.WorkspaceResponse'
+        type: array
+      pagination:
+        $ref: '#/definitions/internal.Pagination'
+    type: object
+  internal.Pagination:
+    properties:
+      page:
+        type: integer
+      page_size:
+        type: integer
+      total:
+        type: integer
     type: object
 info:
   contact: {}
@@ -790,7 +818,7 @@ paths:
         "200":
           description: OK
           schema:
-            $ref: '#/definitions/httpmodel.UserResponse'
+            $ref: '#/definitions/internal.PageResult-httpmodel_UserResponse'
         "400":
           description: Bad Request
           schema:
@@ -801,7 +829,8 @@ paths:
             $ref: '#/definitions/internal.ErrorResponse'
       security:
       - BearerAuth: []
-      summary: List all users across all tenants (owner role required)
+      summary: List all users across all tenants (platform owner or maintainer role
+        required)
       tags:
       - User
   /api/users/by-alias:
@@ -1270,6 +1299,8 @@ paths:
     post:
       consumes:
       - application/json
+      description: 'Send either the sync-SSO API key or a user token as Authorization:
+        Bearer.'
       parameters:
       - description: SSO user fields
         in: body
@@ -1292,6 +1323,8 @@ paths:
           description: Conflict
           schema:
             $ref: '#/definitions/internal.ErrorResponse'
+      security:
+      - BearerAuth: []
       summary: Sync (provision) a SAML SSO user into accounts
       tags:
       - User
@@ -1912,7 +1945,7 @@ paths:
         "200":
           description: OK
           schema:
-            $ref: '#/definitions/httpmodel.WorkspaceResponse'
+            $ref: '#/definitions/internal.PageResult-httpmodel_WorkspaceResponse'
         "400":
           description: Bad Request
           schema:
@@ -1923,7 +1956,8 @@ paths:
             $ref: '#/definitions/internal.ErrorResponse'
       security:
       - BearerAuth: []
-      summary: List all workspaces across all tenants (maintainer permission required)
+      summary: List all workspaces across all tenants (platform owner or maintainer
+        role required)
       tags:
       - Workspace
 securityDefinitions:

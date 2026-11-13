@@ -7,8 +7,8 @@ import (
 	"github.com/labstack/echo/v4"
 	"github.com/reearth/reearth-accounts/server/internal/admin/presentation/internal"
 	"github.com/reearth/reearth-accounts/server/internal/admin/usecase/workspaceuc"
+	"github.com/reearth/reearth-accounts/server/pkg/applog"
 	"github.com/reearth/reearth-accounts/server/pkg/id"
-	"github.com/reearth/reearthx/log"
 )
 
 // TransferWorkspaceOwnerRequest is the request body for transferring ownership.
@@ -72,8 +72,7 @@ func (h *Handler) TransferWorkspaceOwner(c echo.Context) error {
 	})
 	if err != nil {
 		status, code, msg := internal.Classify(err)
-		log.Infofc(ctx, "[admin] transfer workspace owner rejected: admin=%s workspace=%s newOwner=%s status=%d code=%s",
-			admin.ID(), wid, uid, status, code)
+		applog.Info(ctx, "[admin] transfer workspace owner rejected", applog.AdminID(admin.ID()), applog.WorkspaceID(wid), applog.UserID(uid), applog.Status(status), applog.Code(code))
 		var already *workspaceuc.AlreadyOwnerError
 		if errors.As(err, &already) {
 			owner := newWorkspaceMemberResponse(already.Workspace, already.NewOwner)
@@ -83,8 +82,7 @@ func (h *Handler) TransferWorkspaceOwner(c echo.Context) error {
 	}
 
 	res := newTransferWorkspaceOwnerResponse(out)
-	log.Infofc(ctx, "[admin] transfer workspace owner: admin=%s workspace=%s newOwner=%s demoted=%v",
-		admin.ID(), res.Workspace.ID, res.NewOwner.UserID, res.DemotedUserIDs)
+	applog.Info(ctx, "[admin] transfer workspace owner", applog.AdminID(admin.ID()), applog.WorkspaceID(res.Workspace.ID), applog.NewOwnerID(res.NewOwner.UserID), applog.DemotedUserIDs(res.DemotedUserIDs))
 
 	return c.JSON(http.StatusOK, res)
 }

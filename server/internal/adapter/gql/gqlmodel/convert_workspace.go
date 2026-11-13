@@ -5,9 +5,9 @@ import (
 	"errors"
 
 	"github.com/reearth/reearth-accounts/server/internal/adapter"
+	"github.com/reearth/reearth-accounts/server/pkg/applog"
 	"github.com/reearth/reearth-accounts/server/pkg/user"
 	"github.com/reearth/reearth-accounts/server/pkg/workspace"
-	"github.com/reearth/reearthx/log"
 	"github.com/sourcegraph/conc/pool"
 )
 
@@ -18,7 +18,7 @@ func ToWorkspace(
 	photos adapter.PhotoSigner,
 ) (*Workspace, error) {
 	if t == nil {
-		log.Error("workspace is nil")
+		applog.Error(ctx, "workspace is nil")
 		return nil, errors.New("workspace is nil")
 	}
 
@@ -38,16 +38,18 @@ func ToWorkspace(
 	}
 
 	metadata := WorkspaceMetadata{
-		Description:  t.Metadata().Description(),
-		Website:      t.Metadata().Website(),
-		Location:     t.Metadata().Location(),
-		BillingEmail: t.Metadata().BillingEmail(),
+		Description: t.Metadata().Description(),
+		Website:     t.Metadata().Website(),
+		Location:    t.Metadata().Location(),
+	}
+	if viewer := adapter.User(ctx); viewer != nil && t.Members().HasUser(viewer.ID()) {
+		metadata.BillingEmail = t.Metadata().BillingEmail()
 	}
 
 	if t.Metadata() != nil {
 		signedURL, sErr := photos.Sign(ctx, t.Metadata().PhotoURL())
 		if sErr != nil {
-			log.Errorfc(ctx, "gql: failed to sign photo url for workspace %s: %v", t.ID(), sErr)
+			applog.Error(ctx, "gql: failed to sign photo url for workspace", applog.WorkspaceID(t.ID()), applog.Err(sErr))
 		}
 		metadata.PhotoURL = signedURL
 	}
@@ -82,7 +84,7 @@ func ToWorkspaces(
 		p.Go(func() {
 			converted, err := ToWorkspace(ctx, w, exists, photos)
 			if err != nil {
-				log.Errorf("failed to convert workspace: %s", err.Error())
+				applog.Error(ctx, "failed to convert workspace", applog.Err(err))
 				return
 			}
 			results[i] = converted
