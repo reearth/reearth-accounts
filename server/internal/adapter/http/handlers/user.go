@@ -56,7 +56,7 @@ func (h *UserHandler) Me(c echo.Context) error {
 			return err
 		}
 		if w != nil {
-			ws, err := workspaceResponses(c, h.photos, workspace.List{w}, httpmodel.MemberUsers{})
+			ws, err := workspaceResponses(c, h.photos, workspace.List{w}, httpmodel.MemberUsers{}, httpmodel.ViewerOf(u))
 			if err != nil {
 				return err
 			}
@@ -336,14 +336,14 @@ func (h *UserHandler) List(c echo.Context) error {
 
 // ListAll godoc
 // @Tags User
-// @Summary List all users across all tenants (owner role required)
+// @Summary List all users across all tenants (platform owner or maintainer role required)
 // @Security BearerAuth
 // @Param keyword query string false "keyword filter (matches name, alias, or email)"
 // @Param status query string false "active (default), deleted, or all"
 // @Param page query int false "page (default 1)"
 // @Param page_size query int false "page size (default 50, max 100)"
 // @Produce json
-// @Success 200 {object} httpmodel.UserResponse
+// @Success 200 {object} httpinternal.PageResult[httpmodel.UserResponse]
 // @Failure 400 {object} internal.ErrorResponse
 // @Failure 403 {object} internal.ErrorResponse
 // @Router /api/users/all [get]
@@ -624,6 +624,8 @@ func (h *UserHandler) SignupOIDC(c echo.Context) error {
 // SyncSSOUser godoc
 // @Tags User
 // @Summary Sync (provision) a SAML SSO user into accounts
+// @Description Send either the sync-SSO API key or a user token as Authorization: Bearer.
+// @Security BearerAuth
 // @Accept json
 // @Produce json
 // @Param body body httpmodel.SyncSSOUserRequest true "SSO user fields"

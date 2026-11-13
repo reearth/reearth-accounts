@@ -155,7 +155,7 @@ func (h *WorkspaceHandler) List(c echo.Context) error {
 			if err != nil {
 				return err
 			}
-			items, err := workspaceResponses(c, h.photos, res.Workspaces, memberUsersFor(c))
+			items, err := workspaceResponses(c, h.photos, res.Workspaces, memberUsersFor(c), httpmodel.ViewerOf(httpinternal.User(c)))
 			if err != nil {
 				return err
 			}
@@ -171,7 +171,7 @@ func (h *WorkspaceHandler) List(c echo.Context) error {
 
 // ListAll godoc
 // @Tags Workspace
-// @Summary List all workspaces across all tenants (maintainer permission required)
+// @Summary List all workspaces across all tenants (platform owner or maintainer role required)
 // @Security BearerAuth
 // @Param keyword query string false "keyword filter (matches name or alias)"
 // @Param status query string false "active (default), deleted, or all"
@@ -179,7 +179,7 @@ func (h *WorkspaceHandler) List(c echo.Context) error {
 // @Param page_size query int false "page size (default 50, max 100)"
 // @Param expand query string false "comma-separated expansions; allowed: members.user"
 // @Produce json
-// @Success 200 {object} httpmodel.WorkspaceResponse
+// @Success 200 {object} httpinternal.PageResult[httpmodel.WorkspaceResponse]
 // @Failure 400 {object} internal.ErrorResponse
 // @Failure 403 {object} internal.ErrorResponse
 // @Router /api/workspaces/all [get]
@@ -212,7 +212,7 @@ func (h *WorkspaceHandler) ListAll(c echo.Context) error {
 	if err != nil {
 		return err
 	}
-	items, err := workspaceResponses(c, h.photos, res.Workspaces, memberUsersFor(c))
+	items, err := workspaceResponses(c, h.photos, res.Workspaces, memberUsersFor(c), httpmodel.UnrestrictedViewer())
 	if err != nil {
 		return err
 	}
