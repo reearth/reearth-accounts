@@ -15,6 +15,7 @@ func TestPublicFields(t *testing.T) {
 		"findbyid":                     {},
 		"findbyids":                    {},
 		"findusersbyidswithpagination": {},
+		"publicworkspace":              {},
 		"signup":                       {},
 		"signupoidc":                   {},
 		"startpasswordreset":           {},
