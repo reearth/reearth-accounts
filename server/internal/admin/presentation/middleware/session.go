@@ -7,7 +7,7 @@ import (
 	"github.com/labstack/echo/v4"
 	"github.com/reearth/reearth-accounts/server/internal/admin/auth/session"
 	"github.com/reearth/reearth-accounts/server/internal/admin/presentation/internal"
-	"github.com/reearth/reearthx/log"
+	"github.com/reearth/reearth-accounts/server/pkg/applog"
 )
 
 // SessionMiddleware is a named type so Wire can distinguish it from the Auth0
@@ -32,7 +32,7 @@ func NewSessionMiddleware(sess *session.Manager) SessionMiddleware {
 				// An empty signing secret is a server misconfiguration, not a
 				// client auth failure — surface it as 500 so it isn't hidden.
 				if errors.Is(err, session.ErrEmptySecret) {
-					log.Errorfc(c.Request().Context(), "[admin] session secret not configured: %v", err)
+					applog.Error(c.Request().Context(), "[admin] session secret not configured", applog.Err(err))
 					return echo.NewHTTPError(http.StatusInternalServerError)
 				}
 				return echo.NewHTTPError(http.StatusUnauthorized, "unauthorized")

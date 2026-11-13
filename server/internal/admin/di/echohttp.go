@@ -11,7 +11,7 @@ import (
 	"github.com/labstack/echo/v4"
 	"github.com/labstack/echo/v4/middleware"
 	"github.com/reearth/reearth-accounts/server/internal/admin/presentation"
-	"github.com/reearth/reearthx/log"
+	"github.com/reearth/reearth-accounts/server/pkg/applog"
 )
 
 // Server wraps the Echo instance with start/graceful-shutdown behavior.
@@ -73,10 +73,10 @@ func NewAppEchoServer(
 func (s *Server) Start() {
 	go func() {
 		if err := s.echo.Start(s.address); err != nil && err != http.ErrServerClosed {
-			log.Fatalf("admin server: %v", err)
+			applog.Fatal(context.Background(), "admin server", applog.Err(err))
 		}
 	}()
-	log.Infof("admin server started at http://%s", s.address)
+	applog.Info(context.Background(), "admin server started at http://", applog.Address(s.address))
 
 	quit := make(chan os.Signal, 1)
 	signal.Notify(quit, os.Interrupt, syscall.SIGTERM)
@@ -85,9 +85,9 @@ func (s *Server) Start() {
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 	if err := s.echo.Shutdown(ctx); err != nil {
-		log.Errorf("admin server shutdown: %v", err)
+		applog.Error(ctx, "admin server shutdown", applog.Err(err))
 	}
-	log.Infof("admin server stopped")
+	applog.Info(ctx, "admin server stopped")
 }
 
 func allowedOrigins(cfg *Config) []string {

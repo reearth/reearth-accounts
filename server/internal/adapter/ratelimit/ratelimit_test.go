@@ -30,7 +30,12 @@ func TestLimiter_LogOnlyAllowsAndLogs(t *testing.T) {
 	assert.Empty(t, logs.String())
 
 	assert.True(t, l.Allow(ctx, "user:a", "op", 1))
-	assert.Contains(t, logs.String(), "user lookup rate limit exceeded: viewer=user:a op=op lookups=1 enforced=false")
+	out := logs.String()
+	assert.Contains(t, out, "user lookup rate limit exceeded")
+	assert.Contains(t, out, `"limit_key": "user:a"`)
+	assert.Contains(t, out, `"operation": "op"`)
+	assert.Contains(t, out, `"count": 1`)
+	assert.Contains(t, out, `"enforced": false`)
 }
 
 func TestLimiter_EnforceRejects(t *testing.T) {
@@ -39,7 +44,7 @@ func TestLimiter_EnforceRejects(t *testing.T) {
 
 	assert.True(t, l.Allow(ctx, "user:a", "op", 2))
 	assert.False(t, l.Allow(ctx, "user:a", "op", 1))
-	assert.Contains(t, logs.String(), "enforced=true")
+	assert.Contains(t, logs.String(), `"enforced": true`)
 
 	*now = now.Add(time.Second)
 	assert.True(t, l.Allow(ctx, "user:a", "op", 1), "one token refills per second at 60/min")

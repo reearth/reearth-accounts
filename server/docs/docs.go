@@ -239,7 +239,7 @@ const docTemplate = `{
                 "tags": [
                     "User"
                 ],
-                "summary": "List all users across all tenants (owner role required)",
+                "summary": "List all users across all tenants (platform owner or maintainer role required)",
                 "parameters": [
                     {
                         "type": "string",
@@ -270,7 +270,7 @@ const docTemplate = `{
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/httpmodel.UserResponse"
+                            "$ref": "#/definitions/internal.PageResult-httpmodel_UserResponse"
                         }
                     },
                     "400": {
@@ -1028,6 +1028,12 @@ const docTemplate = `{
         },
         "/api/users/sync-sso": {
             "post": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Send either the sync-SSO API key or a user token as Authorization: Bearer.",
                 "consumes": [
                     "application/json"
                 ],
@@ -1405,7 +1411,7 @@ const docTemplate = `{
                 "tags": [
                     "Workspace"
                 ],
-                "summary": "List all workspaces across all tenants (maintainer permission required)",
+                "summary": "List all workspaces across all tenants (platform owner or maintainer role required)",
                 "parameters": [
                     {
                         "type": "string",
@@ -1442,7 +1448,7 @@ const docTemplate = `{
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/httpmodel.WorkspaceResponse"
+                            "$ref": "#/definitions/internal.PageResult-httpmodel_WorkspaceResponse"
                         }
                     },
                     "400": {
@@ -2817,7 +2823,7 @@ const docTemplate = `{
                     "type": "string"
                 },
                 "platform_roles": {
-                    "description": "PlatformRoles and Workspaces are only populated by handlers that batch-fetch\nPermittable data (e.g. ListAll); other endpoints leave them nil.",
+                    "description": "PlatformRoles and Workspaces are populated by GET /api/users/all and by\nGET /api/users/{id} when callers request their own record. Other endpoints\nleave them nil.",
                     "type": "array",
                     "items": {
                         "type": "string"
@@ -2985,6 +2991,48 @@ const docTemplate = `{
                 },
                 "message": {
                     "type": "string"
+                }
+            }
+        },
+        "internal.PageResult-httpmodel_UserResponse": {
+            "type": "object",
+            "properties": {
+                "items": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/httpmodel.UserResponse"
+                    }
+                },
+                "pagination": {
+                    "$ref": "#/definitions/internal.Pagination"
+                }
+            }
+        },
+        "internal.PageResult-httpmodel_WorkspaceResponse": {
+            "type": "object",
+            "properties": {
+                "items": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/httpmodel.WorkspaceResponse"
+                    }
+                },
+                "pagination": {
+                    "$ref": "#/definitions/internal.Pagination"
+                }
+            }
+        },
+        "internal.Pagination": {
+            "type": "object",
+            "properties": {
+                "page": {
+                    "type": "integer"
+                },
+                "page_size": {
+                    "type": "integer"
+                },
+                "total": {
+                    "type": "integer"
                 }
             }
         }

@@ -2,7 +2,6 @@ package mongo
 
 import (
 	"context"
-	"log"
 	"regexp"
 	"strings"
 
@@ -91,7 +90,7 @@ func (r *Workspace) FindAll(ctx context.Context, keyword *string, personal *bool
 func (r *Workspace) FindByUser(ctx context.Context, id user.ID) (workspace.List, error) {
 	uid := strings.ReplaceAll(id.String(), ".", "")
 	return r.find(ctx, bson.M{
-		"members." + uid:              bson.M{"$exists": true},
+		"members." + uid:               bson.M{"$exists": true},
 		"members." + uid + ".disabled": bson.M{"$ne": true},
 	})
 }
@@ -99,7 +98,7 @@ func (r *Workspace) FindByUser(ctx context.Context, id user.ID) (workspace.List,
 func (r *Workspace) FindByUserWithPagination(ctx context.Context, id user.ID, pagination *usecasex.Pagination) (workspace.List, *usecasex.PageInfo, error) {
 	uid := strings.ReplaceAll(id.String(), ".", "")
 	filter := bson.M{
-		"members." + uid:              bson.M{"$exists": true},
+		"members." + uid:               bson.M{"$exists": true},
 		"members." + uid + ".disabled": bson.M{"$ne": true},
 	}
 	return r.paginate(ctx, filter, pagination)
@@ -215,8 +214,7 @@ func (r *Workspace) Create(ctx context.Context, ws *workspace.Workspace) error {
 
 func (r *Workspace) Save(ctx context.Context, ws *workspace.Workspace) error {
 	if !r.f.CanWrite(ws.ID()) {
-		log.Printf("WorkspaceFilter: %+v", r.f)
-		log.Printf("Workspace: %+v", ws.ID().String())
+		applog.Info(ctx, "workspace filter denied write", applog.WorkspaceID(ws.ID()))
 		return applog.ErrorWithCallerLogging(ctx, "failed to save workspace", repo.ErrOperationDenied)
 	}
 

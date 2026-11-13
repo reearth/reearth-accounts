@@ -10,8 +10,8 @@ import (
 	firebase "firebase.google.com/go/v4"
 	fbauth "firebase.google.com/go/v4/auth"
 	"github.com/reearth/reearth-accounts/server/internal/usecase/gateway"
+	"github.com/reearth/reearth-accounts/server/pkg/applog"
 	"github.com/reearth/reearthx/i18n"
-	"github.com/reearth/reearthx/log"
 	"github.com/reearth/reearthx/mailer"
 	"github.com/reearth/reearthx/rerror"
 	"google.golang.org/api/option"
@@ -62,12 +62,12 @@ func New(ctx context.Context, p Params, m mailer.Mailer) (*Authenticator, error)
 	httpClient := &http.Client{Timeout: timeout}
 	app, err := firebase.NewApp(ctx, &firebase.Config{ProjectID: p.ProjectID}, option.WithHTTPClient(httpClient))
 	if err != nil {
-		log.Errorf("cip: init firebase app: %+v", err)
+		applog.Error(ctx, "cip: init firebase app", applog.Err(err))
 		return nil, rerror.NewE(i18n.T("cip is not set up"))
 	}
 	authClient, err := app.Auth(ctx)
 	if err != nil {
-		log.Errorf("cip: init auth client: %+v", err)
+		applog.Error(ctx, "cip: init auth client", applog.Err(err))
 		return nil, rerror.NewE(i18n.T("cip is not set up"))
 	}
 
@@ -75,7 +75,7 @@ func New(ctx context.Context, p Params, m mailer.Mailer) (*Authenticator, error)
 	if p.TenantID != "" {
 		tc, terr := authClient.TenantManager.AuthForTenant(p.TenantID)
 		if terr != nil {
-			log.Errorf("cip: init tenant client: %+v", terr)
+			applog.Error(ctx, "cip: init tenant client", applog.Err(terr))
 			return nil, rerror.NewE(i18n.T("cip is not set up"))
 		}
 		client = tc
@@ -105,7 +105,7 @@ func (a *Authenticator) UpdateUser(ctx context.Context, p gateway.AuthenticatorU
 
 	rec, err := a.client.UpdateUser(ctx, p.ID, update)
 	if err != nil {
-		log.Errorf("cip: update user: %+v", err)
+		applog.Error(ctx, "cip: update user", applog.Err(err))
 		return gateway.AuthenticatorUser{}, rerror.NewE(i18n.T("failed to update user"))
 	}
 	return toAuthenticatorUser(rec), nil
@@ -114,7 +114,7 @@ func (a *Authenticator) UpdateUser(ctx context.Context, p gateway.AuthenticatorU
 func (a *Authenticator) ResendVerificationEmail(ctx context.Context, userID string) error {
 	rec, err := a.client.GetUser(ctx, userID)
 	if err != nil {
-		log.Errorf("cip: get user for verification: %+v", err)
+		applog.Error(ctx, "cip: get user for verification", applog.Err(err))
 		return rerror.NewE(i18n.T("failed to resend verification email"))
 	}
 	if rec.UserInfo == nil || rec.Email == "" {
@@ -126,11 +126,11 @@ func (a *Authenticator) ResendVerificationEmail(ctx context.Context, userID stri
 	// Delivery is handled below via the configured app Mailer.
 	link, err := a.client.EmailVerificationLink(ctx, rec.Email)
 	if err != nil {
-		log.Errorf("cip: email verification link: %+v", err)
+		applog.Error(ctx, "cip: email verification link", applog.Err(err))
 		return rerror.NewE(i18n.T("failed to resend verification email"))
 	}
 	if a.mailer == nil {
-		log.Errorf("cip: mailer is not configured; cannot send verification email")
+		applog.Error(ctx, "cip: mailer is not configured; cannot send verification email")
 		return rerror.NewE(i18n.T("failed to resend verification email"))
 	}
 
@@ -139,7 +139,7 @@ func (a *Authenticator) ResendVerificationEmail(ctx context.Context, userID stri
 	// href attribute to prevent accidental injection or broken markup.
 	htmlBody := fmt.Sprintf(`<p>Please verify your email address by clicking <a href="%s">this link</a>.</p>`, html.EscapeString(link))
 	if err := a.mailer.SendMail(ctx, []mailer.Contact{{Email: rec.Email, Name: rec.DisplayName}}, "email verification", text, htmlBody); err != nil {
-		log.Errorf("cip: send verification email: %+v", err)
+		applog.Error(ctx, "cip: send verification email", applog.Err(err))
 		return rerror.NewE(i18n.T("failed to resend verification email"))
 	}
 	return nil
@@ -160,7 +160,7 @@ func (a *Authenticator) GetMFAStatus(_ context.Context, _ string) (gateway.MFASt
 func (a *Authenticator) GetUser(ctx context.Context, userID string) (gateway.AuthenticatorUser, error) {
 	rec, err := a.client.GetUser(ctx, userID)
 	if err != nil {
-		log.Errorf("cip: get user: %+v", err)
+		applog.Error(ctx, "cip: get user", applog.Err(err))
 		return gateway.AuthenticatorUser{}, rerror.NewE(i18n.T("failed to get user"))
 	}
 	return toAuthenticatorUser(rec), nil
