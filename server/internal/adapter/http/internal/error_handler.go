@@ -7,8 +7,8 @@ import (
 	"github.com/go-playground/validator/v10"
 	"github.com/labstack/echo/v4"
 	"github.com/reearth/reearth-accounts/server/internal/usecase/interfaces"
+	"github.com/reearth/reearth-accounts/server/pkg/applog"
 	"github.com/reearth/reearth-accounts/server/pkg/workspace"
-	"github.com/reearth/reearthx/log"
 	"github.com/reearth/reearthx/rerror"
 )
 
@@ -60,16 +60,16 @@ func CustomHTTPErrorHandler(err error, c echo.Context) {
 		// they don't drown the real errors.
 		ctx := c.Request().Context()
 		if resp.Status >= http.StatusInternalServerError {
-			log.Errorfc(ctx, "rest: %d %s: %v", resp.Status, resp.Message, resp.Err)
+			applog.Error(ctx, "rest: request failed", applog.Status(resp.Status), applog.Reason(resp.Message), applog.Err(resp.Err))
 		} else {
-			log.Warnfc(ctx, "rest: %d %s: %v", resp.Status, resp.Message, resp.Err)
+			applog.Warn(ctx, "rest: request failed", applog.Status(resp.Status), applog.Reason(resp.Message), applog.Err(resp.Err))
 		}
 	}
 	if resp.Challenge != "" {
 		c.Response().Header().Set(echo.HeaderWWWAuthenticate, resp.Challenge)
 	}
 	if jsonErr := c.JSON(resp.Status, resp); jsonErr != nil {
-		log.Errorfc(c.Request().Context(), "rest: failed to write error response: %v", jsonErr)
+		applog.Error(c.Request().Context(), "rest: failed to write error response", applog.Err(jsonErr))
 	}
 }
 

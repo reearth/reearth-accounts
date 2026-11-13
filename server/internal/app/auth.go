@@ -11,12 +11,12 @@ import (
 	"strings"
 
 	"github.com/reearth/reearth-accounts/server/internal/adapter"
+	"github.com/reearth/reearth-accounts/server/pkg/applog"
 	"github.com/reearth/reearth-accounts/server/pkg/id"
 	"github.com/reearth/reearth-accounts/server/pkg/role"
 	"github.com/reearth/reearth-accounts/server/pkg/user"
 	"github.com/reearth/reearth-accounts/server/pkg/workspace"
 	"github.com/reearth/reearthx/appx"
-	"github.com/reearth/reearthx/log"
 	"github.com/reearth/reearthx/rerror"
 	"github.com/vektah/gqlparser/v2/ast"
 	"github.com/vektah/gqlparser/v2/parser"
@@ -50,21 +50,6 @@ type graphqlRequest struct {
 	Query         string         `json:"query"`
 	OperationName string         `json:"operationName"`
 	Variables     map[string]any `json:"variables"`
-}
-
-// bypassedFields is the set of top-level GraphQL field names that are
-// allowed without authentication. Field names must be lowercase.
-var bypassedFields = map[string]struct{}{
-	"authconfig":                   {},
-	"createverification":           {},
-	"findbyalias":                  {},
-	"findbyid":                     {},
-	"findbyids":                    {},
-	"findusersbyidswithpagination": {},
-	"signup":                       {},
-	"signupoidc":                   {},
-	"signupsso":                    {},
-	"startpasswordreset":           {},
 }
 
 func isBypassed(req *http.Request) bool {
@@ -105,7 +90,7 @@ func isBypassed(req *http.Request) bool {
 	// the majority of authenticated requests.
 	queryLower := strings.ToLower(gqlReq.Query)
 	hasCandidate := false
-	for field := range bypassedFields {
+	for field := range publicFields {
 		if strings.Contains(queryLower, field) {
 			hasCandidate = true
 			break
@@ -141,8 +126,7 @@ func isBypassed(req *http.Request) bool {
 		targetOp = doc.Operations[0]
 	}
 
-	// Require every top-level field in the selected operation to be in the
-	// bypass allowlist.
+	// Require every top-level field in the selected operation to be @public.
 	if len(targetOp.SelectionSet) == 0 {
 		return false
 	}
@@ -151,7 +135,7 @@ func isBypassed(req *http.Request) bool {
 		if !ok {
 			return false
 		}
-		if _, allowed := bypassedFields[strings.ToLower(field.Name)]; !allowed {
+		if _, allowed := publicFields[strings.ToLower(field.Name)]; !allowed {
 			return false
 		}
 	}
@@ -175,11 +159,11 @@ func mockAuthMiddleware(cfg *ServerConfig) func(http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
 			ctx := req.Context()
 
-			log.Debugfc(ctx, "[mockAuthMiddleware] Using mock authentication")
+			applog.Debug(ctx, "[mockAuthMiddleware] Using mock authentication")
 
 			// bypass some queries & mutations
 			if isBypassed(req) {
-				log.Debugfc(ctx, "[mockAuthMiddleware] Skipping auth for signup mutation")
+				applog.Debug(ctx, "[mockAuthMiddleware] Skipping auth for signup mutation")
 				next.ServeHTTP(w, req.WithContext(ctx))
 				return
 			}
@@ -195,7 +179,7 @@ func mockAuthMiddleware(cfg *ServerConfig) func(http.Handler) http.Handler {
 					usr, err = cfg.Repos.User.FindByName(ctx, debugUser)
 				}
 				if err != nil {
-					log.Warnfc(ctx, "[mockAuthMiddleware] failed to find debug user: %s, error: %s", debugUser, err.Error())
+					applog.Warn(ctx, "[mockAuthMiddleware] failed to find debug user", applog.Err(err))
 					usr = nil
 				}
 			}
@@ -204,19 +188,19 @@ func mockAuthMiddleware(cfg *ServerConfig) func(http.Handler) http.Handler {
 			if usr == nil {
 				usr, err = cfg.Repos.User.FindByName(ctx, FIXED_MOCK_USERNAME)
 				if err != nil {
-					log.Errorfc(ctx, "[mockAuthMiddleware] failed to find demo user by name: %s, error: %s", FIXED_MOCK_USERNAME, err.Error())
+					applog.Error(ctx, "[mockAuthMiddleware] failed to find demo user by name", applog.Err(err))
 					http.Error(w, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
 					return
 				}
 			}
 
-			log.Debugfc(ctx, "[mockAuthMiddleware] Loaded demo user: %s (%s)", usr.Name(), usr.ID())
+			applog.Debug(ctx, "[mockAuthMiddleware] Loaded demo user", applog.UserID(usr.ID()))
 
 			if usr != nil {
 				ctx = adapter.AttachUser(ctx, usr)
 				op, err := generateUserOperator(ctx, cfg, usr)
 				if err != nil {
-					log.Errorfc(ctx, "[mockAuthMiddleware] failed to generate user operator: %s, error: %s", usr.ID(), err.Error())
+					applog.Error(ctx, "[mockAuthMiddleware] failed to generate user operator", applog.UserID(usr.ID()), applog.Err(err))
 					http.Error(w, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
 					return
 				}
@@ -235,7 +219,7 @@ func identityProviderAuthMiddleware(cfg *ServerConfig) func(http.Handler) http.H
 
 			// bypass some queries & mutations
 			if isBypassed(req) {
-				log.Debugfc(ctx, "[authMiddleware] Skipping auth for signup mutation")
+				applog.Debug(ctx, "[authMiddleware] Skipping auth for signup mutation")
 				next.ServeHTTP(w, req.WithContext(ctx))
 				return
 			}
@@ -263,17 +247,17 @@ func identityProviderAuthMiddleware(cfg *ServerConfig) func(http.Handler) http.H
 				if newCtx, dai := injectDebugAuthInfo(ctx, req); dai != nil {
 					ctx = newCtx
 					ai = *dai
-					log.Debugfc(ctx, "[authMiddleware] Debug auth info injected: sub=%s", ai.Sub)
+					applog.Debug(ctx, "[authMiddleware] Debug auth info injected")
 				}
 				usr = isDebugUserExists(req, cfg, ctx)
 				if usr != nil {
-					log.Debugfc(ctx, "[authMiddleware] Debug user header loaded: %s (%s)", usr.Name(), usr.ID())
+					applog.Debug(ctx, "[authMiddleware] Debug user header loaded", applog.UserID(usr.ID()))
 				}
 			}
 
 			// Guard: Handle empty sub (only if user not already loaded via debug header)
 			if usr == nil && ai.Sub == "" {
-				log.Warnfc(ctx, "[authMiddleware] Rejecting request with empty sub")
+				applog.Warn(ctx, "[authMiddleware] Rejecting request with empty sub")
 				http.Error(w, http.StatusText(http.StatusUnauthorized), http.StatusUnauthorized)
 				return
 			}
@@ -284,19 +268,19 @@ func identityProviderAuthMiddleware(cfg *ServerConfig) func(http.Handler) http.H
 
 				if err != nil {
 					if errors.Is(err, rerror.ErrNotFound) {
-						log.Warnfc(ctx, "[authMiddleware] User not found for sub=%s", ai.Sub)
+						applog.Warn(ctx, "[authMiddleware] User not found")
 						http.Error(w, http.StatusText(http.StatusUnauthorized), http.StatusUnauthorized)
 						return
 					}
 
 					// Unexpected database error
-					log.Errorfc(ctx, "[authMiddleware] Database error finding user by sub=%s: %v", ai.Sub, err)
+					applog.Error(ctx, "[authMiddleware] Database error finding user by", applog.Err(err))
 					http.Error(w, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
 					return
 				}
 
 				usr = existingUsr
-				log.Debugfc(ctx, "[authMiddleware] User loaded by sub: %s (%s)", usr.Name(), usr.ID())
+				applog.Debug(ctx, "[authMiddleware] User loaded by sub", applog.UserID(usr.ID()))
 			}
 
 			if usr != nil {
@@ -304,15 +288,15 @@ func identityProviderAuthMiddleware(cfg *ServerConfig) func(http.Handler) http.H
 
 				op, err := generateUserOperator(ctx, cfg, usr)
 				if err != nil {
-					log.Errorfc(ctx, "[authMiddleware] Failed to generate operator for user %s: %v", usr.ID(), err)
+					applog.Error(ctx, "[authMiddleware] Failed to generate operator for user", applog.UserID(usr.ID()), applog.Err(err))
 					http.Error(w, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
 					return
 				}
 
 				ctx = adapter.AttachOperator(ctx, op)
-				log.Debugfc(ctx, "[authMiddleware] User and operator attached to context: %s", usr.ID())
+				applog.Debug(ctx, "[authMiddleware] User and operator attached to context", applog.UserID(usr.ID()))
 			} else {
-				log.Debugfc(ctx, "[authMiddleware] Proceeding without user/operator in context (debug mode)")
+				applog.Debug(ctx, "[authMiddleware] Proceeding without user/operator in context (debug mode)")
 			}
 
 			next.ServeHTTP(w, req.WithContext(ctx))

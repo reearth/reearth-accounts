@@ -1,8 +1,9 @@
 package main
 
 import (
+	"context"
 	"github.com/reearth/reearth-accounts/server/internal/admin/di"
-	"github.com/reearth/reearthx/log"
+	"github.com/reearth/reearth-accounts/server/pkg/applog"
 )
 
 // @title						Re:Earth Accounts Admin API
@@ -15,7 +16,7 @@ import (
 func main() {
 	server, cleanup, err := di.InitializeEcho()
 	if err != nil {
-		log.Fatalf("failed to initialize admin api: %v", err)
+		applog.Fatal(context.Background(), "failed to initialize admin api", applog.Err(err))
 	}
 	defer cleanup()
 

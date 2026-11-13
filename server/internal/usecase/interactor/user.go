@@ -14,6 +14,7 @@ import (
 	"github.com/reearth/reearth-accounts/server/internal/usecase/gateway"
 	"github.com/reearth/reearth-accounts/server/internal/usecase/interfaces"
 	"github.com/reearth/reearth-accounts/server/internal/usecase/repo"
+	"github.com/reearth/reearth-accounts/server/pkg/applog"
 	"github.com/reearth/reearth-accounts/server/pkg/id"
 	"github.com/reearth/reearth-accounts/server/pkg/pagination"
 	"github.com/reearth/reearth-accounts/server/pkg/permittable"
@@ -21,7 +22,6 @@ import (
 	"github.com/reearth/reearth-accounts/server/pkg/user"
 	"github.com/reearth/reearth-accounts/server/pkg/workspace"
 	"github.com/reearth/reearthx/i18n"
-	"github.com/reearth/reearthx/log"
 	"github.com/reearth/reearthx/mailer"
 	"github.com/reearth/reearthx/rerror"
 )
@@ -921,7 +921,7 @@ func (i *User) UpdateUserBySub(ctx context.Context, sub string, name *string, op
 		if tn == "" || tn == oldName {
 			ws.Rename(*name)
 			if err := i.repos.Workspace.Save(ctx, ws); err != nil {
-				log.Warnfc(ctx, "UpdateUserBySub: workspace rename failed (non-fatal): %v", err)
+				applog.Warn(ctx, "UpdateUserBySub: workspace rename failed (non-fatal)", applog.Err(err))
 			}
 		}
 	}

@@ -8,7 +8,7 @@ import (
 	"github.com/reearth/reearth-accounts/server/internal/admin/auth/session"
 	"github.com/reearth/reearth-accounts/server/internal/admin/presentation/internal"
 	"github.com/reearth/reearth-accounts/server/pkg/adminuser"
-	"github.com/reearth/reearthx/log"
+	"github.com/reearth/reearth-accounts/server/pkg/applog"
 	"github.com/reearth/reearthx/rerror"
 )
 
@@ -36,7 +36,7 @@ func NewRequireApprovedMiddleware(sess *session.Manager, repo adminuser.Repo) Re
 				// An empty signing secret is a server misconfiguration, not a
 				// client auth failure — surface it as 500 so it isn't hidden.
 				if errors.Is(err, session.ErrEmptySecret) {
-					log.Errorfc(ctx, "[admin] session secret not configured: %v", err)
+					applog.Error(ctx, "[admin] session secret not configured", applog.Err(err))
 					return echo.NewHTTPError(http.StatusInternalServerError)
 				}
 				return echo.NewHTTPError(http.StatusUnauthorized, "unauthorized")
@@ -47,7 +47,7 @@ func NewRequireApprovedMiddleware(sess *session.Manager, repo adminuser.Repo) Re
 				if errors.Is(err, rerror.ErrNotFound) {
 					return echo.NewHTTPError(http.StatusUnauthorized, "unauthorized")
 				}
-				log.Errorfc(ctx, "[admin] error loading admin user: %v", err)
+				applog.Error(ctx, "[admin] error loading admin user", applog.Err(err))
 				return echo.NewHTTPError(http.StatusInternalServerError)
 			}
 
