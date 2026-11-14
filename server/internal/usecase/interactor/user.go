@@ -930,8 +930,9 @@ func (i *User) UpdateUserBySub(ctx context.Context, sub string, name *string, op
 }
 
 // SetPlatformRolesBySub replaces a user's global platform roles, looked up by Firebase sub.
-// The caller must hold the maintainer role (see checkMaintainerPermission). An empty
-// roleNames slice clears all platform roles.
+// The caller must hold at least the maintainer role. Granting the owner role additionally
+// requires the caller to already hold the owner role (maintainer cannot self-grant owner).
+// A caller may not target their own sub. An empty roleNames slice clears all platform roles.
 func (i *User) SetPlatformRolesBySub(ctx context.Context, sub string, roleNames []string, operator *workspace.Operator) error {
 	if operator == nil || operator.User == nil {
 		return interfaces.ErrInvalidOperator
@@ -945,14 +946,32 @@ func (i *User) SetPlatformRolesBySub(ctx context.Context, sub string, roleNames 
 		return err
 	}
 
-	// Resolve role names → IDs
+	// A caller must not target their own account to prevent self-promotion.
+	if u.ID() == *operator.User {
+		return interfaces.ErrCannotSelfPromote
+	}
+
+	// Resolve role names → IDs, and flag if the owner role is being granted.
 	rids := make(id.RoleIDList, 0, len(roleNames))
+	grantingOwner := false
 	for _, name := range roleNames {
 		r, err := i.repos.Role.FindByName(ctx, name)
 		if err != nil {
 			return err
 		}
 		rids = append(rids, r.ID())
+		if r.Name() == role.RoleOwner.String() {
+			grantingOwner = true
+		}
+	}
+
+	// Granting the owner role is restricted to callers who already hold it.
+	// Maintainers may manage most roles but cannot elevate themselves or others
+	// to owner, consistent with the per-workspace member role policy.
+	if grantingOwner {
+		if err := i.checkOwnerRolePermission(ctx, operator); err != nil {
+			return err
+		}
 	}
 
 	// Find or create the permittable record for this user
@@ -969,4 +988,29 @@ func (i *User) SetPlatformRolesBySub(ctx context.Context, sub string, roleNames 
 
 	p.EditRoleIDs(rids)
 	return i.repos.Permittable.Save(ctx, *p)
+}
+
+// checkOwnerRolePermission verifies that the operator holds the global 'owner'
+// platform role by inspecting their Permittable directly. It is used for
+// operations that maintainers should not be able to perform even though the
+// general checkMaintainerPermission (and the matching Cerbos ActionManage
+// policy) admits maintainers for most admin actions.
+func (i *User) checkOwnerRolePermission(ctx context.Context, operator *workspace.Operator) error {
+	p, err := i.repos.Permittable.FindByUserID(ctx, *operator.User)
+	if err != nil && !errors.Is(err, rerror.ErrNotFound) {
+		return err
+	}
+	if p == nil {
+		return interfaces.ErrPermissionDenied
+	}
+	roles, err := i.repos.Role.FindByIDs(ctx, p.RoleIDs())
+	if err != nil {
+		return err
+	}
+	for _, r := range roles {
+		if r.Name() == role.RoleOwner.String() {
+			return nil
+		}
+	}
+	return interfaces.ErrPermissionDenied
 }
