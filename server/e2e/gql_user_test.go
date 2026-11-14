@@ -446,7 +446,7 @@ func TestUpdateMe_Website(t *testing.T) {
 func TestUpdateMe_PhotoURL(t *testing.T) {
 	e, r := StartServer(t, &app.Config{StorageIsLocal: true}, true, baseSeederOneUser)
 
-	query := `mutation { updateMe(input: {photoURL: "https://example.com/photo.jpg"}){ me{ id metadata { photoURL } } }}`
+	query := `mutation { updateMe(input: {photoURL: "users/me/photo.jpg"}){ me{ id metadata { photoURL } } }}`
 	request := GraphQLRequest{
 		Query: query,
 	}
@@ -458,12 +458,16 @@ func TestUpdateMe_PhotoURL(t *testing.T) {
 		WithHeader("Content-Type", "application/json").
 		WithHeader("X-Reearth-Debug-User", uId.String()).
 		WithBytes(jsonData).Expect().Status(http.StatusOK).JSON().Object().Value("data").Object().Value("updateMe").Object().Value("me").Object()
-	assertSignedPhoto(t, o.Value("metadata").Object().Value("photoURL").String().Raw())
+	assertSigned(t, o.Value("metadata").Object().Value("photoURL").String().Raw(), "users/me/photo.jpg")
+
+	u, err := r.User.FindByID(context.Background(), uId)
+	assert.NoError(t, err)
+	assert.Equal(t, "users/me/photo.jpg", u.Metadata().PhotoURL())
 
 	// Verify workspace metadata is also updated (personal workspace)
 	ws, err := r.Workspace.FindByID(context.Background(), wId)
 	assert.NoError(t, err)
-	assert.Equal(t, "https://example.com/photo.jpg", ws.Metadata().PhotoURL())
+	assert.Equal(t, "users/me/photo.jpg", ws.Metadata().PhotoURL())
 }
 
 func TestUpdateMe_AllMetadataFields(t *testing.T) {
@@ -474,7 +478,7 @@ func TestUpdateMe_AllMetadataFields(t *testing.T) {
 			alias: "fullalias",
 			description: "Full description",
 			website: "https://fullsite.com",
-			photoURL: "https://fullsite.com/avatar.png"
+			photoURL: "users/me/avatar.png"
 		}){
 			me{
 				id
@@ -498,11 +502,12 @@ func TestUpdateMe_AllMetadataFields(t *testing.T) {
 	o.Value("alias").String().IsEqual("fullalias")
 	o.Value("metadata").Object().Value("description").String().IsEqual("Full description")
 	o.Value("metadata").Object().Value("website").String().IsEqual("https://fullsite.com")
-	assertSignedPhoto(t, o.Value("metadata").Object().Value("photoURL").String().Raw())
+	assertSigned(t, o.Value("metadata").Object().Value("photoURL").String().Raw(), "users/me/avatar.png")
 
 	// Verify user in database
 	u, err := r.User.FindByID(context.Background(), uId)
 	assert.NoError(t, err)
+	assert.Equal(t, "users/me/avatar.png", u.Metadata().PhotoURL())
 	assert.Equal(t, "fullalias", u.Alias())
 	assert.Equal(t, "Full description", u.Metadata().Description())
 
@@ -511,7 +516,7 @@ func TestUpdateMe_AllMetadataFields(t *testing.T) {
 	assert.NoError(t, err)
 	assert.Equal(t, "Full description", ws.Metadata().Description())
 	assert.Equal(t, "https://fullsite.com", ws.Metadata().Website())
-	assert.Equal(t, "https://fullsite.com/avatar.png", ws.Metadata().PhotoURL())
+	assert.Equal(t, "users/me/avatar.png", ws.Metadata().PhotoURL())
 }
 
 func TestUpdateMe_NameUpdatesWorkspace(t *testing.T) {
