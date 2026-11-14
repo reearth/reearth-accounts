@@ -51,3 +51,18 @@ func TestPhotoSigner_Sign(t *testing.T) {
 		assert.Empty(t, got)
 	})
 }
+
+func TestPhotoSigner_SignAll(t *testing.T) {
+	s := gatewaymock.NewMockStorage(gomock.NewController(t))
+	s.EXPECT().GetSignedURL(gomock.Any(), "users/a.png").Return("https://signed/a", nil)
+	s.EXPECT().GetSignedURL(gomock.Any(), "users/b.png").Return("users/b.png", errors.New("gcs down"))
+	p, err := NewPhotoSigner(s)
+	require.NoError(t, err)
+
+	a, b, empty := "users/a.png", "users/b.png", ""
+	p.SignAll(context.Background(), []*string{&a, &b, &empty, nil})
+
+	assert.Equal(t, "https://signed/a", a)
+	assert.Empty(t, b)
+	assert.Empty(t, empty)
+}

@@ -5,7 +5,11 @@ import (
 	"errors"
 
 	"github.com/reearth/reearth-accounts/server/internal/usecase/gateway"
+	"github.com/reearth/reearth-accounts/server/pkg/applog"
+	"github.com/sourcegraph/conc/pool"
 )
+
+const maxSignConcurrency = 10
 
 // PhotoSigner signs stored photo paths for both APIs. Build it with
 // NewPhotoSigner.
@@ -31,4 +35,23 @@ func (s PhotoSigner) Sign(ctx context.Context, stored string) (string, error) {
 		return "", err
 	}
 	return signed, nil
+}
+
+// SignAll replaces each stored photo in place with its signed URL. A failure
+// is logged and leaves that photo empty rather than failing the response.
+func (s PhotoSigner) SignAll(ctx context.Context, photos []*string) {
+	p := pool.New().WithMaxGoroutines(maxSignConcurrency)
+	for _, photo := range photos {
+		if photo == nil || *photo == "" {
+			continue
+		}
+		p.Go(func() {
+			signed, err := s.Sign(ctx, *photo)
+			if err != nil {
+				applog.Error(ctx, "failed to sign photo url", applog.Err(err))
+			}
+			*photo = signed
+		})
+	}
+	p.Wait()
 }

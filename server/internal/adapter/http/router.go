@@ -81,7 +81,7 @@ func RegisterRESTRouter(e *echo.Echo, cfg RouterConfig) {
 	api := e.Group("/api", base...)
 
 	// --- Auth ---
-	ah := handlers.NewAuthHandler(cfg.AuthConfigProvider)
+	ah := handlers.NewAuthHandler(cfg.AuthConfigProvider, cfg.Photos)
 	api.GET("/auth/config", ah.Config)            // public
 	api.POST("/auth/logout", ah.Logout, userOnly) // JWT
 

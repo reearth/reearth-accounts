@@ -19,14 +19,6 @@ func (r *queryResolver) Me(ctx context.Context) (*gqlmodel.Me, error) {
 		return nil, nil
 	}
 
-	if u.Metadata().PhotoURL() != "" {
-		signedURL, err := r.Photos.Sign(ctx, u.Metadata().PhotoURL())
-		if err != nil {
-			return nil, err
-		}
-		u.Metadata().SetPhotoURL(signedURL)
-	}
-
 	return gqlmodel.ToMe(u), nil
 }
 

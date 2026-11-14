@@ -90,6 +90,7 @@ func newExpandEcho(t *testing.T, savePersonal bool) expandFixture {
 
 	storage := gatewaymock.NewMockStorage(gomock.NewController(t))
 	storage.EXPECT().GetSignedURL(gomock.Any(), "workspaces/p.png").Return("https://signed/p", nil).AnyTimes()
+	storage.EXPECT().GetSignedURL(gomock.Any(), "users/other.png").Return("https://signed/other", nil).AnyTimes()
 
 	users := &countingUserUsecase{User: interactor.NewUser(db, nil, nil, "", "")}
 	uc := &interfaces.Container{User: users, Workspace: interactor.NewWorkspace(db, nil, nil)}
@@ -170,7 +171,7 @@ func graphqlUserFields(t *testing.T) []string {
 }
 
 // assertEmbeddedUsers checks every member carries its user with exactly the
-// GraphQL User fields: only the caller's email, the stored photo path, and a
+// GraphQL User fields: only the caller's email, the signed photo URL, and a
 // soft-deleted user shown like a live one.
 func assertEmbeddedUsers(t *testing.T, f expandFixture, w map[string]json.RawMessage) {
 	t.Helper()
@@ -188,7 +189,7 @@ func assertEmbeddedUsers(t *testing.T, f expandFixture, w map[string]json.RawMes
 	other := byID[f.other.ID().String()]
 	assert.ElementsMatch(t, graphqlUserFields(t), slices.Collect(maps.Keys(other)))
 	assert.Equal(t, "", other["email"])
-	assert.Equal(t, "users/other.png", other["metadata"].(map[string]any)["photo_url"])
+	assert.Equal(t, "https://signed/other", other["metadata"].(map[string]any)["photo_url"])
 
 	assert.Equal(t, "me@example.com", byID[f.me.ID().String()]["email"])
 

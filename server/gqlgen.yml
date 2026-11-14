@@ -23,6 +23,10 @@ models:
         resolver: true
   User:
     model: github.com/reearth/reearth-accounts/server/internal/adapter/gql/gqlmodel.User
+  UserMetadata:
+    fields:
+      photoURL:
+        resolver: true
   WorkspaceUserMember:
     fields:
       user:

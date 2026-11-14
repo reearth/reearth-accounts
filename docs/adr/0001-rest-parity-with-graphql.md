@@ -59,9 +59,9 @@ Turn the window on only after the IdP emits the claim and the web client can for
 
 ### 6. REST returns the same shapes as GraphQL
 
-1. **Photo URLs.** REST signs exactly where GraphQL signs: `GET /api/users/me` (and fails if signing fails) and every workspace response (empty on failure). The other `me` routes return the stored value, as their mutations do. Both APIs sign through one `adapter.PhotoSigner`. Signed URLs expire, so clients must not store them.
+1. **Photo URLs.** Both APIs sign every user and workspace photo they return, through one `adapter.PhotoSigner`. GraphQL signs `UserMetadata.photoURL` in one field resolver, so `me`, every query that returns a `User`, and member users all get a signed URL. REST signs in its response builders. A signing failure logs and returns an empty photo, never the stored path. Signed URLs expire, so clients must not store them. (Amended by the PR that signed user photos on every route. It replaced the rule that only `me` signed the user photo and failed when signing failed.)
 2. **Members.** REST drops members whose user no longer exists, as GraphQL does. GraphQL keeps omitting integration members, because `pkg/gqlclient`, which other services use, reads every member as a user. REST keeps returning them. This difference is intentional.
-3. **Expansions.** `GET /api/users/me?expand=my_workspace` and `?expand=members.user` on workspace routes are opt-in. An embedded member user has only the fields GraphQL `User` exposes, follows the email rule, and carries the stored photo path, as GraphQL does. An unknown value returns `400`.
+3. **Expansions.** `GET /api/users/me?expand=my_workspace` and `?expand=members.user` on workspace routes are opt-in. An embedded member user has only the fields GraphQL `User` exposes, follows the email rule, and carries a signed photo URL, as GraphQL does. An unknown value returns `400`.
 4. **`checkPermission` without a user.** Over HTTP both APIs already answer `401`. The unreachable GraphQL fallback now returns `ErrInvalidOperator`, as other resolvers do.
 
 `make swag` excludes the admin API, whose `internal` package collides with `adapter/http/internal`, so the spec regenerates again.
@@ -70,7 +70,7 @@ Turn the window on only after the IdP emits the claim and the web client can for
 
 - REST clients that read another user's email from the lookup routes get an empty string. LINKS-Veda reads it on its admin teams page, its admin user search and its team page, so it must switch its admin pages to `GET /api/users/all` and decide what its team page shows before decision 2 deploys, as with #374.
 - Maintainers can no longer demote or remove owners.
-- REST `photo_url` on `GET /api/users/me` and workspaces is a signed URL that expires.
+- `photoURL` and `photo_url` on every user and workspace response are signed URLs that expire. A service that signs the value itself, such as reearth-dashboard, must stop doing so before the change deploys.
 - REST stops returning members whose user was deleted. GraphQL does not change.
 - Two new optional settings, `REEARTH_ACCOUNTS_MFA_RECOVERY_MAX_AUTH_AGE` and `REEARTH_ACCOUNTS_AUTH_TIME_CLAIM`, are off by default.
 - No DDL or DML. Each implementing PR can be reverted alone.
