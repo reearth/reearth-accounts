@@ -1,6 +1,6 @@
 module github.com/reearth/reearth-accounts/server
 
-go 1.24.10
+go 1.26.2
 
 require (
 	cloud.google.com/go/compute/metadata v0.9.0
@@ -31,7 +31,7 @@ require (
 	github.com/labstack/echo/v4 v4.13.4
 	github.com/labstack/gommon v0.4.2
 	github.com/oklog/ulid v1.3.1
-	github.com/reearth/reearthx v0.0.0-20251202081949-5abca579aec6
+	github.com/reearth/reearthx v0.0.0-20261114071312-942fc8d07349
 	github.com/samber/lo v1.52.0
 	github.com/sourcegraph/conc v0.3.0
 	github.com/square/mongo-lock v0.0.0-20230808145049-cfcf499f6bf0
@@ -177,6 +177,7 @@ require (
 	github.com/josharian/intern v1.0.0 // indirect
 	github.com/klauspost/compress v1.18.1 // indirect
 	github.com/klauspost/cpuid/v2 v2.3.0 // indirect
+	github.com/labstack/echo/v5 v5.1.0 // indirect
 	github.com/leodido/go-urn v1.4.0 // indirect
 	github.com/lestrrat-go/blackmagic v1.0.4 // indirect
 	github.com/lestrrat-go/dsig v1.0.0 // indirect

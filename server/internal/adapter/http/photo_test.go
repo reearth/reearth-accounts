@@ -217,3 +217,14 @@ func TestREST_UserLookupsSignPhotoURL(t *testing.T) {
 		f.noPhoto.ID().String(): "",
 	}, got)
 }
+
+func TestREST_UpdateMeRejectsAbsolutePhotoURL(t *testing.T) {
+	storage := gatewaymock.NewMockStorage(gomock.NewController(t))
+	e, _ := newPhotoEcho(t, storage, "users/me.png")
+
+	req := httptest.NewRequest(http.MethodPatch, "/api/users/me", strings.NewReader(`{"photo_url":"https://example.com/photo.jpg"}`))
+	req.Header.Set(echo.HeaderContentType, echo.MIMEApplicationJSON)
+	rec := httptest.NewRecorder()
+	e.ServeHTTP(rec, req)
+	assert.Equal(t, http.StatusBadRequest, rec.Code, rec.Body.String())
+}

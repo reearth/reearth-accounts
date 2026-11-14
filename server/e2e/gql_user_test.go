@@ -470,6 +470,29 @@ func TestUpdateMe_PhotoURL(t *testing.T) {
 	assert.Equal(t, "users/me/photo.jpg", ws.Metadata().PhotoURL())
 }
 
+func TestUpdateMe_RejectsAbsolutePhotoURL(t *testing.T) {
+	e, r := StartServer(t, &app.Config{}, true, baseSeederOneUser)
+
+	jsonData, err := json.Marshal(GraphQLRequest{
+		Query: `mutation { updateMe(input: {photoURL: "https://example.com/photo.jpg"}){ me{ id } }}`,
+	})
+	assert.NoError(t, err)
+
+	e.POST("/api/graphql").
+		WithHeader("authorization", "Bearer test").
+		WithHeader("Content-Type", "application/json").
+		WithHeader("X-Reearth-Debug-User", uId.String()).
+		WithBytes(jsonData).Expect().Status(http.StatusOK).JSON().Object().
+		Value("errors").Array().NotEmpty()
+
+	u, err := r.User.FindByID(context.Background(), uId)
+	assert.NoError(t, err)
+	assert.Empty(t, u.Metadata().PhotoURL())
+	ws, err := r.Workspace.FindByID(context.Background(), wId)
+	assert.NoError(t, err)
+	assert.Empty(t, ws.Metadata().PhotoURL())
+}
+
 func TestUpdateMe_AllMetadataFields(t *testing.T) {
 	e, r := StartServer(t, &app.Config{StorageIsLocal: true}, true, baseSeederOneUser)
 

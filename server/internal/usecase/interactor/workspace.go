@@ -298,14 +298,10 @@ func (i *Workspace) Update(ctx context.Context, param interfaces.UpdateWorkspace
 			metadata.SetWebsite(*param.Website)
 		}
 
-		// Handle photo URL
-		// Note: Store the path, not the signed URL. The signed URL is generated on-demand in ToWorkspace converter.
 		if param.PhotoURL != nil {
-			photoURL := strings.TrimSpace(*param.PhotoURL)
-			normalizedPhotoURL := strings.ToLower(photoURL)
-			// Reject full URLs - only paths should be stored
-			if strings.HasPrefix(normalizedPhotoURL, "http://") || strings.HasPrefix(normalizedPhotoURL, "https://") {
-				return nil, interfaces.ErrInvalidPhotoURL
+			photoURL, err := photoPath(*param.PhotoURL)
+			if err != nil {
+				return nil, err
 			}
 			metadata.SetPhotoURL(photoURL)
 		}
