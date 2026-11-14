@@ -416,7 +416,8 @@ func applyPermittablesToResponses(ctx context.Context, c echo.Context, userRespo
 	}
 
 	// Build workspace info map (ULID → {Name, Alias}) for all workspaces referenced
-	// in the permittable workspace roles.
+	// in the permittable workspace roles. The fetch is batched in chunks of
+	// maxFetchWorkspaceIDs (100) so the cap never silently drops workspace names.
 	wsInfo := map[string]httpmodel.WorkspaceInfo{}
 	wsIDSet := map[string]bool{}
 	for _, p := range perms {
@@ -432,7 +433,17 @@ func applyPermittablesToResponses(ctx context.Context, c echo.Context, userRespo
 				wsIDs = append(wsIDs, wid)
 			}
 		}
-		if wsList, err := httpinternal.Usecases(c).Workspace.Fetch(ctx, wsIDs, nil); err == nil {
+		const batchSize = 100
+		for i := 0; i < len(wsIDs); i += batchSize {
+			end := i + batchSize
+			if end > len(wsIDs) {
+				end = len(wsIDs)
+			}
+			wsList, err := httpinternal.Usecases(c).Workspace.Fetch(ctx, wsIDs[i:end], nil)
+			if err != nil {
+				log.Errorfc(ctx, "failed to fetch workspace info batch [%d:%d]: %v", i, end, err)
+				continue
+			}
 			for _, ws := range wsList {
 				wsInfo[ws.ID().String()] = httpmodel.WorkspaceInfo{
 					Name:  ws.Name(),
