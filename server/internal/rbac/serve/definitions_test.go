@@ -4,6 +4,7 @@ import (
 	"os"
 	"testing"
 
+	"github.com/reearth/reearth-accounts/server/internal/rbac/policyrules"
 	"github.com/reearth/reearthx/cerbos/generator"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -22,7 +23,7 @@ func matrix() map[string]map[string][]string {
 
 func TestGeneratePolicies(t *testing.T) {
 	dir := t.TempDir()
-	require.NoError(t, generator.GeneratePolicies(ServiceName, DefineResources, dir))
+	require.NoError(t, generator.GeneratePolicies(ServiceName, policyrules.From(ServiceName, DefineResources), dir))
 
 	entries, err := os.ReadDir(dir)
 	require.NoError(t, err)

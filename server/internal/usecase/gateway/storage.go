@@ -1,4 +1,4 @@
-//go:generate go run go.uber.org/mock/mockgen@v0.5.1 -source $GOFILE -destination ./mock/mock_storage.go -package mock -mock_names Service=MockStorageGateway
+//go:generate go run go.uber.org/mock/mockgen@v0.6.0 -source $GOFILE -destination ./mock/mock_storage.go -package mock -mock_names Service=MockStorageGateway
 package gateway
 
 import (
