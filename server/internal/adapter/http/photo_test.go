@@ -126,7 +126,7 @@ func TestREST_OtherMeRoutesReturnStoredPhotoURL(t *testing.T) {
 	routes := []struct {
 		method, path, body, want string
 	}{
-		{http.MethodPatch, "/api/users/me", `{"photo_url":"https://example.com/photo.jpg"}`, "https://example.com/photo.jpg"},
+		{http.MethodPatch, "/api/users/me", `{"photo_url":"users/new.png"}`, "users/new.png"},
 		{http.MethodDelete, "/api/users/me/auths/auth0", "", "users/me.png"},
 		{http.MethodPost, "/api/auth/logout", "", "users/me.png"},
 	}
@@ -182,4 +182,15 @@ func TestREST_WorkspaceSigningErrorEmptiesPhotoURL(t *testing.T) {
 		f.withPhoto.ID().String(): "",
 		f.noPhoto.ID().String():   "",
 	}, photosByID(res))
+}
+
+func TestREST_UpdateMeRejectsAbsolutePhotoURL(t *testing.T) {
+	storage := gatewaymock.NewMockStorage(gomock.NewController(t))
+	e, _ := newPhotoEcho(t, storage, "users/me.png")
+
+	req := httptest.NewRequest(http.MethodPatch, "/api/users/me", strings.NewReader(`{"photo_url":"https://example.com/photo.jpg"}`))
+	req.Header.Set(echo.HeaderContentType, echo.MIMEApplicationJSON)
+	rec := httptest.NewRecorder()
+	e.ServeHTTP(rec, req)
+	assert.Equal(t, http.StatusBadRequest, rec.Code, rec.Body.String())
 }

@@ -192,6 +192,13 @@ func (i *User) UpdateMe(ctx context.Context, p interfaces.UpdateMeParam, operato
 	if operator.User == nil {
 		return nil, interfaces.ErrInvalidOperator
 	}
+	if p.PhotoURL != nil {
+		photoURL, err := photoPath(*p.PhotoURL)
+		if err != nil {
+			return nil, err
+		}
+		p.PhotoURL = &photoURL
+	}
 
 	return Run1(ctx, operator, i.repos, Usecase().Transaction(), func(ctx context.Context) (*user.User, error) {
 		if p.Password != nil {

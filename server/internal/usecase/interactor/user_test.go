@@ -611,16 +611,16 @@ func TestUser_UpdateMe(t *testing.T) {
 				return u, w
 			},
 			param: interfaces.UpdateMeParam{
-				PhotoURL: strPtr("https://example.com/photo.jpg"),
+				PhotoURL: strPtr("users/photo.jpg"),
 			},
 			wantErr: nil,
 			verify: func(t *testing.T, r *repo.Container, u *user.User) {
 				// Verify user metadata is updated
-				assert.Equal(t, "https://example.com/photo.jpg", u.Metadata().PhotoURL())
+				assert.Equal(t, "users/photo.jpg", u.Metadata().PhotoURL())
 				// Verify workspace metadata is also updated
 				ws, err := r.Workspace.FindByID(context.Background(), u.Workspace())
 				assert.NoError(t, err)
-				assert.Equal(t, "https://example.com/photo.jpg", ws.Metadata().PhotoURL())
+				assert.Equal(t, "users/photo.jpg", ws.Metadata().PhotoURL())
 			},
 		},
 		{
@@ -644,20 +644,20 @@ func TestUser_UpdateMe(t *testing.T) {
 			param: interfaces.UpdateMeParam{
 				Description: strPtr("Full description"),
 				Website:     strPtr("https://mysite.com"),
-				PhotoURL:    strPtr("https://mysite.com/avatar.png"),
+				PhotoURL:    strPtr("users/avatar.png"),
 			},
 			wantErr: nil,
 			verify: func(t *testing.T, r *repo.Container, u *user.User) {
 				// Verify user metadata is updated
 				assert.Equal(t, "Full description", u.Metadata().Description())
 				assert.Equal(t, "https://mysite.com", u.Metadata().Website())
-				assert.Equal(t, "https://mysite.com/avatar.png", u.Metadata().PhotoURL())
+				assert.Equal(t, "users/avatar.png", u.Metadata().PhotoURL())
 				// Verify workspace metadata is also updated
 				ws, err := r.Workspace.FindByID(context.Background(), u.Workspace())
 				assert.NoError(t, err)
 				assert.Equal(t, "Full description", ws.Metadata().Description())
 				assert.Equal(t, "https://mysite.com", ws.Metadata().Website())
-				assert.Equal(t, "https://mysite.com/avatar.png", ws.Metadata().PhotoURL())
+				assert.Equal(t, "users/avatar.png", ws.Metadata().PhotoURL())
 			},
 		},
 		{
@@ -2203,4 +2203,40 @@ func TestUser_DeactivateAndRestore(t *testing.T) {
 		_, err = uc.Restore(ctx, uid, &workspace.Operator{})
 		assert.ErrorIs(t, err, interfaces.ErrInvalidOperator)
 	})
+}
+
+func TestUser_UpdateMe_RejectsAbsolutePhotoURL(t *testing.T) {
+	for _, photo := range []string{"https://example.com/a.png", "http://example.com/a.png", " HTTPS://example.com/a.png"} {
+		t.Run(photo, func(t *testing.T) {
+			ctx := context.Background()
+			r := memory.New()
+			uid, wid := id.NewUserID(), id.NewWorkspaceID()
+			md := user.MetadataFrom("users/old.png", "", "", user.NewMetadata().Lang(), user.ThemeDefault)
+			assert.NoError(t, r.User.Save(ctx, user.New().ID(uid).Workspace(wid).Name("u").Email("u@example.com").Metadata(md).MustBuild()))
+			assert.NoError(t, r.Workspace.Save(ctx, workspace.New().ID(wid).Name("u").Personal(true).MustBuild()))
+
+			_, err := NewUser(r, nil, nil, "", "").UpdateMe(ctx, interfaces.UpdateMeParam{PhotoURL: &photo, Name: strPtr("renamed")}, &workspace.Operator{User: &uid})
+			assert.ErrorIs(t, err, interfaces.ErrInvalidPhotoURL)
+
+			u, err := r.User.FindByID(ctx, uid)
+			assert.NoError(t, err)
+			assert.Equal(t, "users/old.png", u.Metadata().PhotoURL())
+			assert.Equal(t, "u", u.Name())
+		})
+	}
+}
+
+func TestUser_UpdateMe_TrimsPhotoPath(t *testing.T) {
+	ctx := context.Background()
+	r := memory.New()
+	uid, wid := id.NewUserID(), id.NewWorkspaceID()
+	assert.NoError(t, r.User.Save(ctx, user.New().ID(uid).Workspace(wid).Name("u").Email("u@example.com").MustBuild()))
+	assert.NoError(t, r.Workspace.Save(ctx, workspace.New().ID(wid).Name("u").Personal(true).MustBuild()))
+
+	u, err := NewUser(r, nil, nil, "", "").UpdateMe(ctx, interfaces.UpdateMeParam{PhotoURL: strPtr("  users/new.png ")}, &workspace.Operator{User: &uid})
+	assert.NoError(t, err)
+	assert.Equal(t, "users/new.png", u.Metadata().PhotoURL())
+	ws, err := r.Workspace.FindByID(ctx, wid)
+	assert.NoError(t, err)
+	assert.Equal(t, "users/new.png", ws.Metadata().PhotoURL())
 }
