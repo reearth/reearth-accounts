@@ -19,11 +19,6 @@ import (
 	"go.uber.org/mock/gomock"
 )
 
-// stubAuthResolver always returns unauthenticated (no user resolved).
-func stubAuthResolver(_ echo.Context, _ *appx.AuthInfo) (*user.User, *workspace.Operator, error) {
-	return nil, nil, nil
-}
-
 type stubAuthConfigProvider struct{}
 
 func (stubAuthConfigProvider) GetAuth0Domain() string      { return "" }

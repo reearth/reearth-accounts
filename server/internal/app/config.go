@@ -1,6 +1,7 @@
 package app
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"net"
@@ -11,9 +12,10 @@ import (
 	"github.com/joho/godotenv"
 	"github.com/kelseyhightower/envconfig"
 	"github.com/reearth/reearth-accounts/server/internal/adapter"
+	"github.com/reearth/reearth-accounts/server/internal/adapter/ratelimit"
+	"github.com/reearth/reearth-accounts/server/pkg/applog"
 	"github.com/reearth/reearth-accounts/server/pkg/workspace"
 	"github.com/reearth/reearthx/appx"
-	"github.com/reearth/reearthx/log"
 )
 
 const configPrefix = "reearth"
@@ -57,6 +59,9 @@ type Config struct {
 	AuthTimeClaim string `envconfig:"REEARTH_ACCOUNTS_AUTH_TIME_CLAIM"`
 
 	GraphQL GraphQLConfig
+
+	// UserLookupLimit caps user lookups per viewer (ADR-0003 decision 6).
+	UserLookupLimit ratelimit.Config
 
 	SignupSecret   string `envconfig:"REEARTH_ACCOUNTS_SIGNUP_SECRET"`
 	HostWeb        string
@@ -255,7 +260,7 @@ func ReadConfig(debug bool) (*Config, error) {
 		if err := godotenv.Load(".env"); err != nil && !os.IsNotExist(err) {
 			return nil, err
 		} else if err == nil {
-			log.Infof("config: .env loaded")
+			applog.Info(context.Background(), "config: .env loaded")
 		}
 	}
 
@@ -282,6 +287,7 @@ func ReadConfig(debug bool) (*Config, error) {
 
 type GraphQLConfig struct {
 	ComplexityLimit int `default:"6000"`
+	DepthLimit      int `default:"10"`
 }
 
 func (c Config) Print() string {

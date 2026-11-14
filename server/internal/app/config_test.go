@@ -128,3 +128,19 @@ func TestResolveDBDriver(t *testing.T) {
 	assert.Equal(t, "postgres", (&Config{DB: "postgres://x", DBDriver: "sqlite"}).ResolveDBDriver())
 	assert.Equal(t, "mongo", (&Config{DB: "mongodb://x", DBDriver: "sqlite"}).ResolveDBDriver())
 }
+
+func TestReadConfig_UserLookupLimit(t *testing.T) {
+	t.Setenv("SKIP_DOTENV", "1")
+
+	c, err := ReadConfig(false)
+	require.NoError(t, err)
+	assert.False(t, c.UserLookupLimit.Enforce, "ships in log-only mode")
+	assert.Positive(t, c.UserLookupLimit.PerMinute)
+
+	t.Setenv("REEARTH_USERLOOKUPLIMIT_ENFORCE", "true")
+	t.Setenv("REEARTH_USERLOOKUPLIMIT_PERMINUTE", "30")
+	c, err = ReadConfig(false)
+	require.NoError(t, err)
+	assert.True(t, c.UserLookupLimit.Enforce)
+	assert.Equal(t, 30, c.UserLookupLimit.PerMinute)
+}
