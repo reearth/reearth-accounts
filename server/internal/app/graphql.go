@@ -11,6 +11,7 @@ import (
 	"github.com/99designs/gqlgen/graphql/handler/transport"
 	"github.com/reearth/reearth-accounts/server/internal/adapter"
 	"github.com/reearth/reearth-accounts/server/internal/adapter/gql"
+	"github.com/reearth/reearth-accounts/server/internal/adapter/ratelimit"
 	"github.com/reearth/reearth-accounts/server/internal/infrastructure/storage"
 	"github.com/reearth/reearth-accounts/server/internal/usecase/gateway"
 	"github.com/reearth/reearth-accounts/server/pkg/applog"
@@ -42,9 +43,10 @@ func newPhotoStorage(conf *Config) gateway.Storage {
 	return str
 }
 
-func GraphqlAPI(conf *Config, photos adapter.PhotoSigner, loginTime adapter.LoginTimeSource, dev bool) echo.HandlerFunc {
+func GraphqlAPI(conf *Config, photos adapter.PhotoSigner, loginTime adapter.LoginTimeSource, lookups *ratelimit.Limiter, dev bool) echo.HandlerFunc {
 	schema := gql.NewExecutableSchema(gql.Config{
-		Resolvers: gql.NewResolver(photos, loginTime),
+		Resolvers:  gql.NewResolver(photos, loginTime),
+		Directives: gql.NewDirectives(),
 	})
 
 	srv := handler.New(schema)
@@ -67,6 +69,10 @@ func GraphqlAPI(conf *Config, photos adapter.PhotoSigner, loginTime adapter.Logi
 	if conf.GraphQL.ComplexityLimit > 0 {
 		srv.Use(extension.FixedComplexityLimit(conf.GraphQL.ComplexityLimit))
 	}
+	if conf.GraphQL.DepthLimit > 0 {
+		srv.Use(depthLimit{max: conf.GraphQL.DepthLimit})
+	}
+	srv.Use(userLookupLimit{limiter: lookups})
 
 	srv.Use(extension.AutomaticPersistedQuery{
 		Cache: lru.New[string](30),
@@ -106,6 +112,7 @@ func GraphqlAPI(conf *Config, photos adapter.PhotoSigner, loginTime adapter.Logi
 		usecases := adapter.Usecases(ctx)
 		ctx = gql.AttachUsecases(ctx, usecases, photos, enableDataLoaders)
 		ctx = adapter.AttachConfig(ctx, conf)
+		ctx = withLookupState(ctx, ratelimit.ViewerKey(adapter.User(ctx), c.RealIP()), c.Response())
 		c.SetRequest(req.WithContext(ctx))
 
 		srv.ServeHTTP(c.Response(), c.Request())

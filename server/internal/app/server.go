@@ -1,10 +1,8 @@
 package app
 
 import (
-	"cloud.google.com/go/compute/metadata"
 	"context"
 	"errors"
-	"github.com/reearth/reearthx/log"
 	"net"
 	"net/http"
 	"os"
@@ -12,6 +10,7 @@ import (
 	"syscall"
 	"time"
 
+	"cloud.google.com/go/compute/metadata"
 	"github.com/labstack/echo/v4"
 	infraCerbos "github.com/reearth/reearth-accounts/server/internal/infrastructure/cerbos"
 	mongorepo "github.com/reearth/reearth-accounts/server/internal/infrastructure/mongo"
@@ -21,6 +20,7 @@ import (
 	"github.com/reearth/reearth-accounts/server/internal/usecase/gateway"
 	"github.com/reearth/reearth-accounts/server/internal/usecase/repo"
 	"github.com/reearth/reearth-accounts/server/pkg/applog"
+	"github.com/reearth/reearthx/log"
 
 	otelapp "github.com/reearth/reearth-accounts/server/internal/app/otel"
 	"github.com/reearth/reearthx/mongox"

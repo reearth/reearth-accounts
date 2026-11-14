@@ -54,7 +54,7 @@ else
 endif
 ifndef MOCKGEN_BIN
 	@echo "mockgen is not installed. Installing..."
-	@go install go.uber.org/mock/mockgen@v0.5.0
+	@go install go.uber.org/mock/mockgen@v0.6.0
 else
 	@echo "mockgen is already installed."
 endif

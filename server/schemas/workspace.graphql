@@ -10,10 +10,10 @@ type Workspace implements Node {
 union WorkspaceMember = WorkspaceUserMember | WorkspaceIntegrationMember
 
 type WorkspaceUserMember {
-    userId: ID!
-    role: Role!
-    host: String
-    user: User
+    userId: ID! @visibility(level: PUBLIC)
+    role: Role! @visibility(level: PUBLIC)
+    host: String @visibility(level: PUBLIC)
+    user: User @visibility(level: PUBLIC)
 }
 
 type WorkspaceIntegrationMember {
@@ -30,6 +30,23 @@ type WorkspaceMetadata {
     location: String!
     billingEmail: String!
     photoURL: String!
+}
+
+"""
+A workspace as an anonymous caller may see it. It leaves out member roles,
+emails and user IDs (ADR-0003 decision 2).
+"""
+type PublicWorkspace {
+    id: ID!
+    name: String!
+    alias: String!
+    members: [PublicWorkspaceMember!]!
+}
+
+type PublicWorkspaceMember {
+    name: String! @visibility(level: PUBLIC)
+    alias: String! @visibility(level: PUBLIC)
+    photoURL: String! @visibility(level: PUBLIC)
 }
 
 type WorkspacesWithPagination {
@@ -161,12 +178,14 @@ type DeleteWorkspacePayload {
 
 # TODO: rename it to findWorkspace** as a prefix to avoid conflict with other entities
 extend type Query {
-    findByID(id: ID!): Workspace!
-    findByIDs(ids: [ID!]!): [Workspace!]!
+    findByID(id: ID!): Workspace! @public
+    findByIDs(ids: [ID!]!): [Workspace!]! @public
     findByName(name: String!): Workspace
-    findByAlias(alias: String!): Workspace
+    findByAlias(alias: String!): Workspace @public
     findByUser(userId: ID!): [Workspace]
     findByUserWithPagination(userId: ID!, pagination: Pagination!): WorkspacesWithPagination!
+    "Looks a workspace up by exactly one of id or alias. Returns null when none matches."
+    publicWorkspace(id: ID, alias: String): PublicWorkspace @public
 }
 
 extend type Mutation {

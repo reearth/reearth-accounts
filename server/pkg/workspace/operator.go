@@ -7,12 +7,19 @@ import (
 )
 
 type Operator struct {
-	User                   *id.UserID
+	User *id.UserID
+	// Integration is set, and User is nil, for a service caller (ADR-0002).
+	Integration            *id.IntegrationID
 	ReadableWorkspaces     id.WorkspaceIDList
 	WritableWorkspaces     id.WorkspaceIDList
 	OwningWorkspaces       id.WorkspaceIDList
 	MaintainableWorkspaces id.WorkspaceIDList
 	DefaultPolicy          *PolicyID
+}
+
+// IsService reports whether the operator is a service caller with no user.
+func (o *Operator) IsService() bool {
+	return o != nil && o.User == nil && o.Integration != nil
 }
 
 func (o *Operator) Workspaces(r role.RoleType) id.WorkspaceIDList {
