@@ -28,6 +28,7 @@ var (
 	svcOwnerUID     = id.NewUserID()
 	svcIntegration  = id.NewIntegrationID()
 	svcLonely       = id.NewIntegrationID()
+	svcHook         = id.NewIntegrationID()
 	svcWsOwned      = id.NewWorkspaceID() // integration is owner
 	svcWsWritable   = id.NewWorkspaceID() // integration is writer
 	svcWsNotAMember = id.NewWorkspaceID()
@@ -93,9 +94,10 @@ func startServiceCallerServer(t *testing.T) (*httpexpect.Expect, *svcIdP) {
 	idp := newSvcIdP(t)
 	jwks := idp.srv.URL + "/jwks.json"
 	cfg := &app.Config{Auth: app.AuthConfigs{{ISS: idp.issuer(), AUD: []string{svcAudience}, JWKSURI: &jwks}}}
-	callers, err := json.Marshal([]map[string]string{
+	callers, err := json.Marshal([]map[string]any{
 		{"issuer": idp.issuer(), "client_id": "svc-flow", "integration_id": svcIntegration.String()},
 		{"issuer": idp.issuer(), "client_id": "svc-lonely", "integration_id": svcLonely.String()},
+		{"issuer": idp.issuer(), "client_id": "svc-hook", "integration_id": svcHook.String(), "sync_sso": true},
 	})
 	require.NoError(t, err)
 	require.NoError(t, cfg.ServiceCallers.Decode(string(callers)))

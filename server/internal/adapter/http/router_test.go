@@ -10,6 +10,7 @@ import (
 	adapterhttp "github.com/reearth/reearth-accounts/server/internal/adapter/http"
 	"github.com/reearth/reearth-accounts/server/internal/usecase/gateway"
 	gatewaymock "github.com/reearth/reearth-accounts/server/internal/usecase/gateway/mock"
+	"github.com/reearth/reearth-accounts/server/pkg/id"
 	"github.com/reearth/reearth-accounts/server/pkg/user"
 	"github.com/reearth/reearth-accounts/server/pkg/workspace"
 	"github.com/reearth/reearthx/appx"
@@ -17,11 +18,6 @@ import (
 	"github.com/stretchr/testify/require"
 	"go.uber.org/mock/gomock"
 )
-
-// stubAuthResolver always returns unauthenticated (no user resolved).
-func stubAuthResolver(_ echo.Context, _ *appx.AuthInfo) (*user.User, *workspace.Operator, error) {
-	return nil, nil, nil
-}
 
 type stubAuthConfigProvider struct{}
 
@@ -90,57 +86,45 @@ func TestRegisterRESTRouter_NoCacheControlWithoutMiddleware(t *testing.T) {
 	assert.Empty(t, rec.Header().Get("Cache-Control"))
 }
 
-// TestSyncSSORoute_AuthGate verifies that the sync-sso route is protected by
-// SyncSSOAPIKey and is not accessible with the general RestAPIKey or no credentials.
-func TestSyncSSORoute_AuthGate(t *testing.T) {
-	const restKey = "rest-key"
-	const syncKey = "sync-key"
-
+// TestServiceRoutes_AuthGate verifies that the routes the static M2M keys used to
+// guard admit a user or a service caller and reject a bearer the resolver does
+// not accept, such as a former static key (ADR-0002 decision 7.1).
+func TestServiceRoutes_AuthGate(t *testing.T) {
+	hook, other := id.NewIntegrationID(), id.NewIntegrationID()
+	resolver := func(c echo.Context, _ *appx.AuthInfo) (*user.User, *workspace.Operator, error) {
+		switch c.Request().Header.Get(echo.HeaderAuthorization) {
+		case "Bearer service-token":
+			return nil, &workspace.Operator{Integration: &hook}, nil
+		case "Bearer other-service-token":
+			return nil, &workspace.Operator{Integration: &other}, nil
+		}
+		return nil, nil, nil
+	}
 	e := newRESTEcho(adapterhttp.RouterConfig{
 		AuthConfigProvider: stubAuthConfigProvider{},
 		Photos:             noSigning(t),
-		AuthResolver:       stubAuthResolver,
-		APIKey:             restKey,
-		SyncSSOAPIKey:      syncKey,
+		AuthResolver:       resolver,
+		SyncSSOAllowed:     func(op *workspace.Operator) bool { return *op.Integration == hook },
 	})
 
-	doPost := func(authHeader string) int {
-		req := httptest.NewRequest(http.MethodPost, "/api/users/sync-sso", nil)
+	do := func(path, authHeader string) int {
+		req := httptest.NewRequest(http.MethodPost, path, nil)
 		if authHeader != "" {
-			req.Header.Set("Authorization", authHeader)
+			req.Header.Set(echo.HeaderAuthorization, authHeader)
 		}
 		rec := httptest.NewRecorder()
 		e.ServeHTTP(rec, req)
 		return rec.Code
 	}
 
-	assert.Equal(t, http.StatusUnauthorized, doPost(""), "no credentials → 401")
-	assert.Equal(t, http.StatusUnauthorized, doPost("Bearer "+restKey), "RestAPIKey must not grant access to sync-sso")
-	assert.NotEqual(t, http.StatusUnauthorized, doPost("Bearer "+syncKey), "SyncSSOAPIKey must pass the auth gate")
-}
-
-// TestSyncSSORoute_KeyIsolation verifies that the SyncSSOAPIKey is not accepted on
-// routes guarded by the general RestAPIKey (find-or-create, permissions/check).
-func TestSyncSSORoute_KeyIsolation(t *testing.T) {
-	const syncKey = "sync-key"
-
-	e := newRESTEcho(adapterhttp.RouterConfig{
-		AuthConfigProvider: stubAuthConfigProvider{},
-		Photos:             noSigning(t),
-		AuthResolver:       stubAuthResolver,
-		SyncSSOAPIKey:      syncKey,
-		// APIKey (RestAPIKey) deliberately omitted
-	})
-
-	routes := []string{
-		"/api/users/find-or-create",
-		"/api/permissions/check",
+	for _, path := range []string{"/api/users/sync-sso", "/api/users/find-or-create", "/api/permissions/check"} {
+		assert.Equal(t, http.StatusUnauthorized, do(path, ""), "%s: no credentials", path)
+		assert.Equal(t, http.StatusUnauthorized, do(path, "Bearer former-static-key"), "%s: a static key is no longer accepted", path)
 	}
-	for _, path := range routes {
-		req := httptest.NewRequest(http.MethodPost, path, nil)
-		req.Header.Set("Authorization", "Bearer "+syncKey)
-		rec := httptest.NewRecorder()
-		e.ServeHTTP(rec, req)
-		assert.Equal(t, http.StatusUnauthorized, rec.Code, "SyncSSOAPIKey must not grant access to %s", path)
+	for _, path := range []string{"/api/users/sync-sso", "/api/users/find-or-create"} {
+		code := do(path, "Bearer service-token")
+		assert.NotContains(t, []int{http.StatusUnauthorized, http.StatusForbidden}, code, "%s: an allowed service caller passes the gate", path)
 	}
+	assert.Equal(t, http.StatusForbidden, do("/api/users/sync-sso", "Bearer other-service-token"), "sync-sso admits only allowed service callers")
+	assert.NotEqual(t, http.StatusForbidden, do("/api/users/find-or-create", "Bearer other-service-token"))
 }

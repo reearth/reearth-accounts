@@ -31,16 +31,24 @@ type serviceCallerKey struct {
 // ServiceCallers maps an (issuer, client ID) pair to the integration it acts as
 // (ADR-0002 decision 3). Client IDs are unique only within one identity provider,
 // so the issuer is part of the key.
-type ServiceCallers map[serviceCallerKey]id.IntegrationID
+type ServiceCallers map[serviceCallerKey]serviceCallerGrant
+
+type serviceCallerGrant struct {
+	integration id.IntegrationID
+	// syncSSO lets the caller provision users through /api/users/sync-sso, which
+	// is not scoped to a workspace.
+	syncSSO bool
+}
 
 type serviceCallerEntry struct {
 	Issuer        string `json:"issuer"`
 	ClientID      string `json:"client_id"`
 	IntegrationID string `json:"integration_id"`
+	SyncSSO       bool   `json:"sync_sso,omitempty"`
 }
 
 // Decode parses REEARTH_ACCOUNTS_SERVICE_CALLERS, a JSON array of
-// {"issuer","client_id","integration_id"} objects.
+// {"issuer","client_id","integration_id","sync_sso"} objects.
 func (s *ServiceCallers) Decode(value string) error {
 	if strings.TrimSpace(value) == "" {
 		*s = nil
@@ -51,6 +59,7 @@ func (s *ServiceCallers) Decode(value string) error {
 		return fmt.Errorf("invalid service callers json: %w", err)
 	}
 	res := make(ServiceCallers, len(entries))
+	syncSSOByIntegration := map[id.IntegrationID]bool{}
 	for _, e := range entries {
 		if e.Issuer == "" || e.ClientID == "" {
 			return fmt.Errorf("service caller needs issuer and client_id: %+v", e)
@@ -63,10 +72,24 @@ func (s *ServiceCallers) Decode(value string) error {
 		if _, dup := res[k]; dup {
 			return fmt.Errorf("service caller %q is registered twice for issuer %q", e.ClientID, e.Issuer)
 		}
-		res[k] = iid
+		if prev, seen := syncSSOByIntegration[iid]; seen && prev != e.SyncSSO {
+			return fmt.Errorf("integration %q has callers that disagree on sync_sso", e.IntegrationID)
+		}
+		syncSSOByIntegration[iid] = e.SyncSSO
+		res[k] = serviceCallerGrant{integration: iid, syncSSO: e.SyncSSO}
 	}
 	*s = res
 	return nil
+}
+
+// CanSyncSSO reports whether the integration's callers may use sync-sso.
+func (s ServiceCallers) CanSyncSSO(iid id.IntegrationID) bool {
+	for _, g := range s {
+		if g.integration == iid {
+			return g.syncSSO
+		}
+	}
+	return false
 }
 
 // checkIssuers fails when a caller names an issuer accounts does not validate
@@ -149,11 +172,11 @@ func (s ServiceCallers) resolve(ai appx.AuthInfo) (*ServiceCaller, error) {
 		return nil, errServiceCallerRejected
 	}
 
-	iid, ok := s[serviceCallerKey{issuer: ai.Iss, clientID: clientID}]
+	g, ok := s[serviceCallerKey{issuer: ai.Iss, clientID: clientID}]
 	if !ok {
 		return nil, errServiceCallerRejected
 	}
-	return &ServiceCaller{ClientID: clientID, Integration: iid}, nil
+	return &ServiceCaller{ClientID: clientID, Integration: g.integration}, nil
 }
 
 func decodeTokenClaims(token string) (tokenClaims, error) {

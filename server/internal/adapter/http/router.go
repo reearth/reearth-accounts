@@ -10,6 +10,7 @@ import (
 	"github.com/reearth/reearth-accounts/server/internal/adapter/http/handlers"
 	httpinternal "github.com/reearth/reearth-accounts/server/internal/adapter/http/internal"
 	"github.com/reearth/reearth-accounts/server/internal/adapter/ratelimit"
+	"github.com/reearth/reearth-accounts/server/pkg/workspace"
 	echoSwagger "github.com/swaggo/echo-swagger"
 )
 
@@ -25,10 +26,8 @@ type RouterConfig struct {
 	JWTMiddleware echo.MiddlewareFunc
 	// AuthConfigProvider exposes Auth0 settings for GET /api/auth/config.
 	AuthConfigProvider adapter.Auth0ConfigProvider
-	// APIKey is the M2M key for service-to-service routes (find-or-create, permissions/check).
-	APIKey string
-	// SyncSSOAPIKey is the dedicated M2M key for the sync-sso route.
-	SyncSSOAPIKey string
+	// SyncSSOAllowed reports whether a service caller may use sync-sso.
+	SyncSSOAllowed func(*workspace.Operator) bool
 	// Photos signs photo URLs.
 	Photos adapter.PhotoSigner
 	// UserLookupLimit caps user lookups per viewer. Nil allows everything.
@@ -58,11 +57,7 @@ func RegisterRESTRouter(e *echo.Echo, cfg RouterConfig) {
 
 	base := []echo.MiddlewareFunc{}
 	if cfg.JWTMiddleware != nil {
-		// Wrap so requests bearing the M2M API key skip JWT validation and reach
-		// APIKeyOrAuth (the API key is not a JWT, so the validator would otherwise
-		// reject it as malformed before APIKeyOrAuth ever runs). When no API key is
-		// configured this is a no-op.
-		base = append(base, skipJWTOnAPIKey(cfg.JWTMiddleware, cfg.APIKey, cfg.SyncSSOAPIKey))
+		base = append(base, cfg.JWTMiddleware)
 	}
 	if cfg.UsecaseMiddleware != nil {
 		base = append(base, cfg.UsecaseMiddleware)
@@ -74,8 +69,6 @@ func RegisterRESTRouter(e *echo.Echo, cfg RouterConfig) {
 	required := RequiredAuth(cfg.AuthResolver)
 	userOnly := RequiredUser(cfg.AuthResolver)
 	optional := OptionalAuth(cfg.AuthResolver)
-	apikeyOrAuth := APIKeyOrAuth(cfg.APIKey)
-	syncSSOApikeyOrAuth := APIKeyOrAuth(cfg.SyncSSOAPIKey)
 	lookup := UserLookupLimit(cfg.UserLookupLimit)
 
 	api := e.Group("/api", base...)
@@ -108,12 +101,13 @@ func RegisterRESTRouter(e *echo.Echo, cfg RouterConfig) {
 	api.POST("/users/:id/restore", uh.Restore, userOnly)       // undo deactivate (maintainer-only)
 	api.POST("/users/signup", uh.Signup, optional)
 	api.POST("/users/signup-oidc", uh.SignupOIDC, optional)
-	api.POST("/users/sync-sso", uh.SyncSSOUser, optional, syncSSOApikeyOrAuth)
+	// Called by the identity provider's post-login hook as a service caller.
+	api.POST("/users/sync-sso", uh.SyncSSOUser, required, userOrService(cfg.SyncSSOAllowed))
 	api.POST("/users/verifications", uh.CreateVerification, optional)
 	api.POST("/users/verify", uh.VerifyUser)
 	api.POST("/users/password-reset/start", uh.StartPasswordReset)
 	api.POST("/users/password-reset", uh.PasswordReset)
-	api.POST("/users/find-or-create", uh.FindOrCreate, optional, apikeyOrAuth)
+	api.POST("/users/find-or-create", uh.FindOrCreate, required)
 	// PATCH /api/users/by-sub/:sub — JWT required; caller must hold the maintainer
 	// role (Cerbos, falling back to a direct Permittable check). Updates mutable
 	// user fields (name) by Firebase sub.
@@ -161,9 +155,7 @@ func RegisterRESTRouter(e *echo.Echo, cfg RouterConfig) {
 
 	// --- Permission ---
 	ph := handlers.NewPermissionHandler()
-	// OptionalAuth resolves a JWT/mock user (attaching it for APIKeyOrAuth and the
-	// handler's RequireUser); APIKeyOrAuth then admits either that user or a valid M2M key.
-	api.POST("/permissions/check", ph.Check, optional, apikeyOrAuth)
+	api.POST("/permissions/check", ph.Check, required)
 
 	// --- Swagger ---
 	// Basic-auth protected when credentials are configured (served in any environment);
@@ -188,4 +180,20 @@ func RegisterRESTRouter(e *echo.Echo, cfg RouterConfig) {
 func pathHasPrefix(c echo.Context, prefix string) bool {
 	p := c.Request().URL.Path
 	return len(p) >= len(prefix) && p[:len(prefix)] == prefix
+}
+
+// userOrService admits a user, or a service caller that allow accepts. Other
+// service callers get 403.
+func userOrService(allow func(*workspace.Operator) bool) echo.MiddlewareFunc {
+	return func(next echo.HandlerFunc) echo.HandlerFunc {
+		return func(c echo.Context) error {
+			if httpinternal.User(c) != nil {
+				return next(c)
+			}
+			if op := httpinternal.Operator(c); op.IsService() && allow != nil && allow(op) {
+				return next(c)
+			}
+			return httpinternal.ErrForbidden
+		}
+	}
 }

@@ -247,7 +247,7 @@ func TestServiceCallersDecode(t *testing.T) {
 	assert.Empty(t, s)
 
 	require.NoError(t, s.Decode(callersJSON("https://idp/", "c1", iid)))
-	assert.Equal(t, iid, s[serviceCallerKey{issuer: "https://idp/", clientID: "c1"}])
+	assert.Equal(t, iid, s[serviceCallerKey{issuer: "https://idp/", clientID: "c1"}].integration)
 
 	assert.Error(t, s.Decode(`[{"issuer":"https://idp/","client_id":"c1","integration_id":"nope"}]`))
 	assert.Error(t, s.Decode(`[{"client_id":"c1","integration_id":"`+iid.String()+`"}]`))
@@ -270,4 +270,19 @@ func TestServiceCallersDisabledLeavesUserTokensAlone(t *testing.T) {
 
 	rr, _ = callWith(h, idp.sign(t, clientClaims("svc-flow")))
 	assert.Equal(t, http.StatusUnauthorized, rr.Code, "an unregistered client still has no user")
+}
+
+func TestServiceCallersSyncSSO(t *testing.T) {
+	flow, hook := id.NewIntegrationID(), id.NewIntegrationID()
+	var s ServiceCallers
+	require.NoError(t, s.Decode(`[
+		{"issuer":"https://idp/","client_id":"flow","integration_id":"`+flow.String()+`"},
+		{"issuer":"https://idp/","client_id":"hook","integration_id":"`+hook.String()+`","sync_sso":true}]`))
+	assert.False(t, s.CanSyncSSO(flow))
+	assert.True(t, s.CanSyncSSO(hook))
+	assert.False(t, s.CanSyncSSO(id.NewIntegrationID()))
+
+	assert.Error(t, s.Decode(`[
+		{"issuer":"https://idp/","client_id":"a","integration_id":"`+hook.String()+`","sync_sso":true},
+		{"issuer":"https://idp/","client_id":"b","integration_id":"`+hook.String()+`"}]`))
 }

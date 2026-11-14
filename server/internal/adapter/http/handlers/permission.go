@@ -25,10 +25,7 @@ func NewPermissionHandler() *PermissionHandler { return &PermissionHandler{} }
 // @Failure 401 {object} internal.ErrorResponse
 // @Router /api/permissions/check [post]
 //
-// The route is gated by APIKeyOrAuth, but the interactor needs a concrete user, so a
-// resolved user is still required: when absent the handler returns 401 Unauthorized
-// (the REST-appropriate status; the GraphQL resolver instead returns ErrNotFound).
-// M2M callers must therefore present a user token; the API-key gate only governs route entry.
+// The interactor checks a user's permission, so a service caller gets 401.
 func (h *PermissionHandler) Check(c echo.Context) error {
 	ctx := c.Request().Context()
 	req := &httpmodel.CheckPermissionRequest{}

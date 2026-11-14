@@ -8,7 +8,7 @@ import (
 )
 
 func TestREST_PermissionUnauthorized(t *testing.T) {
-	cfg := &app.Config{} // non-mock, no token, no API key -> APIKeyOrAuth rejects
+	cfg := &app.Config{} // non-mock, no token -> RequiredAuth rejects
 	exp, _ := StartServer(t, cfg, false, nil)
 	exp.POST("/api/permissions/check").
 		WithJSON(map[string]any{"service": "dashboard", "resource": "user", "action": "read"}).
@@ -18,8 +18,8 @@ func TestREST_PermissionUnauthorized(t *testing.T) {
 func TestREST_PermissionBadRequest(t *testing.T) {
 	cfg := &app.Config{Mock_Auth: true}
 	exp, _ := StartServer(t, cfg, false, seedDemoUser)
-	// Mock user resolves (OptionalAuth) so APIKeyOrAuth admits the request; an empty
-	// body then fails validation in the handler -> 400 (without needing a Cerbos host).
+	// The mock user resolves, so RequiredAuth admits the request; an empty body then
+	// fails validation in the handler -> 400 (without needing a Cerbos host).
 	exp.POST("/api/permissions/check").
 		WithJSON(map[string]any{}).
 		Expect().Status(http.StatusBadRequest)
@@ -36,8 +36,8 @@ func TestREST_RealJWT_PermissionBadRequest(t *testing.T) {
 	exp, _ := StartServer(t, realAuthConfig(), false, seedJWTUsers(realJWTPermissionSub))
 	token := signTestToken(t, key, realJWTPermissionSub)
 
-	// JWT validates -> OptionalAuth attaches the resolved user -> APIKeyOrAuth admits
-	// the request -> handler validates an empty body -> 400.
+	// JWT validates -> RequiredAuth attaches the resolved user -> handler validates
+	// an empty body -> 400.
 	exp.POST("/api/permissions/check").
 		WithHeader("Authorization", "Bearer "+token).
 		WithJSON(map[string]any{}).

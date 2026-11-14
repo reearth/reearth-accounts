@@ -170,11 +170,12 @@ func initEcho(ctx context.Context, cfg *ServerConfig) *echo.Echo {
 		AuthConfigProvider: cfg.Config,
 		Photos:             photos,
 		UserLookupLimit:    lookups,
-		APIKey:             cfg.Config.RestAPIKey,
-		SyncSSOAPIKey:      cfg.Config.SyncSSOAPIKey,
-		SwaggerUser:        cfg.Config.SwaggerBasicUser,
-		SwaggerPass:        cfg.Config.SwaggerBasicPass,
-		Debug:              cfg.Debug || cfg.Config.Dev,
+		SyncSSOAllowed: func(op *workspace.Operator) bool {
+			return op.Integration != nil && cfg.Config.ServiceCallers.CanSyncSSO(*op.Integration)
+		},
+		SwaggerUser: cfg.Config.SwaggerBasicUser,
+		SwaggerPass: cfg.Config.SwaggerBasicPass,
+		Debug:       cfg.Debug || cfg.Config.Dev,
 	})
 
 	scimUC := interactor.NewScim(cfg.Repos, nil)
