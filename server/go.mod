@@ -31,7 +31,7 @@ require (
 	github.com/labstack/echo/v4 v4.13.4
 	github.com/labstack/gommon v0.4.2
 	github.com/oklog/ulid v1.3.1
-	github.com/reearth/reearthx v0.0.0-20261112215740-267be4927a15
+	github.com/reearth/reearthx v0.0.0-20261114071312-942fc8d07349
 	github.com/samber/lo v1.52.0
 	github.com/sourcegraph/conc v0.3.0
 	github.com/square/mongo-lock v0.0.0-20230808145049-cfcf499f6bf0
