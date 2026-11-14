@@ -3,14 +3,18 @@ package gql
 import (
 	"context"
 
-	"github.com/labstack/gommon/log"
 	"github.com/reearth/reearth-accounts/server/internal/adapter/gql/gqlmodel"
 	"github.com/reearth/reearth-accounts/server/internal/usecase/interfaces"
+	"github.com/reearth/reearth-accounts/server/pkg/applog"
 	"github.com/reearth/reearth-accounts/server/pkg/id"
 	"github.com/reearth/reearth-accounts/server/pkg/role"
 )
 
 func (r *mutationResolver) CreateWorkspace(ctx context.Context, input gqlmodel.CreateWorkspaceInput) (*gqlmodel.CreateWorkspacePayload, error) {
+	u := getUser(ctx)
+	if u == nil {
+		return nil, interfaces.ErrInvalidOperator
+	}
 	description := ""
 	if input.Description != nil {
 		description = *input.Description
@@ -18,7 +22,7 @@ func (r *mutationResolver) CreateWorkspace(ctx context.Context, input gqlmodel.C
 
 	// skipOwnerMembership is REST-only (e.g. LINKS-Veda); GraphQL always joins the
 	// caller as owner.
-	w, err := usecases(ctx).Workspace.Create(ctx, input.Alias, input.Name, description, getUser(ctx).ID(), false, getOperator(ctx))
+	w, err := usecases(ctx).Workspace.Create(ctx, input.Alias, input.Name, description, u.ID(), false, getOperator(ctx))
 	if err != nil {
 		return nil, err
 	}
@@ -30,7 +34,7 @@ func (r *mutationResolver) CreateWorkspace(ctx context.Context, input gqlmodel.C
 
 	converted, err := gqlmodel.ToWorkspace(ctx, w, exists, r.Photos)
 	if err != nil {
-		log.Errorf("failed to convert workspace: %s", err.Error())
+		applog.Error(ctx, "failed to convert workspace", applog.Err(err))
 		return nil, err
 	}
 
@@ -77,7 +81,7 @@ func (r *mutationResolver) UpdateWorkspace(ctx context.Context, input gqlmodel.U
 
 	converted, err := gqlmodel.ToWorkspace(ctx, w, exists, r.Photos)
 	if err != nil {
-		log.Errorf("failed to convert workspace: %s", err.Error())
+		applog.Error(ctx, "failed to convert workspace", applog.Err(err))
 		return nil, err
 	}
 
@@ -109,7 +113,7 @@ func (r *mutationResolver) AddUsersToWorkspace(ctx context.Context, input gqlmod
 
 	converted, err := gqlmodel.ToWorkspace(ctx, w, exists, r.Photos)
 	if err != nil {
-		log.Errorf("failed to convert workspace: %s", err.Error())
+		applog.Error(ctx, "failed to convert workspace", applog.Err(err))
 		return nil, err
 	}
 
@@ -134,7 +138,7 @@ func (r *mutationResolver) AddIntegrationToWorkspace(ctx context.Context, input 
 
 	converted, err := gqlmodel.ToWorkspace(ctx, w, exists, r.Photos)
 	if err != nil {
-		log.Errorf("failed to convert workspace: %s", err.Error())
+		applog.Error(ctx, "failed to convert workspace", applog.Err(err))
 		return nil, err
 	}
 
@@ -159,7 +163,7 @@ func (r *mutationResolver) RemoveUserFromWorkspace(ctx context.Context, input gq
 
 	converted, err := gqlmodel.ToWorkspace(ctx, w, exists, r.Photos)
 	if err != nil {
-		log.Errorf("failed to convert workspace: %s", err.Error())
+		applog.Error(ctx, "failed to convert workspace", applog.Err(err))
 		return nil, err
 	}
 
@@ -191,7 +195,7 @@ func (r *mutationResolver) RemoveIntegrationFromWorkspace(ctx context.Context, i
 
 	converted, err := gqlmodel.ToWorkspace(ctx, w, exists, r.Photos)
 	if err != nil {
-		log.Errorf("failed to convert workspace: %s", err.Error())
+		applog.Error(ctx, "failed to convert workspace", applog.Err(err))
 		return nil, err
 	}
 
@@ -223,7 +227,7 @@ func (r *mutationResolver) UpdateUserOfWorkspace(ctx context.Context, input gqlm
 
 	converted, err := gqlmodel.ToWorkspace(ctx, w, exists, r.Photos)
 	if err != nil {
-		log.Errorf("failed to convert workspace: %s", err.Error())
+		applog.Error(ctx, "failed to convert workspace", applog.Err(err))
 		return nil, err
 	}
 
@@ -248,7 +252,7 @@ func (r *mutationResolver) UpdateIntegrationOfWorkspace(ctx context.Context, inp
 
 	converted, err := gqlmodel.ToWorkspace(ctx, w, exists, r.Photos)
 	if err != nil {
-		log.Errorf("failed to convert workspace: %s", err.Error())
+		applog.Error(ctx, "failed to convert workspace", applog.Err(err))
 		return nil, err
 	}
 
@@ -277,7 +281,7 @@ func (r *mutationResolver) TransferWorkspaceOwnership(ctx context.Context, input
 
 	converted, err := gqlmodel.ToWorkspace(ctx, w, exists, r.Photos)
 	if err != nil {
-		log.Errorf("failed to convert workspace: %s", err.Error())
+		applog.Error(ctx, "failed to convert workspace", applog.Err(err))
 	}
 
 	return &gqlmodel.UpdateMemberOfWorkspacePayload{Workspace: converted}, nil

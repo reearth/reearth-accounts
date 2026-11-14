@@ -5,8 +5,8 @@ import (
 
 	"github.com/reearth/reearth-accounts/server/internal/adapter/gql/gqlmodel"
 	"github.com/reearth/reearth-accounts/server/internal/usecase/interfaces"
+	"github.com/reearth/reearth-accounts/server/pkg/applog"
 	"github.com/reearth/reearth-accounts/server/pkg/id"
-	"github.com/reearth/reearthx/log"
 )
 
 func (r *Resolver) Me() MeResolver {
@@ -23,26 +23,6 @@ func (r *meResolver) Workspaces(ctx context.Context, obj *gqlmodel.Me) ([]*gqlmo
 	return loaders(ctx).Workspace.FindByUser(ctx, obj.ID)
 }
 
-func (r *Resolver) User() UserResolver {
-	return &userResolver{r}
-}
-
-type userResolver struct{ *Resolver }
-
-// Email is shown only to its owner. Every query that returns a User, including
-// anonymous ones, resolves through here. Signup is anonymous but returns the
-// caller's own record, hence OwnRecord.
-func (r *userResolver) Email(ctx context.Context, obj *gqlmodel.User) (string, error) {
-	if obj.OwnRecord() {
-		return obj.Email, nil
-	}
-	viewer := getUser(ctx)
-	if viewer == nil || gqlmodel.ID(viewer.ID().String()) != obj.ID {
-		return "", nil
-	}
-	return obj.Email, nil
-}
-
 func (r *Resolver) UserMetadata() UserMetadataResolver {
 	return &userMetadataResolver{r}
 }
@@ -54,12 +34,15 @@ type userMetadataResolver struct{ *Resolver }
 func (r *userMetadataResolver) PhotoURL(ctx context.Context, obj *gqlmodel.UserMetadata) (string, error) {
 	signed, err := r.Photos.Sign(ctx, obj.PhotoURL)
 	if err != nil {
-		log.Errorfc(ctx, "gql: failed to sign user photo url: %v", err)
+		applog.Error(ctx, "gql: failed to sign user photo url", applog.Err(err))
 	}
 	return signed, nil
 }
 
 func (r *queryResolver) FindUsersByIDs(ctx context.Context, userIds []gqlmodel.ID) ([]*gqlmodel.User, error) {
+	if err := denyServiceCaller(ctx); err != nil {
+		return nil, err
+	}
 	uids, err := gqlmodel.ToIDs[id.User](userIds)
 	if err != nil {
 		return nil, err
@@ -74,6 +57,9 @@ func (r *queryResolver) FindUsersByIDs(ctx context.Context, userIds []gqlmodel.I
 }
 
 func (r *queryResolver) FindUsersByIDsWithPagination(ctx context.Context, userIds []gqlmodel.ID, alias *string, pagination gqlmodel.Pagination) (*gqlmodel.UsersWithPagination, error) {
+	if err := denyServiceCaller(ctx); err != nil {
+		return nil, err
+	}
 	uids, err := gqlmodel.ToIDs[id.User](userIds)
 	if err != nil {
 		return nil, err

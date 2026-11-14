@@ -1,1 +1,15 @@
 *        @pyshx @zombozo12
+
+# ADR-0003 decision 12: access control and personal data need @pyshx.
+/server/internal/app/auth.go                          @pyshx
+/server/internal/app/public_fields.go                 @pyshx
+/server/schemas/                                      @pyshx
+/server/internal/adapter/gql/resolver_query.go        @pyshx
+/server/internal/adapter/gql/resolver_user.go         @pyshx
+/server/internal/adapter/gql/resolver_mutation_user.go @pyshx
+/server/internal/adapter/gql/directive_visibility.go  @pyshx
+/server/internal/adapter/gql/gqlmodel/visibility.go   @pyshx
+/server/internal/adapter/gql/gqlmodel/convert_user.go @pyshx
+/server/internal/adapter/gql/gqlmodel/user.go         @pyshx
+/server/internal/adapter/http/handlers/user.go        @pyshx
+/server/internal/adapter/http/httpmodel/user.go       @pyshx

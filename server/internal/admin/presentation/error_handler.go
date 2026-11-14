@@ -5,7 +5,7 @@ import (
 
 	"github.com/labstack/echo/v4"
 	"github.com/reearth/reearth-accounts/server/internal/admin/presentation/internal"
-	"github.com/reearth/reearthx/log"
+	"github.com/reearth/reearth-accounts/server/pkg/applog"
 )
 
 // CustomHTTPErrorHandler converts errors returned from handlers into the
@@ -19,10 +19,10 @@ func CustomHTTPErrorHandler(err error, c echo.Context) {
 	status, code, msg := internal.Classify(err)
 
 	if status >= http.StatusInternalServerError {
-		log.Errorfc(ctx, "[admin] unhandled error: %v", err)
+		applog.Error(ctx, "[admin] unhandled error", applog.Err(err))
 	}
 
 	if jsonErr := c.JSON(status, internal.ErrorResponse{Code: code, Message: msg}); jsonErr != nil {
-		log.Errorfc(ctx, "[admin] failed to write error response: %v", jsonErr)
+		applog.Error(ctx, "[admin] failed to write error response", applog.Err(jsonErr))
 	}
 }

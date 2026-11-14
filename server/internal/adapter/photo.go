@@ -5,7 +5,7 @@ import (
 	"errors"
 
 	"github.com/reearth/reearth-accounts/server/internal/usecase/gateway"
-	"github.com/reearth/reearthx/log"
+	"github.com/reearth/reearth-accounts/server/pkg/applog"
 	"github.com/sourcegraph/conc/pool"
 )
 
@@ -48,7 +48,7 @@ func (s PhotoSigner) SignAll(ctx context.Context, photos []*string) {
 		p.Go(func() {
 			signed, err := s.Sign(ctx, *photo)
 			if err != nil {
-				log.Errorfc(ctx, "failed to sign photo url: %v", err)
+				applog.Error(ctx, "failed to sign photo url", applog.Err(err))
 			}
 			*photo = signed
 		})

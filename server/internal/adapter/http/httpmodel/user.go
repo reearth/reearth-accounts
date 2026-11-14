@@ -51,8 +51,9 @@ type UserResponse struct {
 	IsDeleted bool       `json:"is_deleted"`
 	DeletedAt *time.Time `json:"deleted_at,omitempty"`
 	CreatedAt *time.Time `json:"created_at,omitempty"`
-	// PlatformRoles and Workspaces are only populated by handlers that batch-fetch
-	// Permittable data (e.g. ListAll); other endpoints leave them nil.
+	// PlatformRoles and Workspaces are populated by GET /api/users/all and by
+	// GET /api/users/{id} when callers request their own record. Other endpoints
+	// leave them nil.
 	PlatformRoles []string                `json:"platform_roles,omitempty"`
 	Workspaces    []UserWorkspaceResponse `json:"workspaces,omitempty"`
 }

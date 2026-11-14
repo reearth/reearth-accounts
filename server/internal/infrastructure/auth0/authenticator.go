@@ -5,6 +5,11 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"go.opentelemetry.io/otel"
+	"go.opentelemetry.io/otel/attribute"
+	"go.opentelemetry.io/otel/codes"
+	semconv "go.opentelemetry.io/otel/semconv/v1.26.0"
+	"go.opentelemetry.io/otel/trace"
 	"io"
 	"net/http"
 	"strings"
@@ -12,16 +17,16 @@ import (
 	"time"
 
 	"github.com/reearth/reearth-accounts/server/internal/usecase/gateway"
+	"github.com/reearth/reearth-accounts/server/pkg/applog"
 	"github.com/reearth/reearthx/i18n"
-	"github.com/reearth/reearthx/log"
 	"github.com/reearth/reearthx/rerror"
 )
 
 type Auth0 struct {
-	domain         string
-	client         *http.Client
-	clientID       string
-	clientSecret   string
+	domain       string
+	client       *http.Client
+	clientID     string
+	clientSecret string
 	// token and expireAt are protected by lock (read: RLock, write: Lock).
 	token    string
 	expireAt time.Time
@@ -140,7 +145,7 @@ func (a *Auth0) UpdateUser(ctx context.Context, p gateway.AuthenticatorUpdateUse
 	r, err = a.exec(ctx, http.MethodPatch, "api/v2/users/"+p.ID, a.readToken(), payload)
 	if err != nil {
 		if !a.disableLogging {
-			log.Errorf("auth0: update user: %+v", err)
+			applog.Error(ctx, "auth0: update user", applog.Err(err))
 		}
 		err = rerror.NewE(i18n.T("failed to update user"))
 		return
@@ -173,7 +178,7 @@ func (a *Auth0) ResendVerificationEmail(ctx context.Context, userID string) erro
 	_, err = a.exec(ctx, http.MethodPost, "api/v2/jobs/verification-email", a.readToken(), payload)
 	if err != nil {
 		if !a.disableLogging {
-			log.Errorf("auth0: resend verification email: %+v", err)
+			applog.Error(ctx, "auth0: resend verification email", applog.Err(err))
 		}
 		return rerror.NewE(i18n.T("failed to resend verification email"))
 	}
@@ -189,7 +194,7 @@ func (a *Auth0) DisableMFA(ctx context.Context, sub string) error {
 	var enrollments []enrollment
 	if err := a.execInto(ctx, http.MethodGet, "api/v2/users/"+sub+"/enrollments", a.readToken(), nil, &enrollments); err != nil {
 		if !a.disableLogging {
-			log.Errorf("auth0: disable mfa: list enrollments: %+v", err)
+			applog.Error(ctx, "auth0: disable mfa: list enrollments", applog.Err(err))
 		}
 		return rerror.NewE(i18n.T("failed to list mfa enrollments"))
 	}
@@ -215,7 +220,7 @@ func (a *Auth0) DisableMFA(ctx context.Context, sub string) error {
 		for i, err := range errs {
 			if err != nil {
 				if !a.disableLogging {
-					log.Errorf("auth0: disable mfa: delete enrollment %s: %+v", confirmed[i].ID, err)
+					applog.Error(ctx, "auth0: disable mfa: delete enrollment", applog.EnrollmentID(confirmed[i].ID), applog.Err(err))
 				}
 				return rerror.NewE(i18n.T("failed to delete mfa enrollment"))
 			}
@@ -226,7 +231,7 @@ func (a *Auth0) DisableMFA(ctx context.Context, sub string) error {
 		"app_metadata": map[string]any{"mfa_enabled": false},
 	}); err != nil {
 		if !a.disableLogging {
-			log.Errorf("auth0: disable mfa: update app_metadata: %+v", err)
+			applog.Error(ctx, "auth0: disable mfa: update app_metadata", applog.Err(err))
 		}
 		return rerror.NewE(i18n.T("failed to update mfa status"))
 	}
@@ -244,7 +249,7 @@ func (a *Auth0) EnableMFA(ctx context.Context, sub string) (string, error) {
 		"app_metadata": map[string]any{"mfa_enabled": true},
 	}); err != nil {
 		if !a.disableLogging {
-			log.Errorf("auth0: enable mfa: update app_metadata: %+v", err)
+			applog.Error(ctx, "auth0: enable mfa: update app_metadata", applog.Err(err))
 		}
 		return "", rerror.NewE(i18n.T("failed to update mfa status"))
 	}
@@ -255,7 +260,7 @@ func (a *Auth0) EnableMFA(ctx context.Context, sub string) (string, error) {
 	})
 	if err != nil {
 		if !a.disableLogging {
-			log.Errorf("auth0: enable mfa: create enrollment ticket: %+v", err)
+			applog.Error(ctx, "auth0: enable mfa: create enrollment ticket", applog.Err(err))
 		}
 		return "", rerror.NewE(i18n.T("failed to create mfa enrollment ticket"))
 	}
@@ -278,7 +283,7 @@ func (a *Auth0) GetMFAStatus(ctx context.Context, sub string) (gateway.MFAStatus
 	var enrollments []enrollment
 	if err := a.execInto(ctx, http.MethodGet, "api/v2/users/"+sub+"/enrollments", a.readToken(), nil, &enrollments); err != nil {
 		if !a.disableLogging {
-			log.Errorf("auth0: get mfa status: %+v", err)
+			applog.Error(ctx, "auth0: get mfa status", applog.Err(err))
 		}
 		return gateway.MFAStatus{}, rerror.NewE(i18n.T("failed to get mfa status"))
 	}
@@ -303,7 +308,7 @@ func (a *Auth0) GetUser(ctx context.Context, userID string) (gateway.Authenticat
 	r, err := a.exec(ctx, http.MethodGet, "api/v2/users/"+userID, a.readToken(), nil)
 	if err != nil {
 		if !a.disableLogging {
-			log.Errorf("auth0: get user: %+v", err)
+			applog.Error(ctx, "auth0: get user", applog.Err(err))
 		}
 		return gateway.AuthenticatorUser{}, rerror.NewE(i18n.T("failed to get user"))
 	}
@@ -353,7 +358,7 @@ func (a *Auth0) RegenerateMFARecoveryCode(ctx context.Context, sub string) (stri
 	}
 	if err := a.execInto(ctx, http.MethodPost, "api/v2/users/"+sub+"/recovery-code-regeneration", a.readToken(), nil, &r); err != nil {
 		if !a.disableLogging {
-			log.Errorf("auth0: regenerate mfa recovery code: %+v", err)
+			applog.Error(ctx, "auth0: regenerate mfa recovery code", applog.Err(err))
 		}
 		return "", rerror.NewE(i18n.T("failed to regenerate mfa recovery code"))
 	}
@@ -407,14 +412,14 @@ func (a *Auth0) updateToken(ctx context.Context) error {
 	})
 	if err != nil {
 		if !a.disableLogging {
-			log.Errorf("auth0: access token error: %+v", err)
+			applog.Error(ctx, "auth0: access token error", applog.Err(err))
 		}
 		return rerror.NewE(i18n.T("failed to auth"))
 	}
 
 	if r.Token == "" {
 		if !a.disableLogging {
-			log.Errorf("auth0: no token: %+v", r)
+			applog.Error(ctx, "auth0: no token")
 		}
 		return rerror.NewE(i18n.T("failed to auth"))
 	}
@@ -429,6 +434,9 @@ func (a *Auth0) exec(ctx context.Context, method, path, token string, b interfac
 		err = rerror.NewE(i18n.T("auth0: domain is not set"))
 		return
 	}
+
+	ctx, span := startSpan(ctx, method, path)
+	defer func() { endSpan(span, err) }()
 
 	var body io.Reader = nil
 	if b != nil {
@@ -459,6 +467,7 @@ func (a *Auth0) exec(ctx context.Context, method, path, token string, b interfac
 	if err != nil {
 		return
 	}
+	span.SetAttributes(semconv.HTTPResponseStatusCode(resp.StatusCode))
 
 	defer func() {
 		_ = resp.Body.Close()
@@ -470,7 +479,7 @@ func (a *Auth0) exec(ctx context.Context, method, path, token string, b interfac
 	}
 
 	if !a.disableLogging {
-		log.Infof("auth0: path: %s, status: %d", path, resp.StatusCode)
+		applog.Info(ctx, "auth0: response", applog.Path(auth0Route(path)), applog.Status(resp.StatusCode))
 	}
 
 	if err = json.Unmarshal(respb, &r); err != nil {
@@ -486,10 +495,13 @@ func (a *Auth0) exec(ctx context.Context, method, path, token string, b interfac
 
 // execInto is like exec but unmarshals the response into target (any type, including
 // slices). Pass nil for target on endpoints that return 204 No Content.
-func (a *Auth0) execInto(ctx context.Context, method, path, token string, b, target any) error {
+func (a *Auth0) execInto(ctx context.Context, method, path, token string, b, target any) (err error) {
 	if a == nil || a.domain == "" {
 		return rerror.NewE(i18n.T("auth0: domain is not set"))
 	}
+
+	ctx, span := startSpan(ctx, method, path)
+	defer func() { endSpan(span, err) }()
 
 	var body io.Reader
 	if b != nil {
@@ -515,6 +527,7 @@ func (a *Auth0) execInto(ctx context.Context, method, path, token string, b, tar
 		return err
 	}
 	defer func() { _ = resp.Body.Close() }()
+	span.SetAttributes(semconv.HTTPResponseStatusCode(resp.StatusCode))
 
 	if resp.StatusCode == http.StatusNoContent {
 		return nil
@@ -526,7 +539,7 @@ func (a *Auth0) execInto(ctx context.Context, method, path, token string, b, tar
 	}
 
 	if !a.disableLogging {
-		log.Infof("auth0: path: %s, status: %d", path, resp.StatusCode)
+		applog.Info(ctx, "auth0: response", applog.Path(auth0Route(path)), applog.Status(resp.StatusCode))
 	}
 
 	if resp.StatusCode >= 300 {
@@ -545,6 +558,41 @@ func (a *Auth0) execInto(ctx context.Context, method, path, token string, b, tar
 
 	return nil
 }
+
+var tracer = otel.Tracer("github.com/reearth/reearth-accounts/server/internal/infrastructure/auth0")
+
+// startSpan starts a client span for an Auth0 call. It names the route, not
+// the URL, so the span never carries an Auth0 user ID.
+func startSpan(ctx context.Context, method, path string) (context.Context, trace.Span) {
+	route := auth0Route(path)
+	return tracer.Start(ctx, "auth0 "+method+" "+route,
+		trace.WithSpanKind(trace.SpanKindClient),
+		trace.WithAttributes(
+			semconv.HTTPRequestMethodKey.String(method),
+			attribute.String("auth0.route", route),
+		),
+	)
+}
+
+// endSpan does not record the error text: Auth0 messages can quote user input.
+func endSpan(span trace.Span, err error) {
+	if err != nil {
+		span.SetStatus(codes.Error, "auth0 request failed")
+	}
+	span.End()
+}
+
+// auth0Route replaces the user ID in a Management API path with a
+// placeholder, since Auth0 user IDs identify a person's account.
+func auth0Route(path string) string {
+	path = strings.TrimPrefix(path, "/")
+	if strings.HasPrefix(path, usersPathPrefix) {
+		return usersPathPrefix + "{id}"
+	}
+	return path
+}
+
+const usersPathPrefix = "api/v2/users/"
 
 func urlFromDomain(path string) string {
 	if path == "" {

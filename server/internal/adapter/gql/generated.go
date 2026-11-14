@@ -42,12 +42,12 @@ type ResolverRoot interface {
 	Me() MeResolver
 	Mutation() MutationResolver
 	Query() QueryResolver
-	User() UserResolver
 	UserMetadata() UserMetadataResolver
 	WorkspaceUserMember() WorkspaceUserMemberResolver
 }
 
 type DirectiveRoot struct {
+	Visibility func(ctx context.Context, obj any, next graphql.Resolver, level gqlmodel.VisibilityLevel) (res any, err error)
 }
 
 type ComplexityRoot struct {
@@ -136,6 +136,19 @@ type ComplexityRoot struct {
 		VerifyUser                       func(childComplexity int, input gqlmodel.VerifyUserInput) int
 	}
 
+	PublicWorkspace struct {
+		Alias   func(childComplexity int) int
+		ID      func(childComplexity int) int
+		Members func(childComplexity int) int
+		Name    func(childComplexity int) int
+	}
+
+	PublicWorkspaceMember struct {
+		Alias    func(childComplexity int) int
+		Name     func(childComplexity int) int
+		PhotoURL func(childComplexity int) int
+	}
+
 	Query struct {
 		AuthConfig                   func(childComplexity int) int
 		CheckPermission              func(childComplexity int, input gqlmodel.CheckPermissionInput) int
@@ -152,6 +165,7 @@ type ComplexityRoot struct {
 		MfaStatus                    func(childComplexity int) int
 		Node                         func(childComplexity int, id gqlmodel.ID, typeArg gqlmodel.NodeType) int
 		Nodes                        func(childComplexity int, id []gqlmodel.ID, typeArg gqlmodel.NodeType) int
+		PublicWorkspace              func(childComplexity int, id *gqlmodel.ID, alias *string) int
 		SearchUser                   func(childComplexity int, keyword string) int
 		User                         func(childComplexity int, id gqlmodel.ID) int
 		UserByNameOrAlias            func(childComplexity int, nameOrAlias string) int
@@ -305,9 +319,7 @@ type QueryResolver interface {
 	FindByAlias(ctx context.Context, alias string) (*gqlmodel.Workspace, error)
 	FindByUser(ctx context.Context, userID gqlmodel.ID) ([]*gqlmodel.Workspace, error)
 	FindByUserWithPagination(ctx context.Context, userID gqlmodel.ID, pagination gqlmodel.Pagination) (*gqlmodel.WorkspacesWithPagination, error)
-}
-type UserResolver interface {
-	Email(ctx context.Context, obj *gqlmodel.User) (string, error)
+	PublicWorkspace(ctx context.Context, id *gqlmodel.ID, alias *string) (*gqlmodel.PublicWorkspace, error)
 }
 type UserMetadataResolver interface {
 	PhotoURL(ctx context.Context, obj *gqlmodel.UserMetadata) (string, error)
@@ -768,6 +780,50 @@ func (e *executableSchema) Complexity(ctx context.Context, typeName, field strin
 
 		return e.complexity.Mutation.VerifyUser(childComplexity, args["input"].(gqlmodel.VerifyUserInput)), true
 
+	case "PublicWorkspace.alias":
+		if e.complexity.PublicWorkspace.Alias == nil {
+			break
+		}
+
+		return e.complexity.PublicWorkspace.Alias(childComplexity), true
+	case "PublicWorkspace.id":
+		if e.complexity.PublicWorkspace.ID == nil {
+			break
+		}
+
+		return e.complexity.PublicWorkspace.ID(childComplexity), true
+	case "PublicWorkspace.members":
+		if e.complexity.PublicWorkspace.Members == nil {
+			break
+		}
+
+		return e.complexity.PublicWorkspace.Members(childComplexity), true
+	case "PublicWorkspace.name":
+		if e.complexity.PublicWorkspace.Name == nil {
+			break
+		}
+
+		return e.complexity.PublicWorkspace.Name(childComplexity), true
+
+	case "PublicWorkspaceMember.alias":
+		if e.complexity.PublicWorkspaceMember.Alias == nil {
+			break
+		}
+
+		return e.complexity.PublicWorkspaceMember.Alias(childComplexity), true
+	case "PublicWorkspaceMember.name":
+		if e.complexity.PublicWorkspaceMember.Name == nil {
+			break
+		}
+
+		return e.complexity.PublicWorkspaceMember.Name(childComplexity), true
+	case "PublicWorkspaceMember.photoURL":
+		if e.complexity.PublicWorkspaceMember.PhotoURL == nil {
+			break
+		}
+
+		return e.complexity.PublicWorkspaceMember.PhotoURL(childComplexity), true
+
 	case "Query.authConfig":
 		if e.complexity.Query.AuthConfig == nil {
 			break
@@ -918,6 +974,17 @@ func (e *executableSchema) Complexity(ctx context.Context, typeName, field strin
 		}
 
 		return e.complexity.Query.Nodes(childComplexity, args["id"].([]gqlmodel.ID), args["type"].(gqlmodel.NodeType)), true
+	case "Query.publicWorkspace":
+		if e.complexity.Query.PublicWorkspace == nil {
+			break
+		}
+
+		args, err := ec.field_Query_publicWorkspace_args(ctx, rawArgs)
+		if err != nil {
+			return 0, false
+		}
+
+		return e.complexity.Query.PublicWorkspace(childComplexity, args["id"].(*gqlmodel.ID), args["alias"].(*string)), true
 	case "Query.searchUser":
 		if e.complexity.Query.SearchUser == nil {
 			break
@@ -1392,6 +1459,27 @@ func (ec *executionContext) introspectType(name string) (*introspection.Type, er
 
 var sources = []*ast.Source{
 	{Name: "../../../schemas/_shared.graphql", Input: `
+"""
+Marks a Query or Mutation field as callable without a token. Every other field
+requires authentication. The auth middleware reads this directive at startup.
+"""
+directive @public on FIELD_DEFINITION
+
+"""
+Who may read a field that carries user data. The owner is the user the
+enclosing object describes. A hidden field returns its empty value.
+"""
+enum VisibilityLevel {
+  "Anyone who can reach the object."
+  PUBLIC
+  "Only the owner."
+  SELF
+  "The owner, and users who are members of a workspace the owner is a member of."
+  WORKSPACE
+}
+
+directive @visibility(level: VisibilityLevel!) on FIELD_DEFINITION
+
 interface Node {
   id: ID!
 }
@@ -1458,7 +1546,7 @@ extend type Query {
   Get authentication configuration for client applications.
   This endpoint does not require authentication and returns public auth configuration.
   """
-  authConfig: AuthConfig
+  authConfig: AuthConfig @public
 }
 `, BuiltIn: false},
 	{Name: "../../../schemas/cerbos.graphql", Input: `input CheckPermissionInput {
@@ -1477,41 +1565,41 @@ extend type Query {
 }
 `, BuiltIn: false},
 	{Name: "../../../schemas/user.graphql", Input: `type User implements Node {
-  id: ID!
-  name: String!
-  alias: String!
-  email: String!
-  host: String
-  workspace: ID!
-  auths: [String!]!
-  metadata: UserMetadata!
-  verification: Verification
+  id: ID! @visibility(level: PUBLIC)
+  name: String! @visibility(level: PUBLIC)
+  alias: String! @visibility(level: PUBLIC)
+  email: String! @visibility(level: SELF)
+  host: String @visibility(level: PUBLIC)
+  workspace: ID! @visibility(level: PUBLIC)
+  auths: [String!]! @visibility(level: PUBLIC)
+  metadata: UserMetadata! @visibility(level: PUBLIC)
+  verification: Verification @visibility(level: PUBLIC)
 }
 
 type Me {
-  id: ID!
-  name: String!
-  alias: String!
-  email: String!
-  metadata: UserMetadata!
-  host: String
-  latestLogoutAt: DateTime
-  myWorkspaceId: ID!
-  auths: [String!]!
-  myWorkspace: Workspace!
+  id: ID! @visibility(level: SELF)
+  name: String! @visibility(level: SELF)
+  alias: String! @visibility(level: SELF)
+  email: String! @visibility(level: SELF)
+  metadata: UserMetadata! @visibility(level: SELF)
+  host: String @visibility(level: SELF)
+  latestLogoutAt: DateTime @visibility(level: SELF)
+  myWorkspaceId: ID! @visibility(level: SELF)
+  auths: [String!]! @visibility(level: SELF)
+  myWorkspace: Workspace! @visibility(level: SELF)
 }
 
 type UserMetadata {
-  description: String!
-  website: String!
-  photoURL: String!
-  lang: Lang!
-  theme: Theme!
+  description: String! @visibility(level: PUBLIC)
+  website: String! @visibility(level: PUBLIC)
+  photoURL: String! @visibility(level: PUBLIC)
+  lang: Lang! @visibility(level: PUBLIC)
+  theme: Theme! @visibility(level: PUBLIC)
 }
 
 type Verification {
-  expiration: String!
-  verified: Boolean!
+  expiration: String! @visibility(level: PUBLIC)
+  verified: Boolean! @visibility(level: PUBLIC)
 }
 
 type MFAEnrollResult {
@@ -1600,7 +1688,7 @@ input DeleteMeInput {
 
 extend type Query {
   findUserByAlias(alias: String!): User
-  findUsersByIDsWithPagination(ids: [ID!]!, alias: String, pagination: Pagination!): UsersWithPagination!
+  findUsersByIDsWithPagination(ids: [ID!]!, alias: String, pagination: Pagination!): UsersWithPagination! @public
   findUsersByIDs(ids: [ID!]!): [User!]!
   me: Me
   mfaStatus: MFAStatus!
@@ -1623,7 +1711,7 @@ type DeleteMePayload {
 }
 
 extend type Mutation {
-  createVerification(input: CreateVerificationInput!): Boolean
+  createVerification(input: CreateVerificationInput!): Boolean @public
   deleteMe(input: DeleteMeInput!): DeleteMePayload
   disableMFA: Boolean!
   enableMFA: MFAEnrollResult!
@@ -1632,9 +1720,9 @@ extend type Mutation {
   passwordReset(input: PasswordResetInput!): Boolean
   regenerateMFARecoveryCode: MFARecoveryCodeResult!
   removeMyAuth(input: RemoveMyAuthInput!): UpdateMePayload
-  signup(input: SignupInput!): UserPayload
-  signupOIDC(input: SignupOIDCInput!): UserPayload
-  startPasswordReset(input: StartPasswordResetInput!): Boolean
+  signup(input: SignupInput!): UserPayload @public
+  signupOIDC(input: SignupOIDCInput!): UserPayload @public
+  startPasswordReset(input: StartPasswordResetInput!): Boolean @public
   updateMe(input: UpdateMeInput!): UpdateMePayload
   verifyUser(input: VerifyUserInput!): UserPayload
 }
@@ -1651,10 +1739,10 @@ extend type Mutation {
 union WorkspaceMember = WorkspaceUserMember | WorkspaceIntegrationMember
 
 type WorkspaceUserMember {
-    userId: ID!
-    role: Role!
-    host: String
-    user: User
+    userId: ID! @visibility(level: PUBLIC)
+    role: Role! @visibility(level: PUBLIC)
+    host: String @visibility(level: PUBLIC)
+    user: User @visibility(level: PUBLIC)
 }
 
 type WorkspaceIntegrationMember {
@@ -1671,6 +1759,23 @@ type WorkspaceMetadata {
     location: String!
     billingEmail: String!
     photoURL: String!
+}
+
+"""
+A workspace as an anonymous caller may see it. It leaves out member roles,
+emails and user IDs (ADR-0003 decision 2).
+"""
+type PublicWorkspace {
+    id: ID!
+    name: String!
+    alias: String!
+    members: [PublicWorkspaceMember!]!
+}
+
+type PublicWorkspaceMember {
+    name: String! @visibility(level: PUBLIC)
+    alias: String! @visibility(level: PUBLIC)
+    photoURL: String! @visibility(level: PUBLIC)
 }
 
 type WorkspacesWithPagination {
@@ -1802,12 +1907,14 @@ type DeleteWorkspacePayload {
 
 # TODO: rename it to findWorkspace** as a prefix to avoid conflict with other entities
 extend type Query {
-    findByID(id: ID!): Workspace!
-    findByIDs(ids: [ID!]!): [Workspace!]!
+    findByID(id: ID!): Workspace! @public
+    findByIDs(ids: [ID!]!): [Workspace!]! @public
     findByName(name: String!): Workspace
-    findByAlias(alias: String!): Workspace
+    findByAlias(alias: String!): Workspace @public
     findByUser(userId: ID!): [Workspace]
     findByUserWithPagination(userId: ID!, pagination: Pagination!): WorkspacesWithPagination!
+    "Looks a workspace up by exactly one of id or alias. Returns null when none matches."
+    publicWorkspace(id: ID, alias: String): PublicWorkspace @public
 }
 
 extend type Mutation {
@@ -1830,6 +1937,17 @@ var parsedSchema = gqlparser.MustLoadSchema(sources...)
 // endregion ************************** generated!.gotpl **************************
 
 // region    ***************************** args.gotpl *****************************
+
+func (ec *executionContext) dir_visibility_args(ctx context.Context, rawArgs map[string]any) (map[string]any, error) {
+	var err error
+	args := map[string]any{}
+	arg0, err := graphql.ProcessArgField(ctx, rawArgs, "level", ec.unmarshalNVisibilityLevel2githubᚗcomᚋreearthᚋreearthᚑaccountsᚋserverᚋinternalᚋadapterᚋgqlᚋgqlmodelᚐVisibilityLevel)
+	if err != nil {
+		return nil, err
+	}
+	args["level"] = arg0
+	return args, nil
+}
 
 func (ec *executionContext) field_Mutation_addIntegrationToWorkspace_args(ctx context.Context, rawArgs map[string]any) (map[string]any, error) {
 	var err error
@@ -2238,6 +2356,22 @@ func (ec *executionContext) field_Query_nodes_args(ctx context.Context, rawArgs 
 		return nil, err
 	}
 	args["type"] = arg1
+	return args, nil
+}
+
+func (ec *executionContext) field_Query_publicWorkspace_args(ctx context.Context, rawArgs map[string]any) (map[string]any, error) {
+	var err error
+	args := map[string]any{}
+	arg0, err := graphql.ProcessArgField(ctx, rawArgs, "id", ec.unmarshalOID2ᚖgithubᚗcomᚋreearthᚋreearthᚑaccountsᚋserverᚋinternalᚋadapterᚋgqlᚋgqlmodelᚐID)
+	if err != nil {
+		return nil, err
+	}
+	args["id"] = arg0
+	arg1, err := graphql.ProcessArgField(ctx, rawArgs, "alias", ec.unmarshalOString2ᚖstring)
+	if err != nil {
+		return nil, err
+	}
+	args["alias"] = arg1
 	return args, nil
 }
 
@@ -2838,7 +2972,25 @@ func (ec *executionContext) _Me_id(ctx context.Context, field graphql.CollectedF
 		func(ctx context.Context) (any, error) {
 			return obj.ID, nil
 		},
-		nil,
+		func(ctx context.Context, next graphql.Resolver) graphql.Resolver {
+			directive0 := next
+
+			directive1 := func(ctx context.Context) (any, error) {
+				level, err := ec.unmarshalNVisibilityLevel2githubᚗcomᚋreearthᚋreearthᚑaccountsᚋserverᚋinternalᚋadapterᚋgqlᚋgqlmodelᚐVisibilityLevel(ctx, "SELF")
+				if err != nil {
+					var zeroVal gqlmodel.ID
+					return zeroVal, err
+				}
+				if ec.directives.Visibility == nil {
+					var zeroVal gqlmodel.ID
+					return zeroVal, errors.New("directive visibility is not implemented")
+				}
+				return ec.directives.Visibility(ctx, obj, directive0, level)
+			}
+
+			next = directive1
+			return next
+		},
 		ec.marshalNID2githubᚗcomᚋreearthᚋreearthᚑaccountsᚋserverᚋinternalᚋadapterᚋgqlᚋgqlmodelᚐID,
 		true,
 		true,
@@ -2867,7 +3019,25 @@ func (ec *executionContext) _Me_name(ctx context.Context, field graphql.Collecte
 		func(ctx context.Context) (any, error) {
 			return obj.Name, nil
 		},
-		nil,
+		func(ctx context.Context, next graphql.Resolver) graphql.Resolver {
+			directive0 := next
+
+			directive1 := func(ctx context.Context) (any, error) {
+				level, err := ec.unmarshalNVisibilityLevel2githubᚗcomᚋreearthᚋreearthᚑaccountsᚋserverᚋinternalᚋadapterᚋgqlᚋgqlmodelᚐVisibilityLevel(ctx, "SELF")
+				if err != nil {
+					var zeroVal string
+					return zeroVal, err
+				}
+				if ec.directives.Visibility == nil {
+					var zeroVal string
+					return zeroVal, errors.New("directive visibility is not implemented")
+				}
+				return ec.directives.Visibility(ctx, obj, directive0, level)
+			}
+
+			next = directive1
+			return next
+		},
 		ec.marshalNString2string,
 		true,
 		true,
@@ -2896,7 +3066,25 @@ func (ec *executionContext) _Me_alias(ctx context.Context, field graphql.Collect
 		func(ctx context.Context) (any, error) {
 			return obj.Alias, nil
 		},
-		nil,
+		func(ctx context.Context, next graphql.Resolver) graphql.Resolver {
+			directive0 := next
+
+			directive1 := func(ctx context.Context) (any, error) {
+				level, err := ec.unmarshalNVisibilityLevel2githubᚗcomᚋreearthᚋreearthᚑaccountsᚋserverᚋinternalᚋadapterᚋgqlᚋgqlmodelᚐVisibilityLevel(ctx, "SELF")
+				if err != nil {
+					var zeroVal string
+					return zeroVal, err
+				}
+				if ec.directives.Visibility == nil {
+					var zeroVal string
+					return zeroVal, errors.New("directive visibility is not implemented")
+				}
+				return ec.directives.Visibility(ctx, obj, directive0, level)
+			}
+
+			next = directive1
+			return next
+		},
 		ec.marshalNString2string,
 		true,
 		true,
@@ -2925,7 +3113,25 @@ func (ec *executionContext) _Me_email(ctx context.Context, field graphql.Collect
 		func(ctx context.Context) (any, error) {
 			return obj.Email, nil
 		},
-		nil,
+		func(ctx context.Context, next graphql.Resolver) graphql.Resolver {
+			directive0 := next
+
+			directive1 := func(ctx context.Context) (any, error) {
+				level, err := ec.unmarshalNVisibilityLevel2githubᚗcomᚋreearthᚋreearthᚑaccountsᚋserverᚋinternalᚋadapterᚋgqlᚋgqlmodelᚐVisibilityLevel(ctx, "SELF")
+				if err != nil {
+					var zeroVal string
+					return zeroVal, err
+				}
+				if ec.directives.Visibility == nil {
+					var zeroVal string
+					return zeroVal, errors.New("directive visibility is not implemented")
+				}
+				return ec.directives.Visibility(ctx, obj, directive0, level)
+			}
+
+			next = directive1
+			return next
+		},
 		ec.marshalNString2string,
 		true,
 		true,
@@ -2954,7 +3160,25 @@ func (ec *executionContext) _Me_metadata(ctx context.Context, field graphql.Coll
 		func(ctx context.Context) (any, error) {
 			return obj.Metadata, nil
 		},
-		nil,
+		func(ctx context.Context, next graphql.Resolver) graphql.Resolver {
+			directive0 := next
+
+			directive1 := func(ctx context.Context) (any, error) {
+				level, err := ec.unmarshalNVisibilityLevel2githubᚗcomᚋreearthᚋreearthᚑaccountsᚋserverᚋinternalᚋadapterᚋgqlᚋgqlmodelᚐVisibilityLevel(ctx, "SELF")
+				if err != nil {
+					var zeroVal *gqlmodel.UserMetadata
+					return zeroVal, err
+				}
+				if ec.directives.Visibility == nil {
+					var zeroVal *gqlmodel.UserMetadata
+					return zeroVal, errors.New("directive visibility is not implemented")
+				}
+				return ec.directives.Visibility(ctx, obj, directive0, level)
+			}
+
+			next = directive1
+			return next
+		},
 		ec.marshalNUserMetadata2ᚖgithubᚗcomᚋreearthᚋreearthᚑaccountsᚋserverᚋinternalᚋadapterᚋgqlᚋgqlmodelᚐUserMetadata,
 		true,
 		true,
@@ -2995,7 +3219,25 @@ func (ec *executionContext) _Me_host(ctx context.Context, field graphql.Collecte
 		func(ctx context.Context) (any, error) {
 			return obj.Host, nil
 		},
-		nil,
+		func(ctx context.Context, next graphql.Resolver) graphql.Resolver {
+			directive0 := next
+
+			directive1 := func(ctx context.Context) (any, error) {
+				level, err := ec.unmarshalNVisibilityLevel2githubᚗcomᚋreearthᚋreearthᚑaccountsᚋserverᚋinternalᚋadapterᚋgqlᚋgqlmodelᚐVisibilityLevel(ctx, "SELF")
+				if err != nil {
+					var zeroVal *string
+					return zeroVal, err
+				}
+				if ec.directives.Visibility == nil {
+					var zeroVal *string
+					return zeroVal, errors.New("directive visibility is not implemented")
+				}
+				return ec.directives.Visibility(ctx, obj, directive0, level)
+			}
+
+			next = directive1
+			return next
+		},
 		ec.marshalOString2ᚖstring,
 		true,
 		false,
@@ -3024,7 +3266,25 @@ func (ec *executionContext) _Me_latestLogoutAt(ctx context.Context, field graphq
 		func(ctx context.Context) (any, error) {
 			return obj.LatestLogoutAt, nil
 		},
-		nil,
+		func(ctx context.Context, next graphql.Resolver) graphql.Resolver {
+			directive0 := next
+
+			directive1 := func(ctx context.Context) (any, error) {
+				level, err := ec.unmarshalNVisibilityLevel2githubᚗcomᚋreearthᚋreearthᚑaccountsᚋserverᚋinternalᚋadapterᚋgqlᚋgqlmodelᚐVisibilityLevel(ctx, "SELF")
+				if err != nil {
+					var zeroVal *time.Time
+					return zeroVal, err
+				}
+				if ec.directives.Visibility == nil {
+					var zeroVal *time.Time
+					return zeroVal, errors.New("directive visibility is not implemented")
+				}
+				return ec.directives.Visibility(ctx, obj, directive0, level)
+			}
+
+			next = directive1
+			return next
+		},
 		ec.marshalODateTime2ᚖtimeᚐTime,
 		true,
 		false,
@@ -3053,7 +3313,25 @@ func (ec *executionContext) _Me_myWorkspaceId(ctx context.Context, field graphql
 		func(ctx context.Context) (any, error) {
 			return obj.MyWorkspaceID, nil
 		},
-		nil,
+		func(ctx context.Context, next graphql.Resolver) graphql.Resolver {
+			directive0 := next
+
+			directive1 := func(ctx context.Context) (any, error) {
+				level, err := ec.unmarshalNVisibilityLevel2githubᚗcomᚋreearthᚋreearthᚑaccountsᚋserverᚋinternalᚋadapterᚋgqlᚋgqlmodelᚐVisibilityLevel(ctx, "SELF")
+				if err != nil {
+					var zeroVal gqlmodel.ID
+					return zeroVal, err
+				}
+				if ec.directives.Visibility == nil {
+					var zeroVal gqlmodel.ID
+					return zeroVal, errors.New("directive visibility is not implemented")
+				}
+				return ec.directives.Visibility(ctx, obj, directive0, level)
+			}
+
+			next = directive1
+			return next
+		},
 		ec.marshalNID2githubᚗcomᚋreearthᚋreearthᚑaccountsᚋserverᚋinternalᚋadapterᚋgqlᚋgqlmodelᚐID,
 		true,
 		true,
@@ -3082,7 +3360,25 @@ func (ec *executionContext) _Me_auths(ctx context.Context, field graphql.Collect
 		func(ctx context.Context) (any, error) {
 			return obj.Auths, nil
 		},
-		nil,
+		func(ctx context.Context, next graphql.Resolver) graphql.Resolver {
+			directive0 := next
+
+			directive1 := func(ctx context.Context) (any, error) {
+				level, err := ec.unmarshalNVisibilityLevel2githubᚗcomᚋreearthᚋreearthᚑaccountsᚋserverᚋinternalᚋadapterᚋgqlᚋgqlmodelᚐVisibilityLevel(ctx, "SELF")
+				if err != nil {
+					var zeroVal []string
+					return zeroVal, err
+				}
+				if ec.directives.Visibility == nil {
+					var zeroVal []string
+					return zeroVal, errors.New("directive visibility is not implemented")
+				}
+				return ec.directives.Visibility(ctx, obj, directive0, level)
+			}
+
+			next = directive1
+			return next
+		},
 		ec.marshalNString2ᚕstringᚄ,
 		true,
 		true,
@@ -3111,7 +3407,25 @@ func (ec *executionContext) _Me_myWorkspace(ctx context.Context, field graphql.C
 		func(ctx context.Context) (any, error) {
 			return ec.resolvers.Me().MyWorkspace(ctx, obj)
 		},
-		nil,
+		func(ctx context.Context, next graphql.Resolver) graphql.Resolver {
+			directive0 := next
+
+			directive1 := func(ctx context.Context) (any, error) {
+				level, err := ec.unmarshalNVisibilityLevel2githubᚗcomᚋreearthᚋreearthᚑaccountsᚋserverᚋinternalᚋadapterᚋgqlᚋgqlmodelᚐVisibilityLevel(ctx, "SELF")
+				if err != nil {
+					var zeroVal *gqlmodel.Workspace
+					return zeroVal, err
+				}
+				if ec.directives.Visibility == nil {
+					var zeroVal *gqlmodel.Workspace
+					return zeroVal, errors.New("directive visibility is not implemented")
+				}
+				return ec.directives.Visibility(ctx, obj, directive0, level)
+			}
+
+			next = directive1
+			return next
+		},
 		ec.marshalNWorkspace2ᚖgithubᚗcomᚋreearthᚋreearthᚑaccountsᚋserverᚋinternalᚋadapterᚋgqlᚋgqlmodelᚐWorkspace,
 		true,
 		true,
@@ -4269,6 +4583,271 @@ func (ec *executionContext) fieldContext_Mutation_transferWorkspaceOwnership(ctx
 	return fc, nil
 }
 
+func (ec *executionContext) _PublicWorkspace_id(ctx context.Context, field graphql.CollectedField, obj *gqlmodel.PublicWorkspace) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		ec.fieldContext_PublicWorkspace_id,
+		func(ctx context.Context) (any, error) {
+			return obj.ID, nil
+		},
+		nil,
+		ec.marshalNID2githubᚗcomᚋreearthᚋreearthᚑaccountsᚋserverᚋinternalᚋadapterᚋgqlᚋgqlmodelᚐID,
+		true,
+		true,
+	)
+}
+
+func (ec *executionContext) fieldContext_PublicWorkspace_id(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "PublicWorkspace",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type ID does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _PublicWorkspace_name(ctx context.Context, field graphql.CollectedField, obj *gqlmodel.PublicWorkspace) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		ec.fieldContext_PublicWorkspace_name,
+		func(ctx context.Context) (any, error) {
+			return obj.Name, nil
+		},
+		nil,
+		ec.marshalNString2string,
+		true,
+		true,
+	)
+}
+
+func (ec *executionContext) fieldContext_PublicWorkspace_name(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "PublicWorkspace",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type String does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _PublicWorkspace_alias(ctx context.Context, field graphql.CollectedField, obj *gqlmodel.PublicWorkspace) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		ec.fieldContext_PublicWorkspace_alias,
+		func(ctx context.Context) (any, error) {
+			return obj.Alias, nil
+		},
+		nil,
+		ec.marshalNString2string,
+		true,
+		true,
+	)
+}
+
+func (ec *executionContext) fieldContext_PublicWorkspace_alias(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "PublicWorkspace",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type String does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _PublicWorkspace_members(ctx context.Context, field graphql.CollectedField, obj *gqlmodel.PublicWorkspace) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		ec.fieldContext_PublicWorkspace_members,
+		func(ctx context.Context) (any, error) {
+			return obj.Members, nil
+		},
+		nil,
+		ec.marshalNPublicWorkspaceMember2ᚕᚖgithubᚗcomᚋreearthᚋreearthᚑaccountsᚋserverᚋinternalᚋadapterᚋgqlᚋgqlmodelᚐPublicWorkspaceMemberᚄ,
+		true,
+		true,
+	)
+}
+
+func (ec *executionContext) fieldContext_PublicWorkspace_members(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "PublicWorkspace",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			switch field.Name {
+			case "name":
+				return ec.fieldContext_PublicWorkspaceMember_name(ctx, field)
+			case "alias":
+				return ec.fieldContext_PublicWorkspaceMember_alias(ctx, field)
+			case "photoURL":
+				return ec.fieldContext_PublicWorkspaceMember_photoURL(ctx, field)
+			}
+			return nil, fmt.Errorf("no field named %q was found under type PublicWorkspaceMember", field.Name)
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _PublicWorkspaceMember_name(ctx context.Context, field graphql.CollectedField, obj *gqlmodel.PublicWorkspaceMember) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		ec.fieldContext_PublicWorkspaceMember_name,
+		func(ctx context.Context) (any, error) {
+			return obj.Name, nil
+		},
+		func(ctx context.Context, next graphql.Resolver) graphql.Resolver {
+			directive0 := next
+
+			directive1 := func(ctx context.Context) (any, error) {
+				level, err := ec.unmarshalNVisibilityLevel2githubᚗcomᚋreearthᚋreearthᚑaccountsᚋserverᚋinternalᚋadapterᚋgqlᚋgqlmodelᚐVisibilityLevel(ctx, "PUBLIC")
+				if err != nil {
+					var zeroVal string
+					return zeroVal, err
+				}
+				if ec.directives.Visibility == nil {
+					var zeroVal string
+					return zeroVal, errors.New("directive visibility is not implemented")
+				}
+				return ec.directives.Visibility(ctx, obj, directive0, level)
+			}
+
+			next = directive1
+			return next
+		},
+		ec.marshalNString2string,
+		true,
+		true,
+	)
+}
+
+func (ec *executionContext) fieldContext_PublicWorkspaceMember_name(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "PublicWorkspaceMember",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type String does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _PublicWorkspaceMember_alias(ctx context.Context, field graphql.CollectedField, obj *gqlmodel.PublicWorkspaceMember) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		ec.fieldContext_PublicWorkspaceMember_alias,
+		func(ctx context.Context) (any, error) {
+			return obj.Alias, nil
+		},
+		func(ctx context.Context, next graphql.Resolver) graphql.Resolver {
+			directive0 := next
+
+			directive1 := func(ctx context.Context) (any, error) {
+				level, err := ec.unmarshalNVisibilityLevel2githubᚗcomᚋreearthᚋreearthᚑaccountsᚋserverᚋinternalᚋadapterᚋgqlᚋgqlmodelᚐVisibilityLevel(ctx, "PUBLIC")
+				if err != nil {
+					var zeroVal string
+					return zeroVal, err
+				}
+				if ec.directives.Visibility == nil {
+					var zeroVal string
+					return zeroVal, errors.New("directive visibility is not implemented")
+				}
+				return ec.directives.Visibility(ctx, obj, directive0, level)
+			}
+
+			next = directive1
+			return next
+		},
+		ec.marshalNString2string,
+		true,
+		true,
+	)
+}
+
+func (ec *executionContext) fieldContext_PublicWorkspaceMember_alias(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "PublicWorkspaceMember",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type String does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _PublicWorkspaceMember_photoURL(ctx context.Context, field graphql.CollectedField, obj *gqlmodel.PublicWorkspaceMember) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		ec.fieldContext_PublicWorkspaceMember_photoURL,
+		func(ctx context.Context) (any, error) {
+			return obj.PhotoURL, nil
+		},
+		func(ctx context.Context, next graphql.Resolver) graphql.Resolver {
+			directive0 := next
+
+			directive1 := func(ctx context.Context) (any, error) {
+				level, err := ec.unmarshalNVisibilityLevel2githubᚗcomᚋreearthᚋreearthᚑaccountsᚋserverᚋinternalᚋadapterᚋgqlᚋgqlmodelᚐVisibilityLevel(ctx, "PUBLIC")
+				if err != nil {
+					var zeroVal string
+					return zeroVal, err
+				}
+				if ec.directives.Visibility == nil {
+					var zeroVal string
+					return zeroVal, errors.New("directive visibility is not implemented")
+				}
+				return ec.directives.Visibility(ctx, obj, directive0, level)
+			}
+
+			next = directive1
+			return next
+		},
+		ec.marshalNString2string,
+		true,
+		true,
+	)
+}
+
+func (ec *executionContext) fieldContext_PublicWorkspaceMember_photoURL(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "PublicWorkspaceMember",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type String does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
 func (ec *executionContext) _Query_node(ctx context.Context, field graphql.CollectedField) (ret graphql.Marshaler) {
 	return graphql.ResolveField(
 		ctx,
@@ -5262,6 +5841,57 @@ func (ec *executionContext) fieldContext_Query_findByUserWithPagination(ctx cont
 	return fc, nil
 }
 
+func (ec *executionContext) _Query_publicWorkspace(ctx context.Context, field graphql.CollectedField) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		ec.fieldContext_Query_publicWorkspace,
+		func(ctx context.Context) (any, error) {
+			fc := graphql.GetFieldContext(ctx)
+			return ec.resolvers.Query().PublicWorkspace(ctx, fc.Args["id"].(*gqlmodel.ID), fc.Args["alias"].(*string))
+		},
+		nil,
+		ec.marshalOPublicWorkspace2ᚖgithubᚗcomᚋreearthᚋreearthᚑaccountsᚋserverᚋinternalᚋadapterᚋgqlᚋgqlmodelᚐPublicWorkspace,
+		true,
+		false,
+	)
+}
+
+func (ec *executionContext) fieldContext_Query_publicWorkspace(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "Query",
+		Field:      field,
+		IsMethod:   true,
+		IsResolver: true,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			switch field.Name {
+			case "id":
+				return ec.fieldContext_PublicWorkspace_id(ctx, field)
+			case "name":
+				return ec.fieldContext_PublicWorkspace_name(ctx, field)
+			case "alias":
+				return ec.fieldContext_PublicWorkspace_alias(ctx, field)
+			case "members":
+				return ec.fieldContext_PublicWorkspace_members(ctx, field)
+			}
+			return nil, fmt.Errorf("no field named %q was found under type PublicWorkspace", field.Name)
+		},
+	}
+	defer func() {
+		if r := recover(); r != nil {
+			err = ec.Recover(ctx, r)
+			ec.Error(ctx, err)
+		}
+	}()
+	ctx = graphql.WithFieldContext(ctx, fc)
+	if fc.Args, err = ec.field_Query_publicWorkspace_args(ctx, field.ArgumentMap(ec.Variables)); err != nil {
+		ec.Error(ctx, err)
+		return fc, err
+	}
+	return fc, nil
+}
+
 func (ec *executionContext) _Query___type(ctx context.Context, field graphql.CollectedField) (ret graphql.Marshaler) {
 	return graphql.ResolveField(
 		ctx,
@@ -5645,7 +6275,25 @@ func (ec *executionContext) _User_id(ctx context.Context, field graphql.Collecte
 		func(ctx context.Context) (any, error) {
 			return obj.ID, nil
 		},
-		nil,
+		func(ctx context.Context, next graphql.Resolver) graphql.Resolver {
+			directive0 := next
+
+			directive1 := func(ctx context.Context) (any, error) {
+				level, err := ec.unmarshalNVisibilityLevel2githubᚗcomᚋreearthᚋreearthᚑaccountsᚋserverᚋinternalᚋadapterᚋgqlᚋgqlmodelᚐVisibilityLevel(ctx, "PUBLIC")
+				if err != nil {
+					var zeroVal gqlmodel.ID
+					return zeroVal, err
+				}
+				if ec.directives.Visibility == nil {
+					var zeroVal gqlmodel.ID
+					return zeroVal, errors.New("directive visibility is not implemented")
+				}
+				return ec.directives.Visibility(ctx, obj, directive0, level)
+			}
+
+			next = directive1
+			return next
+		},
 		ec.marshalNID2githubᚗcomᚋreearthᚋreearthᚑaccountsᚋserverᚋinternalᚋadapterᚋgqlᚋgqlmodelᚐID,
 		true,
 		true,
@@ -5674,7 +6322,25 @@ func (ec *executionContext) _User_name(ctx context.Context, field graphql.Collec
 		func(ctx context.Context) (any, error) {
 			return obj.Name, nil
 		},
-		nil,
+		func(ctx context.Context, next graphql.Resolver) graphql.Resolver {
+			directive0 := next
+
+			directive1 := func(ctx context.Context) (any, error) {
+				level, err := ec.unmarshalNVisibilityLevel2githubᚗcomᚋreearthᚋreearthᚑaccountsᚋserverᚋinternalᚋadapterᚋgqlᚋgqlmodelᚐVisibilityLevel(ctx, "PUBLIC")
+				if err != nil {
+					var zeroVal string
+					return zeroVal, err
+				}
+				if ec.directives.Visibility == nil {
+					var zeroVal string
+					return zeroVal, errors.New("directive visibility is not implemented")
+				}
+				return ec.directives.Visibility(ctx, obj, directive0, level)
+			}
+
+			next = directive1
+			return next
+		},
 		ec.marshalNString2string,
 		true,
 		true,
@@ -5703,7 +6369,25 @@ func (ec *executionContext) _User_alias(ctx context.Context, field graphql.Colle
 		func(ctx context.Context) (any, error) {
 			return obj.Alias, nil
 		},
-		nil,
+		func(ctx context.Context, next graphql.Resolver) graphql.Resolver {
+			directive0 := next
+
+			directive1 := func(ctx context.Context) (any, error) {
+				level, err := ec.unmarshalNVisibilityLevel2githubᚗcomᚋreearthᚋreearthᚑaccountsᚋserverᚋinternalᚋadapterᚋgqlᚋgqlmodelᚐVisibilityLevel(ctx, "PUBLIC")
+				if err != nil {
+					var zeroVal string
+					return zeroVal, err
+				}
+				if ec.directives.Visibility == nil {
+					var zeroVal string
+					return zeroVal, errors.New("directive visibility is not implemented")
+				}
+				return ec.directives.Visibility(ctx, obj, directive0, level)
+			}
+
+			next = directive1
+			return next
+		},
 		ec.marshalNString2string,
 		true,
 		true,
@@ -5730,9 +6414,27 @@ func (ec *executionContext) _User_email(ctx context.Context, field graphql.Colle
 		field,
 		ec.fieldContext_User_email,
 		func(ctx context.Context) (any, error) {
-			return ec.resolvers.User().Email(ctx, obj)
+			return obj.Email, nil
 		},
-		nil,
+		func(ctx context.Context, next graphql.Resolver) graphql.Resolver {
+			directive0 := next
+
+			directive1 := func(ctx context.Context) (any, error) {
+				level, err := ec.unmarshalNVisibilityLevel2githubᚗcomᚋreearthᚋreearthᚑaccountsᚋserverᚋinternalᚋadapterᚋgqlᚋgqlmodelᚐVisibilityLevel(ctx, "SELF")
+				if err != nil {
+					var zeroVal string
+					return zeroVal, err
+				}
+				if ec.directives.Visibility == nil {
+					var zeroVal string
+					return zeroVal, errors.New("directive visibility is not implemented")
+				}
+				return ec.directives.Visibility(ctx, obj, directive0, level)
+			}
+
+			next = directive1
+			return next
+		},
 		ec.marshalNString2string,
 		true,
 		true,
@@ -5743,8 +6445,8 @@ func (ec *executionContext) fieldContext_User_email(_ context.Context, field gra
 	fc = &graphql.FieldContext{
 		Object:     "User",
 		Field:      field,
-		IsMethod:   true,
-		IsResolver: true,
+		IsMethod:   false,
+		IsResolver: false,
 		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
 			return nil, errors.New("field of type String does not have child fields")
 		},
@@ -5761,7 +6463,25 @@ func (ec *executionContext) _User_host(ctx context.Context, field graphql.Collec
 		func(ctx context.Context) (any, error) {
 			return obj.Host, nil
 		},
-		nil,
+		func(ctx context.Context, next graphql.Resolver) graphql.Resolver {
+			directive0 := next
+
+			directive1 := func(ctx context.Context) (any, error) {
+				level, err := ec.unmarshalNVisibilityLevel2githubᚗcomᚋreearthᚋreearthᚑaccountsᚋserverᚋinternalᚋadapterᚋgqlᚋgqlmodelᚐVisibilityLevel(ctx, "PUBLIC")
+				if err != nil {
+					var zeroVal *string
+					return zeroVal, err
+				}
+				if ec.directives.Visibility == nil {
+					var zeroVal *string
+					return zeroVal, errors.New("directive visibility is not implemented")
+				}
+				return ec.directives.Visibility(ctx, obj, directive0, level)
+			}
+
+			next = directive1
+			return next
+		},
 		ec.marshalOString2ᚖstring,
 		true,
 		false,
@@ -5790,7 +6510,25 @@ func (ec *executionContext) _User_workspace(ctx context.Context, field graphql.C
 		func(ctx context.Context) (any, error) {
 			return obj.Workspace, nil
 		},
-		nil,
+		func(ctx context.Context, next graphql.Resolver) graphql.Resolver {
+			directive0 := next
+
+			directive1 := func(ctx context.Context) (any, error) {
+				level, err := ec.unmarshalNVisibilityLevel2githubᚗcomᚋreearthᚋreearthᚑaccountsᚋserverᚋinternalᚋadapterᚋgqlᚋgqlmodelᚐVisibilityLevel(ctx, "PUBLIC")
+				if err != nil {
+					var zeroVal gqlmodel.ID
+					return zeroVal, err
+				}
+				if ec.directives.Visibility == nil {
+					var zeroVal gqlmodel.ID
+					return zeroVal, errors.New("directive visibility is not implemented")
+				}
+				return ec.directives.Visibility(ctx, obj, directive0, level)
+			}
+
+			next = directive1
+			return next
+		},
 		ec.marshalNID2githubᚗcomᚋreearthᚋreearthᚑaccountsᚋserverᚋinternalᚋadapterᚋgqlᚋgqlmodelᚐID,
 		true,
 		true,
@@ -5819,7 +6557,25 @@ func (ec *executionContext) _User_auths(ctx context.Context, field graphql.Colle
 		func(ctx context.Context) (any, error) {
 			return obj.Auths, nil
 		},
-		nil,
+		func(ctx context.Context, next graphql.Resolver) graphql.Resolver {
+			directive0 := next
+
+			directive1 := func(ctx context.Context) (any, error) {
+				level, err := ec.unmarshalNVisibilityLevel2githubᚗcomᚋreearthᚋreearthᚑaccountsᚋserverᚋinternalᚋadapterᚋgqlᚋgqlmodelᚐVisibilityLevel(ctx, "PUBLIC")
+				if err != nil {
+					var zeroVal []string
+					return zeroVal, err
+				}
+				if ec.directives.Visibility == nil {
+					var zeroVal []string
+					return zeroVal, errors.New("directive visibility is not implemented")
+				}
+				return ec.directives.Visibility(ctx, obj, directive0, level)
+			}
+
+			next = directive1
+			return next
+		},
 		ec.marshalNString2ᚕstringᚄ,
 		true,
 		true,
@@ -5848,7 +6604,25 @@ func (ec *executionContext) _User_metadata(ctx context.Context, field graphql.Co
 		func(ctx context.Context) (any, error) {
 			return obj.Metadata, nil
 		},
-		nil,
+		func(ctx context.Context, next graphql.Resolver) graphql.Resolver {
+			directive0 := next
+
+			directive1 := func(ctx context.Context) (any, error) {
+				level, err := ec.unmarshalNVisibilityLevel2githubᚗcomᚋreearthᚋreearthᚑaccountsᚋserverᚋinternalᚋadapterᚋgqlᚋgqlmodelᚐVisibilityLevel(ctx, "PUBLIC")
+				if err != nil {
+					var zeroVal *gqlmodel.UserMetadata
+					return zeroVal, err
+				}
+				if ec.directives.Visibility == nil {
+					var zeroVal *gqlmodel.UserMetadata
+					return zeroVal, errors.New("directive visibility is not implemented")
+				}
+				return ec.directives.Visibility(ctx, obj, directive0, level)
+			}
+
+			next = directive1
+			return next
+		},
 		ec.marshalNUserMetadata2ᚖgithubᚗcomᚋreearthᚋreearthᚑaccountsᚋserverᚋinternalᚋadapterᚋgqlᚋgqlmodelᚐUserMetadata,
 		true,
 		true,
@@ -5889,7 +6663,25 @@ func (ec *executionContext) _User_verification(ctx context.Context, field graphq
 		func(ctx context.Context) (any, error) {
 			return obj.Verification, nil
 		},
-		nil,
+		func(ctx context.Context, next graphql.Resolver) graphql.Resolver {
+			directive0 := next
+
+			directive1 := func(ctx context.Context) (any, error) {
+				level, err := ec.unmarshalNVisibilityLevel2githubᚗcomᚋreearthᚋreearthᚑaccountsᚋserverᚋinternalᚋadapterᚋgqlᚋgqlmodelᚐVisibilityLevel(ctx, "PUBLIC")
+				if err != nil {
+					var zeroVal *gqlmodel.Verification
+					return zeroVal, err
+				}
+				if ec.directives.Visibility == nil {
+					var zeroVal *gqlmodel.Verification
+					return zeroVal, errors.New("directive visibility is not implemented")
+				}
+				return ec.directives.Visibility(ctx, obj, directive0, level)
+			}
+
+			next = directive1
+			return next
+		},
 		ec.marshalOVerification2ᚖgithubᚗcomᚋreearthᚋreearthᚑaccountsᚋserverᚋinternalᚋadapterᚋgqlᚋgqlmodelᚐVerification,
 		true,
 		false,
@@ -5924,7 +6716,25 @@ func (ec *executionContext) _UserMetadata_description(ctx context.Context, field
 		func(ctx context.Context) (any, error) {
 			return obj.Description, nil
 		},
-		nil,
+		func(ctx context.Context, next graphql.Resolver) graphql.Resolver {
+			directive0 := next
+
+			directive1 := func(ctx context.Context) (any, error) {
+				level, err := ec.unmarshalNVisibilityLevel2githubᚗcomᚋreearthᚋreearthᚑaccountsᚋserverᚋinternalᚋadapterᚋgqlᚋgqlmodelᚐVisibilityLevel(ctx, "PUBLIC")
+				if err != nil {
+					var zeroVal string
+					return zeroVal, err
+				}
+				if ec.directives.Visibility == nil {
+					var zeroVal string
+					return zeroVal, errors.New("directive visibility is not implemented")
+				}
+				return ec.directives.Visibility(ctx, obj, directive0, level)
+			}
+
+			next = directive1
+			return next
+		},
 		ec.marshalNString2string,
 		true,
 		true,
@@ -5953,7 +6763,25 @@ func (ec *executionContext) _UserMetadata_website(ctx context.Context, field gra
 		func(ctx context.Context) (any, error) {
 			return obj.Website, nil
 		},
-		nil,
+		func(ctx context.Context, next graphql.Resolver) graphql.Resolver {
+			directive0 := next
+
+			directive1 := func(ctx context.Context) (any, error) {
+				level, err := ec.unmarshalNVisibilityLevel2githubᚗcomᚋreearthᚋreearthᚑaccountsᚋserverᚋinternalᚋadapterᚋgqlᚋgqlmodelᚐVisibilityLevel(ctx, "PUBLIC")
+				if err != nil {
+					var zeroVal string
+					return zeroVal, err
+				}
+				if ec.directives.Visibility == nil {
+					var zeroVal string
+					return zeroVal, errors.New("directive visibility is not implemented")
+				}
+				return ec.directives.Visibility(ctx, obj, directive0, level)
+			}
+
+			next = directive1
+			return next
+		},
 		ec.marshalNString2string,
 		true,
 		true,
@@ -5982,7 +6810,25 @@ func (ec *executionContext) _UserMetadata_photoURL(ctx context.Context, field gr
 		func(ctx context.Context) (any, error) {
 			return ec.resolvers.UserMetadata().PhotoURL(ctx, obj)
 		},
-		nil,
+		func(ctx context.Context, next graphql.Resolver) graphql.Resolver {
+			directive0 := next
+
+			directive1 := func(ctx context.Context) (any, error) {
+				level, err := ec.unmarshalNVisibilityLevel2githubᚗcomᚋreearthᚋreearthᚑaccountsᚋserverᚋinternalᚋadapterᚋgqlᚋgqlmodelᚐVisibilityLevel(ctx, "PUBLIC")
+				if err != nil {
+					var zeroVal string
+					return zeroVal, err
+				}
+				if ec.directives.Visibility == nil {
+					var zeroVal string
+					return zeroVal, errors.New("directive visibility is not implemented")
+				}
+				return ec.directives.Visibility(ctx, obj, directive0, level)
+			}
+
+			next = directive1
+			return next
+		},
 		ec.marshalNString2string,
 		true,
 		true,
@@ -6011,7 +6857,25 @@ func (ec *executionContext) _UserMetadata_lang(ctx context.Context, field graphq
 		func(ctx context.Context) (any, error) {
 			return obj.Lang, nil
 		},
-		nil,
+		func(ctx context.Context, next graphql.Resolver) graphql.Resolver {
+			directive0 := next
+
+			directive1 := func(ctx context.Context) (any, error) {
+				level, err := ec.unmarshalNVisibilityLevel2githubᚗcomᚋreearthᚋreearthᚑaccountsᚋserverᚋinternalᚋadapterᚋgqlᚋgqlmodelᚐVisibilityLevel(ctx, "PUBLIC")
+				if err != nil {
+					var zeroVal string
+					return zeroVal, err
+				}
+				if ec.directives.Visibility == nil {
+					var zeroVal string
+					return zeroVal, errors.New("directive visibility is not implemented")
+				}
+				return ec.directives.Visibility(ctx, obj, directive0, level)
+			}
+
+			next = directive1
+			return next
+		},
 		ec.marshalNLang2string,
 		true,
 		true,
@@ -6040,7 +6904,25 @@ func (ec *executionContext) _UserMetadata_theme(ctx context.Context, field graph
 		func(ctx context.Context) (any, error) {
 			return obj.Theme, nil
 		},
-		nil,
+		func(ctx context.Context, next graphql.Resolver) graphql.Resolver {
+			directive0 := next
+
+			directive1 := func(ctx context.Context) (any, error) {
+				level, err := ec.unmarshalNVisibilityLevel2githubᚗcomᚋreearthᚋreearthᚑaccountsᚋserverᚋinternalᚋadapterᚋgqlᚋgqlmodelᚐVisibilityLevel(ctx, "PUBLIC")
+				if err != nil {
+					var zeroVal gqlmodel.Theme
+					return zeroVal, err
+				}
+				if ec.directives.Visibility == nil {
+					var zeroVal gqlmodel.Theme
+					return zeroVal, errors.New("directive visibility is not implemented")
+				}
+				return ec.directives.Visibility(ctx, obj, directive0, level)
+			}
+
+			next = directive1
+			return next
+		},
 		ec.marshalNTheme2githubᚗcomᚋreearthᚋreearthᚑaccountsᚋserverᚋinternalᚋadapterᚋgqlᚋgqlmodelᚐTheme,
 		true,
 		true,
@@ -6196,7 +7078,25 @@ func (ec *executionContext) _Verification_expiration(ctx context.Context, field 
 		func(ctx context.Context) (any, error) {
 			return obj.Expiration, nil
 		},
-		nil,
+		func(ctx context.Context, next graphql.Resolver) graphql.Resolver {
+			directive0 := next
+
+			directive1 := func(ctx context.Context) (any, error) {
+				level, err := ec.unmarshalNVisibilityLevel2githubᚗcomᚋreearthᚋreearthᚑaccountsᚋserverᚋinternalᚋadapterᚋgqlᚋgqlmodelᚐVisibilityLevel(ctx, "PUBLIC")
+				if err != nil {
+					var zeroVal string
+					return zeroVal, err
+				}
+				if ec.directives.Visibility == nil {
+					var zeroVal string
+					return zeroVal, errors.New("directive visibility is not implemented")
+				}
+				return ec.directives.Visibility(ctx, obj, directive0, level)
+			}
+
+			next = directive1
+			return next
+		},
 		ec.marshalNString2string,
 		true,
 		true,
@@ -6225,7 +7125,25 @@ func (ec *executionContext) _Verification_verified(ctx context.Context, field gr
 		func(ctx context.Context) (any, error) {
 			return obj.Verified, nil
 		},
-		nil,
+		func(ctx context.Context, next graphql.Resolver) graphql.Resolver {
+			directive0 := next
+
+			directive1 := func(ctx context.Context) (any, error) {
+				level, err := ec.unmarshalNVisibilityLevel2githubᚗcomᚋreearthᚋreearthᚑaccountsᚋserverᚋinternalᚋadapterᚋgqlᚋgqlmodelᚐVisibilityLevel(ctx, "PUBLIC")
+				if err != nil {
+					var zeroVal bool
+					return zeroVal, err
+				}
+				if ec.directives.Visibility == nil {
+					var zeroVal bool
+					return zeroVal, errors.New("directive visibility is not implemented")
+				}
+				return ec.directives.Visibility(ctx, obj, directive0, level)
+			}
+
+			next = directive1
+			return next
+		},
 		ec.marshalNBoolean2bool,
 		true,
 		true,
@@ -6750,7 +7668,25 @@ func (ec *executionContext) _WorkspaceUserMember_userId(ctx context.Context, fie
 		func(ctx context.Context) (any, error) {
 			return obj.UserID, nil
 		},
-		nil,
+		func(ctx context.Context, next graphql.Resolver) graphql.Resolver {
+			directive0 := next
+
+			directive1 := func(ctx context.Context) (any, error) {
+				level, err := ec.unmarshalNVisibilityLevel2githubᚗcomᚋreearthᚋreearthᚑaccountsᚋserverᚋinternalᚋadapterᚋgqlᚋgqlmodelᚐVisibilityLevel(ctx, "PUBLIC")
+				if err != nil {
+					var zeroVal gqlmodel.ID
+					return zeroVal, err
+				}
+				if ec.directives.Visibility == nil {
+					var zeroVal gqlmodel.ID
+					return zeroVal, errors.New("directive visibility is not implemented")
+				}
+				return ec.directives.Visibility(ctx, obj, directive0, level)
+			}
+
+			next = directive1
+			return next
+		},
 		ec.marshalNID2githubᚗcomᚋreearthᚋreearthᚑaccountsᚋserverᚋinternalᚋadapterᚋgqlᚋgqlmodelᚐID,
 		true,
 		true,
@@ -6779,7 +7715,25 @@ func (ec *executionContext) _WorkspaceUserMember_role(ctx context.Context, field
 		func(ctx context.Context) (any, error) {
 			return obj.Role, nil
 		},
-		nil,
+		func(ctx context.Context, next graphql.Resolver) graphql.Resolver {
+			directive0 := next
+
+			directive1 := func(ctx context.Context) (any, error) {
+				level, err := ec.unmarshalNVisibilityLevel2githubᚗcomᚋreearthᚋreearthᚑaccountsᚋserverᚋinternalᚋadapterᚋgqlᚋgqlmodelᚐVisibilityLevel(ctx, "PUBLIC")
+				if err != nil {
+					var zeroVal gqlmodel.Role
+					return zeroVal, err
+				}
+				if ec.directives.Visibility == nil {
+					var zeroVal gqlmodel.Role
+					return zeroVal, errors.New("directive visibility is not implemented")
+				}
+				return ec.directives.Visibility(ctx, obj, directive0, level)
+			}
+
+			next = directive1
+			return next
+		},
 		ec.marshalNRole2githubᚗcomᚋreearthᚋreearthᚑaccountsᚋserverᚋinternalᚋadapterᚋgqlᚋgqlmodelᚐRole,
 		true,
 		true,
@@ -6808,7 +7762,25 @@ func (ec *executionContext) _WorkspaceUserMember_host(ctx context.Context, field
 		func(ctx context.Context) (any, error) {
 			return obj.Host, nil
 		},
-		nil,
+		func(ctx context.Context, next graphql.Resolver) graphql.Resolver {
+			directive0 := next
+
+			directive1 := func(ctx context.Context) (any, error) {
+				level, err := ec.unmarshalNVisibilityLevel2githubᚗcomᚋreearthᚋreearthᚑaccountsᚋserverᚋinternalᚋadapterᚋgqlᚋgqlmodelᚐVisibilityLevel(ctx, "PUBLIC")
+				if err != nil {
+					var zeroVal *string
+					return zeroVal, err
+				}
+				if ec.directives.Visibility == nil {
+					var zeroVal *string
+					return zeroVal, errors.New("directive visibility is not implemented")
+				}
+				return ec.directives.Visibility(ctx, obj, directive0, level)
+			}
+
+			next = directive1
+			return next
+		},
 		ec.marshalOString2ᚖstring,
 		true,
 		false,
@@ -6837,7 +7809,25 @@ func (ec *executionContext) _WorkspaceUserMember_user(ctx context.Context, field
 		func(ctx context.Context) (any, error) {
 			return ec.resolvers.WorkspaceUserMember().User(ctx, obj)
 		},
-		nil,
+		func(ctx context.Context, next graphql.Resolver) graphql.Resolver {
+			directive0 := next
+
+			directive1 := func(ctx context.Context) (any, error) {
+				level, err := ec.unmarshalNVisibilityLevel2githubᚗcomᚋreearthᚋreearthᚑaccountsᚋserverᚋinternalᚋadapterᚋgqlᚋgqlmodelᚐVisibilityLevel(ctx, "PUBLIC")
+				if err != nil {
+					var zeroVal *gqlmodel.User
+					return zeroVal, err
+				}
+				if ec.directives.Visibility == nil {
+					var zeroVal *gqlmodel.User
+					return zeroVal, errors.New("directive visibility is not implemented")
+				}
+				return ec.directives.Visibility(ctx, obj, directive0, level)
+			}
+
+			next = directive1
+			return next
+		},
 		ec.marshalOUser2ᚖgithubᚗcomᚋreearthᚋreearthᚑaccountsᚋserverᚋinternalᚋadapterᚋgqlᚋgqlmodelᚐUser,
 		true,
 		false,
@@ -10100,6 +11090,109 @@ func (ec *executionContext) _Mutation(ctx context.Context, sel ast.SelectionSet)
 	return out
 }
 
+var publicWorkspaceImplementors = []string{"PublicWorkspace"}
+
+func (ec *executionContext) _PublicWorkspace(ctx context.Context, sel ast.SelectionSet, obj *gqlmodel.PublicWorkspace) graphql.Marshaler {
+	fields := graphql.CollectFields(ec.OperationContext, sel, publicWorkspaceImplementors)
+
+	out := graphql.NewFieldSet(fields)
+	deferred := make(map[string]*graphql.FieldSet)
+	for i, field := range fields {
+		switch field.Name {
+		case "__typename":
+			out.Values[i] = graphql.MarshalString("PublicWorkspace")
+		case "id":
+			out.Values[i] = ec._PublicWorkspace_id(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "name":
+			out.Values[i] = ec._PublicWorkspace_name(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "alias":
+			out.Values[i] = ec._PublicWorkspace_alias(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "members":
+			out.Values[i] = ec._PublicWorkspace_members(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		default:
+			panic("unknown field " + strconv.Quote(field.Name))
+		}
+	}
+	out.Dispatch(ctx)
+	if out.Invalids > 0 {
+		return graphql.Null
+	}
+
+	atomic.AddInt32(&ec.deferred, int32(len(deferred)))
+
+	for label, dfs := range deferred {
+		ec.processDeferredGroup(graphql.DeferredGroup{
+			Label:    label,
+			Path:     graphql.GetPath(ctx),
+			FieldSet: dfs,
+			Context:  ctx,
+		})
+	}
+
+	return out
+}
+
+var publicWorkspaceMemberImplementors = []string{"PublicWorkspaceMember"}
+
+func (ec *executionContext) _PublicWorkspaceMember(ctx context.Context, sel ast.SelectionSet, obj *gqlmodel.PublicWorkspaceMember) graphql.Marshaler {
+	fields := graphql.CollectFields(ec.OperationContext, sel, publicWorkspaceMemberImplementors)
+
+	out := graphql.NewFieldSet(fields)
+	deferred := make(map[string]*graphql.FieldSet)
+	for i, field := range fields {
+		switch field.Name {
+		case "__typename":
+			out.Values[i] = graphql.MarshalString("PublicWorkspaceMember")
+		case "name":
+			out.Values[i] = ec._PublicWorkspaceMember_name(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "alias":
+			out.Values[i] = ec._PublicWorkspaceMember_alias(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "photoURL":
+			out.Values[i] = ec._PublicWorkspaceMember_photoURL(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		default:
+			panic("unknown field " + strconv.Quote(field.Name))
+		}
+	}
+	out.Dispatch(ctx)
+	if out.Invalids > 0 {
+		return graphql.Null
+	}
+
+	atomic.AddInt32(&ec.deferred, int32(len(deferred)))
+
+	for label, dfs := range deferred {
+		ec.processDeferredGroup(graphql.DeferredGroup{
+			Label:    label,
+			Path:     graphql.GetPath(ctx),
+			FieldSet: dfs,
+			Context:  ctx,
+		})
+	}
+
+	return out
+}
+
 var queryImplementors = []string{"Query"}
 
 func (ec *executionContext) _Query(ctx context.Context, sel ast.SelectionSet) graphql.Marshaler {
@@ -10504,6 +11597,25 @@ func (ec *executionContext) _Query(ctx context.Context, sel ast.SelectionSet) gr
 			}
 
 			out.Concurrently(i, func(ctx context.Context) graphql.Marshaler { return rrm(innerCtx) })
+		case "publicWorkspace":
+			field := field
+
+			innerFunc := func(ctx context.Context, _ *graphql.FieldSet) (res graphql.Marshaler) {
+				defer func() {
+					if r := recover(); r != nil {
+						ec.Error(ctx, ec.Recover(ctx, r))
+					}
+				}()
+				res = ec._Query_publicWorkspace(ctx, field)
+				return res
+			}
+
+			rrm := func(ctx context.Context) graphql.Marshaler {
+				return ec.OperationContext.RootResolverMiddleware(ctx,
+					func(ctx context.Context) graphql.Marshaler { return innerFunc(ctx, out) })
+			}
+
+			out.Concurrently(i, func(ctx context.Context) graphql.Marshaler { return rrm(innerCtx) })
 		case "__type":
 			out.Values[i] = ec.OperationContext.RootResolverMiddleware(innerCtx, func(ctx context.Context) (res graphql.Marshaler) {
 				return ec._Query___type(ctx, field)
@@ -10783,70 +11895,39 @@ func (ec *executionContext) _User(ctx context.Context, sel ast.SelectionSet, obj
 		case "id":
 			out.Values[i] = ec._User_id(ctx, field, obj)
 			if out.Values[i] == graphql.Null {
-				atomic.AddUint32(&out.Invalids, 1)
+				out.Invalids++
 			}
 		case "name":
 			out.Values[i] = ec._User_name(ctx, field, obj)
 			if out.Values[i] == graphql.Null {
-				atomic.AddUint32(&out.Invalids, 1)
+				out.Invalids++
 			}
 		case "alias":
 			out.Values[i] = ec._User_alias(ctx, field, obj)
 			if out.Values[i] == graphql.Null {
-				atomic.AddUint32(&out.Invalids, 1)
+				out.Invalids++
 			}
 		case "email":
-			field := field
-
-			innerFunc := func(ctx context.Context, fs *graphql.FieldSet) (res graphql.Marshaler) {
-				defer func() {
-					if r := recover(); r != nil {
-						ec.Error(ctx, ec.Recover(ctx, r))
-					}
-				}()
-				res = ec._User_email(ctx, field, obj)
-				if res == graphql.Null {
-					atomic.AddUint32(&fs.Invalids, 1)
-				}
-				return res
+			out.Values[i] = ec._User_email(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
 			}
-
-			if field.Deferrable != nil {
-				dfs, ok := deferred[field.Deferrable.Label]
-				di := 0
-				if ok {
-					dfs.AddField(field)
-					di = len(dfs.Values) - 1
-				} else {
-					dfs = graphql.NewFieldSet([]graphql.CollectedField{field})
-					deferred[field.Deferrable.Label] = dfs
-				}
-				dfs.Concurrently(di, func(ctx context.Context) graphql.Marshaler {
-					return innerFunc(ctx, dfs)
-				})
-
-				// don't run the out.Concurrently() call below
-				out.Values[i] = graphql.Null
-				continue
-			}
-
-			out.Concurrently(i, func(ctx context.Context) graphql.Marshaler { return innerFunc(ctx, out) })
 		case "host":
 			out.Values[i] = ec._User_host(ctx, field, obj)
 		case "workspace":
 			out.Values[i] = ec._User_workspace(ctx, field, obj)
 			if out.Values[i] == graphql.Null {
-				atomic.AddUint32(&out.Invalids, 1)
+				out.Invalids++
 			}
 		case "auths":
 			out.Values[i] = ec._User_auths(ctx, field, obj)
 			if out.Values[i] == graphql.Null {
-				atomic.AddUint32(&out.Invalids, 1)
+				out.Invalids++
 			}
 		case "metadata":
 			out.Values[i] = ec._User_metadata(ctx, field, obj)
 			if out.Values[i] == graphql.Null {
-				atomic.AddUint32(&out.Invalids, 1)
+				out.Invalids++
 			}
 		case "verification":
 			out.Values[i] = ec._User_verification(ctx, field, obj)
@@ -11954,6 +13035,60 @@ func (ec *executionContext) unmarshalNPasswordResetInput2githubᚗcomᚋreearth�
 	return res, graphql.ErrorOnPath(ctx, err)
 }
 
+func (ec *executionContext) marshalNPublicWorkspaceMember2ᚕᚖgithubᚗcomᚋreearthᚋreearthᚑaccountsᚋserverᚋinternalᚋadapterᚋgqlᚋgqlmodelᚐPublicWorkspaceMemberᚄ(ctx context.Context, sel ast.SelectionSet, v []*gqlmodel.PublicWorkspaceMember) graphql.Marshaler {
+	ret := make(graphql.Array, len(v))
+	var wg sync.WaitGroup
+	isLen1 := len(v) == 1
+	if !isLen1 {
+		wg.Add(len(v))
+	}
+	for i := range v {
+		i := i
+		fc := &graphql.FieldContext{
+			Index:  &i,
+			Result: &v[i],
+		}
+		ctx := graphql.WithFieldContext(ctx, fc)
+		f := func(i int) {
+			defer func() {
+				if r := recover(); r != nil {
+					ec.Error(ctx, ec.Recover(ctx, r))
+					ret = nil
+				}
+			}()
+			if !isLen1 {
+				defer wg.Done()
+			}
+			ret[i] = ec.marshalNPublicWorkspaceMember2ᚖgithubᚗcomᚋreearthᚋreearthᚑaccountsᚋserverᚋinternalᚋadapterᚋgqlᚋgqlmodelᚐPublicWorkspaceMember(ctx, sel, v[i])
+		}
+		if isLen1 {
+			f(i)
+		} else {
+			go f(i)
+		}
+
+	}
+	wg.Wait()
+
+	for _, e := range ret {
+		if e == graphql.Null {
+			return graphql.Null
+		}
+	}
+
+	return ret
+}
+
+func (ec *executionContext) marshalNPublicWorkspaceMember2ᚖgithubᚗcomᚋreearthᚋreearthᚑaccountsᚋserverᚋinternalᚋadapterᚋgqlᚋgqlmodelᚐPublicWorkspaceMember(ctx context.Context, sel ast.SelectionSet, v *gqlmodel.PublicWorkspaceMember) graphql.Marshaler {
+	if v == nil {
+		if !graphql.HasFieldError(ctx, graphql.GetFieldContext(ctx)) {
+			graphql.AddErrorf(ctx, "the requested element is null which the schema does not allow")
+		}
+		return graphql.Null
+	}
+	return ec._PublicWorkspaceMember(ctx, sel, v)
+}
+
 func (ec *executionContext) unmarshalNRemoveIntegrationFromWorkspaceInput2githubᚗcomᚋreearthᚋreearthᚑaccountsᚋserverᚋinternalᚋadapterᚋgqlᚋgqlmodelᚐRemoveIntegrationFromWorkspaceInput(ctx context.Context, v any) (gqlmodel.RemoveIntegrationFromWorkspaceInput, error) {
 	res, err := ec.unmarshalInputRemoveIntegrationFromWorkspaceInput(ctx, v)
 	return res, graphql.ErrorOnPath(ctx, err)
@@ -12166,6 +13301,16 @@ func (ec *executionContext) marshalNUsersWithPagination2ᚖgithubᚗcomᚋreeart
 func (ec *executionContext) unmarshalNVerifyUserInput2githubᚗcomᚋreearthᚋreearthᚑaccountsᚋserverᚋinternalᚋadapterᚋgqlᚋgqlmodelᚐVerifyUserInput(ctx context.Context, v any) (gqlmodel.VerifyUserInput, error) {
 	res, err := ec.unmarshalInputVerifyUserInput(ctx, v)
 	return res, graphql.ErrorOnPath(ctx, err)
+}
+
+func (ec *executionContext) unmarshalNVisibilityLevel2githubᚗcomᚋreearthᚋreearthᚑaccountsᚋserverᚋinternalᚋadapterᚋgqlᚋgqlmodelᚐVisibilityLevel(ctx context.Context, v any) (gqlmodel.VisibilityLevel, error) {
+	var res gqlmodel.VisibilityLevel
+	err := res.UnmarshalGQL(v)
+	return res, graphql.ErrorOnPath(ctx, err)
+}
+
+func (ec *executionContext) marshalNVisibilityLevel2githubᚗcomᚋreearthᚋreearthᚑaccountsᚋserverᚋinternalᚋadapterᚋgqlᚋgqlmodelᚐVisibilityLevel(ctx context.Context, sel ast.SelectionSet, v gqlmodel.VisibilityLevel) graphql.Marshaler {
+	return v
 }
 
 func (ec *executionContext) marshalNWorkspace2githubᚗcomᚋreearthᚋreearthᚑaccountsᚋserverᚋinternalᚋadapterᚋgqlᚋgqlmodelᚐWorkspace(ctx context.Context, sel ast.SelectionSet, v gqlmodel.Workspace) graphql.Marshaler {
@@ -12737,6 +13882,13 @@ func (ec *executionContext) marshalONode2ᚕgithubᚗcomᚋreearthᚋreearthᚑa
 	wg.Wait()
 
 	return ret
+}
+
+func (ec *executionContext) marshalOPublicWorkspace2ᚖgithubᚗcomᚋreearthᚋreearthᚑaccountsᚋserverᚋinternalᚋadapterᚋgqlᚋgqlmodelᚐPublicWorkspace(ctx context.Context, sel ast.SelectionSet, v *gqlmodel.PublicWorkspace) graphql.Marshaler {
+	if v == nil {
+		return graphql.Null
+	}
+	return ec._PublicWorkspace(ctx, sel, v)
 }
 
 func (ec *executionContext) marshalORemoveIntegrationsFromWorkspacePayload2ᚖgithubᚗcomᚋreearthᚋreearthᚑaccountsᚋserverᚋinternalᚋadapterᚋgqlᚋgqlmodelᚐRemoveIntegrationsFromWorkspacePayload(ctx context.Context, sel ast.SelectionSet, v *gqlmodel.RemoveIntegrationsFromWorkspacePayload) graphql.Marshaler {

@@ -12,8 +12,8 @@ import (
 	"github.com/reearth/reearth-accounts/server/internal/infrastructure/storage"
 	"github.com/reearth/reearth-accounts/server/internal/usecase/gateway"
 	"github.com/reearth/reearth-accounts/server/internal/usecase/repo"
+	"github.com/reearth/reearth-accounts/server/pkg/applog"
 	"github.com/reearth/reearth-accounts/server/pkg/user"
-	"github.com/reearth/reearthx/log"
 	"github.com/reearth/reearthx/mailer"
 	"github.com/reearth/reearthx/mongox"
 	"go.mongodb.org/mongo-driver/mongo"
@@ -27,7 +27,7 @@ func initGateways(ctx context.Context, conf *Config) *gateway.Container {
 		EmulatorEndpoint: conf.StorageEmulatorEndpoint,
 	})
 	if err != nil {
-		log.Fatalf("Failed to init storage: %+v\n", err)
+		applog.Fatal(ctx, "Failed to init storage", applog.Err(err))
 	}
 
 	mailerInstance := mailer.New(ctx, &mailer.Config{})
@@ -42,7 +42,7 @@ func initGateways(ctx context.Context, conf *Config) *gateway.Container {
 	}
 	if conf.GetAuthProvider() == "cip" {
 		if conf.CIP.ProjectID == "" {
-			log.Fatalf("REEARTH_ACCOUNTS_AUTH_PROVIDER=cip requires REEARTH_ACCOUNTS_CIP_PROJECT_ID")
+			applog.Fatal(ctx, "REEARTH_ACCOUNTS_AUTH_PROVIDER=cip requires REEARTH_ACCOUNTS_CIP_PROJECT_ID")
 		}
 		cipAuth, cipErr := cip.New(ctx, cip.Params{
 			HTTPTimeout: conf.CIP.HTTPTimeout,
@@ -50,7 +50,7 @@ func initGateways(ctx context.Context, conf *Config) *gateway.Container {
 			TenantID:    conf.CIP.TenantID,
 		}, mailerInstance)
 		if cipErr != nil {
-			log.Fatalf("Failed to init CIP authenticator: %+v\n", cipErr)
+			applog.Fatal(ctx, "Failed to init CIP authenticator", applog.Err(cipErr))
 		}
 		authenticators[gateway.ProviderCIP] = cipAuth
 	}
@@ -65,7 +65,7 @@ func initGateways(ctx context.Context, conf *Config) *gateway.Container {
 func initPostgresReposAndGateways(ctx context.Context, pool *pgxpool.Pool, conf *Config) (*repo.Container, *gateway.Container) {
 	repos, err := postgres.New(ctx, pool, []user.Repo{})
 	if err != nil {
-		log.Fatalf("Failed to init postgres: %+v\n", err)
+		applog.Fatal(ctx, "Failed to init postgres", applog.Err(err))
 	}
 	return repos, initGateways(ctx, conf)
 }
@@ -92,7 +92,7 @@ func initReposAndGateways(ctx context.Context, client *mongo.Client, conf *Confi
 
 	repos, err := mongorepo.New(ctx, client.Database(conf.DBName), txAvailable, false, []user.Repo{})
 	if err != nil {
-		log.Fatalf("Failed to init mongo: %+v\n", err)
+		applog.Fatal(ctx, "Failed to init mongo", applog.Err(err))
 	}
 
 	return repos, initGateways(ctx, conf)

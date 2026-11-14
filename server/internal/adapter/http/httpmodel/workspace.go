@@ -52,18 +52,19 @@ type MemberUsers struct {
 }
 
 // NewWorkspaceResponse converts a domain workspace with signed photos,
-// dropping user members missing from users, as GraphQL does.
-func NewWorkspaceResponse(ctx context.Context, photos adapter.PhotoSigner, w *workspace.Workspace, users map[user.ID]*user.User, memberUsers MemberUsers) *WorkspaceResponse {
-	return NewWorkspaceResponses(ctx, photos, workspace.List{w}, users, memberUsers)[0]
+// dropping user members missing from users, as GraphQL does. billing decides
+// who sees the billing email.
+func NewWorkspaceResponse(ctx context.Context, photos adapter.PhotoSigner, w *workspace.Workspace, users map[user.ID]*user.User, memberUsers MemberUsers, billing EmailViewer) *WorkspaceResponse {
+	return NewWorkspaceResponses(ctx, photos, workspace.List{w}, users, memberUsers, billing)[0]
 }
 
 // NewWorkspaceResponses converts a list, signing every workspace and embedded
 // member photo together.
-func NewWorkspaceResponses(ctx context.Context, photos adapter.PhotoSigner, ws workspace.List, users map[user.ID]*user.User, memberUsers MemberUsers) []*WorkspaceResponse {
+func NewWorkspaceResponses(ctx context.Context, photos adapter.PhotoSigner, ws workspace.List, users map[user.ID]*user.User, memberUsers MemberUsers, billing EmailViewer) []*WorkspaceResponse {
 	out := make([]*WorkspaceResponse, 0, len(ws))
 	var urls []*string
 	for _, w := range ws {
-		r := newWorkspaceResponse(w, users, memberUsers)
+		r := newWorkspaceResponse(w, users, memberUsers, billing)
 		if r != nil {
 			urls = append(urls, &r.Metadata.PhotoURL)
 			for i := range r.Members {
@@ -78,7 +79,7 @@ func NewWorkspaceResponses(ctx context.Context, photos adapter.PhotoSigner, ws w
 	return out
 }
 
-func newWorkspaceResponse(w *workspace.Workspace, users map[user.ID]*user.User, memberUsers MemberUsers) *WorkspaceResponse {
+func newWorkspaceResponse(w *workspace.Workspace, users map[user.ID]*user.User, memberUsers MemberUsers, billing EmailViewer) *WorkspaceResponse {
 	if w == nil {
 		return nil
 	}
@@ -104,7 +105,7 @@ func newWorkspaceResponse(w *workspace.Workspace, users map[user.ID]*user.User, 
 		Description:  md.Description(),
 		Website:      md.Website(),
 		Location:     md.Location(),
-		BillingEmail: md.BillingEmail(),
+		BillingEmail: billing.billingEmail(w),
 		PhotoURL:     md.PhotoURL(),
 	}
 	res := &WorkspaceResponse{
@@ -123,6 +124,15 @@ func newWorkspaceResponse(w *workspace.Workspace, users map[user.ID]*user.User, 
 		res.CreatedBy = &s
 	}
 	return res
+}
+
+// billingEmail shows a workspace's billing email only to its members, as
+// GraphQL does, unless the route already limits who gets the record.
+func (v EmailViewer) billingEmail(w *workspace.Workspace) string {
+	if v.all || (v.self != nil && w.Members().HasUser(*v.self)) {
+		return w.Metadata().BillingEmail()
+	}
+	return ""
 }
 
 // --- Request DTOs ---

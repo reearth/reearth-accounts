@@ -9,6 +9,7 @@ import (
 	"github.com/reearth/reearth-accounts/server/internal/adapter"
 	"github.com/reearth/reearth-accounts/server/internal/adapter/http/handlers"
 	httpinternal "github.com/reearth/reearth-accounts/server/internal/adapter/http/internal"
+	"github.com/reearth/reearth-accounts/server/internal/adapter/ratelimit"
 	echoSwagger "github.com/swaggo/echo-swagger"
 )
 
@@ -30,6 +31,8 @@ type RouterConfig struct {
 	SyncSSOAPIKey string
 	// Photos signs photo URLs.
 	Photos adapter.PhotoSigner
+	// UserLookupLimit caps user lookups per viewer. Nil allows everything.
+	UserLookupLimit *ratelimit.Limiter
 	// Swagger basic-auth (optional).
 	SwaggerUser, SwaggerPass string
 	// LoginTime reads the login time for the recovery code step-up check.
@@ -69,38 +72,40 @@ func RegisterRESTRouter(e *echo.Echo, cfg RouterConfig) {
 	}
 
 	required := RequiredAuth(cfg.AuthResolver)
+	userOnly := RequiredUser(cfg.AuthResolver)
 	optional := OptionalAuth(cfg.AuthResolver)
 	apikeyOrAuth := APIKeyOrAuth(cfg.APIKey)
 	syncSSOApikeyOrAuth := APIKeyOrAuth(cfg.SyncSSOAPIKey)
+	lookup := UserLookupLimit(cfg.UserLookupLimit)
 
 	api := e.Group("/api", base...)
 
 	// --- Auth ---
 	ah := handlers.NewAuthHandler(cfg.AuthConfigProvider, cfg.Photos)
 	api.GET("/auth/config", ah.Config)            // public
-	api.POST("/auth/logout", ah.Logout, required) // JWT
+	api.POST("/auth/logout", ah.Logout, userOnly) // JWT
 
 	// --- Users ---
 	uh := handlers.NewUserHandler(cfg.Photos, cfg.LoginTime)
-	api.GET("/users/me", uh.Me, required, handlers.Expand(handlers.ExpandMyWorkspace))
-	api.PATCH("/users/me", uh.UpdateMe, required)
-	api.DELETE("/users/me", uh.DeleteMe, required)
-	api.DELETE("/users/me/auths/:sub", uh.RemoveMyAuth, required)
-	api.GET("/users/me/mfa", uh.GetMFAStatus, required)
-	api.POST("/users/me/mfa", uh.EnableMFA, required)
-	api.DELETE("/users/me/mfa", uh.DisableMFA, required)
-	api.POST("/users/me/mfa/recovery-code", uh.RegenerateMFARecoveryCode, required)
-	api.GET("/users/search", uh.Search, required)
-	api.GET("/users/by-alias", uh.FindByAlias, required)
-	api.GET("/users/by-name-or-email", uh.FindByNameOrEmail, required)
-	api.GET("/users/by-name-or-alias", uh.FindByNameOrAlias, required)
-	api.GET("/users", uh.List, required) // ?ids= | ?ids=&alias=&page=&page_size=
+	api.GET("/users/me", uh.Me, userOnly, handlers.Expand(handlers.ExpandMyWorkspace))
+	api.PATCH("/users/me", uh.UpdateMe, userOnly)
+	api.DELETE("/users/me", uh.DeleteMe, userOnly)
+	api.DELETE("/users/me/auths/:sub", uh.RemoveMyAuth, userOnly)
+	api.GET("/users/me/mfa", uh.GetMFAStatus, userOnly)
+	api.POST("/users/me/mfa", uh.EnableMFA, userOnly)
+	api.DELETE("/users/me/mfa", uh.DisableMFA, userOnly)
+	api.POST("/users/me/mfa/recovery-code", uh.RegenerateMFARecoveryCode, userOnly)
+	api.GET("/users/search", uh.Search, userOnly, lookup)
+	api.GET("/users/by-alias", uh.FindByAlias, userOnly, lookup)
+	api.GET("/users/by-name-or-email", uh.FindByNameOrEmail, userOnly, lookup)
+	api.GET("/users/by-name-or-alias", uh.FindByNameOrAlias, userOnly, lookup)
+	api.GET("/users", uh.List, userOnly, lookup) // ?ids= | ?ids=&alias=&page=&page_size=
 	// Cross-tenant listing for service-to-service callers (e.g. LINKS-Veda). The
 	// interactor admits only maintainers, and the response includes every email.
-	api.GET("/users/all", uh.ListAll, required) // ?keyword=&status=active|deleted|all&page=&page_size=
-	api.GET("/users/:id", uh.Get, required)
-	api.POST("/users/:id/deactivate", uh.Deactivate, required) // soft delete (maintainer-only)
-	api.POST("/users/:id/restore", uh.Restore, required)       // undo deactivate (maintainer-only)
+	api.GET("/users/all", uh.ListAll, userOnly) // ?keyword=&status=active|deleted|all&page=&page_size=
+	api.GET("/users/:id", uh.Get, userOnly, lookup)
+	api.POST("/users/:id/deactivate", uh.Deactivate, userOnly) // soft delete (maintainer-only)
+	api.POST("/users/:id/restore", uh.Restore, userOnly)       // undo deactivate (maintainer-only)
 	api.POST("/users/signup", uh.Signup, optional)
 	api.POST("/users/signup-oidc", uh.SignupOIDC, optional)
 	api.POST("/users/sync-sso", uh.SyncSSOUser, optional, syncSSOApikeyOrAuth)
@@ -112,10 +117,10 @@ func RegisterRESTRouter(e *echo.Echo, cfg RouterConfig) {
 	// PATCH /api/users/by-sub/:sub — JWT required; caller must hold the maintainer
 	// role (Cerbos, falling back to a direct Permittable check). Updates mutable
 	// user fields (name) by Firebase sub.
-	api.PATCH("/users/by-sub/:sub", uh.UpdateUserBySub, required)
+	api.PATCH("/users/by-sub/:sub", uh.UpdateUserBySub, userOnly)
 	// PUT /api/users/by-sub/:sub/platform-roles — JWT required; same maintainer-role
 	// gate as above. Replaces platform roles by Firebase sub.
-	api.PUT("/users/by-sub/:sub/platform-roles", uh.SetPlatformRolesBySub, required)
+	api.PUT("/users/by-sub/:sub/platform-roles", uh.SetPlatformRolesBySub, userOnly)
 
 	// --- Workspaces ---
 	wh := handlers.NewWorkspaceHandler(cfg.Photos)

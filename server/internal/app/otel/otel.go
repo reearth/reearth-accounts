@@ -6,7 +6,7 @@ import (
 	"time"
 
 	"cloud.google.com/go/compute/metadata"
-	"github.com/reearth/reearthx/log"
+	"github.com/reearth/reearth-accounts/server/pkg/applog"
 	"go.opentelemetry.io/contrib/detectors/gcp"
 	"go.opentelemetry.io/otel"
 	"go.opentelemetry.io/otel/attribute"
@@ -71,7 +71,7 @@ func (n *noopTracerProvider) Shutdown(ctx context.Context) error {
 
 func InitTracer(ctx context.Context, cfg *Config) (TracerProvider, error) {
 	if !cfg.Enabled {
-		log.Infoc(ctx, "OpenTelemetry tracing is disabled")
+		applog.Info(ctx, "OpenTelemetry tracing is disabled")
 		return &noopTracerProvider{TracerProvider: noop.NewTracerProvider()}, nil
 	}
 
@@ -86,16 +86,16 @@ func InitTracer(ctx context.Context, cfg *Config) (TracerProvider, error) {
 	switch cfg.ExporterType {
 	case ExporterTypeGCP:
 		resolvedEndpoint = gcpCloudTraceEndpoint
-		log.Infoc(ctx, "Initializing GCP Cloud Trace exporter via OTLP", "endpoint", resolvedEndpoint)
+		applog.Info(ctx, "Initializing GCP Cloud Trace exporter via OTLP", applog.Endpoint(resolvedEndpoint))
 		exporter, err = createGCPExporter(ctx, cfg)
 	case ExporterTypeJaeger:
-		log.Infoc(ctx, "Initializing Jaeger exporter via OTLP", "endpoint", cfg.Endpoint, "insecure", cfg.Insecure)
+		applog.Info(ctx, "Initializing Jaeger exporter via OTLP", applog.Endpoint(cfg.Endpoint), applog.Insecure(cfg.Insecure))
 		exporter, err = createOTLPExporter(ctx, cfg, false)
 	case ExporterTypeOTLP:
-		log.Infoc(ctx, "Initializing OTLP exporter", "endpoint", cfg.Endpoint, "insecure", cfg.Insecure)
+		applog.Info(ctx, "Initializing OTLP exporter", applog.Endpoint(cfg.Endpoint), applog.Insecure(cfg.Insecure))
 		exporter, err = createOTLPExporter(ctx, cfg, false)
 	default:
-		log.Warnc(ctx, "Unknown exporter type, defaulting to OTLP", "type", cfg.ExporterType, "insecure", cfg.Insecure)
+		applog.Warn(ctx, "Unknown exporter type, defaulting to OTLP", applog.Exporter(cfg.ExporterType), applog.Insecure(cfg.Insecure))
 		exporter, err = createOTLPExporter(ctx, cfg, false)
 	}
 
@@ -108,7 +108,7 @@ func InitTracer(ctx context.Context, cfg *Config) (TracerProvider, error) {
 		return nil, fmt.Errorf("failed to create resource: %w", err)
 	}
 
-	log.Infoc(ctx, fmt.Sprintf("resource attributes: %+v", res.Attributes()))
+	applog.Info(ctx, "resource attributes", applog.Resource(res.Attributes()))
 
 	sampler := createSampler(ctx, cfg)
 
@@ -130,14 +130,7 @@ func InitTracer(ctx context.Context, cfg *Config) (TracerProvider, error) {
 		propagation.Baggage{},
 	))
 
-	log.Infoc(ctx, "OpenTelemetry tracing initialized successfully",
-		"endpoint", resolvedEndpoint,
-		"exporter", cfg.ExporterType,
-		"service", string(cfg.ServiceName),
-		"max_export_batch_size", cfg.MaxExportBatchSize,
-		"batch_timeout", cfg.BatchTimeout,
-		"max_queue_size", cfg.MaxQueueSize,
-		"sampling_ratio", cfg.SamplingRatio)
+	applog.Info(ctx, "OpenTelemetry tracing initialized successfully", applog.Endpoint(resolvedEndpoint), applog.Exporter(cfg.ExporterType), applog.Service(string(cfg.ServiceName)), applog.MaxExportBatchSize(cfg.MaxExportBatchSize), applog.BatchTimeout(cfg.BatchTimeout), applog.MaxQueueSize(cfg.MaxQueueSize), applog.SamplingRatio(cfg.SamplingRatio))
 
 	return tp, nil
 }
@@ -148,7 +141,7 @@ func createResource(ctx context.Context, cfg *Config) (*resource.Resource, error
 	if cfg.ExporterType == ExporterTypeGCP {
 		gcpDetector := gcp.NewDetector()
 		if gcpDetector != nil {
-			log.Infoc(ctx, "GCP resource detector initialized")
+			applog.Info(ctx, "GCP resource detector initialized")
 			baseAttributes = append(baseAttributes, resource.WithDetectors(gcpDetector))
 		}
 
@@ -178,12 +171,12 @@ func createSampler(ctx context.Context, cfg *Config) sdktrace.Sampler {
 	var root sdktrace.Sampler
 	switch {
 	case ratio < 0:
-		log.Warnfc(ctx, "OTEL sampling ratio %f is below 0; clamping to 0 (NeverSample)", ratio)
+		applog.Warn(ctx, "OTEL sampling ratio is below 0; clamping to 0", applog.SamplingRatio(ratio))
 		root = sdktrace.NeverSample()
 	case ratio == 0:
 		root = sdktrace.NeverSample()
 	case ratio > 1:
-		log.Warnfc(ctx, "OTEL sampling ratio %f exceeds 1; clamping to 1 (AlwaysSample)", ratio)
+		applog.Warn(ctx, "OTEL sampling ratio exceeds 1; clamping to 1", applog.SamplingRatio(ratio))
 		root = sdktrace.AlwaysSample()
 	case ratio == 1:
 		root = sdktrace.AlwaysSample()
