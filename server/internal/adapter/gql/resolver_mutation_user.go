@@ -95,26 +95,37 @@ func (r *mutationResolver) SignupOidc(ctx context.Context, input gqlmodel.Signup
 	if input.Sub != nil {
 		sub = *input.Sub
 	}
-	accessToken := ""
-	if au != nil && au.Token != "" {
-		accessToken = au.Token
-	}
-	iss := ""
-	if au != nil && au.Iss != "" {
-		iss = au.Iss
-	}
 
 	var lang language.Tag
 	if input.Lang != nil {
 		lang = language.Make(*input.Lang)
 	}
+
+	// When the auth middleware already validated the caller's JWT, use the
+	// extracted claims directly — no second-hop userinfo call is needed.
+	authVerified := false
+	accessToken := ""
+	iss := ""
+	if au != nil && au.Sub != "" {
+		sub = au.Sub
+		if au.Email != "" {
+			email = au.Email
+		}
+		iss = au.Iss
+		authVerified = true
+	} else if au != nil && au.Token != "" {
+		accessToken = au.Token
+		iss = au.Iss
+	}
+
 	u, err := usecases(ctx).User.SignupOIDC(ctx, interfaces.SignupOIDCParam{
-		Sub:         sub,
-		AccessToken: accessToken,
-		Issuer:      iss,
-		Email:       email,
-		Name:        name,
-		Secret:      input.Secret,
+		AccessToken:  accessToken,
+		AuthVerified: authVerified,
+		Email:        email,
+		Issuer:       iss,
+		Name:         name,
+		Secret:       input.Secret,
+		Sub:          sub,
 		User: interfaces.SignupUserParam{
 			Lang:        &lang,
 			UserID:      gqlmodel.ToIDRef[id.User](input.ID),

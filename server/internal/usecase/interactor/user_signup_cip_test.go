@@ -29,13 +29,18 @@ func TestUser_SignupOIDC_CIP(t *testing.T) {
 	assert.NoError(t, r.Role.Save(ctx, *ownerRole))
 
 	g := &gateway.Container{Mailer: mailer.NewMock()}
-	uc := NewUser(r, g, nil, "", "")
+	// A signup secret is required for the no-access-token path (CIP provisioning)
+	// so that open-signup deployments cannot have sub/email injected.
+	const testSignupSecret = "test-secret"
+	uc := NewUser(r, g, nil, testSignupSecret, "")
 
+	secret := testSignupSecret
 	param := interfaces.SignupOIDCParam{
 		Issuer: "https://securetoken.google.com/my-proj",
 		Sub:    "cip-uid-123",
 		Email:  "cipuser@example.com",
 		Name:   "CIP User",
+		Secret: &secret,
 		User: interfaces.SignupUserParam{
 			Lang:  &language.English,
 			Theme: user.ThemeDefault.Ref(),
