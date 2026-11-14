@@ -32,6 +32,10 @@ func (r *Workspace) Filtered(f workspace.WorkspaceFilter) workspace.Repo {
 // optionally keyword-matched against name/alias and filtered by soft-delete
 // status. Used by the admin app's cross-tenant listing and the
 // /workspaces/all REST route.
+//
+// Pagination is pushed to the database: cursor-forward and offset pages are
+// executed with a LIMIT/OFFSET at the SQL level so the full table is never
+// loaded into memory, regardless of tenant size.
 func (r *Workspace) FindAll(ctx context.Context, keyword *string, _ *bool, status workspace.StatusFilter, p *usecasex.Pagination, excludePersonal bool) (workspace.List, *usecasex.PageInfo, error) {
 	kw := ""
 	if keyword != nil {
@@ -40,11 +44,80 @@ func (r *Workspace) FindAll(ctx context.Context, keyword *string, _ *bool, statu
 	if status == "" {
 		status = workspace.StatusAll
 	}
-	ids, err := r.c.queries(ctx).WorkspaceIDsAll(ctx, gen.WorkspaceIDsAllParams{ExcludePersonal: excludePersonal, Keyword: kw, Status: string(status)})
+	q := r.c.queries(ctx)
+	countParams := gen.WorkspaceIDsAllCountParams{ExcludePersonal: excludePersonal, Keyword: kw, Status: string(status)}
+	total, err := q.WorkspaceIDsAllCount(ctx, countParams)
 	if err != nil {
 		return nil, nil, rerror.ErrInternalByWithContext(ctx, err)
 	}
-	return paginateWorkspaces(ctx, r, ids, p)
+
+	var ids []string
+	hasNext, hasPrev := false, false
+
+	switch {
+	case p != nil && p.Cursor != nil && p.Cursor.First != nil:
+		// Forward cursor pagination.
+		cursor := ""
+		if p.Cursor.After != nil {
+			cursor = string(*p.Cursor.After)
+		}
+		// Fetch one extra row to detect whether a next page exists.
+		pageSize := *p.Cursor.First + 1
+		ids, err = q.WorkspaceIDsAllCursor(ctx, gen.WorkspaceIDsAllCursorParams{
+			ExcludePersonal: excludePersonal,
+			Keyword:         kw,
+			Status:          string(status),
+			Cursor:          cursor,
+			PageSize:        int32(pageSize),
+		})
+		if err != nil {
+			return nil, nil, rerror.ErrInternalByWithContext(ctx, err)
+		}
+		if int64(len(ids)) > *p.Cursor.First {
+			hasNext = true
+			ids = ids[:*p.Cursor.First]
+		}
+		hasPrev = cursor != ""
+
+	case p != nil && p.Offset != nil:
+		// Offset pagination.
+		op := p.Offset
+		hasPrev = op.Offset > 0
+		hasNext = op.Offset+op.Limit < total
+		ids, err = q.WorkspaceIDsAllOffset(ctx, gen.WorkspaceIDsAllOffsetParams{
+			ExcludePersonal: excludePersonal,
+			Keyword:         kw,
+			Status:          string(status),
+			OffsetVal:       op.Offset,
+			PageSize:        int32(op.Limit),
+		})
+		if err != nil {
+			return nil, nil, rerror.ErrInternalByWithContext(ctx, err)
+		}
+
+	default:
+		// No pagination or unsupported cursor mode: load all IDs. For backward
+		// cursor (Last/Before) the in-memory slice approach in paginateWorkspaces
+		// is retained; the assumption is that this variant is rarely hit in
+		// production where callers use forward-only pagination.
+		allIDs, err := q.WorkspaceIDsAll(ctx, gen.WorkspaceIDsAllParams{ExcludePersonal: excludePersonal, Keyword: kw, Status: string(status)})
+		if err != nil {
+			return nil, nil, rerror.ErrInternalByWithContext(ctx, err)
+		}
+		return paginateWorkspaces(ctx, r, allIDs, p)
+	}
+
+	list, err := r.findByIDStrings(ctx, ids)
+	if err != nil {
+		return nil, nil, err
+	}
+	var startCur, endCur *usecasex.Cursor
+	if len(ids) > 0 {
+		s := usecasex.Cursor(ids[0])
+		e := usecasex.Cursor(ids[len(ids)-1])
+		startCur, endCur = &s, &e
+	}
+	return list, usecasex.NewPageInfo(total, startCur, endCur, hasNext, hasPrev), nil
 }
 
 func (r *Workspace) hydrate(ctx context.Context, rows []gen.Workspace) (workspace.List, error) {
@@ -302,7 +375,8 @@ func (r *Workspace) save(ctx context.Context, ws *workspace.Workspace) error {
 		}
 		for _, m := range integrations {
 			if err := q.WorkspaceIntegrationInsert(ctx, gen.WorkspaceIntegrationInsertParams{
-				WorkspaceID: m.WorkspaceID, IntegrationID: m.IntegrationID, Role: m.Role, InvitedBy: m.InvitedBy, Disabled: m.Disabled,
+				WorkspaceID: m.WorkspaceID, IntegrationID: m.IntegrationID, Role: m.Role,
+				InvitedBy: m.InvitedBy, Disabled: m.Disabled,
 			}); err != nil {
 				return rerror.ErrInternalByWithContext(ctx, err)
 			}
