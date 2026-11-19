@@ -184,3 +184,32 @@ func (q *Queries) PolicyVersionFindAll(ctx context.Context) ([]PolicyVersion, er
 	}
 	return items, nil
 }
+
+const policyVersionRevisions = `-- name: PolicyVersionRevisions :many
+SELECT version, revision FROM policy_versions WHERE type = $1
+`
+
+type PolicyVersionRevisionsRow struct {
+	Version  string
+	Revision int64
+}
+
+func (q *Queries) PolicyVersionRevisions(ctx context.Context, type_ string) ([]PolicyVersionRevisionsRow, error) {
+	rows, err := q.db.Query(ctx, policyVersionRevisions, type_)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []PolicyVersionRevisionsRow
+	for rows.Next() {
+		var i PolicyVersionRevisionsRow
+		if err := rows.Scan(&i.Version, &i.Revision); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}

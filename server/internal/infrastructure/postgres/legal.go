@@ -21,6 +21,9 @@ func NewPolicyVersion(c *Client) legal.VersionRepo { return &PolicyVersion{c: c}
 type versionJSON struct {
 	EffectiveAt time.Time         `json:"effectiveAt"`
 	Required    bool              `json:"required"`
+	Revision    int64             `json:"revision"`
+	SetAt       time.Time         `json:"setAt"`
+	SetDigest   []byte            `json:"setDigest"`
 	Title       map[string]string `json:"title"`
 	URL         map[string]string `json:"url,omitempty"`
 	Version     string            `json:"version"`
@@ -28,7 +31,19 @@ type versionJSON struct {
 }
 
 func (r *PolicyVersion) ArchiveVersions(ctx context.Context, h legal.TypeHead) error {
-	for _, v := range h.SortedVersions() {
+	rows, err := r.c.queries(ctx).PolicyVersionRevisions(ctx, string(h.Type))
+	if err != nil {
+		return rerror.ErrInternalByWithContext(ctx, err)
+	}
+	revs := make(map[legal.Version]int64, len(rows))
+	for _, row := range rows {
+		v, err := legal.ParseVersion(row.Version)
+		if err != nil {
+			return rerror.ErrInternalByWithContext(ctx, err)
+		}
+		revs[v] = row.Revision
+	}
+	for _, v := range h.ArchiveDue(revs) {
 		title, err := json.Marshal(nonNil(v.Title))
 		if err != nil {
 			return rerror.ErrInternalByWithContext(ctx, err)
@@ -132,6 +147,9 @@ func marshalVersions(h legal.TypeHead) ([]byte, error) {
 		j := versionJSON{
 			EffectiveAt: v.EffectiveAt.UTC(),
 			Required:    v.Required,
+			Revision:    v.Revision,
+			SetAt:       v.SetAt.UTC(),
+			SetDigest:   v.SetDigest,
 			Title:       v.Title,
 			URL:         v.URL,
 			Version:     v.Version.String(),
@@ -180,7 +198,7 @@ func policyTypeModel(row gen.PolicyType) (legal.TypeHead, error) {
 			Required:    j.Required,
 			Title:       j.Title,
 			URL:         j.URL,
-		}}
+		}, Revision: j.Revision, SetAt: j.SetAt.UTC(), SetDigest: j.SetDigest}
 		if j.WithdrawnAt != nil {
 			at := j.WithdrawnAt.UTC()
 			hv.WithdrawnAt = &at

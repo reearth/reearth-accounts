@@ -20,11 +20,13 @@ var (
 func runLegal(t *testing.T, nc Factory) {
 	t.Run("Legal_HeadCompareAndSwap", func(t *testing.T) { testLegalHeadCAS(t, nc) })
 	t.Run("Legal_ArchiveVersionsGuard", func(t *testing.T) { testLegalArchiveVersions(t, nc) })
+	t.Run("Legal_ArchiveOnlyDueVersions", func(t *testing.T) { testLegalArchiveOnlyDue(t, nc) })
 	t.Run("Legal_ApplyBothOrders", func(t *testing.T) { testLegalApplyBothOrders(t, nc) })
 	t.Run("Legal_ApplyRace", func(t *testing.T) { testLegalApplyRace(t, nc) })
 	t.Run("Legal_ApplyReplayRace", func(t *testing.T) { testLegalApplyReplayRace(t, nc) })
 	runLegalFaults(t, nc)
 	runLegalReceived(t, nc)
+	runLegalTimeline(t, nc)
 }
 
 func legalEntry(typ, version string, eff time.Time, title string) legal.Entry {
@@ -55,6 +57,9 @@ func legalHeadVersion(typ, version string, eff time.Time, title string, withdraw
 	e := legalEntry(typ, version, eff, title)
 	return legal.HeadVersion{
 		VersionRecord: legal.VersionRecord(e),
+		Revision:      1,
+		SetAt:         legalT0.Add(-time.Hour),
+		SetDigest:     []byte(version + title),
 		WithdrawnAt:   withdrawnAt,
 	}
 }
@@ -138,6 +143,9 @@ func assertHeadEqual(t *testing.T, want, got legal.TypeHead) {
 			continue
 		}
 		assertRecordEqual(t, &w.VersionRecord, &g.VersionRecord)
+		assert.Equal(t, w.Revision, g.Revision)
+		assert.True(t, w.SetAt.Equal(g.SetAt), "setAt %v != %v", w.SetAt, g.SetAt)
+		assert.Equal(t, w.SetDigest, g.SetDigest)
 		if w.WithdrawnAt == nil {
 			assert.Nil(t, g.WithdrawnAt)
 		} else if assert.NotNil(t, g.WithdrawnAt) {
@@ -170,7 +178,9 @@ func testLegalArchiveVersions(t *testing.T, nc Factory) {
 	eff := legalT0.Add(48 * time.Hour)
 
 	head := func(rev int64, title string) legal.TypeHead {
-		return legal.TypeHead{Type: "tos", Revision: rev, Applied: legalApplied, AppliedAt: legalT0, Versions: legalVersions(legalHeadVersion("tos", "2.0.0", eff, title, nil))}
+		v := legalHeadVersion("tos", "2.0.0", eff, title, nil)
+		v.Revision = rev
+		return legal.TypeHead{Type: "tos", Revision: rev, Applied: legalApplied, AppliedAt: legalT0, Versions: legalVersions(v)}
 	}
 	won, err := r.CompareAndSwapHead(ctx, head(1, "draft"))
 	require.NoError(t, err)
@@ -197,6 +207,38 @@ func testLegalArchiveVersions(t *testing.T, nc Factory) {
 
 	require.NoError(t, r.ArchiveVersions(ctx, head(3, "final")))
 	assert.Equal(t, "final", find().Title["en"], "the same revision is idempotent")
+}
+
+func testLegalArchiveOnlyDue(t *testing.T, nc Factory) {
+	c, _, done := nc(t)
+	defer done()
+	ctx := context.Background()
+	r := c.PolicyVersion
+	eff := legalT0.Add(48 * time.Hour)
+	version := func(v string, rev int64, title string) legal.HeadVersion {
+		hv := legalHeadVersion("tos", v, eff, title, nil)
+		hv.Revision = rev
+		return hv
+	}
+
+	first := legal.TypeHead{Type: "tos", Revision: 1, Applied: legalApplied, AppliedAt: legalT0, Versions: legalVersions(version("1.0.0", 1, "v1"), version("2.0.0", 1, "v2"))}
+	won, err := r.CompareAndSwapHead(ctx, first)
+	require.NoError(t, err)
+	require.True(t, won)
+	require.NoError(t, r.ArchiveVersions(ctx, first))
+	require.NoError(t, r.ArchiveVersions(ctx, legal.TypeHead{Type: "tos", Revision: 3, Versions: legalVersions(
+		version("1.0.0", 1, "unchanged since revision 1"),
+		version("2.0.0", 3, "v2-changed"),
+		version("3.0.0", 2, "v3-never-archived"),
+	)}))
+
+	records, err := r.FindVersions(ctx)
+	require.NoError(t, err)
+	titles := map[string]string{}
+	for _, rec := range records {
+		titles[rec.Version.String()] = rec.Title["en"]
+	}
+	assert.Equal(t, map[string]string{"1.0.0": "v1", "2.0.0": "v2-changed", "3.0.0": "v3-never-archived"}, titles)
 }
 
 type catalogView struct {

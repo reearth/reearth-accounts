@@ -3,6 +3,7 @@ package legal
 import (
 	"context"
 	"fmt"
+	"math/rand/v2"
 	"time"
 )
 
@@ -34,7 +35,10 @@ func Apply(ctx context.Context, r VersionRepo, m Manifest, now func() time.Time)
 }
 
 func applyEntry(ctx context.Context, r VersionRepo, e Entry, payloadAt time.Time, now func() time.Time) (bool, error) {
-	for range maxApplyAttempts {
+	for attempt := range maxApplyAttempts {
+		if err := backoff(ctx, attempt); err != nil {
+			return false, err
+		}
 		cur, err := r.FindHead(ctx, e.Type)
 		if err != nil {
 			return false, err
@@ -52,4 +56,20 @@ func applyEntry(ctx context.Context, r VersionRepo, e Entry, payloadAt time.Time
 		return outcome == OutcomeWon, r.ArchiveVersions(ctx, next)
 	}
 	return false, fmt.Errorf("legal: %s: head compare-and-set lost %d times", e.Type, maxApplyAttempts)
+}
+
+// backoff waits a random time that doubles with each lost compare-and-set, so
+// writers contending for one head spread out instead of losing in lockstep.
+func backoff(ctx context.Context, attempt int) error {
+	if attempt == 0 {
+		return nil
+	}
+	t := time.NewTimer(rand.N(time.Duration(min(1<<attempt, 128)) * time.Millisecond))
+	defer t.Stop()
+	select {
+	case <-ctx.Done():
+		return ctx.Err()
+	case <-t.C:
+		return nil
+	}
 }
