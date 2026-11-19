@@ -27,8 +27,7 @@ type MFAStatus struct {
 }
 
 // VerificationTarget names the user whose IdP account gets a new
-// verification mail. UserID is the accounts user, Sub the IdP subject, and
-// Lang the user's language for a mail accounts renders itself.
+// verification mail. UserID is the accounts user, Sub the IdP subject.
 type VerificationTarget struct {
 	Lang   language.Tag
 	Sub    string

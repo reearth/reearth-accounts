@@ -4,7 +4,7 @@ Alice 様
 
 Re:Earth にご登録いただきありがとうございます。次のリンクを開いて、メールアドレスを確認してください。
 
-アカウントを有効にしてログインする:
+アカウントを有効にしてログイン：
 https://auth.example.com/?user-verification-token=CODE
 
 このメールアドレスで、いつでも Re:Earth アカウントにログインできます。
