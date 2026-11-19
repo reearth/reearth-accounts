@@ -33,15 +33,16 @@ func New(ctx context.Context, db *mongo.Database, useTransaction, needCompat boo
 	}
 
 	c := &repo.Container{
-		AdminUser:     NewAdminUser(client),
-		User:          NewUser(client),
-		Workspace:     ws,
-		Role:          NewRole(client),
-		Permittable:   NewPermittable(client),
-		PolicyVersion: NewPolicyVersion(db),
-		Transaction:   client.Transaction(),
-		Users:         users,
-		Config:        NewConfig(db.Collection("config"), lock),
+		AdminUser:        NewAdminUser(client),
+		User:             NewUser(client),
+		Workspace:        ws,
+		Role:             NewRole(client),
+		Permittable:      NewPermittable(client),
+		PolicyAcceptance: NewPolicyAcceptance(db),
+		PolicyVersion:    NewPolicyVersion(db),
+		Transaction:      client.Transaction(),
+		Users:            users,
+		Config:           NewConfig(db.Collection("config"), lock),
 	}
 
 	return c, nil

@@ -161,3 +161,29 @@ func TestMigrate_LegalPoliciesDownUp(t *testing.T) {
 	require.NoError(t, migration.Migrate(ctx, pool))
 	assert.Equal(t, 2, tables())
 }
+
+func TestMigrate_PolicyAcceptancesDownUp(t *testing.T) {
+	pool, done := startPG(t)
+	defer done()
+	ctx := context.Background()
+	require.NoError(t, migration.Migrate(ctx, pool))
+
+	tables := func() int {
+		var n int
+		require.NoError(t, pool.QueryRow(ctx,
+			`SELECT count(*) FROM information_schema.tables WHERE table_name = 'policy_acceptances'`).Scan(&n))
+		return n
+	}
+	assert.Equal(t, 1, tables())
+
+	down, err := os.ReadFile("0008_policy_acceptances.down.sql")
+	require.NoError(t, err)
+	_, err = pool.Exec(ctx, string(down))
+	require.NoError(t, err)
+	assert.Equal(t, 0, tables())
+
+	_, err = pool.Exec(ctx, `UPDATE schema_migrations SET version = 7, dirty = false`)
+	require.NoError(t, err)
+	require.NoError(t, migration.Migrate(ctx, pool))
+	assert.Equal(t, 1, tables())
+}

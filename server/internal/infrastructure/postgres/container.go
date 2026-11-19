@@ -11,14 +11,15 @@ import (
 func New(_ context.Context, pool *pgxpool.Pool, users []user.Repo) (*repo.Container, error) {
 	c := NewClient(pool)
 	return &repo.Container{
-		AdminUser:     NewAdminUser(c),
-		User:          NewUser(c),
-		Workspace:     NewWorkspace(c),
-		Role:          NewRole(c),
-		Permittable:   NewPermittable(c),
-		PolicyVersion: NewPolicyVersion(c),
-		Transaction:   NewTransaction(pool),
-		Users:         users,
-		Config:        NewConfig(pool),
+		AdminUser:        NewAdminUser(c),
+		User:             NewUser(c),
+		Workspace:        NewWorkspace(c),
+		Role:             NewRole(c),
+		Permittable:      NewPermittable(c),
+		PolicyAcceptance: NewPolicyAcceptance(c),
+		PolicyVersion:    NewPolicyVersion(c),
+		Transaction:      NewTransaction(pool),
+		Users:            users,
+		Config:           NewConfig(pool),
 	}, nil
 }

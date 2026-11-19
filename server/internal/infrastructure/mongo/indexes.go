@@ -13,6 +13,10 @@ import (
 // binaries create them at startup; CreateMany is a no-op for an existing
 // identical index.
 var indexes = map[string][]mongo.IndexModel{
+	policyAcceptancesCollection: {{
+		Keys:    bson.D{{Key: "user", Value: 1}, {Key: "type", Value: 1}},
+		Options: options.Index().SetName("policy_acceptances_user_type"),
+	}},
 	policyVersionsCollection: {{
 		Keys:    bson.D{{Key: "type", Value: 1}, {Key: "version", Value: 1}},
 		Options: options.Index().SetName("policy_versions_type_version").SetUnique(true),
