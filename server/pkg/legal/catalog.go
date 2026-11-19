@@ -41,8 +41,8 @@ func (c Catalog) Upcoming(t Type, now time.Time) *VersionRecord {
 	return up
 }
 
-// Withdrawn reports whether ref was withdrawn. A withdrawn version never
-// takes effect.
+// Withdrawn reports whether ref is withdrawn. A withdrawn version is never
+// current, though the newest payload can republish it as upcoming.
 func (c Catalog) Withdrawn(ref Ref) bool {
 	return c.heads[ref.Type].IsWithdrawn(ref.Version)
 }
