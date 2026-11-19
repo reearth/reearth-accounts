@@ -281,5 +281,5 @@ func maintenanceRoute(c *Config, runner *maintenance.Runner) *handlers.Maintenan
 	if c.MaintenanceKey == "" {
 		return nil
 	}
-	return &handlers.MaintenanceHandler{Budget: c.MaintenanceBudget(), Key: maintenance.NewKey(c.MaintenanceKey), Runner: runner}
+	return &handlers.MaintenanceHandler{Key: maintenance.NewKey(c.MaintenanceKey), Runner: runner}
 }

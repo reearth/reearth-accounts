@@ -7,7 +7,6 @@ import (
 	"net"
 	"net/netip"
 	"os"
-	"reflect"
 	"strings"
 	"time"
 
@@ -344,17 +343,6 @@ func (c *Config) Maintenance() maintenance.Config {
 	retry := outbox.DefaultRetryPolicy
 	retry.MaxAttempts = c.MailerMaxAttempts
 	return maintenance.Config{Lease: outbox.ClaimLease, Retry: retry, SendsPerSecond: c.MailerRate, TTL: c.MailerOutboxTTL}
-}
-
-// MaintenanceBudget bounds a pass the route starts. With the loop off, it is
-// the loop's default interval.
-func (c *Config) MaintenanceBudget() time.Duration {
-	if c.MaintenanceInterval > 0 {
-		return c.MaintenanceInterval
-	}
-	f, _ := reflect.TypeOf(*c).FieldByName("MaintenanceInterval")
-	d, _ := time.ParseDuration(f.Tag.Get("default"))
-	return d
 }
 
 type GraphQLConfig struct {

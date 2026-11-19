@@ -59,7 +59,7 @@
         },
         "/api/maintenance/run": {
             "post": {
-                "description": "Sweeps the mail outbox, runs retention steps and sends due mail within REEARTH_ACCOUNTS_MAINTENANCE_INTERVAL (its default when the interval is 0), then reports the counts. For a scheduler. Returns 404 when REEARTH_ACCOUNTS_MAINTENANCE_KEY is unset.",
+                "description": "Sweeps the mail outbox, runs retention steps and sends due mail for up to 30 seconds, then reports the counts. For a scheduler. Returns 404 when REEARTH_ACCOUNTS_MAINTENANCE_KEY is unset.",
                 "produces": [
                     "application/json"
                 ],

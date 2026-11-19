@@ -15,8 +15,9 @@ type PassRunner interface {
 	RunPass(ctx context.Context) (maintenance.Report, error)
 }
 
+const maintenanceBudget = 30 * time.Second
+
 type MaintenanceHandler struct {
-	Budget time.Duration
 	Key    maintenance.Key
 	Runner PassRunner
 }
@@ -24,7 +25,7 @@ type MaintenanceHandler struct {
 // Run godoc
 // @Tags Maintenance
 // @Summary Run one maintenance pass
-// @Description Sweeps the mail outbox, runs retention steps and sends due mail within REEARTH_ACCOUNTS_MAINTENANCE_INTERVAL (its default when the interval is 0), then reports the counts. For a scheduler. Returns 404 when REEARTH_ACCOUNTS_MAINTENANCE_KEY is unset.
+// @Description Sweeps the mail outbox, runs retention steps and sends due mail for up to 30 seconds, then reports the counts. For a scheduler. Returns 404 when REEARTH_ACCOUNTS_MAINTENANCE_KEY is unset.
 // @Produce json
 // @Param X-Accounts-Maintenance-Key header string true "the value of REEARTH_ACCOUNTS_MAINTENANCE_KEY"
 // @Success 200 {object} httpmodel.MaintenanceRunResponse
@@ -35,7 +36,7 @@ func (h *MaintenanceHandler) Run(c echo.Context) error {
 	if !h.Key.Matches(c.Request().Header.Get(maintenance.KeyHeader)) {
 		return httpinternal.NewError(http.StatusUnauthorized, "unauthorized", nil)
 	}
-	ctx, cancel := context.WithTimeout(c.Request().Context(), h.Budget)
+	ctx, cancel := context.WithTimeout(c.Request().Context(), maintenanceBudget)
 	defer cancel()
 	rep, err := h.Runner.RunPass(ctx)
 	if err != nil {
