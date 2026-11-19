@@ -3,8 +3,10 @@ package app
 import (
 	"context"
 	"errors"
+	"net"
 	"net/http"
 	"net/http/pprof"
+	"net/netip"
 
 	"github.com/99designs/gqlgen/graphql/playground"
 	"github.com/labstack/echo/v4"
@@ -35,6 +37,7 @@ func initEcho(ctx context.Context, cfg *ServerConfig) *echo.Echo {
 	e.Server.IdleTimeout = cfg.Config.ServerIdleTimeout
 	e.Server.ReadHeaderTimeout = cfg.Config.ServerReadHeaderTimeout
 	e.Server.ReadTimeout = cfg.Config.ServerReadTimeout
+	e.IPExtractor = ipExtractor(cfg.Config.TrustedProxyPrefixes)
 
 	logger := log.NewEcho()
 	e.Logger = logger
@@ -181,6 +184,28 @@ func initEcho(ctx context.Context, cfg *ServerConfig) *echo.Echo {
 	scimadapter.RegisterSCIMRouter(e, cfg.Repos.Workspace, cfg.Repos.User, scimUC)
 
 	return e
+}
+
+// ipExtractor reads the client IP from the right-most X-Forwarded-For hop
+// that is not a listed proxy. Echo trusts loopback, link-local and private
+// ranges by default; those defaults are turned off so that only the listed
+// proxies are trusted.
+func ipExtractor(proxies []netip.Prefix) echo.IPExtractor {
+	if len(proxies) == 0 {
+		return echo.ExtractIPDirect()
+	}
+	opts := []echo.TrustOption{
+		echo.TrustLoopback(false),
+		echo.TrustLinkLocal(false),
+		echo.TrustPrivateNet(false),
+	}
+	for _, p := range proxies {
+		opts = append(opts, echo.TrustIPRange(&net.IPNet{
+			IP:   p.Addr().AsSlice(),
+			Mask: net.CIDRMask(p.Bits(), p.Addr().BitLen()),
+		}))
+	}
+	return echo.ExtractIPFromXFFHeader(opts...)
 }
 
 // restAuthResolver reuses the existing auth pipeline (FindByName for mock auth,

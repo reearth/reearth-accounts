@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"net"
+	"net/netip"
 	"os"
 	"strings"
 	"time"
@@ -29,6 +30,12 @@ type Config struct {
 	DBDriver string   `envconfig:"REEARTH_ACCOUNTS_DB_DRIVER"`
 	Origins  []string `envconfig:"REEARTH_ACCOUNTS_ORIGINS"`
 	Host     string   `default:"0.0.0.0" envconfig:"HOST"`
+
+	// TrustedProxies lists the proxies (CIDRs or single IPs) whose
+	// X-Forwarded-For hop is read as the client IP. Empty means the client IP
+	// is the connection address.
+	TrustedProxies       []string       `envconfig:"REEARTH_ACCOUNTS_TRUSTED_PROXIES"`
+	TrustedProxyPrefixes []netip.Prefix `ignored:"true"`
 
 	GCPProject string `envconfig:"GOOGLE_CLOUD_PROJECT"`
 	Cert       CertConfig
@@ -285,6 +292,12 @@ func ReadConfig(debug bool) (*Config, error) {
 		return nil, fmt.Errorf("REEARTH_ACCOUNTS_SERVICE_CALLERS: %w", err)
 	}
 
+	proxies, err := parseTrustedProxies(c.TrustedProxies)
+	if err != nil {
+		return nil, fmt.Errorf("REEARTH_ACCOUNTS_TRUSTED_PROXIES: %w", err)
+	}
+	c.TrustedProxyPrefixes = proxies
+
 	ms, err := mailprovider.Parse(c.Mailer, c.Dev)
 	if err != nil {
 		return nil, err
@@ -295,6 +308,33 @@ func ReadConfig(debug bool) (*Config, error) {
 		c.Dev = true
 	}
 	return &c, nil
+}
+
+func parseTrustedProxies(entries []string) ([]netip.Prefix, error) {
+	var res []netip.Prefix
+	for _, e := range entries {
+		e = strings.TrimSpace(e)
+		if e == "" {
+			continue
+		}
+		if strings.Contains(e, "/") {
+			p, err := netip.ParsePrefix(e)
+			if err != nil {
+				return nil, err
+			}
+			res = append(res, p.Masked())
+			continue
+		}
+		a, err := netip.ParseAddr(e)
+		if err != nil {
+			return nil, err
+		}
+		if a.Zone() != "" {
+			return nil, fmt.Errorf("address %q must not have a zone", e)
+		}
+		res = append(res, netip.PrefixFrom(a, a.BitLen()))
+	}
+	return res, nil
 }
 
 type GraphQLConfig struct {
