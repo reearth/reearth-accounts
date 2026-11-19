@@ -8,8 +8,9 @@ import (
 )
 
 const (
-	providerSendGrid = "sendgrid"
-	providerSES      = "ses"
+	providerSendGrid   = "sendgrid"
+	providerSES        = "ses"
+	providerCloudflare = "cloudflare"
 )
 
 type Env struct {
@@ -17,6 +18,9 @@ type Env struct {
 	FromName       string `envconfig:"REEARTH_ACCOUNTS_MAILER_FROM_NAME"`
 	Provider       string `envconfig:"REEARTH_ACCOUNTS_MAILER"`
 	SendGridAPIKey string `envconfig:"REEARTH_ACCOUNTS_SENDGRID_API_KEY"`
+
+	CloudflareAccountID string `envconfig:"REEARTH_ACCOUNTS_CLOUDFLARE_ACCOUNT_ID"`
+	CloudflareAPIToken  string `envconfig:"REEARTH_ACCOUNTS_CLOUDFLARE_API_TOKEN"`
 }
 
 type Mode int
@@ -35,6 +39,8 @@ type Settings struct {
 func Parse(e Env, dev bool) (Settings, error) {
 	e.FromEmail = strings.TrimSpace(e.FromEmail)
 	e.SendGridAPIKey = strings.TrimSpace(e.SendGridAPIKey)
+	e.CloudflareAccountID = strings.TrimSpace(e.CloudflareAccountID)
+	e.CloudflareAPIToken = strings.TrimSpace(e.CloudflareAPIToken)
 	switch e.Provider {
 	case "":
 		if dev {
@@ -60,8 +66,22 @@ func Parse(e Env, dev bool) (Settings, error) {
 			Mailer: providerSES,
 			SES:    mailer.SESConfig{Email: e.FromEmail, Name: e.FromName},
 		}}, nil
+	case providerCloudflare:
+		if err := requireFields(e.Provider,
+			field{"REEARTH_ACCOUNTS_MAILER_FROM_EMAIL", e.FromEmail},
+			field{"REEARTH_ACCOUNTS_CLOUDFLARE_ACCOUNT_ID", e.CloudflareAccountID},
+			field{"REEARTH_ACCOUNTS_CLOUDFLARE_API_TOKEN", e.CloudflareAPIToken},
+		); err != nil {
+			return Settings{}, err
+		}
+		return Settings{Mode: ModeProvider, provider: mailer.Config{
+			Mailer: providerCloudflare,
+			Cloudflare: mailer.CloudflareConfig{
+				Email: e.FromEmail, Name: e.FromName, AccountID: e.CloudflareAccountID, APIToken: e.CloudflareAPIToken,
+			},
+		}}, nil
 	default:
-		return Settings{}, fmt.Errorf("REEARTH_ACCOUNTS_MAILER: unsupported provider %q (supported: %s, %s)", e.Provider, providerSendGrid, providerSES)
+		return Settings{}, fmt.Errorf("REEARTH_ACCOUNTS_MAILER: unsupported provider %q (supported: %s, %s, %s)", e.Provider, providerSendGrid, providerSES, providerCloudflare)
 	}
 }
 

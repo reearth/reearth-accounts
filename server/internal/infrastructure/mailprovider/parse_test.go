@@ -10,6 +10,8 @@ import (
 func TestParse(t *testing.T) {
 	sendgrid := Env{Provider: "sendgrid", FromEmail: "noreply@example.com", FromName: "Accounts", SendGridAPIKey: "sg-key"}
 
+	cloudflare := Env{Provider: "cloudflare", FromEmail: "noreply@example.com", FromName: "Accounts", CloudflareAccountID: "acc-id", CloudflareAPIToken: "cf-token"}
+
 	tests := []struct {
 		name    string
 		env     Env
@@ -68,12 +70,48 @@ func TestParse(t *testing.T) {
 			env:     Env{Provider: "ses", FromEmail: "   "},
 			wantErr: "REEARTH_ACCOUNTS_MAILER_FROM_EMAIL is required when REEARTH_ACCOUNTS_MAILER=ses",
 		},
+		{
+			name: "cloudflare complete",
+			env:  cloudflare,
+			want: Settings{Mode: ModeProvider, provider: mailer.Config{
+				Mailer:     "cloudflare",
+				Cloudflare: mailer.CloudflareConfig{Email: "noreply@example.com", Name: "Accounts", AccountID: "acc-id", APIToken: "cf-token"},
+			}},
+		},
+		{
+			name: "cloudflare values are trimmed",
+			env:  Env{Provider: "cloudflare", FromEmail: " noreply@example.com ", CloudflareAccountID: " acc-id\n", CloudflareAPIToken: " cf-token "},
+			want: Settings{Mode: ModeProvider, provider: mailer.Config{
+				Mailer:     "cloudflare",
+				Cloudflare: mailer.CloudflareConfig{Email: "noreply@example.com", AccountID: "acc-id", APIToken: "cf-token"},
+			}},
+		},
+		{
+			name:    "cloudflare without account id",
+			env:     Env{Provider: "cloudflare", FromEmail: "noreply@example.com", CloudflareAPIToken: "cf-token"},
+			wantErr: "REEARTH_ACCOUNTS_CLOUDFLARE_ACCOUNT_ID is required when REEARTH_ACCOUNTS_MAILER=cloudflare",
+		},
+		{
+			name:    "cloudflare without token",
+			env:     Env{Provider: "cloudflare", FromEmail: "noreply@example.com", CloudflareAccountID: "acc-id"},
+			wantErr: "REEARTH_ACCOUNTS_CLOUDFLARE_API_TOKEN is required when REEARTH_ACCOUNTS_MAILER=cloudflare",
+		},
+		{
+			name:    "cloudflare with blank token",
+			env:     Env{Provider: "cloudflare", FromEmail: "noreply@example.com", CloudflareAccountID: "acc-id", CloudflareAPIToken: " \t "},
+			wantErr: "REEARTH_ACCOUNTS_CLOUDFLARE_API_TOKEN is required when REEARTH_ACCOUNTS_MAILER=cloudflare",
+		},
+		{
+			name:    "cloudflare without from email",
+			env:     Env{Provider: "cloudflare", CloudflareAccountID: "acc-id", CloudflareAPIToken: "cf-token"},
+			wantErr: "REEARTH_ACCOUNTS_MAILER_FROM_EMAIL is required when REEARTH_ACCOUNTS_MAILER=cloudflare",
+		},
 		{name: "provider set in dev still sends", env: sendgrid, dev: true, want: Settings{Mode: ModeProvider, provider: mailer.Config{
 			Mailer:   "sendgrid",
 			SendGrid: mailer.SendGridConfig{API: "sg-key", Email: "noreply@example.com", Name: "Accounts"},
 		}}},
 	}
-	for _, name := range []string{"smtp", "cloudflare", "direct", "logger", "sendgird", "SendGrid"} {
+	for _, name := range []string{"smtp", "direct", "logger", "sendgird", "SendGrid"} {
 		tests = append(tests, struct {
 			name    string
 			env     Env

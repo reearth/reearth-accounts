@@ -324,7 +324,7 @@ func (c Config) Print() string {
 	for _, secret := range []string{
 		c.DB, c.RestAPIKey, c.SwaggerBasicPass,
 		c.Auth0.ClientSecret, c.SignupSecret, c.SyncSSOAPIKey,
-		c.Mailer.SendGridAPIKey,
+		c.Mailer.SendGridAPIKey, c.Mailer.CloudflareAPIToken,
 	} {
 		if secret == "" {
 			continue
