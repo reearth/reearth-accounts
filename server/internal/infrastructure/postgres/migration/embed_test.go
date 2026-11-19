@@ -187,3 +187,33 @@ func TestMigrate_PolicyAcceptancesDownUp(t *testing.T) {
 	require.NoError(t, migration.Migrate(ctx, pool))
 	assert.Equal(t, 1, tables())
 }
+
+func TestMigrate_MailOutboxDownUp(t *testing.T) {
+	pool, done := startPG(t)
+	defer done()
+	ctx := context.Background()
+	require.NoError(t, migration.Migrate(ctx, pool))
+
+	tables := func() int {
+		var n int
+		require.NoError(t, pool.QueryRow(ctx,
+			`SELECT count(*) FROM information_schema.tables WHERE table_name = 'mail_outbox'`).Scan(&n))
+		return n
+	}
+	assert.Equal(t, 1, tables())
+
+	_, err := pool.Exec(ctx, `INSERT INTO mail_outbox (key, kind, state, next_attempt_at, created_at, updated_at, recipient_user_id, recipient_address)
+		VALUES ('k', 'kind', 'pending', now(), now(), now(), 'u', 'a@example.com')`)
+	assert.Error(t, err, "a record has exactly one recipient")
+
+	down, err := os.ReadFile("0009_mail_outbox.down.sql")
+	require.NoError(t, err)
+	_, err = pool.Exec(ctx, string(down))
+	require.NoError(t, err)
+	assert.Equal(t, 0, tables())
+
+	_, err = pool.Exec(ctx, `UPDATE schema_migrations SET version = 8, dirty = false`)
+	require.NoError(t, err)
+	require.NoError(t, migration.Migrate(ctx, pool))
+	assert.Equal(t, 1, tables())
+}

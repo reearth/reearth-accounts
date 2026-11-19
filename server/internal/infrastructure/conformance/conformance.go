@@ -69,6 +69,7 @@ func Run(t *testing.T, nc Factory) {
 	t.Run("Transaction_CommitRollback", func(t *testing.T) { testTransaction(t, nc) })
 	runLegal(t, nc)
 	runPolicyAcceptance(t, nc)
+	runOutbox(t, nc)
 }
 
 func newUser(t *testing.T, name, email string) *user.User {

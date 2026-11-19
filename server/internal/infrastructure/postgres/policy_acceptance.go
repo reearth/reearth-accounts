@@ -32,6 +32,26 @@ func (r *PolicyAcceptance) FindByUser(ctx context.Context, u id.UserID) ([]legal
 	return res, nil
 }
 
+func (r *PolicyAcceptance) FindUsersAfter(ctx context.Context, after *id.UserID, limit int) ([]id.UserID, error) {
+	from := ""
+	if after != nil {
+		from = after.String()
+	}
+	rows, err := r.c.queries(ctx).PolicyAcceptanceFindUsersAfter(ctx, gen.PolicyAcceptanceFindUsersAfterParams{After: from, Max: int32(limit)})
+	if err != nil {
+		return nil, rerror.ErrInternalByWithContext(ctx, err)
+	}
+	res := make([]id.UserID, 0, len(rows))
+	for _, s := range rows {
+		u, err := id.UserIDFrom(s)
+		if err != nil {
+			return nil, rerror.ErrInternalByWithContext(ctx, err)
+		}
+		res = append(res, u)
+	}
+	return res, nil
+}
+
 func (r *PolicyAcceptance) InsertIfAbsent(ctx context.Context, as []legal.Acceptance) error {
 	if len(as) == 0 {
 		return nil

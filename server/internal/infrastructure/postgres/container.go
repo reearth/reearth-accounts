@@ -15,6 +15,7 @@ func New(_ context.Context, pool *pgxpool.Pool, users []user.Repo) (*repo.Contai
 		User:             NewUser(c),
 		Workspace:        NewWorkspace(c),
 		Role:             NewRole(c),
+		Outbox:           NewOutbox(c),
 		Permittable:      NewPermittable(c),
 		PolicyAcceptance: NewPolicyAcceptance(c),
 		PolicyVersion:    NewPolicyVersion(c),

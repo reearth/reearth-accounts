@@ -42,6 +42,38 @@ func (q *Queries) PolicyAcceptanceFindByUser(ctx context.Context, userID string)
 	return items, nil
 }
 
+const policyAcceptanceFindUsersAfter = `-- name: PolicyAcceptanceFindUsersAfter :many
+SELECT DISTINCT user_id FROM policy_acceptances
+WHERE user_id > $1::text
+ORDER BY user_id
+LIMIT $2::integer
+`
+
+type PolicyAcceptanceFindUsersAfterParams struct {
+	After string
+	Max   int32
+}
+
+func (q *Queries) PolicyAcceptanceFindUsersAfter(ctx context.Context, arg PolicyAcceptanceFindUsersAfterParams) ([]string, error) {
+	rows, err := q.db.Query(ctx, policyAcceptanceFindUsersAfter, arg.After, arg.Max)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []string
+	for rows.Next() {
+		var user_id string
+		if err := rows.Scan(&user_id); err != nil {
+			return nil, err
+		}
+		items = append(items, user_id)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const policyAcceptanceInsert = `-- name: PolicyAcceptanceInsert :exec
 INSERT INTO policy_acceptances (user_id, type, version, accepted_at, origin, user_agent, ip)
 SELECT unnest($1::text[]), unnest($2::text[]), unnest($3::text[]),
