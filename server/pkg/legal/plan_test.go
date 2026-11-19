@@ -210,20 +210,20 @@ func TestApply(t *testing.T) {
 			applied: []bool{true, true},
 		},
 		{
-			name: "a withdrawn version named again stays withdrawn",
+			name: "the newest payload naming a withdrawn version makes it upcoming with its content",
 			steps: []step{
 				{payloadAt: 0, now: 0, version: "1.0.0", effectiveAt: -day, title: "v1"},
 				{payloadAt: hour, now: hour, version: "2.0.0", effectiveAt: 30 * day, title: "v2"},
 				{payloadAt: 2 * hour, now: 2 * hour, version: "1.0.0", effectiveAt: -day, title: "v1"},
-				{payloadAt: 3 * hour, now: 3 * hour, version: "2.0.0", effectiveAt: 30 * day, title: "v2"},
+				{payloadAt: 3 * hour, now: 3 * hour, version: "2.0.0", effectiveAt: 20 * day, title: "v2-again"},
 			},
-			readAt:    60 * day,
-			current:   "1.0.0",
-			withdrawn: []string{"2.0.0"},
-			applied:   []bool{true, true, true, true},
+			readAt:   4 * hour,
+			current:  "1.0.0",
+			upcoming: "2.0.0", upcomingTitle: "v2-again",
+			applied: []bool{true, true, true, true},
 		},
 		{
-			name: "a withdrawn version named again with a past date does not take effect",
+			name: "a withdrawn version named again with a past date stays withdrawn",
 			steps: []step{
 				{payloadAt: 0, now: 0, version: "1.0.0", effectiveAt: -day, title: "v1"},
 				{payloadAt: hour, now: hour, version: "2.0.0", effectiveAt: 30 * day, title: "v2"},
@@ -236,14 +236,15 @@ func TestApply(t *testing.T) {
 			applied:   []bool{true, true, true, true},
 		},
 		{
-			name: "naming a withdrawn version also withdraws the other upcoming version",
+			name: "republishing a withdrawn version withdraws the other upcoming version",
 			steps: []step{
 				{payloadAt: 0, now: 0, version: "2.0.0", effectiveAt: 30 * day, title: "v2"},
 				{payloadAt: hour, now: hour, version: "3.0.0", effectiveAt: 30 * day, title: "v3"},
 				{payloadAt: 2 * hour, now: 2 * hour, version: "2.0.0", effectiveAt: 30 * day, title: "v2"},
 			},
-			readAt:    2 * hour,
-			withdrawn: []string{"2.0.0", "3.0.0"},
+			readAt:   2 * hour,
+			upcoming: "2.0.0", upcomingTitle: "v2",
+			withdrawn: []string{"3.0.0"},
 			applied:   []bool{true, true, true},
 		},
 		{
@@ -350,10 +351,19 @@ func TestApply_InEffectPatchThenNewerRevert(t *testing.T) {
 	revert := step{payloadAt: 2 * hour, now: 2 * hour, version: "1.0.0", effectiveAt: -day, title: "v1"}
 	base := step{payloadAt: 0, now: 2 * hour, version: "1.0.0", effectiveAt: -day, title: "v1"}
 
-	for _, order := range [][]step{{base, patch, revert}, {base, revert, patch}} {
+	for _, tc := range []struct {
+		name    string
+		order   []step
+		current string
+	}{
+		{"older first keeps the patch in effect", []step{base, patch, revert}, "1.0.1"},
+		{"newer first leaves the older patch withdrawn", []step{base, revert, patch}, "1.0.0"},
+	} {
 		f := newFakeRepo()
-		run(t, f, order)
-		assert.Equal(t, "1.0.1", versionOf(f.catalog().Current("tos", t0.Add(2*hour))), "a version in effect never changes")
+		run(t, f, tc.order)
+		c := f.catalog()
+		assert.Equal(t, tc.current, versionOf(c.Current("tos", t0.Add(2*hour))), tc.name)
+		assert.Equal(t, tc.current == "1.0.0", c.Withdrawn(Ref{Type: "tos", Version: MustParseVersion("1.0.1")}), tc.name)
 	}
 }
 
@@ -469,21 +479,26 @@ func TestPlanApply_FreezeMargin(t *testing.T) {
 	}
 }
 
-func TestPlanApply_StaleVersionJudgedWhenSuperseded(t *testing.T) {
-	head, _ := PlanApply(TypeHead{Type: "tos"}, entry("1.0.0", -day, "v1"), t0.Add(hour), t0.Add(hour))
+func TestPlanApply_LosingPayloadVersion(t *testing.T) {
+	head, _ := PlanApply(TypeHead{Type: "tos"}, entry("3.0.0", -2*day, "v3"), t0.Add(hour), t0.Add(hour))
 	for _, tc := range []struct {
 		name      string
+		payloadAt time.Duration
 		eff       time.Duration
 		arrival   time.Duration
 		withdrawn bool
 	}{
-		{"future when superseded, arrives before its date", day, 2 * hour, true},
-		{"future when superseded, arrives after its date", day, 2 * day, true},
-		{"in effect when superseded", -hour, 2 * day, false},
-		{"within the margin when superseded", hour + FreezeMargin, 2 * day, false},
+		{"older, future at arrival", 0, day, 2 * hour, true},
+		{"older, in effect at arrival", 0, day, 2 * day, true},
+		{"older, in effect before the newer payload", 0, -hour, 2 * day, true},
+		{"older, in effect from the start", 0, -day, 2 * hour, true},
+		{"older, within the margin at the newer payload's timestamp", 0, hour + FreezeMargin, 2 * day, true},
+		{"same timestamp, in effect at arrival", hour, -day, 2 * hour, false},
+		{"same timestamp, within the margin at arrival", hour, 2*hour + FreezeMargin, 2 * hour, false},
+		{"same timestamp, future at arrival", hour, day, 2 * hour, true},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
-			next, outcome := PlanApply(head, entry("2.0.0", tc.eff, "v2"), t0, t0.Add(tc.arrival))
+			next, outcome := PlanApply(head, entry("2.0.0", tc.eff, "v2"), t0.Add(tc.payloadAt), t0.Add(tc.arrival))
 			require.Equal(t, OutcomeRecorded, outcome)
 			assert.Equal(t, tc.withdrawn, next.IsWithdrawn(MustParseVersion("2.0.0")))
 		})

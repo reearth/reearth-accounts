@@ -23,7 +23,7 @@ func runLegalReceived(t *testing.T, nc Factory) {
 	t.Run("Legal_TieBothUpcoming", func(t *testing.T) { testLegalTieBothUpcoming(t, nc) })
 	t.Run("Legal_ArchiveKeepsWithdrawnContent", func(t *testing.T) { testLegalArchiveKeepsWithdrawnContent(t, nc) })
 	t.Run("Legal_ConcurrentMatchesSequential", func(t *testing.T) { testLegalConcurrentMatchesSequential(t, nc) })
-	t.Run("Legal_RenamedWithdrawnVersionIsOrderDependent", func(t *testing.T) { testLegalRenamedWithdrawn(t, nc) })
+	t.Run("Legal_RepublishedWithdrawnVersionConverges", func(t *testing.T) { testLegalRepublishedWithdrawn(t, nc) })
 }
 
 // legalState renders what users can observe for tos at now: current and
@@ -263,15 +263,12 @@ func testLegalConcurrentMatchesSequential(t *testing.T, nc Factory) {
 	assert.True(t, newest.EffectiveAt.Equal(got.EffectiveAt))
 }
 
-// A newest payload that names a withdrawn version is ignored, so the two
-// delivery orders end differently. Changing legal.renamedWithdrawn changes
-// these expectations.
-func testLegalRenamedWithdrawn(t *testing.T, nc Factory) {
+func testLegalRepublishedWithdrawn(t *testing.T, nc Factory) {
 	now := legalT0
 	p1 := legalManifest(legalT0.Add(time.Minute), legalEntry("tos", "3.0.0", legalT0.Add(40*legalDay), "v3"))
 	p2 := legalManifest(legalT0.Add(2*time.Minute), legalEntry("tos", "2.0.0", legalT0.Add(30*legalDay), "v2"))
 	base := []legal.Manifest{legalBase, legalManifest(legalT0, legalEntry("tos", "2.0.0", legalT0.Add(30*legalDay), "v2"))}
 	inOrder, reversed := bothOrders(t, nc, now, legalT0.Add(31*legalDay), base, p1, p2, "2.0.0", "3.0.0")
-	assert.Equal(t, `current=1.0.0@`+legalT0.Add(-30*legalDay).Format(time.RFC3339)+` "v1" upcoming=- withdrawn=[2.0.0 3.0.0]`, inOrder)
-	assert.Equal(t, `current=2.0.0@`+legalT0.Add(30*legalDay).Format(time.RFC3339)+` "v2" upcoming=- withdrawn=[3.0.0]`, reversed)
+	assert.Equal(t, `current=2.0.0@`+legalT0.Add(30*legalDay).Format(time.RFC3339)+` "v2" upcoming=- withdrawn=[3.0.0]`, inOrder, "the newest payload republishes 2.0.0")
+	assert.Equal(t, inOrder, reversed)
 }

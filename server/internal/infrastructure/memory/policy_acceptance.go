@@ -46,6 +46,18 @@ func (r *PolicyAcceptance) InsertIfAbsent(_ context.Context, as []legal.Acceptan
 	return nil
 }
 
+func (r *PolicyAcceptance) Remove(_ context.Context, as []legal.Acceptance) error {
+	r.lock.Lock()
+	defer r.lock.Unlock()
+	for _, a := range as {
+		k := acceptanceKey{Ref: a.Ref, user: a.UserID}
+		if stored, ok := r.data[k]; ok && stored.AcceptedAt.Equal(a.AcceptedAt) {
+			delete(r.data, k)
+		}
+	}
+	return nil
+}
+
 func (r *PolicyAcceptance) RemoveByUser(_ context.Context, u id.UserID) error {
 	r.lock.Lock()
 	defer r.lock.Unlock()

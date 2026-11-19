@@ -237,7 +237,7 @@ func testLegalPatchThenRevert(t *testing.T, nc Factory) {
 		current string
 	}{
 		{"older first keeps the patch in effect", []legal.Manifest{patch, revert}, "1.0.1"},
-		{"newer first still keeps the patch in effect", []legal.Manifest{revert, patch}, "1.0.1"},
+		{"newer first leaves the older patch withdrawn", []legal.Manifest{revert, patch}, "1.0.0"},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			c, _, done := nc(t)
@@ -252,6 +252,7 @@ func testLegalPatchThenRevert(t *testing.T, nc Factory) {
 			cat := legalCatalog(t, c.PolicyVersion)
 			assert.Equal(t, tc.current, legalVersion(cat.Current("tos", now)))
 			assert.Nil(t, cat.Upcoming("tos", now))
+			assert.Equal(t, tc.current == "1.0.0", cat.Withdrawn(legal.Ref{Type: "tos", Version: legal.MustParseVersion("1.0.1")}), "withdrawn 1.0.1")
 		})
 	}
 }

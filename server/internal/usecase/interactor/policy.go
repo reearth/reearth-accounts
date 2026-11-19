@@ -12,7 +12,6 @@ import (
 	"github.com/reearth/reearth-accounts/server/pkg/legal"
 	"github.com/reearth/reearth-accounts/server/pkg/user"
 	"github.com/reearth/reearth-accounts/server/pkg/workspace"
-	"github.com/reearth/reearthx/rerror"
 )
 
 type Policy struct {
@@ -146,18 +145,51 @@ func (p *Policy) record(ctx context.Context, uid user.ID, plan acceptPlan, clien
 		records[i] = legal.Acceptance{AcceptedAt: plan.at, Client: client, Ref: r, UserID: uid}
 	}
 	if err := p.repos.PolicyAcceptance.InsertIfAbsent(ctx, records); err != nil {
-		return nil, err
+		return nil, p.discard(ctx, uid, records, err)
 	}
-	return p.discardAcceptancesOfDeletedUser(ctx, uid)
+	return p.discardAcceptancesOfDeletedUser(ctx, uid, records)
 }
 
-func (p *Policy) discardAcceptancesOfDeletedUser(ctx context.Context, uid user.ID) (*user.User, error) {
-	u, err := p.repos.User.FindByID(ctx, uid)
-	if !errors.Is(err, rerror.ErrNotFound) {
-		return u, err
+func (p *Policy) discardAcceptancesOfDeletedUser(ctx context.Context, uid user.ID, records []legal.Acceptance) (*user.User, error) {
+	dctx, cancel := detached(ctx)
+	defer cancel()
+	u, err := p.repos.User.FindByID(dctx, uid)
+	if err != nil {
+		return nil, p.discard(ctx, uid, records, err)
 	}
-	if rmErr := p.repos.PolicyAcceptance.RemoveByUser(ctx, uid); rmErr != nil {
-		return nil, rmErr
+	return u, nil
+}
+
+func (p *Policy) discard(ctx context.Context, uid user.ID, records []legal.Acceptance, cause error) error {
+	dctx, cancel := detached(ctx)
+	defer cancel()
+	if err := retry(dctx, func(ctx context.Context) error { return p.repos.PolicyAcceptance.Remove(ctx, records) }); err != nil {
+		applog.Error(ctx, "policy acceptances of a failed accept were not removed", applog.UserID(uid), applog.Err(err))
 	}
-	return nil, err
+	return cause
+}
+
+const (
+	cleanupAttempts = 3
+	cleanupTimeout  = 10 * time.Second
+)
+
+// detached outlives the request, so a client that hangs up cannot stop a
+// cleanup halfway.
+func detached(ctx context.Context) (context.Context, context.CancelFunc) {
+	return context.WithTimeout(context.WithoutCancel(ctx), cleanupTimeout)
+}
+
+func retry(ctx context.Context, f func(context.Context) error) error {
+	var err error
+	for attempt := 1; ; attempt++ {
+		if err = f(ctx); err == nil || attempt == cleanupAttempts {
+			return err
+		}
+		select {
+		case <-ctx.Done():
+			return err
+		case <-time.After(time.Duration(attempt) * 100 * time.Millisecond):
+		}
+	}
 }

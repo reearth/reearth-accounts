@@ -73,6 +73,30 @@ func (q *Queries) PolicyAcceptanceInsert(ctx context.Context, arg PolicyAcceptan
 	return err
 }
 
+const policyAcceptanceRemove = `-- name: PolicyAcceptanceRemove :exec
+DELETE FROM policy_acceptances WHERE (user_id, type, version, accepted_at) IN (
+    SELECT unnest($1::text[]), unnest($2::text[]), unnest($3::text[]),
+        unnest($4::timestamptz[])
+)
+`
+
+type PolicyAcceptanceRemoveParams struct {
+	UserIds     []string
+	Types       []string
+	Versions    []string
+	AcceptedAts []time.Time
+}
+
+func (q *Queries) PolicyAcceptanceRemove(ctx context.Context, arg PolicyAcceptanceRemoveParams) error {
+	_, err := q.db.Exec(ctx, policyAcceptanceRemove,
+		arg.UserIds,
+		arg.Types,
+		arg.Versions,
+		arg.AcceptedAts,
+	)
+	return err
+}
+
 const policyAcceptanceRemoveByUser = `-- name: PolicyAcceptanceRemoveByUser :exec
 DELETE FROM policy_acceptances WHERE user_id = $1
 `

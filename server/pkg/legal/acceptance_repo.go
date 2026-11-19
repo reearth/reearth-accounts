@@ -13,5 +13,8 @@ type AcceptanceRepo interface {
 	// InsertIfAbsent stores each record whose (user, type, version) is not
 	// stored yet and keeps the stored one otherwise, so a retry is safe.
 	InsertIfAbsent(ctx context.Context, as []Acceptance) error
+	// Remove deletes each stored record whose user, type, version and
+	// AcceptedAt match one of as, so a record another call stored stays.
+	Remove(ctx context.Context, as []Acceptance) error
 	RemoveByUser(ctx context.Context, u id.UserID) error
 }

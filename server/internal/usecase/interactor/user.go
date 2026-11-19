@@ -552,7 +552,12 @@ func (i *User) DeleteMe(ctx context.Context, userID user.ID, operator *workspace
 	// A policy acceptance inserted after this transaction's removal and before
 	// its commit would otherwise outlive the user; Policy.Accept removes any
 	// inserted after this sweep.
-	return i.repos.PolicyAcceptance.RemoveByUser(ctx, userID)
+	dctx, cancel := detached(ctx)
+	defer cancel()
+	if err := retry(dctx, func(ctx context.Context) error { return i.repos.PolicyAcceptance.RemoveByUser(ctx, userID) }); err != nil {
+		applog.Error(ctx, "policy acceptances outlived their deleted user", applog.UserID(userID), applog.Err(err))
+	}
+	return nil
 }
 
 // Deactivate soft-deletes a user (sets deleted_at). Same permission model as
