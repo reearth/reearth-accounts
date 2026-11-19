@@ -233,6 +233,35 @@ func (q *Queries) WorkspaceFindOrgOwnersAfter(ctx context.Context, arg Workspace
 	return items, nil
 }
 
+const workspaceFindOrgOwnersAmong = `-- name: WorkspaceFindOrgOwnersAmong :many
+SELECT DISTINCT m.user_id
+FROM workspace_members m
+JOIN workspaces w ON w.id = m.workspace_id
+WHERE m.user_id = ANY($1::text[]) AND m.role = 'owner' AND NOT m.disabled
+    AND NOT w.personal AND w.deleted_at IS NULL
+ORDER BY m.user_id
+`
+
+func (q *Queries) WorkspaceFindOrgOwnersAmong(ctx context.Context, users []string) ([]string, error) {
+	rows, err := q.db.Query(ctx, workspaceFindOrgOwnersAmong, users)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []string
+	for rows.Next() {
+		var user_id string
+		if err := rows.Scan(&user_id); err != nil {
+			return nil, err
+		}
+		items = append(items, user_id)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const workspaceIDsAll = `-- name: WorkspaceIDsAll :many
 SELECT id FROM workspaces
 WHERE (NOT $1::boolean OR personal = false)

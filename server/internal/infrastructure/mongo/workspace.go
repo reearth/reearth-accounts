@@ -315,6 +315,41 @@ func (r *Workspace) FindOrgOwnersAfter(ctx context.Context, after *workspace.ID,
 	return owners, &last, nil
 }
 
+func (r *Workspace) FindOrgOwnersAmong(ctx context.Context, users user.IDList) (user.IDList, error) {
+	if len(users) == 0 {
+		return nil, nil
+	}
+	or := make(bson.A, 0, len(users))
+	for _, u := range users {
+		or = append(or, bson.M{"members." + u.String() + ".role": string(role.RoleOwner), "members." + u.String() + ".disabled": bson.M{"$ne": true}})
+	}
+	cur, err := r.client.Client().Find(ctx,
+		bson.M{"personal": bson.M{"$ne": true}, "deletedat": bson.M{"$exists": false}, "$or": or},
+		options.Find().SetProjection(bson.M{"members": 1, "_id": 0}))
+	if err != nil {
+		return nil, rerror.ErrInternalByWithContext(ctx, err)
+	}
+	var docs []struct {
+		Members map[string]struct {
+			Disabled bool   `bson:"disabled"`
+			Role     string `bson:"role"`
+		} `bson:"members"`
+	}
+	if err := cur.All(ctx, &docs); err != nil {
+		return nil, rerror.ErrInternalByWithContext(ctx, err)
+	}
+	var res user.IDList
+	for _, u := range users {
+		for _, d := range docs {
+			if m, ok := d.Members[u.String()]; ok && m.Role == string(role.RoleOwner) && !m.Disabled {
+				res = append(res, u)
+				break
+			}
+		}
+	}
+	return res, nil
+}
+
 func (r *Workspace) find(ctx context.Context, filter any) (workspace.List, error) {
 	c := mongodoc.NewWorkspaceConsumer()
 	if err := r.client.Find(ctx, filter, c); err != nil {

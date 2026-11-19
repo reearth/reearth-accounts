@@ -51,6 +51,9 @@ type Repo interface {
 	// first). It returns the enabled owners of the page and the last
 	// workspace ID in it, which is nil for an empty page.
 	FindOrgOwnersAfter(ctx context.Context, after *ID, limit int) (user.IDList, *ID, error)
+	// FindOrgOwnersAmong returns the users that are enabled owners of a
+	// non-personal, non-deleted workspace.
+	FindOrgOwnersAmong(ctx context.Context, users user.IDList) (user.IDList, error)
 	FindByAlias(ctx context.Context, alias string) (*Workspace, error)
 	FindByAliases(ctx context.Context, aliases []string) (List, error)
 	FindByIDs(context.Context, IDList) (List, error)

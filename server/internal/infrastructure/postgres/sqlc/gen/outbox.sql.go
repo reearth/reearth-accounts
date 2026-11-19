@@ -87,7 +87,7 @@ func (q *Queries) OutboxComplete(ctx context.Context, arg OutboxCompleteParams) 
 
 const outboxCountByNotice = `-- name: OutboxCountByNotice :many
 SELECT state, count(*)::integer AS n FROM mail_outbox
-WHERE subject->>'notice' = $1::text
+WHERE subject ? 'notice' AND subject->>'notice' = $1::text
 GROUP BY state
 `
 
@@ -236,5 +236,21 @@ DELETE FROM mail_outbox WHERE recipient_user_id = $1
 
 func (q *Queries) OutboxRemoveByUser(ctx context.Context, recipientUserID *string) error {
 	_, err := q.db.Exec(ctx, outboxRemoveByUser, recipientUserID)
+	return err
+}
+
+const outboxRemoveFailedByNotice = `-- name: OutboxRemoveFailedByNotice :exec
+DELETE FROM mail_outbox
+WHERE subject ? 'notice' AND subject->>'notice' = $1::text
+    AND state = 'failed' AND reason = $2::text
+`
+
+type OutboxRemoveFailedByNoticeParams struct {
+	Notice string
+	Reason string
+}
+
+func (q *Queries) OutboxRemoveFailedByNotice(ctx context.Context, arg OutboxRemoveFailedByNoticeParams) error {
+	_, err := q.db.Exec(ctx, outboxRemoveFailedByNotice, arg.Notice, arg.Reason)
 	return err
 }

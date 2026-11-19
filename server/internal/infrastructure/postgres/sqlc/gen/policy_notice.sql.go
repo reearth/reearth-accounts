@@ -12,24 +12,24 @@ import (
 
 const policyNoticeAdvanceFanout = `-- name: PolicyNoticeAdvanceFanout :execrows
 UPDATE policy_notices
-SET fanout_cursor = $1::text, fanout_done = $2::boolean,
-    lease_token = CASE WHEN $2::boolean THEN NULL ELSE lease_token END,
-    lease_until = CASE WHEN $2::boolean THEN NULL ELSE $3::timestamptz END
+SET fanout_cursor = $1::text, fanout_end = $2::text,
+    lease_token = CASE WHEN $2::text = '' THEN lease_token ELSE NULL END,
+    lease_until = CASE WHEN $2::text = '' THEN $3::timestamptz ELSE NULL END
 WHERE id = $4 AND lease_token = $5::text
 `
 
 type PolicyNoticeAdvanceFanoutParams struct {
-	Cursor string
-	Done   bool
-	Until  time.Time
-	ID     string
-	Token  string
+	Cursor    string
+	FanoutEnd string
+	Until     time.Time
+	ID        string
+	Token     string
 }
 
 func (q *Queries) PolicyNoticeAdvanceFanout(ctx context.Context, arg PolicyNoticeAdvanceFanoutParams) (int64, error) {
 	result, err := q.db.Exec(ctx, policyNoticeAdvanceFanout,
 		arg.Cursor,
-		arg.Done,
+		arg.FanoutEnd,
 		arg.Until,
 		arg.ID,
 		arg.Token,
@@ -45,12 +45,12 @@ UPDATE policy_notices
 SET lease_token = $1::text, lease_until = $2::timestamptz
 WHERE id = (
     SELECT id FROM policy_notices
-    WHERE NOT fanout_done AND (lease_until IS NULL OR lease_until <= $3::timestamptz)
+    WHERE fanout_end = '' AND (lease_until IS NULL OR lease_until <= $3::timestamptz)
     ORDER BY created_at
     LIMIT 1
     FOR UPDATE SKIP LOCKED
 )
-RETURNING id, type, version, audience, bump, requested_by, created_at, fanout_cursor, fanout_done, lease_token, lease_until
+RETURNING id, type, version, audience, bump, requested_by, created_at, fanout_cursor, fanout_end, lease_token, lease_until
 `
 
 type PolicyNoticeClaimFanoutParams struct {
@@ -71,7 +71,7 @@ func (q *Queries) PolicyNoticeClaimFanout(ctx context.Context, arg PolicyNoticeC
 		&i.RequestedBy,
 		&i.CreatedAt,
 		&i.FanoutCursor,
-		&i.FanoutDone,
+		&i.FanoutEnd,
 		&i.LeaseToken,
 		&i.LeaseUntil,
 	)
@@ -82,7 +82,7 @@ const policyNoticeCreate = `-- name: PolicyNoticeCreate :one
 INSERT INTO policy_notices (id, type, version, audience, bump, requested_by, created_at)
 VALUES ($1, $2, $3, $4, $5, $6, $7)
 ON CONFLICT (type, version, audience) DO NOTHING
-RETURNING id, type, version, audience, bump, requested_by, created_at, fanout_cursor, fanout_done, lease_token, lease_until
+RETURNING id, type, version, audience, bump, requested_by, created_at, fanout_cursor, fanout_end, lease_token, lease_until
 `
 
 type PolicyNoticeCreateParams struct {
@@ -115,7 +115,7 @@ func (q *Queries) PolicyNoticeCreate(ctx context.Context, arg PolicyNoticeCreate
 		&i.RequestedBy,
 		&i.CreatedAt,
 		&i.FanoutCursor,
-		&i.FanoutDone,
+		&i.FanoutEnd,
 		&i.LeaseToken,
 		&i.LeaseUntil,
 	)
@@ -123,7 +123,7 @@ func (q *Queries) PolicyNoticeCreate(ctx context.Context, arg PolicyNoticeCreate
 }
 
 const policyNoticeFindByRef = `-- name: PolicyNoticeFindByRef :many
-SELECT id, type, version, audience, bump, requested_by, created_at, fanout_cursor, fanout_done, lease_token, lease_until FROM policy_notices WHERE type = $1 AND version = $2 ORDER BY created_at
+SELECT id, type, version, audience, bump, requested_by, created_at, fanout_cursor, fanout_end, lease_token, lease_until FROM policy_notices WHERE type = $1 AND version = $2 ORDER BY created_at
 `
 
 type PolicyNoticeFindByRefParams struct {
@@ -149,7 +149,7 @@ func (q *Queries) PolicyNoticeFindByRef(ctx context.Context, arg PolicyNoticeFin
 			&i.RequestedBy,
 			&i.CreatedAt,
 			&i.FanoutCursor,
-			&i.FanoutDone,
+			&i.FanoutEnd,
 			&i.LeaseToken,
 			&i.LeaseUntil,
 		); err != nil {
@@ -164,7 +164,7 @@ func (q *Queries) PolicyNoticeFindByRef(ctx context.Context, arg PolicyNoticeFin
 }
 
 const policyNoticeFindByVersionAudience = `-- name: PolicyNoticeFindByVersionAudience :one
-SELECT id, type, version, audience, bump, requested_by, created_at, fanout_cursor, fanout_done, lease_token, lease_until FROM policy_notices WHERE type = $1 AND version = $2 AND audience = $3
+SELECT id, type, version, audience, bump, requested_by, created_at, fanout_cursor, fanout_end, lease_token, lease_until FROM policy_notices WHERE type = $1 AND version = $2 AND audience = $3
 `
 
 type PolicyNoticeFindByVersionAudienceParams struct {
@@ -185,7 +185,7 @@ func (q *Queries) PolicyNoticeFindByVersionAudience(ctx context.Context, arg Pol
 		&i.RequestedBy,
 		&i.CreatedAt,
 		&i.FanoutCursor,
-		&i.FanoutDone,
+		&i.FanoutEnd,
 		&i.LeaseToken,
 		&i.LeaseUntil,
 	)
@@ -205,4 +205,36 @@ type PolicyNoticeReleaseFanoutParams struct {
 func (q *Queries) PolicyNoticeReleaseFanout(ctx context.Context, arg PolicyNoticeReleaseFanoutParams) error {
 	_, err := q.db.Exec(ctx, policyNoticeReleaseFanout, arg.ID, arg.Token)
 	return err
+}
+
+const policyNoticeReopen = `-- name: PolicyNoticeReopen :one
+UPDATE policy_notices
+SET fanout_cursor = '', fanout_end = '', lease_token = NULL, lease_until = NULL
+WHERE type = $1 AND version = $2 AND audience = $3 AND fanout_end = 'withdrawn'
+RETURNING id, type, version, audience, bump, requested_by, created_at, fanout_cursor, fanout_end, lease_token, lease_until
+`
+
+type PolicyNoticeReopenParams struct {
+	Type     string
+	Version  string
+	Audience string
+}
+
+func (q *Queries) PolicyNoticeReopen(ctx context.Context, arg PolicyNoticeReopenParams) (PolicyNotice, error) {
+	row := q.db.QueryRow(ctx, policyNoticeReopen, arg.Type, arg.Version, arg.Audience)
+	var i PolicyNotice
+	err := row.Scan(
+		&i.ID,
+		&i.Type,
+		&i.Version,
+		&i.Audience,
+		&i.Bump,
+		&i.RequestedBy,
+		&i.CreatedAt,
+		&i.FanoutCursor,
+		&i.FanoutEnd,
+		&i.LeaseToken,
+		&i.LeaseUntil,
+	)
+	return i, err
 }

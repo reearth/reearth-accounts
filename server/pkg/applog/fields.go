@@ -79,11 +79,11 @@ func Pass(v any) Field { return field("pass", v) }
 
 // Outcomes and counters.
 
-func Path(v string) Field   { return field("path", v) }
-func Code(v string) Field   { return field("code", v) }
-func Reason(v string) Field { return field("reason", v) }
-func Count(v int) Field     { return field("count", v) }
-func Created(v bool) Field  { return field("created", v) }
+func Path(v string) Field    { return field("path", v) }
+func Code(v string) Field    { return field("code", v) }
+func Reason(v string) Field  { return field("reason", v) }
+func Count(v int) Field      { return field("count", v) }
+func Outcome(v string) Field { return field("outcome", v) }
 
 // Infrastructure.
 

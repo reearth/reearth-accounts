@@ -78,7 +78,7 @@ type PolicyNotice struct {
 	RequestedBy  string
 	CreatedAt    time.Time
 	FanoutCursor string
-	FanoutDone   bool
+	FanoutEnd    string
 	LeaseToken   *string
 	LeaseUntil   *time.Time
 }

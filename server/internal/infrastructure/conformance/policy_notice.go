@@ -22,11 +22,14 @@ import (
 func runPolicyNotice(t *testing.T, nc Factory) {
 	t.Run("PolicyNotice_CreateIdempotent", func(t *testing.T) { testPolicyNoticeCreateIdempotent(t, nc) })
 	t.Run("PolicyNotice_FanoutLease", func(t *testing.T) { testPolicyNoticeFanoutLease(t, nc) })
+	t.Run("PolicyNotice_ReopenWithdrawn", func(t *testing.T) { testPolicyNoticeReopenWithdrawn(t, nc) })
 	t.Run("PolicyNotice_ClaimExclusive", func(t *testing.T) { testPolicyNoticeClaimExclusive(t, nc) })
 	t.Run("PolicyNotice_OutboxCountByNotice", func(t *testing.T) { testOutboxCountByNotice(t, nc) })
+	t.Run("PolicyNotice_OutboxRemoveFailedByNotice", func(t *testing.T) { testOutboxRemoveFailedByNotice(t, nc) })
 	t.Run("PolicyNotice_AcceptancesByUsers", func(t *testing.T) { testAcceptancesByUsers(t, nc) })
 	t.Run("Audience_ActiveUsersWithEmail", func(t *testing.T) { testAudienceActiveUsers(t, nc) })
 	t.Run("Audience_OrgOwners", func(t *testing.T) { testAudienceOrgOwners(t, nc) })
+	t.Run("Audience_OrgOwnersAmong", func(t *testing.T) { testAudienceOrgOwnersAmong(t, nc) })
 }
 
 func notice(ref legal.Ref, a legal.Audience, at time.Time) legal.Notice {
@@ -44,21 +47,21 @@ func testPolicyNoticeCreateIdempotent(t *testing.T, nc Factory) {
 	now := timeFixed()
 
 	first := notice(tos("2.0.0"), legal.AudienceAll, now)
-	got, created, err := c.PolicyNotice.Create(ctx, first)
+	got, outcome, err := c.PolicyNotice.Create(ctx, first)
 	require.NoError(t, err)
-	assert.True(t, created)
+	assert.Equal(t, legal.NoticeCreated, outcome)
 	assert.Equal(t, first, got)
 
 	again := notice(tos("2.0.0"), legal.AudienceAll, now.Add(time.Hour))
-	got, created, err = c.PolicyNotice.Create(ctx, again)
+	got, outcome, err = c.PolicyNotice.Create(ctx, again)
 	require.NoError(t, err)
-	assert.False(t, created, "a second notice of the same version and audience is not stored")
+	assert.Equal(t, legal.NoticeExisting, outcome, "a second notice of the same version and audience is not stored")
 	assert.Equal(t, first, got, "the stored notice comes back")
 
 	owners := notice(tos("2.0.0"), legal.AudienceOwners, now.Add(time.Minute))
-	_, created, err = c.PolicyNotice.Create(ctx, owners)
+	_, outcome, err = c.PolicyNotice.Create(ctx, owners)
 	require.NoError(t, err)
-	assert.True(t, created, "another audience is another notice")
+	assert.Equal(t, legal.NoticeCreated, outcome, "another audience is another notice")
 	_, _, err = c.PolicyNotice.Create(ctx, notice(tos("3.0.0"), legal.AudienceAll, now))
 	require.NoError(t, err)
 
@@ -98,11 +101,11 @@ func testPolicyNoticeFanoutLease(t *testing.T, nc Factory) {
 	require.NoError(t, err)
 	assert.Nil(t, got, "both notices are leased")
 
-	ok, err := c.PolicyNotice.AdvanceFanout(ctx, older.ID, legal.Lease{Token: "stale", Until: now.Add(2 * time.Minute)}, "u1", false)
+	ok, err := c.PolicyNotice.AdvanceFanout(ctx, older.ID, legal.Lease{Token: "stale", Until: now.Add(2 * time.Minute)}, "u1", legal.FanoutOpen)
 	require.NoError(t, err)
 	assert.False(t, ok, "a stale token writes nothing")
 	renewed := legal.Lease{Token: "a", Until: now.Add(3 * time.Minute)}
-	ok, err = c.PolicyNotice.AdvanceFanout(ctx, older.ID, renewed, "u1", false)
+	ok, err = c.PolicyNotice.AdvanceFanout(ctx, older.ID, renewed, "u1", legal.FanoutOpen)
 	require.NoError(t, err)
 	assert.True(t, ok)
 
@@ -110,7 +113,7 @@ func testPolicyNoticeFanoutLease(t *testing.T, nc Factory) {
 	require.NoError(t, err)
 	require.NotNil(t, got, "the newer notice's lease expired at its until")
 	assert.Equal(t, newer.ID, got.ID)
-	ok, err = c.PolicyNotice.AdvanceFanout(ctx, newer.ID, b, "w", false)
+	ok, err = c.PolicyNotice.AdvanceFanout(ctx, newer.ID, b, "w", legal.FanoutOpen)
 	require.NoError(t, err)
 	assert.False(t, ok, "the first holder lost the notice when its lease expired")
 
@@ -120,7 +123,7 @@ func testPolicyNoticeFanoutLease(t *testing.T, nc Factory) {
 	assert.Equal(t, older.ID, got.ID)
 	assert.Equal(t, "u1", got.Fanout.Cursor, "the cursor survives a lost lease")
 
-	ok, err = c.PolicyNotice.AdvanceFanout(ctx, older.ID, legal.Lease{Token: "e", Until: now.Add(5 * time.Minute)}, "u9", true)
+	ok, err = c.PolicyNotice.AdvanceFanout(ctx, older.ID, legal.Lease{Token: "e", Until: now.Add(5 * time.Minute)}, "u9", legal.FanoutComplete)
 	require.NoError(t, err)
 	assert.True(t, ok)
 	require.NoError(t, c.PolicyNotice.ReleaseFanout(ctx, newer.ID, "d"))
@@ -128,7 +131,7 @@ func testPolicyNoticeFanoutLease(t *testing.T, nc Factory) {
 	list, err := c.PolicyNotice.FindByRef(ctx, tos("2.0.0"))
 	require.NoError(t, err)
 	require.Len(t, list, 2)
-	assert.Equal(t, legal.Fanout{Cursor: "u9", Done: true}, list[0].Fanout, "a done notice drops its lease")
+	assert.Equal(t, legal.Fanout{Cursor: "u9", End: legal.FanoutComplete}, list[0].Fanout, "an ended notice drops its lease")
 	assert.Equal(t, legal.Fanout{}, list[1].Fanout, "a release drops the lease")
 
 	got, err = c.PolicyNotice.ClaimFanout(ctx, now.Add(3*time.Minute), legal.Lease{Token: "f", Until: now.Add(time.Hour)})
@@ -139,6 +142,101 @@ func testPolicyNoticeFanoutLease(t *testing.T, nc Factory) {
 	require.NoError(t, err)
 	require.NotNil(t, got)
 	assert.Equal(t, newer.ID, got.ID, "a done notice is never claimed")
+}
+
+func testPolicyNoticeReopenWithdrawn(t *testing.T, nc Factory) {
+	c, _, done := nc(t)
+	defer done()
+	ctx := context.Background()
+	now := timeFixed()
+	end := func(n legal.Notice, e legal.FanoutEnd) {
+		t.Helper()
+		lease := legal.Lease{Token: "t", Until: now.Add(time.Minute)}
+		got, err := c.PolicyNotice.ClaimFanout(ctx, now, lease)
+		require.NoError(t, err)
+		require.NotNil(t, got)
+		require.Equal(t, n.ID, got.ID)
+		ok, err := c.PolicyNotice.AdvanceFanout(ctx, n.ID, lease, "u5", e)
+		require.NoError(t, err)
+		require.True(t, ok)
+	}
+	withdrawn := notice(tos("2.0.0"), legal.AudienceAll, now)
+	complete := notice(tos("2.0.0"), legal.AudienceOwners, now.Add(time.Second))
+	for _, n := range []legal.Notice{withdrawn, complete} {
+		_, _, err := c.PolicyNotice.Create(ctx, n)
+		require.NoError(t, err)
+	}
+	end(withdrawn, legal.FanoutWithdrawn)
+	end(complete, legal.FanoutComplete)
+
+	got, outcome, err := c.PolicyNotice.Create(ctx, notice(tos("2.0.0"), legal.AudienceAll, now.Add(time.Hour)))
+	require.NoError(t, err)
+	assert.Equal(t, legal.NoticeReopened, outcome)
+	assert.Equal(t, withdrawn.ID, got.ID)
+	assert.Equal(t, legal.Fanout{}, got.Fanout, "a reopened notice starts over")
+	_, outcome, err = c.PolicyNotice.Create(ctx, notice(tos("2.0.0"), legal.AudienceAll, now.Add(time.Hour)))
+	require.NoError(t, err)
+	assert.Equal(t, legal.NoticeExisting, outcome, "an open notice is not reopened")
+	got, outcome, err = c.PolicyNotice.Create(ctx, notice(tos("2.0.0"), legal.AudienceOwners, now.Add(time.Hour)))
+	require.NoError(t, err)
+	assert.Equal(t, legal.NoticeExisting, outcome, "a complete notice is not reopened")
+	assert.Equal(t, legal.Fanout{Cursor: "u5", End: legal.FanoutComplete}, got.Fanout)
+
+	claimed, err := c.PolicyNotice.ClaimFanout(ctx, now, legal.Lease{Token: "u", Until: now.Add(time.Minute)})
+	require.NoError(t, err)
+	require.NotNil(t, claimed)
+	assert.Equal(t, withdrawn.ID, claimed.ID, "a reopened notice is claimed again")
+}
+
+func testOutboxRemoveFailedByNotice(t *testing.T, nc Factory) {
+	c, _, done := nc(t)
+	defer done()
+	ctx := context.Background()
+	now := timeFixed()
+	n, other := id.NewPolicyNoticeID(), id.NewPolicyNoticeID()
+	enqueue := func(k string, nid id.PolicyNoticeID) {
+		t.Helper()
+		subject := outbox.PolicyNoticeSubject{Bump: legal.BumpMajor, Notice: nid, Ref: tos("2.0.0")}.Subject()
+		r, err := outbox.New(outbox.Key(k), testKind, subject, outbox.ToUser(id.NewUserID()), now)
+		require.NoError(t, err)
+		require.NoError(t, c.Outbox.Enqueue(ctx, []outbox.Record{r}))
+	}
+	finish := func(k string, tr outbox.Transition) {
+		t.Helper()
+		cl := claim("t-"+k, now.Add(time.Minute))
+		rec, err := c.Outbox.ClaimDue(ctx, now, cl)
+		require.NoError(t, err)
+		require.NotNil(t, rec)
+		require.Equal(t, outbox.Key(k), rec.Key)
+		ok, err := c.Outbox.Complete(ctx, rec.Key, "t-"+k, tr, now)
+		require.NoError(t, err)
+		require.True(t, ok)
+	}
+	withdrawn := outbox.Transition{To: outbox.StateFailed, Reason: outbox.ReasonVersionNotUpcoming}
+	for _, k := range []string{"withdrawn", "gone", "sent", "other"} {
+		nid := n
+		if k == "other" {
+			nid = other
+		}
+		enqueue(k, nid)
+		switch k {
+		case "gone":
+			finish(k, outbox.Transition{To: outbox.StateFailed, Reason: outbox.ReasonUserGone})
+		case "sent":
+			finish(k, outbox.Transition{To: outbox.StateSent})
+		default:
+			finish(k, withdrawn)
+		}
+	}
+	enqueue("pending", n)
+
+	require.NoError(t, c.Outbox.RemoveFailedByNotice(ctx, n, outbox.ReasonVersionNotUpcoming))
+	_, err := c.Outbox.FindByKey(ctx, "withdrawn")
+	assert.Error(t, err, "the notice's withdrawn record is deleted")
+	for _, k := range []outbox.Key{"gone", "sent", "other", "pending"} {
+		_, err := c.Outbox.FindByKey(ctx, k)
+		assert.NoError(t, err, "%s is kept", k)
+	}
 }
 
 func testPolicyNoticeClaimExclusive(t *testing.T, nc Factory) {
@@ -348,4 +446,33 @@ func testAudienceOrgOwners(t *testing.T, nc Factory) {
 	require.NotNil(t, last)
 	assert.Equal(t, orgs[2], *last)
 	assert.ElementsMatch(t, ownersOf[orgs[2]], owners)
+}
+
+func testAudienceOrgOwnersAmong(t *testing.T, nc Factory) {
+	c, _, done := nc(t)
+	defer done()
+	ctx := context.Background()
+	save := func(b *workspace.Builder) {
+		t.Helper()
+		ws, err := b.Build()
+		require.NoError(t, err)
+		require.NoError(t, c.Workspace.Save(ctx, ws))
+	}
+	owner, twice, writer, disabled, personal, deletedOwner, stranger := id.NewUserID(), id.NewUserID(), id.NewUserID(),
+		id.NewUserID(), id.NewUserID(), id.NewUserID(), id.NewUserID()
+	deletedAt := timeFixed()
+	save(workspace.New().NewID().Name("a").Members(map[id.UserID]workspace.Member{
+		owner: {Role: role.RoleOwner}, twice: {Role: role.RoleOwner}, writer: {Role: role.RoleWriter}, disabled: {Role: role.RoleOwner, Disabled: true},
+	}))
+	save(workspace.New().NewID().Name("b").Members(map[id.UserID]workspace.Member{twice: {Role: role.RoleOwner}}))
+	save(workspace.New().NewID().Name("p").Personal(true).Members(map[id.UserID]workspace.Member{personal: {Role: role.RoleOwner}}))
+	save(workspace.New().NewID().Name("d").DeletedAt(&deletedAt).Members(map[id.UserID]workspace.Member{deletedOwner: {Role: role.RoleOwner}}))
+
+	got, err := c.Workspace.FindOrgOwnersAmong(ctx, user.IDList{owner, twice, writer, disabled, personal, deletedOwner, stranger})
+	require.NoError(t, err)
+	assert.ElementsMatch(t, user.IDList{owner, twice}, got, "each enabled owner of a live organization, once")
+
+	got, err = c.Workspace.FindOrgOwnersAmong(ctx, nil)
+	require.NoError(t, err)
+	assert.Empty(t, got)
 }

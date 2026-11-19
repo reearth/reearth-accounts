@@ -253,6 +253,21 @@ func (mr *MockRepoMockRecorder) FindOrgOwnersAfter(ctx, after, limit any) *gomoc
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "FindOrgOwnersAfter", reflect.TypeOf((*MockRepo)(nil).FindOrgOwnersAfter), ctx, after, limit)
 }
 
+// FindOrgOwnersAmong mocks base method.
+func (m *MockRepo) FindOrgOwnersAmong(ctx context.Context, users user.IDList) (user.IDList, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "FindOrgOwnersAmong", ctx, users)
+	ret0, _ := ret[0].(user.IDList)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// FindOrgOwnersAmong indicates an expected call of FindOrgOwnersAmong.
+func (mr *MockRepoMockRecorder) FindOrgOwnersAmong(ctx, users any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "FindOrgOwnersAmong", reflect.TypeOf((*MockRepo)(nil).FindOrgOwnersAmong), ctx, users)
+}
+
 // Remove mocks base method.
 func (m *MockRepo) Remove(arg0 context.Context, arg1 ID) error {
 	m.ctrl.T.Helper()

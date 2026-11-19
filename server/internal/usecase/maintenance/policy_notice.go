@@ -3,6 +3,7 @@ package maintenance
 import (
 	"context"
 	"errors"
+	"slices"
 	"time"
 
 	"github.com/reearth/reearth-accounts/server/pkg/applog"
@@ -29,14 +30,10 @@ type PolicyNoticeRepos struct {
 	Workspaces  workspace.Repo
 }
 
-// PolicyNoticeFanout queues one record per user of each notice's audience,
-// a page at a time, while it holds the notice's lease.
 func PolicyNoticeFanout(r PolicyNoticeRepos, page int) Producer {
 	return &policyNoticeFanout{now: func() time.Time { return time.Now().UTC() }, page: page, repos: r, token: newToken}
 }
 
-// PolicyNoticeResolver builds a notice when it is sent, from the user's
-// current address and language and the version as it is stored then.
 func PolicyNoticeResolver(r PolicyNoticeRepos) Resolver {
 	return &policyNoticeResolver{now: func() time.Time { return time.Now().UTC() }, repos: r}
 }
@@ -56,7 +53,7 @@ func (f *policyNoticeFanout) Run(ctx context.Context, now time.Time) (int, error
 		lease := legal.Lease{Token: f.token(), Until: now.Add(FanoutLease)}
 		n, err := f.repos.Notices.ClaimFanout(ctx, now, lease)
 		if err != nil || n == nil {
-			return queued, quiet(ctx, err)
+			return queued, unlessPassEnded(ctx, err)
 		}
 		q, err := f.fanout(ctx, *n, lease)
 		queued += q
@@ -64,16 +61,24 @@ func (f *policyNoticeFanout) Run(ctx context.Context, now time.Time) (int, error
 			rctx, cancel := detached(ctx, resultTimeout)
 			_ = f.repos.Notices.ReleaseFanout(rctx, n.ID, lease.Token)
 			cancel()
-			return queued, quiet(ctx, err)
+			return queued, unlessPassEnded(ctx, err)
 		}
 		now = f.now()
 	}
 	return queued, nil
 }
 
-// fanout pages the audience of n until it is done, the lease is lost or ctx
-// ends. A notice whose version is no longer upcoming queues nothing more.
 func (f *policyNoticeFanout) fanout(ctx context.Context, n legal.Notice, lease legal.Lease) (int, error) {
+	siblings, err := f.repos.Notices.FindByRef(ctx, n.Ref)
+	if err != nil {
+		return 0, err
+	}
+	overlap := legal.OverlapOf(n, siblings)
+	if overlap == legal.OverlapCovered {
+		applog.Info(ctx, "policy notice covered by an earlier notice", applog.NoticeID(n.ID))
+		_, err := f.repos.Notices.AdvanceFanout(ctx, n.ID, lease, n.Fanout.Cursor, legal.FanoutCovered)
+		return 0, err
+	}
 	heads, err := f.repos.Versions.FindHeads(ctx)
 	if err != nil {
 		return 0, err
@@ -83,15 +88,28 @@ func (f *policyNoticeFanout) fanout(ctx context.Context, n legal.Notice, lease l
 	for {
 		up := cat.Upcoming(n.Ref.Type, f.now())
 		if up == nil || up.Ref != n.Ref {
-			_, err := f.repos.Notices.AdvanceFanout(ctx, n.ID, lease, cursor, true)
+			_, err := f.repos.Notices.AdvanceFanout(ctx, n.ID, lease, cursor, legal.FanoutWithdrawn)
 			return queued, err
 		}
-		users, next, err := f.audience(ctx, n.Audience, cursor)
+		if cursor == "" {
+			// A reopened notice starts over, and the records it queued before
+			// the withdrawal would keep their keys from being queued again.
+			if err := f.repos.Outbox.RemoveFailedByNotice(ctx, n.ID, outbox.ReasonVersionNotUpcoming); err != nil {
+				return queued, err
+			}
+		}
+		page, err := f.audience(ctx, n.Audience, cursor)
 		if err != nil {
 			return queued, err
 		}
+		users := page.users
 		if n.Bump == legal.BumpMajor {
 			if users, err = f.notHolding(ctx, cat, users, n.Ref); err != nil {
+				return queued, err
+			}
+		}
+		if overlap == legal.OverlapSkipOwners {
+			if users, err = f.notOwners(ctx, users); err != nil {
 				return queued, err
 			}
 		}
@@ -99,48 +117,67 @@ func (f *policyNoticeFanout) fanout(ctx context.Context, n legal.Notice, lease l
 			return queued, err
 		}
 		queued += len(users)
+		end := legal.FanoutOpen
+		if page.done {
+			end = legal.FanoutComplete
+		}
 		lease.Until = f.now().Add(FanoutLease)
-		held, err := f.repos.Notices.AdvanceFanout(ctx, n.ID, lease, next, next == "")
-		if err != nil || next == "" {
+		held, err := f.repos.Notices.AdvanceFanout(ctx, n.ID, lease, page.next, end)
+		if err != nil || page.done {
 			return queued, err
 		}
 		if !held {
 			applog.Warn(ctx, "policy notice fanout lost its lease", applog.NoticeID(n.ID))
 			return queued, nil
 		}
-		cursor = next
+		cursor = page.next
 		if ctx.Err() != nil {
 			return queued, ctx.Err()
 		}
 	}
 }
 
-// audience returns the next page of users after cursor, and the cursor after
-// it, which is empty when the audience is exhausted.
-func (f *policyNoticeFanout) audience(ctx context.Context, a legal.Audience, cursor string) (user.IDList, string, error) {
+type audiencePage struct {
+	done  bool
+	next  string
+	users user.IDList
+}
+
+func (f *policyNoticeFanout) audience(ctx context.Context, a legal.Audience, cursor string) (audiencePage, error) {
 	switch a {
 	case legal.AudienceAll:
 		after, err := cursorID(cursor, user.IDFrom)
 		if err != nil {
-			return nil, "", err
+			return audiencePage{}, err
 		}
 		ids, err := f.repos.Users.FindActiveIDsWithEmailAfter(ctx, after, f.page)
 		if err != nil || len(ids) == 0 {
-			return nil, "", err
+			return audiencePage{done: true}, err
 		}
-		return ids, ids[len(ids)-1].String(), nil
+		return audiencePage{next: ids[len(ids)-1].String(), users: ids}, nil
 	case legal.AudienceOwners:
 		after, err := cursorID(cursor, workspace.IDFrom)
 		if err != nil {
-			return nil, "", err
+			return audiencePage{}, err
 		}
 		owners, last, err := f.repos.Workspaces.FindOrgOwnersAfter(ctx, after, f.page)
 		if err != nil || last == nil {
-			return nil, "", err
+			return audiencePage{done: true}, err
 		}
-		return owners, last.String(), nil
+		return audiencePage{next: last.String(), users: owners}, nil
 	}
-	return nil, "", errors.New("policy notice: unknown audience " + string(a))
+	return audiencePage{}, errors.New("policy notice: unknown audience " + string(a))
+}
+
+func (f *policyNoticeFanout) notOwners(ctx context.Context, users user.IDList) (user.IDList, error) {
+	if len(users) == 0 {
+		return users, nil
+	}
+	owners, err := f.repos.Workspaces.FindOrgOwnersAmong(ctx, users)
+	if err != nil {
+		return nil, err
+	}
+	return slices.DeleteFunc(users, func(u user.ID) bool { return owners.Has(u) }), nil
 }
 
 func (f *policyNoticeFanout) enqueue(ctx context.Context, n legal.Notice, users user.IDList) error {
@@ -222,11 +259,12 @@ func (r *policyNoticeResolver) Resolve(ctx context.Context, rec outbox.Record) (
 		return nil, outbox.ReasonAlreadyAccepted, nil
 	}
 	lang := u.Metadata().Lang()
+	tmpl := string(mail.LangOf(lang))
 	msg, err := mail.Render(lang, mail.PolicyNoticeData{
-		ActionURL:     up.URL.Pick(lang.String()),
+		ActionURL:     up.URL.Pick(tmpl),
 		EffectiveDate: up.EffectiveAt,
 		Major:         s.Bump == legal.BumpMajor,
-		PolicyTitle:   up.Title.Pick(lang.String()),
+		PolicyTitle:   up.Title.Pick(tmpl),
 		Version:       up.Version.String(),
 	})
 	if err != nil {
@@ -246,9 +284,7 @@ func cursorID[T any](cursor string, parse func(string) (T, error)) (*T, error) {
 	return &v, nil
 }
 
-// quiet drops the error a write returns because the pass budget ended, which
-// is how every long fan-out stops.
-func quiet(ctx context.Context, err error) error {
+func unlessPassEnded(ctx context.Context, err error) error {
 	if ctx.Err() != nil {
 		return nil
 	}

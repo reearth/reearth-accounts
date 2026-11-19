@@ -443,7 +443,7 @@ const docTemplate = `{
                 }
             },
             "post": {
-                "description": "Records a notice for the upcoming version of the policy type. The accounts server then queues one mail per user of the audience and sends it: \"all\" is every active user with an email address, \"owners\" is the owners of non-personal workspaces. A major notice skips users who already accepted the version. Each user gets at most one mail per version, so repeating the request queues nothing new and returns the recorded notice with 200. The admin API sends no mail itself.",
+                "description": "Records a notice for the upcoming version of the policy type. The accounts server then queues one mail per user of the audience and sends it: \"all\" is every active user with an email address, \"owners\" is the owners of non-personal workspaces. A major notice skips users who already accepted the version. Each user gets at most one mail per version, so repeating the request queues nothing new and returns the recorded notice with 200. The two audiences of one version share that limit: an \"owners\" notice after an \"all\" notice ends \"covered\" and queues nothing, and an \"all\" notice after an \"owners\" notice skips the current owners. Repeating the request for a notice that ended \"withdrawn\" restarts it once the version is upcoming again. The admin API sends no mail itself.",
                 "consumes": [
                     "application/json"
                 ],
@@ -1288,8 +1288,14 @@ const docTemplate = `{
                 "createdAt": {
                     "type": "string"
                 },
-                "fanoutDone": {
-                    "type": "boolean"
+                "fanout": {
+                    "type": "string",
+                    "enum": [
+                        "open",
+                        "complete",
+                        "covered",
+                        "withdrawn"
+                    ]
                 },
                 "id": {
                     "type": "string"

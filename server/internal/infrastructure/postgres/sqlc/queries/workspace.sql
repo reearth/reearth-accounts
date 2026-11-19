@@ -27,6 +27,14 @@ FROM page
 LEFT JOIN workspace_members m ON m.workspace_id = page.id AND m.role = 'owner' AND NOT m.disabled
 ORDER BY page.id;
 
+-- name: WorkspaceFindOrgOwnersAmong :many
+SELECT DISTINCT m.user_id
+FROM workspace_members m
+JOIN workspaces w ON w.id = m.workspace_id
+WHERE m.user_id = ANY(sqlc.arg(users)::text[]) AND m.role = 'owner' AND NOT m.disabled
+    AND NOT w.personal AND w.deleted_at IS NULL
+ORDER BY m.user_id;
+
 -- name: WorkspaceFindByName :one
 SELECT * FROM workspaces WHERE name = $1;
 

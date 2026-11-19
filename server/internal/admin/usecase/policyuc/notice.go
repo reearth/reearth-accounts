@@ -1,5 +1,3 @@
-// Package policyuc records policy notices and reports their mail. The admin
-// API never sends mail; the accounts server's passes queue and send it.
 package policyuc
 
 import (
@@ -27,18 +25,25 @@ func NewCreateNoticeUseCase(versions legal.VersionRepo, notices legal.NoticeRepo
 	return &CreateNoticeUseCase{notices: notices, now: func() time.Time { return time.Now().UTC() }, versions: versions}
 }
 
-// Execute records a notice for the upcoming version of in.Type, or returns
-// the stored one for the same version and audience with created false.
-func (uc *CreateNoticeUseCase) Execute(ctx context.Context, in CreateNoticeInput) (legal.Notice, bool, error) {
+type CreateNoticeResult struct {
+	Notice  legal.Notice
+	Outcome legal.CreateOutcome
+}
+
+func (uc *CreateNoticeUseCase) Execute(ctx context.Context, in CreateNoticeInput) (CreateNoticeResult, error) {
 	cat, err := catalog(ctx, uc.versions)
 	if err != nil {
-		return legal.Notice{}, false, err
+		return CreateNoticeResult{}, err
 	}
 	n, err := legal.NewNotice(cat, in.Type, in.Audience, in.RequestedBy, uc.now())
 	if err != nil {
-		return legal.Notice{}, false, err
+		return CreateNoticeResult{}, err
 	}
-	return uc.notices.Create(ctx, n)
+	stored, outcome, err := uc.notices.Create(ctx, n)
+	if err != nil {
+		return CreateNoticeResult{}, err
+	}
+	return CreateNoticeResult{Notice: stored, Outcome: outcome}, nil
 }
 
 type NoticeStatus struct {
@@ -57,8 +62,6 @@ func NewListNoticesUseCase(versions legal.VersionRepo, notices legal.NoticeRepo,
 	return &ListNoticesUseCase{notices: notices, now: func() time.Time { return time.Now().UTC() }, outbox: ob, versions: versions}
 }
 
-// Execute returns the notices of t's upcoming version with their record
-// counts per outbox state. It returns none when t has no upcoming version.
 func (uc *ListNoticesUseCase) Execute(ctx context.Context, t legal.Type) ([]NoticeStatus, error) {
 	cat, err := catalog(ctx, uc.versions)
 	if err != nil {

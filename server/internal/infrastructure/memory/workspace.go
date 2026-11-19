@@ -194,6 +194,25 @@ func (r *Workspace) FindOrgOwnersAfter(_ context.Context, after *workspace.ID, l
 	return owners, &last, nil
 }
 
+func (r *Workspace) FindOrgOwnersAmong(_ context.Context, users user.IDList) (user.IDList, error) {
+	if r.err != nil {
+		return nil, r.err
+	}
+	var res user.IDList
+	for _, u := range users {
+		owns := false
+		r.data.Range(func(_ workspace.ID, w *workspace.Workspace) bool {
+			m := w.Members().User(u)
+			owns = !w.IsPersonal() && !w.IsDeleted() && m != nil && m.Role == role.RoleOwner && !m.Disabled
+			return !owns
+		})
+		if owns {
+			res = append(res, u)
+		}
+	}
+	return res, nil
+}
+
 func (r *Workspace) FindByIDs(_ context.Context, ids workspace.IDList) (workspace.List, error) {
 	if r.err != nil {
 		return nil, r.err

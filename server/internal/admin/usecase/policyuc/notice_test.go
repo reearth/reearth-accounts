@@ -33,14 +33,18 @@ func TestNotices(t *testing.T) {
 	create.now, list.now = func() time.Time { return now }, func() time.Time { return now }
 	admin := id.NewAdminUserID()
 
-	_, _, err := create.Execute(ctx, CreateNoticeInput{Audience: legal.AudienceAll, RequestedBy: admin, Type: "privacy"})
+	_, err := create.Execute(ctx, CreateNoticeInput{Audience: legal.AudienceAll, RequestedBy: admin, Type: "privacy"})
 	assert.ErrorIs(t, err, legal.ErrPatchNotice)
-	_, _, err = create.Execute(ctx, CreateNoticeInput{Audience: legal.AudienceAll, RequestedBy: admin, Type: "cookies"})
+	_, err = create.Execute(ctx, CreateNoticeInput{Audience: legal.AudienceAll, RequestedBy: admin, Type: "cookies"})
 	assert.ErrorIs(t, err, legal.ErrNotRequired)
 
-	n, created, err := create.Execute(ctx, CreateNoticeInput{Audience: legal.AudienceOwners, RequestedBy: admin, Type: "tos"})
+	res, err := create.Execute(ctx, CreateNoticeInput{Audience: legal.AudienceOwners, RequestedBy: admin, Type: "tos"})
 	require.NoError(t, err)
-	assert.True(t, created)
+	assert.Equal(t, legal.NoticeCreated, res.Outcome)
+	n := res.Notice
+	again, err := create.Execute(ctx, CreateNoticeInput{Audience: legal.AudienceOwners, RequestedBy: admin, Type: "tos"})
+	require.NoError(t, err)
+	assert.Equal(t, CreateNoticeResult{Notice: n, Outcome: legal.NoticeExisting}, again)
 	rec, err := outbox.New(outbox.PolicyNoticeKey(n.Ref, id.NewUserID()), mail.KindPolicyNotice,
 		outbox.PolicyNoticeSubject{Bump: n.Bump, Notice: n.ID, Ref: n.Ref}.Subject(), outbox.ToUser(id.NewUserID()), now)
 	require.NoError(t, err)

@@ -17,7 +17,7 @@ type CreatePolicyNoticeRequest struct {
 // CreatePolicyNotice godoc
 //
 //	@Summary		Record a notice for a policy's upcoming version
-//	@Description	Records a notice for the upcoming version of the policy type. The accounts server then queues one mail per user of the audience and sends it: "all" is every active user with an email address, "owners" is the owners of non-personal workspaces. A major notice skips users who already accepted the version. Each user gets at most one mail per version, so repeating the request queues nothing new and returns the recorded notice with 200. The admin API sends no mail itself.
+//	@Description	Records a notice for the upcoming version of the policy type. The accounts server then queues one mail per user of the audience and sends it: "all" is every active user with an email address, "owners" is the owners of non-personal workspaces. A major notice skips users who already accepted the version. Each user gets at most one mail per version, so repeating the request queues nothing new and returns the recorded notice with 200. The two audiences of one version share that limit: an "owners" notice after an "all" notice ends "covered" and queues nothing, and an "all" notice after an "owners" notice skips the current owners. Repeating the request for a notice that ended "withdrawn" restarts it once the version is upcoming again. The admin API sends no mail itself.
 //	@Tags			policies
 //	@Accept			json
 //	@Produce		json
@@ -52,19 +52,20 @@ func (h *Handler) CreatePolicyNotice(c echo.Context) error {
 	}
 
 	ctx := c.Request().Context()
-	n, created, err := h.create.Execute(ctx, policyuc.CreateNoticeInput{Audience: a, RequestedBy: admin.ID(), Type: t})
+	res, err := h.create.Execute(ctx, policyuc.CreateNoticeInput{Audience: a, RequestedBy: admin.ID(), Type: t})
 	if err != nil {
 		status, code, _ := internal.Classify(err)
 		applog.Info(ctx, "[admin] create policy notice rejected", applog.AdminID(admin.ID()), applog.PolicyType(string(t)), applog.Status(status), applog.Code(code))
 		return err
 	}
-	applog.Info(ctx, "[admin] create policy notice", applog.AdminID(admin.ID()), applog.NoticeID(n.ID), applog.PolicyType(string(t)), applog.Created(created))
+	applog.Info(ctx, "[admin] create policy notice", applog.AdminID(admin.ID()), applog.NoticeID(res.Notice.ID), applog.PolicyType(string(t)), applog.Outcome(string(res.Outcome)))
 
+	created := res.Outcome == legal.NoticeCreated
 	status := http.StatusOK
 	if created {
 		status = http.StatusCreated
 	}
-	return c.JSON(status, CreatePolicyNoticeResponse{Created: created, Notice: newPolicyNoticeResponse(n)})
+	return c.JSON(status, CreatePolicyNoticeResponse{Created: created, Notice: newPolicyNoticeResponse(res.Notice)})
 }
 
 // ListPolicyNotices godoc

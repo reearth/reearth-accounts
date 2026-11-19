@@ -111,6 +111,14 @@ func (r *Outbox) CountByNotice(ctx context.Context, n id.PolicyNoticeID) (map[ou
 	return counts, nil
 }
 
+func (r *Outbox) RemoveFailedByNotice(ctx context.Context, n id.PolicyNoticeID, reason outbox.Reason) error {
+	_, err := r.c.DeleteMany(ctx, bson.M{"subject." + outbox.SubjectNotice: n.String(), "state": string(outbox.StateFailed), "reason": string(reason)})
+	if err != nil {
+		return rerror.ErrInternalByWithContext(ctx, err)
+	}
+	return nil
+}
+
 func (r *Outbox) Enqueue(ctx context.Context, rs []outbox.Record) error {
 	if len(rs) == 0 {
 		return nil

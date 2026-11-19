@@ -53,7 +53,6 @@ func newNoticeFixture(t *testing.T, page int) *noticeFixture {
 	return f
 }
 
-// publish applies a payload whose entries are the versions.json in force.
 func (f *noticeFixture) publish(t *testing.T, entries ...legal.Entry) {
 	t.Helper()
 	f.clock = f.clock.Add(time.Second)
@@ -76,13 +75,49 @@ func (f *noticeFixture) user(t *testing.T, name, lang string) *user.User {
 
 func (f *noticeFixture) notice(t *testing.T, a legal.Audience) legal.Notice {
 	t.Helper()
+	n, _ := f.request(t, a)
+	return n
+}
+
+func (f *noticeFixture) request(t *testing.T, a legal.Audience) (legal.Notice, legal.CreateOutcome) {
+	t.Helper()
 	heads, err := f.repos.PolicyVersion.FindHeads(context.Background())
 	require.NoError(t, err)
 	n, err := legal.NewNotice(legal.NewCatalog(heads), "tos", a, id.NewAdminUserID(), f.clock)
 	require.NoError(t, err)
-	stored, _, err := f.repos.PolicyNotice.Create(context.Background(), n)
+	stored, outcome, err := f.repos.PolicyNotice.Create(context.Background(), n)
 	require.NoError(t, err)
-	return stored
+	return stored, outcome
+}
+
+func (f *noticeFixture) stored(t *testing.T, n legal.Notice) legal.Notice {
+	t.Helper()
+	ns, err := f.repos.PolicyNotice.FindByRef(context.Background(), n.Ref)
+	require.NoError(t, err)
+	for _, s := range ns {
+		if s.ID == n.ID {
+			return s
+		}
+	}
+	require.FailNow(t, "notice not stored")
+	return legal.Notice{}
+}
+
+func (f *noticeFixture) org(t *testing.T, owner user.ID) {
+	t.Helper()
+	ws, err := workspace.New().NewID().Name("org").Members(map[id.UserID]workspace.Member{owner: {Role: role.RoleOwner}}).Build()
+	require.NoError(t, err)
+	require.NoError(t, f.repos.Workspace.Save(context.Background(), ws))
+}
+
+func (f *noticeFixture) mailsTo(u user.ID) int {
+	n := 0
+	for _, e := range f.mail.got {
+		if *e.To.UserID() == u {
+			n++
+		}
+	}
+	return n
 }
 
 func (f *noticeFixture) accept(t *testing.T, u user.ID, r legal.Ref) {
@@ -149,7 +184,7 @@ func TestPolicyNotice_QueuesTheAudienceAndSendsInTheUsersLanguage(t *testing.T) 
 	stored, err := f.repos.PolicyNotice.FindByRef(context.Background(), tos2)
 	require.NoError(t, err)
 	require.Len(t, stored, 1)
-	assert.True(t, stored[0].Fanout.Done)
+	assert.Equal(t, legal.FanoutComplete, stored[0].Fanout.End)
 	assert.Nil(t, stored[0].Fanout.Lease)
 	want := outbox.EmptyCounts()
 	want[outbox.StateSent] = 3
@@ -177,6 +212,7 @@ func TestPolicyNotice_RepeatedRequestQueuesNothingNew(t *testing.T) {
 	assert.Equal(t, 2, f.mail.count(), "an owner already mailed for this version gets no second mail")
 	assert.Equal(t, outbox.StateSent, f.record(t, u.ID()).State)
 	assert.Equal(t, outbox.EmptyCounts(), f.counts(t, owners), "the records stay counted under the first notice")
+	assert.Equal(t, legal.FanoutCovered, f.stored(t, owners).Fanout.End)
 }
 
 func TestPolicyNotice_OwnersAudience(t *testing.T) {
@@ -223,7 +259,7 @@ func TestPolicyNotice_FanoutResumesFromItsCursor(t *testing.T) {
 	assert.Equal(t, 2, queued)
 	stored, err := f.repos.PolicyNotice.FindByRef(context.Background(), tos2)
 	require.NoError(t, err)
-	assert.False(t, stored[0].Fanout.Done)
+	assert.False(t, stored[0].Fanout.Done())
 	assert.Nil(t, stored[0].Fanout.Lease, "the lease is released, so the next pass resumes at once")
 
 	queued, err = f.fanout.Run(context.Background(), f.clock)
@@ -284,7 +320,7 @@ func TestPolicyNotice_WithdrawnVersion(t *testing.T) {
 	assert.Equal(t, 0, f.mail.count())
 	stored, err := f.repos.PolicyNotice.FindByRef(context.Background(), n.Ref)
 	require.NoError(t, err)
-	assert.True(t, stored[0].Fanout.Done)
+	assert.Equal(t, legal.FanoutWithdrawn, stored[0].Fanout.End)
 }
 
 func TestPolicyNotice_MinorNoticeDoesNotSkipAtFanout(t *testing.T) {
@@ -320,6 +356,104 @@ func TestPolicyNotice_ResolverRendersMinorWithoutURL(t *testing.T) {
 	want, err := mail.Render(language.English, mail.PolicyNoticeData{EffectiveDate: t0.Add(time.Hour), PolicyTitle: "Privacy Policy", Version: "1.1.0"})
 	require.NoError(t, err)
 	assert.Equal(t, want, env.Message)
+}
+
+func TestPolicyNotice_SecondAudienceAfterRetentionSendsNoSecondMail(t *testing.T) {
+	tos3 := legal.Ref{Type: "tos", Version: legal.MustParseVersion("3.0.0")}
+	for _, tt := range []struct {
+		first, second legal.Audience
+		end           legal.FanoutEnd
+	}{
+		{first: legal.AudienceAll, second: legal.AudienceOwners, end: legal.FanoutCovered},
+		{first: legal.AudienceOwners, second: legal.AudienceAll, end: legal.FanoutComplete},
+	} {
+		t.Run(string(tt.first)+" then "+string(tt.second), func(t *testing.T) {
+			f := newNoticeFixture(t, 10)
+			f.publish(t, legal.Entry{Ref: tos1, EffectiveAt: t0.Add(-30 * 24 * time.Hour), Required: true, Title: legal.LocalizedText{"en": "Terms"}},
+				legal.Entry{Ref: tos3, EffectiveAt: t0.Add(90 * 24 * time.Hour), Required: true, Title: legal.LocalizedText{"en": "Terms of Service"}})
+			owner := f.user(t, "owner", "en")
+			member := f.user(t, "member", "en")
+			f.org(t, owner.ID())
+			f.notice(t, tt.first)
+			f.pass(t)
+			require.Equal(t, 1, f.mailsTo(owner.ID()))
+
+			f.clock = f.clock.Add(721 * time.Hour)
+			f.pass(t)
+			_, err := f.repos.Outbox.FindByKey(context.Background(), outbox.PolicyNoticeKey(tos3, owner.ID()))
+			require.Error(t, err, "retention deleted the sent record")
+
+			second := f.notice(t, tt.second)
+			f.pass(t)
+			assert.Equal(t, 1, f.mailsTo(owner.ID()), "an owner gets one mail per version across both audiences")
+			assert.Equal(t, 1, f.mailsTo(member.ID()), "a member gets the all notice")
+			assert.Equal(t, tt.end, f.stored(t, second).Fanout.End)
+		})
+	}
+}
+
+func TestPolicyNotice_WithdrawnAndRepublishedVersion(t *testing.T) {
+	f := newNoticeFixture(t, 1)
+	a := f.user(t, "a", "en")
+	b := f.user(t, "b", "en")
+	tos2Entry := legal.Entry{Ref: tos2, EffectiveAt: t0.Add(30 * 24 * time.Hour), Required: true, Title: legal.LocalizedText{"en": "Terms of Service"}}
+	tos1Entry := legal.Entry{Ref: tos1, EffectiveAt: t0.Add(-30 * 24 * time.Hour), Required: true, Title: legal.LocalizedText{"en": "Terms"}}
+	n := f.notice(t, legal.AudienceAll)
+	f.mail.noSender = true
+	_, err := f.fanout.Run(cancelAfterPages(t, f, 1), f.clock)
+	require.NoError(t, err)
+	require.NotNil(t, f.record(t, a.ID()))
+
+	f.publish(t, tos1Entry)
+	f.mail.noSender = false
+	f.pass(t)
+	require.Equal(t, outbox.ReasonVersionNotUpcoming, f.record(t, a.ID()).Reason)
+	require.Equal(t, legal.FanoutWithdrawn, f.stored(t, n).Fanout.End)
+
+	f.publish(t, tos1Entry, tos2Entry)
+	again, outcome := f.request(t, legal.AudienceAll)
+	assert.Equal(t, legal.NoticeReopened, outcome)
+	assert.Equal(t, n.ID, again.ID)
+	rep := f.pass(t)
+
+	assert.Equal(t, 2, rep.Queued, "the reopened notice queues its whole audience")
+	for _, u := range []*user.User{a, b} {
+		r := f.record(t, u.ID())
+		require.NotNil(t, r, u.Name())
+		assert.Equal(t, outbox.StateSent, r.State, u.Name())
+	}
+	assert.Equal(t, 2, f.mail.count())
+	assert.Equal(t, legal.FanoutComplete, f.stored(t, n).Fanout.End)
+}
+
+func TestPolicyNotice_TitleAndURLFollowTheTemplateLanguage(t *testing.T) {
+	f := newNoticeFixture(t, 10)
+	f.publish(t, legal.Entry{Ref: tos1, EffectiveAt: t0.Add(-30 * 24 * time.Hour), Required: true, Title: legal.LocalizedText{"en": "Terms"}},
+		legal.Entry{Ref: tos2, EffectiveAt: t0.Add(30 * 24 * time.Hour), Required: true,
+			Title: legal.LocalizedText{"de": "Nutzungsbedingungen", "en": "Terms of Service", "ja": "利用規約"},
+			URL:   legal.LocalizedText{"de": "https://example.com/de/tos", "en": "https://example.com/en/tos", "ja": "https://example.com/ja/tos"}})
+	users := map[string]*user.User{}
+	for _, l := range []string{"de", "en-GB", "ja-JP", "zz"} {
+		users[l] = f.user(t, "u"+l, l)
+	}
+	f.notice(t, legal.AudienceAll)
+	f.pass(t)
+
+	byUser := map[id.UserID]mail.Envelope{}
+	for _, e := range f.mail.got {
+		byUser[*e.To.UserID()] = e
+	}
+	for l, want := range map[string]struct{ subject, url string }{
+		"de":    {"[Re:Earth] Changes to the Terms of Service", "https://example.com/en/tos"},
+		"en-GB": {"[Re:Earth] Changes to the Terms of Service", "https://example.com/en/tos"},
+		"ja-JP": {"【Re:Earth】利用規約改定のお知らせ", "https://example.com/ja/tos"},
+		"zz":    {"[Re:Earth] Changes to the Terms of Service", "https://example.com/en/tos"},
+	} {
+		e := byUser[users[l].ID()]
+		assert.Equal(t, want.subject, e.Message.Subject(), l)
+		assert.Contains(t, e.Message.Text(), want.url, l)
+		assert.NotContains(t, e.Message.Text(), "Nutzungsbedingungen", l)
+	}
 }
 
 type pageCounter struct {

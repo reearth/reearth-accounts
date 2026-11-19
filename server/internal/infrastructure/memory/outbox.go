@@ -58,6 +58,17 @@ func (r *Outbox) CountByNotice(_ context.Context, n id.PolicyNoticeID) (map[outb
 	return counts, nil
 }
 
+func (r *Outbox) RemoveFailedByNotice(_ context.Context, n id.PolicyNoticeID, reason outbox.Reason) error {
+	r.lock.Lock()
+	defer r.lock.Unlock()
+	for k, rec := range r.data {
+		if rec.Subject[outbox.SubjectNotice] == n.String() && rec.State == outbox.StateFailed && rec.Reason == reason {
+			delete(r.data, k)
+		}
+	}
+	return nil
+}
+
 func (r *Outbox) Enqueue(_ context.Context, rs []outbox.Record) error {
 	r.lock.Lock()
 	defer r.lock.Unlock()

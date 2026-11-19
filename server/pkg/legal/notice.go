@@ -90,6 +90,40 @@ func NewNotice(c Catalog, t Type, a Audience, by id.AdminUserID, now time.Time) 
 	return Notice{Audience: a, Bump: b, CreatedAt: now, ID: id.NewPolicyNoticeID(), Ref: up.Ref, RequestedBy: by}, nil
 }
 
+func (n Notice) before(o Notice) bool {
+	if !n.CreatedAt.Equal(o.CreatedAt) {
+		return n.CreatedAt.Before(o.CreatedAt)
+	}
+	return n.ID.String() < o.ID.String()
+}
+
+// Overlap is what an earlier notice of the same version for the other
+// audience leaves n to do. The outbox key stops a second mail only while the
+// first record is kept, so both audiences are compared at fan-out instead.
+type Overlap int
+
+const (
+	OverlapNone Overlap = iota
+	// OverlapCovered is an owners notice after an all notice: every owner is
+	// already in the earlier audience.
+	OverlapCovered
+	// OverlapSkipOwners is an all notice after an owners notice.
+	OverlapSkipOwners
+)
+
+func OverlapOf(n Notice, notices []Notice) Overlap {
+	for _, o := range notices {
+		if o.Ref != n.Ref || o.Audience == n.Audience || !o.before(n) {
+			continue
+		}
+		if n.Audience == AudienceOwners {
+			return OverlapCovered
+		}
+		return OverlapSkipOwners
+	}
+	return OverlapNone
+}
+
 func ParseAudience(s string) (Audience, error) {
 	switch a := Audience(s); a {
 	case AudienceAll, AudienceOwners:
@@ -102,9 +136,31 @@ func ParseAudience(s string) (Audience, error) {
 // the last user or workspace ID paged.
 type Fanout struct {
 	Cursor string
-	Done   bool
+	End    FanoutEnd
 	Lease  *Lease
 }
+
+func (f Fanout) Done() bool { return f.End != FanoutOpen }
+
+type FanoutEnd string
+
+const (
+	FanoutOpen     FanoutEnd = ""
+	FanoutComplete FanoutEnd = "complete"
+	FanoutCovered  FanoutEnd = "covered"
+	// FanoutWithdrawn is a notice whose version stopped being upcoming. A
+	// repeated request reopens it once the version is upcoming again.
+	FanoutWithdrawn FanoutEnd = "withdrawn"
+)
+
+// CreateOutcome is what NoticeRepo.Create did with a notice.
+type CreateOutcome string
+
+const (
+	NoticeCreated  CreateOutcome = "created"
+	NoticeExisting CreateOutcome = "existing"
+	NoticeReopened CreateOutcome = "reopened"
+)
 
 type Lease struct {
 	Token string
@@ -113,17 +169,19 @@ type Lease struct {
 
 // NoticeRepo stores policy_notices. Each method is one conditional write.
 type NoticeRepo interface {
-	// AdvanceFanout stores cursor and done, and renews the lease until
-	// lease.Until, while lease.Token holds the notice. A done notice drops
+	// AdvanceFanout stores cursor and end, and renews the lease until
+	// lease.Until, while lease.Token holds the notice. An ended notice drops
 	// its lease. It returns false when the token no longer holds.
-	AdvanceFanout(ctx context.Context, n id.PolicyNoticeID, lease Lease, cursor string, done bool) (bool, error)
+	AdvanceFanout(ctx context.Context, n id.PolicyNoticeID, lease Lease, cursor string, end FanoutEnd) (bool, error)
 	// ClaimFanout leases the oldest notice that is not done and whose lease
 	// is absent or expired at now, and returns it. It returns nil when none
 	// is due. Two callers never hold the same notice.
 	ClaimFanout(ctx context.Context, now time.Time, lease Lease) (*Notice, error)
 	// Create stores n unless a notice with its version and audience exists,
-	// and returns the stored notice and whether n was stored.
-	Create(ctx context.Context, n Notice) (Notice, bool, error)
+	// and returns the stored notice. A stored notice that ended withdrawn
+	// restarts with an empty cursor, because the caller checked that its
+	// version is upcoming.
+	Create(ctx context.Context, n Notice) (Notice, CreateOutcome, error)
 	// FindByRef returns the notices of r, oldest first.
 	FindByRef(ctx context.Context, r Ref) ([]Notice, error)
 	// ReleaseFanout drops the lease while token holds it.

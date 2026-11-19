@@ -21,8 +21,13 @@ WHERE key = sqlc.arg(key) AND state = 'sending' AND claim_token = sqlc.arg(token
 
 -- name: OutboxCountByNotice :many
 SELECT state, count(*)::integer AS n FROM mail_outbox
-WHERE subject->>'notice' = sqlc.arg(notice)::text
+WHERE subject ? 'notice' AND subject->>'notice' = sqlc.arg(notice)::text
 GROUP BY state;
+
+-- name: OutboxRemoveFailedByNotice :exec
+DELETE FROM mail_outbox
+WHERE subject ? 'notice' AND subject->>'notice' = sqlc.arg(notice)::text
+    AND state = 'failed' AND reason = sqlc.arg(reason)::text;
 
 -- name: OutboxEnqueue :exec
 INSERT INTO mail_outbox (key, kind, subject, recipient_user_id, recipient_address, state, attempts,

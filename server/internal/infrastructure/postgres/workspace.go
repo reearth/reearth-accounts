@@ -184,6 +184,21 @@ func (r *Workspace) FindOrgOwnersAfter(ctx context.Context, after *workspace.ID,
 	return owners, &last, nil
 }
 
+func (r *Workspace) FindOrgOwnersAmong(ctx context.Context, users user.IDList) (user.IDList, error) {
+	if len(users) == 0 {
+		return nil, nil
+	}
+	rows, err := r.c.queries(ctx).WorkspaceFindOrgOwnersAmong(ctx, users.Strings())
+	if err != nil {
+		return nil, rerror.ErrInternalByWithContext(ctx, err)
+	}
+	res, err := id.UserIDListFrom(rows)
+	if err != nil {
+		return nil, rerror.ErrInternalByWithContext(ctx, err)
+	}
+	return res, nil
+}
+
 func (r *Workspace) FindByIDs(ctx context.Context, ids id.WorkspaceIDList) (workspace.List, error) {
 	if len(ids) == 0 {
 		return nil, nil

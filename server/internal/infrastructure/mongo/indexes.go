@@ -37,7 +37,7 @@ var indexes = map[string][]mongo.IndexModel{
 			Keys:    bson.D{{Key: "type", Value: 1}, {Key: "version", Value: 1}, {Key: "audience", Value: 1}},
 			Options: options.Index().SetName("policy_notices_type_version_audience").SetUnique(true),
 		},
-		{Keys: bson.D{{Key: "fanout.done", Value: 1}, {Key: "createdAt", Value: 1}}, Options: options.Index().SetName("policy_notices_fanout")},
+		{Keys: bson.D{{Key: "fanout.end", Value: 1}, {Key: "createdAt", Value: 1}}, Options: options.Index().SetName("policy_notices_fanout")},
 	},
 	policyVersionsCollection: {{
 		Keys:    bson.D{{Key: "type", Value: 1}, {Key: "version", Value: 1}},

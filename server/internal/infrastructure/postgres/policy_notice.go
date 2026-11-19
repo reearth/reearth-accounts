@@ -18,9 +18,9 @@ type PolicyNotice struct {
 
 func NewPolicyNotice(c *Client) legal.NoticeRepo { return &PolicyNotice{c: c} }
 
-func (r *PolicyNotice) AdvanceFanout(ctx context.Context, n id.PolicyNoticeID, lease legal.Lease, cursor string, done bool) (bool, error) {
+func (r *PolicyNotice) AdvanceFanout(ctx context.Context, n id.PolicyNoticeID, lease legal.Lease, cursor string, end legal.FanoutEnd) (bool, error) {
 	rows, err := r.c.queries(ctx).PolicyNoticeAdvanceFanout(ctx, gen.PolicyNoticeAdvanceFanoutParams{
-		Cursor: cursor, Done: done, ID: n.String(), Token: lease.Token, Until: lease.Until,
+		Cursor: cursor, FanoutEnd: string(end), ID: n.String(), Token: lease.Token, Until: lease.Until,
 	})
 	if err != nil {
 		return false, rerror.ErrInternalByWithContext(ctx, err)
@@ -43,7 +43,7 @@ func (r *PolicyNotice) ClaimFanout(ctx context.Context, now time.Time, lease leg
 	return &n, nil
 }
 
-func (r *PolicyNotice) Create(ctx context.Context, n legal.Notice) (legal.Notice, bool, error) {
+func (r *PolicyNotice) Create(ctx context.Context, n legal.Notice) (legal.Notice, legal.CreateOutcome, error) {
 	q := r.c.queries(ctx)
 	row, err := q.PolicyNoticeCreate(ctx, gen.PolicyNoticeCreateParams{
 		Audience:    string(n.Audience),
@@ -54,20 +54,27 @@ func (r *PolicyNotice) Create(ctx context.Context, n legal.Notice) (legal.Notice
 		Type:        string(n.Ref.Type),
 		Version:     n.Ref.Version.String(),
 	})
-	created := err == nil
+	outcome := legal.NoticeCreated
 	if errors.Is(err, pgx.ErrNoRows) {
+		outcome = legal.NoticeReopened
+		row, err = q.PolicyNoticeReopen(ctx, gen.PolicyNoticeReopenParams{
+			Audience: string(n.Audience), Type: string(n.Ref.Type), Version: n.Ref.Version.String(),
+		})
+	}
+	if errors.Is(err, pgx.ErrNoRows) {
+		outcome = legal.NoticeExisting
 		row, err = q.PolicyNoticeFindByVersionAudience(ctx, gen.PolicyNoticeFindByVersionAudienceParams{
 			Audience: string(n.Audience), Type: string(n.Ref.Type), Version: n.Ref.Version.String(),
 		})
 	}
 	if err != nil {
-		return legal.Notice{}, false, rerror.ErrInternalByWithContext(ctx, err)
+		return legal.Notice{}, "", rerror.ErrInternalByWithContext(ctx, err)
 	}
 	stored, err := noticeModel(row)
 	if err != nil {
-		return legal.Notice{}, false, rerror.ErrInternalByWithContext(ctx, err)
+		return legal.Notice{}, "", rerror.ErrInternalByWithContext(ctx, err)
 	}
-	return stored, created, nil
+	return stored, outcome, nil
 }
 
 func (r *PolicyNotice) FindByRef(ctx context.Context, ref legal.Ref) ([]legal.Notice, error) {
@@ -114,7 +121,7 @@ func noticeModel(row gen.PolicyNotice) (legal.Notice, error) {
 		Audience:    legal.Audience(row.Audience),
 		Bump:        legal.Bump(row.Bump),
 		CreatedAt:   row.CreatedAt.UTC(),
-		Fanout:      legal.Fanout{Cursor: row.FanoutCursor, Done: row.FanoutDone},
+		Fanout:      legal.Fanout{Cursor: row.FanoutCursor, End: legal.FanoutEnd(row.FanoutEnd)},
 		ID:          nid,
 		Ref:         legal.Ref{Type: t, Version: v},
 		RequestedBy: by,

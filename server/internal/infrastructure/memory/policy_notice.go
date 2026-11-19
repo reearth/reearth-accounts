@@ -19,15 +19,15 @@ func NewPolicyNotice() *PolicyNotice {
 	return &PolicyNotice{data: map[id.PolicyNoticeID]legal.Notice{}}
 }
 
-func (r *PolicyNotice) AdvanceFanout(_ context.Context, n id.PolicyNoticeID, lease legal.Lease, cursor string, done bool) (bool, error) {
+func (r *PolicyNotice) AdvanceFanout(_ context.Context, n id.PolicyNoticeID, lease legal.Lease, cursor string, end legal.FanoutEnd) (bool, error) {
 	r.lock.Lock()
 	defer r.lock.Unlock()
 	stored, ok := r.data[n]
 	if !ok || stored.Fanout.Lease == nil || stored.Fanout.Lease.Token != lease.Token {
 		return false, nil
 	}
-	stored.Fanout = legal.Fanout{Cursor: cursor, Done: done}
-	if !done {
+	stored.Fanout = legal.Fanout{Cursor: cursor, End: end}
+	if end == legal.FanoutOpen {
 		stored.Fanout.Lease = &lease
 	}
 	r.data[n] = stored
@@ -39,7 +39,7 @@ func (r *PolicyNotice) ClaimFanout(_ context.Context, now time.Time, lease legal
 	defer r.lock.Unlock()
 	var next *legal.Notice
 	for _, n := range r.data {
-		if n.Fanout.Done || (n.Fanout.Lease != nil && n.Fanout.Lease.Until.After(now)) {
+		if n.Fanout.Done() || (n.Fanout.Lease != nil && n.Fanout.Lease.Until.After(now)) {
 			continue
 		}
 		if next == nil || n.CreatedAt.Before(next.CreatedAt) {
@@ -54,16 +54,22 @@ func (r *PolicyNotice) ClaimFanout(_ context.Context, now time.Time, lease legal
 	return next, nil
 }
 
-func (r *PolicyNotice) Create(_ context.Context, n legal.Notice) (legal.Notice, bool, error) {
+func (r *PolicyNotice) Create(_ context.Context, n legal.Notice) (legal.Notice, legal.CreateOutcome, error) {
 	r.lock.Lock()
 	defer r.lock.Unlock()
 	for _, stored := range r.data {
-		if stored.Ref == n.Ref && stored.Audience == n.Audience {
-			return stored, false, nil
+		if stored.Ref != n.Ref || stored.Audience != n.Audience {
+			continue
 		}
+		if stored.Fanout.End != legal.FanoutWithdrawn {
+			return stored, legal.NoticeExisting, nil
+		}
+		stored.Fanout = legal.Fanout{}
+		r.data[stored.ID] = stored
+		return stored, legal.NoticeReopened, nil
 	}
 	r.data[n.ID] = n
-	return n, true, nil
+	return n, legal.NoticeCreated, nil
 }
 
 func (r *PolicyNotice) FindByRef(_ context.Context, ref legal.Ref) ([]legal.Notice, error) {

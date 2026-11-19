@@ -20,6 +20,9 @@ type Repo interface {
 	// CountByNotice returns the number of records in each state among the
 	// records whose subject names notice n. Every state is present.
 	CountByNotice(ctx context.Context, n id.PolicyNoticeID) (map[State]int, error)
+	// RemoveFailedByNotice deletes the failed records with reason whose
+	// subject names notice n.
+	RemoveFailedByNotice(ctx context.Context, n id.PolicyNoticeID, reason Reason) error
 	// Enqueue stores each record whose key is absent and leaves existing
 	// records unchanged.
 	Enqueue(ctx context.Context, rs []Record) error

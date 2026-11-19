@@ -30,7 +30,7 @@ type noticeLeaseDoc struct {
 
 type noticeFanoutDoc struct {
 	Cursor string          `bson:"cursor"`
-	Done   bool            `bson:"done"`
+	End    string          `bson:"end"`
 	Lease  *noticeLeaseDoc `bson:"lease,omitempty"`
 }
 
@@ -45,10 +45,10 @@ type policyNoticeDoc struct {
 	Version     string          `bson:"version"`
 }
 
-func (r *PolicyNotice) AdvanceFanout(ctx context.Context, n id.PolicyNoticeID, lease legal.Lease, cursor string, done bool) (bool, error) {
-	update := bson.M{"$set": bson.M{"fanout.cursor": cursor, "fanout.done": done, "fanout.lease": noticeLeaseDoc(lease)}}
-	if done {
-		update = bson.M{"$set": bson.M{"fanout.cursor": cursor, "fanout.done": true}, "$unset": bson.M{"fanout.lease": ""}}
+func (r *PolicyNotice) AdvanceFanout(ctx context.Context, n id.PolicyNoticeID, lease legal.Lease, cursor string, end legal.FanoutEnd) (bool, error) {
+	update := bson.M{"$set": bson.M{"fanout.cursor": cursor, "fanout.end": string(end), "fanout.lease": noticeLeaseDoc(lease)}}
+	if end != legal.FanoutOpen {
+		update = bson.M{"$set": bson.M{"fanout.cursor": cursor, "fanout.end": string(end)}, "$unset": bson.M{"fanout.lease": ""}}
 	}
 	res, err := r.c.UpdateOne(ctx, bson.M{"_id": n.String(), "fanout.lease.token": lease.Token}, update)
 	if err != nil {
@@ -60,7 +60,7 @@ func (r *PolicyNotice) AdvanceFanout(ctx context.Context, n id.PolicyNoticeID, l
 func (r *PolicyNotice) ClaimFanout(ctx context.Context, now time.Time, lease legal.Lease) (*legal.Notice, error) {
 	var d policyNoticeDoc
 	err := r.c.FindOneAndUpdate(ctx,
-		bson.M{"fanout.done": false, "$or": bson.A{
+		bson.M{"fanout.end": string(legal.FanoutOpen), "$or": bson.A{
 			bson.M{"fanout.lease": bson.M{"$exists": false}},
 			bson.M{"fanout.lease.until": bson.M{"$lte": now}},
 		}},
@@ -80,24 +80,35 @@ func (r *PolicyNotice) ClaimFanout(ctx context.Context, now time.Time, lease leg
 	return &n, nil
 }
 
-func (r *PolicyNotice) Create(ctx context.Context, n legal.Notice) (legal.Notice, bool, error) {
+func (r *PolicyNotice) Create(ctx context.Context, n legal.Notice) (legal.Notice, legal.CreateOutcome, error) {
 	d := newPolicyNoticeDoc(n)
 	_, err := r.c.InsertOne(ctx, d)
 	if err == nil {
-		return n, true, nil
+		return n, legal.NoticeCreated, nil
 	}
 	if !mongo.IsDuplicateKeyError(err) {
-		return legal.Notice{}, false, rerror.ErrInternalByWithContext(ctx, err)
+		return legal.Notice{}, "", rerror.ErrInternalByWithContext(ctx, err)
 	}
+	same := bson.M{"type": d.Type, "version": d.Version, "audience": d.Audience}
+	withdrawn := bson.M{"type": d.Type, "version": d.Version, "audience": d.Audience, "fanout.end": string(legal.FanoutWithdrawn)}
+	outcome := legal.NoticeReopened
 	var stored policyNoticeDoc
-	if err := r.c.FindOne(ctx, bson.M{"type": d.Type, "version": d.Version, "audience": d.Audience}).Decode(&stored); err != nil {
-		return legal.Notice{}, false, rerror.ErrInternalByWithContext(ctx, err)
+	err = r.c.FindOneAndUpdate(ctx, withdrawn,
+		bson.M{"$set": bson.M{"fanout.cursor": "", "fanout.end": string(legal.FanoutOpen)}, "$unset": bson.M{"fanout.lease": ""}},
+		options.FindOneAndUpdate().SetReturnDocument(options.After),
+	).Decode(&stored)
+	if errors.Is(err, mongo.ErrNoDocuments) {
+		outcome = legal.NoticeExisting
+		err = r.c.FindOne(ctx, same).Decode(&stored)
+	}
+	if err != nil {
+		return legal.Notice{}, "", rerror.ErrInternalByWithContext(ctx, err)
 	}
 	m, err := stored.model()
 	if err != nil {
-		return legal.Notice{}, false, rerror.ErrInternalByWithContext(ctx, err)
+		return legal.Notice{}, "", rerror.ErrInternalByWithContext(ctx, err)
 	}
-	return m, false, nil
+	return m, outcome, nil
 }
 
 func (r *PolicyNotice) FindByRef(ctx context.Context, ref legal.Ref) ([]legal.Notice, error) {
@@ -134,7 +145,7 @@ func newPolicyNoticeDoc(n legal.Notice) policyNoticeDoc {
 		Audience:    string(n.Audience),
 		Bump:        string(n.Bump),
 		CreatedAt:   n.CreatedAt,
-		Fanout:      noticeFanoutDoc{Cursor: n.Fanout.Cursor, Done: n.Fanout.Done},
+		Fanout:      noticeFanoutDoc{Cursor: n.Fanout.Cursor, End: string(n.Fanout.End)},
 		ID:          n.ID.String(),
 		RequestedBy: n.RequestedBy.String(),
 		Type:        string(n.Ref.Type),
@@ -167,7 +178,7 @@ func (d policyNoticeDoc) model() (legal.Notice, error) {
 		Audience:    legal.Audience(d.Audience),
 		Bump:        legal.Bump(d.Bump),
 		CreatedAt:   d.CreatedAt.UTC(),
-		Fanout:      legal.Fanout{Cursor: d.Fanout.Cursor, Done: d.Fanout.Done},
+		Fanout:      legal.Fanout{Cursor: d.Fanout.Cursor, End: legal.FanoutEnd(d.Fanout.End)},
 		ID:          nid,
 		Ref:         legal.Ref{Type: t, Version: v},
 		RequestedBy: by,
