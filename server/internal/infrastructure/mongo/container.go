@@ -28,15 +28,20 @@ func New(ctx context.Context, db *mongo.Database, useTransaction, needCompat boo
 		return nil, err
 	}
 
+	if err := ensureIndexes(ctx, db); err != nil {
+		return nil, err
+	}
+
 	c := &repo.Container{
-		AdminUser:   NewAdminUser(client),
-		User:        NewUser(client),
-		Workspace:   ws,
-		Role:        NewRole(client),
-		Permittable: NewPermittable(client),
-		Transaction: client.Transaction(),
-		Users:       users,
-		Config:      NewConfig(db.Collection("config"), lock),
+		AdminUser:     NewAdminUser(client),
+		User:          NewUser(client),
+		Workspace:     ws,
+		Role:          NewRole(client),
+		Permittable:   NewPermittable(client),
+		PolicyVersion: NewPolicyVersion(db),
+		Transaction:   client.Transaction(),
+		Users:         users,
+		Config:        NewConfig(db.Collection("config"), lock),
 	}
 
 	return c, nil

@@ -42,6 +42,25 @@ type PermittableWorkspaceRole struct {
 	RoleID        string
 }
 
+type PolicyType struct {
+	Type                string
+	Revision            int64
+	AppliedAt           time.Time
+	UpcomingVersion     *string
+	UpcomingEffectiveAt *time.Time
+	Withdrawn           []byte
+}
+
+type PolicyVersion struct {
+	Type        string
+	Version     string
+	EffectiveAt time.Time
+	Required    bool
+	Title       []byte
+	Url         []byte
+	Stamp       time.Time
+}
+
 type Role struct {
 	ID   string
 	Name string

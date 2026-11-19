@@ -103,3 +103,23 @@ CREATE TABLE config (
     auth_key       text NOT NULL DEFAULT '',
     default_policy text
 );
+
+CREATE TABLE policy_types (
+    type                  text PRIMARY KEY,
+    revision              bigint NOT NULL,
+    applied_at            timestamptz NOT NULL,
+    upcoming_version      text,
+    upcoming_effective_at timestamptz,
+    withdrawn             jsonb NOT NULL DEFAULT '[]'
+);
+
+CREATE TABLE policy_versions (
+    type         text NOT NULL REFERENCES policy_types(type),
+    version      text NOT NULL,
+    effective_at timestamptz NOT NULL,
+    required     boolean NOT NULL,
+    title        jsonb NOT NULL,
+    url          jsonb NOT NULL DEFAULT '{}',
+    stamp        timestamptz NOT NULL,
+    PRIMARY KEY (type, version)
+);

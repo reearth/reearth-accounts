@@ -3,6 +3,7 @@ package repo
 import (
 	"github.com/reearth/reearth-accounts/server/pkg/adminuser"
 	"github.com/reearth/reearth-accounts/server/pkg/config"
+	"github.com/reearth/reearth-accounts/server/pkg/legal"
 	"github.com/reearth/reearth-accounts/server/pkg/permittable"
 	"github.com/reearth/reearth-accounts/server/pkg/role"
 	"github.com/reearth/reearth-accounts/server/pkg/user"
@@ -13,33 +14,30 @@ import (
 )
 
 type Container struct {
-	AdminUser   adminuser.Repo
-	User        user.Repo
-	Workspace   workspace.Repo
-	Role        role.Repo
-	Permittable permittable.Repo
-	Transaction usecasex.Transaction
-	Users       []user.Repo
-	Config      config.Repo
+	AdminUser     adminuser.Repo
+	User          user.Repo
+	Workspace     workspace.Repo
+	Role          role.Repo
+	Permittable   permittable.Repo
+	PolicyVersion legal.VersionRepo
+	Transaction   usecasex.Transaction
+	Users         []user.Repo
+	Config        config.Repo
 }
 
 var (
 	ErrOperationDenied = rerror.NewE(i18n.T("operation denied"))
 )
 
+// Filtered copies every repo and narrows Workspace, so a new repo field
+// cannot be dropped by accident.
 func (c *Container) Filtered(f workspace.WorkspaceFilter) *Container {
 	if c == nil {
 		return c
 	}
-	return &Container{
-		Workspace:   c.Workspace.Filtered(f),
-		AdminUser:   c.AdminUser,
-		User:        c.User,
-		Users:       c.Users,
-		Role:        c.Role,
-		Permittable: c.Permittable,
-		Transaction: c.Transaction,
-	}
+	cc := *c
+	cc.Workspace = c.Workspace.Filtered(f)
+	return &cc
 }
 
 // WorkspaceFilterFromOperator creates a WorkspaceFilter from an Operator

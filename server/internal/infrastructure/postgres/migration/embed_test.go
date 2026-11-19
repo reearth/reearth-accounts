@@ -135,3 +135,29 @@ func TestMigrate_SeedRolesDown(t *testing.T) {
 		"self":   foreign,
 	}, left)
 }
+
+func TestMigrate_LegalPoliciesDownUp(t *testing.T) {
+	pool, done := startPG(t)
+	defer done()
+	ctx := context.Background()
+	require.NoError(t, migration.Migrate(ctx, pool))
+
+	tables := func() int {
+		var n int
+		require.NoError(t, pool.QueryRow(ctx,
+			`SELECT count(*) FROM information_schema.tables WHERE table_name IN ('policy_types', 'policy_versions')`).Scan(&n))
+		return n
+	}
+	assert.Equal(t, 2, tables())
+
+	down, err := os.ReadFile("0007_legal_policies.down.sql")
+	require.NoError(t, err)
+	_, err = pool.Exec(ctx, string(down))
+	require.NoError(t, err)
+	assert.Equal(t, 0, tables())
+
+	_, err = pool.Exec(ctx, `UPDATE schema_migrations SET version = 6, dirty = false`)
+	require.NoError(t, err)
+	require.NoError(t, migration.Migrate(ctx, pool))
+	assert.Equal(t, 2, tables())
+}
