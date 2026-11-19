@@ -1,0 +1,9 @@
+Subject: email verification
+
+Hi Alice:
+Thank you for signing up to Re:Earth. Please verify your email address by clicking the button below.
+
+To Activate your account and log in:
+https://auth.example.com/?user-verification-token=CODE
+
+You can use this email address to log in to Re:Earth account anytime.

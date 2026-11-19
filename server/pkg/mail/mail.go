@@ -29,16 +29,13 @@ func (r Recipient) UserID() *id.UserID { return r.userID }
 func (r Recipient) Address() string    { return r.address }
 func (r Recipient) Name() string       { return r.name }
 
+// Message is a rendered mail. Only Render builds one, so a message always has
+// a known kind and both bodies.
 type Message struct {
 	kind    Kind
 	subject string
 	text    string
 	html    string
-}
-
-// Raw builds a message from bodies the caller already rendered.
-func Raw(kind Kind, subject, text, html string) Message {
-	return Message{kind: kind, subject: subject, text: text, html: html}
 }
 
 func (m Message) Kind() Kind      { return m.kind }

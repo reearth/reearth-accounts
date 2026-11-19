@@ -1,14 +1,12 @@
-<html lang="en">
+<html lang="ja">
 
 <head>
     <meta charset="UTF-8">
     <meta http-equiv="X-UA-Compatible" content="IE=edge">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Re:Earth reset password</title>
+    <title>Re:Earth メールアドレスの確認</title>
     <style>
-        /* -------------------------------------
-            GLOBAL RESETS
-        ------------------------------------- */
+         
 
         @font-face {
             font-family: 'Hiragino Kaku Gothic Pro';
@@ -16,7 +14,7 @@
         }
 
 
-        /*All the styling goes here*/
+         
 
         img {
             border: none;
@@ -50,9 +48,7 @@
         }
 
 
-        /* -------------------------------------
-              BODY & CONTAINER
-          ------------------------------------- */
+         
 
         .body {
             background-color: #FFF;
@@ -60,19 +56,19 @@
         }
 
 
-        /* Set a max-width, and make it display as block so it will automatically stretch to that width, but will also shrink down on a phone or something */
+         
 
         .container {
             display: block;
             Margin: 0 auto !important;
-            /* makes it centered */
+             
             max-width: 475px;
             padding: 10px;
             width: 475px;
         }
 
 
-        /* This should also be a block element, so that it will fill 100% of the .container */
+         
 
         .content {
             box-sizing: border-box;
@@ -83,9 +79,7 @@
         }
 
 
-        /* -------------------------------------
-              HEADER, FOOTER, MAIN
-          ------------------------------------- */
+         
 
         .main {
             background: #ffffff;
@@ -119,9 +113,7 @@
         }
 
 
-        /* -------------------------------------
-              TYPOGRAPHY
-          ------------------------------------- */
+         
 
         h1,
         h2,
@@ -172,9 +164,7 @@
         }
 
 
-        /* -------------------------------------
-              BUTTONS
-          ------------------------------------- */
+         
 
         a.btn {
             font-family: sans-serif;
@@ -206,9 +196,7 @@
         }
 
 
-        /* -------------------------------------
-              OTHER STYLES THAT MIGHT BE USEFUL
-          ------------------------------------- */
+         
 
         .last {
             margin-bottom: 0;
@@ -262,9 +250,7 @@
         }
 
 
-        /* -------------------------------------
-              RESPONSIVE AND MOBILE FRIENDLY STYLES
-          ------------------------------------- */
+         
 
         @media only screen and (max-width: 620px) {
             table[class=body] h1 {
@@ -305,9 +291,7 @@
         }
 
 
-        /* -------------------------------------
-              PRESERVE THESE STYLES IN THE HEAD
-          ------------------------------------- */
+         
 
         @media all {
             .ExternalClass {
@@ -357,9 +341,8 @@
                 </div>
                 <div class="content">
 
-                    <!-- START CENTERED WHITE CONTAINER -->
-                    <span class="preheader">This is preheader text. Some clients will show this text as a
-                        preview.</span>
+                    
+                    <span class="preheader"></span>
                     <table role="presentation" class="main">
                         <tr>
                             <td style="border: none;border-top: 1px solid #E9551880;padding: 0;" width="100%"></td>
@@ -369,21 +352,21 @@
                                 <table class="wrapper" role="presentation" border="0" cellpadding="0" cellspacing="0">
                                     <tr>
                                         <td>
-                                            <p class="greeting">Hi {{ .UserName }}：</p>
+                                            <p class="greeting">Alice 様</p>
                                         </td>
                                     </tr>
                                     <tr>
                                         <td>
-                                            <p>{{ .Message }}</p>
+                                            <p>Re:Earth にご登録いただきありがとうございます。下のボタンをクリックして、メールアドレスを確認してください。</p>
                                         </td>
                                     </tr>
                                     <tr align="center">
-                                        <td> <a class="btn" href="{{ .ActionURL }}" target="_blank">{{ .ActionLabel }}</a> </td>
+                                        <td> <a class="btn" href="https://auth.example.com/?user-verification-token=CODE" target="_blank">アカウントを有効にしてログイン</a> </td>
                                     </tr>
                                     <tr>
                                         <tr>
                                             <td>
-                                                <p>{{ .Suffix }}</p>
+                                                <p>このメールアドレスで、いつでも Re:Earth アカウントにログインできます。</p>
                                             </td>
                                         </tr>
                                 </table>
@@ -397,10 +380,10 @@
                                     <table class="wrapper" role="presentation" border="0" cellpadding="0" cellspacing="0">
                                         <tr>
                                             <td>
-                                                <p>If any problems, please contact the Re:Earth team: <br><a href="mailto:info@reearth.io">info@reearth.io</a> </p>
-                                                <p>You can also find us on discord! Feel free to join and ask any questions.
+                                                <p>ご不明な点がありましたら、Re:Earth チームまでお問い合わせください。<br><a href="mailto:info@reearth.io">info@reearth.io</a> </p>
+                                                <p>Discord でも質問を受け付けています。お気軽にご参加ください。
                                                     <br>
-                                                    <a class="discord-button" href=""><img src="discord-button.png" alt="Discord button"></a>
+                                                    <a class="discord-button" href=""><img src="discord-button.png" alt="Discord"></a>
                                                 </p>
                                             </td>
                                         </tr>

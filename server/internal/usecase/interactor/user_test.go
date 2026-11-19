@@ -278,6 +278,46 @@ func TestUser_StartPasswordReset(t *testing.T) {
 	}
 }
 
+func TestUser_StartPasswordReset_MailLanguage(t *testing.T) {
+	tests := []struct {
+		name        string
+		lang        language.Tag
+		wantSubject string
+		wantText    string
+	}{
+		{"ja", language.Japanese, "【Re:Earth】パスワードの再設定", "パスワード再設定のリクエストを受け付けました"},
+		{"ja-JP", language.MustParse("ja-JP"), "【Re:Earth】パスワードの再設定", "パスワード再設定のリクエストを受け付けました"},
+		{"en", language.English, "Password reset", "We've received a request to reset your password"},
+		{"und", language.Und, "Password reset", "We've received a request to reset your password"},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			ctx := context.Background()
+			r := memory.New()
+			m := &mailprovider.Mock{}
+			uc := NewUser(r, &gateway.Container{Mail: m}, nil, "", "https://auth.example.com")
+
+			uid := id.NewUserID()
+			u := user.New().ID(uid).Workspace(id.NewWorkspaceID()).Email("reset@example.com").Name("NAME").
+				Auths([]user.Auth{{Provider: user.ProviderReearth, Sub: "reearth|" + uid.String()}}).
+				Metadata(user.MetadataFrom("", "", "", tt.lang, user.ThemeDefault)).
+				MustBuild()
+			assert.NoError(t, r.User.Save(ctx, u))
+
+			assert.NoError(t, uc.StartPasswordReset(ctx, "reset@example.com"))
+
+			saved, err := r.User.FindByEmail(ctx, "reset@example.com")
+			assert.NoError(t, err)
+			mails := m.Envelopes()
+			if assert.Len(t, mails, 1) {
+				assert.Equal(t, tt.wantSubject, mails[0].Message.Subject())
+				assert.Contains(t, mails[0].Message.Text(), tt.wantText)
+				assert.Contains(t, mails[0].Message.Text(), "https://auth.example.com/?pwd-reset-token="+saved.PasswordReset().Token)
+			}
+		})
+	}
+}
+
 func TestUser_PasswordReset(t *testing.T) {
 	user.DefaultPasswordEncoder = &user.NoopPasswordEncoder{}
 	uid := id.NewUserID()

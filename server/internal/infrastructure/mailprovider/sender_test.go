@@ -13,19 +13,23 @@ import (
 	"github.com/reearth/reearthx/mailer"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"golang.org/x/text/language"
 )
 
 const (
 	address = "someone@example.com"
 	link    = "https://accounts.example/?user-verification-token=SECRET"
-	subject = "email verification"
 )
 
-func envelope(uid id.UserID) mail.Envelope {
-	return mail.Envelope{
-		Message: mail.Raw(mail.KindVerification, subject, "open "+link, `<a href="`+link+`">open</a>`),
-		To:      mail.ToUser(uid, address, "Someone"),
-	}
+func message(t *testing.T) mail.Message {
+	t.Helper()
+	m, err := mail.Render(language.English, mail.VerificationData{UserName: "Someone", ActionURL: link})
+	require.NoError(t, err)
+	return m
+}
+
+func envelope(t *testing.T, uid id.UserID) mail.Envelope {
+	return mail.Envelope{Message: message(t), To: mail.ToUser(uid, address, "Someone")}
 }
 
 func captureLog(t *testing.T) *bytes.Buffer {
@@ -41,15 +45,16 @@ func TestSender_Provider_OneContactPerSend(t *testing.T) {
 	s := &sender{m: m, mode: ModeProvider}
 	uid := id.NewUserID()
 
-	require.NoError(t, s.Send(context.Background(), envelope(uid)))
-	require.NoError(t, s.Send(context.Background(), envelope(uid)))
+	require.NoError(t, s.Send(context.Background(), envelope(t, uid)))
+	require.NoError(t, s.Send(context.Background(), envelope(t, uid)))
 
 	mails := m.Mails()
 	require.Len(t, mails, 2)
 	for _, got := range mails {
 		assert.Equal(t, []mailer.Contact{{Email: address, Name: "Someone"}}, got.To)
-		assert.Equal(t, subject, got.Subject)
-		assert.Equal(t, "open "+link, got.PlainContent)
+		assert.Equal(t, message(t).Subject(), got.Subject)
+		assert.Equal(t, message(t).Text(), got.PlainContent)
+		assert.Equal(t, message(t).HTML(), got.HTMLContent)
 	}
 	assert.True(t, s.Deliverable())
 }
@@ -64,7 +69,7 @@ func TestSender_Provider_ErrorIsSendErrorWithoutAddress(t *testing.T) {
 	cause := errors.New("invalid email " + address)
 	s := &sender{m: failingMailer{err: cause}, mode: ModeProvider}
 
-	err := s.Send(context.Background(), envelope(id.NewUserID()))
+	err := s.Send(context.Background(), envelope(t, id.NewUserID()))
 
 	var se *mail.SendError
 	require.ErrorAs(t, err, &se)
@@ -79,13 +84,13 @@ func TestSender_Drop_LogsKindAndUserOnly(t *testing.T) {
 	s := &sender{mode: ModeDrop, out: &out}
 	uid := id.NewUserID()
 
-	require.NoError(t, s.Send(context.Background(), envelope(uid)))
+	require.NoError(t, s.Send(context.Background(), envelope(t, uid)))
 
 	logged := buf.String()
 	assert.Contains(t, logged, "mail dropped: no provider configured")
 	assert.Contains(t, logged, `"mail_kind": "verification"`)
 	assert.Contains(t, logged, `"user_id": "`+uid.String()+`"`)
-	for _, secret := range []string{address, "Someone", link, subject} {
+	for _, secret := range []string{address, "Someone", link, message(t).Subject()} {
 		assert.NotContains(t, logged, secret)
 	}
 	assert.Empty(t, out.String())
@@ -97,9 +102,9 @@ func TestSender_DevPrint_PrintsTextBody(t *testing.T) {
 	var out bytes.Buffer
 	s := &sender{mode: ModeDevPrint, out: &out}
 
-	require.NoError(t, s.Send(context.Background(), envelope(id.NewUserID())))
+	require.NoError(t, s.Send(context.Background(), envelope(t, id.NewUserID())))
 
-	assert.Equal(t, "open "+link+"\n", out.String())
+	assert.Equal(t, message(t).Text()+"\n", out.String())
 	assert.Contains(t, buf.String(), "mail dropped: no provider configured")
 	assert.NotContains(t, buf.String(), link)
 	assert.False(t, s.Deliverable())

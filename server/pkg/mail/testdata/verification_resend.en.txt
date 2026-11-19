@@ -1,0 +1,4 @@
+Subject: email verification
+
+Please verify your email address by opening the following link:
+https://verify.example.com/?mode=verifyEmail&oobCode=CODE

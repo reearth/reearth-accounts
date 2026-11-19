@@ -1,11 +1,9 @@
 package interactor
 
 import (
-	"bytes"
 	"context"
 	_ "embed"
 	"errors"
-	htmlTmpl "html/template"
 	"slices"
 	"strings"
 	"time"
@@ -37,14 +35,6 @@ type User struct {
 	now                   func() time.Time
 	query                 interfaces.UserQuery
 }
-
-var (
-	passwordResetMailContent = mailContent{
-		Message:     "Thank you for using Re:Earth. We've received a request to reset your password. If this was you, please click the link below to confirm and change your password.",
-		Suffix:      "If you did not mean to reset your password, then you can ignore this email.",
-		ActionLabel: "Confirm to reset your password",
-	}
-)
 
 type UserOption func(*User)
 
@@ -689,25 +679,15 @@ func (i *User) StartPasswordReset(ctx context.Context, email string) error {
 			return err
 		}
 
-		var TextOut, HTMLOut bytes.Buffer
-		link := i.authSrvUIDomain + "/?pwd-reset-token=" + pr.Token
-		content := mailContent{
-			UserName:    u.Name(),
-			ActionURL:   htmlTmpl.URL(link),
-			Message:     passwordResetMailContent.Message,
-			Suffix:      passwordResetMailContent.Suffix,
-			ActionLabel: passwordResetMailContent.ActionLabel,
-		}
-
-		if err = authTextTMPL.Execute(&TextOut, content); err != nil {
+		msg, err := mail.Render(u.Metadata().Lang(), mail.PasswordResetData{
+			UserName:  u.Name(),
+			ActionURL: i.authSrvUIDomain + "/?pwd-reset-token=" + pr.Token,
+		})
+		if err != nil {
 			return err
 		}
-		if err = authHTMLTMPL.Execute(&HTMLOut, content); err != nil {
-			return err
-		}
-
 		envelope = mail.Envelope{
-			Message: mail.Raw(mail.KindPasswordReset, "Password reset", TextOut.String(), HTMLOut.String()),
+			Message: msg,
 			To:      mail.ToUser(u.ID(), u.Email(), u.Name()),
 		}
 

@@ -264,7 +264,7 @@ func TestUser_Signup(t *testing.T) {
 				Personal(true).
 				MustBuild(),
 			wantMailTo:      mail.ToUser(uid, "aaa@bbb.com", "NAME"),
-			wantMailSubject: "email verification",
+			wantMailSubject: "【Re:Earth】メールアドレスの確認",
 			wantMailContent: "/?user-verification-token=CODECODE",
 			wantError:       nil,
 		},
@@ -379,6 +379,50 @@ func TestUser_Signup(t *testing.T) {
 				assert.Equal(t, tt.wantMailSubject, mails[0].Message.Subject())
 				assert.Equal(t, tt.wantMailTo, mails[0].To)
 				assert.Contains(t, mails[0].Message.Text(), tt.wantMailContent)
+			}
+		})
+	}
+}
+
+func TestUser_Signup_MailLanguage(t *testing.T) {
+	user.DefaultPasswordEncoder = &user.NoopPasswordEncoder{}
+	defer user.MockGenerateVerificationCode("CODECODE")()
+
+	tests := []struct {
+		name        string
+		lang        *language.Tag
+		wantSubject string
+		wantText    string
+	}{
+		{"ja", &language.Japanese, "【Re:Earth】メールアドレスの確認", "メールアドレスを確認してください"},
+		{"ja-JP", lo.ToPtr(language.MustParse("ja-JP")), "【Re:Earth】メールアドレスの確認", "メールアドレスを確認してください"},
+		{"en", &language.English, "email verification", "Please verify your email address"},
+		{"no lang", nil, "email verification", "Please verify your email address"},
+		{"fr", &language.French, "email verification", "Please verify your email address"},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			ctx := context.Background()
+			r := accountmemory.New()
+			assert.NoError(t, r.Role.Save(ctx, *role.New().NewID().Name(interfaces.RoleSelf).MustBuild()))
+			assert.NoError(t, r.Role.Save(ctx, *role.New().NewID().Name(role.RoleOwner.String()).MustBuild()))
+
+			m := &mailprovider.Mock{}
+			uc := NewUser(r, &gateway.Container{Mail: m}, nil, "", "https://auth.example.com")
+			_, err := uc.Signup(ctx, interfaces.SignupParam{
+				Email:    "lang@example.com",
+				Lang:     tt.lang,
+				Name:     "NAME",
+				Password: "PAss00!!",
+			})
+			assert.NoError(t, err)
+
+			mails := m.Envelopes()
+			if assert.Len(t, mails, 1) {
+				assert.Equal(t, tt.wantSubject, mails[0].Message.Subject())
+				assert.Contains(t, mails[0].Message.Text(), tt.wantText)
+				assert.Contains(t, mails[0].Message.Text(), "https://auth.example.com/?user-verification-token=CODECODE")
+				assert.Contains(t, mails[0].Message.HTML(), `href="https://auth.example.com/?user-verification-token=CODECODE"`)
 			}
 		})
 	}
@@ -768,6 +812,7 @@ type mockAuthenticator struct {
 	resendVerificationEmailCalled bool
 	resendVerificationEmailUserID string
 	resendVerificationAccountUser id.UserID
+	resendVerificationLang        language.Tag
 	resendVerificationEmailError  error
 	updateUserCalled              bool
 	updateUserParam               gateway.AuthenticatorUpdateUserParam
@@ -811,6 +856,7 @@ func (m *mockAuthenticator) ResendVerificationEmail(ctx context.Context, target 
 	m.resendVerificationEmailCalled = true
 	m.resendVerificationEmailUserID = target.Sub
 	m.resendVerificationAccountUser = target.UserID
+	m.resendVerificationLang = target.Lang
 	return m.resendVerificationEmailError
 }
 
@@ -993,6 +1039,7 @@ func TestUser_CreateVerification(t *testing.T) {
 				saved, err := r.User.FindByEmail(ctx, tt.email)
 				assert.NoError(t, err)
 				assert.Equal(t, saved.ID(), auth.resendVerificationAccountUser, "accounts user ID mismatch")
+				assert.Equal(t, saved.Metadata().Lang(), auth.resendVerificationLang, "user lang mismatch")
 			}
 		})
 	}
@@ -1189,6 +1236,7 @@ func TestUser_SyncSSOUser(t *testing.T) {
 		uc := NewUser(r, g, nil, "", "")
 		u, err := uc.SyncSSOUser(ctx, interfaces.SyncSSOUserParam{
 			Email: "sso4@example.com",
+			Lang:  &language.Japanese,
 			Name:  "SSO User 4",
 			Sub:   "samlp|org123|idp111",
 		})
@@ -1198,6 +1246,7 @@ func TestUser_SyncSSOUser(t *testing.T) {
 		assert.True(t, auth0Mock.resendVerificationEmailCalled)
 		assert.Equal(t, "samlp|org123|idp111", auth0Mock.resendVerificationEmailUserID)
 		assert.Equal(t, u.ID(), auth0Mock.resendVerificationAccountUser)
+		assert.Equal(t, language.Japanese, auth0Mock.resendVerificationLang)
 	})
 
 	t.Run("succeeds even when auth0 ResendVerificationEmail fails (best-effort)", func(t *testing.T) {
