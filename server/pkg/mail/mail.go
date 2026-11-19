@@ -47,6 +47,8 @@ type Envelope struct {
 // the recipient address; the cause stays reachable through Unwrap.
 type SendError struct {
 	Err error
+	// Permanent means a retry cannot succeed.
+	Permanent bool
 }
 
 func (e *SendError) Error() string { return "mail: send failed" }

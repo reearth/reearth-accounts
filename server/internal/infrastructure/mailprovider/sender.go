@@ -37,10 +37,12 @@ func (s *sender) Send(ctx context.Context, e mail.Envelope) error {
 	to := []mailer.Contact{{Email: e.To.Address(), Name: e.To.Name()}}
 	if err := s.m.SendMail(ctx, to, e.Message.Subject(), e.Message.Text(), e.Message.HTML()); err != nil {
 		applog.Warn(ctx, "mail send failed", logFields(e)...)
-		return &mail.SendError{Err: err}
+		return &mail.SendError{Err: err, Permanent: permanent(err)}
 	}
 	return nil
 }
+
+func (s *sender) Deliverable() bool { return s.mode == ModeProvider }
 
 func (s *sender) drop(ctx context.Context, e mail.Envelope) {
 	applog.Warn(ctx, "mail dropped: no provider configured", logFields(e)...)
@@ -48,6 +50,11 @@ func (s *sender) drop(ctx context.Context, e mail.Envelope) {
 		_, _ = fmt.Fprintln(s.out, e.Message.Text())
 	}
 }
+
+// permanent is the one place that tells a permanent provider error from a
+// transient one. reearthx returns no typed errors yet, so every error is
+// treated as transient.
+func permanent(error) bool { return false }
 
 func logFields(e mail.Envelope) []applog.Field {
 	fields := []applog.Field{applog.MailKind(e.Message.Kind())}

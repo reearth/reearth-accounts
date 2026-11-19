@@ -10,6 +10,7 @@ import (
 	"github.com/reearth/reearth-accounts/server/internal/adapter/http/handlers"
 	httpinternal "github.com/reearth/reearth-accounts/server/internal/adapter/http/internal"
 	"github.com/reearth/reearth-accounts/server/internal/adapter/ratelimit"
+	"github.com/reearth/reearth-accounts/server/internal/usecase/maintenance"
 	echoSwagger "github.com/swaggo/echo-swagger"
 )
 
@@ -40,6 +41,10 @@ type RouterConfig struct {
 	// Debug enables serving /swagger without credentials (debug/dev only); in
 	// production Swagger is served only when basic-auth credentials are configured.
 	Debug bool
+	// Maintenance runs the passes POST /api/maintenance/run starts. Nil or a
+	// zero MaintenanceKey turns the route off.
+	Maintenance    *maintenance.Runner
+	MaintenanceKey maintenance.Key
 }
 
 // RegisterRESTRouter mounts all /api/* REST routes additively. It MUST be called after
@@ -170,6 +175,14 @@ func RegisterRESTRouter(e *echo.Echo, cfg RouterConfig) {
 
 	// No user or service auth: the HMAC signature is the only check.
 	api.POST("/policies/webhook", polh.Webhook)
+
+	// --- Maintenance ---
+	// No user or service auth: the maintenance key is the only check.
+	var passes handlers.PassRunner
+	if cfg.Maintenance != nil {
+		passes = cfg.Maintenance
+	}
+	api.POST("/maintenance/run", handlers.NewMaintenanceHandler(cfg.MaintenanceKey, passes).Run)
 
 	// --- Swagger ---
 	// Basic-auth protected when credentials are configured (served in any environment);

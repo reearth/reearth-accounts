@@ -90,6 +90,7 @@ func TestConfig_Print_MasksSecrets(t *testing.T) {
 		SignupSecret:        "signup-secret-value",
 		SyncSSOAPIKey:       "sync-sso-api-key-value",
 		PolicyWebhookSecret: "policy-webhook-secret-value",
+		MaintenanceKey:      "maintenance-key-value",
 		Auth0: Auth0Config{
 			ClientSecret: "auth0-client-secret-value",
 		},
@@ -115,6 +116,7 @@ func TestConfig_Print_MasksSecrets(t *testing.T) {
 		"sendgrid-api-key-value",
 		"policy-webhook-secret-value",
 		"cloudflare-token-value",
+		"maintenance-key-value",
 	} {
 		assert.NotContains(t, got, secret)
 	}
@@ -206,4 +208,45 @@ func TestReadConfig_UserLookupLimit(t *testing.T) {
 	require.NoError(t, err)
 	assert.True(t, c.UserLookupLimit.Enforce)
 	assert.Equal(t, 30, c.UserLookupLimit.PerMinute)
+}
+
+func TestReadConfig_Maintenance(t *testing.T) {
+	t.Setenv("SKIP_DOTENV", "1")
+
+	c, err := ReadConfig(false)
+	require.NoError(t, err)
+	assert.Equal(t, 30*time.Second, c.MaintenanceInterval)
+	assert.Empty(t, c.MaintenanceKey)
+	mc := c.Maintenance()
+	assert.Equal(t, 10*time.Minute, mc.Lease)
+	assert.Equal(t, 2.0, mc.Rate)
+	assert.Equal(t, 5, mc.Retry.MaxAttempts)
+	assert.Equal(t, 720*time.Hour, mc.TTL)
+
+	t.Setenv("REEARTH_ACCOUNTS_MAINTENANCE_INTERVAL", "0")
+	t.Setenv("REEARTH_ACCOUNTS_MAINTENANCE_KEY", "k")
+	t.Setenv("REEARTH_ACCOUNTS_MAILER_RATE", "0.5")
+	t.Setenv("REEARTH_ACCOUNTS_MAILER_MAX_ATTEMPTS", "3")
+	t.Setenv("REEARTH_ACCOUNTS_MAILER_OUTBOX_TTL", "48h")
+	c, err = ReadConfig(false)
+	require.NoError(t, err)
+	assert.Zero(t, c.MaintenanceInterval, "0 turns the loop off")
+	assert.Equal(t, "k", c.MaintenanceKey)
+	mc = c.Maintenance()
+	assert.Equal(t, 0.5, mc.Rate)
+	assert.Equal(t, 3, mc.Retry.MaxAttempts)
+	assert.Equal(t, 48*time.Hour, mc.TTL)
+
+	for env, value := range map[string]string{
+		"REEARTH_ACCOUNTS_MAINTENANCE_INTERVAL": "-1s",
+		"REEARTH_ACCOUNTS_MAILER_RATE":          "0",
+		"REEARTH_ACCOUNTS_MAILER_MAX_ATTEMPTS":  "0",
+		"REEARTH_ACCOUNTS_MAILER_OUTBOX_TTL":    "0s",
+	} {
+		t.Run(env, func(t *testing.T) {
+			t.Setenv(env, value)
+			_, err := ReadConfig(false)
+			assert.ErrorContains(t, err, env)
+		})
+	}
 }

@@ -70,6 +70,7 @@ func Run(t *testing.T, nc Factory) {
 	runLegal(t, nc)
 	runPolicyAcceptance(t, nc)
 	runOutbox(t, nc)
+	runMaintenance(t, nc)
 }
 
 func newUser(t *testing.T, name, email string) *user.User {

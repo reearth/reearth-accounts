@@ -73,6 +73,9 @@ func Enforced(v bool) Field   { return field("enforced", v) }
 
 func MailKind(v mail.Kind) Field { return field("mail_kind", v) }
 
+// Pass holds the counts of one maintenance pass.
+func Pass(v any) Field { return field("pass", v) }
+
 // Outcomes and counters.
 
 func Path(v string) Field   { return field("path", v) }
