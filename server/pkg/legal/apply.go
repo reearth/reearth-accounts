@@ -64,7 +64,7 @@ func backoff(ctx context.Context, attempt int) error {
 	if attempt == 0 {
 		return nil
 	}
-	t := time.NewTimer(rand.N(time.Duration(min(1<<attempt, 128)) * time.Millisecond))
+	t := time.NewTimer(rand.N(time.Duration(1<<min(attempt, 7)) * time.Millisecond))
 	defer t.Stop()
 	select {
 	case <-ctx.Done():
