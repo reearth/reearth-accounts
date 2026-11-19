@@ -902,6 +902,94 @@ const docTemplate = `{
                 }
             }
         },
+        "/api/users/me/policies": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Every list is empty when REEARTH_ACCOUNTS_POLICY_WEBHOOK_SECRET is unset.",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "User"
+                ],
+                "summary": "Get the current user's policy acceptances, pending policies and upcoming policies",
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/httpmodel.MyPoliciesResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/internal.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/api/users/me/policies/accept": {
+            "post": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Each version must be the current or upcoming version of its type. Accepting a version the user already holds, or a lower one, records nothing. Returns 404 when REEARTH_ACCOUNTS_POLICY_WEBHOOK_SECRET is unset.",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "User"
+                ],
+                "summary": "Accept policy versions for the current user",
+                "parameters": [
+                    {
+                        "description": "versions to accept",
+                        "name": "body",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/httpmodel.AcceptPoliciesRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/httpmodel.MyPoliciesResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "unknown type, or a version that is neither current nor upcoming",
+                        "schema": {
+                            "$ref": "#/definitions/internal.ErrorResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/internal.ErrorResponse"
+                        }
+                    },
+                    "404": {
+                        "description": "policies not configured",
+                        "schema": {
+                            "$ref": "#/definitions/internal.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
         "/api/users/password-reset": {
             "post": {
                 "consumes": [
@@ -2254,6 +2342,20 @@ const docTemplate = `{
         }
     },
     "definitions": {
+        "httpmodel.AcceptPoliciesRequest": {
+            "type": "object",
+            "required": [
+                "policies"
+            ],
+            "properties": {
+                "policies": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/httpmodel.PolicyRefRequest"
+                    }
+                }
+            }
+        },
         "httpmodel.AddIntegrationRequest": {
             "type": "object",
             "required": [
@@ -2521,6 +2623,29 @@ const docTemplate = `{
                 }
             }
         },
+        "httpmodel.MyPoliciesResponse": {
+            "type": "object",
+            "properties": {
+                "acceptances": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/httpmodel.PolicyAcceptanceResponse"
+                    }
+                },
+                "pending": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/httpmodel.PolicyVersionResponse"
+                    }
+                },
+                "upcoming": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/httpmodel.PolicyVersionResponse"
+                    }
+                }
+            }
+        },
         "httpmodel.PasswordResetRequest": {
             "type": "object",
             "required": [
@@ -2532,6 +2657,58 @@ const docTemplate = `{
                     "type": "string"
                 },
                 "token": {
+                    "type": "string"
+                }
+            }
+        },
+        "httpmodel.PolicyAcceptanceResponse": {
+            "type": "object",
+            "properties": {
+                "acceptedAt": {
+                    "type": "string"
+                },
+                "type": {
+                    "type": "string"
+                },
+                "version": {
+                    "type": "string"
+                }
+            }
+        },
+        "httpmodel.PolicyRefRequest": {
+            "type": "object",
+            "required": [
+                "type",
+                "version"
+            ],
+            "properties": {
+                "type": {
+                    "type": "string"
+                },
+                "version": {
+                    "type": "string"
+                }
+            }
+        },
+        "httpmodel.PolicyVersionResponse": {
+            "type": "object",
+            "properties": {
+                "effectiveDate": {
+                    "type": "string"
+                },
+                "required": {
+                    "type": "boolean"
+                },
+                "title": {
+                    "type": "string"
+                },
+                "type": {
+                    "type": "string"
+                },
+                "url": {
+                    "type": "string"
+                },
+                "version": {
                     "type": "string"
                 }
             }

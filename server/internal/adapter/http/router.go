@@ -56,7 +56,7 @@ func RegisterRESTRouter(e *echo.Echo, cfg RouterConfig) {
 		prev(err, c)
 	}
 
-	base := []echo.MiddlewareFunc{}
+	base := []echo.MiddlewareFunc{AttachClient}
 	if cfg.JWTMiddleware != nil {
 		// Wrap so requests bearing the M2M API key skip JWT validation and reach
 		// APIKeyOrAuth (the API key is not a JWT, so the validator would otherwise
@@ -95,6 +95,9 @@ func RegisterRESTRouter(e *echo.Echo, cfg RouterConfig) {
 	api.POST("/users/me/mfa", uh.EnableMFA, userOnly)
 	api.DELETE("/users/me/mfa", uh.DisableMFA, userOnly)
 	api.POST("/users/me/mfa/recovery-code", uh.RegenerateMFARecoveryCode, userOnly)
+	polh := handlers.NewPolicyHandler()
+	api.GET("/users/me/policies", polh.GetMyPolicies, userOnly)
+	api.POST("/users/me/policies/accept", polh.AcceptMyPolicies, userOnly)
 	api.GET("/users/search", uh.Search, userOnly, lookup)
 	api.GET("/users/by-alias", uh.FindByAlias, userOnly, lookup)
 	api.GET("/users/by-name-or-email", uh.FindByNameOrEmail, userOnly, lookup)
@@ -167,7 +170,6 @@ func RegisterRESTRouter(e *echo.Echo, cfg RouterConfig) {
 
 	// --- Policies ---
 	// No user or service auth: the HMAC signature is the only check.
-	polh := handlers.NewPolicyHandler()
 	api.POST("/policies/webhook", polh.Webhook)
 
 	// --- Swagger ---

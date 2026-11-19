@@ -18,7 +18,7 @@ import (
 )
 
 // userDataTypes carry user data, so every field must declare @visibility.
-var userDataTypes = []string{"User", "Me", "UserMetadata", "Verification", "WorkspaceUserMember", "PublicWorkspaceMember"}
+var userDataTypes = []string{"User", "Me", "UserMetadata", "Verification", "WorkspaceUserMember", "PublicWorkspaceMember", "PolicyAcceptance"}
 
 func TestSchema_UserDataFieldsDeclareVisibility(t *testing.T) {
 	s := NewExecutableSchema(Config{}).Schema()

@@ -1,0 +1,40 @@
+type AcceptPoliciesPayload {
+  me: Me!
+}
+
+type PolicyAcceptance {
+  acceptedAt: DateTime! @visibility(level: SELF)
+  type: String! @visibility(level: SELF)
+  version: String! @visibility(level: SELF)
+}
+
+input PolicyAcceptanceInput {
+  type: String!
+  version: String!
+}
+
+"""
+One version of a legal policy. title and url are in the viewer's language,
+with English as the fallback.
+"""
+type PolicyVersion {
+  effectiveDate: DateTime!
+  required: Boolean!
+  title: String!
+  type: String!
+  url: String
+  version: String!
+}
+
+extend type Me {
+  "The user's highest accepted version per type."
+  policyAcceptances: [PolicyAcceptance!]! @visibility(level: SELF)
+  "Current versions the user must accept. Empty when policies are not configured."
+  pendingPolicies: [PolicyVersion!]! @visibility(level: SELF)
+  "Versions that take effect later, one per type."
+  upcomingPolicies: [PolicyVersion!]! @visibility(level: SELF)
+}
+
+extend type Mutation {
+  acceptPolicies(input: [PolicyAcceptanceInput!]!): AcceptPoliciesPayload
+}

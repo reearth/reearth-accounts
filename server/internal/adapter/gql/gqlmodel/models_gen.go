@@ -19,6 +19,10 @@ type WorkspaceMember interface {
 	IsWorkspaceMember()
 }
 
+type AcceptPoliciesPayload struct {
+	Me *Me `json:"me"`
+}
+
 type AddIntegrationToWorkspaceInput struct {
 	WorkspaceID   ID   `json:"workspaceId"`
 	IntegrationID ID   `json:"integrationId"`
@@ -125,6 +129,12 @@ type Me struct {
 	MyWorkspaceID  ID            `json:"myWorkspaceId"`
 	Auths          []string      `json:"auths"`
 	MyWorkspace    *Workspace    `json:"myWorkspace"`
+	// The user's highest accepted version per type.
+	PolicyAcceptances []*PolicyAcceptance `json:"policyAcceptances"`
+	// Current versions the user must accept. Empty when policies are not configured.
+	PendingPolicies []*PolicyVersion `json:"pendingPolicies"`
+	// Versions that take effect later, one per type.
+	UpcomingPolicies []*PolicyVersion `json:"upcomingPolicies"`
 }
 
 type MemberInput struct {
@@ -143,6 +153,28 @@ type Pagination struct {
 type PasswordResetInput struct {
 	Password string `json:"password"`
 	Token    string `json:"token"`
+}
+
+type PolicyAcceptance struct {
+	AcceptedAt time.Time `json:"acceptedAt"`
+	Type       string    `json:"type"`
+	Version    string    `json:"version"`
+}
+
+type PolicyAcceptanceInput struct {
+	Type    string `json:"type"`
+	Version string `json:"version"`
+}
+
+// One version of a legal policy. title and url are in the viewer's language,
+// with English as the fallback.
+type PolicyVersion struct {
+	EffectiveDate time.Time `json:"effectiveDate"`
+	Required      bool      `json:"required"`
+	Title         string    `json:"title"`
+	Type          string    `json:"type"`
+	URL           *string   `json:"url,omitempty"`
+	Version       string    `json:"version"`
 }
 
 // A workspace as an anonymous caller may see it. It leaves out member roles,

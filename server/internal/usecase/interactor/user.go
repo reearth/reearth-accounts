@@ -530,6 +530,10 @@ func (i *User) DeleteMe(ctx context.Context, userID user.ID, operator *workspace
 			return err
 		}
 
+		if err := i.repos.PolicyAcceptance.RemoveByUser(ctx, u.ID()); err != nil {
+			return err
+		}
+
 		// Delete user
 		if err := i.repos.User.Remove(ctx, u.ID()); err != nil {
 			return err

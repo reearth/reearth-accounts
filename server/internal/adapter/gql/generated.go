@@ -51,6 +51,10 @@ type DirectiveRoot struct {
 }
 
 type ComplexityRoot struct {
+	AcceptPoliciesPayload struct {
+		Me func(childComplexity int) int
+	}
+
 	AddUsersToWorkspacePayload struct {
 		Workspace func(childComplexity int) int
 	}
@@ -95,19 +99,23 @@ type ComplexityRoot struct {
 	}
 
 	Me struct {
-		Alias          func(childComplexity int) int
-		Auths          func(childComplexity int) int
-		Email          func(childComplexity int) int
-		Host           func(childComplexity int) int
-		ID             func(childComplexity int) int
-		LatestLogoutAt func(childComplexity int) int
-		Metadata       func(childComplexity int) int
-		MyWorkspace    func(childComplexity int) int
-		MyWorkspaceID  func(childComplexity int) int
-		Name           func(childComplexity int) int
+		Alias             func(childComplexity int) int
+		Auths             func(childComplexity int) int
+		Email             func(childComplexity int) int
+		Host              func(childComplexity int) int
+		ID                func(childComplexity int) int
+		LatestLogoutAt    func(childComplexity int) int
+		Metadata          func(childComplexity int) int
+		MyWorkspace       func(childComplexity int) int
+		MyWorkspaceID     func(childComplexity int) int
+		Name              func(childComplexity int) int
+		PendingPolicies   func(childComplexity int) int
+		PolicyAcceptances func(childComplexity int) int
+		UpcomingPolicies  func(childComplexity int) int
 	}
 
 	Mutation struct {
+		AcceptPolicies                   func(childComplexity int, input []*gqlmodel.PolicyAcceptanceInput) int
 		AddIntegrationToWorkspace        func(childComplexity int, input gqlmodel.AddIntegrationToWorkspaceInput) int
 		AddUsersToWorkspace              func(childComplexity int, input gqlmodel.AddUsersToWorkspaceInput) int
 		CreateVerification               func(childComplexity int, input gqlmodel.CreateVerificationInput) int
@@ -134,6 +142,21 @@ type ComplexityRoot struct {
 		UpdateUserOfWorkspace            func(childComplexity int, input gqlmodel.UpdateUserOfWorkspaceInput) int
 		UpdateWorkspace                  func(childComplexity int, input gqlmodel.UpdateWorkspaceInput) int
 		VerifyUser                       func(childComplexity int, input gqlmodel.VerifyUserInput) int
+	}
+
+	PolicyAcceptance struct {
+		AcceptedAt func(childComplexity int) int
+		Type       func(childComplexity int) int
+		Version    func(childComplexity int) int
+	}
+
+	PolicyVersion struct {
+		EffectiveDate func(childComplexity int) int
+		Required      func(childComplexity int) int
+		Title         func(childComplexity int) int
+		Type          func(childComplexity int) int
+		URL           func(childComplexity int) int
+		Version       func(childComplexity int) int
 	}
 
 	PublicWorkspace struct {
@@ -270,8 +293,12 @@ type ComplexityRoot struct {
 
 type MeResolver interface {
 	MyWorkspace(ctx context.Context, obj *gqlmodel.Me) (*gqlmodel.Workspace, error)
+	PolicyAcceptances(ctx context.Context, obj *gqlmodel.Me) ([]*gqlmodel.PolicyAcceptance, error)
+	PendingPolicies(ctx context.Context, obj *gqlmodel.Me) ([]*gqlmodel.PolicyVersion, error)
+	UpcomingPolicies(ctx context.Context, obj *gqlmodel.Me) ([]*gqlmodel.PolicyVersion, error)
 }
 type MutationResolver interface {
+	AcceptPolicies(ctx context.Context, input []*gqlmodel.PolicyAcceptanceInput) (*gqlmodel.AcceptPoliciesPayload, error)
 	CreateVerification(ctx context.Context, input gqlmodel.CreateVerificationInput) (*bool, error)
 	DeleteMe(ctx context.Context, input gqlmodel.DeleteMeInput) (*gqlmodel.DeleteMePayload, error)
 	DisableMfa(ctx context.Context) (bool, error)
@@ -346,6 +373,13 @@ func (e *executableSchema) Complexity(ctx context.Context, typeName, field strin
 	ec := executionContext{nil, e, 0, 0, nil}
 	_ = ec
 	switch typeName + "." + field {
+
+	case "AcceptPoliciesPayload.me":
+		if e.complexity.AcceptPoliciesPayload.Me == nil {
+			break
+		}
+
+		return e.complexity.AcceptPoliciesPayload.Me(childComplexity), true
 
 	case "AddUsersToWorkspacePayload.workspace":
 		if e.complexity.AddUsersToWorkspacePayload.Workspace == nil {
@@ -512,7 +546,36 @@ func (e *executableSchema) Complexity(ctx context.Context, typeName, field strin
 		}
 
 		return e.complexity.Me.Name(childComplexity), true
+	case "Me.pendingPolicies":
+		if e.complexity.Me.PendingPolicies == nil {
+			break
+		}
 
+		return e.complexity.Me.PendingPolicies(childComplexity), true
+	case "Me.policyAcceptances":
+		if e.complexity.Me.PolicyAcceptances == nil {
+			break
+		}
+
+		return e.complexity.Me.PolicyAcceptances(childComplexity), true
+	case "Me.upcomingPolicies":
+		if e.complexity.Me.UpcomingPolicies == nil {
+			break
+		}
+
+		return e.complexity.Me.UpcomingPolicies(childComplexity), true
+
+	case "Mutation.acceptPolicies":
+		if e.complexity.Mutation.AcceptPolicies == nil {
+			break
+		}
+
+		args, err := ec.field_Mutation_acceptPolicies_args(ctx, rawArgs)
+		if err != nil {
+			return 0, false
+		}
+
+		return e.complexity.Mutation.AcceptPolicies(childComplexity, args["input"].([]*gqlmodel.PolicyAcceptanceInput)), true
 	case "Mutation.addIntegrationToWorkspace":
 		if e.complexity.Mutation.AddIntegrationToWorkspace == nil {
 			break
@@ -779,6 +842,62 @@ func (e *executableSchema) Complexity(ctx context.Context, typeName, field strin
 		}
 
 		return e.complexity.Mutation.VerifyUser(childComplexity, args["input"].(gqlmodel.VerifyUserInput)), true
+
+	case "PolicyAcceptance.acceptedAt":
+		if e.complexity.PolicyAcceptance.AcceptedAt == nil {
+			break
+		}
+
+		return e.complexity.PolicyAcceptance.AcceptedAt(childComplexity), true
+	case "PolicyAcceptance.type":
+		if e.complexity.PolicyAcceptance.Type == nil {
+			break
+		}
+
+		return e.complexity.PolicyAcceptance.Type(childComplexity), true
+	case "PolicyAcceptance.version":
+		if e.complexity.PolicyAcceptance.Version == nil {
+			break
+		}
+
+		return e.complexity.PolicyAcceptance.Version(childComplexity), true
+
+	case "PolicyVersion.effectiveDate":
+		if e.complexity.PolicyVersion.EffectiveDate == nil {
+			break
+		}
+
+		return e.complexity.PolicyVersion.EffectiveDate(childComplexity), true
+	case "PolicyVersion.required":
+		if e.complexity.PolicyVersion.Required == nil {
+			break
+		}
+
+		return e.complexity.PolicyVersion.Required(childComplexity), true
+	case "PolicyVersion.title":
+		if e.complexity.PolicyVersion.Title == nil {
+			break
+		}
+
+		return e.complexity.PolicyVersion.Title(childComplexity), true
+	case "PolicyVersion.type":
+		if e.complexity.PolicyVersion.Type == nil {
+			break
+		}
+
+		return e.complexity.PolicyVersion.Type(childComplexity), true
+	case "PolicyVersion.url":
+		if e.complexity.PolicyVersion.URL == nil {
+			break
+		}
+
+		return e.complexity.PolicyVersion.URL(childComplexity), true
+	case "PolicyVersion.version":
+		if e.complexity.PolicyVersion.Version == nil {
+			break
+		}
+
+		return e.complexity.PolicyVersion.Version(childComplexity), true
 
 	case "PublicWorkspace.alias":
 		if e.complexity.PublicWorkspace.Alias == nil {
@@ -1347,6 +1466,7 @@ func (e *executableSchema) Exec(ctx context.Context) graphql.ResponseHandler {
 		ec.unmarshalInputMemberInput,
 		ec.unmarshalInputPagination,
 		ec.unmarshalInputPasswordResetInput,
+		ec.unmarshalInputPolicyAcceptanceInput,
 		ec.unmarshalInputRemoveIntegrationFromWorkspaceInput,
 		ec.unmarshalInputRemoveIntegrationsFromWorkspaceInput,
 		ec.unmarshalInputRemoveMultipleUsersFromWorkspaceInput,
@@ -1562,6 +1682,47 @@ type CheckPermissionPayload {
 
 extend type Query {
   checkPermission(input: CheckPermissionInput!): CheckPermissionPayload
+}
+`, BuiltIn: false},
+	{Name: "../../../schemas/policy.graphql", Input: `type AcceptPoliciesPayload {
+  me: Me!
+}
+
+type PolicyAcceptance {
+  acceptedAt: DateTime! @visibility(level: SELF)
+  type: String! @visibility(level: SELF)
+  version: String! @visibility(level: SELF)
+}
+
+input PolicyAcceptanceInput {
+  type: String!
+  version: String!
+}
+
+"""
+One version of a legal policy. title and url are in the viewer's language,
+with English as the fallback.
+"""
+type PolicyVersion {
+  effectiveDate: DateTime!
+  required: Boolean!
+  title: String!
+  type: String!
+  url: String
+  version: String!
+}
+
+extend type Me {
+  "The user's highest accepted version per type."
+  policyAcceptances: [PolicyAcceptance!]! @visibility(level: SELF)
+  "Current versions the user must accept. Empty when policies are not configured."
+  pendingPolicies: [PolicyVersion!]! @visibility(level: SELF)
+  "Versions that take effect later, one per type."
+  upcomingPolicies: [PolicyVersion!]! @visibility(level: SELF)
+}
+
+extend type Mutation {
+  acceptPolicies(input: [PolicyAcceptanceInput!]!): AcceptPoliciesPayload
 }
 `, BuiltIn: false},
 	{Name: "../../../schemas/user.graphql", Input: `type User implements Node {
@@ -1946,6 +2107,17 @@ func (ec *executionContext) dir_visibility_args(ctx context.Context, rawArgs map
 		return nil, err
 	}
 	args["level"] = arg0
+	return args, nil
+}
+
+func (ec *executionContext) field_Mutation_acceptPolicies_args(ctx context.Context, rawArgs map[string]any) (map[string]any, error) {
+	var err error
+	args := map[string]any{}
+	arg0, err := graphql.ProcessArgField(ctx, rawArgs, "input", ec.unmarshalNPolicyAcceptanceInput2ᚕᚖgithubᚗcomᚋreearthᚋreearthᚑaccountsᚋserverᚋinternalᚋadapterᚋgqlᚋgqlmodelᚐPolicyAcceptanceInputᚄ)
+	if err != nil {
+		return nil, err
+	}
+	args["input"] = arg0
 	return args, nil
 }
 
@@ -2470,6 +2642,63 @@ func (ec *executionContext) field___Type_fields_args(ctx context.Context, rawArg
 // endregion ************************** directives.gotpl **************************
 
 // region    **************************** field.gotpl *****************************
+
+func (ec *executionContext) _AcceptPoliciesPayload_me(ctx context.Context, field graphql.CollectedField, obj *gqlmodel.AcceptPoliciesPayload) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		ec.fieldContext_AcceptPoliciesPayload_me,
+		func(ctx context.Context) (any, error) {
+			return obj.Me, nil
+		},
+		nil,
+		ec.marshalNMe2ᚖgithubᚗcomᚋreearthᚋreearthᚑaccountsᚋserverᚋinternalᚋadapterᚋgqlᚋgqlmodelᚐMe,
+		true,
+		true,
+	)
+}
+
+func (ec *executionContext) fieldContext_AcceptPoliciesPayload_me(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "AcceptPoliciesPayload",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			switch field.Name {
+			case "id":
+				return ec.fieldContext_Me_id(ctx, field)
+			case "name":
+				return ec.fieldContext_Me_name(ctx, field)
+			case "alias":
+				return ec.fieldContext_Me_alias(ctx, field)
+			case "email":
+				return ec.fieldContext_Me_email(ctx, field)
+			case "metadata":
+				return ec.fieldContext_Me_metadata(ctx, field)
+			case "host":
+				return ec.fieldContext_Me_host(ctx, field)
+			case "latestLogoutAt":
+				return ec.fieldContext_Me_latestLogoutAt(ctx, field)
+			case "myWorkspaceId":
+				return ec.fieldContext_Me_myWorkspaceId(ctx, field)
+			case "auths":
+				return ec.fieldContext_Me_auths(ctx, field)
+			case "myWorkspace":
+				return ec.fieldContext_Me_myWorkspace(ctx, field)
+			case "policyAcceptances":
+				return ec.fieldContext_Me_policyAcceptances(ctx, field)
+			case "pendingPolicies":
+				return ec.fieldContext_Me_pendingPolicies(ctx, field)
+			case "upcomingPolicies":
+				return ec.fieldContext_Me_upcomingPolicies(ctx, field)
+			}
+			return nil, fmt.Errorf("no field named %q was found under type Me", field.Name)
+		},
+	}
+	return fc, nil
+}
 
 func (ec *executionContext) _AddUsersToWorkspacePayload_workspace(ctx context.Context, field graphql.CollectedField, obj *gqlmodel.AddUsersToWorkspacePayload) (ret graphql.Marshaler) {
 	return graphql.ResolveField(
@@ -3459,6 +3688,228 @@ func (ec *executionContext) fieldContext_Me_myWorkspace(_ context.Context, field
 	return fc, nil
 }
 
+func (ec *executionContext) _Me_policyAcceptances(ctx context.Context, field graphql.CollectedField, obj *gqlmodel.Me) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		ec.fieldContext_Me_policyAcceptances,
+		func(ctx context.Context) (any, error) {
+			return ec.resolvers.Me().PolicyAcceptances(ctx, obj)
+		},
+		func(ctx context.Context, next graphql.Resolver) graphql.Resolver {
+			directive0 := next
+
+			directive1 := func(ctx context.Context) (any, error) {
+				level, err := ec.unmarshalNVisibilityLevel2githubᚗcomᚋreearthᚋreearthᚑaccountsᚋserverᚋinternalᚋadapterᚋgqlᚋgqlmodelᚐVisibilityLevel(ctx, "SELF")
+				if err != nil {
+					var zeroVal []*gqlmodel.PolicyAcceptance
+					return zeroVal, err
+				}
+				if ec.directives.Visibility == nil {
+					var zeroVal []*gqlmodel.PolicyAcceptance
+					return zeroVal, errors.New("directive visibility is not implemented")
+				}
+				return ec.directives.Visibility(ctx, obj, directive0, level)
+			}
+
+			next = directive1
+			return next
+		},
+		ec.marshalNPolicyAcceptance2ᚕᚖgithubᚗcomᚋreearthᚋreearthᚑaccountsᚋserverᚋinternalᚋadapterᚋgqlᚋgqlmodelᚐPolicyAcceptanceᚄ,
+		true,
+		true,
+	)
+}
+
+func (ec *executionContext) fieldContext_Me_policyAcceptances(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "Me",
+		Field:      field,
+		IsMethod:   true,
+		IsResolver: true,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			switch field.Name {
+			case "acceptedAt":
+				return ec.fieldContext_PolicyAcceptance_acceptedAt(ctx, field)
+			case "type":
+				return ec.fieldContext_PolicyAcceptance_type(ctx, field)
+			case "version":
+				return ec.fieldContext_PolicyAcceptance_version(ctx, field)
+			}
+			return nil, fmt.Errorf("no field named %q was found under type PolicyAcceptance", field.Name)
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _Me_pendingPolicies(ctx context.Context, field graphql.CollectedField, obj *gqlmodel.Me) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		ec.fieldContext_Me_pendingPolicies,
+		func(ctx context.Context) (any, error) {
+			return ec.resolvers.Me().PendingPolicies(ctx, obj)
+		},
+		func(ctx context.Context, next graphql.Resolver) graphql.Resolver {
+			directive0 := next
+
+			directive1 := func(ctx context.Context) (any, error) {
+				level, err := ec.unmarshalNVisibilityLevel2githubᚗcomᚋreearthᚋreearthᚑaccountsᚋserverᚋinternalᚋadapterᚋgqlᚋgqlmodelᚐVisibilityLevel(ctx, "SELF")
+				if err != nil {
+					var zeroVal []*gqlmodel.PolicyVersion
+					return zeroVal, err
+				}
+				if ec.directives.Visibility == nil {
+					var zeroVal []*gqlmodel.PolicyVersion
+					return zeroVal, errors.New("directive visibility is not implemented")
+				}
+				return ec.directives.Visibility(ctx, obj, directive0, level)
+			}
+
+			next = directive1
+			return next
+		},
+		ec.marshalNPolicyVersion2ᚕᚖgithubᚗcomᚋreearthᚋreearthᚑaccountsᚋserverᚋinternalᚋadapterᚋgqlᚋgqlmodelᚐPolicyVersionᚄ,
+		true,
+		true,
+	)
+}
+
+func (ec *executionContext) fieldContext_Me_pendingPolicies(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "Me",
+		Field:      field,
+		IsMethod:   true,
+		IsResolver: true,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			switch field.Name {
+			case "effectiveDate":
+				return ec.fieldContext_PolicyVersion_effectiveDate(ctx, field)
+			case "required":
+				return ec.fieldContext_PolicyVersion_required(ctx, field)
+			case "title":
+				return ec.fieldContext_PolicyVersion_title(ctx, field)
+			case "type":
+				return ec.fieldContext_PolicyVersion_type(ctx, field)
+			case "url":
+				return ec.fieldContext_PolicyVersion_url(ctx, field)
+			case "version":
+				return ec.fieldContext_PolicyVersion_version(ctx, field)
+			}
+			return nil, fmt.Errorf("no field named %q was found under type PolicyVersion", field.Name)
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _Me_upcomingPolicies(ctx context.Context, field graphql.CollectedField, obj *gqlmodel.Me) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		ec.fieldContext_Me_upcomingPolicies,
+		func(ctx context.Context) (any, error) {
+			return ec.resolvers.Me().UpcomingPolicies(ctx, obj)
+		},
+		func(ctx context.Context, next graphql.Resolver) graphql.Resolver {
+			directive0 := next
+
+			directive1 := func(ctx context.Context) (any, error) {
+				level, err := ec.unmarshalNVisibilityLevel2githubᚗcomᚋreearthᚋreearthᚑaccountsᚋserverᚋinternalᚋadapterᚋgqlᚋgqlmodelᚐVisibilityLevel(ctx, "SELF")
+				if err != nil {
+					var zeroVal []*gqlmodel.PolicyVersion
+					return zeroVal, err
+				}
+				if ec.directives.Visibility == nil {
+					var zeroVal []*gqlmodel.PolicyVersion
+					return zeroVal, errors.New("directive visibility is not implemented")
+				}
+				return ec.directives.Visibility(ctx, obj, directive0, level)
+			}
+
+			next = directive1
+			return next
+		},
+		ec.marshalNPolicyVersion2ᚕᚖgithubᚗcomᚋreearthᚋreearthᚑaccountsᚋserverᚋinternalᚋadapterᚋgqlᚋgqlmodelᚐPolicyVersionᚄ,
+		true,
+		true,
+	)
+}
+
+func (ec *executionContext) fieldContext_Me_upcomingPolicies(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "Me",
+		Field:      field,
+		IsMethod:   true,
+		IsResolver: true,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			switch field.Name {
+			case "effectiveDate":
+				return ec.fieldContext_PolicyVersion_effectiveDate(ctx, field)
+			case "required":
+				return ec.fieldContext_PolicyVersion_required(ctx, field)
+			case "title":
+				return ec.fieldContext_PolicyVersion_title(ctx, field)
+			case "type":
+				return ec.fieldContext_PolicyVersion_type(ctx, field)
+			case "url":
+				return ec.fieldContext_PolicyVersion_url(ctx, field)
+			case "version":
+				return ec.fieldContext_PolicyVersion_version(ctx, field)
+			}
+			return nil, fmt.Errorf("no field named %q was found under type PolicyVersion", field.Name)
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _Mutation_acceptPolicies(ctx context.Context, field graphql.CollectedField) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		ec.fieldContext_Mutation_acceptPolicies,
+		func(ctx context.Context) (any, error) {
+			fc := graphql.GetFieldContext(ctx)
+			return ec.resolvers.Mutation().AcceptPolicies(ctx, fc.Args["input"].([]*gqlmodel.PolicyAcceptanceInput))
+		},
+		nil,
+		ec.marshalOAcceptPoliciesPayload2ᚖgithubᚗcomᚋreearthᚋreearthᚑaccountsᚋserverᚋinternalᚋadapterᚋgqlᚋgqlmodelᚐAcceptPoliciesPayload,
+		true,
+		false,
+	)
+}
+
+func (ec *executionContext) fieldContext_Mutation_acceptPolicies(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "Mutation",
+		Field:      field,
+		IsMethod:   true,
+		IsResolver: true,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			switch field.Name {
+			case "me":
+				return ec.fieldContext_AcceptPoliciesPayload_me(ctx, field)
+			}
+			return nil, fmt.Errorf("no field named %q was found under type AcceptPoliciesPayload", field.Name)
+		},
+	}
+	defer func() {
+		if r := recover(); r != nil {
+			err = ec.Recover(ctx, r)
+			ec.Error(ctx, err)
+		}
+	}()
+	ctx = graphql.WithFieldContext(ctx, fc)
+	if fc.Args, err = ec.field_Mutation_acceptPolicies_args(ctx, field.ArgumentMap(ec.Variables)); err != nil {
+		ec.Error(ctx, err)
+		return fc, err
+	}
+	return fc, nil
+}
+
 func (ec *executionContext) _Mutation_createVerification(ctx context.Context, field graphql.CollectedField) (ret graphql.Marshaler) {
 	return graphql.ResolveField(
 		ctx,
@@ -3696,6 +4147,12 @@ func (ec *executionContext) fieldContext_Mutation_logout(_ context.Context, fiel
 				return ec.fieldContext_Me_auths(ctx, field)
 			case "myWorkspace":
 				return ec.fieldContext_Me_myWorkspace(ctx, field)
+			case "policyAcceptances":
+				return ec.fieldContext_Me_policyAcceptances(ctx, field)
+			case "pendingPolicies":
+				return ec.fieldContext_Me_pendingPolicies(ctx, field)
+			case "upcomingPolicies":
+				return ec.fieldContext_Me_upcomingPolicies(ctx, field)
 			}
 			return nil, fmt.Errorf("no field named %q was found under type Me", field.Name)
 		},
@@ -4583,6 +5040,321 @@ func (ec *executionContext) fieldContext_Mutation_transferWorkspaceOwnership(ctx
 	return fc, nil
 }
 
+func (ec *executionContext) _PolicyAcceptance_acceptedAt(ctx context.Context, field graphql.CollectedField, obj *gqlmodel.PolicyAcceptance) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		ec.fieldContext_PolicyAcceptance_acceptedAt,
+		func(ctx context.Context) (any, error) {
+			return obj.AcceptedAt, nil
+		},
+		func(ctx context.Context, next graphql.Resolver) graphql.Resolver {
+			directive0 := next
+
+			directive1 := func(ctx context.Context) (any, error) {
+				level, err := ec.unmarshalNVisibilityLevel2githubᚗcomᚋreearthᚋreearthᚑaccountsᚋserverᚋinternalᚋadapterᚋgqlᚋgqlmodelᚐVisibilityLevel(ctx, "SELF")
+				if err != nil {
+					var zeroVal time.Time
+					return zeroVal, err
+				}
+				if ec.directives.Visibility == nil {
+					var zeroVal time.Time
+					return zeroVal, errors.New("directive visibility is not implemented")
+				}
+				return ec.directives.Visibility(ctx, obj, directive0, level)
+			}
+
+			next = directive1
+			return next
+		},
+		ec.marshalNDateTime2timeᚐTime,
+		true,
+		true,
+	)
+}
+
+func (ec *executionContext) fieldContext_PolicyAcceptance_acceptedAt(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "PolicyAcceptance",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type DateTime does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _PolicyAcceptance_type(ctx context.Context, field graphql.CollectedField, obj *gqlmodel.PolicyAcceptance) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		ec.fieldContext_PolicyAcceptance_type,
+		func(ctx context.Context) (any, error) {
+			return obj.Type, nil
+		},
+		func(ctx context.Context, next graphql.Resolver) graphql.Resolver {
+			directive0 := next
+
+			directive1 := func(ctx context.Context) (any, error) {
+				level, err := ec.unmarshalNVisibilityLevel2githubᚗcomᚋreearthᚋreearthᚑaccountsᚋserverᚋinternalᚋadapterᚋgqlᚋgqlmodelᚐVisibilityLevel(ctx, "SELF")
+				if err != nil {
+					var zeroVal string
+					return zeroVal, err
+				}
+				if ec.directives.Visibility == nil {
+					var zeroVal string
+					return zeroVal, errors.New("directive visibility is not implemented")
+				}
+				return ec.directives.Visibility(ctx, obj, directive0, level)
+			}
+
+			next = directive1
+			return next
+		},
+		ec.marshalNString2string,
+		true,
+		true,
+	)
+}
+
+func (ec *executionContext) fieldContext_PolicyAcceptance_type(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "PolicyAcceptance",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type String does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _PolicyAcceptance_version(ctx context.Context, field graphql.CollectedField, obj *gqlmodel.PolicyAcceptance) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		ec.fieldContext_PolicyAcceptance_version,
+		func(ctx context.Context) (any, error) {
+			return obj.Version, nil
+		},
+		func(ctx context.Context, next graphql.Resolver) graphql.Resolver {
+			directive0 := next
+
+			directive1 := func(ctx context.Context) (any, error) {
+				level, err := ec.unmarshalNVisibilityLevel2githubᚗcomᚋreearthᚋreearthᚑaccountsᚋserverᚋinternalᚋadapterᚋgqlᚋgqlmodelᚐVisibilityLevel(ctx, "SELF")
+				if err != nil {
+					var zeroVal string
+					return zeroVal, err
+				}
+				if ec.directives.Visibility == nil {
+					var zeroVal string
+					return zeroVal, errors.New("directive visibility is not implemented")
+				}
+				return ec.directives.Visibility(ctx, obj, directive0, level)
+			}
+
+			next = directive1
+			return next
+		},
+		ec.marshalNString2string,
+		true,
+		true,
+	)
+}
+
+func (ec *executionContext) fieldContext_PolicyAcceptance_version(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "PolicyAcceptance",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type String does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _PolicyVersion_effectiveDate(ctx context.Context, field graphql.CollectedField, obj *gqlmodel.PolicyVersion) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		ec.fieldContext_PolicyVersion_effectiveDate,
+		func(ctx context.Context) (any, error) {
+			return obj.EffectiveDate, nil
+		},
+		nil,
+		ec.marshalNDateTime2timeᚐTime,
+		true,
+		true,
+	)
+}
+
+func (ec *executionContext) fieldContext_PolicyVersion_effectiveDate(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "PolicyVersion",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type DateTime does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _PolicyVersion_required(ctx context.Context, field graphql.CollectedField, obj *gqlmodel.PolicyVersion) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		ec.fieldContext_PolicyVersion_required,
+		func(ctx context.Context) (any, error) {
+			return obj.Required, nil
+		},
+		nil,
+		ec.marshalNBoolean2bool,
+		true,
+		true,
+	)
+}
+
+func (ec *executionContext) fieldContext_PolicyVersion_required(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "PolicyVersion",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type Boolean does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _PolicyVersion_title(ctx context.Context, field graphql.CollectedField, obj *gqlmodel.PolicyVersion) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		ec.fieldContext_PolicyVersion_title,
+		func(ctx context.Context) (any, error) {
+			return obj.Title, nil
+		},
+		nil,
+		ec.marshalNString2string,
+		true,
+		true,
+	)
+}
+
+func (ec *executionContext) fieldContext_PolicyVersion_title(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "PolicyVersion",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type String does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _PolicyVersion_type(ctx context.Context, field graphql.CollectedField, obj *gqlmodel.PolicyVersion) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		ec.fieldContext_PolicyVersion_type,
+		func(ctx context.Context) (any, error) {
+			return obj.Type, nil
+		},
+		nil,
+		ec.marshalNString2string,
+		true,
+		true,
+	)
+}
+
+func (ec *executionContext) fieldContext_PolicyVersion_type(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "PolicyVersion",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type String does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _PolicyVersion_url(ctx context.Context, field graphql.CollectedField, obj *gqlmodel.PolicyVersion) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		ec.fieldContext_PolicyVersion_url,
+		func(ctx context.Context) (any, error) {
+			return obj.URL, nil
+		},
+		nil,
+		ec.marshalOString2ᚖstring,
+		true,
+		false,
+	)
+}
+
+func (ec *executionContext) fieldContext_PolicyVersion_url(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "PolicyVersion",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type String does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _PolicyVersion_version(ctx context.Context, field graphql.CollectedField, obj *gqlmodel.PolicyVersion) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		ec.fieldContext_PolicyVersion_version,
+		func(ctx context.Context) (any, error) {
+			return obj.Version, nil
+		},
+		nil,
+		ec.marshalNString2string,
+		true,
+		true,
+	)
+}
+
+func (ec *executionContext) fieldContext_PolicyVersion_version(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "PolicyVersion",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type String does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
 func (ec *executionContext) _PublicWorkspace_id(ctx context.Context, field graphql.CollectedField, obj *gqlmodel.PublicWorkspace) (ret graphql.Marshaler) {
 	return graphql.ResolveField(
 		ctx,
@@ -5235,6 +6007,12 @@ func (ec *executionContext) fieldContext_Query_me(_ context.Context, field graph
 				return ec.fieldContext_Me_auths(ctx, field)
 			case "myWorkspace":
 				return ec.fieldContext_Me_myWorkspace(ctx, field)
+			case "policyAcceptances":
+				return ec.fieldContext_Me_policyAcceptances(ctx, field)
+			case "pendingPolicies":
+				return ec.fieldContext_Me_pendingPolicies(ctx, field)
+			case "upcomingPolicies":
+				return ec.fieldContext_Me_upcomingPolicies(ctx, field)
 			}
 			return nil, fmt.Errorf("no field named %q was found under type Me", field.Name)
 		},
@@ -6173,6 +6951,12 @@ func (ec *executionContext) fieldContext_UpdateMePayload_me(_ context.Context, f
 				return ec.fieldContext_Me_auths(ctx, field)
 			case "myWorkspace":
 				return ec.fieldContext_Me_myWorkspace(ctx, field)
+			case "policyAcceptances":
+				return ec.fieldContext_Me_policyAcceptances(ctx, field)
+			case "pendingPolicies":
+				return ec.fieldContext_Me_pendingPolicies(ctx, field)
+			case "upcomingPolicies":
+				return ec.fieldContext_Me_upcomingPolicies(ctx, field)
 			}
 			return nil, fmt.Errorf("no field named %q was found under type Me", field.Name)
 		},
@@ -9773,6 +10557,40 @@ func (ec *executionContext) unmarshalInputPasswordResetInput(ctx context.Context
 	return it, nil
 }
 
+func (ec *executionContext) unmarshalInputPolicyAcceptanceInput(ctx context.Context, obj any) (gqlmodel.PolicyAcceptanceInput, error) {
+	var it gqlmodel.PolicyAcceptanceInput
+	asMap := map[string]any{}
+	for k, v := range obj.(map[string]any) {
+		asMap[k] = v
+	}
+
+	fieldsInOrder := [...]string{"type", "version"}
+	for _, k := range fieldsInOrder {
+		v, ok := asMap[k]
+		if !ok {
+			continue
+		}
+		switch k {
+		case "type":
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("type"))
+			data, err := ec.unmarshalNString2string(ctx, v)
+			if err != nil {
+				return it, err
+			}
+			it.Type = data
+		case "version":
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("version"))
+			data, err := ec.unmarshalNString2string(ctx, v)
+			if err != nil {
+				return it, err
+			}
+			it.Version = data
+		}
+	}
+
+	return it, nil
+}
+
 func (ec *executionContext) unmarshalInputRemoveIntegrationFromWorkspaceInput(ctx context.Context, obj any) (gqlmodel.RemoveIntegrationFromWorkspaceInput, error) {
 	var it gqlmodel.RemoveIntegrationFromWorkspaceInput
 	asMap := map[string]any{}
@@ -10464,6 +11282,45 @@ func (ec *executionContext) _WorkspaceMember(ctx context.Context, sel ast.Select
 
 // region    **************************** object.gotpl ****************************
 
+var acceptPoliciesPayloadImplementors = []string{"AcceptPoliciesPayload"}
+
+func (ec *executionContext) _AcceptPoliciesPayload(ctx context.Context, sel ast.SelectionSet, obj *gqlmodel.AcceptPoliciesPayload) graphql.Marshaler {
+	fields := graphql.CollectFields(ec.OperationContext, sel, acceptPoliciesPayloadImplementors)
+
+	out := graphql.NewFieldSet(fields)
+	deferred := make(map[string]*graphql.FieldSet)
+	for i, field := range fields {
+		switch field.Name {
+		case "__typename":
+			out.Values[i] = graphql.MarshalString("AcceptPoliciesPayload")
+		case "me":
+			out.Values[i] = ec._AcceptPoliciesPayload_me(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		default:
+			panic("unknown field " + strconv.Quote(field.Name))
+		}
+	}
+	out.Dispatch(ctx)
+	if out.Invalids > 0 {
+		return graphql.Null
+	}
+
+	atomic.AddInt32(&ec.deferred, int32(len(deferred)))
+
+	for label, dfs := range deferred {
+		ec.processDeferredGroup(graphql.DeferredGroup{
+			Label:    label,
+			Path:     graphql.GetPath(ctx),
+			FieldSet: dfs,
+			Context:  ctx,
+		})
+	}
+
+	return out
+}
+
 var addUsersToWorkspacePayloadImplementors = []string{"AddUsersToWorkspacePayload"}
 
 func (ec *executionContext) _AddUsersToWorkspacePayload(ctx context.Context, sel ast.SelectionSet, obj *gqlmodel.AddUsersToWorkspacePayload) graphql.Marshaler {
@@ -10912,6 +11769,114 @@ func (ec *executionContext) _Me(ctx context.Context, sel ast.SelectionSet, obj *
 			}
 
 			out.Concurrently(i, func(ctx context.Context) graphql.Marshaler { return innerFunc(ctx, out) })
+		case "policyAcceptances":
+			field := field
+
+			innerFunc := func(ctx context.Context, fs *graphql.FieldSet) (res graphql.Marshaler) {
+				defer func() {
+					if r := recover(); r != nil {
+						ec.Error(ctx, ec.Recover(ctx, r))
+					}
+				}()
+				res = ec._Me_policyAcceptances(ctx, field, obj)
+				if res == graphql.Null {
+					atomic.AddUint32(&fs.Invalids, 1)
+				}
+				return res
+			}
+
+			if field.Deferrable != nil {
+				dfs, ok := deferred[field.Deferrable.Label]
+				di := 0
+				if ok {
+					dfs.AddField(field)
+					di = len(dfs.Values) - 1
+				} else {
+					dfs = graphql.NewFieldSet([]graphql.CollectedField{field})
+					deferred[field.Deferrable.Label] = dfs
+				}
+				dfs.Concurrently(di, func(ctx context.Context) graphql.Marshaler {
+					return innerFunc(ctx, dfs)
+				})
+
+				// don't run the out.Concurrently() call below
+				out.Values[i] = graphql.Null
+				continue
+			}
+
+			out.Concurrently(i, func(ctx context.Context) graphql.Marshaler { return innerFunc(ctx, out) })
+		case "pendingPolicies":
+			field := field
+
+			innerFunc := func(ctx context.Context, fs *graphql.FieldSet) (res graphql.Marshaler) {
+				defer func() {
+					if r := recover(); r != nil {
+						ec.Error(ctx, ec.Recover(ctx, r))
+					}
+				}()
+				res = ec._Me_pendingPolicies(ctx, field, obj)
+				if res == graphql.Null {
+					atomic.AddUint32(&fs.Invalids, 1)
+				}
+				return res
+			}
+
+			if field.Deferrable != nil {
+				dfs, ok := deferred[field.Deferrable.Label]
+				di := 0
+				if ok {
+					dfs.AddField(field)
+					di = len(dfs.Values) - 1
+				} else {
+					dfs = graphql.NewFieldSet([]graphql.CollectedField{field})
+					deferred[field.Deferrable.Label] = dfs
+				}
+				dfs.Concurrently(di, func(ctx context.Context) graphql.Marshaler {
+					return innerFunc(ctx, dfs)
+				})
+
+				// don't run the out.Concurrently() call below
+				out.Values[i] = graphql.Null
+				continue
+			}
+
+			out.Concurrently(i, func(ctx context.Context) graphql.Marshaler { return innerFunc(ctx, out) })
+		case "upcomingPolicies":
+			field := field
+
+			innerFunc := func(ctx context.Context, fs *graphql.FieldSet) (res graphql.Marshaler) {
+				defer func() {
+					if r := recover(); r != nil {
+						ec.Error(ctx, ec.Recover(ctx, r))
+					}
+				}()
+				res = ec._Me_upcomingPolicies(ctx, field, obj)
+				if res == graphql.Null {
+					atomic.AddUint32(&fs.Invalids, 1)
+				}
+				return res
+			}
+
+			if field.Deferrable != nil {
+				dfs, ok := deferred[field.Deferrable.Label]
+				di := 0
+				if ok {
+					dfs.AddField(field)
+					di = len(dfs.Values) - 1
+				} else {
+					dfs = graphql.NewFieldSet([]graphql.CollectedField{field})
+					deferred[field.Deferrable.Label] = dfs
+				}
+				dfs.Concurrently(di, func(ctx context.Context) graphql.Marshaler {
+					return innerFunc(ctx, dfs)
+				})
+
+				// don't run the out.Concurrently() call below
+				out.Values[i] = graphql.Null
+				continue
+			}
+
+			out.Concurrently(i, func(ctx context.Context) graphql.Marshaler { return innerFunc(ctx, out) })
 		default:
 			panic("unknown field " + strconv.Quote(field.Name))
 		}
@@ -10954,6 +11919,10 @@ func (ec *executionContext) _Mutation(ctx context.Context, sel ast.SelectionSet)
 		switch field.Name {
 		case "__typename":
 			out.Values[i] = graphql.MarshalString("Mutation")
+		case "acceptPolicies":
+			out.Values[i] = ec.OperationContext.RootResolverMiddleware(innerCtx, func(ctx context.Context) (res graphql.Marshaler) {
+				return ec._Mutation_acceptPolicies(ctx, field)
+			})
 		case "createVerification":
 			out.Values[i] = ec.OperationContext.RootResolverMiddleware(innerCtx, func(ctx context.Context) (res graphql.Marshaler) {
 				return ec._Mutation_createVerification(ctx, field)
@@ -11067,6 +12036,116 @@ func (ec *executionContext) _Mutation(ctx context.Context, sel ast.SelectionSet)
 			out.Values[i] = ec.OperationContext.RootResolverMiddleware(innerCtx, func(ctx context.Context) (res graphql.Marshaler) {
 				return ec._Mutation_transferWorkspaceOwnership(ctx, field)
 			})
+		default:
+			panic("unknown field " + strconv.Quote(field.Name))
+		}
+	}
+	out.Dispatch(ctx)
+	if out.Invalids > 0 {
+		return graphql.Null
+	}
+
+	atomic.AddInt32(&ec.deferred, int32(len(deferred)))
+
+	for label, dfs := range deferred {
+		ec.processDeferredGroup(graphql.DeferredGroup{
+			Label:    label,
+			Path:     graphql.GetPath(ctx),
+			FieldSet: dfs,
+			Context:  ctx,
+		})
+	}
+
+	return out
+}
+
+var policyAcceptanceImplementors = []string{"PolicyAcceptance"}
+
+func (ec *executionContext) _PolicyAcceptance(ctx context.Context, sel ast.SelectionSet, obj *gqlmodel.PolicyAcceptance) graphql.Marshaler {
+	fields := graphql.CollectFields(ec.OperationContext, sel, policyAcceptanceImplementors)
+
+	out := graphql.NewFieldSet(fields)
+	deferred := make(map[string]*graphql.FieldSet)
+	for i, field := range fields {
+		switch field.Name {
+		case "__typename":
+			out.Values[i] = graphql.MarshalString("PolicyAcceptance")
+		case "acceptedAt":
+			out.Values[i] = ec._PolicyAcceptance_acceptedAt(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "type":
+			out.Values[i] = ec._PolicyAcceptance_type(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "version":
+			out.Values[i] = ec._PolicyAcceptance_version(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		default:
+			panic("unknown field " + strconv.Quote(field.Name))
+		}
+	}
+	out.Dispatch(ctx)
+	if out.Invalids > 0 {
+		return graphql.Null
+	}
+
+	atomic.AddInt32(&ec.deferred, int32(len(deferred)))
+
+	for label, dfs := range deferred {
+		ec.processDeferredGroup(graphql.DeferredGroup{
+			Label:    label,
+			Path:     graphql.GetPath(ctx),
+			FieldSet: dfs,
+			Context:  ctx,
+		})
+	}
+
+	return out
+}
+
+var policyVersionImplementors = []string{"PolicyVersion"}
+
+func (ec *executionContext) _PolicyVersion(ctx context.Context, sel ast.SelectionSet, obj *gqlmodel.PolicyVersion) graphql.Marshaler {
+	fields := graphql.CollectFields(ec.OperationContext, sel, policyVersionImplementors)
+
+	out := graphql.NewFieldSet(fields)
+	deferred := make(map[string]*graphql.FieldSet)
+	for i, field := range fields {
+		switch field.Name {
+		case "__typename":
+			out.Values[i] = graphql.MarshalString("PolicyVersion")
+		case "effectiveDate":
+			out.Values[i] = ec._PolicyVersion_effectiveDate(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "required":
+			out.Values[i] = ec._PolicyVersion_required(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "title":
+			out.Values[i] = ec._PolicyVersion_title(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "type":
+			out.Values[i] = ec._PolicyVersion_type(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "url":
+			out.Values[i] = ec._PolicyVersion_url(ctx, field, obj)
+		case "version":
+			out.Values[i] = ec._PolicyVersion_version(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
 		default:
 			panic("unknown field " + strconv.Quote(field.Name))
 		}
@@ -12849,6 +13928,22 @@ func (ec *executionContext) unmarshalNCreateWorkspaceInput2githubᚗcomᚋreeart
 	return res, graphql.ErrorOnPath(ctx, err)
 }
 
+func (ec *executionContext) unmarshalNDateTime2timeᚐTime(ctx context.Context, v any) (time.Time, error) {
+	res, err := graphql.UnmarshalTime(v)
+	return res, graphql.ErrorOnPath(ctx, err)
+}
+
+func (ec *executionContext) marshalNDateTime2timeᚐTime(ctx context.Context, sel ast.SelectionSet, v time.Time) graphql.Marshaler {
+	_ = sel
+	res := graphql.MarshalTime(v)
+	if res == graphql.Null {
+		if !graphql.HasFieldError(ctx, graphql.GetFieldContext(ctx)) {
+			graphql.AddErrorf(ctx, "the requested element is null which the schema does not allow")
+		}
+	}
+	return res
+}
+
 func (ec *executionContext) unmarshalNDeleteMeInput2githubᚗcomᚋreearthᚋreearthᚑaccountsᚋserverᚋinternalᚋadapterᚋgqlᚋgqlmodelᚐDeleteMeInput(ctx context.Context, v any) (gqlmodel.DeleteMeInput, error) {
 	res, err := ec.unmarshalInputDeleteMeInput(ctx, v)
 	return res, graphql.ErrorOnPath(ctx, err)
@@ -13033,6 +14128,134 @@ func (ec *executionContext) unmarshalNPagination2githubᚗcomᚋreearthᚋreeart
 func (ec *executionContext) unmarshalNPasswordResetInput2githubᚗcomᚋreearthᚋreearthᚑaccountsᚋserverᚋinternalᚋadapterᚋgqlᚋgqlmodelᚐPasswordResetInput(ctx context.Context, v any) (gqlmodel.PasswordResetInput, error) {
 	res, err := ec.unmarshalInputPasswordResetInput(ctx, v)
 	return res, graphql.ErrorOnPath(ctx, err)
+}
+
+func (ec *executionContext) marshalNPolicyAcceptance2ᚕᚖgithubᚗcomᚋreearthᚋreearthᚑaccountsᚋserverᚋinternalᚋadapterᚋgqlᚋgqlmodelᚐPolicyAcceptanceᚄ(ctx context.Context, sel ast.SelectionSet, v []*gqlmodel.PolicyAcceptance) graphql.Marshaler {
+	ret := make(graphql.Array, len(v))
+	var wg sync.WaitGroup
+	isLen1 := len(v) == 1
+	if !isLen1 {
+		wg.Add(len(v))
+	}
+	for i := range v {
+		i := i
+		fc := &graphql.FieldContext{
+			Index:  &i,
+			Result: &v[i],
+		}
+		ctx := graphql.WithFieldContext(ctx, fc)
+		f := func(i int) {
+			defer func() {
+				if r := recover(); r != nil {
+					ec.Error(ctx, ec.Recover(ctx, r))
+					ret = nil
+				}
+			}()
+			if !isLen1 {
+				defer wg.Done()
+			}
+			ret[i] = ec.marshalNPolicyAcceptance2ᚖgithubᚗcomᚋreearthᚋreearthᚑaccountsᚋserverᚋinternalᚋadapterᚋgqlᚋgqlmodelᚐPolicyAcceptance(ctx, sel, v[i])
+		}
+		if isLen1 {
+			f(i)
+		} else {
+			go f(i)
+		}
+
+	}
+	wg.Wait()
+
+	for _, e := range ret {
+		if e == graphql.Null {
+			return graphql.Null
+		}
+	}
+
+	return ret
+}
+
+func (ec *executionContext) marshalNPolicyAcceptance2ᚖgithubᚗcomᚋreearthᚋreearthᚑaccountsᚋserverᚋinternalᚋadapterᚋgqlᚋgqlmodelᚐPolicyAcceptance(ctx context.Context, sel ast.SelectionSet, v *gqlmodel.PolicyAcceptance) graphql.Marshaler {
+	if v == nil {
+		if !graphql.HasFieldError(ctx, graphql.GetFieldContext(ctx)) {
+			graphql.AddErrorf(ctx, "the requested element is null which the schema does not allow")
+		}
+		return graphql.Null
+	}
+	return ec._PolicyAcceptance(ctx, sel, v)
+}
+
+func (ec *executionContext) unmarshalNPolicyAcceptanceInput2ᚕᚖgithubᚗcomᚋreearthᚋreearthᚑaccountsᚋserverᚋinternalᚋadapterᚋgqlᚋgqlmodelᚐPolicyAcceptanceInputᚄ(ctx context.Context, v any) ([]*gqlmodel.PolicyAcceptanceInput, error) {
+	var vSlice []any
+	vSlice = graphql.CoerceList(v)
+	var err error
+	res := make([]*gqlmodel.PolicyAcceptanceInput, len(vSlice))
+	for i := range vSlice {
+		ctx := graphql.WithPathContext(ctx, graphql.NewPathWithIndex(i))
+		res[i], err = ec.unmarshalNPolicyAcceptanceInput2ᚖgithubᚗcomᚋreearthᚋreearthᚑaccountsᚋserverᚋinternalᚋadapterᚋgqlᚋgqlmodelᚐPolicyAcceptanceInput(ctx, vSlice[i])
+		if err != nil {
+			return nil, err
+		}
+	}
+	return res, nil
+}
+
+func (ec *executionContext) unmarshalNPolicyAcceptanceInput2ᚖgithubᚗcomᚋreearthᚋreearthᚑaccountsᚋserverᚋinternalᚋadapterᚋgqlᚋgqlmodelᚐPolicyAcceptanceInput(ctx context.Context, v any) (*gqlmodel.PolicyAcceptanceInput, error) {
+	res, err := ec.unmarshalInputPolicyAcceptanceInput(ctx, v)
+	return &res, graphql.ErrorOnPath(ctx, err)
+}
+
+func (ec *executionContext) marshalNPolicyVersion2ᚕᚖgithubᚗcomᚋreearthᚋreearthᚑaccountsᚋserverᚋinternalᚋadapterᚋgqlᚋgqlmodelᚐPolicyVersionᚄ(ctx context.Context, sel ast.SelectionSet, v []*gqlmodel.PolicyVersion) graphql.Marshaler {
+	ret := make(graphql.Array, len(v))
+	var wg sync.WaitGroup
+	isLen1 := len(v) == 1
+	if !isLen1 {
+		wg.Add(len(v))
+	}
+	for i := range v {
+		i := i
+		fc := &graphql.FieldContext{
+			Index:  &i,
+			Result: &v[i],
+		}
+		ctx := graphql.WithFieldContext(ctx, fc)
+		f := func(i int) {
+			defer func() {
+				if r := recover(); r != nil {
+					ec.Error(ctx, ec.Recover(ctx, r))
+					ret = nil
+				}
+			}()
+			if !isLen1 {
+				defer wg.Done()
+			}
+			ret[i] = ec.marshalNPolicyVersion2ᚖgithubᚗcomᚋreearthᚋreearthᚑaccountsᚋserverᚋinternalᚋadapterᚋgqlᚋgqlmodelᚐPolicyVersion(ctx, sel, v[i])
+		}
+		if isLen1 {
+			f(i)
+		} else {
+			go f(i)
+		}
+
+	}
+	wg.Wait()
+
+	for _, e := range ret {
+		if e == graphql.Null {
+			return graphql.Null
+		}
+	}
+
+	return ret
+}
+
+func (ec *executionContext) marshalNPolicyVersion2ᚖgithubᚗcomᚋreearthᚋreearthᚑaccountsᚋserverᚋinternalᚋadapterᚋgqlᚋgqlmodelᚐPolicyVersion(ctx context.Context, sel ast.SelectionSet, v *gqlmodel.PolicyVersion) graphql.Marshaler {
+	if v == nil {
+		if !graphql.HasFieldError(ctx, graphql.GetFieldContext(ctx)) {
+			graphql.AddErrorf(ctx, "the requested element is null which the schema does not allow")
+		}
+		return graphql.Null
+	}
+	return ec._PolicyVersion(ctx, sel, v)
 }
 
 func (ec *executionContext) marshalNPublicWorkspaceMember2ᚕᚖgithubᚗcomᚋreearthᚋreearthᚑaccountsᚋserverᚋinternalᚋadapterᚋgqlᚋgqlmodelᚐPublicWorkspaceMemberᚄ(ctx context.Context, sel ast.SelectionSet, v []*gqlmodel.PublicWorkspaceMember) graphql.Marshaler {
@@ -13700,6 +14923,13 @@ func (ec *executionContext) marshalN__TypeKind2string(ctx context.Context, sel a
 		}
 	}
 	return res
+}
+
+func (ec *executionContext) marshalOAcceptPoliciesPayload2ᚖgithubᚗcomᚋreearthᚋreearthᚑaccountsᚋserverᚋinternalᚋadapterᚋgqlᚋgqlmodelᚐAcceptPoliciesPayload(ctx context.Context, sel ast.SelectionSet, v *gqlmodel.AcceptPoliciesPayload) graphql.Marshaler {
+	if v == nil {
+		return graphql.Null
+	}
+	return ec._AcceptPoliciesPayload(ctx, sel, v)
 }
 
 func (ec *executionContext) marshalOAddUsersToWorkspacePayload2ᚖgithubᚗcomᚋreearthᚋreearthᚑaccountsᚋserverᚋinternalᚋadapterᚋgqlᚋgqlmodelᚐAddUsersToWorkspacePayload(ctx context.Context, sel ast.SelectionSet, v *gqlmodel.AddUsersToWorkspacePayload) graphql.Marshaler {

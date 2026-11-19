@@ -11,6 +11,7 @@ import (
 	"github.com/99designs/gqlgen/graphql/handler/transport"
 	"github.com/reearth/reearth-accounts/server/internal/adapter"
 	"github.com/reearth/reearth-accounts/server/internal/adapter/gql"
+	adapterhttp "github.com/reearth/reearth-accounts/server/internal/adapter/http"
 	"github.com/reearth/reearth-accounts/server/internal/adapter/ratelimit"
 	"github.com/reearth/reearth-accounts/server/internal/infrastructure/storage"
 	"github.com/reearth/reearth-accounts/server/internal/usecase/gateway"
@@ -112,6 +113,7 @@ func GraphqlAPI(conf *Config, photos adapter.PhotoSigner, loginTime adapter.Logi
 		usecases := adapter.Usecases(ctx)
 		ctx = gql.AttachUsecases(ctx, usecases, photos, enableDataLoaders)
 		ctx = adapter.AttachConfig(ctx, conf)
+		ctx = adapter.AttachClient(ctx, adapterhttp.ClientOf(c))
 		ctx = withLookupState(ctx, ratelimit.ViewerKey(adapter.User(ctx), c.RealIP()), c.Response())
 		c.SetRequest(req.WithContext(ctx))
 
