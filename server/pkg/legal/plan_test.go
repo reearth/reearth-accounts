@@ -3,6 +3,7 @@ package legal
 import (
 	"context"
 	"errors"
+	"slices"
 	"testing"
 	"time"
 
@@ -403,14 +404,14 @@ func TestPlanApply_EqualTimestamp(t *testing.T) {
 	assert.Equal(t, OutcomeIgnored, outcome, "an older payload naming a seen version changes nothing")
 }
 
-func TestApply_SameTimestampTieSetsContent(t *testing.T) {
+func TestApply_SameTimestampTie(t *testing.T) {
 	for _, tc := range []struct {
-		name      string
-		eff       time.Duration
-		withdrawn bool
+		name     string
+		eff      time.Duration
+		inEffect bool
 	}{
-		{"in effect", -30 * day, false},
-		{"withdrawn by a higher version", 30 * day, true},
+		{"in effect keeps the first content", -30 * day, true},
+		{"not yet in effect or withdrawn takes the larger digest", 30 * day, false},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			a, b := entry("1.0.5", tc.eff, "draft-A"), entry("1.0.5", tc.eff, "draft-B")
@@ -420,15 +421,19 @@ func TestApply_SameTimestampTieSetsContent(t *testing.T) {
 			higher := entry("2.0.0", 40*day, "v2")
 			for _, order := range [][]Entry{{a, b}, {b, a}, {a, higher, b}, {b, higher, a}, {higher, a, b}, {higher, b, a}} {
 				f := newFakeRepo()
+				want := b.Title["en"]
+				if tc.inEffect {
+					want = order[slices.IndexFunc(order, func(e Entry) bool { return e.Version == a.Version })].Title["en"]
+				}
 				for _, e := range order {
 					_, err := Apply(context.Background(), f, Manifest{Timestamp: t0, Entries: []Entry{e}}, func() time.Time { return t0.Add(hour) })
 					require.NoError(t, err)
 				}
 				got := f.heads["tos"].Versions[MustParseVersion("1.0.5")]
-				assert.Equal(t, b.Title["en"], got.Title["en"], "order %v", order)
-				assert.Equal(t, b.Title["en"], f.versions[got.Ref].Title["en"], "archived, order %v", order)
+				assert.Equal(t, want, got.Title["en"], "order %v", order)
+				assert.Equal(t, want, f.versions[got.Ref].Title["en"], "archived, order %v", order)
 				if len(order) == 3 {
-					assert.Equal(t, tc.withdrawn, got.withdrawn(), "order %v", order)
+					assert.Equal(t, !tc.inEffect, got.withdrawn(), "order %v", order)
 				}
 			}
 		})

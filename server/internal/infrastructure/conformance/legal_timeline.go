@@ -1,6 +1,7 @@
 package conformance
 
 import (
+	"fmt"
 	"testing"
 	"time"
 
@@ -95,9 +96,11 @@ func testLegalTieSameVersion(t *testing.T, nc Factory) {
 	for _, tc := range []struct {
 		name             string
 		eff, first, then time.Time
+		converges        bool
 	}{
-		{"both in effect", legalT0.Add(-legalDay), legalT0.Add(time.Hour), legalT0.Add(time.Hour)},
-		{"second arrives after the date", legalT0.Add(legalDay), legalT0.Add(time.Hour), legalT0.Add(legalDay + time.Hour)},
+		{"both in effect", legalT0.Add(-legalDay), legalT0.Add(time.Hour), legalT0.Add(time.Hour), false},
+		{"second arrives after the date", legalT0.Add(legalDay), legalT0.Add(time.Hour), legalT0.Add(legalDay + time.Hour), false},
+		{"both before the date", legalT0.Add(legalDay), legalT0.Add(time.Hour), legalT0.Add(2 * time.Hour), true},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			a := legalManifest(legalT0, legalEntry("tos", "1.0.1", tc.eff, "A"))
@@ -107,10 +110,16 @@ func testLegalTieSameVersion(t *testing.T, nc Factory) {
 				c, _, done := nc(t)
 				applyLegal(t, c.PolicyVersion, tc.first, legalBase, order[0])
 				applyLegal(t, c.PolicyVersion, tc.then, order[1])
-				states = append(states, legalState(t, c.PolicyVersion, legalT0.Add(2*legalDay), "1.0.0", "1.0.1"))
+				state := legalState(t, c.PolicyVersion, legalT0.Add(2*legalDay), "1.0.0", "1.0.1")
+				if !tc.converges {
+					assert.Contains(t, state, fmt.Sprintf("%q", order[0].Entries[0].Title["en"]), "a version in effect keeps its first content")
+				}
+				states = append(states, state)
 				done()
 			}
-			assert.Equal(t, states[0], states[1], "the same-timestamp tie winner sets the content in either order")
+			if tc.converges {
+				assert.Equal(t, states[0], states[1], "the same-timestamp tie winner sets the content in either order")
+			}
 		})
 	}
 }

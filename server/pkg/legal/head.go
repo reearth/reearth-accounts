@@ -58,13 +58,18 @@ func (v HeadVersion) inEffect(now time.Time) bool { return !v.EffectiveAt.After(
 func (v HeadVersion) frozen(at time.Time) bool { return v.inEffect(at.Add(FreezeMargin)) }
 
 // takes reports whether an entry of a payload stamped payloadAt replaces the
-// content. The same-timestamp entry with the larger digest always does, so
-// either order ends the same; a newer payload does only before the freeze.
+// content. A frozen version never changes, since readers may already see it
+// in effect; the freeze skips a withdrawn one, which never took effect.
+// Otherwise a newer payload does, and so does the same-timestamp entry with
+// the larger digest, so either order ends the same.
 func (v HeadVersion) takes(payloadAt time.Time, digest []byte, now time.Time) bool {
+	if !v.withdrawn() && v.frozen(now) {
+		return false
+	}
 	if payloadAt.Equal(v.SetAt) {
 		return bytes.Compare(digest, v.SetDigest) > 0
 	}
-	return payloadAt.After(v.SetAt) && !v.frozen(now)
+	return payloadAt.After(v.SetAt)
 }
 
 func (v HeadVersion) setBy(e Entry, payloadAt time.Time, a Applied) HeadVersion {
@@ -167,13 +172,12 @@ const (
 // that beats the applied one (the higher version, then the larger digest),
 // wins:
 //   - A withdrawn version named again follows renamedWithdrawn.
-//   - Any other named version takes the entry's content unless it is frozen
-//     and the entry is not the same-timestamp tie winner for it.
+//   - Any other named version takes the entry's content unless it is frozen.
 //   - Every other version not withdrawn and not frozen is withdrawn.
 //
 // Any other payload adds its version when the head has not seen it, as
 // stalePayloadVersion decides, and otherwise only replaces the content of a
-// version it wins a same-timestamp tie for, withdrawn or not.
+// version it wins a same-timestamp tie for that is withdrawn or not frozen.
 func PlanApply(cur TypeHead, e Entry, payloadAt, now time.Time) (TypeHead, Outcome) {
 	applied := e.applied()
 	won := cur.Revision == 0 || payloadAt.After(cur.AppliedAt) || payloadAt.Equal(cur.AppliedAt) && applied.beats(cur.Applied)
