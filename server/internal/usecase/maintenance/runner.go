@@ -6,6 +6,7 @@ import (
 	"encoding/hex"
 	"errors"
 	"math/rand/v2"
+	"slices"
 	"sync"
 	"time"
 
@@ -143,7 +144,16 @@ func (r *Runner) RunPass(ctx context.Context) (Report, error) {
 	if !r.mail.Deliverable() {
 		return rep, nil
 	}
-	for !r.stopped() && r.limiter.Wait(ctx) == nil && !r.stopped() {
+	waitCtx, cancelWait := context.WithCancel(ctx)
+	defer cancelWait()
+	go func() {
+		select {
+		case <-r.stopping:
+			cancelWait()
+		case <-waitCtx.Done():
+		}
+	}()
+	for !r.stopped() && r.limiter.Wait(waitCtx) == nil && !r.stopped() {
 		more, err := r.sendOne(ctx, &rep)
 		if err != nil || !more {
 			return rep, err
@@ -178,6 +188,10 @@ func (r *Runner) deliver(ctx context.Context, rec outbox.Record) outbox.Outcome 
 		return outbox.SendFailed{}
 	}
 	if env == nil {
+		if !slices.Contains(outbox.Reasons, reason) {
+			applog.Warn(ctx, "outbox resolver gave a reason outside the set", applog.MailKind(rec.Kind))
+			reason = outbox.ReasonPermanent
+		}
 		return outbox.NothingToSend{Reason: reason}
 	}
 	if err := r.mail.Send(ctx, *env); err != nil {
