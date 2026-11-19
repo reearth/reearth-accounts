@@ -193,6 +193,28 @@ func TestRunPass_NothingToSendFails(t *testing.T) {
 	assert.Equal(t, outbox.ReasonUserGone, r.Reason)
 }
 
+func TestRunPass_ReasonOutsideTheSetIsStoredAsPermanent(t *testing.T) {
+	for _, reason := range []outbox.Reason{"not_a_reason", ""} {
+		t.Run(fmt.Sprintf("%q", reason), func(t *testing.T) {
+			f := newFixture(t, &fakeMail{}, defaultConfig(), map[mail.Kind]Resolver{testKind: nothingResolver{reason}})
+			keys := f.enqueue(t, testKind, 1)
+
+			rep, err := f.runner.RunPass(context.Background())
+			require.NoError(t, err)
+			assert.Equal(t, 1, rep.Failed)
+			r := f.record(t, keys[0])
+			assert.Equal(t, outbox.StateFailed, r.State)
+			assert.Equal(t, outbox.ReasonPermanent, r.Reason)
+		})
+	}
+}
+
+type nothingResolver struct{ reason outbox.Reason }
+
+func (r nothingResolver) Resolve(context.Context, outbox.Record) (*mail.Envelope, outbox.Reason, error) {
+	return nil, r.reason, nil
+}
+
 func TestRunPass_UnknownKindFails(t *testing.T) {
 	f := newFixture(t, &fakeMail{}, defaultConfig(), nil)
 	keys := f.enqueue(t, "unregistered_kind", 1)
@@ -391,6 +413,27 @@ func TestShutdown_GivesUpAtItsDeadline(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 20*time.Millisecond)
 	defer cancel()
 	assert.ErrorIs(t, f.runner.Shutdown(ctx), context.DeadlineExceeded)
+}
+
+func TestShutdown_StopsAPassWaitingForTheRate(t *testing.T) {
+	cfg := defaultConfig()
+	cfg.SendsPerSecond = 0.05
+	m := &fakeMail{}
+	f := newFixture(t, m, cfg, sendable())
+	f.enqueue(t, testKind, 2)
+
+	passDone := make(chan struct{})
+	go func() {
+		_, _ = f.runner.RunPass(context.Background())
+		close(passDone)
+	}()
+	require.Eventually(t, func() bool { return m.count() == 1 }, time.Second, time.Millisecond)
+
+	ctx, cancel := context.WithTimeout(context.Background(), time.Second)
+	defer cancel()
+	require.NoError(t, f.runner.Shutdown(ctx))
+	<-passDone
+	assert.Equal(t, 1, m.count())
 }
 
 func TestRunPass_OnePassAtATime(t *testing.T) {
