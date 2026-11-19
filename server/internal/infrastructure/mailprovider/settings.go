@@ -1,9 +1,8 @@
-// Package mailprovider builds gateway.Mail from the environment on top of the
-// reearthx mailer (ADR-0004 decisions 10 to 12).
 package mailprovider
 
 import (
 	"fmt"
+	"strings"
 
 	"github.com/reearth/reearthx/mailer"
 )
@@ -28,16 +27,14 @@ const (
 	ModeProvider
 )
 
-// Settings is a validated Env. Its zero value drops every message.
 type Settings struct {
 	Mode     Mode
 	provider mailer.Config
 }
 
-// Parse accepts only the providers accounts offers. smtp, cloudflare, direct
-// and logger are refused like any unknown name, so a typo cannot fall back to
-// the reearthx logger mailer.
 func Parse(e Env, dev bool) (Settings, error) {
+	e.FromEmail = strings.TrimSpace(e.FromEmail)
+	e.SendGridAPIKey = strings.TrimSpace(e.SendGridAPIKey)
 	switch e.Provider {
 	case "":
 		if dev {

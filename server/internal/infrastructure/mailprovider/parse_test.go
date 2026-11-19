@@ -33,6 +33,19 @@ func TestParse(t *testing.T) {
 			wantErr: "REEARTH_ACCOUNTS_SENDGRID_API_KEY is required when REEARTH_ACCOUNTS_MAILER=sendgrid",
 		},
 		{
+			name:    "sendgrid with whitespace-only api key",
+			env:     Env{Provider: "sendgrid", FromEmail: "noreply@example.com", SendGridAPIKey: " \t "},
+			wantErr: "REEARTH_ACCOUNTS_SENDGRID_API_KEY is required when REEARTH_ACCOUNTS_MAILER=sendgrid",
+		},
+		{
+			name: "sendgrid values are trimmed",
+			env:  Env{Provider: "sendgrid", FromEmail: " noreply@example.com\n", FromName: "Accounts", SendGridAPIKey: " sg-key "},
+			want: Settings{Mode: ModeProvider, provider: mailer.Config{
+				Mailer:   "sendgrid",
+				SendGrid: mailer.SendGridConfig{API: "sg-key", Email: "noreply@example.com", Name: "Accounts"},
+			}},
+		},
+		{
 			name:    "sendgrid without from email",
 			env:     Env{Provider: "sendgrid", SendGridAPIKey: "sg-key"},
 			wantErr: "REEARTH_ACCOUNTS_MAILER_FROM_EMAIL is required when REEARTH_ACCOUNTS_MAILER=sendgrid",
@@ -48,6 +61,11 @@ func TestParse(t *testing.T) {
 		{
 			name:    "ses without from email",
 			env:     Env{Provider: "ses"},
+			wantErr: "REEARTH_ACCOUNTS_MAILER_FROM_EMAIL is required when REEARTH_ACCOUNTS_MAILER=ses",
+		},
+		{
+			name:    "ses with whitespace-only from email",
+			env:     Env{Provider: "ses", FromEmail: "   "},
 			wantErr: "REEARTH_ACCOUNTS_MAILER_FROM_EMAIL is required when REEARTH_ACCOUNTS_MAILER=ses",
 		},
 		{name: "provider set in dev still sends", env: sendgrid, dev: true, want: Settings{Mode: ModeProvider, provider: mailer.Config{

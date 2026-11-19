@@ -121,7 +121,6 @@ func (a *Authenticator) ResendVerificationEmail(ctx context.Context, t gateway.V
 
 	// The Firebase Admin SDK's EmailVerificationLink only generates an
 	// out-of-band verification URL; it does not send any email itself.
-	// Delivery is handled below via the accounts mail gateway.
 	link, err := a.client.EmailVerificationLink(ctx, rec.Email)
 	if err != nil {
 		applog.Error(ctx, "cip: email verification link", applog.Err(err))

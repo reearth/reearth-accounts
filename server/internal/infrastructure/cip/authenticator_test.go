@@ -6,8 +6,8 @@ import (
 	"testing"
 
 	fbauth "firebase.google.com/go/v4/auth"
-	"github.com/reearth/reearth-accounts/server/internal/usecase/gateway"
 	"github.com/reearth/reearth-accounts/server/internal/infrastructure/mailprovider"
+	"github.com/reearth/reearth-accounts/server/internal/usecase/gateway"
 	"github.com/reearth/reearth-accounts/server/pkg/id"
 	"github.com/reearth/reearth-accounts/server/pkg/mail"
 	"github.com/stretchr/testify/assert"

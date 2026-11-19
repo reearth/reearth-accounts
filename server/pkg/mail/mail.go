@@ -1,5 +1,3 @@
-// Package mail is the vocabulary accounts uses to send mail: what kind of
-// mail it is, the one person it goes to, and the rendered message.
 package mail
 
 import "github.com/reearth/reearth-accounts/server/pkg/id"
@@ -12,9 +10,7 @@ const (
 	KindVerificationResend Kind = "verification_resend"
 )
 
-// Recipient is exactly one person, so a send can never address two
-// (ADR-0004 decision 12). The user ID is the only recipient field that may
-// be logged.
+// The user ID is the only recipient field that may be logged.
 type Recipient struct {
 	userID  *id.UserID
 	address string
@@ -48,20 +44,12 @@ type Envelope struct {
 	Message Message
 }
 
-// SendError is a provider failure. Its message names only the code, because
-// provider errors can quote the recipient address; the cause stays reachable
-// through Unwrap.
+// SendError hides the provider error text, because provider errors can quote
+// the recipient address; the cause stays reachable through Unwrap.
 type SendError struct {
-	Permanent bool
-	Code      string
-	Err       error
+	Err error
 }
 
-func (e *SendError) Error() string {
-	if e.Code == "" {
-		return "mail: send failed"
-	}
-	return "mail: send failed: " + e.Code
-}
+func (e *SendError) Error() string { return "mail: send failed" }
 
 func (e *SendError) Unwrap() error { return e.Err }

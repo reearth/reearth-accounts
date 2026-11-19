@@ -1,6 +1,7 @@
 package app
 
 import (
+	"os"
 	"testing"
 	"time"
 
@@ -46,6 +47,17 @@ func TestReadConfig_Mailer(t *testing.T) {
 
 	t.Setenv("REEARTH_DEV", "true")
 	c, err = ReadConfig(false)
+	require.NoError(t, err)
+	assert.Equal(t, mailprovider.ModeDevPrint, c.MailSettings.Mode)
+
+	require.NoError(t, os.Unsetenv("REEARTH_DEV"))
+	c, err = ReadConfig(true)
+	require.NoError(t, err)
+	assert.True(t, c.Dev)
+	assert.Equal(t, mailprovider.ModeDrop, c.MailSettings.Mode, "a debug build alone must not print mail bodies")
+
+	t.Setenv("REEARTH_DEV", "true")
+	c, err = ReadConfig(true)
 	require.NoError(t, err)
 	assert.Equal(t, mailprovider.ModeDevPrint, c.MailSettings.Mode)
 
