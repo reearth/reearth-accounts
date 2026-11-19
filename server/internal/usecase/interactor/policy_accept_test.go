@@ -184,6 +184,35 @@ func TestPolicy_AcceptAfterDeleteMeLeavesNoRecord(t *testing.T) {
 	assert.Empty(t, f.records(t))
 }
 
+type failingSweeps struct {
+	legal.AcceptanceRepo
+	calls int
+}
+
+func (f *failingSweeps) RemoveByUser(ctx context.Context, u id.UserID) error {
+	f.calls++
+	if f.calls == 1 {
+		return f.AcceptanceRepo.RemoveByUser(ctx, u)
+	}
+	return assert.AnError
+}
+
+func TestDeleteMe_SucceedsWhenThePostCommitSweepKeepsFailing(t *testing.T) {
+	ctx := context.Background()
+	f := newAcceptFixture(t, "s")
+	ws := workspace.New().NewID().Name("u").Personal(true).
+		Members(map[id.UserID]workspace.Member{f.uid: {Role: role.RoleOwner, InvitedBy: f.uid}}).MustBuild()
+	require.NoError(t, f.repos.Workspace.Save(ctx, ws))
+	sweeps := &failingSweeps{AcceptanceRepo: f.repos.PolicyAcceptance}
+	r := *f.repos
+	r.PolicyAcceptance = sweeps
+
+	require.NoError(t, NewUser(&r, &gateway.Container{}, nil, "", "").DeleteMe(ctx, f.uid, f.op))
+	_, err := f.repos.User.FindByID(ctx, f.uid)
+	assert.ErrorIs(t, err, rerror.ErrNotFound)
+	assert.Equal(t, 1+cleanupAttempts, sweeps.calls)
+}
+
 func refsOf(as []legal.Acceptance) []legal.Ref {
 	res := []legal.Ref{}
 	for _, a := range as {

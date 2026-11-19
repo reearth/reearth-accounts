@@ -56,6 +56,23 @@ func (r *PolicyAcceptance) InsertIfAbsent(ctx context.Context, as []legal.Accept
 	return nil
 }
 
+func (r *PolicyAcceptance) Remove(ctx context.Context, as []legal.Acceptance) error {
+	if len(as) == 0 {
+		return nil
+	}
+	var p gen.PolicyAcceptanceRemoveParams
+	for _, a := range as {
+		p.UserIds = append(p.UserIds, a.UserID.String())
+		p.Types = append(p.Types, string(a.Type))
+		p.Versions = append(p.Versions, a.Version.String())
+		p.AcceptedAts = append(p.AcceptedAts, a.AcceptedAt)
+	}
+	if err := r.c.queries(ctx).PolicyAcceptanceRemove(ctx, p); err != nil {
+		return rerror.ErrInternalByWithContext(ctx, err)
+	}
+	return nil
+}
+
 func (r *PolicyAcceptance) RemoveByUser(ctx context.Context, u id.UserID) error {
 	if err := r.c.queries(ctx).PolicyAcceptanceRemoveByUser(ctx, u.String()); err != nil {
 		return rerror.ErrInternalByWithContext(ctx, err)

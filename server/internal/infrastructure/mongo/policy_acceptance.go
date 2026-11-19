@@ -72,6 +72,20 @@ func (r *PolicyAcceptance) InsertIfAbsent(ctx context.Context, as []legal.Accept
 	return nil
 }
 
+func (r *PolicyAcceptance) Remove(ctx context.Context, as []legal.Acceptance) error {
+	if len(as) == 0 {
+		return nil
+	}
+	or := make(bson.A, len(as))
+	for i, a := range as {
+		or[i] = bson.M{"acceptedAt": a.AcceptedAt, "type": string(a.Type), "user": a.UserID.String(), "version": a.Version.String()}
+	}
+	if _, err := r.c.DeleteMany(ctx, bson.M{"$or": or}); err != nil {
+		return rerror.ErrInternalByWithContext(ctx, err)
+	}
+	return nil
+}
+
 func (r *PolicyAcceptance) RemoveByUser(ctx context.Context, u id.UserID) error {
 	if _, err := r.c.DeleteMany(ctx, bson.M{"user": u.String()}); err != nil {
 		return rerror.ErrInternalByWithContext(ctx, err)
