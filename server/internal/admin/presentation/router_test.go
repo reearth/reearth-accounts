@@ -428,7 +428,6 @@ func TestRoutes_PolicyNotices_ByRole(t *testing.T) {
 		status  int
 		wantMsg string
 	}{
-		// The CSRF token matches, so a 403 must come from the role check.
 		{name: "viewer cannot post a notice", role: adminuser.RoleViewer, method: http.MethodPost, path: "/api/v1/policies/tos/notices", body: `{"audience":"all"}`, status: http.StatusForbidden, wantMsg: "forbidden"},
 		{name: "viewer can read notices", role: adminuser.RoleViewer, method: http.MethodGet, path: "/api/v1/policies/tos/notices", status: http.StatusOK},
 		{name: "system admin posts a notice", role: adminuser.RoleSystemAdmin, method: http.MethodPost, path: "/api/v1/policies/tos/notices", body: `{"audience":"all"}`, status: http.StatusCreated},

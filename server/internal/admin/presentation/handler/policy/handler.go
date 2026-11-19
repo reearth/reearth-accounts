@@ -1,5 +1,3 @@
-// Package policy serves the admin policy notice endpoints, behind the
-// RequireApproved middleware.
 package policy
 
 import (
@@ -11,7 +9,6 @@ type Handler struct {
 	list   *policyuc.ListNoticesUseCase
 }
 
-// NewHandler is a Wire provider for the policy Handler.
 func NewHandler(create *policyuc.CreateNoticeUseCase, list *policyuc.ListNoticesUseCase) *Handler {
 	return &Handler{create: create, list: list}
 }

@@ -34,7 +34,6 @@ var usecaseWire = wire.NewSet(
 	adminuseruc.NewRejectAdminUserUseCase,
 	adminuseruc.NewSetRoleUseCase,
 
-	// policy notice usecases
 	policyuc.NewCreateNoticeUseCase,
 	policyuc.NewListNoticesUseCase,
 

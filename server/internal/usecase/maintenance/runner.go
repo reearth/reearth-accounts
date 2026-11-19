@@ -29,7 +29,6 @@ type Config struct {
 	TTL            time.Duration
 }
 
-// Producer queues records, such as the audience of a policy notice.
 type Producer interface {
 	Name() string
 	Run(ctx context.Context, now time.Time) (int, error)
