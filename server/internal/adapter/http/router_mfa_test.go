@@ -114,7 +114,7 @@ func newMFAFixtureWithLoginTime(t *testing.T, maxAuthAge time.Duration, tokenCla
 
 	fake := &fakeMFAAuthenticator{enrolled: true}
 	gw := &gateway.Container{Authenticators: map[gateway.Provider]gateway.Authenticator{gateway.ProviderAuth0: fake}}
-	uc := interactor.NewContainer(repos, gw, nil, nil, interactor.ContainerConfig{MFARecoveryMaxAuthAge: maxAuthAge})
+	uc := interactor.NewContainer(repos, gw, nil, nil, interactor.NewPolicyCatalog(repos.PolicyVersion, interactor.PolicyCatalogTTL), interactor.ContainerConfig{MFARecoveryMaxAuthAge: maxAuthAge})
 
 	users := map[string]*user.User{
 		auth0User.ID().String(): auth0User,

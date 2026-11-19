@@ -24,6 +24,7 @@ func runLegal(t *testing.T, nc Factory) {
 	t.Run("Legal_ApplyRace", func(t *testing.T) { testLegalApplyRace(t, nc) })
 	t.Run("Legal_ApplyReplayRace", func(t *testing.T) { testLegalApplyReplayRace(t, nc) })
 	runLegalFaults(t, nc)
+	runLegalReceived(t, nc)
 }
 
 func legalEntry(typ, version string, eff time.Time, title string) legal.Entry {
@@ -42,9 +43,20 @@ func legalManifest(at time.Time, entries ...legal.Entry) legal.Manifest {
 
 func clockAt(t time.Time) func() time.Time { return func() time.Time { return t } }
 
-func legalRecord(typ, version string, eff time.Time, title string) *legal.VersionRecord {
+func legalVersions(vs ...legal.HeadVersion) map[legal.Version]legal.HeadVersion {
+	m := make(map[legal.Version]legal.HeadVersion, len(vs))
+	for _, v := range vs {
+		m[v.Version] = v
+	}
+	return m
+}
+
+func legalHeadVersion(typ, version string, eff time.Time, title string, withdrawnAt *time.Time) legal.HeadVersion {
 	e := legalEntry(typ, version, eff, title)
-	return &legal.VersionRecord{Ref: e.Ref, EffectiveAt: e.EffectiveAt, Required: e.Required, Title: e.Title, URL: e.URL}
+	return legal.HeadVersion{
+		VersionRecord: legal.VersionRecord(e),
+		WithdrawnAt:   withdrawnAt,
+	}
 }
 
 func testLegalHeadCAS(t *testing.T, nc Factory) {
@@ -60,10 +72,12 @@ func testLegalHeadCAS(t *testing.T, nc Factory) {
 	first := legal.TypeHead{
 		Applied:   legal.Applied{Digest: []byte{1, 2, 3}, Version: legal.MustParseVersion("2.0.0")},
 		AppliedAt: legalT0,
-		Current:   legalRecord("tos", "1.0.0", legalT0.Add(-48*time.Hour), "v1"),
 		Revision:  1,
 		Type:      "tos",
-		Upcoming:  legalRecord("tos", "2.0.0", legalT0.Add(48*time.Hour), "v2"),
+		Versions: legalVersions(
+			legalHeadVersion("tos", "1.0.0", legalT0.Add(-48*time.Hour), "v1", nil),
+			legalHeadVersion("tos", "2.0.0", legalT0.Add(48*time.Hour), "v2", nil),
+		),
 	}
 	won, err := r.CompareAndSwapHead(ctx, first)
 	require.NoError(t, err)
@@ -73,13 +87,16 @@ func testLegalHeadCAS(t *testing.T, nc Factory) {
 	require.NoError(t, err)
 	assert.False(t, won, "a second first write loses")
 
+	withdrawnAt := legalT0.Add(time.Hour + 123*time.Millisecond)
 	second := legal.TypeHead{
 		Applied:   legal.Applied{Digest: []byte{4}, Version: legal.MustParseVersion("1.0.0")},
 		AppliedAt: legalT0.Add(time.Hour),
-		Current:   first.Current,
 		Revision:  2,
 		Type:      "tos",
-		Withdrawn: []legal.Withdrawal{{Version: legal.MustParseVersion("2.0.0"), At: legalT0.Add(time.Hour)}},
+		Versions: legalVersions(
+			legalHeadVersion("tos", "1.0.0", legalT0.Add(-48*time.Hour), "v1", nil),
+			legalHeadVersion("tos", "2.0.0", legalT0.Add(48*time.Hour), "v2", &withdrawnAt),
+		),
 	}
 	won, err = r.CompareAndSwapHead(ctx, second)
 	require.NoError(t, err)
@@ -114,12 +131,18 @@ func assertHeadEqual(t *testing.T, want, got legal.TypeHead) {
 	assert.Equal(t, want.Revision, got.Revision)
 	assert.Equal(t, want.Applied, got.Applied)
 	assert.True(t, want.AppliedAt.Equal(got.AppliedAt), "appliedAt %v != %v", want.AppliedAt, got.AppliedAt)
-	assertRecordEqual(t, want.Current, got.Current)
-	assertRecordEqual(t, want.Upcoming, got.Upcoming)
-	require.Len(t, got.Withdrawn, len(want.Withdrawn))
-	for i := range want.Withdrawn {
-		assert.Equal(t, want.Withdrawn[i].Version, got.Withdrawn[i].Version)
-		assert.True(t, want.Withdrawn[i].At.Equal(got.Withdrawn[i].At))
+	require.Len(t, got.Versions, len(want.Versions))
+	for v, w := range want.Versions {
+		g, ok := got.Versions[v]
+		if !assert.True(t, ok, "version %s", v) {
+			continue
+		}
+		assertRecordEqual(t, &w.VersionRecord, &g.VersionRecord)
+		if w.WithdrawnAt == nil {
+			assert.Nil(t, g.WithdrawnAt)
+		} else if assert.NotNil(t, g.WithdrawnAt) {
+			assert.True(t, w.WithdrawnAt.Equal(*g.WithdrawnAt), "withdrawnAt %v != %v", w.WithdrawnAt, g.WithdrawnAt)
+		}
 	}
 }
 
@@ -147,7 +170,7 @@ func testLegalArchiveVersions(t *testing.T, nc Factory) {
 	eff := legalT0.Add(48 * time.Hour)
 
 	head := func(rev int64, title string) legal.TypeHead {
-		return legal.TypeHead{Type: "tos", Revision: rev, Applied: legalApplied, AppliedAt: legalT0, Upcoming: legalRecord("tos", "2.0.0", eff, title)}
+		return legal.TypeHead{Type: "tos", Revision: rev, Applied: legalApplied, AppliedAt: legalT0, Versions: legalVersions(legalHeadVersion("tos", "2.0.0", eff, title, nil))}
 	}
 	won, err := r.CompareAndSwapHead(ctx, head(1, "draft"))
 	require.NoError(t, err)
@@ -163,7 +186,8 @@ func testLegalArchiveVersions(t *testing.T, nc Factory) {
 
 	require.NoError(t, r.ArchiveVersions(ctx, head(2, "draft")))
 	got := find()
-	assertRecordEqual(t, head(2, "draft").Upcoming, &got)
+	want := head(2, "draft").Versions[legal.MustParseVersion("2.0.0")].VersionRecord
+	assertRecordEqual(t, &want, &got)
 
 	require.NoError(t, r.ArchiveVersions(ctx, head(3, "final")))
 	assert.Equal(t, "final", find().Title["en"], "a newer revision replaces the record")
@@ -258,9 +282,6 @@ func testLegalApplyBothOrders(t *testing.T, nc Factory) {
 	}
 }
 
-// testLegalApplyRace delivers 16 payloads at once, each naming its own
-// upcoming version. The newest wins and every other stored version is
-// withdrawn.
 func testLegalApplyRace(t *testing.T, nc Factory) {
 	c, _, done := nc(t)
 	defer done()
@@ -310,8 +331,6 @@ func testLegalApplyRace(t *testing.T, nc Factory) {
 	}
 }
 
-// testLegalApplyReplayRace delivers the same payload 16 times at once. The
-// head is written once and the version stored once.
 func testLegalApplyReplayRace(t *testing.T, nc Factory) {
 	c, _, done := nc(t)
 	defer done()

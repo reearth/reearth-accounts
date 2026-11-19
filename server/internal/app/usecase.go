@@ -15,6 +15,7 @@ func UsecaseMiddleware(
 	acg *gateway.Container,
 	enforcer interactor.WorkspaceMemberCountEnforcer,
 	cerbosAdapter gateway.CerbosGateway,
+	catalog *interactor.PolicyCatalog,
 	config interactor.ContainerConfig) echo.MiddlewareFunc {
 	return ContextMiddleware(func(ctx context.Context) context.Context {
 		var r2 *repo.Container
@@ -24,7 +25,7 @@ func UsecaseMiddleware(
 		} else {
 			r2 = r
 		}
-		uc := interactor.NewContainer(r2, acg, enforcer, cerbosAdapter, config)
+		uc := interactor.NewContainer(r2, acg, enforcer, cerbosAdapter, catalog, config)
 		ctx = adapter.AttachUsecases(ctx, &uc)
 		return ctx
 	})

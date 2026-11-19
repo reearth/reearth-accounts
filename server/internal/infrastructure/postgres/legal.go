@@ -24,18 +24,11 @@ type versionJSON struct {
 	Title       map[string]string `json:"title"`
 	URL         map[string]string `json:"url,omitempty"`
 	Version     string            `json:"version"`
-}
-
-type withdrawalJSON struct {
-	At      time.Time `json:"at"`
-	Version string    `json:"version"`
+	WithdrawnAt *time.Time        `json:"withdrawnAt,omitempty"`
 }
 
 func (r *PolicyVersion) ArchiveVersions(ctx context.Context, h legal.TypeHead) error {
-	for _, v := range []*legal.VersionRecord{h.Current, h.Upcoming} {
-		if v == nil {
-			continue
-		}
+	for _, v := range h.SortedVersions() {
 		title, err := json.Marshal(nonNil(v.Title))
 		if err != nil {
 			return rerror.ErrInternalByWithContext(ctx, err)
@@ -60,19 +53,7 @@ func (r *PolicyVersion) ArchiveVersions(ctx context.Context, h legal.TypeHead) e
 }
 
 func (r *PolicyVersion) CompareAndSwapHead(ctx context.Context, next legal.TypeHead) (bool, error) {
-	withdrawn := make([]withdrawalJSON, 0, len(next.Withdrawn))
-	for _, w := range next.Withdrawn {
-		withdrawn = append(withdrawn, withdrawalJSON{At: w.At, Version: w.Version.String()})
-	}
-	wj, err := json.Marshal(withdrawn)
-	if err != nil {
-		return false, rerror.ErrInternalByWithContext(ctx, err)
-	}
-	current, err := marshalVersion(next.Current)
-	if err != nil {
-		return false, rerror.ErrInternalByWithContext(ctx, err)
-	}
-	upcoming, err := marshalVersion(next.Upcoming)
+	versions, err := marshalVersions(next)
 	if err != nil {
 		return false, rerror.ErrInternalByWithContext(ctx, err)
 	}
@@ -83,13 +64,13 @@ func (r *PolicyVersion) CompareAndSwapHead(ctx context.Context, next legal.TypeH
 		n, err = q.PolicyTypeInsert(ctx, gen.PolicyTypeInsertParams{
 			Type: string(next.Type), Revision: next.Revision, AppliedAt: next.AppliedAt,
 			AppliedVersion: next.Applied.Version.String(), AppliedDigest: next.Applied.Digest,
-			Current: current, Upcoming: upcoming, Withdrawn: wj,
+			Versions: versions,
 		})
 	} else {
 		n, err = q.PolicyTypeSwap(ctx, gen.PolicyTypeSwapParams{
 			Type: string(next.Type), Revision: next.Revision, AppliedAt: next.AppliedAt,
 			AppliedVersion: next.Applied.Version.String(), AppliedDigest: next.Applied.Digest,
-			Current: current, Upcoming: upcoming, Withdrawn: wj,
+			Versions: versions,
 		})
 	}
 	if err != nil {
@@ -145,17 +126,23 @@ func (r *PolicyVersion) FindVersions(ctx context.Context) ([]legal.VersionRecord
 	return res, nil
 }
 
-func marshalVersion(v *legal.VersionRecord) ([]byte, error) {
-	if v == nil {
-		return nil, nil
+func marshalVersions(h legal.TypeHead) ([]byte, error) {
+	vs := make([]versionJSON, 0, len(h.Versions))
+	for _, v := range h.SortedVersions() {
+		j := versionJSON{
+			EffectiveAt: v.EffectiveAt.UTC(),
+			Required:    v.Required,
+			Title:       v.Title,
+			URL:         v.URL,
+			Version:     v.Version.String(),
+		}
+		if v.WithdrawnAt != nil {
+			at := v.WithdrawnAt.UTC()
+			j.WithdrawnAt = &at
+		}
+		vs = append(vs, j)
 	}
-	return json.Marshal(versionJSON{
-		EffectiveAt: v.EffectiveAt,
-		Required:    v.Required,
-		Title:       v.Title,
-		URL:         v.URL,
-		Version:     v.Version.String(),
-	})
+	return json.Marshal(vs)
 }
 
 func nonNil(t legal.LocalizedText) legal.LocalizedText {
@@ -171,28 +158,34 @@ func policyTypeModel(row gen.PolicyType) (legal.TypeHead, error) {
 	if err != nil {
 		return legal.TypeHead{}, err
 	}
+	var vs []versionJSON
+	if err := json.Unmarshal(row.Versions, &vs); err != nil {
+		return legal.TypeHead{}, err
+	}
 	h := legal.TypeHead{
 		Applied:   legal.Applied{Digest: row.AppliedDigest, Version: applied},
 		AppliedAt: row.AppliedAt.UTC(),
 		Revision:  row.Revision,
 		Type:      t,
+		Versions:  make(map[legal.Version]legal.HeadVersion, len(vs)),
 	}
-	if h.Current, err = unmarshalVersion(t, row.Current); err != nil {
-		return legal.TypeHead{}, err
-	}
-	if h.Upcoming, err = unmarshalVersion(t, row.Upcoming); err != nil {
-		return legal.TypeHead{}, err
-	}
-	var withdrawn []withdrawalJSON
-	if err := json.Unmarshal(row.Withdrawn, &withdrawn); err != nil {
-		return legal.TypeHead{}, err
-	}
-	for _, w := range withdrawn {
-		v, err := legal.ParseVersion(w.Version)
+	for _, j := range vs {
+		v, err := legal.ParseVersion(j.Version)
 		if err != nil {
 			return legal.TypeHead{}, err
 		}
-		h.Withdrawn = append(h.Withdrawn, legal.Withdrawal{At: w.At.UTC(), Version: v})
+		hv := legal.HeadVersion{VersionRecord: legal.VersionRecord{
+			Ref:         legal.Ref{Type: t, Version: v},
+			EffectiveAt: j.EffectiveAt.UTC(),
+			Required:    j.Required,
+			Title:       j.Title,
+			URL:         j.URL,
+		}}
+		if j.WithdrawnAt != nil {
+			at := j.WithdrawnAt.UTC()
+			hv.WithdrawnAt = &at
+		}
+		h.Versions[v] = hv
 	}
 	return h, nil
 }
@@ -217,25 +210,4 @@ func policyVersionModel(row gen.PolicyVersion) (legal.VersionRecord, error) {
 		rec.URL = nil
 	}
 	return rec, nil
-}
-
-func unmarshalVersion(t legal.Type, b []byte) (*legal.VersionRecord, error) {
-	if b == nil {
-		return nil, nil
-	}
-	var j versionJSON
-	if err := json.Unmarshal(b, &j); err != nil {
-		return nil, err
-	}
-	v, err := legal.ParseVersion(j.Version)
-	if err != nil {
-		return nil, err
-	}
-	return &legal.VersionRecord{
-		Ref:         legal.Ref{Type: t, Version: v},
-		EffectiveAt: j.EffectiveAt.UTC(),
-		Required:    j.Required,
-		Title:       j.Title,
-		URL:         j.URL,
-	}, nil
 }

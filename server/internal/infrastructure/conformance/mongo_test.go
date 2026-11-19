@@ -41,6 +41,7 @@ func TestMongoConformance(t *testing.T) {
 
 		repos, err := mongorepo.New(ctx, db, false, false, nil)
 		require.NoError(t, err)
+		require.NoError(t, mongorepo.EnsureIndexes(ctx, db))
 		return repos, Caps{
 			EnforcesFilter:  true,
 			EnforcesLimit:   true,

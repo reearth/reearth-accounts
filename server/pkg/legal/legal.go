@@ -14,7 +14,6 @@ var (
 	versionPattern = regexp.MustCompile(`^[0-9]+\.[0-9]+\.[0-9]+$`)
 )
 
-// Type is a policy type key. It never contains ':' because mail keys embed it.
 type Type string
 
 func ParseType(s string) (Type, error) {
@@ -66,7 +65,6 @@ func (v Version) Compare(o Version) int {
 	return 0
 }
 
-// Ref names one version of one type.
 type Ref struct {
 	Type    Type
 	Version Version

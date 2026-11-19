@@ -124,3 +124,33 @@ func (u unreadable) Read([]byte) (int, error) {
 	u.t.Error("the body was read")
 	return 0, io.EOF
 }
+
+func TestPolicy_ReceiveWebhookSameTimestampEitherOrder(t *testing.T) {
+	ctx := context.Background()
+	secret := legal.NewSecret("s")
+	now := time.Date(2026, 11, 20, 3, 1, 0, 0, time.UTC)
+	payload := func(version, eff string) []byte {
+		return []byte(`{"event":"policy_version_updated","timestamp":"2026-11-20T03:00:00Z","versions":{"tos":{"version":"` + version + `","effectiveDate":"` + eff + `","required":true,"title":{"en":"x"}}}}`)
+	}
+	base := payload("1.0.0", "2026-01-01T00:00:00Z")
+	inEffect := payload("1.0.5", "2026-11-19T00:00:00Z")
+	upcoming := payload("1.1.0", "2026-11-21T00:00:00Z")
+	run := func(order ...[]byte) string {
+		repos := memory.New()
+		p := NewPolicy(repos, secret, NewPolicyCatalog(repos.PolicyVersion, PolicyCatalogTTL))
+		p.now = func() time.Time { return now }
+		for _, b := range append([][]byte{base}, order...) {
+			_, err := p.ReceiveWebhook(ctx, bytes.NewReader(b), secret.Sign(b))
+			require.NoError(t, err)
+		}
+		c, err := p.catalog.Get(ctx)
+		require.NoError(t, err)
+		up := ""
+		if u := c.Upcoming("tos", now); u != nil {
+			up = u.Version.String()
+		}
+		return currentTos(t, c, now) + " / " + up
+	}
+	assert.Equal(t, "1.0.5 / 1.1.0", run(inEffect, upcoming))
+	assert.Equal(t, "1.0.5 / 1.1.0", run(upcoming, inEffect))
+}

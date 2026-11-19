@@ -81,9 +81,6 @@ func (p *Policy) Overview(ctx context.Context, op *workspace.Operator) (legal.Ov
 	return legal.BuildOverview(cat, held, p.now()), nil
 }
 
-// ReceiveWebhook checks the secret, then the signature over the exact bytes
-// received, then every field, before it writes anything. A request without
-// a well-formed signature is refused before its body is read.
 func (p *Policy) ReceiveWebhook(ctx context.Context, r io.Reader, signature string) (legal.ApplyResult, error) {
 	if !p.secret.Enabled() {
 		return legal.ApplyResult{}, legal.ErrNotConfigured
@@ -103,8 +100,6 @@ func (p *Policy) ReceiveWebhook(ctx context.Context, r io.Reader, signature stri
 		return legal.ApplyResult{}, err
 	}
 	res, err := legal.Apply(ctx, p.repos.PolicyVersion, m, p.now)
-	if len(res.Applied) > 0 {
-		p.catalog.Invalidate()
-	}
+	p.catalog.Invalidate()
 	return res, err
 }

@@ -9,9 +9,7 @@ import (
 	"go.mongodb.org/mongo-driver/mongo/options"
 )
 
-// indexes lists the indexes of collections that need no migration job. Both
-// binaries create them at startup; CreateMany is a no-op for an existing
-// identical index.
+// CreateMany is a no-op for an existing identical index.
 var indexes = map[string][]mongo.IndexModel{
 	policyAcceptancesCollection: {{
 		Keys:    bson.D{{Key: "user", Value: 1}, {Key: "type", Value: 1}},
@@ -23,7 +21,7 @@ var indexes = map[string][]mongo.IndexModel{
 	}},
 }
 
-func ensureIndexes(ctx context.Context, db *mongo.Database) error {
+func EnsureIndexes(ctx context.Context, db *mongo.Database) error {
 	for coll, models := range indexes {
 		if _, err := db.Collection(coll).Indexes().CreateMany(ctx, models); err != nil {
 			return fmt.Errorf("create indexes on %s: %w", coll, err)

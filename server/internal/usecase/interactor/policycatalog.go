@@ -8,11 +8,8 @@ import (
 	"github.com/reearth/reearth-accounts/server/pkg/legal"
 )
 
-// PolicyCatalogTTL bounds how long an instance serves policy versions that
-// another instance's webhook may have changed.
 const PolicyCatalogTTL = time.Minute
 
-// PolicyCatalog caches the policy catalog per process.
 type PolicyCatalog struct {
 	loadedAt time.Time
 	mu       sync.Mutex
@@ -26,7 +23,6 @@ func NewPolicyCatalog(r legal.VersionRepo, ttl time.Duration) *PolicyCatalog {
 	return &PolicyCatalog{now: time.Now, repo: r, ttl: ttl}
 }
 
-// Get returns the cached catalog, reloading it when it is older than the TTL.
 func (c *PolicyCatalog) Get(ctx context.Context) (legal.Catalog, error) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
@@ -42,7 +38,6 @@ func (c *PolicyCatalog) Invalidate() {
 	c.snapshot = nil
 }
 
-// Refresh reloads the catalog whatever its age.
 func (c *PolicyCatalog) Refresh(ctx context.Context) (legal.Catalog, error) {
 	c.mu.Lock()
 	defer c.mu.Unlock()

@@ -110,9 +110,7 @@ CREATE TABLE policy_types (
     applied_at      timestamptz NOT NULL,
     applied_version text NOT NULL,
     applied_digest  bytea NOT NULL,
-    current         jsonb,
-    upcoming        jsonb,
-    withdrawn       jsonb NOT NULL DEFAULT '[]'
+    versions        jsonb NOT NULL DEFAULT '[]'
 );
 
 CREATE TABLE policy_versions (
