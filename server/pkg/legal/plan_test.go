@@ -223,17 +223,16 @@ func TestApply(t *testing.T) {
 			applied: []bool{true, true, true, true},
 		},
 		{
-			name: "a withdrawn version named again with a past date stays withdrawn",
+			name: "a withdrawn version named again with a past date is republished in effect",
 			steps: []step{
 				{payloadAt: 0, now: 0, version: "1.0.0", effectiveAt: -day, title: "v1"},
 				{payloadAt: hour, now: hour, version: "2.0.0", effectiveAt: 30 * day, title: "v2"},
 				{payloadAt: 2 * hour, now: 2 * hour, version: "1.0.0", effectiveAt: -day, title: "v1"},
-				{payloadAt: 3 * hour, now: 3 * hour, version: "2.0.0", effectiveAt: -day, title: "v2"},
+				{payloadAt: 3 * hour, now: 3 * hour, version: "2.0.0", effectiveAt: 3 * hour, title: "v2"},
 			},
-			readAt:    4 * hour,
-			current:   "1.0.0",
-			withdrawn: []string{"2.0.0"},
-			applied:   []bool{true, true, true, true},
+			readAt:  4 * hour,
+			current: "2.0.0",
+			applied: []bool{true, true, true, true},
 		},
 		{
 			name: "republishing a withdrawn version withdraws the other upcoming version",
