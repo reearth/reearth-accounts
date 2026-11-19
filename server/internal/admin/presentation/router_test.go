@@ -24,15 +24,18 @@ import (
 	"github.com/reearth/reearth-accounts/server/internal/admin/presentation"
 	adminuserhandler "github.com/reearth/reearth-accounts/server/internal/admin/presentation/handler/adminuser"
 	"github.com/reearth/reearth-accounts/server/internal/admin/presentation/handler/auth"
+	policyhandler "github.com/reearth/reearth-accounts/server/internal/admin/presentation/handler/policy"
 	workspacehandler "github.com/reearth/reearth-accounts/server/internal/admin/presentation/handler/workspace"
 	"github.com/reearth/reearth-accounts/server/internal/admin/presentation/internal"
 	mw "github.com/reearth/reearth-accounts/server/internal/admin/presentation/middleware"
 	adminrbac "github.com/reearth/reearth-accounts/server/internal/admin/rbac"
 	"github.com/reearth/reearth-accounts/server/internal/admin/usecase/adminuseruc"
 	"github.com/reearth/reearth-accounts/server/internal/admin/usecase/authz"
+	"github.com/reearth/reearth-accounts/server/internal/admin/usecase/policyuc"
 	"github.com/reearth/reearth-accounts/server/internal/admin/usecase/workspaceuc"
 	"github.com/reearth/reearth-accounts/server/internal/infrastructure/memory"
 	"github.com/reearth/reearth-accounts/server/pkg/adminuser"
+	"github.com/reearth/reearth-accounts/server/pkg/legal"
 	"github.com/reearth/reearth-accounts/server/pkg/role"
 	"github.com/reearth/reearth-accounts/server/pkg/user"
 	"github.com/reearth/reearth-accounts/server/pkg/workspace"
@@ -142,6 +145,7 @@ func newRouterFixture(t *testing.T) *routerFixture {
 			adminuseruc.NewSetRoleUseCase(repo),
 		),
 		auth.NewHandler(nil, nil, sess, false),
+		nil,
 		nil,
 		nil,
 		mw.NewSessionMiddleware(sess),
@@ -281,6 +285,7 @@ func TestRouter_AllMutatingRoutesRequireCSRF(t *testing.T) {
 		http.MethodPost + " /api/v1/admin-users/:id/reject",
 		http.MethodPut + " /api/v1/admin-users/:id/roles",
 		http.MethodPost + " /api/v1/workspaces/:id/transfer-owner",
+		http.MethodPost + " /api/v1/policies/:type/notices",
 	} {
 		assert.True(t, checked[want], "route walk did not reach %s", want)
 	}
@@ -398,4 +403,80 @@ func TestRoutes_TransferWorkspaceOwner_ByRole(t *testing.T) {
 			assert.Equal(t, want, saved.Members().UserRole(owner.ID()))
 		})
 	}
+}
+
+func TestRoutes_PolicyNotices_ByRole(t *testing.T) {
+	ctx := context.Background()
+	now := time.Now().UTC()
+	versions := memory.NewPolicyVersion()
+	for _, e := range []legal.Entry{
+		{Ref: legal.Ref{Type: "tos", Version: legal.MustParseVersion("1.0.0")}, EffectiveAt: now.Add(-time.Hour), Required: true},
+		{Ref: legal.Ref{Type: "tos", Version: legal.MustParseVersion("2.0.0")}, EffectiveAt: now.Add(24 * time.Hour), Required: true},
+		{Ref: legal.Ref{Type: "privacy", Version: legal.MustParseVersion("1.0.0")}, EffectiveAt: now.Add(-time.Hour), Required: true},
+	} {
+		_, err := legal.Apply(ctx, versions, legal.Manifest{Timestamp: now, Entries: []legal.Entry{e}}, func() time.Time { return now })
+		require.NoError(t, err)
+	}
+	notices := memory.NewPolicyNotice()
+
+	tests := []struct {
+		name    string
+		role    adminuser.Role
+		method  string
+		path    string
+		body    string
+		status  int
+		wantMsg string
+	}{
+		// The CSRF token matches, so a 403 must come from the role check.
+		{name: "viewer cannot post a notice", role: adminuser.RoleViewer, method: http.MethodPost, path: "/api/v1/policies/tos/notices", body: `{"audience":"all"}`, status: http.StatusForbidden, wantMsg: "forbidden"},
+		{name: "viewer can read notices", role: adminuser.RoleViewer, method: http.MethodGet, path: "/api/v1/policies/tos/notices", status: http.StatusOK},
+		{name: "system admin posts a notice", role: adminuser.RoleSystemAdmin, method: http.MethodPost, path: "/api/v1/policies/tos/notices", body: `{"audience":"all"}`, status: http.StatusCreated},
+		{name: "the same notice again", role: adminuser.RoleSystemAdmin, method: http.MethodPost, path: "/api/v1/policies/tos/notices", body: `{"audience":"all"}`, status: http.StatusOK},
+		{name: "no upcoming version", role: adminuser.RoleSystemAdmin, method: http.MethodPost, path: "/api/v1/policies/privacy/notices", body: `{"audience":"all"}`, status: http.StatusUnprocessableEntity, wantMsg: "policy type has no upcoming version"},
+		{name: "unknown audience", role: adminuser.RoleSystemAdmin, method: http.MethodPost, path: "/api/v1/policies/tos/notices", body: `{"audience":"everyone"}`, status: http.StatusBadRequest, wantMsg: "invalid audience"},
+		{name: "malformed type", role: adminuser.RoleSystemAdmin, method: http.MethodGet, path: "/api/v1/policies/TOS:1/notices", status: http.StatusBadRequest, wantMsg: "invalid type"},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			op := adminuser.New().NewID().Name("op@eukarya.io").Email("op@eukarya.io").
+				Status(adminuser.StatusApproved).Role(tt.role).MustBuild()
+			sess := session.NewManager(testSecret, time.Hour)
+			h := &presentation.Handler{
+				Policy: policyhandler.NewHandler(
+					policyuc.NewCreateNoticeUseCase(versions, notices),
+					policyuc.NewListNoticesUseCase(versions, notices, memory.NewOutbox()),
+				),
+				SessionMw:       mw.NewSessionMiddleware(sess),
+				RequireApproved: mw.NewRequireApprovedMiddleware(sess, memory.NewAdminUserWith(op)),
+				Checker:         authz.NewChecker(startPolicyCerbos(t)),
+			}
+			e := echo.New()
+			e.HTTPErrorHandler = presentation.CustomHTTPErrorHandler
+			e.Validator = testValidator{v: validator.New()}
+			presentation.RegisterRoutes(e, h)
+
+			tok, err := sess.Issue(op.ID(), time.Now())
+			require.NoError(t, err)
+			req := httptest.NewRequest(tt.method, tt.path, strings.NewReader(tt.body))
+			req.Header.Set("Content-Type", "application/json")
+			req.AddCookie(&http.Cookie{Name: session.CookieName, Value: tok})
+			req.AddCookie(&http.Cookie{Name: session.CSRFCookieName, Value: csrfToken})
+			req.Header.Set(session.CSRFHeaderName, csrfToken)
+			rec := httptest.NewRecorder()
+			e.ServeHTTP(rec, req)
+
+			require.Equal(t, tt.status, rec.Code, rec.Body.String())
+			if tt.wantMsg != "" {
+				var body internal.ErrorResponse
+				require.NoError(t, json.Unmarshal(rec.Body.Bytes(), &body))
+				assert.Equal(t, tt.wantMsg, body.Message)
+			}
+		})
+	}
+
+	stored, err := notices.FindByRef(ctx, legal.Ref{Type: "tos", Version: legal.MustParseVersion("2.0.0")})
+	require.NoError(t, err)
+	require.Len(t, stored, 1, "only the system admin's first request stored a notice")
+	assert.Equal(t, legal.BumpMajor, stored[0].Bump)
 }

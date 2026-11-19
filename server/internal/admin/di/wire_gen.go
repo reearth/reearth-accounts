@@ -9,12 +9,14 @@ import (
 	"github.com/reearth/reearth-accounts/server/internal/admin/presentation"
 	"github.com/reearth/reearth-accounts/server/internal/admin/presentation/handler/adminuser"
 	"github.com/reearth/reearth-accounts/server/internal/admin/presentation/handler/auth"
+	"github.com/reearth/reearth-accounts/server/internal/admin/presentation/handler/policy"
 	"github.com/reearth/reearth-accounts/server/internal/admin/presentation/handler/user"
 	"github.com/reearth/reearth-accounts/server/internal/admin/presentation/handler/workspace"
 	"github.com/reearth/reearth-accounts/server/internal/admin/presentation/middleware"
 	"github.com/reearth/reearth-accounts/server/internal/admin/usecase/adminuseruc"
 	"github.com/reearth/reearth-accounts/server/internal/admin/usecase/authuc"
 	"github.com/reearth/reearth-accounts/server/internal/admin/usecase/authz"
+	"github.com/reearth/reearth-accounts/server/internal/admin/usecase/policyuc"
 	"github.com/reearth/reearth-accounts/server/internal/admin/usecase/useruc"
 	"github.com/reearth/reearth-accounts/server/internal/admin/usecase/workspaceuc"
 )
@@ -50,6 +52,12 @@ func InitializeEcho() (*Server, func(), error) {
 	}
 	cookieSecure := provideCookieSecure(config)
 	authHandler := auth.NewHandler(googleSignInUseCase, getMeUseCase, manager, cookieSecure)
+	versionRepo := container.PolicyVersion
+	noticeRepo := container.PolicyNotice
+	createNoticeUseCase := policyuc.NewCreateNoticeUseCase(versionRepo, noticeRepo)
+	outboxRepo := container.Outbox
+	listNoticesUseCase := policyuc.NewListNoticesUseCase(versionRepo, noticeRepo, outboxRepo)
+	policyHandler := policy.NewHandler(createNoticeUseCase, listNoticesUseCase)
 	userRepo := container.User
 	getUserUseCase := useruc.NewGetUserUseCase(userRepo)
 	workspaceRepo := container.Workspace
@@ -74,7 +82,7 @@ func InitializeEcho() (*Server, func(), error) {
 		return nil, nil, err
 	}
 	checker := authz.NewChecker(grpcClient)
-	presentationHandler := presentation.NewHandler(handler, authHandler, userHandler, workspaceHandler, sessionMiddleware, requireApprovedMiddleware, checker)
+	presentationHandler := presentation.NewHandler(handler, authHandler, policyHandler, userHandler, workspaceHandler, sessionMiddleware, requireApprovedMiddleware, checker)
 	appMiddlewares := presentation.NewAppMiddlewares()
 	server := NewAppEchoServer(config, presentationHandler, appMiddlewares)
 	return server, func() {

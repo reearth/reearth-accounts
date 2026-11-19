@@ -99,7 +99,6 @@ var (
 	ErrInvalidRecipient = errors.New("outbox: recipient must be exactly one of a user or an address")
 )
 
-// EmptyCounts has every state at zero.
 func EmptyCounts() map[State]int {
 	m := make(map[State]int, len(States))
 	for _, s := range States {

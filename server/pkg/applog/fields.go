@@ -72,6 +72,8 @@ func LimitKey(v string) Field { return field("limit_key", v) }
 func Enforced(v bool) Field   { return field("enforced", v) }
 
 func MailKind(v mail.Kind) Field { return field("mail_kind", v) }
+func NoticeID(v any) Field       { return field("notice_id", stringer(v)) }
+func PolicyType(v string) Field  { return field("policy_type", v) }
 
 func Pass(v any) Field { return field("pass", v) }
 
@@ -81,6 +83,7 @@ func Path(v string) Field   { return field("path", v) }
 func Code(v string) Field   { return field("code", v) }
 func Reason(v string) Field { return field("reason", v) }
 func Count(v int) Field     { return field("count", v) }
+func Created(v bool) Field  { return field("created", v) }
 
 // Infrastructure.
 

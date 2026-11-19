@@ -8,6 +8,7 @@ import (
 	"github.com/reearth/reearth-accounts/server/internal/admin/usecase/adminuseruc"
 	"github.com/reearth/reearth-accounts/server/internal/admin/usecase/authuc"
 	"github.com/reearth/reearth-accounts/server/internal/admin/usecase/authz"
+	"github.com/reearth/reearth-accounts/server/internal/admin/usecase/policyuc"
 	"github.com/reearth/reearth-accounts/server/internal/admin/usecase/useruc"
 	"github.com/reearth/reearth-accounts/server/internal/admin/usecase/workspaceuc"
 )
@@ -32,6 +33,10 @@ var usecaseWire = wire.NewSet(
 	adminuseruc.NewApproveAdminUserUseCase,
 	adminuseruc.NewRejectAdminUserUseCase,
 	adminuseruc.NewSetRoleUseCase,
+
+	// policy notice usecases
+	policyuc.NewCreateNoticeUseCase,
+	policyuc.NewListNoticesUseCase,
 
 	// cross-tenant workspace usecases
 	workspaceuc.NewGetWorkspaceScimStateUseCase,

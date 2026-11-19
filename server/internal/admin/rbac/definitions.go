@@ -17,6 +17,7 @@ const (
 
 const (
 	ResourceAdminUser = "admin_user"
+	ResourcePolicy    = "policy"
 	ResourceUser      = "user"
 	ResourceWorkspace = "workspace"
 )
@@ -27,6 +28,7 @@ const (
 	ActionDelete     = "delete"
 	ActionEdit       = "edit"
 	ActionList       = "list"
+	ActionNotify     = "notify"
 	ActionRead       = "read"
 	ActionReadMember = "read_member"
 	ActionReject     = "reject"
@@ -57,6 +59,13 @@ var resourceRules = []ResourceRule{
 			ActionApprove:    {roleSystemAdmin},
 			ActionReject:     {roleSystemAdmin},
 			ActionAssignRole: {roleSystemAdmin},
+		},
+	},
+	{
+		Resource: ResourcePolicy,
+		Actions: map[string][]string{
+			ActionNotify: {roleSystemAdmin},
+			ActionRead:   {roleSystemAdmin, roleViewer},
 		},
 	},
 	{

@@ -63,8 +63,8 @@ func CheckNoticeable(c Catalog, t Type, now time.Time) (VersionRecord, Bump, err
 	return *up, b, nil
 }
 
-// HoldsAtLeast reports whether the user whose records are as holds r or a
-// later version of its type.
+// HoldsAtLeast reports whether as, the records of one user, hold r or a later
+// version of its type.
 func HoldsAtLeast(c Catalog, as []Acceptance, r Ref) bool {
 	h := Held(c, as, r.Type)
 	return h != nil && h.Version.Compare(r.Version) >= 0

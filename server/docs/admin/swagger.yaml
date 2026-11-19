@@ -23,6 +23,24 @@ definitions:
       updatedAt:
         type: string
     type: object
+  CreatePolicyNoticeRequest:
+    properties:
+      audience:
+        enum:
+        - all
+        - owners
+        example: all
+        type: string
+    required:
+    - audience
+    type: object
+  CreatePolicyNoticeResponse:
+    properties:
+      created:
+        type: boolean
+      notice:
+        $ref: '#/definitions/PolicyNotice'
+    type: object
   ErrorResponse:
     properties:
       code:
@@ -62,6 +80,13 @@ definitions:
         type: integer
       totalCount:
         type: integer
+    type: object
+  ListPolicyNoticesResponse:
+    properties:
+      items:
+        items:
+          $ref: '#/definitions/PolicyNoticeStatus'
+        type: array
     type: object
   ListUsersResponse:
     properties:
@@ -109,6 +134,38 @@ definitions:
         type: string
       updatedAt:
         type: string
+    type: object
+  PolicyNotice:
+    properties:
+      audience:
+        example: all
+        type: string
+      bump:
+        example: major
+        type: string
+      createdAt:
+        type: string
+      fanoutDone:
+        type: boolean
+      id:
+        type: string
+      requestedBy:
+        type: string
+      type:
+        example: tos
+        type: string
+      version:
+        example: 2.0.0
+        type: string
+    type: object
+  PolicyNoticeStatus:
+    properties:
+      counts:
+        additionalProperties:
+          type: integer
+        type: object
+      notice:
+        $ref: '#/definitions/PolicyNotice'
     type: object
   SetAdminUserRoleRequest:
     properties:
@@ -223,6 +280,16 @@ definitions:
         type: string
       userId:
         type: string
+    type: object
+  scimStateResponse:
+    properties:
+      scim_enabled:
+        type: boolean
+    type: object
+  setScimAvailableRequest:
+    properties:
+      enabled:
+        type: boolean
     type: object
 info:
   contact: {}
@@ -494,6 +561,94 @@ paths:
       summary: Get the current admin user
       tags:
       - auth
+  /policies/{type}/notices:
+    get:
+      description: Returns each notice recorded for the upcoming version of the policy
+        type, with the number of its mail records in each outbox state. The list is
+        empty when the type has no upcoming version. While the accounts server has
+        no mail provider, records stay pending.
+      parameters:
+      - description: Policy type
+        example: tos
+        in: path
+        name: type
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/ListPolicyNoticesResponse'
+        "400":
+          description: invalid type
+          schema:
+            $ref: '#/definitions/ErrorResponse'
+        "401":
+          description: unauthorized
+          schema:
+            $ref: '#/definitions/ErrorResponse'
+        "403":
+          description: not approved / forbidden
+          schema:
+            $ref: '#/definitions/ErrorResponse'
+      summary: List the notices of a policy's upcoming version
+      tags:
+      - policies
+    post:
+      consumes:
+      - application/json
+      description: 'Records a notice for the upcoming version of the policy type.
+        The accounts server then queues one mail per user of the audience and sends
+        it: "all" is every active user with an email address, "owners" is the owners
+        of non-personal workspaces. A major notice skips users who already accepted
+        the version. Each user gets at most one mail per version, so repeating the
+        request queues nothing new and returns the recorded notice with 200. The admin
+        API sends no mail itself.'
+      parameters:
+      - description: Policy type
+        example: tos
+        in: path
+        name: type
+        required: true
+        type: string
+      - description: Audience
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/CreatePolicyNoticeRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: already recorded
+          schema:
+            $ref: '#/definitions/CreatePolicyNoticeResponse'
+        "201":
+          description: recorded
+          schema:
+            $ref: '#/definitions/CreatePolicyNoticeResponse'
+        "400":
+          description: invalid type / invalid request body / invalid audience
+          schema:
+            $ref: '#/definitions/ErrorResponse'
+        "401":
+          description: unauthorized
+          schema:
+            $ref: '#/definitions/ErrorResponse'
+        "403":
+          description: not approved / forbidden
+          schema:
+            $ref: '#/definitions/ErrorResponse'
+        "422":
+          description: no_upcoming_version / not_required / patch_version
+          schema:
+            $ref: '#/definitions/ErrorResponse'
+      summary: Record a notice for a policy's upcoming version
+      tags:
+      - policies
   /users:
     get:
       description: Lists users, optionally filtered by a name/alias/email keyword,
@@ -738,6 +893,85 @@ paths:
           schema:
             $ref: '#/definitions/ErrorResponse'
       summary: List a workspace's members
+      tags:
+      - workspaces
+  /workspaces/{id}/scim:
+    get:
+      description: 'Returns whether the admin has enabled SCIM provisioning for the
+        workspace (scim_available: true means a ScimConfig exists).'
+      parameters:
+      - description: Workspace ID
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/scimStateResponse'
+        "400":
+          description: invalid workspace id
+          schema:
+            $ref: '#/definitions/ErrorResponse'
+        "401":
+          description: unauthorized
+          schema:
+            $ref: '#/definitions/ErrorResponse'
+        "403":
+          description: not approved or forbidden
+          schema:
+            $ref: '#/definitions/ErrorResponse'
+        "404":
+          description: workspace not found
+          schema:
+            $ref: '#/definitions/ErrorResponse'
+      summary: Get SCIM availability for a workspace
+      tags:
+      - workspaces
+    patch:
+      consumes:
+      - application/json
+      description: When enabled is true and no ScimConfig exists, a blank one is created.
+        When enabled is false, the ScimConfig (and the SCIM token) is removed.
+      parameters:
+      - description: Workspace ID
+        in: path
+        name: id
+        required: true
+        type: string
+      - description: enabled flag
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/setScimAvailableRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/scimStateResponse'
+        "400":
+          description: invalid workspace id or request body
+          schema:
+            $ref: '#/definitions/ErrorResponse'
+        "401":
+          description: unauthorized
+          schema:
+            $ref: '#/definitions/ErrorResponse'
+        "403":
+          description: not approved or forbidden
+          schema:
+            $ref: '#/definitions/ErrorResponse'
+        "404":
+          description: workspace not found
+          schema:
+            $ref: '#/definitions/ErrorResponse'
+      summary: Enable or disable SCIM for a workspace
       tags:
       - workspaces
   /workspaces/{id}/transfer-owner:

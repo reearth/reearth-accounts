@@ -57,6 +57,10 @@ func RegisterRoutes(e *echo.Echo, h *Handler) {
 		users.GET("/:id", h.User.GetUser, mw.RequirePermission(h.Checker, adminrbac.ResourceUser, adminrbac.ActionRead))
 		users.GET("/:id/workspaces", h.User.GetUserWorkspaces, mw.RequirePermission(h.Checker, adminrbac.ResourceUser, adminrbac.ActionRead))
 
+		policies := v1.Group("/policies/:type", approved...)
+		policies.GET("/notices", h.Policy.ListPolicyNotices, mw.RequirePermission(h.Checker, adminrbac.ResourcePolicy, adminrbac.ActionRead))
+		policies.POST("/notices", h.Policy.CreatePolicyNotice, mw.RequirePermission(h.Checker, adminrbac.ResourcePolicy, adminrbac.ActionNotify))
+
 		// Cross-tenant workspaces
 		workspaces := v1.Group("/workspaces", approved...)
 		workspaces.GET("", h.Workspace.ListWorkspaces, mw.RequirePermission(h.Checker, adminrbac.ResourceWorkspace, adminrbac.ActionList))

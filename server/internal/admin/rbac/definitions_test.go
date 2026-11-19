@@ -23,6 +23,11 @@ func actionRoles(t *testing.T, resource, action string) []string {
 	return nil
 }
 
+func TestDefineResources_PolicyNotices(t *testing.T) {
+	assert.Equal(t, []string{roleSystemAdmin}, actionRoles(t, ResourcePolicy, ActionNotify))
+	assert.ElementsMatch(t, []string{roleSystemAdmin, roleViewer}, actionRoles(t, ResourcePolicy, ActionRead))
+}
+
 func TestDefineResources_TransferOwnerIsSystemAdminOnly(t *testing.T) {
 	assert.Equal(t, []string{roleSystemAdmin}, actionRoles(t, ResourceWorkspace, ActionTransferOwner))
 }
