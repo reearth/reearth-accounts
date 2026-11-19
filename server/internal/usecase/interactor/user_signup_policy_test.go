@@ -191,9 +191,9 @@ func TestUser_SignupWithoutPolicySecret(t *testing.T) {
 
 	for _, in := range []legal.RefInput{tosIn("1.0.0"), tosIn("1.0")} {
 		_, err := f.signup(in)
-		assert.ErrorIs(t, err, legal.ErrNotConfigured)
+		assert.ErrorIs(t, err, interfaces.ErrSignupPoliciesNotConfigured)
 		_, err = f.signupOIDC(in)
-		assert.ErrorIs(t, err, legal.ErrNotConfigured)
+		assert.ErrorIs(t, err, interfaces.ErrSignupPoliciesNotConfigured)
 	}
 	f.assertNoUser(t)
 

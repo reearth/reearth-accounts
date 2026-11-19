@@ -165,3 +165,60 @@ func TestPolicySignup_WithoutSecret(t *testing.T) {
 	signupREST(e, "empty-rest@example.com", nil).Status(http.StatusOK)
 	signedUp(t, r, "empty@example.com")
 }
+
+func TestSignup_RejectsAnIDAlreadyInUse(t *testing.T) {
+	for _, useMongo := range []bool{false, true} {
+		t.Run(fmt.Sprintf("mongo=%v", useMongo), func(t *testing.T) {
+			testSignupRejectsAnIDAlreadyInUse(t, useMongo)
+		})
+	}
+}
+
+func testSignupRejectsAnIDAlreadyInUse(t *testing.T, useMongo bool) {
+	ctx := context.Background()
+	now := time.Now().Truncate(time.Second)
+	e, r := StartServer(t, &app.Config{PolicyWebhookSecret: webhookSecret}, useMongo, seedRoles)
+	deliverPolicies(t, e, currentTosPayload(now, -2*time.Minute))
+
+	signupGQL(e, "existing@example.com", nil).NotContainsKey("errors")
+	existing := signedUp(t, r, "existing@example.com")
+	policies := policyList("tos", tosCurrent, "privacy", privacyCurrent)
+
+	gqlIn := func(email string) map[string]any {
+		return map[string]any{"id": existing.String(), "email": email, "name": email, "policies": policies}
+	}
+	in := gqlIn("gql@example.com")
+	in["password"] = "StrongPassw0rd!"
+	e.POST("/api/graphql").
+		WithJSON(GraphQLRequest{Query: signupMutation, Variables: map[string]any{"input": in}}).
+		Expect().Status(http.StatusOK).JSON().Object().Value("errors").Array().NotEmpty()
+
+	in = gqlIn("oidc@example.com")
+	in["sub"] = "auth0|oidc"
+	e.POST("/api/graphql").
+		WithHeader("authorization", "Bearer test").
+		WithHeader("X-Reearth-Debug-Auth-Sub", "auth0|oidc").
+		WithHeader("X-Reearth-Debug-Auth-Iss", "https://issuer.example.com").
+		WithHeader("X-Reearth-Debug-Auth-Token", "dummy").
+		WithJSON(GraphQLRequest{Query: signupOIDCMutation, Variables: map[string]any{"input": in}}).
+		Expect().Status(http.StatusOK).JSON().Object().Value("errors").Array().NotEmpty()
+
+	e.POST("/api/users/signup").
+		WithJSON(map[string]any{"id": existing.String(), "email": "rest@example.com", "name": "rest", "password": "StrongPassw0rd!", "policies": policies}).
+		Expect().Status(http.StatusConflict)
+
+	e.POST("/api/users/signup-oidc").
+		WithJSON(map[string]any{"id": existing.String(), "email": "rest-oidc@example.com", "name": "rest-oidc", "sub": "auth0|rest-oidc", "policies": policies}).
+		Expect().Status(http.StatusConflict)
+
+	for _, email := range []string{"gql@example.com", "oidc@example.com", "rest@example.com", "rest-oidc@example.com"} {
+		assertNotSignedUp(t, r, email)
+	}
+	assert.Empty(t, storedAcceptances(t, r, existing))
+	ws, err := r.Workspace.FindByUser(ctx, existing)
+	require.NoError(t, err)
+	assert.Len(t, ws, 1)
+	u, err := r.User.FindByID(ctx, existing)
+	require.NoError(t, err)
+	assert.Equal(t, "existing@example.com", u.Email())
+}

@@ -18,6 +18,7 @@ var (
 	ErrUserInvalidPasswordReset        = rerror.NewE(i18n.T("invalid password reset request"))
 	ErrUserInvalidLang                 = rerror.NewE(i18n.T("invalid lang"))
 	ErrSignupInvalidSecret             = rerror.NewE(i18n.T("invalid secret"))
+	ErrSignupPoliciesNotConfigured     = rerror.NewE(i18n.T("policies not configured"))
 	ErrInvalidUserEmail                = rerror.NewE(i18n.T("invalid email"))
 	ErrNotVerifiedUser                 = rerror.NewE(i18n.T("not verified user"))
 	ErrInvalidEmailOrPassword          = rerror.NewE(i18n.T("invalid email or password"))

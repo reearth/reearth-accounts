@@ -61,6 +61,9 @@ func (i *User) Signup(ctx context.Context, param interfaces.SignupParam) (*user.
 			applog.Warn(ctx, "[Signup] User already exists with email")
 			return nil, interfaces.ErrUserAlreadyExists
 		}
+		if err := i.ensureUserIDFree(ctx, param.UserID); err != nil {
+			return nil, err
+		}
 
 		u, ws, err := workspace.Init(workspace.InitParams{
 			Email:       param.Email,
@@ -122,7 +125,7 @@ func (i *User) Signup(ctx context.Context, param interfaces.SignupParam) (*user.
 	if err != nil {
 		return nil, err
 	}
-	i.policy.acceptAtSignup(ctx, u.ID(), plan, param.Client)
+	i.policy.tryAcceptAtSignup(ctx, u.ID(), plan, param.Client)
 	return u, nil
 }
 
@@ -162,6 +165,9 @@ func (i *User) SignupOIDC(ctx context.Context, param interfaces.SignupOIDCParam)
 		}
 		if eu != nil {
 			return nil, user.ErrDuplicatedUser
+		}
+		if err := i.ensureUserIDFree(ctx, param.User.UserID); err != nil {
+			return nil, err
 		}
 
 		// Initialize user and ws
@@ -209,7 +215,7 @@ func (i *User) SignupOIDC(ctx context.Context, param interfaces.SignupOIDCParam)
 	if err != nil {
 		return nil, err
 	}
-	i.policy.acceptAtSignup(ctx, u.ID(), plan, param.Client)
+	i.policy.tryAcceptAtSignup(ctx, u.ID(), plan, param.Client)
 	return u, nil
 }
 
@@ -526,6 +532,20 @@ func issToURL(iss, p string) *url.URL {
 	}
 
 	return nil
+}
+
+func (i *User) ensureUserIDFree(ctx context.Context, uid *user.ID) error {
+	if uid == nil {
+		return nil
+	}
+	_, err := i.repos.User.FindByID(ctx, *uid)
+	if errors.Is(err, rerror.ErrNotFound) {
+		return nil
+	}
+	if err != nil {
+		return err
+	}
+	return interfaces.ErrUserAlreadyExists
 }
 
 func (i *User) verifySignupSecret(secret *string) error {

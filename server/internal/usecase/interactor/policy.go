@@ -86,10 +86,7 @@ func (p *Policy) ReceiveWebhook(ctx context.Context, r io.Reader, signature stri
 	return res, err
 }
 
-// acceptAtSignup takes no operator because its subject is the user the signup
-// just created. A failed write leaves that user pending at first sign-in
-// instead of failing the signup.
-func (p *Policy) acceptAtSignup(ctx context.Context, uid user.ID, plan acceptPlan, client legal.Client) {
+func (p *Policy) tryAcceptAtSignup(ctx context.Context, uid user.ID, plan acceptPlan, client legal.Client) {
 	if len(plan.refs) == 0 {
 		return
 	}
@@ -116,14 +113,12 @@ func (p *Policy) plan(ctx context.Context, held []legal.Acceptance, in []legal.R
 	return acceptPlan{at: now, refs: refs}, nil
 }
 
-// planSignup checks a signup's policies before the user exists, so a version
-// the catalog refuses fails the signup without creating the user.
 func (p *Policy) planSignup(ctx context.Context, in []legal.RefInput) (acceptPlan, error) {
 	if len(in) == 0 {
 		return acceptPlan{}, nil
 	}
 	if p == nil || !p.secret.Enabled() {
-		return acceptPlan{}, legal.ErrNotConfigured
+		return acceptPlan{}, interfaces.ErrSignupPoliciesNotConfigured
 	}
 	return p.plan(ctx, nil, in)
 }
@@ -153,13 +148,16 @@ func (p *Policy) record(ctx context.Context, uid user.ID, plan acceptPlan, clien
 	if err := p.repos.PolicyAcceptance.InsertIfAbsent(ctx, records); err != nil {
 		return nil, err
 	}
+	return p.discardAcceptancesOfDeletedUser(ctx, uid)
+}
+
+func (p *Policy) discardAcceptancesOfDeletedUser(ctx context.Context, uid user.ID) (*user.User, error) {
 	u, err := p.repos.User.FindByID(ctx, uid)
-	if errors.Is(err, rerror.ErrNotFound) {
-		// DeleteMe may have removed the user after this request authenticated,
-		// and its sweep may have run before the insert above.
-		if rmErr := p.repos.PolicyAcceptance.RemoveByUser(ctx, uid); rmErr != nil {
-			return nil, rmErr
-		}
+	if !errors.Is(err, rerror.ErrNotFound) {
+		return u, err
 	}
-	return u, err
+	if rmErr := p.repos.PolicyAcceptance.RemoveByUser(ctx, uid); rmErr != nil {
+		return nil, rmErr
+	}
+	return nil, err
 }

@@ -569,7 +569,7 @@ func (h *UserHandler) Signup(c echo.Context) error {
 	}
 	u, err := httpinternal.Usecases(c).User.Signup(ctx, param)
 	if err != nil {
-		return signupPolicyError(err)
+		return policyError(err)
 	}
 	return c.JSON(http.StatusOK, httpmodel.NewUserResponse(c.Request().Context(), h.photos, u, httpmodel.UnrestrictedViewer()))
 }
@@ -620,7 +620,7 @@ func (h *UserHandler) SignupOIDC(c echo.Context) error {
 	}
 	u, err := httpinternal.Usecases(c).User.SignupOIDC(ctx, param)
 	if err != nil {
-		return signupPolicyError(err)
+		return policyError(err)
 	}
 	return c.JSON(http.StatusOK, httpmodel.NewUserResponse(c.Request().Context(), h.photos, u, httpmodel.UnrestrictedViewer()))
 }
