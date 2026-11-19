@@ -8,6 +8,7 @@ import (
 
 	"github.com/reearth/reearth-accounts/server/internal/usecase/interfaces"
 	"github.com/reearth/reearth-accounts/server/internal/usecase/repo"
+	"github.com/reearth/reearth-accounts/server/pkg/applog"
 	"github.com/reearth/reearth-accounts/server/pkg/legal"
 	"github.com/reearth/reearth-accounts/server/pkg/user"
 	"github.com/reearth/reearth-accounts/server/pkg/workspace"
@@ -32,36 +33,16 @@ func (p *Policy) Accept(ctx context.Context, in []legal.RefInput, client legal.C
 	if op == nil || op.User == nil {
 		return nil, interfaces.ErrInvalidOperator
 	}
-	refs, err := legal.ParseRefs(in)
-	if err != nil {
-		return nil, err
-	}
 	uid := *op.User
 	held, err := p.repos.PolicyAcceptance.FindByUser(ctx, uid)
 	if err != nil {
 		return nil, err
 	}
-	now := p.now().UTC().Truncate(time.Millisecond)
-	plan, err := p.planWithFreshCatalog(ctx, held, refs, now)
+	plan, err := p.plan(ctx, held, in)
 	if err != nil {
 		return nil, err
 	}
-	records := make([]legal.Acceptance, len(plan))
-	for i, r := range plan {
-		records[i] = legal.Acceptance{AcceptedAt: now, Client: client, Ref: r, UserID: uid}
-	}
-	if err := p.repos.PolicyAcceptance.InsertIfAbsent(ctx, records); err != nil {
-		return nil, err
-	}
-	u, err := p.repos.User.FindByID(ctx, uid)
-	if errors.Is(err, rerror.ErrNotFound) {
-		// DeleteMe may have removed the user after this request authenticated,
-		// and its sweep may have run before the insert above.
-		if rmErr := p.repos.PolicyAcceptance.RemoveByUser(ctx, uid); rmErr != nil {
-			return nil, rmErr
-		}
-	}
-	return u, err
+	return p.record(ctx, uid, plan, client)
 }
 
 func (p *Policy) Overview(ctx context.Context, op *workspace.Operator) (legal.Overview, error) {
@@ -105,6 +86,48 @@ func (p *Policy) ReceiveWebhook(ctx context.Context, r io.Reader, signature stri
 	return res, err
 }
 
+// acceptAtSignup takes no operator because its subject is the user the signup
+// just created. A failed write leaves that user pending at first sign-in
+// instead of failing the signup.
+func (p *Policy) acceptAtSignup(ctx context.Context, uid user.ID, plan acceptPlan, client legal.Client) {
+	if len(plan.refs) == 0 {
+		return
+	}
+	if _, err := p.record(ctx, uid, plan, client); err != nil {
+		applog.Warn(ctx, "could not record policy acceptance at signup", applog.UserID(uid))
+	}
+}
+
+type acceptPlan struct {
+	at   time.Time
+	refs []legal.Ref
+}
+
+func (p *Policy) plan(ctx context.Context, held []legal.Acceptance, in []legal.RefInput) (acceptPlan, error) {
+	refs, err := legal.ParseRefs(in)
+	if err != nil {
+		return acceptPlan{}, err
+	}
+	now := p.now().UTC().Truncate(time.Millisecond)
+	refs, err = p.planWithFreshCatalog(ctx, held, refs, now)
+	if err != nil {
+		return acceptPlan{}, err
+	}
+	return acceptPlan{at: now, refs: refs}, nil
+}
+
+// planSignup checks a signup's policies before the user exists, so a version
+// the catalog refuses fails the signup without creating the user.
+func (p *Policy) planSignup(ctx context.Context, in []legal.RefInput) (acceptPlan, error) {
+	if len(in) == 0 {
+		return acceptPlan{}, nil
+	}
+	if p == nil || !p.secret.Enabled() {
+		return acceptPlan{}, legal.ErrNotConfigured
+	}
+	return p.plan(ctx, nil, in)
+}
+
 // planWithFreshCatalog reloads the catalog once before it rejects a version,
 // because the webhook may have reached another instance within the cache TTL.
 func (p *Policy) planWithFreshCatalog(ctx context.Context, held []legal.Acceptance, refs []legal.Ref, now time.Time) ([]legal.Ref, error) {
@@ -120,4 +143,23 @@ func (p *Policy) planWithFreshCatalog(ctx context.Context, held []legal.Acceptan
 		return nil, err
 	}
 	return legal.PlanAccept(cat, held, refs, now)
+}
+
+func (p *Policy) record(ctx context.Context, uid user.ID, plan acceptPlan, client legal.Client) (*user.User, error) {
+	records := make([]legal.Acceptance, len(plan.refs))
+	for i, r := range plan.refs {
+		records[i] = legal.Acceptance{AcceptedAt: plan.at, Client: client, Ref: r, UserID: uid}
+	}
+	if err := p.repos.PolicyAcceptance.InsertIfAbsent(ctx, records); err != nil {
+		return nil, err
+	}
+	u, err := p.repos.User.FindByID(ctx, uid)
+	if errors.Is(err, rerror.ErrNotFound) {
+		// DeleteMe may have removed the user after this request authenticated,
+		// and its sweep may have run before the insert above.
+		if rmErr := p.repos.PolicyAcceptance.RemoveByUser(ctx, uid); rmErr != nil {
+			return nil, rmErr
+		}
+	}
+	return u, err
 }

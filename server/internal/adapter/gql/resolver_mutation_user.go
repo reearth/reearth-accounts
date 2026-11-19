@@ -72,6 +72,8 @@ func (r *mutationResolver) Signup(ctx context.Context, input gqlmodel.SignupInpu
 		UserID:      gqlmodel.ToIDRef[id.User](input.ID),
 		WorkspaceID: gqlmodel.ToIDRef[id.Workspace](input.WorkspaceID),
 		MockAuth:    lo.FromPtr(input.MockAuth),
+		Policies:    gqlmodel.ToPolicyRefInputs(input.Policies),
+		Client:      adapter.Client(ctx),
 	})
 	if err != nil {
 		return nil, err
@@ -114,6 +116,8 @@ func (r *mutationResolver) SignupOidc(ctx context.Context, input gqlmodel.Signup
 		Issuer:      iss,
 		Email:       email,
 		Name:        name,
+		Policies:    gqlmodel.ToPolicyRefInputs(input.Policies),
+		Client:      adapter.Client(ctx),
 		Secret:      input.Secret,
 		User: interfaces.SignupUserParam{
 			Lang:        &lang,

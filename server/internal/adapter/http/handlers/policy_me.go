@@ -75,3 +75,12 @@ func policyError(err error) error {
 	}
 	return err
 }
+
+// signupPolicyError answers 400 when policies are not configured, because the
+// signup route exists and only its policies field cannot be served.
+func signupPolicyError(err error) error {
+	if errors.Is(err, legal.ErrNotConfigured) {
+		return httpinternal.NewError(http.StatusBadRequest, err.Error(), err)
+	}
+	return policyError(err)
+}

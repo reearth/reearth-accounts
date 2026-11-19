@@ -5,6 +5,7 @@ import (
 	"time"
 
 	"github.com/reearth/reearth-accounts/server/internal/usecase/gateway"
+	"github.com/reearth/reearth-accounts/server/pkg/legal"
 	"github.com/reearth/reearth-accounts/server/pkg/user"
 	"github.com/reearth/reearth-accounts/server/pkg/workspace"
 	"github.com/reearth/reearthx/i18n"
@@ -33,6 +34,8 @@ type SignupOIDCParam struct {
 	Sub         string
 	Email       string
 	Name        string
+	Policies    []legal.RefInput
+	Client      legal.Client
 	Secret      *string
 	User        SignupUserParam
 }
@@ -64,6 +67,8 @@ type SignupParam struct {
 	UserID      *user.ID
 	WorkspaceID *workspace.ID
 	MockAuth    bool
+	Policies    []legal.RefInput
+	Client      legal.Client
 }
 
 type UserFindOrCreateParam struct {

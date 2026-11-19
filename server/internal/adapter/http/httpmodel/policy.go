@@ -35,8 +35,12 @@ type PolicyRefRequest struct {
 }
 
 func (r AcceptPoliciesRequest) Inputs() []legal.RefInput {
-	res := make([]legal.RefInput, len(r.Policies))
-	for i, p := range r.Policies {
+	return PolicyRefInputs(r.Policies)
+}
+
+func PolicyRefInputs(ps []PolicyRefRequest) []legal.RefInput {
+	res := make([]legal.RefInput, len(ps))
+	for i, p := range ps {
 		res[i] = legal.RefInput{Type: p.Type, Version: p.Version}
 	}
 	return res

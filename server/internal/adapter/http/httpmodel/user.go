@@ -333,26 +333,28 @@ func (r *UpdateMeRequest) ToInteractorInput() interfaces.UpdateMeParam {
 
 // SignupRequest mirrors signup input.
 type SignupRequest struct {
-	ID          *string `json:"id,omitempty"`
-	WorkspaceID *string `json:"workspace_id,omitempty"`
-	Name        string  `json:"name" validate:"required"`
-	Email       string  `json:"email" validate:"required,email"`
-	Password    string  `json:"password" validate:"required"`
-	Secret      *string `json:"secret,omitempty"`
-	Lang        *string `json:"lang,omitempty"`
-	Theme       *string `json:"theme,omitempty" validate:"omitempty,oneof=default dark light"`
-	MockAuth    *bool   `json:"mock_auth,omitempty"`
+	ID          *string            `json:"id,omitempty"`
+	WorkspaceID *string            `json:"workspace_id,omitempty"`
+	Name        string             `json:"name" validate:"required"`
+	Email       string             `json:"email" validate:"required,email"`
+	Password    string             `json:"password" validate:"required"`
+	Secret      *string            `json:"secret,omitempty"`
+	Lang        *string            `json:"lang,omitempty"`
+	Theme       *string            `json:"theme,omitempty" validate:"omitempty,oneof=default dark light"`
+	MockAuth    *bool              `json:"mock_auth,omitempty"`
+	Policies    []PolicyRefRequest `json:"policies,omitempty" validate:"omitempty,dive"`
 }
 
 // SignupOIDCRequest mirrors signupOIDC input.
 type SignupOIDCRequest struct {
-	ID          *string `json:"id,omitempty"`
-	WorkspaceID *string `json:"workspace_id,omitempty"`
-	Name        *string `json:"name,omitempty"`
-	Email       *string `json:"email,omitempty" validate:"omitempty,email"`
-	Sub         *string `json:"sub,omitempty"`
-	Lang        *string `json:"lang,omitempty"`
-	Secret      *string `json:"secret,omitempty"`
+	ID          *string            `json:"id,omitempty"`
+	WorkspaceID *string            `json:"workspace_id,omitempty"`
+	Name        *string            `json:"name,omitempty"`
+	Email       *string            `json:"email,omitempty" validate:"omitempty,email"`
+	Sub         *string            `json:"sub,omitempty"`
+	Lang        *string            `json:"lang,omitempty"`
+	Secret      *string            `json:"secret,omitempty"`
+	Policies    []PolicyRefRequest `json:"policies,omitempty" validate:"omitempty,dive"`
 }
 
 // SyncSSOUserRequest is the request body for POST /users/sync-sso.

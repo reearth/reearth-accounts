@@ -40,12 +40,16 @@ type UserInfo struct {
 
 var oidcHTTPClient = &http.Client{Timeout: 10 * time.Second}
 
-func (i *User) Signup(ctx context.Context, param interfaces.SignupParam) (u *user.User, err error) {
-	if err = i.verifySignupSecret(param.Secret); err != nil {
+func (i *User) Signup(ctx context.Context, param interfaces.SignupParam) (*user.User, error) {
+	if err := i.verifySignupSecret(param.Secret); err != nil {
+		return nil, err
+	}
+	plan, err := i.policy.planSignup(ctx, param.Policies)
+	if err != nil {
 		return nil, err
 	}
 
-	return Run1(ctx, nil, i.repos, Usecase().Transaction(), func(ctx context.Context) (*user.User, error) {
+	u, err := Run1(ctx, nil, i.repos, Usecase().Transaction(), func(ctx context.Context) (*user.User, error) {
 		applog.Debug(ctx, "[Signup] Inside transaction")
 		// Check for duplicate email
 		eu, err := i.repos.User.FindByEmail(ctx, param.Email)
@@ -115,10 +119,19 @@ func (i *User) Signup(ctx context.Context, param interfaces.SignupParam) (u *use
 
 		return u, nil
 	})
+	if err != nil {
+		return nil, err
+	}
+	i.policy.acceptAtSignup(ctx, u.ID(), plan, param.Client)
+	return u, nil
 }
 
 func (i *User) SignupOIDC(ctx context.Context, param interfaces.SignupOIDCParam) (*user.User, error) {
 	if err := i.verifySignupSecret(param.Secret); err != nil {
+		return nil, err
+	}
+	plan, err := i.policy.planSignup(ctx, param.Policies)
+	if err != nil {
 		return nil, err
 	}
 
@@ -134,7 +147,7 @@ func (i *User) SignupOIDC(ctx context.Context, param interfaces.SignupOIDCParam)
 		email = ui.Email
 	}
 
-	return Run1(ctx, nil, i.repos, Usecase().Transaction(), func(ctx context.Context) (*user.User, error) {
+	u, err := Run1(ctx, nil, i.repos, Usecase().Transaction(), func(ctx context.Context) (*user.User, error) {
 		eu, err := i.repos.User.FindByEmail(ctx, email)
 		if err != nil && !errors.Is(err, rerror.ErrNotFound) {
 			return nil, err
@@ -193,6 +206,11 @@ func (i *User) SignupOIDC(ctx context.Context, param interfaces.SignupOIDCParam)
 
 		return u, nil
 	})
+	if err != nil {
+		return nil, err
+	}
+	i.policy.acceptAtSignup(ctx, u.ID(), plan, param.Client)
+	return u, nil
 }
 
 func (i *User) SyncSSOUser(ctx context.Context, param interfaces.SyncSSOUserParam) (*user.User, error) {

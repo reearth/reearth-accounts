@@ -63,6 +63,7 @@ input SignupInput {
   lang: Lang
   theme: Theme
   mockAuth: Boolean
+  policies: [PolicyAcceptanceInput!]
 }
 
 input SignupOIDCInput {
@@ -73,6 +74,7 @@ input SignupOIDCInput {
   lang: Lang
   workspaceId: ID
   secret: String
+  policies: [PolicyAcceptanceInput!]
 }
 
 

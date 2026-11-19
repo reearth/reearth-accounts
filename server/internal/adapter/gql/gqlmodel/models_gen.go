@@ -232,25 +232,27 @@ type RemoveUserFromWorkspaceInput struct {
 }
 
 type SignupInput struct {
-	ID          *ID     `json:"id,omitempty"`
-	WorkspaceID *ID     `json:"workspaceID,omitempty"`
-	Name        string  `json:"name"`
-	Email       string  `json:"email"`
-	Password    string  `json:"password"`
-	Secret      *string `json:"secret,omitempty"`
-	Lang        *string `json:"lang,omitempty"`
-	Theme       *Theme  `json:"theme,omitempty"`
-	MockAuth    *bool   `json:"mockAuth,omitempty"`
+	ID          *ID                      `json:"id,omitempty"`
+	WorkspaceID *ID                      `json:"workspaceID,omitempty"`
+	Name        string                   `json:"name"`
+	Email       string                   `json:"email"`
+	Password    string                   `json:"password"`
+	Secret      *string                  `json:"secret,omitempty"`
+	Lang        *string                  `json:"lang,omitempty"`
+	Theme       *Theme                   `json:"theme,omitempty"`
+	MockAuth    *bool                    `json:"mockAuth,omitempty"`
+	Policies    []*PolicyAcceptanceInput `json:"policies,omitempty"`
 }
 
 type SignupOIDCInput struct {
-	ID          *ID     `json:"id,omitempty"`
-	Name        *string `json:"name,omitempty"`
-	Email       *string `json:"email,omitempty"`
-	Sub         *string `json:"sub,omitempty"`
-	Lang        *string `json:"lang,omitempty"`
-	WorkspaceID *ID     `json:"workspaceId,omitempty"`
-	Secret      *string `json:"secret,omitempty"`
+	ID          *ID                      `json:"id,omitempty"`
+	Name        *string                  `json:"name,omitempty"`
+	Email       *string                  `json:"email,omitempty"`
+	Sub         *string                  `json:"sub,omitempty"`
+	Lang        *string                  `json:"lang,omitempty"`
+	WorkspaceID *ID                      `json:"workspaceId,omitempty"`
+	Secret      *string                  `json:"secret,omitempty"`
+	Policies    []*PolicyAcceptanceInput `json:"policies,omitempty"`
 }
 
 type StartPasswordResetInput struct {

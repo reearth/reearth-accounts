@@ -534,9 +534,10 @@ func (h *UserHandler) FindByNameOrAlias(c echo.Context) error {
 // @Summary Sign up a new user
 // @Accept json
 // @Produce json
+// @Description `policies` lists the policy versions the user accepts. Each must be the current or upcoming version of its type, and a non-empty list needs REEARTH_ACCOUNTS_POLICY_WEBHOOK_SECRET.
 // @Param body body httpmodel.SignupRequest true "signup fields"
 // @Success 200 {object} httpmodel.UserResponse
-// @Failure 400 {object} internal.ErrorResponse
+// @Failure 400 {object} internal.ErrorResponse "invalid fields, or a policy that cannot be accepted"
 // @Failure 409 {object} internal.ErrorResponse
 // @Router /api/users/signup [post]
 func (h *UserHandler) Signup(c echo.Context) error {
@@ -563,10 +564,12 @@ func (h *UserHandler) Signup(c echo.Context) error {
 		UserID:      uid,
 		WorkspaceID: wid,
 		MockAuth:    lo.FromPtr(req.MockAuth),
+		Policies:    httpmodel.PolicyRefInputs(req.Policies),
+		Client:      adapter.Client(ctx),
 	}
 	u, err := httpinternal.Usecases(c).User.Signup(ctx, param)
 	if err != nil {
-		return err
+		return signupPolicyError(err)
 	}
 	return c.JSON(http.StatusOK, httpmodel.NewUserResponse(c.Request().Context(), h.photos, u, httpmodel.UnrestrictedViewer()))
 }
@@ -576,8 +579,10 @@ func (h *UserHandler) Signup(c echo.Context) error {
 // @Summary Sign up via OIDC
 // @Accept json
 // @Produce json
+// @Description `policies` lists the policy versions the user accepts. Each must be the current or upcoming version of its type, and a non-empty list needs REEARTH_ACCOUNTS_POLICY_WEBHOOK_SECRET.
 // @Param body body httpmodel.SignupOIDCRequest true "OIDC signup fields"
 // @Success 200 {object} httpmodel.UserResponse
+// @Failure 400 {object} internal.ErrorResponse "invalid fields, or a policy that cannot be accepted"
 // @Router /api/users/signup-oidc [post]
 func (h *UserHandler) SignupOIDC(c echo.Context) error {
 	ctx := c.Request().Context()
@@ -604,6 +609,8 @@ func (h *UserHandler) SignupOIDC(c echo.Context) error {
 		Issuer:      iss,
 		Email:       lo.FromPtr(req.Email),
 		Name:        lo.FromPtr(req.Name),
+		Policies:    httpmodel.PolicyRefInputs(req.Policies),
+		Client:      adapter.Client(ctx),
 		Secret:      req.Secret,
 		User: interfaces.SignupUserParam{
 			Lang:        httpmodel.ParseLang(req.Lang),
@@ -613,7 +620,7 @@ func (h *UserHandler) SignupOIDC(c echo.Context) error {
 	}
 	u, err := httpinternal.Usecases(c).User.SignupOIDC(ctx, param)
 	if err != nil {
-		return err
+		return signupPolicyError(err)
 	}
 	return c.JSON(http.StatusOK, httpmodel.NewUserResponse(c.Request().Context(), h.photos, u, httpmodel.UnrestrictedViewer()))
 }

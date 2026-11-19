@@ -301,6 +301,10 @@ definitions:
         type: string
       name:
         type: string
+      policies:
+        items:
+          $ref: '#/definitions/httpmodel.PolicyRefRequest'
+        type: array
       secret:
         type: string
       sub:
@@ -322,6 +326,10 @@ definitions:
         type: string
       password:
         type: string
+      policies:
+        items:
+          $ref: '#/definitions/httpmodel.PolicyRefRequest'
+        type: array
       secret:
         type: string
       theme:
@@ -1417,6 +1425,9 @@ paths:
     post:
       consumes:
       - application/json
+      description: '`policies` lists the policy versions the user accepts. Each must
+        be the current or upcoming version of its type, and a non-empty list needs
+        REEARTH_ACCOUNTS_POLICY_WEBHOOK_SECRET.'
       parameters:
       - description: signup fields
         in: body
@@ -1432,7 +1443,7 @@ paths:
           schema:
             $ref: '#/definitions/httpmodel.UserResponse'
         "400":
-          description: Bad Request
+          description: invalid fields, or a policy that cannot be accepted
           schema:
             $ref: '#/definitions/internal.ErrorResponse'
         "409":
@@ -1446,6 +1457,9 @@ paths:
     post:
       consumes:
       - application/json
+      description: '`policies` lists the policy versions the user accepts. Each must
+        be the current or upcoming version of its type, and a non-empty list needs
+        REEARTH_ACCOUNTS_POLICY_WEBHOOK_SECRET.'
       parameters:
       - description: OIDC signup fields
         in: body
@@ -1460,6 +1474,10 @@ paths:
           description: OK
           schema:
             $ref: '#/definitions/httpmodel.UserResponse'
+        "400":
+          description: invalid fields, or a policy that cannot be accepted
+          schema:
+            $ref: '#/definitions/internal.ErrorResponse'
       summary: Sign up via OIDC
       tags:
       - User
