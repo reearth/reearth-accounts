@@ -45,11 +45,41 @@ var indexes = map[string][]mongo.IndexModel{
 	}},
 }
 
+// The audience pages sort on id. These collections predate EnsureIndexes, so
+// an index on the same key under another name is reused: creating it again
+// under ours would fail startup.
+var keysetIndexes = map[string]string{userCollection: "user_id", workspaceCollection: "workspace_id"}
+
 func EnsureIndexes(ctx context.Context, db *mongo.Database) error {
 	for coll, models := range indexes {
 		if _, err := db.Collection(coll).Indexes().CreateMany(ctx, models); err != nil {
 			return fmt.Errorf("create indexes on %s: %w", coll, err)
 		}
 	}
+	for coll, name := range keysetIndexes {
+		if err := ensureIDIndex(ctx, db.Collection(coll), name); err != nil {
+			return fmt.Errorf("create indexes on %s: %w", coll, err)
+		}
+	}
 	return nil
+}
+
+func ensureIDIndex(ctx context.Context, c *mongo.Collection, name string) error {
+	cur, err := c.Indexes().List(ctx)
+	if err != nil {
+		return err
+	}
+	var existing []struct {
+		Key bson.D `bson:"key"`
+	}
+	if err := cur.All(ctx, &existing); err != nil {
+		return err
+	}
+	for _, e := range existing {
+		if len(e.Key) == 1 && e.Key[0].Key == "id" {
+			return nil
+		}
+	}
+	_, err = c.Indexes().CreateOne(ctx, mongo.IndexModel{Keys: bson.D{{Key: "id", Value: 1}}, Options: options.Index().SetName(name)})
+	return err
 }

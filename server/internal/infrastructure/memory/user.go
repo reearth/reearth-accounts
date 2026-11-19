@@ -31,6 +31,14 @@ func NewUserWith(users ...*user.User) *User {
 	return r
 }
 
+func (r *User) deactivated(id user.ID) bool {
+	if r == nil {
+		return false
+	}
+	u, ok := r.data.Load(id)
+	return ok && u.IsDeleted()
+}
+
 func (r *User) FindActiveIDsWithEmailAfter(_ context.Context, after *user.ID, limit int) (user.IDList, error) {
 	if r.err != nil {
 		return nil, r.err

@@ -23,12 +23,14 @@ type User struct {
 	host   string
 }
 
+const userCollection = "user"
+
 func NewUser(client *mongox.Client) user.Repo {
-	return &User{client: client.WithCollection("user")}
+	return &User{client: client.WithCollection(userCollection)}
 }
 
 func NewUserWithHost(client *mongox.Client, host string) user.Repo {
-	return &User{client: client.WithCollection("user"), host: host}
+	return &User{client: client.WithCollection(userCollection), host: host}
 }
 
 func (r *User) FindActiveIDsWithEmailAfter(ctx context.Context, after *user.ID, limit int) (user.IDList, error) {

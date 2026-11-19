@@ -407,7 +407,10 @@ func testAudienceOrgOwners(t *testing.T, nc Factory) {
 		id.NewUserID(), id.NewUserID(), id.NewUserID(), id.NewUserID()
 	w1 := org(map[id.UserID]workspace.Member{o1: member(role.RoleOwner, false), writer: member(role.RoleWriter, false)}, nil)
 	w2 := org(map[id.UserID]workspace.Member{o2: member(role.RoleOwner, false), o1: member(role.RoleOwner, false), disabled: member(role.RoleOwner, true)}, nil)
-	w3 := org(map[id.UserID]workspace.Member{o3: member(role.RoleOwner, false)}, nil)
+	deactivated := newUser(t, "deactivated", "deactivated@example.com")
+	deactivated.Deactivate()
+	require.NoError(t, c.User.Save(ctx, deactivated))
+	w3 := org(map[id.UserID]workspace.Member{o3: member(role.RoleOwner, false), deactivated.ID(): member(role.RoleOwner, false)}, nil)
 	org(map[id.UserID]workspace.Member{personalOwner: member(role.RoleOwner, false)}, func(b *workspace.Builder) { b.Personal(true) })
 	deletedAt := timeFixed()
 	org(map[id.UserID]workspace.Member{deletedOwner: member(role.RoleOwner, false)}, func(b *workspace.Builder) { b.DeletedAt(&deletedAt) })
@@ -439,7 +442,7 @@ func testAudienceOrgOwners(t *testing.T, nc Factory) {
 			want[o]++
 		}
 	}
-	assert.Equal(t, want, got, "enabled owners of non-personal, non-deleted workspaces")
+	assert.Equal(t, want, got, "enabled, active owners of non-personal, non-deleted workspaces")
 
 	owners, last, err := c.Workspace.FindOrgOwnersAfter(ctx, &orgs[1], 5)
 	require.NoError(t, err)

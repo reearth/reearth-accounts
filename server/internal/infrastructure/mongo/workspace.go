@@ -2,6 +2,7 @@ package mongo
 
 import (
 	"context"
+	"slices"
 	"regexp"
 	"strings"
 
@@ -26,8 +27,10 @@ type Workspace struct {
 	f      workspace.WorkspaceFilter
 }
 
+const workspaceCollection = "workspace"
+
 func NewWorkspace(client *mongox.Client) workspace.Repo {
-	return &Workspace{client: client.WithCollection("workspace")}
+	return &Workspace{client: client.WithCollection(workspaceCollection)}
 }
 
 func NewWorkspaceCompat(client *mongox.Client) workspace.Repo {
@@ -308,11 +311,37 @@ func (r *Workspace) FindOrgOwnersAfter(ctx context.Context, after *workspace.ID,
 			owners = append(owners, u)
 		}
 	}
+	if owners, err = r.withoutDeactivated(ctx, owners); err != nil {
+		return nil, nil, err
+	}
 	last, err := workspace.IDFrom(docs[len(docs)-1].ID)
 	if err != nil {
 		return nil, nil, rerror.ErrInternalByWithContext(ctx, err)
 	}
 	return owners, &last, nil
+}
+
+func (r *Workspace) withoutDeactivated(ctx context.Context, users user.IDList) (user.IDList, error) {
+	if len(users) == 0 {
+		return users, nil
+	}
+	cur, err := r.client.Client().Database().Collection(userCollection).Find(ctx,
+		bson.M{"id": bson.M{"$in": users.Strings()}, "deletedat": bson.M{"$exists": true}},
+		options.Find().SetProjection(bson.M{"id": 1, "_id": 0}))
+	if err != nil {
+		return nil, rerror.ErrInternalByWithContext(ctx, err)
+	}
+	var docs []struct {
+		ID string `bson:"id"`
+	}
+	if err := cur.All(ctx, &docs); err != nil {
+		return nil, rerror.ErrInternalByWithContext(ctx, err)
+	}
+	gone := make(map[string]struct{}, len(docs))
+	for _, d := range docs {
+		gone[d.ID] = struct{}{}
+	}
+	return slices.DeleteFunc(users, func(u user.ID) bool { _, ok := gone[u.String()]; return ok }), nil
 }
 
 func (r *Workspace) FindOrgOwnersAmong(ctx context.Context, users user.IDList) (user.IDList, error) {

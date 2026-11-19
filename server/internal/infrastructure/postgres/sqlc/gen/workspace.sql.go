@@ -200,6 +200,7 @@ WITH page AS (
 SELECT page.id AS workspace_id, m.user_id
 FROM page
 LEFT JOIN workspace_members m ON m.workspace_id = page.id AND m.role = 'owner' AND NOT m.disabled
+    AND NOT EXISTS (SELECT 1 FROM users u WHERE u.id = m.user_id AND u.deleted_at IS NOT NULL)
 ORDER BY page.id
 `
 

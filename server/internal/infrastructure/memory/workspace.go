@@ -17,9 +17,10 @@ import (
 )
 
 type Workspace struct {
-	data *util.SyncMap[workspace.ID, *workspace.Workspace]
-	f    workspace.WorkspaceFilter
-	err  error
+	data  *util.SyncMap[workspace.ID, *workspace.Workspace]
+	f     workspace.WorkspaceFilter
+	err   error
+	users *User
 }
 
 func NewWorkspace() *Workspace {
@@ -38,9 +39,10 @@ func NewWorkspaceWith(workspaces ...*workspace.Workspace) *Workspace {
 
 func (r *Workspace) Filtered(f workspace.WorkspaceFilter) workspace.Repo {
 	return &Workspace{
-		data: r.data,
-		f:    r.f.Merge(f),
-		err:  r.err,
+		data:  r.data,
+		f:     r.f.Merge(f),
+		err:   r.err,
+		users: r.users,
 	}
 }
 
@@ -185,7 +187,7 @@ func (r *Workspace) FindOrgOwnersAfter(_ context.Context, after *workspace.ID, l
 	var owners user.IDList
 	for _, w := range page {
 		for u, m := range w.Members().Users() {
-			if m.Role == role.RoleOwner && !m.Disabled {
+			if m.Role == role.RoleOwner && !m.Disabled && !r.users.deactivated(u) {
 				owners = append(owners, u)
 			}
 		}
