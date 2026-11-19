@@ -392,6 +392,56 @@ func TestPolicyNotice_SecondAudienceAfterRetentionSendsNoSecondMail(t *testing.T
 	}
 }
 
+func TestPolicyNotice_WithdrawnEarlierNoticeDoesNotNarrowTheOtherAudience(t *testing.T) {
+	tos1Entry := legal.Entry{Ref: tos1, EffectiveAt: t0.Add(-30 * 24 * time.Hour), Required: true, Title: legal.LocalizedText{"en": "Terms"}}
+	tos2Entry := legal.Entry{Ref: tos2, EffectiveAt: t0.Add(30 * 24 * time.Hour), Required: true, Title: legal.LocalizedText{"en": "Terms of Service"}}
+	for _, tt := range []struct {
+		first, second legal.Audience
+		queuedPages   int
+		mails         int
+	}{
+		{first: legal.AudienceAll, second: legal.AudienceOwners, mails: 2},
+		{first: legal.AudienceOwners, second: legal.AudienceAll, mails: 3},
+		{first: legal.AudienceAll, second: legal.AudienceOwners, queuedPages: 2, mails: 2},
+		{first: legal.AudienceOwners, second: legal.AudienceAll, queuedPages: 1, mails: 3},
+	} {
+		name := string(tt.first) + " withdrawn then " + string(tt.second)
+		if tt.queuedPages > 0 {
+			name += " mid fan-out"
+		}
+		t.Run(name, func(t *testing.T) {
+			f := newNoticeFixture(t, 1)
+			owners := []*user.User{f.user(t, "owner1", "en"), f.user(t, "owner2", "en")}
+			f.user(t, "member", "en")
+			for _, o := range owners {
+				f.org(t, o.ID())
+			}
+			first := f.notice(t, tt.first)
+			if tt.queuedPages > 0 {
+				f.mail.noSender = true
+				_, err := f.fanout.Run(cancelAfterPages(t, f, tt.queuedPages), f.clock)
+				require.NoError(t, err)
+				require.Equal(t, legal.FanoutOpen, f.stored(t, first).Fanout.End)
+				require.NotEmpty(t, f.counts(t, first))
+				f.mail.noSender = false
+			}
+			f.publish(t, tos1Entry)
+			f.pass(t)
+			require.Equal(t, legal.FanoutWithdrawn, f.stored(t, first).Fanout.End)
+
+			f.publish(t, tos1Entry, tos2Entry)
+			second := f.notice(t, tt.second)
+			f.pass(t)
+			for _, o := range owners {
+				assert.Equal(t, 1, f.mailsTo(o.ID()), "each owner is mailed once by the later notice")
+			}
+			assert.Equal(t, tt.mails, f.mail.count(), "the later notice mails its whole audience")
+			assert.Equal(t, legal.FanoutComplete, f.stored(t, second).Fanout.End)
+			assert.Equal(t, legal.FanoutWithdrawn, f.stored(t, first).Fanout.End)
+		})
+	}
+}
+
 func TestPolicyNotice_WithdrawnAndRepublishedVersion(t *testing.T) {
 	f := newNoticeFixture(t, 1)
 	a := f.user(t, "a", "en")
@@ -467,17 +517,30 @@ func (p pageCounter) FindActiveIDsWithEmailAfter(ctx context.Context, after *use
 	return ids, err
 }
 
+type ownerPageCounter struct {
+	workspace.Repo
+	onPage func()
+}
+
+func (p ownerPageCounter) FindOrgOwnersAfter(ctx context.Context, after *workspace.ID, limit int) (user.IDList, *workspace.ID, error) {
+	owners, last, err := p.Repo.FindOrgOwnersAfter(ctx, after, limit)
+	p.onPage()
+	return owners, last, err
+}
+
 func cancelAfterPages(t *testing.T, f *noticeFixture, n int) context.Context {
 	t.Helper()
 	ctx, cancel := context.WithCancel(context.Background())
 	t.Cleanup(cancel)
 	pages := 0
-	inner := f.fanout.repos.Users
-	f.fanout.repos.Users = pageCounter{Repo: inner, onPage: func() {
+	onPage := func() {
 		if pages++; pages == n {
 			cancel()
 		}
-	}}
-	t.Cleanup(func() { f.fanout.repos.Users = inner })
+	}
+	users, workspaces := f.fanout.repos.Users, f.fanout.repos.Workspaces
+	f.fanout.repos.Users = pageCounter{Repo: users, onPage: onPage}
+	f.fanout.repos.Workspaces = ownerPageCounter{Repo: workspaces, onPage: onPage}
+	t.Cleanup(func() { f.fanout.repos.Users, f.fanout.repos.Workspaces = users, workspaces })
 	return ctx
 }

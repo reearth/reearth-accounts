@@ -100,6 +100,8 @@ func (n Notice) before(o Notice) bool {
 // Overlap is what an earlier notice of the same version for the other
 // audience leaves n to do. The outbox key stops a second mail only while the
 // first record is kept, so both audiences are compared at fan-out instead.
+// Only an earlier notice that is open or ended complete counts, because a
+// withdrawn or covered one does not reach its whole audience.
 type Overlap int
 
 const (
@@ -114,6 +116,9 @@ const (
 func OverlapOf(n Notice, notices []Notice) Overlap {
 	for _, o := range notices {
 		if o.Ref != n.Ref || o.Audience == n.Audience || !o.before(n) {
+			continue
+		}
+		if o.Fanout.End != FanoutOpen && o.Fanout.End != FanoutComplete {
 			continue
 		}
 		if n.Audience == AudienceOwners {

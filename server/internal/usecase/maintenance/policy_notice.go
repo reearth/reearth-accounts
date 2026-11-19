@@ -92,10 +92,16 @@ func (f *policyNoticeFanout) fanout(ctx context.Context, n legal.Notice, lease l
 			return queued, err
 		}
 		if cursor == "" {
-			// A reopened notice starts over, and the records it queued before
-			// the withdrawal would keep their keys from being queued again.
-			if err := f.repos.Outbox.RemoveFailedByNotice(ctx, n.ID, outbox.ReasonVersionNotUpcoming); err != nil {
-				return queued, err
+			// A reopened notice starts over, and the records it or a withdrawn
+			// notice of the other audience queued before the withdrawal would
+			// keep their keys from being queued again.
+			for _, o := range siblings {
+				if o.ID != n.ID && o.Fanout.End != legal.FanoutWithdrawn {
+					continue
+				}
+				if err := f.repos.Outbox.RemoveFailedByNotice(ctx, o.ID, outbox.ReasonVersionNotUpcoming); err != nil {
+					return queued, err
+				}
 			}
 		}
 		page, err := f.audience(ctx, n.Audience, cursor)
