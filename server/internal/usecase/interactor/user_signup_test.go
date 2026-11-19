@@ -13,16 +13,17 @@ import (
 	"github.com/samber/lo"
 	"golang.org/x/text/language"
 
+	"github.com/reearth/reearth-accounts/server/internal/infrastructure/mailprovider"
 	accountmemory "github.com/reearth/reearth-accounts/server/internal/infrastructure/memory"
 	"github.com/reearth/reearth-accounts/server/internal/usecase/gateway"
 	"github.com/reearth/reearth-accounts/server/internal/usecase/interfaces"
 	"github.com/reearth/reearth-accounts/server/internal/usecase/repo"
 	"github.com/reearth/reearth-accounts/server/pkg/id"
+	"github.com/reearth/reearth-accounts/server/pkg/mail"
 	"github.com/reearth/reearth-accounts/server/pkg/role"
 	"github.com/reearth/reearth-accounts/server/pkg/user"
 	"github.com/reearth/reearth-accounts/server/pkg/workspace"
 	"github.com/reearth/reearthx/i18n"
-	"github.com/reearth/reearthx/mailer"
 	"github.com/reearth/reearthx/rerror"
 	"github.com/reearth/reearthx/util"
 
@@ -44,7 +45,7 @@ func TestUser_Signup(t *testing.T) {
 		args             interfaces.SignupParam
 		wantUser         func(u *user.User) *user.User
 		wantWorkspace    *workspace.Workspace
-		wantMailTo       []mailer.Contact
+		wantMailTo       mail.Recipient
 		wantMailSubject  string
 		wantMailContent  string
 		wantError        error
@@ -103,7 +104,7 @@ func TestUser_Signup(t *testing.T) {
 				Members(map[user.ID]workspace.Member{uid: {Role: role.RoleOwner, Disabled: false, InvitedBy: uid}}).
 				Personal(true).
 				MustBuild(),
-			wantMailTo:      []mailer.Contact{{Email: "unique@bbb.com", Name: "NAME"}},
+			wantMailTo:      mail.ToUser(uid, "unique@bbb.com", "NAME"),
 			wantMailSubject: "email verification",
 			wantMailContent: "/?user-verification-token=CODECODE",
 			wantError:       nil,
@@ -139,7 +140,7 @@ func TestUser_Signup(t *testing.T) {
 				Members(map[user.ID]workspace.Member{uid: {Role: role.RoleOwner, Disabled: false, InvitedBy: uid}}).
 				Personal(true).
 				MustBuild(),
-			wantMailTo:      []mailer.Contact{{Email: "aaa@bbb.com", Name: "NAME"}},
+			wantMailTo:      mail.ToUser(uid, "aaa@bbb.com", "NAME"),
 			wantMailSubject: "email verification",
 			wantMailContent: "https://reearth.io/?user-verification-token=CODECODE",
 			wantError:       nil,
@@ -219,7 +220,7 @@ func TestUser_Signup(t *testing.T) {
 				Members(map[user.ID]workspace.Member{uid: {Role: role.RoleOwner, Disabled: false, InvitedBy: uid}}).
 				Personal(true).
 				MustBuild(),
-			wantMailTo:      []mailer.Contact{{Email: "aaa@bbb.com", Name: "NAME"}},
+			wantMailTo:      mail.ToUser(uid, "aaa@bbb.com", "NAME"),
 			wantMailSubject: "email verification",
 			wantMailContent: "/?user-verification-token=CODECODE",
 			wantError:       nil,
@@ -262,7 +263,7 @@ func TestUser_Signup(t *testing.T) {
 				Members(map[user.ID]workspace.Member{uid: {Role: role.RoleOwner, Disabled: false, InvitedBy: uid}}).
 				Personal(true).
 				MustBuild(),
-			wantMailTo:      []mailer.Contact{{Email: "aaa@bbb.com", Name: "NAME"}},
+			wantMailTo:      mail.ToUser(uid, "aaa@bbb.com", "NAME"),
 			wantMailSubject: "email verification",
 			wantMailContent: "/?user-verification-token=CODECODE",
 			wantError:       nil,
@@ -331,8 +332,8 @@ func TestUser_Signup(t *testing.T) {
 				assert.NoError(t, r.User.Save(ctx, tt.createUserBefore))
 			}
 
-			m := mailer.NewMock()
-			g := &gateway.Container{Mailer: m}
+			m := &mailprovider.Mock{}
+			g := &gateway.Container{Mail: m}
 			uc := NewUser(r, g, nil, tt.signupSecret, tt.authSrvUIDomain)
 			u, err := uc.Signup(ctx, tt.args)
 
@@ -369,14 +370,15 @@ func TestUser_Signup(t *testing.T) {
 
 			assert.Equal(t, tt.wantError, err)
 
-			mails := m.Mails()
+			mails := m.Envelopes()
 			if tt.wantMailSubject == "" {
 				assert.Empty(t, mails)
 			} else {
 				assert.Equal(t, 1, len(mails))
-				assert.Equal(t, tt.wantMailSubject, mails[0].Subject)
+				assert.Equal(t, mail.KindVerification, mails[0].Message.Kind())
+				assert.Equal(t, tt.wantMailSubject, mails[0].Message.Subject())
 				assert.Equal(t, tt.wantMailTo, mails[0].To)
-				assert.Contains(t, mails[0].PlainContent, tt.wantMailContent)
+				assert.Contains(t, mails[0].Message.Text(), tt.wantMailContent)
 			}
 		})
 	}
@@ -765,6 +767,7 @@ type mockAuthenticator struct {
 	getUserError                  error
 	resendVerificationEmailCalled bool
 	resendVerificationEmailUserID string
+	resendVerificationAccountUser id.UserID
 	resendVerificationEmailError  error
 	updateUserCalled              bool
 	updateUserParam               gateway.AuthenticatorUpdateUserParam
@@ -804,9 +807,10 @@ func (m *mockAuthenticator) RegenerateMFARecoveryCode(_ context.Context, _ strin
 	return "", nil
 }
 
-func (m *mockAuthenticator) ResendVerificationEmail(ctx context.Context, userID string) error {
+func (m *mockAuthenticator) ResendVerificationEmail(ctx context.Context, target gateway.VerificationTarget) error {
 	m.resendVerificationEmailCalled = true
-	m.resendVerificationEmailUserID = userID
+	m.resendVerificationEmailUserID = target.Sub
+	m.resendVerificationAccountUser = target.UserID
 	return m.resendVerificationEmailError
 }
 
@@ -962,12 +966,12 @@ func TestUser_CreateVerification(t *testing.T) {
 				assert.NoError(t, r.User.Save(ctx, tt.createUserBefore()))
 			}
 
-			m := mailer.NewMock()
+			m := &mailprovider.Mock{}
 			auth := &mockAuthenticator{
 				resendVerificationEmailError: tt.authenticatorError,
 			}
 			g := &gateway.Container{
-				Mailer:         m,
+				Mail:           m,
 				Authenticators: map[gateway.Provider]gateway.Authenticator{gateway.ProviderAuth0: auth},
 			}
 			uc := NewUser(r, g, nil, "", "")
@@ -986,6 +990,9 @@ func TestUser_CreateVerification(t *testing.T) {
 			assert.Equal(t, tt.wantAuthenticatorCalled, auth.resendVerificationEmailCalled, "authenticator call mismatch")
 			if tt.wantAuthenticatorCalled {
 				assert.Equal(t, tt.wantAuthenticatorCalledWithUserID, auth.resendVerificationEmailUserID, "authenticator userID mismatch")
+				saved, err := r.User.FindByEmail(ctx, tt.email)
+				assert.NoError(t, err)
+				assert.Equal(t, saved.ID(), auth.resendVerificationAccountUser, "accounts user ID mismatch")
 			}
 		})
 	}
@@ -1190,6 +1197,7 @@ func TestUser_SyncSSOUser(t *testing.T) {
 		assert.NotNil(t, u)
 		assert.True(t, auth0Mock.resendVerificationEmailCalled)
 		assert.Equal(t, "samlp|org123|idp111", auth0Mock.resendVerificationEmailUserID)
+		assert.Equal(t, u.ID(), auth0Mock.resendVerificationAccountUser)
 	})
 
 	t.Run("succeeds even when auth0 ResendVerificationEmail fails (best-effort)", func(t *testing.T) {

@@ -20,12 +20,12 @@ import (
 	"github.com/reearth/reearth-accounts/server/internal/usecase/interfaces"
 	"github.com/reearth/reearth-accounts/server/pkg/applog"
 	"github.com/reearth/reearth-accounts/server/pkg/id"
+	"github.com/reearth/reearth-accounts/server/pkg/mail"
 	"github.com/reearth/reearth-accounts/server/pkg/permittable"
 	"github.com/reearth/reearth-accounts/server/pkg/role"
 	"github.com/reearth/reearth-accounts/server/pkg/user"
 	"github.com/reearth/reearth-accounts/server/pkg/workspace"
 	"github.com/reearth/reearthx/i18n"
-	"github.com/reearth/reearthx/mailer"
 	"github.com/reearth/reearthx/rerror"
 	"github.com/samber/lo"
 )
@@ -331,7 +331,7 @@ func (i *User) SyncSSOUser(ctx context.Context, param interfaces.SyncSSOUserPara
 		return u, nil
 	}
 
-	if err = authenticator.ResendVerificationEmail(ctx, param.Sub); err != nil {
+	if err = authenticator.ResendVerificationEmail(ctx, gateway.VerificationTarget{Sub: param.Sub, UserID: u.ID()}); err != nil {
 		applog.Warn(ctx, "SyncSSOUser: verification email failed, will retry on next login", applog.Err(err))
 		return u, nil
 	}
@@ -403,22 +403,10 @@ func (i *User) sendVerificationMail(ctx context.Context, u *user.User, vr *user.
 		return err
 	}
 
-	if err := i.gateways.Mailer.SendMail(
-		ctx,
-		[]mailer.Contact{
-			{
-				Email: u.Email(),
-				Name:  u.Name(),
-			},
-		},
-		"email verification",
-		text.String(),
-		html.String(),
-	); err != nil {
-		return err
-	}
-
-	return nil
+	return i.gateways.Mail.Send(ctx, mail.Envelope{
+		Message: mail.Raw(mail.KindVerification, "email verification", text.String(), html.String()),
+		To:      mail.ToUser(u.ID(), u.Email(), u.Name()),
+	})
 }
 
 func (i *User) getUserInfoFromISS(ctx context.Context, iss, accessToken string) (UserInfo, error) {
@@ -594,7 +582,7 @@ func (i *User) findOrCreateRole(ctx context.Context, roleName string, mockAuth b
 
 func (i *User) CreateVerification(ctx context.Context, email string) error {
 	var idpAuth gateway.Authenticator
-	var idpSub string
+	var target gateway.VerificationTarget
 
 	if err := Run0(ctx, nil, i.repos, Usecase().Transaction(), func(ctx context.Context) error {
 		u, err := i.repos.User.FindByEmail(ctx, email)
@@ -625,7 +613,7 @@ func (i *User) CreateVerification(ctx context.Context, email string) error {
 				continue
 			}
 			idpAuth = auth
-			idpSub = a.Sub
+			target = gateway.VerificationTarget{Sub: a.Sub, UserID: u.ID()}
 			break
 		}
 
@@ -635,7 +623,7 @@ func (i *User) CreateVerification(ctx context.Context, email string) error {
 	}
 
 	if idpAuth != nil {
-		if err := idpAuth.ResendVerificationEmail(ctx, idpSub); err != nil {
+		if err := idpAuth.ResendVerificationEmail(ctx, target); err != nil {
 			return err
 		}
 	}

@@ -16,13 +16,13 @@ import (
 	"github.com/reearth/reearth-accounts/server/internal/usecase/repo"
 	"github.com/reearth/reearth-accounts/server/pkg/applog"
 	"github.com/reearth/reearth-accounts/server/pkg/id"
+	"github.com/reearth/reearth-accounts/server/pkg/mail"
 	"github.com/reearth/reearth-accounts/server/pkg/pagination"
 	"github.com/reearth/reearth-accounts/server/pkg/permittable"
 	"github.com/reearth/reearth-accounts/server/pkg/role"
 	"github.com/reearth/reearth-accounts/server/pkg/user"
 	"github.com/reearth/reearth-accounts/server/pkg/workspace"
 	"github.com/reearth/reearthx/i18n"
-	"github.com/reearth/reearthx/mailer"
 	"github.com/reearth/reearthx/rerror"
 )
 
@@ -669,8 +669,7 @@ func (i *User) VerifyUser(ctx context.Context, code string) (*user.User, error) 
 	})
 }
 func (i *User) StartPasswordReset(ctx context.Context, email string) error {
-	var contact mailer.Contact
-	var mailText, mailHTML string
+	var envelope mail.Envelope
 
 	if err := Run0(ctx, nil, i.repos, Usecase().Transaction(), func(ctx context.Context) error {
 		u, err := i.repos.User.FindByEmail(ctx, email)
@@ -707,16 +706,17 @@ func (i *User) StartPasswordReset(ctx context.Context, email string) error {
 			return err
 		}
 
-		contact = mailer.Contact{Email: u.Email(), Name: u.Name()}
-		mailText = TextOut.String()
-		mailHTML = HTMLOut.String()
+		envelope = mail.Envelope{
+			Message: mail.Raw(mail.KindPasswordReset, "Password reset", TextOut.String(), HTMLOut.String()),
+			To:      mail.ToUser(u.ID(), u.Email(), u.Name()),
+		}
 
 		return nil
 	}); err != nil {
 		return err
 	}
 
-	return i.gateways.Mailer.SendMail(ctx, []mailer.Contact{contact}, "Password reset", mailText, mailHTML)
+	return i.gateways.Mail.Send(ctx, envelope)
 }
 
 func (i *User) PasswordReset(ctx context.Context, password string, token string) error {

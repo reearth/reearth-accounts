@@ -12,12 +12,12 @@ import (
 	"github.com/labstack/gommon/log"
 	"github.com/reearth/reearth-accounts/server/internal/app"
 	infraCerbos "github.com/reearth/reearth-accounts/server/internal/infrastructure/cerbos"
+	"github.com/reearth/reearth-accounts/server/internal/infrastructure/mailprovider"
 	"github.com/reearth/reearth-accounts/server/internal/infrastructure/memory"
 	mongorepo "github.com/reearth/reearth-accounts/server/internal/infrastructure/mongo"
 	"github.com/reearth/reearth-accounts/server/internal/usecase/gateway"
 	gatewaymock "github.com/reearth/reearth-accounts/server/internal/usecase/gateway/mock"
 	"github.com/reearth/reearth-accounts/server/internal/usecase/repo"
-	"github.com/reearth/reearthx/mailer"
 	"github.com/reearth/reearthx/mongox/mongotest"
 	"go.uber.org/mock/gomock"
 )
@@ -137,7 +137,7 @@ func StartServerWithAuthenticator(
 
 	return StartServerWithGateways(t, cfg, repos, &gateway.Container{
 		Authenticators: map[gateway.Provider]gateway.Authenticator{gateway.ProviderAuth0: authenticator},
-		Mailer:         mailer.New(ctx, &mailer.Config{}),
+		Mail:           &mailprovider.Mock{},
 	}, true), repos
 }
 
@@ -168,7 +168,7 @@ func startServerURL(
 	ctx := context.Background()
 	if gateways == nil {
 		gateways = &gateway.Container{
-			Mailer: mailer.New(ctx, &mailer.Config{}),
+			Mail: &mailprovider.Mock{},
 		}
 	}
 

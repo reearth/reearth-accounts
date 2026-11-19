@@ -6,17 +6,18 @@ import (
 	"testing"
 	"time"
 
+	"github.com/reearth/reearth-accounts/server/internal/infrastructure/mailprovider"
 	"github.com/reearth/reearth-accounts/server/internal/infrastructure/memory"
 	"github.com/reearth/reearth-accounts/server/internal/rbac"
 	"github.com/reearth/reearth-accounts/server/internal/usecase/gateway"
 	"github.com/reearth/reearth-accounts/server/internal/usecase/interfaces"
 	"github.com/reearth/reearth-accounts/server/internal/usecase/repo"
 	"github.com/reearth/reearth-accounts/server/pkg/id"
+	"github.com/reearth/reearth-accounts/server/pkg/mail"
 	"github.com/reearth/reearth-accounts/server/pkg/permittable"
 	"github.com/reearth/reearth-accounts/server/pkg/role"
 	"github.com/reearth/reearth-accounts/server/pkg/user"
 	"github.com/reearth/reearth-accounts/server/pkg/workspace"
-	"github.com/reearth/reearthx/mailer"
 	"github.com/reearth/reearthx/rerror"
 	"github.com/samber/lo"
 	"golang.org/x/text/language"
@@ -179,15 +180,15 @@ func TestUser_StartPasswordReset(t *testing.T) {
 	tid := id.NewWorkspaceID()
 	r := memory.New()
 
-	m := mailer.NewMock()
-	g := &gateway.Container{Mailer: m}
+	m := &mailprovider.Mock{}
+	g := &gateway.Container{Mail: m}
 	uc := NewUser(r, g, nil, "", "")
 	tests := []struct {
 		name             string
 		createUserBefore *user.User
 		email            string
 		wantMailSubject  string
-		wantMailTo       []mailer.Contact
+		wantMailTo       mail.Recipient
 		wantError        error
 	}{
 		{
@@ -206,13 +207,8 @@ func TestUser_StartPasswordReset(t *testing.T) {
 				MustBuild(),
 			email:           "aaa@bbb.com",
 			wantMailSubject: "Password reset",
-			wantMailTo: []mailer.Contact{
-				{
-					Email: "aaa@bbb.com",
-					Name:  "NAME",
-				},
-			},
-			wantError: nil,
+			wantMailTo:      mail.ToUser(uid, "aaa@bbb.com", "NAME"),
+			wantError:       nil,
 		},
 		{
 			name:      "not found",
@@ -271,10 +267,11 @@ func TestUser_StartPasswordReset(t *testing.T) {
 				assert.NotNil(t, user.PasswordReset())
 			}
 
-			mails := m.Mails()
+			mails := m.Envelopes()
 			if tt.wantMailSubject != "" {
 				assert.Equal(t, 1, len(mails))
-				assert.Equal(t, tt.wantMailSubject, mails[0].Subject)
+				assert.Equal(t, mail.KindPasswordReset, mails[0].Message.Kind())
+				assert.Equal(t, tt.wantMailSubject, mails[0].Message.Subject())
 				assert.Equal(t, tt.wantMailTo, mails[0].To)
 			}
 		})
@@ -1283,7 +1280,7 @@ func (m *mockAuthenticatorWithError) RegenerateMFARecoveryCode(_ context.Context
 	return "new-recovery-code", nil
 }
 
-func (m *mockAuthenticatorWithError) ResendVerificationEmail(_ context.Context, _ string) error {
+func (m *mockAuthenticatorWithError) ResendVerificationEmail(_ context.Context, _ gateway.VerificationTarget) error {
 	return nil
 }
 
@@ -1848,12 +1845,6 @@ func TestUser_DeleteMe_LeavesWhenAnotherOwnerJoinedBeforeLock(t *testing.T) {
 	assert.Equal(t, role.RoleOwner, shared.Members().UserRole(otherOwner))
 }
 
-type failingMailer struct{ err error }
-
-func (f *failingMailer) SendMail(_ context.Context, _ []mailer.Contact, _, _, _ string) error {
-	return f.err
-}
-
 func TestUser_StartPasswordReset_TokenPersistedBeforeMailSend(t *testing.T) {
 	user.DefaultPasswordEncoder = &user.NoopPasswordEncoder{}
 	t.Parallel()
@@ -1861,7 +1852,7 @@ func TestUser_StartPasswordReset_TokenPersistedBeforeMailSend(t *testing.T) {
 	ctx := context.Background()
 	r := memory.New()
 	mailerErr := errors.New("smtp unavailable")
-	g := &gateway.Container{Mailer: &failingMailer{err: mailerErr}}
+	g := &gateway.Container{Mail: &mailprovider.Mock{Err: mailerErr}}
 	uc := NewUser(r, g, nil, "", "")
 
 	uid := id.NewUserID()

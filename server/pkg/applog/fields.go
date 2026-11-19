@@ -69,6 +69,10 @@ func Subject(v string) Field { return field("subject", v) }
 func LimitKey(v string) Field { return field("limit_key", v) }
 func Enforced(v bool) Field   { return field("enforced", v) }
 
+// Mail. Never a recipient address, subject or body.
+
+func MailKind(v string) Field { return field("mail_kind", v) }
+
 // Outcomes and counters.
 
 func Path(v string) Field   { return field("path", v) }

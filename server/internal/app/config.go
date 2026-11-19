@@ -13,6 +13,7 @@ import (
 	"github.com/kelseyhightower/envconfig"
 	"github.com/reearth/reearth-accounts/server/internal/adapter"
 	"github.com/reearth/reearth-accounts/server/internal/adapter/ratelimit"
+	"github.com/reearth/reearth-accounts/server/internal/infrastructure/mailprovider"
 	"github.com/reearth/reearth-accounts/server/pkg/applog"
 	"github.com/reearth/reearth-accounts/server/pkg/workspace"
 	"github.com/reearth/reearthx/appx"
@@ -59,6 +60,10 @@ type Config struct {
 	AuthTimeClaim string `envconfig:"REEARTH_ACCOUNTS_AUTH_TIME_CLAIM"`
 
 	GraphQL GraphQLConfig
+
+	Mailer mailprovider.Env
+	// MailSettings is Mailer validated by ReadConfig.
+	MailSettings mailprovider.Settings `ignored:"true"`
 
 	// UserLookupLimit caps user lookups per viewer (ADR-0003 decision 6).
 	UserLookupLimit ratelimit.Config
@@ -284,6 +289,12 @@ func ReadConfig(debug bool) (*Config, error) {
 	if debug {
 		c.Dev = true
 	}
+
+	ms, err := mailprovider.Parse(c.Mailer, c.Dev)
+	if err != nil {
+		return nil, err
+	}
+	c.MailSettings = ms
 	return &c, nil
 }
 
@@ -300,6 +311,7 @@ func (c Config) Print() string {
 	for _, secret := range []string{
 		c.DB, c.RestAPIKey, c.SwaggerBasicPass,
 		c.Auth0.ClientSecret, c.SignupSecret, c.SyncSSOAPIKey,
+		c.Mailer.SendGridAPIKey,
 	} {
 		if secret == "" {
 			continue
