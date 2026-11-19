@@ -12,7 +12,6 @@ import (
 	"github.com/reearth/reearthx/mailer"
 )
 
-// New builds the gateway. Only ModeProvider calls mailer.New.
 func New(ctx context.Context, s Settings) (gateway.Mail, error) {
 	if s.Mode != ModeProvider {
 		return &sender{mode: s.Mode, out: os.Stdout}, nil
@@ -30,8 +29,6 @@ type sender struct {
 	out  io.Writer
 }
 
-func (s *sender) Deliverable() bool { return s.mode == ModeProvider }
-
 func (s *sender) Send(ctx context.Context, e mail.Envelope) error {
 	if s.mode != ModeProvider {
 		s.drop(ctx, e)
@@ -39,25 +36,23 @@ func (s *sender) Send(ctx context.Context, e mail.Envelope) error {
 	}
 	to := []mailer.Contact{{Email: e.To.Address(), Name: e.To.Name()}}
 	if err := s.m.SendMail(ctx, to, e.Message.Subject(), e.Message.Text(), e.Message.HTML()); err != nil {
-		permanent, code := classify(err)
-		return &mail.SendError{Code: code, Err: err, Permanent: permanent}
+		applog.Warn(ctx, "mail send failed", logFields(e)...)
+		return &mail.SendError{Err: err}
 	}
 	return nil
 }
 
 func (s *sender) drop(ctx context.Context, e mail.Envelope) {
-	fields := []applog.Field{applog.MailKind(string(e.Message.Kind()))}
-	if uid := e.To.UserID(); uid != nil {
-		fields = append(fields, applog.UserID(*uid))
-	}
-	applog.Warn(ctx, "mail dropped: no provider configured", fields...)
+	applog.Warn(ctx, "mail dropped: no provider configured", logFields(e)...)
 	if s.mode == ModeDevPrint {
 		_, _ = fmt.Fprintln(s.out, e.Message.Text())
 	}
 }
 
-// classify is the one place that knows reearthx error shapes. reearthx
-// returns untyped errors today, so every failure counts as transient.
-func classify(error) (permanent bool, code string) {
-	return false, ""
+func logFields(e mail.Envelope) []applog.Field {
+	fields := []applog.Field{applog.MailKind(e.Message.Kind())}
+	if uid := e.To.UserID(); uid != nil {
+		fields = append(fields, applog.UserID(*uid))
+	}
+	return fields
 }

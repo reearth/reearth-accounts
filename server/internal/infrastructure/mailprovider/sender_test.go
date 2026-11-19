@@ -5,6 +5,7 @@ import (
 	"context"
 	"errors"
 	"os"
+	"strings"
 	"testing"
 
 	"github.com/reearth/reearth-accounts/server/pkg/id"
@@ -51,7 +52,6 @@ func TestSender_Provider_OneContactPerSend(t *testing.T) {
 		assert.Equal(t, subject, got.Subject)
 		assert.Equal(t, "open "+link, got.PlainContent)
 	}
-	assert.True(t, s.Deliverable())
 }
 
 type failingMailer struct{ err error }
@@ -61,16 +61,25 @@ func (f failingMailer) SendMail(context.Context, []mailer.Contact, string, strin
 }
 
 func TestSender_Provider_ErrorIsSendErrorWithoutAddress(t *testing.T) {
-	cause := errors.New("invalid email " + address)
+	buf := captureLog(t)
+	cause := errors.New("provider rejected: invalid email " + address)
 	s := &sender{m: failingMailer{err: cause}, mode: ModeProvider}
+	uid := id.NewUserID()
 
-	err := s.Send(context.Background(), envelope(id.NewUserID()))
+	err := s.Send(context.Background(), envelope(uid))
 
 	var se *mail.SendError
 	require.ErrorAs(t, err, &se)
-	assert.False(t, se.Permanent)
 	assert.ErrorIs(t, err, cause)
 	assert.NotContains(t, err.Error(), address)
+
+	logged := buf.String()
+	assert.Equal(t, 1, strings.Count(logged, "mail send failed"))
+	assert.Contains(t, logged, `"mail_kind": "verification"`)
+	assert.Contains(t, logged, `"user_id": "`+uid.String()+`"`)
+	for _, secret := range []string{address, "Someone", link, subject, "provider rejected"} {
+		assert.NotContains(t, logged, secret)
+	}
 }
 
 func TestSender_Drop_LogsKindAndUserOnly(t *testing.T) {
@@ -89,7 +98,6 @@ func TestSender_Drop_LogsKindAndUserOnly(t *testing.T) {
 		assert.NotContains(t, logged, secret)
 	}
 	assert.Empty(t, out.String())
-	assert.False(t, s.Deliverable())
 }
 
 func TestSender_DevPrint_PrintsTextBody(t *testing.T) {
@@ -102,23 +110,22 @@ func TestSender_DevPrint_PrintsTextBody(t *testing.T) {
 	assert.Equal(t, "open "+link+"\n", out.String())
 	assert.Contains(t, buf.String(), "mail dropped: no provider configured")
 	assert.NotContains(t, buf.String(), link)
-	assert.False(t, s.Deliverable())
 }
 
 func TestNew(t *testing.T) {
 	ctx := context.Background()
 	buf := captureLog(t)
 
-	drop, err := New(ctx, Settings{})
+	_, err := New(ctx, Settings{})
 	require.NoError(t, err)
-	assert.False(t, drop.Deliverable())
 	assert.NotContains(t, buf.String(), "mailer:", "no provider must not build a reearthx mailer")
 
 	sg, err := Parse(Env{Provider: "sendgrid", FromEmail: "noreply@example.com", SendGridAPIKey: "sg-key"}, false)
 	require.NoError(t, err)
 	m, err := New(ctx, sg)
 	require.NoError(t, err)
-	assert.True(t, m.Deliverable())
+	assert.IsType(t, &sender{}, m)
+	assert.Equal(t, ModeProvider, m.(*sender).mode)
 }
 
 func TestNew_NilMailerFailsStartup(t *testing.T) {

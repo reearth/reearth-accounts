@@ -61,8 +61,7 @@ type Config struct {
 
 	GraphQL GraphQLConfig
 
-	Mailer mailprovider.Env
-	// MailSettings is Mailer validated by ReadConfig.
+	Mailer       mailprovider.Env
 	MailSettings mailprovider.Settings `ignored:"true"`
 
 	// UserLookupLimit caps user lookups per viewer (ADR-0003 decision 6).
@@ -286,15 +285,15 @@ func ReadConfig(debug bool) (*Config, error) {
 		return nil, fmt.Errorf("REEARTH_ACCOUNTS_SERVICE_CALLERS: %w", err)
 	}
 
-	if debug {
-		c.Dev = true
-	}
-
 	ms, err := mailprovider.Parse(c.Mailer, c.Dev)
 	if err != nil {
 		return nil, err
 	}
 	c.MailSettings = ms
+
+	if debug {
+		c.Dev = true
+	}
 	return &c, nil
 }
 
