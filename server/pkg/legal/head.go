@@ -1,130 +1,138 @@
 package legal
 
 import (
+	"bytes"
+	"crypto/sha256"
+	"encoding/json"
 	"slices"
 	"time"
 )
 
-// TypeHead is the decision state of one type, written by one compare-and-set
-// per payload. Revision is the CAS token; 0 means never stored.
+// TypeHead holds every decision about one type, so one compare-and-set of
+// it applies a payload. Revision is the CAS token; 0 means never stored.
 type TypeHead struct {
+	Applied   Applied
 	AppliedAt time.Time
+	Current   *VersionRecord
 	Revision  int64
 	Type      Type
-	Upcoming  *Scheduled
+	Upcoming  *VersionRecord
 	Withdrawn []Withdrawal
 }
 
-// Scheduled is the upcoming version as of the payload that named it.
-type Scheduled struct {
-	EffectiveAt time.Time
-	Version     Version
+// Applied identifies the entry of the payload stamped AppliedAt, so that a
+// second payload with the same timestamp is resolved the same in either
+// order.
+type Applied struct {
+	Digest  []byte
+	Version Version
 }
 
-// Withdrawal records when a version stopped being upcoming. It counts only
-// for a version whose effective date is after At: a version already in effect
-// is never withdrawn.
+func (a Applied) beats(o Applied) bool {
+	if c := a.Version.Compare(o.Version); c != 0 {
+		return c > 0
+	}
+	return bytes.Compare(a.Digest, o.Digest) > 0
+}
+
+// Withdrawal records when a version stopped being upcoming. Only a version
+// that never took effect is withdrawn.
 type Withdrawal struct {
 	At      time.Time
 	Version Version
 }
 
-func (h TypeHead) WithdrawalOf(v Version) (Withdrawal, bool) {
-	i := slices.IndexFunc(h.Withdrawn, func(w Withdrawal) bool { return w.Version == v })
-	if i < 0 {
-		return Withdrawal{}, false
-	}
-	return h.Withdrawn[i], true
-}
-
-// VersionRecord is one saved version of one type. Stamp is the timestamp of
-// the payload that last wrote it.
+// VersionRecord is the content of one version of one type.
 type VersionRecord struct {
 	Ref
 	EffectiveAt time.Time
 	Required    bool
-	Stamp       time.Time
 	Title       LocalizedText
 	URL         LocalizedText
 }
 
-func NewVersionRecord(e Entry, stamp time.Time) VersionRecord {
-	return VersionRecord{
-		Ref:         e.Ref,
-		EffectiveAt: e.EffectiveAt,
-		Required:    e.Required,
-		Stamp:       stamp,
-		Title:       e.Title,
-		URL:         e.URL,
+func (e Entry) record() VersionRecord {
+	return VersionRecord{Ref: e.Ref, EffectiveAt: e.EffectiveAt, Required: e.Required, Title: e.Title, URL: e.URL}
+}
+
+func (e Entry) applied() Applied {
+	// json.Marshal sorts map keys, so equal entries give equal bytes.
+	b, _ := json.Marshal(struct {
+		EffectiveAt time.Time
+		Required    bool
+		Title       LocalizedText
+		URL         LocalizedText
+		Version     string
+	}{e.EffectiveAt.UTC(), e.Required, e.Title, e.URL, e.Version.String()})
+	sum := sha256.Sum256(b)
+	return Applied{Digest: sum[:], Version: e.Version}
+}
+
+func (h TypeHead) IsWithdrawn(v Version) bool {
+	return slices.ContainsFunc(h.Withdrawn, func(w Withdrawal) bool { return w.Version == v })
+}
+
+// At returns the current and upcoming versions at now. An upcoming version
+// whose date has passed is current.
+func (h TypeHead) At(now time.Time) (current, upcoming *VersionRecord) {
+	if u := h.Upcoming; u != nil && !u.EffectiveAt.After(now) {
+		return u, nil
 	}
-}
-
-func (r VersionRecord) InEffect(now time.Time) bool { return !r.EffectiveAt.After(now) }
-
-// CanOverwrite reports whether a write stamped stamp may replace r: r must not
-// be newer and must not be in effect.
-func (r VersionRecord) CanOverwrite(stamp, now time.Time) bool {
-	return !r.Stamp.After(stamp) && !r.InEffect(now)
-}
-
-// Decision is what one payload entry does to one type. Next nil keeps the
-// stored head. Write upserts the entry's version record, which happens only
-// after Next (if any) has won its compare-and-set.
-type Decision struct {
-	Next  *TypeHead
-	Write bool
+	return h.Current, h.Upcoming
 }
 
 // PlanApply decides one entry of a payload stamped payloadAt against the
-// stored head. It reads no version record, so a record that is not written
-// yet cannot change the decision.
+// stored head. It returns false when the head stays as it is.
 //
-//   - An older payload changes nothing.
-//   - A payload with the head's own timestamp is a replay: the head stays and
-//     the record is rewritten only when the head names the entry.
-//   - A withdrawn version stays withdrawn. Naming it again is ignored, and the
-//     upcoming version is withdrawn as for any entry that is not upcoming.
-//   - The entry becomes the upcoming version when its date has not passed.
-//     The previous upcoming version, if it is another one, is withdrawn;
-//     a withdrawal does not count for a version already in effect.
-func PlanApply(cur TypeHead, e Entry, payloadAt, now time.Time) Decision {
-	switch {
-	case payloadAt.Before(cur.AppliedAt):
-		return Decision{}
-	case payloadAt.Equal(cur.AppliedAt) && cur.Revision > 0:
-		return Decision{Write: names(cur, e, now)}
+//   - An older payload changes nothing. A payload with the head's own
+//     timestamp changes the head only when its entry beats the applied one:
+//     the higher version, then the larger digest.
+//   - An upcoming version whose date has passed becomes current first.
+//   - A withdrawn version stays withdrawn; naming it again is ignored.
+//   - A version that has taken effect never changes.
+//   - An entry not yet in effect becomes the upcoming version, and replaces
+//     the content of the same upcoming version.
+//   - An entry already in effect becomes current when its date is after the
+//     current version's date.
+//   - The previous upcoming version is withdrawn unless the entry keeps it
+//     upcoming or makes it current.
+func PlanApply(cur TypeHead, e Entry, payloadAt, now time.Time) (TypeHead, bool) {
+	applied := e.applied()
+	if cur.Revision > 0 && (payloadAt.Before(cur.AppliedAt) || payloadAt.Equal(cur.AppliedAt) && !applied.beats(cur.Applied)) {
+		return cur, false
 	}
 
 	next := cur
-	next.Revision = cur.Revision + 1
+	next.Revision++
 	next.AppliedAt = payloadAt
-	next.Upcoming = nil
+	next.Applied = applied
+	next.Current, next.Upcoming = cur.At(now)
 	next.Withdrawn = slices.Clone(cur.Withdrawn)
 
-	_, withdrawn := cur.WithdrawalOf(e.Version)
-	upcoming := !withdrawn && e.EffectiveAt.After(now)
-	frozen := false
-	if u := cur.Upcoming; u != nil {
-		switch {
-		case u.Version == e.Version && !u.EffectiveAt.After(now):
-			frozen = true
-			upcoming = false
-		case u.Version != e.Version:
-			next.Withdrawn = append(next.Withdrawn, Withdrawal{At: now, Version: u.Version})
-		}
+	rec := e.record()
+	prev := next.Upcoming
+	next.Upcoming = nil
+	switch {
+	case next.IsWithdrawn(e.Version), next.Current != nil && next.Current.Version == e.Version:
+	case e.EffectiveAt.After(now):
+		next.Upcoming = &rec
+	case next.Current == nil || later(rec, *next.Current):
+		next.Current = &rec
 	}
-	if upcoming {
-		next.Upcoming = &Scheduled{EffectiveAt: e.EffectiveAt, Version: e.Version}
+	if prev != nil && !next.names(prev.Version) {
+		next.Withdrawn = append(next.Withdrawn, Withdrawal{At: now.Truncate(time.Millisecond), Version: prev.Version})
 	}
-	return Decision{Next: &next, Write: !withdrawn && !frozen}
+	return next, true
 }
 
-// names reports whether the head, unchanged since a payload with its own
-// timestamp, decided to write e.
-func names(h TypeHead, e Entry, now time.Time) bool {
-	if u := h.Upcoming; u != nil {
-		return u.Version == e.Version && u.EffectiveAt.Equal(e.EffectiveAt)
+func (h TypeHead) names(v Version) bool {
+	return h.Current != nil && h.Current.Version == v || h.Upcoming != nil && h.Upcoming.Version == v
+}
+
+// later orders versions in effect: the later date, then the higher version.
+func later(a, b VersionRecord) bool {
+	if !a.EffectiveAt.Equal(b.EffectiveAt) {
+		return a.EffectiveAt.After(b.EffectiveAt)
 	}
-	_, withdrawn := h.WithdrawalOf(e.Version)
-	return !withdrawn && !e.EffectiveAt.After(now)
+	return a.Version.Compare(b.Version) > 0
 }

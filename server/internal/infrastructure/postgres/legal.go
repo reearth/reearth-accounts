@@ -18,9 +18,45 @@ type PolicyVersion struct {
 
 func NewPolicyVersion(c *Client) legal.VersionRepo { return &PolicyVersion{c: c} }
 
+type versionJSON struct {
+	EffectiveAt time.Time         `json:"effectiveAt"`
+	Required    bool              `json:"required"`
+	Title       map[string]string `json:"title"`
+	URL         map[string]string `json:"url,omitempty"`
+	Version     string            `json:"version"`
+}
+
 type withdrawalJSON struct {
 	At      time.Time `json:"at"`
 	Version string    `json:"version"`
+}
+
+func (r *PolicyVersion) ArchiveVersions(ctx context.Context, h legal.TypeHead) error {
+	for _, v := range []*legal.VersionRecord{h.Current, h.Upcoming} {
+		if v == nil {
+			continue
+		}
+		title, err := json.Marshal(nonNil(v.Title))
+		if err != nil {
+			return rerror.ErrInternalByWithContext(ctx, err)
+		}
+		url, err := json.Marshal(nonNil(v.URL))
+		if err != nil {
+			return rerror.ErrInternalByWithContext(ctx, err)
+		}
+		if err := r.c.queries(ctx).PolicyVersionArchive(ctx, gen.PolicyVersionArchiveParams{
+			Type:        string(v.Type),
+			Version:     v.Version.String(),
+			EffectiveAt: v.EffectiveAt,
+			Required:    v.Required,
+			Title:       title,
+			Url:         url,
+			Revision:    h.Revision,
+		}); err != nil {
+			return rerror.ErrInternalByWithContext(ctx, err)
+		}
+	}
+	return nil
 }
 
 func (r *PolicyVersion) CompareAndSwapHead(ctx context.Context, next legal.TypeHead) (bool, error) {
@@ -32,11 +68,13 @@ func (r *PolicyVersion) CompareAndSwapHead(ctx context.Context, next legal.TypeH
 	if err != nil {
 		return false, rerror.ErrInternalByWithContext(ctx, err)
 	}
-	var upVersion *string
-	var upAt *time.Time
-	if u := next.Upcoming; u != nil {
-		v := u.Version.String()
-		upVersion, upAt = &v, &u.EffectiveAt
+	current, err := marshalVersion(next.Current)
+	if err != nil {
+		return false, rerror.ErrInternalByWithContext(ctx, err)
+	}
+	upcoming, err := marshalVersion(next.Upcoming)
+	if err != nil {
+		return false, rerror.ErrInternalByWithContext(ctx, err)
 	}
 
 	q := r.c.queries(ctx)
@@ -44,12 +82,14 @@ func (r *PolicyVersion) CompareAndSwapHead(ctx context.Context, next legal.TypeH
 	if next.Revision == 1 {
 		n, err = q.PolicyTypeInsert(ctx, gen.PolicyTypeInsertParams{
 			Type: string(next.Type), Revision: next.Revision, AppliedAt: next.AppliedAt,
-			UpcomingVersion: upVersion, UpcomingEffectiveAt: upAt, Withdrawn: wj,
+			AppliedVersion: next.Applied.Version.String(), AppliedDigest: next.Applied.Digest,
+			Current: current, Upcoming: upcoming, Withdrawn: wj,
 		})
 	} else {
 		n, err = q.PolicyTypeSwap(ctx, gen.PolicyTypeSwapParams{
 			Type: string(next.Type), Revision: next.Revision, AppliedAt: next.AppliedAt,
-			UpcomingVersion: upVersion, UpcomingEffectiveAt: upAt, Withdrawn: wj,
+			AppliedVersion: next.Applied.Version.String(), AppliedDigest: next.Applied.Digest,
+			Current: current, Upcoming: upcoming, Withdrawn: wj,
 		})
 	}
 	if err != nil {
@@ -105,28 +145,17 @@ func (r *PolicyVersion) FindVersions(ctx context.Context) ([]legal.VersionRecord
 	return res, nil
 }
 
-func (r *PolicyVersion) UpsertVersion(ctx context.Context, v legal.VersionRecord, now time.Time) error {
-	title, err := json.Marshal(nonNil(v.Title))
-	if err != nil {
-		return rerror.ErrInternalByWithContext(ctx, err)
+func marshalVersion(v *legal.VersionRecord) ([]byte, error) {
+	if v == nil {
+		return nil, nil
 	}
-	url, err := json.Marshal(nonNil(v.URL))
-	if err != nil {
-		return rerror.ErrInternalByWithContext(ctx, err)
-	}
-	if err := r.c.queries(ctx).PolicyVersionUpsert(ctx, gen.PolicyVersionUpsertParams{
-		Type:        string(v.Type),
-		Version:     v.Version.String(),
+	return json.Marshal(versionJSON{
 		EffectiveAt: v.EffectiveAt,
 		Required:    v.Required,
-		Title:       title,
-		Url:         url,
-		Stamp:       v.Stamp,
-		Now:         now,
-	}); err != nil {
-		return rerror.ErrInternalByWithContext(ctx, err)
-	}
-	return nil
+		Title:       v.Title,
+		URL:         v.URL,
+		Version:     v.Version.String(),
+	})
 }
 
 func nonNil(t legal.LocalizedText) legal.LocalizedText {
@@ -137,13 +166,22 @@ func nonNil(t legal.LocalizedText) legal.LocalizedText {
 }
 
 func policyTypeModel(row gen.PolicyType) (legal.TypeHead, error) {
-	h := legal.TypeHead{AppliedAt: row.AppliedAt.UTC(), Revision: row.Revision, Type: legal.Type(row.Type)}
-	if row.UpcomingVersion != nil && row.UpcomingEffectiveAt != nil {
-		v, err := legal.ParseVersion(*row.UpcomingVersion)
-		if err != nil {
-			return legal.TypeHead{}, err
-		}
-		h.Upcoming = &legal.Scheduled{EffectiveAt: row.UpcomingEffectiveAt.UTC(), Version: v}
+	t := legal.Type(row.Type)
+	applied, err := legal.ParseVersion(row.AppliedVersion)
+	if err != nil {
+		return legal.TypeHead{}, err
+	}
+	h := legal.TypeHead{
+		Applied:   legal.Applied{Digest: row.AppliedDigest, Version: applied},
+		AppliedAt: row.AppliedAt.UTC(),
+		Revision:  row.Revision,
+		Type:      t,
+	}
+	if h.Current, err = unmarshalVersion(t, row.Current); err != nil {
+		return legal.TypeHead{}, err
+	}
+	if h.Upcoming, err = unmarshalVersion(t, row.Upcoming); err != nil {
+		return legal.TypeHead{}, err
 	}
 	var withdrawn []withdrawalJSON
 	if err := json.Unmarshal(row.Withdrawn, &withdrawn); err != nil {
@@ -168,7 +206,6 @@ func policyVersionModel(row gen.PolicyVersion) (legal.VersionRecord, error) {
 		Ref:         legal.Ref{Type: legal.Type(row.Type), Version: v},
 		EffectiveAt: row.EffectiveAt.UTC(),
 		Required:    row.Required,
-		Stamp:       row.Stamp.UTC(),
 	}
 	if err := json.Unmarshal(row.Title, &rec.Title); err != nil {
 		return legal.VersionRecord{}, err
@@ -180,4 +217,25 @@ func policyVersionModel(row gen.PolicyVersion) (legal.VersionRecord, error) {
 		rec.URL = nil
 	}
 	return rec, nil
+}
+
+func unmarshalVersion(t legal.Type, b []byte) (*legal.VersionRecord, error) {
+	if b == nil {
+		return nil, nil
+	}
+	var j versionJSON
+	if err := json.Unmarshal(b, &j); err != nil {
+		return nil, err
+	}
+	v, err := legal.ParseVersion(j.Version)
+	if err != nil {
+		return nil, err
+	}
+	return &legal.VersionRecord{
+		Ref:         legal.Ref{Type: t, Version: v},
+		EffectiveAt: j.EffectiveAt.UTC(),
+		Required:    j.Required,
+		Title:       j.Title,
+		URL:         j.URL,
+	}, nil
 }

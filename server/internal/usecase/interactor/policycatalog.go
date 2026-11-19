@@ -55,11 +55,7 @@ func (c *PolicyCatalog) load(ctx context.Context) (legal.Catalog, error) {
 	if err != nil {
 		return legal.Catalog{}, err
 	}
-	records, err := c.repo.FindVersions(ctx)
-	if err != nil {
-		return legal.Catalog{}, err
-	}
-	cat := legal.NewCatalog(heads, records)
+	cat := legal.NewCatalog(heads)
 	c.snapshot, c.loadedAt = &cat, at
 	return cat, nil
 }

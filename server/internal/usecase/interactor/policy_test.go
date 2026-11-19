@@ -3,6 +3,7 @@ package interactor
 import (
 	"bytes"
 	"context"
+	"io"
 	"testing"
 	"time"
 
@@ -96,6 +97,15 @@ func TestPolicy_ReceiveWebhook(t *testing.T) {
 		assert.Equal(t, "1.0.0", currentTos(t, after, now))
 	})
 
+	t.Run("a missing or none signature is refused before the body is read", func(t *testing.T) {
+		repos := memory.New()
+		p := NewPolicy(repos, secret, NewPolicyCatalog(repos.PolicyVersion, PolicyCatalogTTL))
+		for _, sig := range []string{"", "none"} {
+			_, err := p.ReceiveWebhook(ctx, unreadable{t}, sig)
+			assert.ErrorIs(t, err, legal.ErrBadSignature, "signature %q", sig)
+		}
+	})
+
 	t.Run("a bad signature stores nothing", func(t *testing.T) {
 		repos := memory.New()
 		p := NewPolicy(repos, secret, NewPolicyCatalog(repos.PolicyVersion, PolicyCatalogTTL))
@@ -106,4 +116,11 @@ func TestPolicy_ReceiveWebhook(t *testing.T) {
 		require.NoError(t, err)
 		assert.Empty(t, heads)
 	})
+}
+
+type unreadable struct{ t *testing.T }
+
+func (u unreadable) Read([]byte) (int, error) {
+	u.t.Error("the body was read")
+	return 0, io.EOF
 }

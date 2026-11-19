@@ -97,6 +97,10 @@ func TestParseManifest_Rejects(t *testing.T) {
 		{"missing title", tos(`"version":"2.0.0","effectiveDate":"2027-01-01T00:00:00Z","required":true`), "versions.tos.title"},
 		{"title not a map", tos(`"version":"2.0.0","effectiveDate":"2027-01-01T00:00:00Z","required":true,"title":"ToS"`), "versions.tos"},
 		{"url not a map", tos(ok + `,"url":"https://example.com"`), "versions.tos"},
+		{"NUL in a title", tos(`"version":"2.0.0","effectiveDate":"2027-01-01T00:00:00Z","required":true,"title":{"en":"To\u0000S"}`), "versions.tos.title"},
+		{"NUL in a title locale", tos(`"version":"2.0.0","effectiveDate":"2027-01-01T00:00:00Z","required":true,"title":{"e\u0000n":"ToS"}`), "versions.tos.title"},
+		{"NUL in a url", tos(ok + `,"url":{"en":"https://example.com/\u0000"}`), "versions.tos.url"},
+		{"invalid UTF-8", tos(`"version":"2.0.0","effectiveDate":"2027-01-01T00:00:00Z","required":true,"title":{"en":"To` + "\xff" + `S"}`), "body"},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -141,6 +145,7 @@ func TestSecret_Verify(t *testing.T) {
 		"other secret":  NewSecret("other").Sign(body),
 		"other body":    s.Sign(append(bytes.Clone(body), ' ')),
 		"empty hex":     "sha256=",
+		"short hex":     "sha256=00",
 		"padded header": " " + good,
 	} {
 		t.Run(name, func(t *testing.T) {

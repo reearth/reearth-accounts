@@ -105,12 +105,14 @@ CREATE TABLE config (
 );
 
 CREATE TABLE policy_types (
-    type                  text PRIMARY KEY,
-    revision              bigint NOT NULL,
-    applied_at            timestamptz NOT NULL,
-    upcoming_version      text,
-    upcoming_effective_at timestamptz,
-    withdrawn             jsonb NOT NULL DEFAULT '[]'
+    type            text PRIMARY KEY,
+    revision        bigint NOT NULL,
+    applied_at      timestamptz NOT NULL,
+    applied_version text NOT NULL,
+    applied_digest  bytea NOT NULL,
+    current         jsonb,
+    upcoming        jsonb,
+    withdrawn       jsonb NOT NULL DEFAULT '[]'
 );
 
 CREATE TABLE policy_versions (
@@ -120,6 +122,6 @@ CREATE TABLE policy_versions (
     required     boolean NOT NULL,
     title        jsonb NOT NULL,
     url          jsonb NOT NULL DEFAULT '{}',
-    stamp        timestamptz NOT NULL,
+    revision     bigint NOT NULL,
     PRIMARY KEY (type, version)
 );

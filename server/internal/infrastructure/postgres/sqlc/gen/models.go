@@ -43,12 +43,14 @@ type PermittableWorkspaceRole struct {
 }
 
 type PolicyType struct {
-	Type                string
-	Revision            int64
-	AppliedAt           time.Time
-	UpcomingVersion     *string
-	UpcomingEffectiveAt *time.Time
-	Withdrawn           []byte
+	Type           string
+	Revision       int64
+	AppliedAt      time.Time
+	AppliedVersion string
+	AppliedDigest  []byte
+	Current        []byte
+	Upcoming       []byte
+	Withdrawn      []byte
 }
 
 type PolicyVersion struct {
@@ -58,7 +60,7 @@ type PolicyVersion struct {
 	Required    bool
 	Title       []byte
 	Url         []byte
-	Stamp       time.Time
+	Revision    int64
 }
 
 type Role struct {

@@ -90,9 +90,11 @@ func testPolicyWebhook(t *testing.T, useMongo bool) {
 		assert.Empty(t, storedVersions(t, r))
 	})
 
-	t.Run("oversized body returns 413", func(t *testing.T) {
+	t.Run("oversized body returns 413, or 401 when unsigned", func(t *testing.T) {
 		big := upcoming[:len(upcoming)-1] + `,"pad":"` + strings.Repeat("x", legal.MaxWebhookBody) + `"}`
 		assert.Equal(t, http.StatusRequestEntityTooLarge, post(big, secret.Sign([]byte(big))))
+		assert.Equal(t, http.StatusUnauthorized, post(big, ""), "missing")
+		assert.Equal(t, http.StatusUnauthorized, post(big, "none"), "none")
 		assert.Empty(t, storedVersions(t, r))
 	})
 
@@ -103,6 +105,10 @@ func testPolicyWebhook(t *testing.T, useMongo bool) {
 		missing := strings.Replace(upcoming, `"version": "2.0.0",`, "", 1)
 		require.NotEqual(t, upcoming, missing)
 		assert.Equal(t, http.StatusBadRequest, post(missing, secret.Sign([]byte(missing))), "missing tos version")
+
+		nul := strings.Replace(upcoming, `"en": "Terms of Service"`, `"en": "Terms\u0000of Service"`, 1)
+		require.NotEqual(t, upcoming, nul)
+		assert.Equal(t, http.StatusBadRequest, post(nul, secret.Sign([]byte(nul))), "NUL in a title")
 		assert.Empty(t, storedVersions(t, r), "a rejected payload saves no type, the valid privacy entry included")
 	})
 
@@ -135,9 +141,7 @@ func testPolicyWebhook(t *testing.T, useMongo bool) {
 		assert.Equal(t, http.StatusOK, post(revert, secret.Sign([]byte(revert))))
 		heads, err := r.PolicyVersion.FindHeads(context.Background())
 		require.NoError(t, err)
-		recs, err := r.PolicyVersion.FindVersions(context.Background())
-		require.NoError(t, err)
-		cat := legal.NewCatalog(heads, recs)
+		cat := legal.NewCatalog(heads)
 		assert.True(t, cat.Withdrawn(legal.Ref{Type: "tos", Version: legal.MustParseVersion("2.0.0")}))
 		assert.Equal(t, "1.0.0", cat.Current("tos", time.Now()).Version.String())
 		assert.Nil(t, cat.Upcoming("tos", time.Now()))

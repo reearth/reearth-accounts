@@ -28,10 +28,10 @@ type Querier interface {
 	PolicyTypeFindAll(ctx context.Context) ([]PolicyType, error)
 	PolicyTypeInsert(ctx context.Context, arg PolicyTypeInsertParams) (int64, error)
 	PolicyTypeSwap(ctx context.Context, arg PolicyTypeSwapParams) (int64, error)
+	// A stored record is replaced only by a write from a head revision not
+	// below its own.
+	PolicyVersionArchive(ctx context.Context, arg PolicyVersionArchiveParams) error
 	PolicyVersionFindAll(ctx context.Context) ([]PolicyVersion, error)
-	// A stored record is replaced only when it is not newer than this write and
-	// has not taken effect.
-	PolicyVersionUpsert(ctx context.Context, arg PolicyVersionUpsertParams) error
 	RoleDelete(ctx context.Context, id string) error
 	RoleFindAll(ctx context.Context) ([]Role, error)
 	RoleFindByID(ctx context.Context, id string) (Role, error)

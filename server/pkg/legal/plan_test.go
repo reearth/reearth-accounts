@@ -2,6 +2,7 @@ package legal
 
 import (
 	"context"
+	"errors"
 	"testing"
 	"time"
 
@@ -13,13 +14,26 @@ var t0 = time.Date(2026, 11, 20, 3, 0, 0, 0, time.UTC)
 
 // fakeRepo is a sequential VersionRepo that honors the repo contract.
 type fakeRepo struct {
-	heads    map[Type]TypeHead
-	versions map[Ref]VersionRecord
-	dropNext bool
+	failArchive bool
+	heads       map[Type]TypeHead
+	versions    map[Ref]VersionRecord
 }
 
 func newFakeRepo() *fakeRepo {
 	return &fakeRepo{heads: map[Type]TypeHead{}, versions: map[Ref]VersionRecord{}}
+}
+
+func (f *fakeRepo) ArchiveVersions(_ context.Context, h TypeHead) error {
+	if f.failArchive {
+		f.failArchive = false
+		return errors.New("archive unavailable")
+	}
+	for _, v := range []*VersionRecord{h.Current, h.Upcoming} {
+		if v != nil {
+			f.versions[v.Ref] = *v
+		}
+	}
+	return nil
 }
 
 func (f *fakeRepo) CompareAndSwapHead(_ context.Context, next TypeHead) (bool, error) {
@@ -53,22 +67,9 @@ func (f *fakeRepo) FindVersions(context.Context) ([]VersionRecord, error) {
 	return rs, nil
 }
 
-func (f *fakeRepo) UpsertVersion(_ context.Context, r VersionRecord, now time.Time) error {
-	if f.dropNext {
-		f.dropNext = false
-		return nil
-	}
-	if cur, ok := f.versions[r.Ref]; ok && !cur.CanOverwrite(r.Stamp, now) {
-		return nil
-	}
-	f.versions[r.Ref] = r
-	return nil
-}
-
 func (f *fakeRepo) catalog() Catalog {
 	hs, _ := f.FindHeads(context.Background())
-	rs, _ := f.FindVersions(context.Background())
-	return NewCatalog(hs, rs)
+	return NewCatalog(hs)
 }
 
 type step struct {
@@ -144,11 +145,21 @@ func TestApply(t *testing.T) {
 		{
 			name: "replay of the same payload changes nothing",
 			steps: []step{
-				{at: 0, version: "1.0.0", eff: -day, title: "v1"},
 				{at: 0, version: "2.0.0", eff: 30 * day, title: "v2"},
+				{at: 0, clock: hour, version: "2.0.0", eff: 30 * day, title: "v2"},
 			},
-			current: "1.0.0",
-			absent:  []string{"2.0.0"},
+			at:       hour,
+			upcoming: "2.0.0", upcomingTitle: "v2",
+			results: []bool{true, false},
+		},
+		{
+			name: "a payload with the same timestamp and a higher version wins",
+			steps: []step{
+				{at: 0, version: "2.0.0", eff: 30 * day, title: "v2"},
+				{at: 0, version: "1.0.0", eff: -day, title: "v1"},
+			},
+			upcoming: "2.0.0", upcomingTitle: "v2",
+			absent:  []string{"1.0.0"},
 			results: []bool{true, false},
 		},
 		{
@@ -293,15 +304,17 @@ func TestApply(t *testing.T) {
 	}
 }
 
-func TestApply_FrozenRecordKeepsItsContent(t *testing.T) {
+func TestApply_VersionInEffectKeepsItsContent(t *testing.T) {
 	f := newFakeRepo()
 	run(t, f, []step{
 		{at: 0, version: "1.0.0", eff: -day, title: "v1"},
 		{at: hour, version: "1.0.0", eff: -2 * day, title: "rewritten"},
 	})
-	got := f.versions[Ref{Type: "tos", Version: MustParseVersion("1.0.0")}]
+	got := f.catalog().Current("tos", t0.Add(hour))
+	require.NotNil(t, got)
 	assert.Equal(t, "v1", got.Title["en"])
 	assert.True(t, got.EffectiveAt.Equal(t0.Add(-day)))
+	assert.Equal(t, "v1", f.versions[got.Ref].Title["en"])
 }
 
 func TestApply_ReplayKeepsTheHead(t *testing.T) {
@@ -313,29 +326,71 @@ func TestApply_ReplayKeepsTheHead(t *testing.T) {
 	assert.Equal(t, before, f.heads["tos"])
 }
 
-func TestApply_ReplayRepairsARecordLostAfterTheHeadWon(t *testing.T) {
+func TestApply_FailedArchiveWriteDecidesAndIsRepairedByTheNextApply(t *testing.T) {
 	f := newFakeRepo()
 	run(t, f, []step{{at: 0, version: "1.0.0", eff: -day, title: "v1"}})
-	f.dropNext = true
-	run(t, f, []step{{at: hour, version: "2.0.0", eff: 30 * day, title: "v2"}})
+	f.failArchive = true
+	m := Manifest{Timestamp: t0.Add(hour), Entries: []Entry{entry("2.0.0", day, "v2")}}
+	res, err := Apply(context.Background(), f, m, func() time.Time { return t0.Add(hour) })
+	assert.Error(t, err)
+	assert.Equal(t, []Type{"tos"}, res.Applied, "the head decided before the archive failed")
 
-	now := t0.Add(hour)
 	c := f.catalog()
-	assert.Nil(t, c.Upcoming("tos", now), "a head pointer without its record is ignored")
-	assert.Equal(t, "1.0.0", versionOf(c.Current("tos", now)))
+	assert.Equal(t, "2.0.0", versionOf(c.Upcoming("tos", t0.Add(hour))))
+	assert.Equal(t, "2.0.0", versionOf(c.Current("tos", t0.Add(2*day))))
+	_, archived := f.versions[Ref{Type: "tos", Version: MustParseVersion("2.0.0")}]
+	assert.False(t, archived)
 
-	run(t, f, []step{{at: hour, version: "2.0.0", eff: 30 * day, title: "v2"}})
-	assert.Equal(t, "2.0.0", versionOf(f.catalog().Upcoming("tos", now)))
+	run(t, f, []step{{at: 2 * day, version: "2.0.0", eff: day, title: "v2"}})
+	assert.Equal(t, "v2", f.versions[Ref{Type: "tos", Version: MustParseVersion("2.0.0")}].Title["en"], "the next apply archives it")
 }
 
-func TestPlanApply_ReplayWritesOnlyWhatTheHeadNames(t *testing.T) {
-	head := TypeHead{
-		Type: "tos", Revision: 3, AppliedAt: t0,
-		Upcoming: &Scheduled{Version: MustParseVersion("2.0.0"), EffectiveAt: t0.Add(30 * day)},
+func TestApply_InEffectPatchThenNewerRevert(t *testing.T) {
+	patch := step{at: hour, clock: 2 * hour, version: "1.0.1", eff: hour, title: "v1.0.1"}
+	revert := step{at: 2 * hour, version: "1.0.0", eff: -day, title: "v1"}
+	base := step{at: 0, clock: 2 * hour, version: "1.0.0", eff: -day, title: "v1"}
+
+	older := newFakeRepo()
+	run(t, older, []step{base, patch, revert})
+	assert.Equal(t, "1.0.1", versionOf(older.catalog().Current("tos", t0.Add(2*hour))), "a version in effect never changes")
+
+	newer := newFakeRepo()
+	run(t, newer, []step{base, revert, patch})
+	assert.Equal(t, "1.0.0", versionOf(newer.catalog().Current("tos", t0.Add(2*hour))), "the older patch is ignored")
+}
+
+func TestPlanApply_PromotesTheUpcomingVersionBeforeApplying(t *testing.T) {
+	v1 := entry("1.0.0", -day, "v1").record()
+	v2 := entry("2.0.0", day, "v2").record()
+	head := TypeHead{Type: "tos", Revision: 2, AppliedAt: t0, Current: &v1, Upcoming: &v2}
+
+	next, ok := PlanApply(head, entry("1.0.0", -day, "v1"), t0.Add(2*day), t0.Add(2*day))
+	require.True(t, ok)
+	assert.Equal(t, "2.0.0", versionOf(next.Current), "2.0.0 took effect before the revert arrived")
+	assert.Nil(t, next.Upcoming)
+	assert.Empty(t, next.Withdrawn)
+}
+
+func TestPlanApply_EqualTimestamp(t *testing.T) {
+	a, b := entry("2.0.0", 30*day, "draft"), entry("2.0.0", 40*day, "final")
+	if a.applied().beats(b.applied()) {
+		a, b = b, a
 	}
-	assert.Equal(t, Decision{Write: true}, PlanApply(head, entry("2.0.0", 30*day, "v2"), t0, t0))
-	assert.Equal(t, Decision{}, PlanApply(head, entry("2.0.0", 31*day, "v2"), t0, t0))
-	assert.Equal(t, Decision{}, PlanApply(head, entry("3.0.0", 30*day, "v3"), t0, t0))
-	assert.Equal(t, Decision{}, PlanApply(head, entry("1.0.0", -day, "v1"), t0, t0))
-	assert.Equal(t, Decision{}, PlanApply(head, entry("2.0.0", 30*day, "v2"), t0.Add(-time.Second), t0))
+	first, ok := PlanApply(TypeHead{Type: "tos"}, a, t0, t0)
+	require.True(t, ok)
+
+	_, ok = PlanApply(first, a, t0, t0)
+	assert.False(t, ok, "an identical entry is a replay")
+
+	next, ok := PlanApply(first, b, t0, t0)
+	require.True(t, ok, "the larger digest wins at the same version")
+	assert.Equal(t, b.Title, next.Upcoming.Title)
+
+	_, ok = PlanApply(next, a, t0, t0)
+	assert.False(t, ok, "the smaller digest loses after the larger")
+
+	_, ok = PlanApply(next, entry("1.9.0", 30*day, "lower"), t0, t0)
+	assert.False(t, ok, "a lower version loses")
+	_, ok = PlanApply(next, entry("2.0.0", 30*day, "v2"), t0.Add(-time.Millisecond), t0)
+	assert.False(t, ok, "an older payload loses")
 }

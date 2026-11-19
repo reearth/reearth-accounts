@@ -11,7 +11,7 @@ import (
 )
 
 const policyTypeFind = `-- name: PolicyTypeFind :one
-SELECT type, revision, applied_at, upcoming_version, upcoming_effective_at, withdrawn FROM policy_types WHERE type = $1
+SELECT type, revision, applied_at, applied_version, applied_digest, current, upcoming, withdrawn FROM policy_types WHERE type = $1
 `
 
 func (q *Queries) PolicyTypeFind(ctx context.Context, type_ string) (PolicyType, error) {
@@ -21,15 +21,17 @@ func (q *Queries) PolicyTypeFind(ctx context.Context, type_ string) (PolicyType,
 		&i.Type,
 		&i.Revision,
 		&i.AppliedAt,
-		&i.UpcomingVersion,
-		&i.UpcomingEffectiveAt,
+		&i.AppliedVersion,
+		&i.AppliedDigest,
+		&i.Current,
+		&i.Upcoming,
 		&i.Withdrawn,
 	)
 	return i, err
 }
 
 const policyTypeFindAll = `-- name: PolicyTypeFindAll :many
-SELECT type, revision, applied_at, upcoming_version, upcoming_effective_at, withdrawn FROM policy_types ORDER BY type
+SELECT type, revision, applied_at, applied_version, applied_digest, current, upcoming, withdrawn FROM policy_types ORDER BY type
 `
 
 func (q *Queries) PolicyTypeFindAll(ctx context.Context) ([]PolicyType, error) {
@@ -45,8 +47,10 @@ func (q *Queries) PolicyTypeFindAll(ctx context.Context) ([]PolicyType, error) {
 			&i.Type,
 			&i.Revision,
 			&i.AppliedAt,
-			&i.UpcomingVersion,
-			&i.UpcomingEffectiveAt,
+			&i.AppliedVersion,
+			&i.AppliedDigest,
+			&i.Current,
+			&i.Upcoming,
 			&i.Withdrawn,
 		); err != nil {
 			return nil, err
@@ -60,18 +64,20 @@ func (q *Queries) PolicyTypeFindAll(ctx context.Context) ([]PolicyType, error) {
 }
 
 const policyTypeInsert = `-- name: PolicyTypeInsert :execrows
-INSERT INTO policy_types (type, revision, applied_at, upcoming_version, upcoming_effective_at, withdrawn)
-VALUES ($1, $2, $3, $4, $5, $6)
+INSERT INTO policy_types (type, revision, applied_at, applied_version, applied_digest, current, upcoming, withdrawn)
+VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
 ON CONFLICT (type) DO NOTHING
 `
 
 type PolicyTypeInsertParams struct {
-	Type                string
-	Revision            int64
-	AppliedAt           time.Time
-	UpcomingVersion     *string
-	UpcomingEffectiveAt *time.Time
-	Withdrawn           []byte
+	Type           string
+	Revision       int64
+	AppliedAt      time.Time
+	AppliedVersion string
+	AppliedDigest  []byte
+	Current        []byte
+	Upcoming       []byte
+	Withdrawn      []byte
 }
 
 func (q *Queries) PolicyTypeInsert(ctx context.Context, arg PolicyTypeInsertParams) (int64, error) {
@@ -79,8 +85,10 @@ func (q *Queries) PolicyTypeInsert(ctx context.Context, arg PolicyTypeInsertPara
 		arg.Type,
 		arg.Revision,
 		arg.AppliedAt,
-		arg.UpcomingVersion,
-		arg.UpcomingEffectiveAt,
+		arg.AppliedVersion,
+		arg.AppliedDigest,
+		arg.Current,
+		arg.Upcoming,
 		arg.Withdrawn,
 	)
 	if err != nil {
@@ -92,26 +100,30 @@ func (q *Queries) PolicyTypeInsert(ctx context.Context, arg PolicyTypeInsertPara
 const policyTypeSwap = `-- name: PolicyTypeSwap :execrows
 UPDATE policy_types
 SET revision = $1, applied_at = $2,
-    upcoming_version = $3, upcoming_effective_at = $4,
-    withdrawn = $5
-WHERE type = $6 AND revision = $1::bigint - 1
+    applied_version = $3, applied_digest = $4,
+    current = $5, upcoming = $6, withdrawn = $7
+WHERE type = $8 AND revision = $1::bigint - 1
 `
 
 type PolicyTypeSwapParams struct {
-	Revision            int64
-	AppliedAt           time.Time
-	UpcomingVersion     *string
-	UpcomingEffectiveAt *time.Time
-	Withdrawn           []byte
-	Type                string
+	Revision       int64
+	AppliedAt      time.Time
+	AppliedVersion string
+	AppliedDigest  []byte
+	Current        []byte
+	Upcoming       []byte
+	Withdrawn      []byte
+	Type           string
 }
 
 func (q *Queries) PolicyTypeSwap(ctx context.Context, arg PolicyTypeSwapParams) (int64, error) {
 	result, err := q.db.Exec(ctx, policyTypeSwap,
 		arg.Revision,
 		arg.AppliedAt,
-		arg.UpcomingVersion,
-		arg.UpcomingEffectiveAt,
+		arg.AppliedVersion,
+		arg.AppliedDigest,
+		arg.Current,
+		arg.Upcoming,
 		arg.Withdrawn,
 		arg.Type,
 	)
@@ -121,8 +133,42 @@ func (q *Queries) PolicyTypeSwap(ctx context.Context, arg PolicyTypeSwapParams) 
 	return result.RowsAffected(), nil
 }
 
+const policyVersionArchive = `-- name: PolicyVersionArchive :exec
+INSERT INTO policy_versions (type, version, effective_at, required, title, url, revision)
+VALUES ($1, $2, $3, $4, $5, $6, $7)
+ON CONFLICT (type, version) DO UPDATE SET
+    effective_at = EXCLUDED.effective_at, required = EXCLUDED.required,
+    title = EXCLUDED.title, url = EXCLUDED.url, revision = EXCLUDED.revision
+WHERE policy_versions.revision <= EXCLUDED.revision
+`
+
+type PolicyVersionArchiveParams struct {
+	Type        string
+	Version     string
+	EffectiveAt time.Time
+	Required    bool
+	Title       []byte
+	Url         []byte
+	Revision    int64
+}
+
+// A stored record is replaced only by a write from a head revision not
+// below its own.
+func (q *Queries) PolicyVersionArchive(ctx context.Context, arg PolicyVersionArchiveParams) error {
+	_, err := q.db.Exec(ctx, policyVersionArchive,
+		arg.Type,
+		arg.Version,
+		arg.EffectiveAt,
+		arg.Required,
+		arg.Title,
+		arg.Url,
+		arg.Revision,
+	)
+	return err
+}
+
 const policyVersionFindAll = `-- name: PolicyVersionFindAll :many
-SELECT type, version, effective_at, required, title, url, stamp FROM policy_versions ORDER BY type, version
+SELECT type, version, effective_at, required, title, url, revision FROM policy_versions ORDER BY type, version
 `
 
 func (q *Queries) PolicyVersionFindAll(ctx context.Context) ([]PolicyVersion, error) {
@@ -141,7 +187,7 @@ func (q *Queries) PolicyVersionFindAll(ctx context.Context) ([]PolicyVersion, er
 			&i.Required,
 			&i.Title,
 			&i.Url,
-			&i.Stamp,
+			&i.Revision,
 		); err != nil {
 			return nil, err
 		}
@@ -151,40 +197,4 @@ func (q *Queries) PolicyVersionFindAll(ctx context.Context) ([]PolicyVersion, er
 		return nil, err
 	}
 	return items, nil
-}
-
-const policyVersionUpsert = `-- name: PolicyVersionUpsert :exec
-INSERT INTO policy_versions (type, version, effective_at, required, title, url, stamp)
-VALUES ($1, $2, $3, $4, $5, $6, $7)
-ON CONFLICT (type, version) DO UPDATE SET
-    effective_at = EXCLUDED.effective_at, required = EXCLUDED.required,
-    title = EXCLUDED.title, url = EXCLUDED.url, stamp = EXCLUDED.stamp
-WHERE policy_versions.stamp <= EXCLUDED.stamp AND policy_versions.effective_at > $8::timestamptz
-`
-
-type PolicyVersionUpsertParams struct {
-	Type        string
-	Version     string
-	EffectiveAt time.Time
-	Required    bool
-	Title       []byte
-	Url         []byte
-	Stamp       time.Time
-	Now         time.Time
-}
-
-// A stored record is replaced only when it is not newer than this write and
-// has not taken effect.
-func (q *Queries) PolicyVersionUpsert(ctx context.Context, arg PolicyVersionUpsertParams) error {
-	_, err := q.db.Exec(ctx, policyVersionUpsert,
-		arg.Type,
-		arg.Version,
-		arg.EffectiveAt,
-		arg.Required,
-		arg.Title,
-		arg.Url,
-		arg.Stamp,
-		arg.Now,
-	)
-	return err
 }

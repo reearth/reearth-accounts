@@ -1,14 +1,16 @@
 package legal
 
-import (
-	"context"
-	"time"
-)
+import "context"
 
-// VersionRepo stores policy_types (one head per type) and policy_versions
-// (one record per type and version). Every write is a single-document or
-// single-statement conditional write.
+// VersionRepo stores policy_types (one head per type, which decides) and
+// policy_versions (one archived record per type and version, which nothing
+// reads to decide). Every write is a single-document or single-statement
+// conditional write.
 type VersionRepo interface {
+	// ArchiveVersions upserts h's current and upcoming versions into
+	// policy_versions, stamped with h.Revision. A stored record with a higher
+	// revision is kept.
+	ArchiveVersions(ctx context.Context, h TypeHead) error
 	// CompareAndSwapHead stores next when the stored revision is
 	// next.Revision-1 (an absent head counts as 0). It returns false when
 	// another writer won.
@@ -17,7 +19,4 @@ type VersionRepo interface {
 	FindHead(ctx context.Context, t Type) (TypeHead, error)
 	FindHeads(ctx context.Context) ([]TypeHead, error)
 	FindVersions(ctx context.Context) ([]VersionRecord, error)
-	// UpsertVersion inserts r, or replaces the stored record only when
-	// stored.CanOverwrite(r.Stamp, now).
-	UpsertVersion(ctx context.Context, r VersionRecord, now time.Time) error
 }

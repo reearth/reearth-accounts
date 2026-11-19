@@ -12,23 +12,24 @@ const maxApplyAttempts = 64
 
 type ApplyResult struct {
 	Applied []Type // the head changed
-	Ignored []Type // an older payload or a replay
+	Ignored []Type // an older payload, a replay, or a tie the stored entry won
 }
 
-// Apply writes a validated manifest one type at a time. Per type, it first
-// wins the head compare-and-set and only then upserts the version record the
-// decision names, so no record exists that no head decision named.
+// Apply writes a validated manifest one type at a time. Per type, one
+// compare-and-set of the head decides; the archive is written afterwards
+// from the head, so a failed archive write is repaired by the next apply of
+// that type.
 func Apply(ctx context.Context, r VersionRepo, m Manifest, now func() time.Time) (ApplyResult, error) {
 	var res ApplyResult
 	for _, e := range m.Entries {
 		applied, err := applyEntry(ctx, r, e, m.Timestamp, now)
-		if err != nil {
-			return res, err
-		}
 		if applied {
 			res.Applied = append(res.Applied, e.Type)
-		} else {
+		} else if err == nil {
 			res.Ignored = append(res.Ignored, e.Type)
+		}
+		if err != nil {
+			return res, err
 		}
 	}
 	return res, nil
@@ -40,9 +41,9 @@ func applyEntry(ctx context.Context, r VersionRepo, e Entry, payloadAt time.Time
 		if err != nil {
 			return false, err
 		}
-		d := PlanApply(cur, e, payloadAt, now())
-		if d.Next != nil {
-			won, err := r.CompareAndSwapHead(ctx, *d.Next)
+		next, changed := PlanApply(cur, e, payloadAt, now())
+		if changed {
+			won, err := r.CompareAndSwapHead(ctx, next)
 			if err != nil {
 				return false, err
 			}
@@ -50,12 +51,7 @@ func applyEntry(ctx context.Context, r VersionRepo, e Entry, payloadAt time.Time
 				continue
 			}
 		}
-		if d.Write {
-			if err := r.UpsertVersion(ctx, NewVersionRecord(e, payloadAt), now()); err != nil {
-				return false, err
-			}
-		}
-		return d.Next != nil, nil
+		return changed, r.ArchiveVersions(ctx, next)
 	}
 	return false, fmt.Errorf("legal: %s: head compare-and-set lost %d times", e.Type, maxApplyAttempts)
 }

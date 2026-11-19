@@ -11,6 +11,7 @@ import (
 	"sort"
 	"strings"
 	"time"
+	"unicode/utf8"
 
 	"github.com/reearth/reearthx/i18n"
 	"github.com/reearth/reearthx/rerror"
@@ -47,16 +48,27 @@ func (s Secret) Enabled() bool { return len(s.b) > 0 }
 
 func (s Secret) String() string { return "***" }
 
-// Verify checks that header is "sha256=" followed by the hex HMAC-SHA256 of
-// body keyed with s, comparing in constant time.
-func (s Secret) Verify(body []byte, header string) error {
+// ParseSignature checks that header is "sha256=" followed by a hex
+// HMAC-SHA256, so that a missing or "none" signature is refused before the
+// body is read.
+func ParseSignature(header string) ([]byte, error) {
 	hexSum, ok := strings.CutPrefix(header, signaturePrefix)
 	if !ok {
-		return ErrBadSignature
+		return nil, ErrBadSignature
 	}
-	got, err := hex.DecodeString(hexSum)
+	sum, err := hex.DecodeString(hexSum)
+	if err != nil || len(sum) != sha256.Size {
+		return nil, ErrBadSignature
+	}
+	return sum, nil
+}
+
+// Verify checks header against the HMAC-SHA256 of body keyed with s,
+// comparing in constant time.
+func (s Secret) Verify(body []byte, header string) error {
+	got, err := ParseSignature(header)
 	if err != nil {
-		return ErrBadSignature
+		return err
 	}
 	mac := hmac.New(sha256.New, s.b)
 	mac.Write(body)
@@ -118,6 +130,9 @@ type wireEntry struct {
 // any missing or malformed required field is rejected whole. Times are
 // truncated to milliseconds, the precision every backend stores.
 func ParseManifest(body []byte, now time.Time) (Manifest, error) {
+	if !utf8.Valid(body) {
+		return Manifest{}, &PayloadError{Field: "body", Reason: "not valid UTF-8"}
+	}
 	var p wirePayload
 	if err := json.Unmarshal(body, &p); err != nil {
 		return Manifest{}, &PayloadError{Field: "body", Reason: err.Error()}
@@ -178,6 +193,12 @@ func parseEntry(key string, raw json.RawMessage) (Entry, error) {
 	if w.Title == nil {
 		return Entry{}, &PayloadError{Field: field + ".title", Reason: "missing"}
 	}
+	if hasNUL(w.Title) {
+		return Entry{}, &PayloadError{Field: field + ".title", Reason: "contains NUL"}
+	}
+	if hasNUL(w.URL) {
+		return Entry{}, &PayloadError{Field: field + ".url", Reason: "contains NUL"}
+	}
 	return Entry{
 		Ref:         Ref{Type: t, Version: v},
 		EffectiveAt: eff,
@@ -185,6 +206,16 @@ func parseEntry(key string, raw json.RawMessage) (Entry, error) {
 		Title:       w.Title,
 		URL:         w.URL,
 	}, nil
+}
+
+// hasNUL reports a NUL in a key or value, which no store accepts in text.
+func hasNUL(m map[string]string) bool {
+	for k, v := range m {
+		if strings.ContainsRune(k, 0) || strings.ContainsRune(v, 0) {
+			return true
+		}
+	}
+	return false
 }
 
 func parseTime(field string, s *string) (time.Time, error) {

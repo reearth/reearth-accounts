@@ -32,16 +32,26 @@ func NewPolicyVersion(db *mongo.Database) *PolicyVersion {
 }
 
 type policyTypeDoc struct {
+	Applied   appliedDoc      `bson:"applied"`
 	AppliedAt time.Time       `bson:"appliedAt"`
+	Current   *versionDoc     `bson:"current"`
 	Revision  int64           `bson:"revision"`
 	Type      string          `bson:"_id"`
-	Upcoming  *scheduledDoc   `bson:"upcoming"`
+	Upcoming  *versionDoc     `bson:"upcoming"`
 	Withdrawn []withdrawalDoc `bson:"withdrawn"`
 }
 
-type scheduledDoc struct {
-	EffectiveAt time.Time `bson:"effectiveAt"`
-	Version     string    `bson:"version"`
+type appliedDoc struct {
+	Digest  []byte `bson:"digest"`
+	Version string `bson:"version"`
+}
+
+type versionDoc struct {
+	EffectiveAt time.Time         `bson:"effectiveAt"`
+	Required    bool              `bson:"required"`
+	Title       map[string]string `bson:"title"`
+	URL         map[string]string `bson:"url"`
+	Version     string            `bson:"version"`
 }
 
 type withdrawalDoc struct {
@@ -52,11 +62,42 @@ type withdrawalDoc struct {
 type policyVersionDoc struct {
 	EffectiveAt time.Time         `bson:"effectiveAt"`
 	Required    bool              `bson:"required"`
-	Stamp       time.Time         `bson:"stamp"`
+	Revision    int64             `bson:"revision"`
 	Title       map[string]string `bson:"title"`
 	Type        string            `bson:"type"`
 	URL         map[string]string `bson:"url"`
 	Version     string            `bson:"version"`
+}
+
+// ArchiveVersions upserts each record only over one with a revision not
+// above h.Revision. When a record exists that does not match, the upsert's
+// insert hits the unique (type, version) index. Two upserts of a missing
+// record race the same way, so a duplicate key retries as a plain update:
+// the record now exists, and a non-matching one is newer and kept.
+func (r *PolicyVersion) ArchiveVersions(ctx context.Context, h legal.TypeHead) error {
+	for _, v := range []*legal.VersionRecord{h.Current, h.Upcoming} {
+		if v == nil {
+			continue
+		}
+		doc := policyVersionDoc{
+			EffectiveAt: v.EffectiveAt,
+			Required:    v.Required,
+			Revision:    h.Revision,
+			Title:       v.Title,
+			Type:        string(v.Type),
+			URL:         v.URL,
+			Version:     v.Version.String(),
+		}
+		filter := bson.M{"type": doc.Type, "version": doc.Version, "revision": bson.M{"$lte": h.Revision}}
+		_, err := r.versions.UpdateOne(ctx, filter, bson.M{"$set": doc}, options.Update().SetUpsert(true))
+		if mongo.IsDuplicateKeyError(err) {
+			_, err = r.versions.UpdateOne(ctx, filter, bson.M{"$set": doc})
+		}
+		if err != nil {
+			return rerror.ErrInternalByWithContext(ctx, err)
+		}
+	}
+	return nil
 }
 
 func (r *PolicyVersion) CompareAndSwapHead(ctx context.Context, next legal.TypeHead) (bool, error) {
@@ -116,46 +157,19 @@ func (r *PolicyVersion) FindVersions(ctx context.Context) ([]legal.VersionRecord
 	}
 	res := make([]legal.VersionRecord, 0, len(docs))
 	for _, d := range docs {
-		v, err := legal.ParseVersion(d.Version)
+		rec, err := versionDoc{
+			EffectiveAt: d.EffectiveAt,
+			Required:    d.Required,
+			Title:       d.Title,
+			URL:         d.URL,
+			Version:     d.Version,
+		}.model(legal.Type(d.Type))
 		if err != nil {
 			return nil, rerror.ErrInternalByWithContext(ctx, err)
 		}
-		res = append(res, legal.VersionRecord{
-			Ref:         legal.Ref{Type: legal.Type(d.Type), Version: v},
-			EffectiveAt: d.EffectiveAt,
-			Required:    d.Required,
-			Stamp:       d.Stamp,
-			Title:       d.Title,
-			URL:         d.URL,
-		})
+		res = append(res, rec)
 	}
 	return res, nil
-}
-
-// UpsertVersion matches the stored record only when it may be overwritten.
-// When a record exists that does not match, the upsert's insert hits the
-// unique (type, version) index, and the duplicate key means "keep it".
-func (r *PolicyVersion) UpsertVersion(ctx context.Context, v legal.VersionRecord, now time.Time) error {
-	doc := policyVersionDoc{
-		EffectiveAt: v.EffectiveAt,
-		Required:    v.Required,
-		Stamp:       v.Stamp,
-		Title:       v.Title,
-		Type:        string(v.Type),
-		URL:         v.URL,
-		Version:     v.Version.String(),
-	}
-	filter := bson.M{
-		"type":        doc.Type,
-		"version":     doc.Version,
-		"stamp":       bson.M{"$lte": v.Stamp},
-		"effectiveAt": bson.M{"$gt": now},
-	}
-	_, err := r.versions.UpdateOne(ctx, filter, bson.M{"$set": doc}, options.Update().SetUpsert(true))
-	if err != nil && !mongo.IsDuplicateKeyError(err) {
-		return rerror.ErrInternalByWithContext(ctx, err)
-	}
-	return nil
 }
 
 func findAll[T any](ctx context.Context, c *mongo.Collection, out *[]T) error {
@@ -171,13 +185,13 @@ func findAll[T any](ctx context.Context, c *mongo.Collection, out *[]T) error {
 
 func newPolicyTypeDoc(h legal.TypeHead) policyTypeDoc {
 	doc := policyTypeDoc{
+		Applied:   appliedDoc{Digest: h.Applied.Digest, Version: h.Applied.Version.String()},
 		AppliedAt: h.AppliedAt,
+		Current:   newVersionDoc(h.Current),
 		Revision:  h.Revision,
 		Type:      string(h.Type),
+		Upcoming:  newVersionDoc(h.Upcoming),
 		Withdrawn: make([]withdrawalDoc, 0, len(h.Withdrawn)),
-	}
-	if h.Upcoming != nil {
-		doc.Upcoming = &scheduledDoc{EffectiveAt: h.Upcoming.EffectiveAt, Version: h.Upcoming.Version.String()}
 	}
 	for _, w := range h.Withdrawn {
 		doc.Withdrawn = append(doc.Withdrawn, withdrawalDoc{At: w.At, Version: w.Version.String()})
@@ -185,14 +199,39 @@ func newPolicyTypeDoc(h legal.TypeHead) policyTypeDoc {
 	return doc
 }
 
+func newVersionDoc(v *legal.VersionRecord) *versionDoc {
+	if v == nil {
+		return nil
+	}
+	return &versionDoc{
+		EffectiveAt: v.EffectiveAt,
+		Required:    v.Required,
+		Title:       v.Title,
+		URL:         v.URL,
+		Version:     v.Version.String(),
+	}
+}
+
 func (d policyTypeDoc) model() (legal.TypeHead, error) {
-	h := legal.TypeHead{AppliedAt: d.AppliedAt, Revision: d.Revision, Type: legal.Type(d.Type)}
-	if d.Upcoming != nil {
-		v, err := legal.ParseVersion(d.Upcoming.Version)
+	t := legal.Type(d.Type)
+	h := legal.TypeHead{AppliedAt: d.AppliedAt, Revision: d.Revision, Type: t}
+	v, err := legal.ParseVersion(d.Applied.Version)
+	if err != nil {
+		return legal.TypeHead{}, err
+	}
+	h.Applied = legal.Applied{Digest: d.Applied.Digest, Version: v}
+	for _, p := range []struct {
+		doc *versionDoc
+		out **legal.VersionRecord
+	}{{d.Current, &h.Current}, {d.Upcoming, &h.Upcoming}} {
+		if p.doc == nil {
+			continue
+		}
+		rec, err := p.doc.model(t)
 		if err != nil {
 			return legal.TypeHead{}, err
 		}
-		h.Upcoming = &legal.Scheduled{EffectiveAt: d.Upcoming.EffectiveAt, Version: v}
+		*p.out = &rec
 	}
 	for _, w := range d.Withdrawn {
 		v, err := legal.ParseVersion(w.Version)
@@ -202,4 +241,18 @@ func (d policyTypeDoc) model() (legal.TypeHead, error) {
 		h.Withdrawn = append(h.Withdrawn, legal.Withdrawal{At: w.At, Version: v})
 	}
 	return h, nil
+}
+
+func (d versionDoc) model(t legal.Type) (legal.VersionRecord, error) {
+	v, err := legal.ParseVersion(d.Version)
+	if err != nil {
+		return legal.VersionRecord{}, err
+	}
+	return legal.VersionRecord{
+		Ref:         legal.Ref{Type: t, Version: v},
+		EffectiveAt: d.EffectiveAt,
+		Required:    d.Required,
+		Title:       d.Title,
+		URL:         d.URL,
+	}, nil
 }

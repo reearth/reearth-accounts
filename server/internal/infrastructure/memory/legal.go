@@ -2,10 +2,8 @@ package memory
 
 import (
 	"context"
-	"maps"
 	"slices"
 	"sync"
-	"time"
 
 	"github.com/reearth/reearth-accounts/server/pkg/legal"
 )
@@ -13,14 +11,34 @@ import (
 type PolicyVersion struct {
 	heads    map[legal.Type]legal.TypeHead
 	lock     sync.Mutex
-	versions map[legal.Ref]legal.VersionRecord
+	versions map[legal.Ref]archived
+}
+
+type archived struct {
+	record   legal.VersionRecord
+	revision int64
 }
 
 func NewPolicyVersion() *PolicyVersion {
 	return &PolicyVersion{
 		heads:    map[legal.Type]legal.TypeHead{},
-		versions: map[legal.Ref]legal.VersionRecord{},
+		versions: map[legal.Ref]archived{},
 	}
+}
+
+func (r *PolicyVersion) ArchiveVersions(_ context.Context, h legal.TypeHead) error {
+	r.lock.Lock()
+	defer r.lock.Unlock()
+	for _, v := range []*legal.VersionRecord{h.Current, h.Upcoming} {
+		if v == nil {
+			continue
+		}
+		if cur, ok := r.versions[v.Ref]; ok && cur.revision > h.Revision {
+			continue
+		}
+		r.versions[v.Ref] = archived{record: *v, revision: h.Revision}
+	}
+	return nil
 }
 
 func (r *PolicyVersion) CompareAndSwapHead(_ context.Context, next legal.TypeHead) (bool, error) {
@@ -59,15 +77,9 @@ func (r *PolicyVersion) FindHeads(_ context.Context) ([]legal.TypeHead, error) {
 func (r *PolicyVersion) FindVersions(_ context.Context) ([]legal.VersionRecord, error) {
 	r.lock.Lock()
 	defer r.lock.Unlock()
-	return slices.Collect(maps.Values(r.versions)), nil
-}
-
-func (r *PolicyVersion) UpsertVersion(_ context.Context, v legal.VersionRecord, now time.Time) error {
-	r.lock.Lock()
-	defer r.lock.Unlock()
-	if cur, ok := r.versions[v.Ref]; ok && !cur.CanOverwrite(v.Stamp, now) {
-		return nil
+	res := make([]legal.VersionRecord, 0, len(r.versions))
+	for _, a := range r.versions {
+		res = append(res, a.record)
 	}
-	r.versions[v.Ref] = v
-	return nil
+	return res, nil
 }

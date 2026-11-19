@@ -12,14 +12,18 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-var legalT0 = time.Date(2026, 11, 20, 3, 0, 0, 0, time.UTC)
+var (
+	legalApplied = legal.Applied{Digest: []byte{1}, Version: legal.MustParseVersion("2.0.0")}
+	legalT0      = time.Date(2026, 11, 20, 3, 0, 0, 0, time.UTC)
+)
 
 func runLegal(t *testing.T, nc Factory) {
 	t.Run("Legal_HeadCompareAndSwap", func(t *testing.T) { testLegalHeadCAS(t, nc) })
-	t.Run("Legal_UpsertVersionGuard", func(t *testing.T) { testLegalUpsertVersion(t, nc) })
+	t.Run("Legal_ArchiveVersionsGuard", func(t *testing.T) { testLegalArchiveVersions(t, nc) })
 	t.Run("Legal_ApplyBothOrders", func(t *testing.T) { testLegalApplyBothOrders(t, nc) })
 	t.Run("Legal_ApplyRace", func(t *testing.T) { testLegalApplyRace(t, nc) })
 	t.Run("Legal_ApplyReplayRace", func(t *testing.T) { testLegalApplyReplayRace(t, nc) })
+	runLegalFaults(t, nc)
 }
 
 func legalEntry(typ, version string, eff time.Time, title string) legal.Entry {
@@ -38,6 +42,11 @@ func legalManifest(at time.Time, entries ...legal.Entry) legal.Manifest {
 
 func clockAt(t time.Time) func() time.Time { return func() time.Time { return t } }
 
+func legalRecord(typ, version string, eff time.Time, title string) *legal.VersionRecord {
+	e := legalEntry(typ, version, eff, title)
+	return &legal.VersionRecord{Ref: e.Ref, EffectiveAt: e.EffectiveAt, Required: e.Required, Title: e.Title, URL: e.URL}
+}
+
 func testLegalHeadCAS(t *testing.T, nc Factory) {
 	c, _, done := nc(t)
 	defer done()
@@ -49,8 +58,12 @@ func testLegalHeadCAS(t *testing.T, nc Factory) {
 	assert.Equal(t, legal.TypeHead{Type: "tos"}, empty)
 
 	first := legal.TypeHead{
-		Type: "tos", Revision: 1, AppliedAt: legalT0,
-		Upcoming: &legal.Scheduled{Version: legal.MustParseVersion("2.0.0"), EffectiveAt: legalT0.Add(48 * time.Hour)},
+		Applied:   legal.Applied{Digest: []byte{1, 2, 3}, Version: legal.MustParseVersion("2.0.0")},
+		AppliedAt: legalT0,
+		Current:   legalRecord("tos", "1.0.0", legalT0.Add(-48*time.Hour), "v1"),
+		Revision:  1,
+		Type:      "tos",
+		Upcoming:  legalRecord("tos", "2.0.0", legalT0.Add(48*time.Hour), "v2"),
 	}
 	won, err := r.CompareAndSwapHead(ctx, first)
 	require.NoError(t, err)
@@ -61,40 +74,48 @@ func testLegalHeadCAS(t *testing.T, nc Factory) {
 	assert.False(t, won, "a second first write loses")
 
 	second := legal.TypeHead{
-		Type: "tos", Revision: 2, AppliedAt: legalT0.Add(time.Hour),
+		Applied:   legal.Applied{Digest: []byte{4}, Version: legal.MustParseVersion("1.0.0")},
+		AppliedAt: legalT0.Add(time.Hour),
+		Current:   first.Current,
+		Revision:  2,
+		Type:      "tos",
 		Withdrawn: []legal.Withdrawal{{Version: legal.MustParseVersion("2.0.0"), At: legalT0.Add(time.Hour)}},
 	}
 	won, err = r.CompareAndSwapHead(ctx, second)
 	require.NoError(t, err)
 	assert.True(t, won)
 
-	stale := second
-	stale.Revision = 2
-	won, err = r.CompareAndSwapHead(ctx, stale)
-	require.NoError(t, err)
-	assert.False(t, won, "a write based on a stale revision loses")
-
 	got, err := r.FindHead(ctx, "tos")
 	require.NoError(t, err)
 	assertHeadEqual(t, second, got)
+
+	won, err = r.CompareAndSwapHead(ctx, second)
+	require.NoError(t, err)
+	assert.False(t, won, "a write based on a stale revision loses")
 
 	heads, err := r.FindHeads(ctx)
 	require.NoError(t, err)
 	require.Len(t, heads, 1)
 	assertHeadEqual(t, second, heads[0])
+
+	third := first
+	third.Revision = 3
+	won, err = r.CompareAndSwapHead(ctx, third)
+	require.NoError(t, err)
+	require.True(t, won)
+	got, err = r.FindHead(ctx, "tos")
+	require.NoError(t, err)
+	assertHeadEqual(t, third, got)
 }
 
 func assertHeadEqual(t *testing.T, want, got legal.TypeHead) {
 	t.Helper()
 	assert.Equal(t, want.Type, got.Type)
 	assert.Equal(t, want.Revision, got.Revision)
+	assert.Equal(t, want.Applied, got.Applied)
 	assert.True(t, want.AppliedAt.Equal(got.AppliedAt), "appliedAt %v != %v", want.AppliedAt, got.AppliedAt)
-	if want.Upcoming == nil {
-		assert.Nil(t, got.Upcoming)
-	} else if assert.NotNil(t, got.Upcoming) {
-		assert.Equal(t, want.Upcoming.Version, got.Upcoming.Version)
-		assert.True(t, want.Upcoming.EffectiveAt.Equal(got.Upcoming.EffectiveAt))
-	}
+	assertRecordEqual(t, want.Current, got.Current)
+	assertRecordEqual(t, want.Upcoming, got.Upcoming)
 	require.Len(t, got.Withdrawn, len(want.Withdrawn))
 	for i := range want.Withdrawn {
 		assert.Equal(t, want.Withdrawn[i].Version, got.Withdrawn[i].Version)
@@ -102,16 +123,35 @@ func assertHeadEqual(t *testing.T, want, got legal.TypeHead) {
 	}
 }
 
-func testLegalUpsertVersion(t *testing.T, nc Factory) {
+func assertRecordEqual(t *testing.T, want, got *legal.VersionRecord) {
+	t.Helper()
+	if want == nil {
+		assert.Nil(t, got)
+		return
+	}
+	if !assert.NotNil(t, got) {
+		return
+	}
+	assert.Equal(t, want.Ref, got.Ref)
+	assert.True(t, want.EffectiveAt.Equal(got.EffectiveAt), "effectiveAt %v != %v", want.EffectiveAt, got.EffectiveAt)
+	assert.Equal(t, want.Required, got.Required)
+	assert.Equal(t, want.Title, got.Title)
+	assert.Equal(t, want.URL, got.URL)
+}
+
+func testLegalArchiveVersions(t *testing.T, nc Factory) {
 	c, _, done := nc(t)
 	defer done()
 	ctx := context.Background()
 	r := c.PolicyVersion
-	now := legalT0
 	eff := legalT0.Add(48 * time.Hour)
 
-	_, err := r.CompareAndSwapHead(ctx, legal.TypeHead{Type: "tos", Revision: 1, AppliedAt: legalT0})
+	head := func(rev int64, title string) legal.TypeHead {
+		return legal.TypeHead{Type: "tos", Revision: rev, Applied: legalApplied, AppliedAt: legalT0, Upcoming: legalRecord("tos", "2.0.0", eff, title)}
+	}
+	won, err := r.CompareAndSwapHead(ctx, head(1, "draft"))
 	require.NoError(t, err)
+	require.True(t, won)
 
 	find := func() legal.VersionRecord {
 		t.Helper()
@@ -121,29 +161,18 @@ func testLegalUpsertVersion(t *testing.T, nc Factory) {
 		return vs[0]
 	}
 
-	v1 := legal.NewVersionRecord(legalEntry("tos", "2.0.0", eff, "draft"), legalT0)
-	require.NoError(t, r.UpsertVersion(ctx, v1, now))
+	require.NoError(t, r.ArchiveVersions(ctx, head(2, "draft")))
 	got := find()
-	assert.Equal(t, v1.Ref, got.Ref)
-	assert.True(t, got.EffectiveAt.Equal(eff))
-	assert.True(t, got.Stamp.Equal(legalT0))
-	assert.True(t, got.Required)
-	assert.Equal(t, v1.Title, got.Title)
-	assert.Equal(t, v1.URL, got.URL)
+	assertRecordEqual(t, head(2, "draft").Upcoming, &got)
 
-	newer := legal.NewVersionRecord(legalEntry("tos", "2.0.0", eff.Add(time.Hour), "final"), legalT0.Add(time.Minute))
-	require.NoError(t, r.UpsertVersion(ctx, newer, now))
-	assert.Equal(t, "final", find().Title["en"], "a newer write replaces a record not in effect")
+	require.NoError(t, r.ArchiveVersions(ctx, head(3, "final")))
+	assert.Equal(t, "final", find().Title["en"], "a newer revision replaces the record")
 
-	older := legal.NewVersionRecord(legalEntry("tos", "2.0.0", eff, "stale"), legalT0)
-	require.NoError(t, r.UpsertVersion(ctx, older, now))
-	assert.Equal(t, "final", find().Title["en"], "an older write keeps the record")
+	require.NoError(t, r.ArchiveVersions(ctx, head(2, "stale")))
+	assert.Equal(t, "final", find().Title["en"], "an older revision keeps the record")
 
-	later := legal.NewVersionRecord(legalEntry("tos", "2.0.0", eff, "after effect"), legalT0.Add(time.Hour))
-	require.NoError(t, r.UpsertVersion(ctx, later, eff.Add(2*time.Hour)))
-	got = find()
-	assert.Equal(t, "final", got.Title["en"], "a record in effect never changes")
-	assert.True(t, got.EffectiveAt.Equal(eff.Add(time.Hour)))
+	require.NoError(t, r.ArchiveVersions(ctx, head(3, "final")))
+	assert.Equal(t, "final", find().Title["en"], "the same revision is idempotent")
 }
 
 type catalogView struct {
@@ -156,9 +185,7 @@ func viewOf(t *testing.T, ctx context.Context, r legal.VersionRepo, typ legal.Ty
 	t.Helper()
 	heads, err := r.FindHeads(ctx)
 	require.NoError(t, err)
-	records, err := r.FindVersions(ctx)
-	require.NoError(t, err)
-	cat := legal.NewCatalog(heads, records)
+	cat := legal.NewCatalog(heads)
 	v := catalogView{acceptable: map[string]bool{}}
 	if cur := cat.Current(typ, now); cur != nil {
 		v.current = cur.Version.String()
@@ -268,7 +295,7 @@ func testLegalApplyRace(t *testing.T, nc Factory) {
 	require.NoError(t, err)
 	records, err := r.FindVersions(ctx)
 	require.NoError(t, err)
-	cat := legal.NewCatalog(heads, records)
+	cat := legal.NewCatalog(heads)
 	up := cat.Upcoming("tos", now)
 	require.NotNil(t, up)
 	assert.Equal(t, fmt.Sprintf("2.%d.0", n-1), up.Version.String())

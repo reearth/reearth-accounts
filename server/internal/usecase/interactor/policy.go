@@ -21,10 +21,14 @@ func NewPolicy(r *repo.Container, secret legal.Secret, catalog *PolicyCatalog) *
 }
 
 // ReceiveWebhook checks the secret, then the signature over the exact bytes
-// received, then every field, before it writes anything.
+// received, then every field, before it writes anything. A request without
+// a well-formed signature is refused before its body is read.
 func (p *Policy) ReceiveWebhook(ctx context.Context, r io.Reader, signature string) (legal.ApplyResult, error) {
 	if !p.secret.Enabled() {
 		return legal.ApplyResult{}, legal.ErrNotConfigured
+	}
+	if _, err := legal.ParseSignature(signature); err != nil {
+		return legal.ApplyResult{}, err
 	}
 	body, err := legal.ReadWebhookBody(r)
 	if err != nil {
