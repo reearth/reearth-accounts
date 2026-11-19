@@ -11,26 +11,20 @@ import (
 	"github.com/reearth/reearth-accounts/server/internal/usecase/maintenance"
 )
 
-// maintenanceBudget matches the default interval of the per-instance loop.
-const maintenanceBudget = 30 * time.Second
-
 type PassRunner interface {
 	RunPass(ctx context.Context) (maintenance.Report, error)
 }
 
 type MaintenanceHandler struct {
-	key    maintenance.Key
-	runner PassRunner
-}
-
-func NewMaintenanceHandler(key maintenance.Key, runner PassRunner) *MaintenanceHandler {
-	return &MaintenanceHandler{key: key, runner: runner}
+	Budget time.Duration
+	Key    maintenance.Key
+	Runner PassRunner
 }
 
 // Run godoc
 // @Tags Maintenance
 // @Summary Run one maintenance pass
-// @Description Sweeps the mail outbox, runs retention steps and sends due mail within 30 seconds, then reports the counts. For a scheduler. Returns 404 when REEARTH_ACCOUNTS_MAINTENANCE_KEY is unset.
+// @Description Sweeps the mail outbox, runs retention steps and sends due mail within REEARTH_ACCOUNTS_MAINTENANCE_INTERVAL (its default when the interval is 0), then reports the counts. For a scheduler. Returns 404 when REEARTH_ACCOUNTS_MAINTENANCE_KEY is unset.
 // @Produce json
 // @Param X-Accounts-Maintenance-Key header string true "the value of REEARTH_ACCOUNTS_MAINTENANCE_KEY"
 // @Success 200 {object} httpmodel.MaintenanceRunResponse
@@ -38,15 +32,12 @@ func NewMaintenanceHandler(key maintenance.Key, runner PassRunner) *MaintenanceH
 // @Failure 404 {object} internal.ErrorResponse "maintenance route not configured"
 // @Router /api/maintenance/run [post]
 func (h *MaintenanceHandler) Run(c echo.Context) error {
-	if !h.key.Enabled() || h.runner == nil {
-		return echo.ErrNotFound
-	}
-	if !h.key.Matches(c.Request().Header.Get(maintenance.KeyHeader)) {
+	if !h.Key.Matches(c.Request().Header.Get(maintenance.KeyHeader)) {
 		return httpinternal.NewError(http.StatusUnauthorized, "unauthorized", nil)
 	}
-	ctx, cancel := context.WithTimeout(c.Request().Context(), maintenanceBudget)
+	ctx, cancel := context.WithTimeout(c.Request().Context(), h.Budget)
 	defer cancel()
-	rep, err := h.runner.RunPass(ctx)
+	rep, err := h.Runner.RunPass(ctx)
 	if err != nil {
 		return err
 	}

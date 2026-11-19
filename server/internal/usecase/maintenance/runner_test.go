@@ -37,18 +37,23 @@ func (r testResolver) Resolve(_ context.Context, rec outbox.Record) (*mail.Envel
 }
 
 type fakeMail struct {
-	err      error
-	got      []mail.Envelope
-	lock     sync.Mutex
-	noSender bool
-	onSend   func()
-	release  chan struct{}
-	sent     chan mail.Envelope
+	blockOnce atomic.Bool
+	err       error
+	got       []mail.Envelope
+	lock      sync.Mutex
+	noSender  bool
+	onSend    func()
+	release   chan struct{}
+	sent      chan mail.Envelope
 }
 
 func (m *fakeMail) Deliverable() bool { return !m.noSender }
 
 func (m *fakeMail) Send(ctx context.Context, e mail.Envelope) error {
+	if m.blockOnce.CompareAndSwap(true, false) {
+		<-ctx.Done()
+		return ctx.Err()
+	}
 	if m.onSend != nil {
 		m.onSend()
 	}
@@ -73,6 +78,23 @@ func (m *fakeMail) count() int {
 	return len(m.got)
 }
 
+// ctxOutbox fails on a done context, as the MongoDB and PostgreSQL repos do.
+type ctxOutbox struct{ outbox.Repo }
+
+func (o ctxOutbox) ClaimDue(ctx context.Context, now time.Time, c outbox.Claim) (*outbox.Record, error) {
+	if err := ctx.Err(); err != nil {
+		return nil, err
+	}
+	return o.Repo.ClaimDue(ctx, now, c)
+}
+
+func (o ctxOutbox) Complete(ctx context.Context, k outbox.Key, token string, t outbox.Transition, now time.Time) (bool, error) {
+	if err := ctx.Err(); err != nil {
+		return false, err
+	}
+	return o.Repo.Complete(ctx, k, token, t, now)
+}
+
 type fixture struct {
 	clock  time.Time
 	mail   *fakeMail
@@ -82,7 +104,7 @@ type fixture struct {
 
 func newFixture(t *testing.T, m *fakeMail, cfg Config, resolvers map[mail.Kind]Resolver, hooks ...Retention) *fixture {
 	t.Helper()
-	f := &fixture{clock: t0, mail: m, outbox: memory.NewOutbox()}
+	f := &fixture{clock: t0, mail: m, outbox: ctxOutbox{memory.NewOutbox()}}
 	f.runner = NewRunner(cfg, f.outbox, m, resolvers, hooks...)
 	f.runner.now = func() time.Time { return f.clock }
 	f.runner.jitter = func(d time.Duration) time.Duration { return d }
@@ -90,7 +112,7 @@ func newFixture(t *testing.T, m *fakeMail, cfg Config, resolvers map[mail.Kind]R
 }
 
 func defaultConfig() Config {
-	return Config{Lease: outbox.ClaimLease, Rate: 1000, Retry: outbox.DefaultRetryPolicy, TTL: 720 * time.Hour}
+	return Config{Lease: outbox.ClaimLease, Retry: outbox.DefaultRetryPolicy, SendsPerSecond: 1000, TTL: 720 * time.Hour}
 }
 
 func sendable() map[mail.Kind]Resolver { return map[mail.Kind]Resolver{testKind: testResolver{}} }
@@ -113,6 +135,9 @@ func (f *fixture) record(t *testing.T, k outbox.Key) outbox.Record {
 	t.Helper()
 	r, err := f.outbox.FindByKey(context.Background(), k)
 	require.NoError(t, err)
+	if r.Reason != "" {
+		assert.Contains(t, outbox.Reasons, r.Reason, "a stored reason is one of outbox.Reasons")
+	}
 	return *r
 }
 
@@ -156,7 +181,7 @@ func TestRunPass_NoProviderLeavesMailQueued(t *testing.T) {
 }
 
 func TestRunPass_NothingToSendFails(t *testing.T) {
-	f := newFixture(t, &fakeMail{}, defaultConfig(), map[mail.Kind]Resolver{testKind: testResolver{nothing: "user_gone"}})
+	f := newFixture(t, &fakeMail{}, defaultConfig(), map[mail.Kind]Resolver{testKind: testResolver{nothing: outbox.ReasonUserGone}})
 	keys := f.enqueue(t, testKind, 1)
 
 	rep, err := f.runner.RunPass(context.Background())
@@ -165,7 +190,7 @@ func TestRunPass_NothingToSendFails(t *testing.T) {
 	assert.Zero(t, f.mail.count())
 	r := f.record(t, keys[0])
 	assert.Equal(t, outbox.StateFailed, r.State)
-	assert.Equal(t, outbox.Reason("user_gone"), r.Reason)
+	assert.Equal(t, outbox.ReasonUserGone, r.Reason)
 }
 
 func TestRunPass_UnknownKindFails(t *testing.T) {
@@ -249,7 +274,7 @@ func TestRunPass_ResultAfterClaimExpiryIsNotWritten(t *testing.T) {
 
 func TestRunPass_StopsAtTheBudget(t *testing.T) {
 	cfg := defaultConfig()
-	cfg.Rate = 10
+	cfg.SendsPerSecond = 10
 	f := newFixture(t, &fakeMail{}, cfg, sendable())
 	f.enqueue(t, testKind, 20)
 
@@ -265,7 +290,7 @@ func TestRunPass_StopsAtTheBudget(t *testing.T) {
 
 func TestRunPass_SendsAtMostRatePerSecond(t *testing.T) {
 	cfg := defaultConfig()
-	cfg.Rate = 20
+	cfg.SendsPerSecond = 20
 	f := newFixture(t, &fakeMail{}, cfg, sendable())
 	f.enqueue(t, testKind, 5)
 
@@ -274,6 +299,49 @@ func TestRunPass_SendsAtMostRatePerSecond(t *testing.T) {
 	require.NoError(t, err)
 	assert.Equal(t, 5, rep.Sent)
 	assert.GreaterOrEqual(t, time.Since(start), 190*time.Millisecond, "five sends at 20 per second take four intervals of 50ms")
+}
+
+func TestRunPass_TimedOutSendIsRetriedAndThePassGoesOn(t *testing.T) {
+	m := &fakeMail{}
+	m.blockOnce.Store(true)
+	f := newFixture(t, m, defaultConfig(), sendable())
+	f.runner.sendTimeout = 50 * time.Millisecond
+	keys := f.enqueue(t, testKind, 2)
+
+	rep, err := f.runner.RunPass(context.Background())
+	require.NoError(t, err)
+	assert.Equal(t, 1, rep.Retried)
+	assert.Equal(t, 1, rep.Sent, "the pass goes on after a timed-out send")
+	r := f.record(t, keys[0])
+	assert.Equal(t, outbox.StatePending, r.State, "a timed-out send is transient")
+	assert.Equal(t, t0.Add(time.Minute), r.NextAttemptAt)
+	assert.Equal(t, outbox.StateSent, f.record(t, keys[1]).State)
+}
+
+func TestRunPass_KeepsTheRateAcrossPasses(t *testing.T) {
+	var lock sync.Mutex
+	var at []time.Time
+	m := &fakeMail{onSend: func() {
+		lock.Lock()
+		defer lock.Unlock()
+		at = append(at, time.Now())
+	}}
+	cfg := defaultConfig()
+	cfg.SendsPerSecond = 5
+	f := newFixture(t, m, cfg, sendable())
+	f.enqueue(t, testKind, 2)
+
+	budget, cancel := context.WithTimeout(context.Background(), 100*time.Millisecond)
+	defer cancel()
+	rep, err := f.runner.RunPass(budget)
+	require.NoError(t, err)
+	require.Equal(t, 1, rep.Sent, "the budget ends the first pass before its second send")
+	rep, err = f.runner.RunPass(context.Background())
+	require.NoError(t, err)
+	require.Equal(t, 1, rep.Sent)
+
+	require.Len(t, at, 2)
+	assert.GreaterOrEqual(t, at[1].Sub(at[0]), 190*time.Millisecond, "5 per second leaves 200ms between sends, even across passes")
 }
 
 func TestShutdown_FinishesTheSendAndClaimsNothingMore(t *testing.T) {

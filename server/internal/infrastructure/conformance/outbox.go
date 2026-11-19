@@ -39,6 +39,9 @@ func findRecord(t *testing.T, c *repo.Container, key string) *outbox.Record {
 	t.Helper()
 	r, err := c.Outbox.FindByKey(context.Background(), outbox.Key(key))
 	require.NoError(t, err)
+	if r != nil && r.Reason != "" {
+		assert.Contains(t, outbox.Reasons, r.Reason, "a stored reason is one of outbox.Reasons")
+	}
 	return r
 }
 

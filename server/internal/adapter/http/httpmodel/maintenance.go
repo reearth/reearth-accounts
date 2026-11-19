@@ -2,8 +2,6 @@ package httpmodel
 
 import "github.com/reearth/reearth-accounts/server/internal/usecase/maintenance"
 
-// MaintenanceRunResponse counts what one maintenance pass did. Ran is false
-// when another pass on the same instance was running.
 type MaintenanceRunResponse struct {
 	ClaimsExpired  int            `json:"claimsExpired"`
 	Deleted        int            `json:"deleted"`

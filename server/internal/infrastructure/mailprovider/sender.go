@@ -51,9 +51,8 @@ func (s *sender) drop(ctx context.Context, e mail.Envelope) {
 	}
 }
 
-// permanent is the one place that tells a permanent provider error from a
-// transient one. reearthx returns no typed errors yet, so every error is
-// treated as transient.
+// reearthx returns no typed errors yet, so every error is treated as
+// transient.
 func permanent(error) bool { return false }
 
 func logFields(e mail.Envelope) []applog.Field {

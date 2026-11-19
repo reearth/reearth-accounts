@@ -2,7 +2,6 @@ package outbox
 
 import "time"
 
-// Outcome is what happened to a claimed record.
 type Outcome interface{ outcome() }
 
 type Delivered struct{}
@@ -25,7 +24,6 @@ type RetryPolicy struct {
 
 var DefaultRetryPolicy = RetryPolicy{BaseDelay: time.Minute, MaxAttempts: 5, MaxDelay: time.Hour}
 
-// Transition is the result a pass writes for a record it still holds.
 type Transition struct {
 	NextAttemptAt time.Time
 	Reason        Reason
@@ -61,12 +59,10 @@ func backoff(attempts int, p RetryPolicy) time.Duration {
 	return min(d, p.MaxDelay)
 }
 
-// Due reports whether a pass may claim r.
 func (r Record) Due(now time.Time) bool {
 	return r.State == StatePending && !r.NextAttemptAt.After(now)
 }
 
-// Claimed is r after a pass claims it.
 func (r Record) Claimed(c Claim, now time.Time) Record {
 	r.State = StateSending
 	r.Attempts++
@@ -75,12 +71,10 @@ func (r Record) Claimed(c Claim, now time.Time) Record {
 	return r
 }
 
-// Holds reports whether token still holds r, so its result may be written.
 func (r Record) Holds(token string, now time.Time) bool {
 	return r.State == StateSending && r.Claim != nil && r.Claim.Token == token && r.Claim.Until.After(now)
 }
 
-// Applied is r after t is written.
 func (r Record) Applied(t Transition, now time.Time) Record {
 	r.State = t.To
 	r.Reason = t.Reason
@@ -98,17 +92,14 @@ func (r Record) ClaimExpired(now time.Time) bool {
 	return r.State == StateSending && r.Claim != nil && !r.Claim.Until.After(now)
 }
 
-// Stale reports whether r waited longer than ttl without being sent.
 func (r Record) Stale(now time.Time, ttl time.Duration) bool {
 	return r.State == StatePending && !r.CreatedAt.After(now.Add(-ttl))
 }
 
-// Retired reports whether r ended longer ago than ttl and can be deleted.
 func (r Record) Retired(now time.Time, ttl time.Duration) bool {
 	return r.State.Ended() && r.EndedAt != nil && !r.EndedAt.After(now.Add(-ttl))
 }
 
-// Expired is r after Sweep finds its claim expired.
 func (r Record) Expired(now time.Time) Record {
 	r.State = StateUnknown
 	r.Reason = ReasonClaimExpired
@@ -117,7 +108,6 @@ func (r Record) Expired(now time.Time) Record {
 	return r.ended(now)
 }
 
-// TimedOut is r after Sweep finds it stale.
 func (r Record) TimedOut(now time.Time) Record {
 	r.State = StateFailed
 	r.Reason = ReasonTTL

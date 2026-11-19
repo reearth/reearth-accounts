@@ -166,8 +166,6 @@ func Start(debug bool) {
 	}).Run(ctx)
 }
 
-// orphanAcceptancePage is how many users a pass checks for orphaned policy
-// acceptances.
 const orphanAcceptancePage = 200
 
 type WebServer struct {
@@ -183,8 +181,7 @@ type ServerConfig struct {
 	Repos         *repo.Container
 	Gateways      *gateway.Container
 	CerbosAdapter gateway.CerbosGateway
-	// Resolvers builds queued mail by kind. No kind is queued yet.
-	Resolvers map[mail.Kind]maintenance.Resolver
+	Resolvers     map[mail.Kind]maintenance.Resolver
 }
 
 func NewServer(ctx context.Context, cfg *ServerConfig) *WebServer {

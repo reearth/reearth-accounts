@@ -7,6 +7,7 @@ import (
 	"net"
 	"net/netip"
 	"os"
+	"reflect"
 	"strings"
 	"time"
 
@@ -74,8 +75,6 @@ type Config struct {
 	Mailer       mailprovider.Env
 	MailSettings mailprovider.Settings `ignored:"true"`
 
-	// Outbox and maintenance passes (ADR-0004 decision 13). An interval of 0
-	// turns the per-instance loop off; an empty key turns the route off.
 	MailerMaxAttempts   int           `default:"5" envconfig:"REEARTH_ACCOUNTS_MAILER_MAX_ATTEMPTS"`
 	MailerOutboxTTL     time.Duration `default:"720h" envconfig:"REEARTH_ACCOUNTS_MAILER_OUTBOX_TTL"`
 	MailerRate          float64       `default:"2" envconfig:"REEARTH_ACCOUNTS_MAILER_RATE"`
@@ -341,11 +340,21 @@ func (c *Config) checkMaintenance() error {
 	return nil
 }
 
-// Maintenance is the pass configuration this config describes.
 func (c *Config) Maintenance() maintenance.Config {
 	retry := outbox.DefaultRetryPolicy
 	retry.MaxAttempts = c.MailerMaxAttempts
-	return maintenance.Config{Lease: outbox.ClaimLease, Rate: c.MailerRate, Retry: retry, TTL: c.MailerOutboxTTL}
+	return maintenance.Config{Lease: outbox.ClaimLease, Retry: retry, SendsPerSecond: c.MailerRate, TTL: c.MailerOutboxTTL}
+}
+
+// MaintenanceBudget bounds a pass the route starts. With the loop off, it is
+// the loop's default interval.
+func (c *Config) MaintenanceBudget() time.Duration {
+	if c.MaintenanceInterval > 0 {
+		return c.MaintenanceInterval
+	}
+	f, _ := reflect.TypeOf(*c).FieldByName("MaintenanceInterval")
+	d, _ := time.ParseDuration(f.Tag.Get("default"))
+	return d
 }
 
 type GraphQLConfig struct {

@@ -5,10 +5,8 @@ import (
 	"crypto/subtle"
 )
 
-// KeyHeader carries the maintenance key on POST /api/maintenance/run.
 const KeyHeader = "X-Accounts-Maintenance-Key"
 
-// Key guards the maintenance route. The zero value turns the route off.
 type Key struct{ sum *[sha256.Size]byte }
 
 func NewKey(s string) Key {
@@ -18,8 +16,6 @@ func NewKey(s string) Key {
 	sum := sha256.Sum256([]byte(s))
 	return Key{sum: &sum}
 }
-
-func (k Key) Enabled() bool { return k.sum != nil }
 
 // Matches compares digests, so the time taken reveals neither the key nor
 // its length.

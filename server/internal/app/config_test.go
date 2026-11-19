@@ -219,7 +219,8 @@ func TestReadConfig_Maintenance(t *testing.T) {
 	assert.Empty(t, c.MaintenanceKey)
 	mc := c.Maintenance()
 	assert.Equal(t, 10*time.Minute, mc.Lease)
-	assert.Equal(t, 2.0, mc.Rate)
+	assert.Equal(t, 2.0, mc.SendsPerSecond)
+	assert.Equal(t, 30*time.Second, c.MaintenanceBudget(), "the route budget is the loop interval")
 	assert.Equal(t, 5, mc.Retry.MaxAttempts)
 	assert.Equal(t, 720*time.Hour, mc.TTL)
 
@@ -233,7 +234,8 @@ func TestReadConfig_Maintenance(t *testing.T) {
 	assert.Zero(t, c.MaintenanceInterval, "0 turns the loop off")
 	assert.Equal(t, "k", c.MaintenanceKey)
 	mc = c.Maintenance()
-	assert.Equal(t, 0.5, mc.Rate)
+	assert.Equal(t, 0.5, mc.SendsPerSecond)
+	assert.Equal(t, 30*time.Second, c.MaintenanceBudget(), "with the loop off the route budget is the default interval")
 	assert.Equal(t, 3, mc.Retry.MaxAttempts)
 	assert.Equal(t, 48*time.Hour, mc.TTL)
 
@@ -249,4 +251,9 @@ func TestReadConfig_Maintenance(t *testing.T) {
 			assert.ErrorContains(t, err, env)
 		})
 	}
+}
+
+func TestConfig_MaintenanceBudget(t *testing.T) {
+	assert.Equal(t, 90*time.Second, (&Config{MaintenanceInterval: 90 * time.Second}).MaintenanceBudget())
+	assert.Equal(t, 30*time.Second, (&Config{}).MaintenanceBudget(), "with the loop off the route budget is the default interval")
 }

@@ -11,6 +11,7 @@ import (
 	"github.com/labstack/echo/v4/middleware"
 	"github.com/reearth/reearth-accounts/server/internal/adapter"
 	adapterhttp "github.com/reearth/reearth-accounts/server/internal/adapter/http"
+	"github.com/reearth/reearth-accounts/server/internal/adapter/http/handlers"
 	"github.com/reearth/reearth-accounts/server/internal/adapter/ratelimit"
 	scimadapter "github.com/reearth/reearth-accounts/server/internal/adapter/scim"
 	"github.com/reearth/reearth-accounts/server/internal/app/clientip"
@@ -181,8 +182,7 @@ func initEcho(ctx context.Context, cfg *ServerConfig, runner *maintenance.Runner
 		SwaggerUser:        cfg.Config.SwaggerBasicUser,
 		SwaggerPass:        cfg.Config.SwaggerBasicPass,
 		Debug:              cfg.Debug || cfg.Config.Dev,
-		Maintenance:        runner,
-		MaintenanceKey:     maintenance.NewKey(cfg.Config.MaintenanceKey),
+		Maintenance:        maintenanceRoute(cfg.Config, runner),
 	})
 
 	scimUC := interactor.NewScim(cfg.Repos, nil)
@@ -275,4 +275,11 @@ func cacheControl(next echo.HandlerFunc) echo.HandlerFunc {
 		c.Response().Header().Set("Cache-Control", "private")
 		return next(c)
 	}
+}
+
+func maintenanceRoute(c *Config, runner *maintenance.Runner) *handlers.MaintenanceHandler {
+	if c.MaintenanceKey == "" {
+		return nil
+	}
+	return &handlers.MaintenanceHandler{Budget: c.MaintenanceBudget(), Key: maintenance.NewKey(c.MaintenanceKey), Runner: runner}
 }

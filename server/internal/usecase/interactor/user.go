@@ -553,9 +553,6 @@ func (i *User) DeleteMe(ctx context.Context, userID user.ID, operator *workspace
 	if err != nil {
 		return err
 	}
-	// A policy acceptance or outbox record inserted after this transaction's
-	// removal and before its commit would otherwise outlive the user;
-	// Policy.Accept removes any acceptance inserted after this sweep.
 	dctx, cancel := detached(ctx)
 	defer cancel()
 	if err := retry(dctx, func(ctx context.Context) error { return i.repos.PolicyAcceptance.RemoveByUser(ctx, userID) }); err != nil {

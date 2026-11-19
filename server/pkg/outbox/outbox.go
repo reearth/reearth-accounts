@@ -1,6 +1,6 @@
-// Package outbox holds queued mail (ADR-0004 decision 13). A record leaves
-// sending only through a claim-guarded result or an expired claim, so a
-// recipient gets each message at most once.
+// Package outbox holds queued mail. A record leaves sending only through a
+// claim-guarded result or an expired claim, so a recipient gets each message
+// at most once.
 package outbox
 
 import (
@@ -12,7 +12,6 @@ import (
 	"github.com/reearth/reearth-accounts/server/pkg/mail"
 )
 
-// ClaimLease is how long a pass may hold a record in sending.
 const ClaimLease = 10 * time.Minute
 
 // Key is chosen by the feature that queues the record, so queuing the same
@@ -33,7 +32,6 @@ var States = []State{StatePending, StateSending, StateSent, StateFailed, StateUn
 
 func (s State) Ended() bool { return s == StateSent || s == StateFailed || s == StateUnknown }
 
-// Reason says why a record ended failed or unknown. It holds no personal data.
 type Reason string
 
 const (
@@ -42,10 +40,11 @@ const (
 	ReasonPermanent    Reason = "permanent_error"
 	ReasonClaimExpired Reason = "claim_expired"
 	ReasonUnknownKind  Reason = "unknown_kind"
+	ReasonUserGone     Reason = "user_gone"
 )
 
-// Subject names the records the mail refers to, such as a notice or an
-// invitation ID. The resolver for the record's kind reads it.
+var Reasons = []Reason{ReasonTTL, ReasonMaxAttempts, ReasonPermanent, ReasonClaimExpired, ReasonUnknownKind, ReasonUserGone}
+
 type Subject map[string]string
 
 // Recipient is a user, or an address only for a person without an account.
@@ -93,7 +92,6 @@ var (
 	ErrInvalidRecipient = errors.New("outbox: recipient must be exactly one of a user or an address")
 )
 
-// New returns a pending record that is due at once.
 func New(k Key, kind mail.Kind, s Subject, to Recipient, now time.Time) (Record, error) {
 	switch {
 	case k == "":

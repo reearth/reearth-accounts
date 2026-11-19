@@ -1,5 +1,3 @@
-// Package maintenance runs passes: short, budgeted runs that sweep the mail
-// outbox, run retention hooks and send due mail (ADR-0004 decision 13).
 package maintenance
 
 import (
@@ -18,27 +16,22 @@ import (
 	"golang.org/x/time/rate"
 )
 
-// sendTimeout bounds one claim, send and result write. They run detached from
-// the pass context, so stopping the server never cuts a send between its
-// claim and its result.
-const sendTimeout = 5 * time.Second
+const (
+	sendTimeout   = 5 * time.Second
+	resultTimeout = 2 * time.Second
+)
 
 type Config struct {
-	Lease time.Duration
-	// Rate is the most messages a pass sends per second.
-	Rate  float64
-	Retry outbox.RetryPolicy
-	TTL   time.Duration
+	Lease          time.Duration
+	Retry          outbox.RetryPolicy
+	SendsPerSecond float64
+	TTL            time.Duration
 }
 
-// Resolver builds the mail for a claimed record when it is sent, reading the
-// recipient's address and language then. It returns a reason and no envelope
-// when the mail no longer applies. An error is retried like a send error.
 type Resolver interface {
 	Resolve(ctx context.Context, r outbox.Record) (*mail.Envelope, outbox.Reason, error)
 }
 
-// Retention is a cleanup step that each pass runs after the outbox sweep.
 type Retention interface {
 	Name() string
 	Run(ctx context.Context, now time.Time) (int, error)
@@ -55,35 +48,37 @@ type Report struct {
 }
 
 type Runner struct {
-	cfg        Config
-	jitter     func(time.Duration) time.Duration
-	mail       gateway.Mail
-	now        func() time.Time
-	outbox     outbox.Repo
-	pass       sync.Mutex
-	resolvers  map[mail.Kind]Resolver
-	retentions []Retention
-	stopOnce   sync.Once
-	stopping   chan struct{}
-	token      func() string
+	cfg         Config
+	jitter      func(time.Duration) time.Duration
+	limiter     *rate.Limiter
+	mail        gateway.Mail
+	now         func() time.Time
+	outbox      outbox.Repo
+	pass        sync.Mutex
+	resolvers   map[mail.Kind]Resolver
+	retentions  []Retention
+	sendTimeout time.Duration
+	stopOnce    sync.Once
+	stopping    chan struct{}
+	token       func() string
 }
 
 func NewRunner(cfg Config, ob outbox.Repo, m gateway.Mail, resolvers map[mail.Kind]Resolver, retentions ...Retention) *Runner {
 	return &Runner{
-		cfg:        cfg,
-		jitter:     jitter,
-		mail:       m,
-		now:        func() time.Time { return time.Now().UTC() },
-		outbox:     ob,
-		resolvers:  resolvers,
-		retentions: retentions,
-		stopping:   make(chan struct{}),
-		token:      newToken,
+		cfg:         cfg,
+		jitter:      jitter,
+		limiter:     rate.NewLimiter(rate.Limit(cfg.SendsPerSecond), 1),
+		mail:        m,
+		now:         func() time.Time { return time.Now().UTC() },
+		outbox:      ob,
+		resolvers:   resolvers,
+		retentions:  retentions,
+		sendTimeout: sendTimeout,
+		stopping:    make(chan struct{}),
+		token:       newToken,
 	}
 }
 
-// Loop runs a pass every interval, each within that interval, until ctx ends.
-// An interval of 0 runs nothing.
 func (r *Runner) Loop(ctx context.Context, interval time.Duration) {
 	if interval <= 0 {
 		return
@@ -103,8 +98,6 @@ func (r *Runner) Loop(ctx context.Context, interval time.Duration) {
 	}
 }
 
-// RunPass does one pass within ctx's deadline. It reports Ran false when
-// another pass on this instance is running or the runner is shut down.
 func (r *Runner) RunPass(ctx context.Context) (Report, error) {
 	if !r.pass.TryLock() {
 		return Report{}, nil
@@ -131,8 +124,7 @@ func (r *Runner) RunPass(ctx context.Context) (Report, error) {
 	if !r.mail.Deliverable() {
 		return rep, nil
 	}
-	limiter := rate.NewLimiter(rate.Limit(r.cfg.Rate), 1)
-	for !r.stopped() && limiter.Wait(ctx) == nil && !r.stopped() {
+	for !r.stopped() && r.limiter.Wait(ctx) == nil && !r.stopped() {
 		more, err := r.sendOne(ctx, &rep)
 		if err != nil || !more {
 			return rep, err
@@ -141,8 +133,6 @@ func (r *Runner) RunPass(ctx context.Context) (Report, error) {
 	return rep, nil
 }
 
-// Shutdown stops new claims and waits for the running pass to finish its
-// send. Later passes do nothing.
 func (r *Runner) Shutdown(ctx context.Context) error {
 	r.stopOnce.Do(func() { close(r.stopping) })
 	idle := make(chan struct{})
@@ -178,17 +168,25 @@ func (r *Runner) deliver(ctx context.Context, rec outbox.Record) outbox.Outcome 
 	return outbox.Delivered{}
 }
 
+// detached outlives the pass context, so stopping a pass never cuts a send
+// between its claim and its result.
+func detached(ctx context.Context, timeout time.Duration) (context.Context, context.CancelFunc) {
+	return context.WithTimeout(context.WithoutCancel(ctx), timeout)
+}
+
 func (r *Runner) sendOne(ctx context.Context, rep *Report) (bool, error) {
-	ctx, cancel := context.WithTimeout(context.WithoutCancel(ctx), sendTimeout)
-	defer cancel()
+	sendCtx, cancelSend := detached(ctx, r.sendTimeout)
+	defer cancelSend()
 	now := r.now()
 	claim := outbox.Claim{Token: r.token(), Until: now.Add(r.cfg.Lease)}
-	rec, err := r.outbox.ClaimDue(ctx, now, claim)
+	rec, err := r.outbox.ClaimDue(sendCtx, now, claim)
 	if err != nil || rec == nil {
 		return false, err
 	}
-	t := outbox.Decide(*rec, r.deliver(ctx, *rec), r.cfg.Retry, r.now(), r.jitter)
-	held, err := r.outbox.Complete(ctx, rec.Key, claim.Token, t, r.now())
+	t := outbox.Decide(*rec, r.deliver(sendCtx, *rec), r.cfg.Retry, r.now(), r.jitter)
+	resultCtx, cancelResult := detached(ctx, resultTimeout)
+	defer cancelResult()
+	held, err := r.outbox.Complete(resultCtx, rec.Key, claim.Token, t, r.now())
 	if err != nil {
 		return false, err
 	}
