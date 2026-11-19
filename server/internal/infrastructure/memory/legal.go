@@ -29,7 +29,13 @@ func NewPolicyVersion() *PolicyVersion {
 func (r *PolicyVersion) ArchiveVersions(_ context.Context, h legal.TypeHead) error {
 	r.lock.Lock()
 	defer r.lock.Unlock()
-	for _, v := range h.Versions {
+	revs := map[legal.Version]int64{}
+	for ref, a := range r.versions {
+		if ref.Type == h.Type {
+			revs[ref.Version] = a.revision
+		}
+	}
+	for _, v := range h.ArchiveDue(revs) {
 		if cur, ok := r.versions[v.Ref]; ok && cur.revision > h.Revision {
 			continue
 		}

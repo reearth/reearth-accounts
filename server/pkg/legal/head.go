@@ -34,16 +34,43 @@ func (a Applied) beats(o Applied) bool {
 	return bytes.Compare(a.Digest, o.Digest) > 0
 }
 
+// FreezeMargin is how long before its effective date a version stops
+// changing when a payload is planned. It covers the time between planning
+// and writing the head, and clock skew between instances.
+const FreezeMargin = time.Minute
+
 // HeadVersion is one received version. WithdrawnAt is set when it was
-// withdrawn before it took effect.
+// withdrawn before it took effect. SetAt and SetDigest identify the payload
+// entry its content came from. Revision is the head revision that last
+// changed it.
 type HeadVersion struct {
 	VersionRecord
+	Revision    int64
+	SetAt       time.Time
+	SetDigest   []byte
 	WithdrawnAt *time.Time
 }
 
 func (v HeadVersion) withdrawn() bool { return v.WithdrawnAt != nil }
 
 func (v HeadVersion) inEffect(now time.Time) bool { return !v.EffectiveAt.After(now) }
+
+func (v HeadVersion) frozen(at time.Time) bool { return v.inEffect(at.Add(FreezeMargin)) }
+
+// takes reports whether an entry of a payload stamped payloadAt replaces the
+// content. The same-timestamp entry with the larger digest always does, so
+// either order ends the same; a newer payload does only before the freeze.
+func (v HeadVersion) takes(payloadAt time.Time, digest []byte, now time.Time) bool {
+	if payloadAt.Equal(v.SetAt) {
+		return bytes.Compare(digest, v.SetDigest) > 0
+	}
+	return payloadAt.After(v.SetAt) && !v.frozen(now)
+}
+
+func (v HeadVersion) setBy(e Entry, payloadAt time.Time, a Applied) HeadVersion {
+	v.VersionRecord, v.SetAt, v.SetDigest = e.record(), payloadAt, a.Digest
+	return v
+}
 
 type VersionRecord struct {
 	Ref
@@ -73,6 +100,19 @@ func (e Entry) applied() Applied {
 func (h TypeHead) IsWithdrawn(v Version) bool {
 	hv, ok := h.Versions[v]
 	return ok && hv.withdrawn()
+}
+
+// ArchiveDue returns, in ascending version order, the versions whose
+// archived revision is missing from archived or older than the revision that
+// last changed them.
+func (h TypeHead) ArchiveDue(archived map[Version]int64) []HeadVersion {
+	var due []HeadVersion
+	for _, v := range h.SortedVersions() {
+		if rev, ok := archived[v.Version]; !ok || rev < v.Revision {
+			due = append(due, v)
+		}
+	}
+	return due
 }
 
 // SortedVersions returns the head's versions in ascending version order.
@@ -121,23 +161,25 @@ const (
 )
 
 // PlanApply decides one entry of a payload stamped payloadAt against the
-// stored head.
+// stored head. A version is frozen from FreezeMargin before its date.
 //
 // A payload newer than the head, or with the head's timestamp and an entry
 // that beats the applied one (the higher version, then the larger digest),
 // wins:
-//   - A version whose date has passed never changes.
 //   - A withdrawn version named again follows renamedWithdrawn.
-//   - Any other named version takes the entry's content.
-//   - Every other version not yet in effect is withdrawn.
+//   - Any other named version takes the entry's content unless it is frozen
+//     and the entry is not the same-timestamp tie winner for it.
+//   - Every other version not withdrawn and not frozen is withdrawn.
 //
-// Any other payload only adds its version when the head has not seen it,
-// as stalePayloadVersion decides.
+// Any other payload adds its version when the head has not seen it, as
+// stalePayloadVersion decides, and otherwise only replaces the content of a
+// version it wins a same-timestamp tie for, withdrawn or not.
 func PlanApply(cur TypeHead, e Entry, payloadAt, now time.Time) (TypeHead, Outcome) {
 	applied := e.applied()
 	won := cur.Revision == 0 || payloadAt.After(cur.AppliedAt) || payloadAt.Equal(cur.AppliedAt) && applied.beats(cur.Applied)
-	_, seen := cur.Versions[e.Version]
-	if !won && seen {
+	v, seen := cur.Versions[e.Version]
+	tie := seen && payloadAt.Equal(v.SetAt) && v.takes(payloadAt, applied.Digest, now)
+	if !won && seen && !tie {
 		return cur, OutcomeIgnored
 	}
 
@@ -147,25 +189,31 @@ func PlanApply(cur TypeHead, e Entry, payloadAt, now time.Time) (TypeHead, Outco
 	if next.Versions == nil {
 		next.Versions = map[Version]HeadVersion{}
 	}
+	set := func(v HeadVersion) {
+		v.Revision = next.Revision
+		next.Versions[v.Version] = v
+	}
 	if !won {
-		next.Versions[e.Version] = stalePayloadVersion(e, now)
+		if seen {
+			set(v.setBy(e, payloadAt, applied))
+		} else {
+			set(stalePayloadVersion(e, payloadAt, applied, cur.AppliedAt, now))
+		}
 		return next, OutcomeRecorded
 	}
 
 	next.Applied, next.AppliedAt = applied, payloadAt
-	v, ok := next.Versions[e.Version]
 	switch {
-	case !ok:
-		v = HeadVersion{VersionRecord: e.record()}
+	case !seen:
+		set(HeadVersion{}.setBy(e, payloadAt, applied))
 	case v.withdrawn():
-		v = renamedWithdrawn(v, e)
-	case !v.inEffect(now):
-		v.VersionRecord = e.record()
+		set(renamedWithdrawn(v, e))
+	case v.takes(payloadAt, applied.Digest, now):
+		set(v.setBy(e, payloadAt, applied))
 	}
-	next.Versions[e.Version] = v
 	for ver, o := range next.Versions {
-		if ver != e.Version && !o.withdrawn() && !o.inEffect(now) {
-			next.Versions[ver] = withdraw(o, now)
+		if ver != e.Version && !o.withdrawn() && !o.frozen(now) {
+			set(withdraw(o, now))
 		}
 	}
 	return next, OutcomeWon
@@ -176,13 +224,13 @@ func PlanApply(cur TypeHead, e Entry, payloadAt, now time.Time) (TypeHead, Outco
 func renamedWithdrawn(v HeadVersion, _ Entry) HeadVersion { return v }
 
 // stalePayloadVersion adds a version the head has not seen from a payload
-// that lost to it. A version already in effect is added in effect and
-// becomes current when its date is the latest that has passed. A version
-// not yet in effect was superseded by the newer payload, so it is added
-// withdrawn.
-func stalePayloadVersion(e Entry, now time.Time) HeadVersion {
-	v := HeadVersion{VersionRecord: e.record()}
-	if !v.inEffect(now) {
+// that lost to it. Whether it is in effect is judged at supersededAt, the
+// timestamp of the head's newest payload, when that payload superseded it,
+// so the time it arrives does not matter. A version frozen then is added in
+// effect; any other version is added withdrawn.
+func stalePayloadVersion(e Entry, payloadAt time.Time, a Applied, supersededAt, now time.Time) HeadVersion {
+	v := HeadVersion{}.setBy(e, payloadAt, a)
+	if !v.frozen(supersededAt) {
 		v = withdraw(v, now)
 	}
 	return v

@@ -30,6 +30,7 @@ type Querier interface {
 	PolicyTypeSwap(ctx context.Context, arg PolicyTypeSwapParams) (int64, error)
 	PolicyVersionArchive(ctx context.Context, arg PolicyVersionArchiveParams) error
 	PolicyVersionFindAll(ctx context.Context) ([]PolicyVersion, error)
+	PolicyVersionRevisions(ctx context.Context, type_ string) ([]PolicyVersionRevisionsRow, error)
 	RoleDelete(ctx context.Context, id string) error
 	RoleFindAll(ctx context.Context) ([]Role, error)
 	RoleFindByID(ctx context.Context, id string) (Role, error)

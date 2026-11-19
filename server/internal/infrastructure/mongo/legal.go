@@ -47,6 +47,9 @@ type versionDoc struct {
 	Required    bool              `bson:"required"`
 	Title       map[string]string `bson:"title"`
 	URL         map[string]string `bson:"url"`
+	Revision    int64             `bson:"revision"`
+	SetAt       time.Time         `bson:"setAt"`
+	SetDigest   []byte            `bson:"setDigest"`
 	Version     string            `bson:"version"`
 	WithdrawnAt *time.Time        `bson:"withdrawnAt,omitempty"`
 }
@@ -67,7 +70,11 @@ type policyVersionDoc struct {
 // record race the same way, so a duplicate key retries as a plain update:
 // the record now exists, and a non-matching one is newer and kept.
 func (r *PolicyVersion) ArchiveVersions(ctx context.Context, h legal.TypeHead) error {
-	for _, v := range h.SortedVersions() {
+	revs, err := r.archivedRevisions(ctx, h.Type)
+	if err != nil {
+		return err
+	}
+	for _, v := range h.ArchiveDue(revs) {
 		doc := policyVersionDoc{
 			EffectiveAt: v.EffectiveAt,
 			Required:    v.Required,
@@ -87,6 +94,29 @@ func (r *PolicyVersion) ArchiveVersions(ctx context.Context, h legal.TypeHead) e
 		}
 	}
 	return nil
+}
+
+func (r *PolicyVersion) archivedRevisions(ctx context.Context, t legal.Type) (map[legal.Version]int64, error) {
+	var docs []struct {
+		Revision int64  `bson:"revision"`
+		Version  string `bson:"version"`
+	}
+	cur, err := r.versions.Find(ctx, bson.M{"type": string(t)}, options.Find().SetProjection(bson.M{"_id": 0, "revision": 1, "version": 1}))
+	if err != nil {
+		return nil, rerror.ErrInternalByWithContext(ctx, err)
+	}
+	if err := cur.All(ctx, &docs); err != nil {
+		return nil, rerror.ErrInternalByWithContext(ctx, err)
+	}
+	revs := make(map[legal.Version]int64, len(docs))
+	for _, d := range docs {
+		v, err := legal.ParseVersion(d.Version)
+		if err != nil {
+			return nil, rerror.ErrInternalByWithContext(ctx, err)
+		}
+		revs[v] = d.Revision
+	}
+	return revs, nil
 }
 
 func (r *PolicyVersion) CompareAndSwapHead(ctx context.Context, next legal.TypeHead) (bool, error) {
@@ -186,6 +216,9 @@ func newPolicyTypeDoc(h legal.TypeHead) policyTypeDoc {
 			Required:    v.Required,
 			Title:       v.Title,
 			URL:         v.URL,
+			Revision:    v.Revision,
+			SetAt:       v.SetAt,
+			SetDigest:   v.SetDigest,
 			Version:     v.Version.String(),
 			WithdrawnAt: v.WithdrawnAt,
 		})
@@ -211,7 +244,7 @@ func (d policyTypeDoc) model() (legal.TypeHead, error) {
 		if err != nil {
 			return legal.TypeHead{}, err
 		}
-		h.Versions[rec.Version] = legal.HeadVersion{VersionRecord: rec, WithdrawnAt: vd.WithdrawnAt}
+		h.Versions[rec.Version] = legal.HeadVersion{VersionRecord: rec, Revision: vd.Revision, SetAt: vd.SetAt, SetDigest: vd.SetDigest, WithdrawnAt: vd.WithdrawnAt}
 	}
 	return h, nil
 }

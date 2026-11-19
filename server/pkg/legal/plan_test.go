@@ -28,7 +28,13 @@ func (f *fakeRepo) ArchiveVersions(_ context.Context, h TypeHead) error {
 		f.failArchive = false
 		return errors.New("archive unavailable")
 	}
-	for _, v := range h.Versions {
+	revs := map[Version]int64{}
+	for ref, rev := range f.revisions {
+		if ref.Type == h.Type {
+			revs[ref.Version] = rev
+		}
+	}
+	for _, v := range h.ArchiveDue(revs) {
 		if rev, ok := f.revisions[v.Ref]; ok && rev > h.Revision {
 			continue
 		}
@@ -395,4 +401,101 @@ func TestPlanApply_EqualTimestamp(t *testing.T) {
 	assert.True(t, lower.IsWithdrawn(MustParseVersion("1.9.0")))
 	_, outcome = PlanApply(next, entry("2.0.0", 30*day, "v2"), t0.Add(-time.Millisecond), t0)
 	assert.Equal(t, OutcomeIgnored, outcome, "an older payload naming a seen version changes nothing")
+}
+
+func TestApply_SameTimestampTieSetsContent(t *testing.T) {
+	for _, tc := range []struct {
+		name      string
+		eff       time.Duration
+		withdrawn bool
+	}{
+		{"in effect", -30 * day, false},
+		{"withdrawn by a higher version", 30 * day, true},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			a, b := entry("1.0.5", tc.eff, "draft-A"), entry("1.0.5", tc.eff, "draft-B")
+			if a.applied().beats(b.applied()) {
+				a, b = b, a
+			}
+			higher := entry("2.0.0", 40*day, "v2")
+			for _, order := range [][]Entry{{a, b}, {b, a}, {a, higher, b}, {b, higher, a}, {higher, a, b}, {higher, b, a}} {
+				f := newFakeRepo()
+				for _, e := range order {
+					_, err := Apply(context.Background(), f, Manifest{Timestamp: t0, Entries: []Entry{e}}, func() time.Time { return t0.Add(hour) })
+					require.NoError(t, err)
+				}
+				got := f.heads["tos"].Versions[MustParseVersion("1.0.5")]
+				assert.Equal(t, b.Title["en"], got.Title["en"], "order %v", order)
+				assert.Equal(t, b.Title["en"], f.versions[got.Ref].Title["en"], "archived, order %v", order)
+				if len(order) == 3 {
+					assert.Equal(t, tc.withdrawn, got.withdrawn(), "order %v", order)
+				}
+			}
+		})
+	}
+}
+
+func TestPlanApply_FreezeMargin(t *testing.T) {
+	eff := t0.Add(day)
+	head, _ := PlanApply(TypeHead{Type: "tos"}, entry("2.0.0", day, "v2"), t0, t0)
+	correction := entry("2.0.0", 10*day, "corrected")
+	revert := entry("1.0.0", -day, "v1")
+	for _, tc := range []struct {
+		name    string
+		e       Entry
+		now     time.Time
+		changed bool
+	}{
+		{"correction inside the margin", correction, eff.Add(-FreezeMargin), false},
+		{"correction before the margin", correction, eff.Add(-FreezeMargin - time.Millisecond), true},
+		{"revert inside the margin", revert, eff.Add(-time.Second), false},
+		{"revert before the margin", revert, eff.Add(-2 * FreezeMargin), true},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			next, outcome := PlanApply(head, tc.e, t0.Add(hour), tc.now)
+			require.Equal(t, OutcomeWon, outcome)
+			got := next.Versions[MustParseVersion("2.0.0")]
+			assert.Equal(t, tc.changed, got.withdrawn() || got.Title["en"] != "v2")
+			cur, _ := next.At(eff)
+			if !tc.changed {
+				assert.Equal(t, "2.0.0", versionOf(cur), "reads still use the real time")
+			}
+		})
+	}
+}
+
+func TestPlanApply_StaleVersionJudgedWhenSuperseded(t *testing.T) {
+	head, _ := PlanApply(TypeHead{Type: "tos"}, entry("1.0.0", -day, "v1"), t0.Add(hour), t0.Add(hour))
+	for _, tc := range []struct {
+		name      string
+		eff       time.Duration
+		arrival   time.Duration
+		withdrawn bool
+	}{
+		{"future when superseded, arrives before its date", day, 2 * hour, true},
+		{"future when superseded, arrives after its date", day, 2 * day, true},
+		{"in effect when superseded", -hour, 2 * day, false},
+		{"within the margin when superseded", hour + FreezeMargin, 2 * day, false},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			next, outcome := PlanApply(head, entry("2.0.0", tc.eff, "v2"), t0, t0.Add(tc.arrival))
+			require.Equal(t, OutcomeRecorded, outcome)
+			assert.Equal(t, tc.withdrawn, next.IsWithdrawn(MustParseVersion("2.0.0")))
+		})
+	}
+}
+
+func TestApply_ArchivesOnlyChangedVersions(t *testing.T) {
+	f := newFakeRepo()
+	run(t, f, []step{
+		{payloadAt: 0, now: 0, version: "1.0.0", effectiveAt: -day, title: "v1"},
+		{payloadAt: hour, now: hour, version: "2.0.0", effectiveAt: 30 * day, title: "v2"},
+		{payloadAt: hour, now: 2 * hour, version: "2.0.0", effectiveAt: 30 * day, title: "v2"},
+	})
+	v1, v2 := Ref{Type: "tos", Version: MustParseVersion("1.0.0")}, Ref{Type: "tos", Version: MustParseVersion("2.0.0")}
+	assert.Equal(t, map[Ref]int64{v1: 1, v2: 2}, f.revisions)
+
+	run(t, f, []step{{payloadAt: 2 * hour, now: 2 * hour, version: "3.0.0", effectiveAt: 30 * day, title: "v3"}})
+	assert.Equal(t, int64(1), f.revisions[v1], "unchanged")
+	assert.Equal(t, int64(3), f.revisions[v2], "withdrawn")
 }

@@ -78,7 +78,9 @@ func faultArchiveInsertRace(t *testing.T, nc Factory) {
 	for round := range rounds {
 		typ := fmt.Sprintf("tos-%d", round)
 		head := func(rev int64, eff time.Duration, title string) legal.TypeHead {
-			return legal.TypeHead{Type: legal.Type(typ), Revision: rev, Applied: legalApplied, AppliedAt: legalT0, Versions: legalVersions(legalHeadVersion(typ, "2.0.0", legalT0.Add(eff), title, nil))}
+			v := legalHeadVersion(typ, "2.0.0", legalT0.Add(eff), title, nil)
+			v.Revision = rev
+			return legal.TypeHead{Type: legal.Type(typ), Revision: rev, Applied: legalApplied, AppliedAt: legalT0, Versions: legalVersions(v)}
 		}
 		older, newer := head(1, 30*legalDay, "older"), head(2, 40*legalDay, "newer")
 		won, err := r.CompareAndSwapHead(ctx, older)

@@ -7,8 +7,9 @@ import "context"
 // reads to decide). Every write is a single-document or single-statement
 // conditional write.
 type VersionRepo interface {
-	// ArchiveVersions upserts every version of h into policy_versions,
-	// stamped with h.Revision. A stored record with a higher revision is kept.
+	// ArchiveVersions upserts the versions of h.ArchiveDue into
+	// policy_versions, stamped with h.Revision. A stored record with a
+	// higher revision is kept.
 	ArchiveVersions(ctx context.Context, h TypeHead) error
 	// CompareAndSwapHead stores next when the stored revision is
 	// next.Revision-1 (an absent head counts as 0). It returns false when

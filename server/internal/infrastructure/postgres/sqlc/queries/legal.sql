@@ -19,6 +19,9 @@ WHERE type = sqlc.arg(type) AND revision = sqlc.arg(revision)::bigint - 1;
 -- name: PolicyVersionFindAll :many
 SELECT * FROM policy_versions ORDER BY type, version;
 
+-- name: PolicyVersionRevisions :many
+SELECT version, revision FROM policy_versions WHERE type = $1;
+
 -- name: PolicyVersionArchive :exec
 INSERT INTO policy_versions (type, version, effective_at, required, title, url, revision)
 VALUES (sqlc.arg(type), sqlc.arg(version), sqlc.arg(effective_at), sqlc.arg(required), sqlc.arg(title), sqlc.arg(url), sqlc.arg(revision))
