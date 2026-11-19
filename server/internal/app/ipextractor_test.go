@@ -12,6 +12,10 @@ import (
 	"github.com/reearth/reearth-accounts/server/internal/usecase/gateway"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"go.opentelemetry.io/otel"
+	sdktrace "go.opentelemetry.io/otel/sdk/trace"
+	"go.opentelemetry.io/otel/sdk/trace/tracetest"
+	semconv "go.opentelemetry.io/otel/semconv/v1.21.0"
 )
 
 func TestClientIP(t *testing.T) {
@@ -122,6 +126,48 @@ func TestReadConfig_TrustedProxies(t *testing.T) {
 		t.Setenv("REEARTH_ACCOUNTS_TRUSTED_PROXIES", v)
 		_, err = ReadConfig(false)
 		assert.ErrorContains(t, err, "REEARTH_ACCOUNTS_TRUSTED_PROXIES: ", v)
+	}
+}
+
+func TestClientIP_TraceClientAddress(t *testing.T) {
+	sr := tracetest.NewSpanRecorder()
+	prev := otel.GetTracerProvider()
+	otel.SetTracerProvider(sdktrace.NewTracerProvider(sdktrace.WithSpanProcessor(sr)))
+	t.Cleanup(func() { otel.SetTracerProvider(prev) })
+
+	tests := []struct {
+		name       string
+		proxies    string
+		remoteAddr string
+		want       string
+	}{
+		{name: "untrusted peer", remoteAddr: "198.51.100.7:4000", want: "198.51.100.7"},
+		{name: "trusted proxy", proxies: "10.0.0.0/8", remoteAddr: "10.1.2.3:4000", want: "1.2.3.4"},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			sr.Reset()
+			t.Setenv("SKIP_DOTENV", "1")
+			t.Setenv("REEARTH_ACCOUNTS_OTEL_ENABLED", "true")
+			t.Setenv("REEARTH_ACCOUNTS_TRUSTED_PROXIES", tt.proxies)
+			conf, err := ReadConfig(false)
+			require.NoError(t, err)
+
+			req := httptest.NewRequest(http.MethodGet, "/test/client-ip", nil)
+			req.RemoteAddr = tt.remoteAddr
+			req.Header.Set("X-Forwarded-For", "1.2.3.4")
+			require.Equal(t, tt.want, serveClientIP(t, conf, req))
+
+			spans := sr.Ended()
+			require.Len(t, spans, 1)
+			var got []string
+			for _, a := range spans[0].Attributes() {
+				if a.Key == semconv.ClientAddressKey {
+					got = append(got, a.Value.AsString())
+				}
+			}
+			assert.Equal(t, []string{tt.want}, got)
+		})
 	}
 }
 
