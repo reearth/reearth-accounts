@@ -10,8 +10,7 @@ import (
 	"golang.org/x/text/language"
 )
 
-// Kinds lists every mail accounts sends; the template registry and its tests
-// derive from it.
+// Kinds lists every mail accounts sends.
 var Kinds = []Kind{KindVerification, KindPasswordReset, KindVerificationResend}
 
 type Lang string
@@ -23,10 +22,13 @@ const (
 
 var Langs = []Lang{LangEN, LangJA}
 
-var baseLangs = map[language.Base]Lang{
-	language.MustParseBase("en"): LangEN,
-	language.MustParseBase("ja"): LangJA,
-}
+var baseLangs = func() map[language.Base]Lang {
+	m := make(map[language.Base]Lang, len(Langs))
+	for _, l := range Langs {
+		m[language.MustParseBase(string(l))] = l
+	}
+	return m
+}()
 
 // LangOf picks the template language by the tag's base language and falls
 // back to English. An und or zero tag only has a guessed base, so it never
@@ -42,8 +44,6 @@ func LangOf(t language.Tag) Lang {
 	return LangEN
 }
 
-// Data is the template input of one kind, so a caller cannot render a kind
-// with another kind's fields.
 type Data interface{ Kind() Kind }
 
 type VerificationData struct {
@@ -72,8 +72,6 @@ type kindTemplates struct {
 	html *htmltemplate.Template
 }
 
-// registry panics at init on a missing or broken template, so every package
-// that imports mail fails its tests instead of a user getting no mail.
 var registry = buildRegistry()
 
 func buildRegistry() map[Kind]map[Lang]kindTemplates {
@@ -94,8 +92,6 @@ func textFile(k Kind, l Lang) string {
 	return fmt.Sprintf("templates/%s.%s.txt.tmpl", k, l)
 }
 
-// htmlFiles are the kind's own template plus the page layout and its
-// language's parts, which a kind's template may use.
 func htmlFiles(k Kind, l Lang) []string {
 	return []string{
 		"templates/layout.html.tmpl",
@@ -104,8 +100,7 @@ func htmlFiles(k Kind, l Lang) []string {
 	}
 }
 
-// Render renders d in the user's language. The text template defines
-// "subject" and "text"; the HTML template defines "html".
+// Render renders d in the user's language.
 func Render(lang language.Tag, d Data) (Message, error) {
 	byLang, ok := registry[d.Kind()]
 	if !ok {

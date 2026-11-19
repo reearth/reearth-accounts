@@ -25,8 +25,7 @@ func (r Recipient) UserID() *id.UserID { return r.userID }
 func (r Recipient) Address() string    { return r.address }
 func (r Recipient) Name() string       { return r.name }
 
-// Message is a rendered mail. Only Render builds one, so a message always has
-// a known kind and both bodies.
+// Message is a rendered mail.
 type Message struct {
 	kind    Kind
 	subject string
