@@ -6,13 +6,11 @@ import (
 	"time"
 )
 
-// maxApplyAttempts bounds the compare-and-set loop. Each lost attempt means
-// another payload won, so concurrent deliveries settle far below it.
 const maxApplyAttempts = 64
 
 type ApplyResult struct {
-	Applied []Type // the head changed
-	Ignored []Type // an older payload, a replay, or a tie the stored entry won
+	Applied []Type
+	Ignored []Type
 }
 
 // Apply writes a validated manifest one type at a time. Per type, one
@@ -22,8 +20,8 @@ type ApplyResult struct {
 func Apply(ctx context.Context, r VersionRepo, m Manifest, now func() time.Time) (ApplyResult, error) {
 	var res ApplyResult
 	for _, e := range m.Entries {
-		applied, err := applyEntry(ctx, r, e, m.Timestamp, now)
-		if applied {
+		won, err := applyEntry(ctx, r, e, m.Timestamp, now)
+		if won {
 			res.Applied = append(res.Applied, e.Type)
 		} else if err == nil {
 			res.Ignored = append(res.Ignored, e.Type)
@@ -41,8 +39,8 @@ func applyEntry(ctx context.Context, r VersionRepo, e Entry, payloadAt time.Time
 		if err != nil {
 			return false, err
 		}
-		next, changed := PlanApply(cur, e, payloadAt, now())
-		if changed {
+		next, outcome := PlanApply(cur, e, payloadAt, now())
+		if outcome != OutcomeIgnored {
 			won, err := r.CompareAndSwapHead(ctx, next)
 			if err != nil {
 				return false, err
@@ -51,7 +49,7 @@ func applyEntry(ctx context.Context, r VersionRepo, e Entry, payloadAt time.Time
 				continue
 			}
 		}
-		return changed, r.ArchiveVersions(ctx, next)
+		return outcome == OutcomeWon, r.ArchiveVersions(ctx, next)
 	}
 	return false, fmt.Errorf("legal: %s: head compare-and-set lost %d times", e.Type, maxApplyAttempts)
 }

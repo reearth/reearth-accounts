@@ -15,11 +15,8 @@ type ContainerConfig struct {
 	AllowedISS            []string
 	AuthSrvUIDomain       string
 	MFARecoveryMaxAuthAge time.Duration
-	// PolicyCatalog is shared by every request of the process. Nil builds
-	// one per container.
-	PolicyCatalog *PolicyCatalog
-	PolicySecret  legal.Secret
-	SignupSecret  string
+	PolicySecret          legal.Secret
+	SignupSecret          string
 }
 
 func NewContainer(
@@ -27,6 +24,7 @@ func NewContainer(
 	acg *gateway.Container,
 	enforcer WorkspaceMemberCountEnforcer,
 	cerbosAdapter gateway.CerbosGateway,
+	catalog *PolicyCatalog,
 	config ContainerConfig,
 ) interfaces.Container {
 	cerbos := NewCerbos(r, cerbosAdapter)
@@ -34,10 +32,6 @@ func NewContainer(
 		WithAllowedISS(config.AllowedISS...),
 		WithMFARecoveryMaxAuthAge(config.MFARecoveryMaxAuthAge),
 	)
-	catalog := config.PolicyCatalog
-	if catalog == nil {
-		catalog = NewPolicyCatalog(r.PolicyVersion, PolicyCatalogTTL)
-	}
 	return interfaces.Container{
 		Cerbos:      cerbos,
 		Permittable: NewPermittable(r),

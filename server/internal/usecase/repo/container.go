@@ -29,8 +29,6 @@ var (
 	ErrOperationDenied = rerror.NewE(i18n.T("operation denied"))
 )
 
-// Filtered copies every repo and narrows Workspace, so a new repo field
-// cannot be dropped by accident.
 func (c *Container) Filtered(f workspace.WorkspaceFilter) *Container {
 	if c == nil {
 		return c

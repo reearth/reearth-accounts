@@ -165,7 +165,6 @@ func RegisterRESTRouter(e *echo.Echo, cfg RouterConfig) {
 	// handler's RequireUser); APIKeyOrAuth then admits either that user or a valid M2M key.
 	api.POST("/permissions/check", ph.Check, optional, apikeyOrAuth)
 
-	// --- Policies ---
 	// No user or service auth: the HMAC signature is the only check.
 	polh := handlers.NewPolicyHandler()
 	api.POST("/policies/webhook", polh.Webhook)

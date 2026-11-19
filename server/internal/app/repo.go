@@ -93,9 +93,13 @@ func isMongoDBTransactionAvailable(uri string) bool {
 func initReposAndGateways(ctx context.Context, client *mongo.Client, conf *Config) (*repo.Container, *gateway.Container) {
 	txAvailable := isMongoDBTransactionAvailable(conf.DB)
 
-	repos, err := mongorepo.New(ctx, client.Database(conf.DBName), txAvailable, false, []user.Repo{})
+	db := client.Database(conf.DBName)
+	repos, err := mongorepo.New(ctx, db, txAvailable, false, []user.Repo{})
 	if err != nil {
 		applog.Fatal(ctx, "Failed to init mongo", applog.Err(err))
+	}
+	if err := mongorepo.EnsureIndexes(ctx, db); err != nil {
+		applog.Fatal(ctx, "Failed to create mongo indexes", applog.Err(err))
 	}
 
 	return repos, initGateways(ctx, conf)

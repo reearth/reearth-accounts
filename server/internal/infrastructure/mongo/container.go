@@ -28,10 +28,6 @@ func New(ctx context.Context, db *mongo.Database, useTransaction, needCompat boo
 		return nil, err
 	}
 
-	if err := ensureIndexes(ctx, db); err != nil {
-		return nil, err
-	}
-
 	c := &repo.Container{
 		AdminUser:     NewAdminUser(client),
 		User:          NewUser(client),

@@ -49,8 +49,7 @@ func (s Secret) Enabled() bool { return len(s.b) > 0 }
 func (s Secret) String() string { return "***" }
 
 // ParseSignature checks that header is "sha256=" followed by a hex
-// HMAC-SHA256, so that a missing or "none" signature is refused before the
-// body is read.
+// HMAC-SHA256.
 func ParseSignature(header string) ([]byte, error) {
 	hexSum, ok := strings.CutPrefix(header, signaturePrefix)
 	if !ok {

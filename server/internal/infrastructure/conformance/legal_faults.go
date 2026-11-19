@@ -68,8 +68,6 @@ func runLegalFaults(t *testing.T, nc Factory) {
 
 var legalBase = legalManifest(legalT0.Add(-legalDay), legalEntry("tos", "1.0.0", legalT0.Add(-30*legalDay), "v1"))
 
-// Two archive writes of a record that does not exist yet race on its
-// insert. The higher revision must win.
 func faultArchiveInsertRace(t *testing.T, nc Factory) {
 	c, _, done := nc(t)
 	defer done()
@@ -80,7 +78,7 @@ func faultArchiveInsertRace(t *testing.T, nc Factory) {
 	for round := range rounds {
 		typ := fmt.Sprintf("tos-%d", round)
 		head := func(rev int64, eff time.Duration, title string) legal.TypeHead {
-			return legal.TypeHead{Type: legal.Type(typ), Revision: rev, Applied: legalApplied, AppliedAt: legalT0, Upcoming: legalRecord(typ, "2.0.0", legalT0.Add(eff), title)}
+			return legal.TypeHead{Type: legal.Type(typ), Revision: rev, Applied: legalApplied, AppliedAt: legalT0, Versions: legalVersions(legalHeadVersion(typ, "2.0.0", legalT0.Add(eff), title, nil))}
 		}
 		older, newer := head(1, 30*legalDay, "older"), head(2, 40*legalDay, "newer")
 		won, err := r.CompareAndSwapHead(ctx, older)
@@ -109,8 +107,6 @@ func faultArchiveInsertRace(t *testing.T, nc Factory) {
 	assert.Zero(t, lost, "rounds where the newer archive write was lost, of %d", rounds)
 }
 
-// A correction whose archive write fails still moves the date, and a later
-// revert withdraws the version.
 func faultCorrectionArchiveFails(t *testing.T, nc Factory) {
 	c, _, done := nc(t)
 	defer done()
@@ -136,7 +132,6 @@ func faultCorrectionArchiveFails(t *testing.T, nc Factory) {
 	assert.True(t, cat.Withdrawn(legal.Ref{Type: "tos", Version: legal.MustParseVersion("2.0.0")}))
 }
 
-// A crash after the head write leaves the decision in force.
 func faultCrashAfterHead(t *testing.T, nc Factory) {
 	c, _, done := nc(t)
 	defer done()
@@ -152,8 +147,6 @@ func faultCrashAfterHead(t *testing.T, nc Factory) {
 	assert.Equal(t, "2.0.0", legalVersion(cat.Current("tos", legalT0.Add(31*legalDay))))
 }
 
-// An older archive write that lands after a correction and a revert
-// changes no decision.
 func faultDelayedOlderArchiveAfterRevert(t *testing.T, nc Factory) {
 	c, _, done := nc(t)
 	defer done()
@@ -177,8 +170,6 @@ func faultDelayedOlderArchiveAfterRevert(t *testing.T, nc Factory) {
 	assert.True(t, cat.Withdrawn(legal.Ref{Type: "tos", Version: legal.MustParseVersion("2.0.0")}))
 }
 
-// A version whose first archive write failed is archived by the resend
-// that arrives after its date.
 func faultResendAfterEffect(t *testing.T, nc Factory) {
 	c, _, done := nc(t)
 	defer done()
@@ -204,7 +195,6 @@ func faultResendAfterEffect(t *testing.T, nc Factory) {
 	assert.True(t, found, "the redelivery archives 2.0.0")
 }
 
-// Two payloads with the same timestamp resolve the same in either order.
 func testLegalEqualTimestampTie(t *testing.T, nc Factory) {
 	cases := []struct {
 		name string
@@ -235,9 +225,6 @@ func testLegalEqualTimestampTie(t *testing.T, nc Factory) {
 	}
 }
 
-// An immediate patch in effect never changes, so an older patch delivered
-// before a newer revert stays current, while the reverse order ignores the
-// patch. This is the one case where the two delivery orders differ.
 func testLegalPatchThenRevert(t *testing.T, nc Factory) {
 	patch := legalManifest(legalT0, legalEntry("tos", "1.0.1", legalT0, "v1.0.1"))
 	revert := legalManifest(legalT0.Add(time.Minute), legalEntry("tos", "1.0.0", legalT0.Add(-30*legalDay), "v1"))
@@ -248,7 +235,7 @@ func testLegalPatchThenRevert(t *testing.T, nc Factory) {
 		current string
 	}{
 		{"older first keeps the patch in effect", []legal.Manifest{patch, revert}, "1.0.1"},
-		{"newer first never sees the patch", []legal.Manifest{revert, patch}, "1.0.0"},
+		{"newer first still keeps the patch in effect", []legal.Manifest{revert, patch}, "1.0.1"},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			c, _, done := nc(t)

@@ -2,7 +2,7 @@ package memory
 
 import (
 	"context"
-	"slices"
+	"maps"
 	"sync"
 
 	"github.com/reearth/reearth-accounts/server/pkg/legal"
@@ -29,14 +29,11 @@ func NewPolicyVersion() *PolicyVersion {
 func (r *PolicyVersion) ArchiveVersions(_ context.Context, h legal.TypeHead) error {
 	r.lock.Lock()
 	defer r.lock.Unlock()
-	for _, v := range []*legal.VersionRecord{h.Current, h.Upcoming} {
-		if v == nil {
-			continue
-		}
+	for _, v := range h.Versions {
 		if cur, ok := r.versions[v.Ref]; ok && cur.revision > h.Revision {
 			continue
 		}
-		r.versions[v.Ref] = archived{record: *v, revision: h.Revision}
+		r.versions[v.Ref] = archived{record: v.VersionRecord, revision: h.Revision}
 	}
 	return nil
 }
@@ -47,7 +44,7 @@ func (r *PolicyVersion) CompareAndSwapHead(_ context.Context, next legal.TypeHea
 	if r.heads[next.Type].Revision != next.Revision-1 {
 		return false, nil
 	}
-	next.Withdrawn = slices.Clone(next.Withdrawn)
+	next.Versions = maps.Clone(next.Versions)
 	r.heads[next.Type] = next
 	return true, nil
 }
@@ -59,7 +56,7 @@ func (r *PolicyVersion) FindHead(_ context.Context, t legal.Type) (legal.TypeHea
 	if !ok {
 		return legal.TypeHead{Type: t}, nil
 	}
-	h.Withdrawn = slices.Clone(h.Withdrawn)
+	h.Versions = maps.Clone(h.Versions)
 	return h, nil
 }
 
@@ -68,7 +65,7 @@ func (r *PolicyVersion) FindHeads(_ context.Context) ([]legal.TypeHead, error) {
 	defer r.lock.Unlock()
 	res := make([]legal.TypeHead, 0, len(r.heads))
 	for _, h := range r.heads {
-		h.Withdrawn = slices.Clone(h.Withdrawn)
+		h.Versions = maps.Clone(h.Versions)
 		res = append(res, h)
 	}
 	return res, nil

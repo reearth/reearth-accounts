@@ -12,15 +12,15 @@ import (
 
 var t0 = time.Date(2026, 11, 20, 3, 0, 0, 0, time.UTC)
 
-// fakeRepo is a sequential VersionRepo that honors the repo contract.
 type fakeRepo struct {
 	failArchive bool
 	heads       map[Type]TypeHead
+	revisions   map[Ref]int64
 	versions    map[Ref]VersionRecord
 }
 
 func newFakeRepo() *fakeRepo {
-	return &fakeRepo{heads: map[Type]TypeHead{}, versions: map[Ref]VersionRecord{}}
+	return &fakeRepo{heads: map[Type]TypeHead{}, revisions: map[Ref]int64{}, versions: map[Ref]VersionRecord{}}
 }
 
 func (f *fakeRepo) ArchiveVersions(_ context.Context, h TypeHead) error {
@@ -28,10 +28,12 @@ func (f *fakeRepo) ArchiveVersions(_ context.Context, h TypeHead) error {
 		f.failArchive = false
 		return errors.New("archive unavailable")
 	}
-	for _, v := range []*VersionRecord{h.Current, h.Upcoming} {
-		if v != nil {
-			f.versions[v.Ref] = *v
+	for _, v := range h.Versions {
+		if rev, ok := f.revisions[v.Ref]; ok && rev > h.Revision {
+			continue
 		}
+		f.versions[v.Ref] = v.VersionRecord
+		f.revisions[v.Ref] = h.Revision
 	}
 	return nil
 }
@@ -73,11 +75,11 @@ func (f *fakeRepo) catalog() Catalog {
 }
 
 type step struct {
-	at      time.Duration // payload timestamp and clock, from t0
-	clock   time.Duration // clock offset when it differs from at
-	version string
-	eff     time.Duration // effective date, from t0
-	title   string
+	effectiveAt time.Duration
+	now         time.Duration
+	payloadAt   time.Duration
+	title       string
+	version     string
 }
 
 func entry(version string, eff time.Duration, title string) Entry {
@@ -93,12 +95,8 @@ func run(t *testing.T, f *fakeRepo, steps []step) []ApplyResult {
 	t.Helper()
 	var out []ApplyResult
 	for _, s := range steps {
-		clock := s.at
-		if s.clock != 0 {
-			clock = s.clock
-		}
-		m := Manifest{Timestamp: t0.Add(s.at), Entries: []Entry{entry(s.version, s.eff, s.title)}}
-		res, err := Apply(context.Background(), f, m, func() time.Time { return t0.Add(clock) })
+		m := Manifest{Timestamp: t0.Add(s.payloadAt), Entries: []Entry{entry(s.version, s.effectiveAt, s.title)}}
+		res, err := Apply(context.Background(), f, m, func() time.Time { return t0.Add(s.now) })
 		require.NoError(t, err)
 		out = append(out, res)
 	}
@@ -121,172 +119,171 @@ func TestApply(t *testing.T) {
 	tests := []struct {
 		name          string
 		steps         []step
-		at            time.Duration // catalog read time
+		applied       []bool
 		current       string
 		upcoming      string
 		upcomingTitle string
 		withdrawn     []string
-		absent        []string
-		results       []bool // Applied per step
+		readAt        time.Duration
 	}{
 		{
 			name:     "first version already in effect becomes current",
-			steps:    []step{{at: 0, version: "1.0.0", eff: -day, title: "v1"}},
+			steps:    []step{{payloadAt: 0, now: 0, version: "1.0.0", effectiveAt: -day, title: "v1"}},
 			current:  "1.0.0",
-			results:  []bool{true},
+			applied:  []bool{true},
 			upcoming: "",
 		},
 		{
 			name:     "new version ahead of its date is upcoming and nothing is current yet",
-			steps:    []step{{at: 0, version: "2.0.0", eff: 30 * day, title: "v2"}},
+			steps:    []step{{payloadAt: 0, now: 0, version: "2.0.0", effectiveAt: 30 * day, title: "v2"}},
 			upcoming: "2.0.0", upcomingTitle: "v2",
-			results: []bool{true},
+			applied: []bool{true},
 		},
 		{
 			name: "replay of the same payload changes nothing",
 			steps: []step{
-				{at: 0, version: "2.0.0", eff: 30 * day, title: "v2"},
-				{at: 0, clock: hour, version: "2.0.0", eff: 30 * day, title: "v2"},
+				{payloadAt: 0, now: 0, version: "2.0.0", effectiveAt: 30 * day, title: "v2"},
+				{payloadAt: 0, now: hour, version: "2.0.0", effectiveAt: 30 * day, title: "v2"},
 			},
-			at:       hour,
+			readAt:   hour,
 			upcoming: "2.0.0", upcomingTitle: "v2",
-			results: []bool{true, false},
+			applied: []bool{true, false},
 		},
 		{
-			name: "a payload with the same timestamp and a higher version wins",
+			name: "a same-timestamp loser already in effect is kept in effect",
 			steps: []step{
-				{at: 0, version: "2.0.0", eff: 30 * day, title: "v2"},
-				{at: 0, version: "1.0.0", eff: -day, title: "v1"},
+				{payloadAt: 0, now: 0, version: "2.0.0", effectiveAt: 30 * day, title: "v2"},
+				{payloadAt: 0, now: 0, version: "1.0.0", effectiveAt: -day, title: "v1"},
 			},
+			current:  "1.0.0",
 			upcoming: "2.0.0", upcomingTitle: "v2",
-			absent:  []string{"1.0.0"},
-			results: []bool{true, false},
+			applied: []bool{true, false},
 		},
 		{
-			name: "older payload is ignored",
+			name: "an older payload's version not yet in effect is recorded withdrawn",
 			steps: []step{
-				{at: hour, version: "1.0.0", eff: -day, title: "v1"},
-				{at: 0, clock: 2 * hour, version: "2.0.0", eff: 30 * day, title: "v2"},
+				{payloadAt: hour, now: hour, version: "1.0.0", effectiveAt: -day, title: "v1"},
+				{payloadAt: 0, now: 2 * hour, version: "2.0.0", effectiveAt: 30 * day, title: "v2"},
 			},
-			at:      2 * hour,
-			current: "1.0.0",
-			absent:  []string{"2.0.0"},
-			results: []bool{true, false},
+			readAt:    2 * hour,
+			current:   "1.0.0",
+			withdrawn: []string{"2.0.0"},
+			applied:   []bool{true, false},
 		},
 		{
 			name: "reverting withdraws the upcoming version and it never takes effect",
 			steps: []step{
-				{at: 0, version: "1.0.0", eff: -day, title: "v1"},
-				{at: hour, version: "2.0.0", eff: 30 * day, title: "v2"},
-				{at: 2 * hour, version: "1.0.0", eff: -day, title: "v1"},
+				{payloadAt: 0, now: 0, version: "1.0.0", effectiveAt: -day, title: "v1"},
+				{payloadAt: hour, now: hour, version: "2.0.0", effectiveAt: 30 * day, title: "v2"},
+				{payloadAt: 2 * hour, now: 2 * hour, version: "1.0.0", effectiveAt: -day, title: "v1"},
 			},
-			at:        60 * day,
+			readAt:    60 * day,
 			current:   "1.0.0",
 			withdrawn: []string{"2.0.0"},
-			results:   []bool{true, true, true},
+			applied:   []bool{true, true, true},
 		},
 		{
 			name: "a later payload corrects a version that has not taken effect",
 			steps: []step{
-				{at: 0, version: "2.0.0", eff: 30 * day, title: "draft"},
-				{at: hour, version: "2.0.0", eff: 40 * day, title: "final"},
+				{payloadAt: 0, now: 0, version: "2.0.0", effectiveAt: 30 * day, title: "draft"},
+				{payloadAt: hour, now: hour, version: "2.0.0", effectiveAt: 40 * day, title: "final"},
 			},
-			at:       35 * day,
+			readAt:   35 * day,
 			upcoming: "2.0.0", upcomingTitle: "final",
-			results: []bool{true, true},
+			applied: []bool{true, true},
 		},
 		{
 			name: "a version in effect never changes",
 			steps: []step{
-				{at: 0, version: "1.0.0", eff: -day, title: "v1"},
-				{at: hour, version: "1.0.0", eff: 30 * day, title: "rewritten"},
+				{payloadAt: 0, now: 0, version: "1.0.0", effectiveAt: -day, title: "v1"},
+				{payloadAt: hour, now: hour, version: "1.0.0", effectiveAt: 30 * day, title: "rewritten"},
 			},
-			at:      2 * hour,
+			readAt:  2 * hour,
 			current: "1.0.0",
-			results: []bool{true, true},
+			applied: []bool{true, true},
 		},
 		{
 			name: "a withdrawn version named again stays withdrawn",
 			steps: []step{
-				{at: 0, version: "1.0.0", eff: -day, title: "v1"},
-				{at: hour, version: "2.0.0", eff: 30 * day, title: "v2"},
-				{at: 2 * hour, version: "1.0.0", eff: -day, title: "v1"},
-				{at: 3 * hour, version: "2.0.0", eff: 30 * day, title: "v2"},
+				{payloadAt: 0, now: 0, version: "1.0.0", effectiveAt: -day, title: "v1"},
+				{payloadAt: hour, now: hour, version: "2.0.0", effectiveAt: 30 * day, title: "v2"},
+				{payloadAt: 2 * hour, now: 2 * hour, version: "1.0.0", effectiveAt: -day, title: "v1"},
+				{payloadAt: 3 * hour, now: 3 * hour, version: "2.0.0", effectiveAt: 30 * day, title: "v2"},
 			},
-			at:        60 * day,
+			readAt:    60 * day,
 			current:   "1.0.0",
 			withdrawn: []string{"2.0.0"},
-			results:   []bool{true, true, true, true},
+			applied:   []bool{true, true, true, true},
 		},
 		{
 			name: "a withdrawn version named again with a past date does not take effect",
 			steps: []step{
-				{at: 0, version: "1.0.0", eff: -day, title: "v1"},
-				{at: hour, version: "2.0.0", eff: 30 * day, title: "v2"},
-				{at: 2 * hour, version: "1.0.0", eff: -day, title: "v1"},
-				{at: 3 * hour, version: "2.0.0", eff: -day, title: "v2"},
+				{payloadAt: 0, now: 0, version: "1.0.0", effectiveAt: -day, title: "v1"},
+				{payloadAt: hour, now: hour, version: "2.0.0", effectiveAt: 30 * day, title: "v2"},
+				{payloadAt: 2 * hour, now: 2 * hour, version: "1.0.0", effectiveAt: -day, title: "v1"},
+				{payloadAt: 3 * hour, now: 3 * hour, version: "2.0.0", effectiveAt: -day, title: "v2"},
 			},
-			at:        4 * hour,
+			readAt:    4 * hour,
 			current:   "1.0.0",
 			withdrawn: []string{"2.0.0"},
-			results:   []bool{true, true, true, true},
+			applied:   []bool{true, true, true, true},
 		},
 		{
 			name: "naming a withdrawn version also withdraws the other upcoming version",
 			steps: []step{
-				{at: 0, version: "2.0.0", eff: 30 * day, title: "v2"},
-				{at: hour, version: "3.0.0", eff: 30 * day, title: "v3"},
-				{at: 2 * hour, version: "2.0.0", eff: 30 * day, title: "v2"},
+				{payloadAt: 0, now: 0, version: "2.0.0", effectiveAt: 30 * day, title: "v2"},
+				{payloadAt: hour, now: hour, version: "3.0.0", effectiveAt: 30 * day, title: "v3"},
+				{payloadAt: 2 * hour, now: 2 * hour, version: "2.0.0", effectiveAt: 30 * day, title: "v2"},
 			},
-			at:        2 * hour,
+			readAt:    2 * hour,
 			withdrawn: []string{"2.0.0", "3.0.0"},
-			results:   []bool{true, true, true},
+			applied:   []bool{true, true, true},
 		},
 		{
 			name: "an upcoming version that took effect is not withdrawn by the next one",
 			steps: []step{
-				{at: 0, version: "1.0.0", eff: -day, title: "v1"},
-				{at: hour, version: "2.0.0", eff: day, title: "v2"},
-				{at: 2 * day, version: "3.0.0", eff: 30 * day, title: "v3"},
+				{payloadAt: 0, now: 0, version: "1.0.0", effectiveAt: -day, title: "v1"},
+				{payloadAt: hour, now: hour, version: "2.0.0", effectiveAt: day, title: "v2"},
+				{payloadAt: 2 * day, now: 2 * day, version: "3.0.0", effectiveAt: 30 * day, title: "v3"},
 			},
-			at:       2 * day,
+			readAt:   2 * day,
 			current:  "2.0.0",
 			upcoming: "3.0.0", upcomingTitle: "v3",
-			results: []bool{true, true, true},
+			applied: []bool{true, true, true},
 		},
 		{
 			name: "an old version named with a future date stays in effect when the next version withdraws it",
 			steps: []step{
-				{at: 0, version: "1.0.0", eff: -day, title: "v1"},
-				{at: hour, version: "1.0.0", eff: 30 * day, title: "v1"},
-				{at: 2 * hour, version: "1.1.0", eff: 30 * day, title: "v1.1"},
+				{payloadAt: 0, now: 0, version: "1.0.0", effectiveAt: -day, title: "v1"},
+				{payloadAt: hour, now: hour, version: "1.0.0", effectiveAt: 30 * day, title: "v1"},
+				{payloadAt: 2 * hour, now: 2 * hour, version: "1.1.0", effectiveAt: 30 * day, title: "v1.1"},
 			},
-			at:       3 * hour,
+			readAt:   3 * hour,
 			current:  "1.0.0",
 			upcoming: "1.1.0", upcomingTitle: "v1.1",
-			results: []bool{true, true, true},
+			applied: []bool{true, true, true},
 		},
 		{
 			name: "a correction that moves the date into the past takes effect",
 			steps: []step{
-				{at: 0, version: "1.0.0", eff: -day, title: "v1"},
-				{at: hour, version: "2.0.0", eff: 30 * day, title: "v2"},
-				{at: 2 * hour, version: "2.0.0", eff: hour, title: "v2"},
+				{payloadAt: 0, now: 0, version: "1.0.0", effectiveAt: -day, title: "v1"},
+				{payloadAt: hour, now: hour, version: "2.0.0", effectiveAt: 30 * day, title: "v2"},
+				{payloadAt: 2 * hour, now: 2 * hour, version: "2.0.0", effectiveAt: hour, title: "v2"},
 			},
-			at:      3 * hour,
+			readAt:  3 * hour,
 			current: "2.0.0",
-			results: []bool{true, true, true},
+			applied: []bool{true, true, true},
 		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			f := newFakeRepo()
 			res := run(t, f, tt.steps)
-			for i, want := range tt.results {
+			for i, want := range tt.applied {
 				assert.Equal(t, want, len(res[i].Applied) == 1, "step %d applied", i)
 			}
 			c := f.catalog()
-			now := t0.Add(tt.at)
+			now := t0.Add(tt.readAt)
 			assert.Equal(t, tt.current, versionOf(c.Current("tos", now)), "current")
 			up := c.Upcoming("tos", now)
 			assert.Equal(t, tt.upcoming, versionOf(up), "upcoming")
@@ -296,10 +293,6 @@ func TestApply(t *testing.T) {
 			for _, v := range tt.withdrawn {
 				assert.True(t, c.Withdrawn(Ref{Type: "tos", Version: MustParseVersion(v)}), "%s withdrawn", v)
 			}
-			for _, v := range tt.absent {
-				_, ok := f.versions[Ref{Type: "tos", Version: MustParseVersion(v)}]
-				assert.False(t, ok, "%s must not be stored", v)
-			}
 		})
 	}
 }
@@ -307,8 +300,8 @@ func TestApply(t *testing.T) {
 func TestApply_VersionInEffectKeepsItsContent(t *testing.T) {
 	f := newFakeRepo()
 	run(t, f, []step{
-		{at: 0, version: "1.0.0", eff: -day, title: "v1"},
-		{at: hour, version: "1.0.0", eff: -2 * day, title: "rewritten"},
+		{payloadAt: 0, now: 0, version: "1.0.0", effectiveAt: -day, title: "v1"},
+		{payloadAt: hour, now: hour, version: "1.0.0", effectiveAt: -2 * day, title: "rewritten"},
 	})
 	got := f.catalog().Current("tos", t0.Add(hour))
 	require.NotNil(t, got)
@@ -319,16 +312,16 @@ func TestApply_VersionInEffectKeepsItsContent(t *testing.T) {
 
 func TestApply_ReplayKeepsTheHead(t *testing.T) {
 	f := newFakeRepo()
-	run(t, f, []step{{at: 0, version: "2.0.0", eff: 30 * day, title: "v2"}})
+	run(t, f, []step{{payloadAt: 0, now: 0, version: "2.0.0", effectiveAt: 30 * day, title: "v2"}})
 	before := f.heads["tos"]
-	res := run(t, f, []step{{at: 0, version: "2.0.0", eff: 30 * day, title: "v2"}})
+	res := run(t, f, []step{{payloadAt: 0, now: 0, version: "2.0.0", effectiveAt: 30 * day, title: "v2"}})
 	assert.Equal(t, []Type{"tos"}, res[0].Ignored)
 	assert.Equal(t, before, f.heads["tos"])
 }
 
 func TestApply_FailedArchiveWriteDecidesAndIsRepairedByTheNextApply(t *testing.T) {
 	f := newFakeRepo()
-	run(t, f, []step{{at: 0, version: "1.0.0", eff: -day, title: "v1"}})
+	run(t, f, []step{{payloadAt: 0, now: 0, version: "1.0.0", effectiveAt: -day, title: "v1"}})
 	f.failArchive = true
 	m := Manifest{Timestamp: t0.Add(hour), Entries: []Entry{entry("2.0.0", day, "v2")}}
 	res, err := Apply(context.Background(), f, m, func() time.Time { return t0.Add(hour) })
@@ -341,34 +334,41 @@ func TestApply_FailedArchiveWriteDecidesAndIsRepairedByTheNextApply(t *testing.T
 	_, archived := f.versions[Ref{Type: "tos", Version: MustParseVersion("2.0.0")}]
 	assert.False(t, archived)
 
-	run(t, f, []step{{at: 2 * day, version: "2.0.0", eff: day, title: "v2"}})
+	run(t, f, []step{{payloadAt: 2 * day, now: 2 * day, version: "2.0.0", effectiveAt: day, title: "v2"}})
 	assert.Equal(t, "v2", f.versions[Ref{Type: "tos", Version: MustParseVersion("2.0.0")}].Title["en"], "the next apply archives it")
 }
 
 func TestApply_InEffectPatchThenNewerRevert(t *testing.T) {
-	patch := step{at: hour, clock: 2 * hour, version: "1.0.1", eff: hour, title: "v1.0.1"}
-	revert := step{at: 2 * hour, version: "1.0.0", eff: -day, title: "v1"}
-	base := step{at: 0, clock: 2 * hour, version: "1.0.0", eff: -day, title: "v1"}
+	patch := step{payloadAt: hour, now: 2 * hour, version: "1.0.1", effectiveAt: hour, title: "v1.0.1"}
+	revert := step{payloadAt: 2 * hour, now: 2 * hour, version: "1.0.0", effectiveAt: -day, title: "v1"}
+	base := step{payloadAt: 0, now: 2 * hour, version: "1.0.0", effectiveAt: -day, title: "v1"}
 
-	older := newFakeRepo()
-	run(t, older, []step{base, patch, revert})
-	assert.Equal(t, "1.0.1", versionOf(older.catalog().Current("tos", t0.Add(2*hour))), "a version in effect never changes")
-
-	newer := newFakeRepo()
-	run(t, newer, []step{base, revert, patch})
-	assert.Equal(t, "1.0.0", versionOf(newer.catalog().Current("tos", t0.Add(2*hour))), "the older patch is ignored")
+	for _, order := range [][]step{{base, patch, revert}, {base, revert, patch}} {
+		f := newFakeRepo()
+		run(t, f, order)
+		assert.Equal(t, "1.0.1", versionOf(f.catalog().Current("tos", t0.Add(2*hour))), "a version in effect never changes")
+	}
 }
 
-func TestPlanApply_PromotesTheUpcomingVersionBeforeApplying(t *testing.T) {
-	v1 := entry("1.0.0", -day, "v1").record()
-	v2 := entry("2.0.0", day, "v2").record()
-	head := TypeHead{Type: "tos", Revision: 2, AppliedAt: t0, Current: &v1, Upcoming: &v2}
+func TestTypeHead_At(t *testing.T) {
+	withdrawnAt := t0
+	head := TypeHead{Type: "tos", Versions: map[Version]HeadVersion{}}
+	for _, v := range []HeadVersion{
+		{VersionRecord: entry("1.0.0", -2*day, "v1").record()},
+		{VersionRecord: entry("1.5.0", -3*day, "v1.5").record()},
+		{VersionRecord: entry("2.0.0", day, "v2").record()},
+		{VersionRecord: entry("3.0.0", -hour, "v3").record(), WithdrawnAt: &withdrawnAt},
+	} {
+		head.Versions[v.Version] = v
+	}
 
-	next, ok := PlanApply(head, entry("1.0.0", -day, "v1"), t0.Add(2*day), t0.Add(2*day))
-	require.True(t, ok)
-	assert.Equal(t, "2.0.0", versionOf(next.Current), "2.0.0 took effect before the revert arrived")
-	assert.Nil(t, next.Upcoming)
-	assert.Empty(t, next.Withdrawn)
+	cur, up := head.At(t0)
+	assert.Equal(t, "1.0.0", versionOf(cur), "the latest date that has passed, not the highest version")
+	assert.Equal(t, "2.0.0", versionOf(up))
+
+	cur, up = head.At(t0.Add(day))
+	assert.Equal(t, "2.0.0", versionOf(cur), "an upcoming version is current at its date")
+	assert.Nil(t, up)
 }
 
 func TestPlanApply_EqualTimestamp(t *testing.T) {
@@ -376,21 +376,23 @@ func TestPlanApply_EqualTimestamp(t *testing.T) {
 	if a.applied().beats(b.applied()) {
 		a, b = b, a
 	}
-	first, ok := PlanApply(TypeHead{Type: "tos"}, a, t0, t0)
-	require.True(t, ok)
+	first, outcome := PlanApply(TypeHead{Type: "tos"}, a, t0, t0)
+	require.Equal(t, OutcomeWon, outcome)
 
-	_, ok = PlanApply(first, a, t0, t0)
-	assert.False(t, ok, "an identical entry is a replay")
+	_, outcome = PlanApply(first, a, t0, t0)
+	assert.Equal(t, OutcomeIgnored, outcome, "an identical entry is a replay")
 
-	next, ok := PlanApply(first, b, t0, t0)
-	require.True(t, ok, "the larger digest wins at the same version")
-	assert.Equal(t, b.Title, next.Upcoming.Title)
+	next, outcome := PlanApply(first, b, t0, t0)
+	require.Equal(t, OutcomeWon, outcome, "the larger digest wins at the same version")
+	_, up := next.At(t0)
+	assert.Equal(t, b.Title, up.Title)
 
-	_, ok = PlanApply(next, a, t0, t0)
-	assert.False(t, ok, "the smaller digest loses after the larger")
+	_, outcome = PlanApply(next, a, t0, t0)
+	assert.Equal(t, OutcomeIgnored, outcome, "the smaller digest loses after the larger")
 
-	_, ok = PlanApply(next, entry("1.9.0", 30*day, "lower"), t0, t0)
-	assert.False(t, ok, "a lower version loses")
-	_, ok = PlanApply(next, entry("2.0.0", 30*day, "v2"), t0.Add(-time.Millisecond), t0)
-	assert.False(t, ok, "an older payload loses")
+	lower, outcome := PlanApply(next, entry("1.9.0", 30*day, "lower"), t0, t0)
+	assert.Equal(t, OutcomeRecorded, outcome, "a lower version loses and is recorded")
+	assert.True(t, lower.IsWithdrawn(MustParseVersion("1.9.0")))
+	_, outcome = PlanApply(next, entry("2.0.0", 30*day, "v2"), t0.Add(-time.Millisecond), t0)
+	assert.Equal(t, OutcomeIgnored, outcome, "an older payload naming a seen version changes nothing")
 }

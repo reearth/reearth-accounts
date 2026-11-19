@@ -17,8 +17,6 @@ const (
 	policyVersionsCollection = "policy_versions"
 )
 
-// PolicyVersion uses single-document conditional writes only, so it needs no
-// transaction (standalone MongoDB has none).
 type PolicyVersion struct {
 	types    *mongo.Collection
 	versions *mongo.Collection
@@ -32,13 +30,11 @@ func NewPolicyVersion(db *mongo.Database) *PolicyVersion {
 }
 
 type policyTypeDoc struct {
-	Applied   appliedDoc      `bson:"applied"`
-	AppliedAt time.Time       `bson:"appliedAt"`
-	Current   *versionDoc     `bson:"current"`
-	Revision  int64           `bson:"revision"`
-	Type      string          `bson:"_id"`
-	Upcoming  *versionDoc     `bson:"upcoming"`
-	Withdrawn []withdrawalDoc `bson:"withdrawn"`
+	Applied   appliedDoc   `bson:"applied"`
+	AppliedAt time.Time    `bson:"appliedAt"`
+	Revision  int64        `bson:"revision"`
+	Type      string       `bson:"_id"`
+	Versions  []versionDoc `bson:"versions"`
 }
 
 type appliedDoc struct {
@@ -52,11 +48,7 @@ type versionDoc struct {
 	Title       map[string]string `bson:"title"`
 	URL         map[string]string `bson:"url"`
 	Version     string            `bson:"version"`
-}
-
-type withdrawalDoc struct {
-	At      time.Time `bson:"at"`
-	Version string    `bson:"version"`
+	WithdrawnAt *time.Time        `bson:"withdrawnAt,omitempty"`
 }
 
 type policyVersionDoc struct {
@@ -75,10 +67,7 @@ type policyVersionDoc struct {
 // record race the same way, so a duplicate key retries as a plain update:
 // the record now exists, and a non-matching one is newer and kept.
 func (r *PolicyVersion) ArchiveVersions(ctx context.Context, h legal.TypeHead) error {
-	for _, v := range []*legal.VersionRecord{h.Current, h.Upcoming} {
-		if v == nil {
-			continue
-		}
+	for _, v := range h.SortedVersions() {
 		doc := policyVersionDoc{
 			EffectiveAt: v.EffectiveAt,
 			Required:    v.Required,
@@ -187,58 +176,42 @@ func newPolicyTypeDoc(h legal.TypeHead) policyTypeDoc {
 	doc := policyTypeDoc{
 		Applied:   appliedDoc{Digest: h.Applied.Digest, Version: h.Applied.Version.String()},
 		AppliedAt: h.AppliedAt,
-		Current:   newVersionDoc(h.Current),
 		Revision:  h.Revision,
 		Type:      string(h.Type),
-		Upcoming:  newVersionDoc(h.Upcoming),
-		Withdrawn: make([]withdrawalDoc, 0, len(h.Withdrawn)),
+		Versions:  []versionDoc{},
 	}
-	for _, w := range h.Withdrawn {
-		doc.Withdrawn = append(doc.Withdrawn, withdrawalDoc{At: w.At, Version: w.Version.String()})
+	for _, v := range h.SortedVersions() {
+		doc.Versions = append(doc.Versions, versionDoc{
+			EffectiveAt: v.EffectiveAt,
+			Required:    v.Required,
+			Title:       v.Title,
+			URL:         v.URL,
+			Version:     v.Version.String(),
+			WithdrawnAt: v.WithdrawnAt,
+		})
 	}
 	return doc
 }
 
-func newVersionDoc(v *legal.VersionRecord) *versionDoc {
-	if v == nil {
-		return nil
-	}
-	return &versionDoc{
-		EffectiveAt: v.EffectiveAt,
-		Required:    v.Required,
-		Title:       v.Title,
-		URL:         v.URL,
-		Version:     v.Version.String(),
-	}
-}
-
 func (d policyTypeDoc) model() (legal.TypeHead, error) {
 	t := legal.Type(d.Type)
-	h := legal.TypeHead{AppliedAt: d.AppliedAt, Revision: d.Revision, Type: t}
 	v, err := legal.ParseVersion(d.Applied.Version)
 	if err != nil {
 		return legal.TypeHead{}, err
 	}
-	h.Applied = legal.Applied{Digest: d.Applied.Digest, Version: v}
-	for _, p := range []struct {
-		doc *versionDoc
-		out **legal.VersionRecord
-	}{{d.Current, &h.Current}, {d.Upcoming, &h.Upcoming}} {
-		if p.doc == nil {
-			continue
-		}
-		rec, err := p.doc.model(t)
-		if err != nil {
-			return legal.TypeHead{}, err
-		}
-		*p.out = &rec
+	h := legal.TypeHead{
+		Applied:   legal.Applied{Digest: d.Applied.Digest, Version: v},
+		AppliedAt: d.AppliedAt,
+		Revision:  d.Revision,
+		Type:      t,
+		Versions:  make(map[legal.Version]legal.HeadVersion, len(d.Versions)),
 	}
-	for _, w := range d.Withdrawn {
-		v, err := legal.ParseVersion(w.Version)
+	for _, vd := range d.Versions {
+		rec, err := vd.model(t)
 		if err != nil {
 			return legal.TypeHead{}, err
 		}
-		h.Withdrawn = append(h.Withdrawn, legal.Withdrawal{At: w.At, Version: v})
+		h.Versions[rec.Version] = legal.HeadVersion{VersionRecord: rec, WithdrawnAt: vd.WithdrawnAt}
 	}
 	return h, nil
 }

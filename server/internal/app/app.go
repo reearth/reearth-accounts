@@ -109,11 +109,11 @@ func initEcho(ctx context.Context, cfg *ServerConfig) *echo.Echo {
 		cfg.Gateways,
 		nil,
 		cfg.CerbosAdapter,
+		interactor.NewPolicyCatalog(cfg.Repos.PolicyVersion, interactor.PolicyCatalogTTL),
 		interactor.ContainerConfig{
 			AllowedISS:            allowedISS,
 			AuthSrvUIDomain:       cfg.Config.HostWeb,
 			MFARecoveryMaxAuthAge: cfg.Config.MFARecoveryMaxAuthAge,
-			PolicyCatalog:         interactor.NewPolicyCatalog(cfg.Repos.PolicyVersion, interactor.PolicyCatalogTTL),
 			PolicySecret:          legal.NewSecret(cfg.Config.PolicyWebhookSecret),
 			SignupSecret:          cfg.Config.SignupSecret,
 		})

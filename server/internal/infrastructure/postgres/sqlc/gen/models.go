@@ -48,9 +48,7 @@ type PolicyType struct {
 	AppliedAt      time.Time
 	AppliedVersion string
 	AppliedDigest  []byte
-	Current        []byte
-	Upcoming       []byte
-	Withdrawn      []byte
+	Versions       []byte
 }
 
 type PolicyVersion struct {
