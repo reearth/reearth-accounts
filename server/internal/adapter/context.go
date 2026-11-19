@@ -24,7 +24,6 @@ const (
 	contextClient   ContextKey = "client"
 )
 
-// AttachClient records the calling client that a policy acceptance stores.
 func AttachClient(ctx context.Context, c legal.Client) context.Context {
 	return context.WithValue(ctx, contextClient, c)
 }

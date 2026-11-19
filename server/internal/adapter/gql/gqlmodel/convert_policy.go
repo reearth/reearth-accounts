@@ -12,20 +12,12 @@ func ToPolicyAcceptances(as []legal.Acceptance) []*PolicyAcceptance {
 	return res
 }
 
-func ToPolicyRefs(input []*PolicyAcceptanceInput) ([]legal.Ref, error) {
-	res := make([]legal.Ref, len(input))
+func ToPolicyRefInputs(input []*PolicyAcceptanceInput) []legal.RefInput {
+	res := make([]legal.RefInput, len(input))
 	for i, in := range input {
-		t, err := legal.ParseType(in.Type)
-		if err != nil {
-			return nil, err
-		}
-		v, err := legal.ParseVersion(in.Version)
-		if err != nil {
-			return nil, err
-		}
-		res[i] = legal.Ref{Type: t, Version: v}
+		res[i] = legal.RefInput{Type: in.Type, Version: in.Version}
 	}
-	return res, nil
+	return res
 }
 
 func ToPolicyVersions(vs []legal.VersionRecord, lang string) []*PolicyVersion {

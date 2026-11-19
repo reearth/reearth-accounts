@@ -73,7 +73,7 @@ func acceptanceModel(row gen.PolicyAcceptance) (legal.Acceptance, error) {
 		return legal.Acceptance{}, err
 	}
 	a := legal.Acceptance{
-		AcceptedAt: row.AcceptedAt,
+		AcceptedAt: row.AcceptedAt.UTC(),
 		Client:     legal.Client{Origin: row.Origin, UserAgent: row.UserAgent},
 		Ref:        legal.Ref{Type: legal.Type(row.Type), Version: v},
 		UserID:     u,

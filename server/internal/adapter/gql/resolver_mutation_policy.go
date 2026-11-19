@@ -11,11 +11,7 @@ func (r *mutationResolver) AcceptPolicies(ctx context.Context, input []*gqlmodel
 	if err := denyServiceCaller(ctx); err != nil {
 		return nil, err
 	}
-	refs, err := gqlmodel.ToPolicyRefs(input)
-	if err != nil {
-		return nil, err
-	}
-	u, err := usecases(ctx).Policy.Accept(ctx, refs, adapter.Client(ctx), getOperator(ctx))
+	u, err := usecases(ctx).Policy.Accept(ctx, gqlmodel.ToPolicyRefInputs(input), adapter.Client(ctx), getOperator(ctx))
 	if err != nil {
 		return nil, err
 	}

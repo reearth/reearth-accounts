@@ -25,6 +25,14 @@ const (
 	policyUserAgent = "policy-e2e"
 	forgedIP        = "198.51.100.9"
 
+	tosCurrent       = "1.0.0"
+	tosUpcoming      = "2.0.0"
+	tosUnpublished   = "2.5.0"
+	privacyCurrent   = "1.0.0"
+	inEffectSince    = -24 * time.Hour
+	upcomingIn       = 30 * 24 * time.Hour
+	malformedVersion = "1.0"
+
 	meAllPolicies = `{ me {
 		pendingPolicies { type version title url required effectiveDate }
 		upcomingPolicies { type version title url }
@@ -71,8 +79,7 @@ func policyGQL(e *httpexpect.Expect, query string, vars map[string]any) *httpexp
 		Expect().Status(http.StatusOK).JSON().Object()
 }
 
-// policyREST runs as the mock-auth demo user.
-func policyREST(r *httpexpect.Request) *httpexpect.Request {
+func demoUserREST(r *httpexpect.Request) *httpexpect.Request {
 	return r.WithHeader("Origin", policyOrigin).
 		WithHeader("User-Agent", policyUserAgent).
 		WithHeader("X-Forwarded-For", forgedIP)
@@ -93,9 +100,12 @@ func storedAcceptances(t *testing.T, r *repo.Container, u id.UserID) []legal.Acc
 	return as
 }
 
-// tos 1.0.0 is in effect and 2.0.0 is upcoming; privacy 1.0.0 is in effect.
-func policyCatalogPayload(now time.Time) string {
-	return webhookPayload(now.Add(-time.Minute), "2.0.0", now.Add(30*24*time.Hour))
+func currentTosPayload(now time.Time, delivered time.Duration) string {
+	return webhookPayload(now.Add(delivered), tosCurrent, now.Add(inEffectSince))
+}
+
+func upcomingTosPayload(now time.Time) string {
+	return webhookPayload(now.Add(-time.Minute), tosUpcoming, now.Add(upcomingIn))
 }
 
 func TestPolicyAcceptance_GraphQL(t *testing.T) {
@@ -110,29 +120,29 @@ func testPolicyAcceptanceGraphQL(t *testing.T, useMongo bool) {
 	now := time.Now().Truncate(time.Second)
 	e, r := StartServer(t, &app.Config{PolicyWebhookSecret: webhookSecret}, useMongo, seedPolicyUser)
 
-	deliverPolicies(t, e, webhookPayload(now.Add(-2*time.Minute), "1.0.0", now.Add(-24*time.Hour)))
+	deliverPolicies(t, e, currentTosPayload(now, -2*time.Minute))
 
 	me := policyGQL(e, meAllPolicies, nil).Value("data").Object().Value("me").Object()
 	pending := me.Value("pendingPolicies").Array()
 	pending.Length().IsEqual(2)
 	pending.Value(0).Object().HasValue("type", "privacy").HasValue("title", "Privacy Policy").Value("url").IsNull()
-	pending.Value(1).Object().HasValue("type", "tos").HasValue("version", "1.0.0").
+	pending.Value(1).Object().HasValue("type", "tos").HasValue("version", tosCurrent).
 		HasValue("title", "利用規約").HasValue("url", "https://example.com/tos").HasValue("required", true)
 	me.Value("upcomingPolicies").Array().IsEmpty()
 	me.Value("policyAcceptances").Array().IsEmpty()
 
-	deliverPolicies(t, e, policyCatalogPayload(now))
+	deliverPolicies(t, e, upcomingTosPayload(now))
 	upcoming := policyGQL(e, meAllPolicies, nil).Value("data").Object().Value("me").Object().Value("upcomingPolicies").Array()
 	upcoming.Length().IsEqual(1)
-	upcoming.Value(0).Object().HasValue("type", "tos").HasValue("version", "2.0.0")
+	upcoming.Value(0).Object().HasValue("type", "tos").HasValue("version", tosUpcoming)
 
 	t.Run("accept records once with the client", func(t *testing.T) {
-		payload := policyGQL(e, acceptMutation, acceptInput("tos", "1.0.0", "privacy", "1.0.0")).
+		payload := policyGQL(e, acceptMutation, acceptInput("tos", tosCurrent, "privacy", privacyCurrent)).
 			Value("data").Object().Value("acceptPolicies").Object().Value("me").Object()
 		payload.Value("pendingPolicies").Array().IsEmpty()
 		payload.Value("policyAcceptances").Array().IsEqual([]map[string]string{
-			{"type": "privacy", "version": "1.0.0"},
-			{"type": "tos", "version": "1.0.0"},
+			{"type": "privacy", "version": privacyCurrent},
+			{"type": "tos", "version": tosCurrent},
 		})
 
 		as := storedAcceptances(t, r, policyUser)
@@ -143,30 +153,32 @@ func testPolicyAcceptanceGraphQL(t *testing.T, useMongo bool) {
 			assert.True(t, a.Client.IP.IsLoopback(), "the connection address, not X-Forwarded-For from an untrusted peer: %s", a.Client.IP)
 		}
 
-		policyGQL(e, acceptMutation, acceptInput("tos", "1.0.0")).NotContainsKey("errors")
+		policyGQL(e, acceptMutation, acceptInput("tos", tosCurrent)).NotContainsKey("errors")
 		assert.Len(t, storedAcceptances(t, r, policyUser), 2, "a repeat writes no record")
 	})
 
 	t.Run("upcoming acceptance is recorded and counts for current", func(t *testing.T) {
-		policyGQL(e, acceptMutation, acceptInput("tos", "2.0.0")).NotContainsKey("errors")
+		policyGQL(e, acceptMutation, acceptInput("tos", tosUpcoming)).NotContainsKey("errors")
 		assert.Len(t, storedAcceptances(t, r, policyUser), 3)
 		me := policyGQL(e, meAllPolicies, nil).Value("data").Object().Value("me").Object()
 		me.Value("pendingPolicies").Array().IsEmpty()
-		me.Value("policyAcceptances").Array().Value(1).Object().HasValue("version", "2.0.0")
+		me.Value("policyAcceptances").Array().Value(1).Object().HasValue("version", tosUpcoming)
 
-		policyGQL(e, acceptMutation, acceptInput("tos", "1.0.0")).NotContainsKey("errors")
+		policyGQL(e, acceptMutation, acceptInput("tos", tosCurrent)).NotContainsKey("errors")
 		assert.Len(t, storedAcceptances(t, r, policyUser), 3, "a lower version writes no record")
 	})
 
 	t.Run("a version neither current nor upcoming is refused", func(t *testing.T) {
 		for _, in := range []map[string]any{
-			acceptInput("tos", "0.9.0"),
-			acceptInput("cookies", "1.0.0"),
-			acceptInput("privacy", "1.0.0", "tos", "3.0.0"),
-			acceptInput("TOS!", "1.0.0"),
+			acceptInput("tos", tosUnpublished),
+			acceptInput("cookies", tosCurrent),
+			acceptInput("privacy", privacyCurrent, "tos", tosUnpublished),
+			acceptInput("TOS!", tosCurrent),
 		} {
 			policyGQL(e, acceptMutation, in).Value("errors").Array().NotEmpty()
 		}
+		policyGQL(e, acceptMutation, acceptInput("tos", malformedVersion)).Value("errors").Array().
+			Value(0).Object().Value("message").String().Contains("MAJOR.MINOR.PATCH")
 		assert.Len(t, storedAcceptances(t, r, policyUser), 3)
 	})
 
@@ -188,23 +200,23 @@ func TestPolicyAcceptance_REST(t *testing.T) {
 func testPolicyAcceptanceREST(t *testing.T, useMongo bool) {
 	now := time.Now().Truncate(time.Second)
 	e, r := StartServer(t, &app.Config{Mock_Auth: true, PolicyWebhookSecret: webhookSecret}, useMongo, seedDemoUser)
-	deliverPolicies(t, e, policyCatalogPayload(now))
+	deliverPolicies(t, e, upcomingTosPayload(now))
 
-	got := policyREST(e.GET("/api/users/me/policies")).Expect().Status(http.StatusOK).JSON().Object()
+	got := demoUserREST(e.GET("/api/users/me/policies")).Expect().Status(http.StatusOK).JSON().Object()
 	got.Value("acceptances").Array().IsEmpty()
 	got.Value("pending").Array().Length().IsEqual(1)
 	got.Value("pending").Array().Value(0).Object().HasValue("type", "privacy")
 	got.Value("upcoming").Array().Value(0).Object().
-		HasValue("type", "tos").HasValue("version", "2.0.0").HasValue("title", "Terms of Service")
+		HasValue("type", "tos").HasValue("version", tosUpcoming).HasValue("title", "Terms of Service")
 
-	accepted := policyREST(e.POST("/api/users/me/policies/accept")).
-		WithJSON(map[string]any{"policies": acceptInput("tos", "2.0.0", "privacy", "1.0.0")["input"]}).
+	accepted := demoUserREST(e.POST("/api/users/me/policies/accept")).
+		WithJSON(map[string]any{"policies": acceptInput("tos", tosUpcoming, "privacy", privacyCurrent)["input"]}).
 		Expect().Status(http.StatusOK).JSON().Object()
 	accepted.Value("pending").Array().IsEmpty()
 	acc := accepted.Value("acceptances").Array()
 	acc.Length().IsEqual(2)
 	acc.Value(1).Object().Keys().ContainsOnly("acceptedAt", "type", "version")
-	acc.Value(1).Object().HasValue("type", "tos").HasValue("version", "2.0.0")
+	acc.Value(1).Object().HasValue("type", "tos").HasValue("version", tosUpcoming)
 
 	as := storedAcceptances(t, r, restDemoUID)
 	require.Len(t, as, 2)
@@ -212,18 +224,38 @@ func testPolicyAcceptanceREST(t *testing.T, useMongo bool) {
 	assert.Equal(t, policyUserAgent, as[0].Client.UserAgent)
 
 	for _, body := range []any{
-		map[string]any{"policies": acceptInput("tos", "0.9.0")["input"]},
-		map[string]any{"policies": acceptInput("cookies", "1.0.0")["input"]},
-		map[string]any{"policies": acceptInput("tos", "1.0")["input"]},
+		map[string]any{"policies": acceptInput("tos", tosUnpublished)["input"]},
+		map[string]any{"policies": acceptInput("cookies", tosCurrent)["input"]},
+		map[string]any{"policies": acceptInput("tos", malformedVersion)["input"]},
 		map[string]any{},
 	} {
-		policyREST(e.POST("/api/users/me/policies/accept")).WithJSON(body).
+		demoUserREST(e.POST("/api/users/me/policies/accept")).WithJSON(body).
 			Expect().Status(http.StatusBadRequest)
 	}
+	demoUserREST(e.POST("/api/users/me/policies/accept")).
+		WithJSON(map[string]any{"policies": acceptInput("tos", malformedVersion)["input"]}).
+		Expect().Status(http.StatusBadRequest).JSON().Object().Value("message").String().Contains("MAJOR.MINOR.PATCH")
 	assert.Len(t, storedAcceptances(t, r, restDemoUID), 2)
 
-	policyREST(e.DELETE("/api/users/me")).Expect().Status(http.StatusNoContent)
+	demoUserREST(e.DELETE("/api/users/me")).Expect().Status(http.StatusNoContent)
 	assert.Empty(t, storedAcceptances(t, r, restDemoUID))
+}
+
+func TestPolicyAcceptance_WithdrawingTheUpcomingKeepsTheCurrent(t *testing.T) {
+	now := time.Now().Truncate(time.Second)
+	e, _ := StartServer(t, &app.Config{Mock_Auth: true, PolicyWebhookSecret: webhookSecret}, false, seedDemoUser)
+	deliverPolicies(t, e, currentTosPayload(now, -2*time.Minute))
+	deliverPolicies(t, e, upcomingTosPayload(now))
+
+	demoUserREST(e.POST("/api/users/me/policies/accept")).
+		WithJSON(map[string]any{"policies": acceptInput("tos", tosCurrent, "tos", tosUpcoming, "privacy", privacyCurrent)["input"]}).
+		Expect().Status(http.StatusOK)
+	deliverPolicies(t, e, currentTosPayload(now, 0))
+
+	got := demoUserREST(e.GET("/api/users/me/policies")).Expect().Status(http.StatusOK).JSON().Object()
+	got.Value("upcoming").Array().IsEmpty()
+	got.Value("pending").Array().IsEmpty()
+	got.Value("acceptances").Array().Value(1).Object().HasValue("type", "tos").HasValue("version", tosCurrent)
 }
 
 func TestPolicyAcceptance_WithoutSecret(t *testing.T) {
@@ -234,15 +266,19 @@ func TestPolicyAcceptance_WithoutSecret(t *testing.T) {
 	me.Value("upcomingPolicies").Array().IsEmpty()
 	me.Value("policyAcceptances").Array().IsEmpty()
 
-	errs := policyGQL(e, acceptMutation, acceptInput("tos", "1.0.0")).Value("errors").Array()
-	errs.Value(0).Object().Value("message").String().Contains("policies not configured")
+	for _, v := range []string{tosCurrent, malformedVersion} {
+		errs := policyGQL(e, acceptMutation, acceptInput("tos", v)).Value("errors").Array()
+		errs.Value(0).Object().Value("message").String().Contains("policies not configured")
+	}
 
 	rest, restRepos := StartServer(t, &app.Config{Mock_Auth: true}, false, seedDemoUser)
-	policyREST(rest.GET("/api/users/me/policies")).Expect().Status(http.StatusOK).JSON().Object().
+	demoUserREST(rest.GET("/api/users/me/policies")).Expect().Status(http.StatusOK).JSON().Object().
 		IsEqual(map[string]any{"acceptances": []any{}, "pending": []any{}, "upcoming": []any{}})
-	policyREST(rest.POST("/api/users/me/policies/accept")).
-		WithJSON(map[string]any{"policies": acceptInput("tos", "1.0.0")["input"]}).
-		Expect().Status(http.StatusNotFound)
+	for _, v := range []string{tosCurrent, malformedVersion} {
+		demoUserREST(rest.POST("/api/users/me/policies/accept")).
+			WithJSON(map[string]any{"policies": acceptInput("tos", v)["input"]}).
+			Expect().Status(http.StatusNotFound)
+	}
 	assert.Empty(t, storedAcceptances(t, r, policyUser))
 	assert.Empty(t, storedAcceptances(t, restRepos, restDemoUID))
 }
@@ -258,12 +294,12 @@ func TestPolicyAcceptance_ServiceCallerRefused(t *testing.T) {
 	require.NoError(t, err)
 	require.NoError(t, cfg.ServiceCallers.Decode(string(callers)))
 	e, r := StartServerNoDebug(t, cfg, false, seedServiceCallers)
-	deliverPolicies(t, e, policyCatalogPayload(time.Now().Truncate(time.Second)))
+	deliverPolicies(t, e, upcomingTosPayload(time.Now().Truncate(time.Second)))
 	auth := "Bearer " + idp.clientToken(t, "svc-flow")
 
-	serviceGQL(e, auth, acceptMutation, acceptInput("tos", "1.0.0")).Value("errors").Array().NotEmpty()
+	serviceGQL(e, auth, acceptMutation, acceptInput("tos", tosCurrent)).Value("errors").Array().NotEmpty()
 	e.POST("/api/users/me/policies/accept").WithHeader("Authorization", auth).
-		WithJSON(map[string]any{"policies": acceptInput("tos", "1.0.0")["input"]}).
+		WithJSON(map[string]any{"policies": acceptInput("tos", tosCurrent)["input"]}).
 		Expect().Status(http.StatusUnauthorized)
 	e.GET("/api/users/me/policies").WithHeader("Authorization", auth).
 		Expect().Status(http.StatusUnauthorized)

@@ -166,8 +166,8 @@ type PolicyAcceptanceInput struct {
 	Version string `json:"version"`
 }
 
-// One version of a legal policy. title and url are in the viewer's language,
-// with English as the fallback.
+// One version of a legal policy. title and url are in the user's language,
+// then its base language, then English, then the first language by key order.
 type PolicyVersion struct {
 	EffectiveDate time.Time `json:"effectiveDate"`
 	Required      bool      `json:"required"`

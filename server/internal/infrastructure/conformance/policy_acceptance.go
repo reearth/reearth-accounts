@@ -2,14 +2,19 @@ package conformance
 
 import (
 	"context"
+	"fmt"
 	"net/netip"
 	"sort"
 	"sync"
 	"testing"
 	"time"
 
+	"github.com/reearth/reearth-accounts/server/internal/usecase/gateway"
+	"github.com/reearth/reearth-accounts/server/internal/usecase/interactor"
 	"github.com/reearth/reearth-accounts/server/pkg/id"
 	"github.com/reearth/reearth-accounts/server/pkg/legal"
+	"github.com/reearth/reearth-accounts/server/pkg/role"
+	"github.com/reearth/reearth-accounts/server/pkg/workspace"
 	"github.com/reearth/reearthx/usecasex"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -20,6 +25,7 @@ func runPolicyAcceptance(t *testing.T, nc Factory) {
 	t.Run("PolicyAcceptance_InsertRace", func(t *testing.T) { testPolicyAcceptanceInsertRace(t, nc) })
 	t.Run("PolicyAcceptance_RemoveByUser", func(t *testing.T) { testPolicyAcceptanceRemoveByUser(t, nc) })
 	t.Run("PolicyAcceptance_RemoveRollsBack", func(t *testing.T) { testPolicyAcceptanceRemoveRollsBack(t, nc) })
+	t.Run("PolicyAcceptance_AcceptRacingDeleteMe", func(t *testing.T) { testPolicyAcceptanceAcceptRacingDeleteMe(t, nc) })
 }
 
 func acceptance(u id.UserID, typ, version, ua string) legal.Acceptance {
@@ -45,9 +51,6 @@ func acceptancesOf(t *testing.T, r legal.AcceptanceRepo, u id.UserID) []legal.Ac
 		}
 		return as[i].Version.Compare(as[j].Version) < 0
 	})
-	for i := range as {
-		as[i].AcceptedAt = as[i].AcceptedAt.UTC()
-	}
 	return as
 }
 
@@ -132,4 +135,49 @@ func testPolicyAcceptanceRemoveRollsBack(t *testing.T, nc Factory) {
 	})
 	assert.ErrorIs(t, err, assert.AnError)
 	assert.Len(t, acceptancesOf(t, c.PolicyAcceptance, u), 1)
+}
+
+func testPolicyAcceptanceAcceptRacingDeleteMe(t *testing.T, nc Factory) {
+	c, _, done := nc(t)
+	defer done()
+	ctx := context.Background()
+	now := time.Now()
+	_, err := legal.Apply(ctx, c.PolicyVersion, legal.Manifest{Timestamp: now.Add(-time.Minute), Entries: []legal.Entry{{
+		EffectiveAt: now.Add(-time.Hour),
+		Ref:         legal.Ref{Type: "tos", Version: legal.MustParseVersion("1.0.0")},
+		Required:    true,
+		Title:       legal.LocalizedText{"en": "ToS"},
+	}}}, func() time.Time { return now.Add(-time.Minute) })
+	require.NoError(t, err)
+	policy := interactor.NewPolicy(c, legal.NewSecret("s"), interactor.NewPolicyCatalog(c.PolicyVersion, interactor.PolicyCatalogTTL))
+	users := interactor.NewUser(c, &gateway.Container{}, nil, "", "")
+
+	orphans := 0
+	const rounds = 300
+	for i := range rounds {
+		u := newUser(t, "racer", fmt.Sprintf("racer%d@example.com", i))
+		require.NoError(t, c.User.Save(ctx, u))
+		ws, err := workspace.New().ID(u.Workspace()).Name("racer").Personal(true).
+			Members(map[id.UserID]workspace.Member{u.ID(): {Role: role.RoleOwner, InvitedBy: u.ID()}}).Build()
+		require.NoError(t, err)
+		require.NoError(t, c.Workspace.Save(ctx, ws))
+		uid := u.ID()
+		op := &workspace.Operator{OwningWorkspaces: id.WorkspaceIDList{ws.ID()}, User: &uid}
+
+		var wg sync.WaitGroup
+		wg.Add(2)
+		go func() {
+			defer wg.Done()
+			_, _ = policy.Accept(ctx, []legal.RefInput{{Type: "tos", Version: "1.0.0"}}, legal.Client{}, op)
+		}()
+		go func() {
+			defer wg.Done()
+			assert.NoError(t, users.DeleteMe(ctx, uid, op))
+		}()
+		wg.Wait()
+		if len(acceptancesOf(t, c.PolicyAcceptance, uid)) > 0 {
+			orphans++
+		}
+	}
+	assert.Zero(t, orphans, "deleted users that still have acceptance records, of %d", rounds)
 }

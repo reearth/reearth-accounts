@@ -36,8 +36,6 @@ func ref(typ, version string) legal.Ref {
 	return legal.Ref{Type: legal.Type(typ), Version: legal.MustParseVersion(version)}
 }
 
-// catalog delivers each payload at its own time through the webhook's apply
-// path, so the tests depend only on the catalog's read API.
 func catalog(t *testing.T, ds ...delivery) legal.Catalog {
 	t.Helper()
 	ctx := context.Background()
@@ -206,10 +204,12 @@ func TestPlanAccept(t *testing.T) {
 		{name: "repeat writes nothing", accepted: []legal.Ref{ref("tos", "1.1.0")}, req: []legal.Ref{ref("tos", "1.1.0")}, want: []legal.Ref{}},
 		{name: "lower than held writes nothing", accepted: []legal.Ref{ref("tos", "2.0.0")}, req: []legal.Ref{ref("tos", "1.1.0")}, want: []legal.Ref{}},
 		{name: "higher than held", accepted: []legal.Ref{ref("tos", "1.0.0")}, req: []legal.Ref{ref("tos", "1.1.0")}, want: []legal.Ref{ref("tos", "1.1.0")}},
+		{name: "held stale version writes nothing", accepted: []legal.Ref{ref("tos", "1.0.0")}, req: []legal.Ref{ref("tos", "1.0.0")}, want: []legal.Ref{}},
+		{name: "unpublished version below held writes nothing", accepted: []legal.Ref{ref("tos", "1.1.0")}, req: []legal.Ref{ref("tos", "0.9.0")}, want: []legal.Ref{}},
 		{
-			name: "highest requested version per type, sorted by type",
+			name: "every requested version above held, sorted",
 			req:  []legal.Ref{ref("tos", "2.0.0"), ref("privacy", "1.0.0"), ref("tos", "1.1.0"), ref("tos", "2.0.0")},
-			want: []legal.Ref{ref("privacy", "1.0.0"), ref("tos", "2.0.0")},
+			want: []legal.Ref{ref("privacy", "1.0.0"), ref("tos", "1.1.0"), ref("tos", "2.0.0")},
 		},
 		{name: "empty request", want: []legal.Ref{}},
 	}
@@ -225,6 +225,29 @@ func TestPlanAccept(t *testing.T) {
 			assert.Equal(t, tt.want, got)
 		})
 	}
+}
+
+func TestPlanAccept_BothVersionsSurviveWithdrawingTheUpcoming(t *testing.T) {
+	first := delivery{at: base, entries: []legal.Entry{entry("tos", "1.0.0", base.Add(-day), true)}}
+	upcoming := delivery{at: base.Add(time.Hour), entries: []legal.Entry{entry("tos", "2.0.0", base.Add(10*day), true)}}
+	now := base.Add(time.Hour)
+	plan, err := legal.PlanAccept(catalog(t, first, upcoming), nil, []legal.Ref{ref("tos", "1.0.0"), ref("tos", "2.0.0")}, now)
+	require.NoError(t, err)
+
+	reverted := delivery{at: base.Add(2 * time.Hour), entries: []legal.Entry{entry("tos", "1.0.0", base.Add(-day), true)}}
+	assert.Empty(t, pendingRefs(catalog(t, first, upcoming, reverted), accepted(plan...), now))
+}
+
+func TestParseRefs(t *testing.T) {
+	got, err := legal.ParseRefs([]legal.RefInput{{Type: "tos", Version: "1.2.3"}})
+	require.NoError(t, err)
+	assert.Equal(t, []legal.Ref{ref("tos", "1.2.3")}, got)
+
+	_, err = legal.ParseRefs([]legal.RefInput{{Type: "tos", Version: "1.2"}})
+	assert.ErrorIs(t, err, legal.ErrInvalidVersion)
+	assert.EqualError(t, err, "version must be MAJOR.MINOR.PATCH")
+	_, err = legal.ParseRefs([]legal.RefInput{{Type: "TOS!", Version: "1.0.0"}})
+	assert.ErrorIs(t, err, legal.ErrUnknownType)
 }
 
 func TestPlanAccept_WithdrawnIsNotAcceptable(t *testing.T) {

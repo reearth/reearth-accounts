@@ -29,9 +29,10 @@ password should have numbers: パスワードには数字を含める必要が�
 password should have upper case letters: パスワードには大文字を含める必要があります。
 personal workspace cannot be modified: パーソナルワークスペースは変更できません。
 policies not configured: ポリシーが設定されていません。
-policy version is neither current nor upcoming: ポリシーのバージョンが現在または今後のバージョンではありません。
+policy version is neither current nor upcoming: 指定されたバージョンは、現在のポリシーでも今後適用されるポリシーでもありません。
 target user does not exist in the workspace: 対象のユーザーはワークスペースに存在しません。
 target workspace still has some project: 対象のワークスペースにプロジェクトが存在します。
 unknown policy type: 不明なポリシーの種類です。
 user already exists: ユーザーはすでに存在します。
 user already joined: ユーザーはすでに参加しています。
+version must be MAJOR.MINOR.PATCH: バージョンは MAJOR.MINOR.PATCH の形式で指定してください。

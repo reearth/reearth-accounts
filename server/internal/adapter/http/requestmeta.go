@@ -8,9 +8,6 @@ import (
 	"github.com/reearth/reearth-accounts/server/pkg/legal"
 )
 
-// AttachClient records the calling client for policy acceptances. The IP
-// comes from echo's IPExtractor, which reads X-Forwarded-For only from
-// trusted proxies.
 func AttachClient(next echo.HandlerFunc) echo.HandlerFunc {
 	return func(c echo.Context) error {
 		req := c.Request()

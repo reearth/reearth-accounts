@@ -1,5 +1,3 @@
--- One record per user, policy type and version: the evidence of consent and
--- the consent state. Inserting an existing key does nothing.
 CREATE TABLE IF NOT EXISTS policy_acceptances (
     user_id     text NOT NULL,
     type        text NOT NULL,

@@ -12,8 +12,9 @@ import (
 )
 
 var (
-	ErrNotAcceptable = rerror.NewE(i18n.T("policy version is neither current nor upcoming"))
-	ErrUnknownType   = rerror.NewE(i18n.T("unknown policy type"))
+	ErrInvalidVersion = rerror.NewE(i18n.T("version must be MAJOR.MINOR.PATCH"))
+	ErrNotAcceptable  = rerror.NewE(i18n.T("policy version is neither current nor upcoming"))
+	ErrUnknownType    = rerror.NewE(i18n.T("unknown policy type"))
 )
 
 // Acceptance is one record of policy_acceptances: the evidence of consent and
@@ -25,7 +26,6 @@ type Acceptance struct {
 	UserID     id.UserID
 }
 
-// Client is the calling client recorded with an acceptance. No API returns it.
 type Client struct {
 	// IP is the connection address, or the client address that a trusted
 	// proxy reported. The zero value means unknown.
@@ -39,6 +39,11 @@ type Overview struct {
 	Acceptances []Acceptance
 	Pending     []VersionRecord
 	Upcoming    []VersionRecord
+}
+
+type RefInput struct {
+	Type    string
+	Version string
 }
 
 func BuildOverview(c Catalog, as []Acceptance, now time.Time) Overview {
@@ -75,6 +80,24 @@ func Held(c Catalog, as []Acceptance, t Type) *Acceptance {
 		}
 	}
 	return held
+}
+
+// ParseRefs reports a malformed type as ErrUnknownType, since no published
+// type can have that form.
+func ParseRefs(in []RefInput) ([]Ref, error) {
+	res := make([]Ref, len(in))
+	for i, r := range in {
+		t, err := ParseType(r.Type)
+		if err != nil {
+			return nil, ErrUnknownType
+		}
+		v, err := ParseVersion(r.Version)
+		if err != nil {
+			return nil, ErrInvalidVersion
+		}
+		res[i] = Ref{Type: t, Version: v}
+	}
+	return res, nil
 }
 
 // Pending lists, sorted by type, the current versions the user must accept:
@@ -120,33 +143,31 @@ func (t LocalizedText) Pick(lang string) string {
 }
 
 // PlanAccept returns the refs to record when the user holding as accepts req.
-// It rejects the whole request when one ref names an unknown type
-// (ErrUnknownType) or a version that is neither current nor upcoming
-// (ErrNotAcceptable). Per type it keeps the highest requested version, and
-// drops it when the user already holds that version or a higher one.
+// A ref at or below the version the user holds records nothing. It rejects
+// the whole request when one ref names an unknown type (ErrUnknownType) or
+// another version that is neither current nor upcoming (ErrNotAcceptable).
 func PlanAccept(c Catalog, as []Acceptance, req []Ref, now time.Time) ([]Ref, error) {
 	types := c.Types()
-	want := map[Type]Version{}
+	res := []Ref{}
 	for _, r := range req {
 		if _, ok := slices.BinarySearch(types, r.Type); !ok {
 			return nil, ErrUnknownType
 		}
+		if h := Held(c, as, r.Type); h != nil && h.Version.Compare(r.Version) >= 0 {
+			continue
+		}
 		if !names(c.Current(r.Type, now), r.Version) && !names(c.Upcoming(r.Type, now), r.Version) {
 			return nil, ErrNotAcceptable
 		}
-		if v, ok := want[r.Type]; !ok || r.Version.Compare(v) > 0 {
-			want[r.Type] = r.Version
-		}
+		res = append(res, r)
 	}
-	res := []Ref{}
-	for t, v := range want {
-		if h := Held(c, as, t); h != nil && h.Version.Compare(v) >= 0 {
-			continue
+	slices.SortFunc(res, func(a, b Ref) int {
+		if a.Type != b.Type {
+			return strings.Compare(string(a.Type), string(b.Type))
 		}
-		res = append(res, Ref{Type: t, Version: v})
-	}
-	slices.SortFunc(res, func(a, b Ref) int { return strings.Compare(string(a.Type), string(b.Type)) })
-	return res, nil
+		return a.Version.Compare(b.Version)
+	})
+	return slices.Compact(res), nil
 }
 
 // Upcoming lists the upcoming version of each type, sorted by type.

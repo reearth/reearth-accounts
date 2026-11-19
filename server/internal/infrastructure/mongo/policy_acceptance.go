@@ -19,8 +19,6 @@ const (
 	policyAcceptancesCollection = "policy_acceptances"
 )
 
-// PolicyAcceptance keys each record by "<user>:<type>:<version>". A type
-// never contains ':', so the _id is the unique (user, type, version).
 type PolicyAcceptance struct {
 	c *mongo.Collection
 }
@@ -31,7 +29,6 @@ func NewPolicyAcceptance(db *mongo.Database) *PolicyAcceptance {
 
 type policyAcceptanceDoc struct {
 	AcceptedAt time.Time `bson:"acceptedAt"`
-	ID         string    `bson:"_id"`
 	IP         string    `bson:"ip"`
 	Origin     string    `bson:"origin"`
 	Type       string    `bson:"type"`
@@ -98,7 +95,6 @@ func onlyDuplicateKeys(err error) bool {
 func newPolicyAcceptanceDoc(a legal.Acceptance) policyAcceptanceDoc {
 	d := policyAcceptanceDoc{
 		AcceptedAt: a.AcceptedAt,
-		ID:         a.UserID.String() + ":" + string(a.Type) + ":" + a.Version.String(),
 		Origin:     a.Client.Origin,
 		Type:       string(a.Type),
 		User:       a.UserID.String(),

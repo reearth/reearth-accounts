@@ -1700,8 +1700,8 @@ input PolicyAcceptanceInput {
 }
 
 """
-One version of a legal policy. title and url are in the viewer's language,
-with English as the fallback.
+One version of a legal policy. title and url are in the user's language,
+then its base language, then English, then the first language by key order.
 """
 type PolicyVersion {
   effectiveDate: DateTime!

@@ -970,7 +970,7 @@ const docTemplate = `{
                         }
                     },
                     "400": {
-                        "description": "unknown type, or a version that is neither current nor upcoming",
+                        "description": "unknown type, malformed version, or a version that is neither current nor upcoming",
                         "schema": {
                             "$ref": "#/definitions/internal.ErrorResponse"
                         }

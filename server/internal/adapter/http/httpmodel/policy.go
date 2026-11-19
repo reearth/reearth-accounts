@@ -25,7 +25,6 @@ func typeStrings(ts []legal.Type) []string {
 	return out
 }
 
-// AcceptPoliciesRequest takes the same input as the acceptPolicies mutation.
 type AcceptPoliciesRequest struct {
 	Policies []PolicyRefRequest `json:"policies" validate:"required,dive"`
 }
@@ -35,23 +34,14 @@ type PolicyRefRequest struct {
 	Version string `json:"version" validate:"required"`
 }
 
-func (r AcceptPoliciesRequest) Refs() ([]legal.Ref, error) {
-	res := make([]legal.Ref, len(r.Policies))
+func (r AcceptPoliciesRequest) Inputs() []legal.RefInput {
+	res := make([]legal.RefInput, len(r.Policies))
 	for i, p := range r.Policies {
-		t, err := legal.ParseType(p.Type)
-		if err != nil {
-			return nil, err
-		}
-		v, err := legal.ParseVersion(p.Version)
-		if err != nil {
-			return nil, err
-		}
-		res[i] = legal.Ref{Type: t, Version: v}
+		res[i] = legal.RefInput{Type: p.Type, Version: p.Version}
 	}
-	return res, nil
+	return res
 }
 
-// MyPoliciesResponse never carries the client or IP an acceptance recorded.
 type MyPoliciesResponse struct {
 	Acceptances []PolicyAcceptanceResponse `json:"acceptances"`
 	Pending     []PolicyVersionResponse    `json:"pending"`
@@ -64,8 +54,6 @@ type PolicyAcceptanceResponse struct {
 	Version    string    `json:"version"`
 }
 
-// PolicyVersionResponse has title and url in the user's language, falling
-// back to English.
 type PolicyVersionResponse struct {
 	EffectiveDate time.Time `json:"effectiveDate"`
 	Required      bool      `json:"required"`
