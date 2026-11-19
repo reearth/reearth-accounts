@@ -133,6 +133,18 @@ func TestNew(t *testing.T) {
 	assert.Equal(t, ModeProvider, m.(*sender).mode)
 }
 
+func TestNew_CloudflareBuildsWithoutNetwork(t *testing.T) {
+	cf, err := Parse(Env{Provider: "cloudflare", FromEmail: "noreply@example.com", CloudflareAccountID: "acc-id", CloudflareAPIToken: "cf-token"}, false)
+	require.NoError(t, err)
+
+	m, err := New(context.Background(), cf)
+
+	require.NoError(t, err)
+	require.IsType(t, &sender{}, m)
+	assert.Equal(t, ModeProvider, m.(*sender).mode)
+	assert.NotNil(t, m.(*sender).m)
+}
+
 func TestNew_NilMailerFailsStartup(t *testing.T) {
 	t.Setenv("AWS_CONFIG_FILE", t.TempDir()+"/missing")
 	t.Setenv("AWS_PROFILE", "accounts-test-missing-profile")

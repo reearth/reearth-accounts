@@ -78,7 +78,7 @@ func TestReadConfig_Mailer(t *testing.T) {
 }
 
 func TestConfig_Print_MasksSecrets(t *testing.T) {
-	mailerEnv := mailprovider.Env{Provider: "sendgrid", FromEmail: "noreply@example.com", SendGridAPIKey: "sendgrid-api-key-value"}
+	mailerEnv := mailprovider.Env{Provider: "sendgrid", FromEmail: "noreply@example.com", SendGridAPIKey: "sendgrid-api-key-value", CloudflareAccountID: "cf-account", CloudflareAPIToken: "cloudflare-token-value"}
 	mailSettings, err := mailprovider.Parse(mailerEnv, false)
 	require.NoError(t, err)
 	c := Config{
@@ -95,7 +95,15 @@ func TestConfig_Print_MasksSecrets(t *testing.T) {
 		},
 	}
 
-	got := c.Print()
+	cfEnv := mailerEnv
+	cfEnv.Provider = "cloudflare"
+	cfSettings, err := mailprovider.Parse(cfEnv, false)
+	require.NoError(t, err)
+	cf := c
+	cf.Mailer = cfEnv
+	cf.MailSettings = cfSettings
+
+	got := c.Print() + cf.Print()
 
 	for _, secret := range []string{
 		"mongodb://user:pass@localhost/db",
@@ -106,6 +114,7 @@ func TestConfig_Print_MasksSecrets(t *testing.T) {
 		"auth0-client-secret-value",
 		"sendgrid-api-key-value",
 		"policy-webhook-secret-value",
+		"cloudflare-token-value",
 	} {
 		assert.NotContains(t, got, secret)
 	}

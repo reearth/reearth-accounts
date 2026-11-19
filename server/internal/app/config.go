@@ -14,6 +14,7 @@ import (
 	"github.com/kelseyhightower/envconfig"
 	"github.com/reearth/reearth-accounts/server/internal/adapter"
 	"github.com/reearth/reearth-accounts/server/internal/adapter/ratelimit"
+	"github.com/reearth/reearth-accounts/server/internal/app/clientip"
 	"github.com/reearth/reearth-accounts/server/internal/infrastructure/mailprovider"
 	"github.com/reearth/reearth-accounts/server/pkg/applog"
 	"github.com/reearth/reearth-accounts/server/pkg/workspace"
@@ -296,7 +297,7 @@ func ReadConfig(debug bool) (*Config, error) {
 		return nil, fmt.Errorf("REEARTH_ACCOUNTS_SERVICE_CALLERS: %w", err)
 	}
 
-	proxies, err := parseTrustedProxies(c.TrustedProxies)
+	proxies, err := clientip.ParseTrustedProxies(c.TrustedProxies)
 	if err != nil {
 		return nil, fmt.Errorf("REEARTH_ACCOUNTS_TRUSTED_PROXIES: %w", err)
 	}
@@ -314,33 +315,6 @@ func ReadConfig(debug bool) (*Config, error) {
 	return &c, nil
 }
 
-func parseTrustedProxies(entries []string) ([]netip.Prefix, error) {
-	var res []netip.Prefix
-	for _, e := range entries {
-		e = strings.TrimSpace(e)
-		if e == "" {
-			continue
-		}
-		if strings.Contains(e, "/") {
-			p, err := netip.ParsePrefix(e)
-			if err != nil {
-				return nil, err
-			}
-			res = append(res, p.Masked())
-			continue
-		}
-		a, err := netip.ParseAddr(e)
-		if err != nil {
-			return nil, err
-		}
-		if a.Zone() != "" {
-			return nil, fmt.Errorf("address %q must not have a zone", e)
-		}
-		res = append(res, netip.PrefixFrom(a, a.BitLen()))
-	}
-	return res, nil
-}
-
 type GraphQLConfig struct {
 	ComplexityLimit int `default:"6000"`
 	DepthLimit      int `default:"10"`
@@ -354,7 +328,7 @@ func (c Config) Print() string {
 	for _, secret := range []string{
 		c.DB, c.RestAPIKey, c.SwaggerBasicPass,
 		c.Auth0.ClientSecret, c.SignupSecret, c.SyncSSOAPIKey,
-		c.Mailer.SendGridAPIKey, c.PolicyWebhookSecret,
+		c.Mailer.SendGridAPIKey, c.Mailer.CloudflareAPIToken, c.PolicyWebhookSecret,
 	} {
 		if secret == "" {
 			continue
