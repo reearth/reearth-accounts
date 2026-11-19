@@ -176,7 +176,7 @@ const (
 //   - Every other version not withdrawn and not frozen is withdrawn.
 //
 // Any other payload adds its version when the head has not seen it, as
-// stalePayloadVersion decides, and otherwise only replaces the content of a
+// losingPayloadVersion decides, and otherwise only replaces the content of a
 // version it wins a same-timestamp tie for that is withdrawn or not frozen.
 func PlanApply(cur TypeHead, e Entry, payloadAt, now time.Time) (TypeHead, Outcome) {
 	applied := e.applied()
@@ -201,7 +201,7 @@ func PlanApply(cur TypeHead, e Entry, payloadAt, now time.Time) (TypeHead, Outco
 		if seen {
 			set(v.setBy(e, payloadAt, applied))
 		} else {
-			set(stalePayloadVersion(e, payloadAt, applied, cur.AppliedAt, now))
+			set(losingPayloadVersion(e, payloadAt, applied, payloadAt.Before(cur.AppliedAt), now))
 		}
 		return next, OutcomeRecorded
 	}
@@ -211,7 +211,7 @@ func PlanApply(cur TypeHead, e Entry, payloadAt, now time.Time) (TypeHead, Outco
 	case !seen:
 		set(HeadVersion{}.setBy(e, payloadAt, applied))
 	case v.withdrawn():
-		set(renamedWithdrawn(v, e))
+		set(renamedWithdrawn(v, e, payloadAt, applied, now))
 	case v.takes(payloadAt, applied.Digest, now):
 		set(v.setBy(e, payloadAt, applied))
 	}
@@ -223,18 +223,26 @@ func PlanApply(cur TypeHead, e Entry, payloadAt, now time.Time) (TypeHead, Outco
 	return next, OutcomeWon
 }
 
-// renamedWithdrawn keeps a withdrawn version withdrawn when the newest
-// payload names it again, so that a withdrawn version never takes effect.
-func renamedWithdrawn(v HeadVersion, _ Entry) HeadVersion { return v }
+// renamedWithdrawn republishes a withdrawn version the newest payload names
+// again, as upcoming with the entry's content, so that it ends the same as
+// when the payloads arrive in the other order. A version that would be frozen
+// stays withdrawn, so a republish never puts a version into effect at once.
+func renamedWithdrawn(v HeadVersion, e Entry, payloadAt time.Time, a Applied, now time.Time) HeadVersion {
+	next := v.setBy(e, payloadAt, a)
+	if next.frozen(now) {
+		return v
+	}
+	next.WithdrawnAt = nil
+	return next
+}
 
-// stalePayloadVersion adds a version the head has not seen from a payload
-// that lost to it. Whether it is in effect is judged at supersededAt, the
-// timestamp of the head's newest payload, when that payload superseded it,
-// so the time it arrives does not matter. A version frozen then is added in
-// effect; any other version is added withdrawn.
-func stalePayloadVersion(e Entry, payloadAt time.Time, a Applied, supersededAt, now time.Time) HeadVersion {
+// losingPayloadVersion adds a version the head has not seen from a payload
+// that lost to it. An older payload never puts a version into effect, so its
+// version is added withdrawn whatever its date. A same-timestamp loser is
+// judged as the winner judges the versions it does not name.
+func losingPayloadVersion(e Entry, payloadAt time.Time, a Applied, older bool, now time.Time) HeadVersion {
 	v := HeadVersion{}.setBy(e, payloadAt, a)
-	if !v.frozen(supersededAt) {
+	if older || !v.frozen(now) {
 		v = withdraw(v, now)
 	}
 	return v
