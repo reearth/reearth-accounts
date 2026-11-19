@@ -1,0 +1,10 @@
+{{define "subject"}}[Re:Earth] Changes to the {{.PolicyTitle}}{{end}}
+{{define "text"}}Hello,
+
+We are updating the {{.PolicyTitle}}. Version {{.Version}} takes effect on {{.EffectiveDate.UTC.Format "January 2, 2006 at 15:04 UTC"}}.
+
+{{if .Major}}After that date, you will be asked to accept the new version the next time you sign in to Re:Earth.{{else}}If you continue to use Re:Earth after that date, you agree to the new version.{{end}}
+{{with .ActionURL}}
+Read the new version:
+{{.}}
+{{end}}{{end}}

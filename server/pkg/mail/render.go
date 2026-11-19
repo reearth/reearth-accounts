@@ -6,12 +6,13 @@ import (
 	"fmt"
 	htmltemplate "html/template"
 	texttemplate "text/template"
+	"time"
 
 	"golang.org/x/text/language"
 )
 
 // Kinds lists every mail accounts sends.
-var Kinds = []Kind{KindVerification, KindPasswordReset, KindVerificationResend}
+var Kinds = []Kind{KindVerification, KindPasswordReset, KindVerificationResend, KindPolicyNotice}
 
 type Lang string
 
@@ -60,9 +61,20 @@ type VerificationResendData struct {
 	ActionURL string
 }
 
+// PolicyNoticeData announces an upcoming policy version. ActionURL links the
+// policy text in the user's language and may be empty.
+type PolicyNoticeData struct {
+	ActionURL     string
+	EffectiveDate time.Time
+	Major         bool
+	PolicyTitle   string
+	Version       string
+}
+
 func (VerificationData) Kind() Kind       { return KindVerification }
 func (PasswordResetData) Kind() Kind      { return KindPasswordReset }
 func (VerificationResendData) Kind() Kind { return KindVerificationResend }
+func (PolicyNoticeData) Kind() Kind       { return KindPolicyNotice }
 
 //go:embed templates/*.tmpl
 var templateFS embed.FS

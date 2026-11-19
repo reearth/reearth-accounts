@@ -7,6 +7,7 @@ import (
 	"path/filepath"
 	"regexp"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -26,6 +27,13 @@ var samples = map[Kind]Data{
 	},
 	KindVerificationResend: VerificationResendData{
 		ActionURL: "https://verify.example.com/?mode=verifyEmail&oobCode=CODE",
+	},
+	KindPolicyNotice: PolicyNoticeData{
+		ActionURL:     "https://policies.example.com/tos/2.0.0",
+		EffectiveDate: time.Date(2027, 1, 1, 9, 0, 0, 0, time.FixedZone("JST", 9*3600)),
+		Major:         true,
+		PolicyTitle:   "Terms of Service",
+		Version:       "2.0.0",
 	},
 }
 
@@ -164,5 +172,31 @@ func BenchmarkRender_Verification(b *testing.B) {
 		if _, err := Render(language.Japanese, samples[KindVerification]); err != nil {
 			b.Fatal(err)
 		}
+	}
+}
+
+func TestRender_PolicyNotice(t *testing.T) {
+	minor := PolicyNoticeData{
+		EffectiveDate: time.Date(2027, 1, 1, 0, 0, 0, 0, time.UTC),
+		PolicyTitle:   "Privacy Policy",
+		Version:       "1.3.0",
+	}
+	for _, l := range Langs {
+		t.Run(string(l), func(t *testing.T) {
+			m, err := Render(language.Make(string(l)), samples[KindPolicyNotice])
+			require.NoError(t, err)
+			assert.Contains(t, m.Text(), "2027", "the date is in UTC")
+			assert.Contains(t, m.Text(), "00:00", "09:00 JST is 00:00 UTC")
+			assert.Contains(t, m.Text(), "https://policies.example.com/tos/2.0.0")
+			assert.Contains(t, m.HTML(), `href="https://policies.example.com/tos/2.0.0"`)
+
+			m, err = Render(language.Make(string(l)), minor)
+			require.NoError(t, err)
+			assert.Contains(t, m.Subject(), "Privacy Policy")
+			assert.Contains(t, m.Text(), "1.3.0")
+			assert.NotContains(t, m.Text(), "http", "no link without a URL")
+			assert.NotContains(t, m.HTML(), `class="btn"`, "no button without a URL")
+			golden(t, filepath.Join("testdata", "policy_notice_minor."+string(l)+".txt"), "Subject: "+m.Subject()+"\n\n"+m.Text())
+		})
 	}
 }

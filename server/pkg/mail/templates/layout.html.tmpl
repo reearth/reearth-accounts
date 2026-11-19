@@ -376,9 +376,9 @@
                                             <p>{{template "message" .}}</p>
                                         </td>
                                     </tr>
-                                    <tr align="center">
+                                    {{if .ActionURL}}<tr align="center">
                                         <td> <a class="btn" href="{{ .ActionURL }}" target="_blank">{{template "action" .}}</a> </td>
-                                    </tr>
+                                    </tr>{{end}}
                                     <tr>
                                         <tr>
                                             <td>

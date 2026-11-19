@@ -1,0 +1,10 @@
+Subject: [Re:Earth] Changes to the Terms of Service
+
+Hello,
+
+We are updating the Terms of Service. Version 2.0.0 takes effect on January 1, 2027 at 00:00 UTC.
+
+After that date, you will be asked to accept the new version the next time you sign in to Re:Earth.
+
+Read the new version:
+https://policies.example.com/tos/2.0.0
