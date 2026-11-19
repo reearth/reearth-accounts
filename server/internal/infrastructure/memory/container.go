@@ -14,6 +14,7 @@ func New() *repo.Container {
 		Outbox:           NewOutbox(),
 		Permittable:      NewPermittable(),
 		PolicyAcceptance: NewPolicyAcceptance(),
+		PolicyNotice:     NewPolicyNotice(),
 		PolicyVersion:    NewPolicyVersion(),
 		Transaction:      &usecasex.NopTransaction{},
 		Config:           NewConfig(),

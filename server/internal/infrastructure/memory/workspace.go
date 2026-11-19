@@ -8,6 +8,7 @@ import (
 
 	"github.com/reearth/reearth-accounts/server/internal/usecase/repo"
 	"github.com/reearth/reearth-accounts/server/pkg/id"
+	"github.com/reearth/reearth-accounts/server/pkg/role"
 	"github.com/reearth/reearth-accounts/server/pkg/user"
 	"github.com/reearth/reearth-accounts/server/pkg/workspace"
 	"github.com/reearth/reearthx/rerror"
@@ -163,6 +164,34 @@ func (r *Workspace) FindByIntegrations(_ context.Context, ids workspace.Integrat
 	slices.SortFunc(res, func(a, b *workspace.Workspace) int { return a.ID().Compare(b.ID()) })
 
 	return res, nil
+}
+
+func (r *Workspace) FindOrgOwnersAfter(_ context.Context, after *workspace.ID, limit int) (user.IDList, *workspace.ID, error) {
+	if r.err != nil {
+		return nil, nil, r.err
+	}
+	var page workspace.List
+	r.data.Range(func(k workspace.ID, w *workspace.Workspace) bool {
+		if !w.IsPersonal() && !w.IsDeleted() && (after == nil || k.String() > after.String()) {
+			page = append(page, w)
+		}
+		return true
+	})
+	slices.SortFunc(page, func(a, b *workspace.Workspace) int { return strings.Compare(a.ID().String(), b.ID().String()) })
+	page = page[:min(limit, len(page))]
+	if len(page) == 0 {
+		return nil, nil, nil
+	}
+	var owners user.IDList
+	for _, w := range page {
+		for u, m := range w.Members().Users() {
+			if m.Role == role.RoleOwner && !m.Disabled {
+				owners = append(owners, u)
+			}
+		}
+	}
+	last := page[len(page)-1].ID()
+	return owners, &last, nil
 }
 
 func (r *Workspace) FindByIDs(_ context.Context, ids workspace.IDList) (workspace.List, error) {

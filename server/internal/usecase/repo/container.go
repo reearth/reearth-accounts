@@ -22,6 +22,7 @@ type Container struct {
 	Outbox           outbox.Repo
 	Permittable      permittable.Repo
 	PolicyAcceptance legal.AcceptanceRepo
+	PolicyNotice     legal.NoticeRepo
 	PolicyVersion    legal.VersionRepo
 	Transaction      usecasex.Transaction
 	Users            []user.Repo

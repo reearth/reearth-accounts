@@ -157,3 +157,20 @@ CREATE INDEX mail_outbox_state_claim_until ON mail_outbox (state, claim_until);
 CREATE INDEX mail_outbox_state_created ON mail_outbox (state, created_at);
 CREATE INDEX mail_outbox_ended ON mail_outbox (ended_at) WHERE ended_at IS NOT NULL;
 CREATE INDEX mail_outbox_recipient_user ON mail_outbox (recipient_user_id) WHERE recipient_user_id IS NOT NULL;
+CREATE INDEX mail_outbox_notice_state ON mail_outbox ((subject->>'notice'), state) WHERE subject ? 'notice';
+
+CREATE TABLE policy_notices (
+    id            text PRIMARY KEY,
+    type          text NOT NULL,
+    version       text NOT NULL,
+    audience      text NOT NULL,
+    bump          text NOT NULL,
+    requested_by  text NOT NULL,
+    created_at    timestamptz NOT NULL,
+    fanout_cursor text NOT NULL DEFAULT '',
+    fanout_done   boolean NOT NULL DEFAULT false,
+    lease_token   text,
+    lease_until   timestamptz,
+    CONSTRAINT policy_notices_type_version_audience UNIQUE (type, version, audience)
+);
+CREATE INDEX policy_notices_fanout ON policy_notices (created_at) WHERE NOT fanout_done;

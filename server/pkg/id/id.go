@@ -78,3 +78,12 @@ var NewPermittableIDSet = idx.NewSet[Permittable]
 var NewUserIDSet = idx.NewSet[User]
 var NewWorkspaceIDSet = idx.NewSet[Workspace]
 var NewIntegrationIDSet = idx.NewSet[Integration]
+
+type PolicyNotice struct{}
+
+func (PolicyNotice) Type() string { return "policynotice" }
+
+type PolicyNoticeID = idx.ID[PolicyNotice]
+
+var NewPolicyNoticeID = idx.New[PolicyNotice]
+var PolicyNoticeIDFrom = idx.From[PolicyNotice]

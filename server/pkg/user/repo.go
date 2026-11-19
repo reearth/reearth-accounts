@@ -41,6 +41,10 @@ type Repo interface {
 }
 
 type Query interface {
+	// FindActiveIDsWithEmailAfter returns, in ID order, up to limit IDs of
+	// users that are not deleted and have an email address, starting after
+	// the given ID (nil starts at the first).
+	FindActiveIDsWithEmailAfter(ctx context.Context, after *ID, limit int) (IDList, error)
 	FindAll(context.Context) (List, error)
 	FindAllWithPagination(ctx context.Context, keyword *string, status StatusFilter, pagination *usecasex.Pagination) (List, *usecasex.PageInfo, error)
 	FindByAlias(context.Context, string) (*User, error)

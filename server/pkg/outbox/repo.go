@@ -17,6 +17,9 @@ type Repo interface {
 	// Complete writes t only while token holds the record and its claim has
 	// not expired at now. It returns false when the claim no longer holds.
 	Complete(ctx context.Context, k Key, token string, t Transition, now time.Time) (bool, error)
+	// CountByNotice returns the number of records in each state among the
+	// records whose subject names notice n. Every state is present.
+	CountByNotice(ctx context.Context, n id.PolicyNoticeID) (map[State]int, error)
 	// Enqueue stores each record whose key is absent and leaves existing
 	// records unchanged.
 	Enqueue(ctx context.Context, rs []Record) error

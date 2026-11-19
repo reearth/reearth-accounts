@@ -46,6 +46,18 @@ func (r *Outbox) Complete(ctx context.Context, k outbox.Key, token string, t out
 	return n == 1, nil
 }
 
+func (r *Outbox) CountByNotice(ctx context.Context, n id.PolicyNoticeID) (map[outbox.State]int, error) {
+	rows, err := r.c.queries(ctx).OutboxCountByNotice(ctx, n.String())
+	if err != nil {
+		return nil, rerror.ErrInternalByWithContext(ctx, err)
+	}
+	counts := outbox.EmptyCounts()
+	for _, row := range rows {
+		counts[outbox.State(row.State)] = int(row.N)
+	}
+	return counts, nil
+}
+
 func (r *Outbox) Enqueue(ctx context.Context, rs []outbox.Record) error {
 	if len(rs) == 0 {
 		return nil

@@ -15,6 +15,18 @@ SELECT * FROM workspaces WHERE id = $1 FOR UPDATE;
 -- name: WorkspaceFindByIDs :many
 SELECT * FROM workspaces WHERE id = ANY($1::text[]) ORDER BY id;
 
+-- name: WorkspaceFindOrgOwnersAfter :many
+WITH page AS (
+    SELECT id FROM workspaces
+    WHERE NOT personal AND deleted_at IS NULL AND id > sqlc.arg(after)::text
+    ORDER BY id
+    LIMIT sqlc.arg(max)::integer
+)
+SELECT page.id AS workspace_id, m.user_id
+FROM page
+LEFT JOIN workspace_members m ON m.workspace_id = page.id AND m.role = 'owner' AND NOT m.disabled
+ORDER BY page.id;
+
 -- name: WorkspaceFindByName :one
 SELECT * FROM workspaces WHERE name = $1;
 

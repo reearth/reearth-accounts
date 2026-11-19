@@ -42,6 +42,43 @@ func (q *Queries) PolicyAcceptanceFindByUser(ctx context.Context, userID string)
 	return items, nil
 }
 
+const policyAcceptanceFindByUsers = `-- name: PolicyAcceptanceFindByUsers :many
+SELECT user_id, type, version, accepted_at, origin, user_agent, ip FROM policy_acceptances WHERE user_id = ANY($1::text[]) AND type = $2::text
+`
+
+type PolicyAcceptanceFindByUsersParams struct {
+	UserIds []string
+	Type    string
+}
+
+func (q *Queries) PolicyAcceptanceFindByUsers(ctx context.Context, arg PolicyAcceptanceFindByUsersParams) ([]PolicyAcceptance, error) {
+	rows, err := q.db.Query(ctx, policyAcceptanceFindByUsers, arg.UserIds, arg.Type)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []PolicyAcceptance
+	for rows.Next() {
+		var i PolicyAcceptance
+		if err := rows.Scan(
+			&i.UserID,
+			&i.Type,
+			&i.Version,
+			&i.AcceptedAt,
+			&i.Origin,
+			&i.UserAgent,
+			&i.Ip,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const policyAcceptanceFindUsersAfter = `-- name: PolicyAcceptanceFindUsersAfter :many
 SELECT DISTINCT user_id FROM policy_acceptances
 WHERE user_id > $1::text

@@ -38,7 +38,22 @@ type policyAcceptanceDoc struct {
 }
 
 func (r *PolicyAcceptance) FindByUser(ctx context.Context, u id.UserID) ([]legal.Acceptance, error) {
-	cur, err := r.c.Find(ctx, bson.M{"user": u.String()})
+	return r.find(ctx, bson.M{"user": u.String()})
+}
+
+func (r *PolicyAcceptance) FindByUsers(ctx context.Context, users []id.UserID, t legal.Type) ([]legal.Acceptance, error) {
+	if len(users) == 0 {
+		return nil, nil
+	}
+	ids := make([]string, len(users))
+	for i, u := range users {
+		ids[i] = u.String()
+	}
+	return r.find(ctx, bson.M{"user": bson.M{"$in": ids}, "type": string(t)})
+}
+
+func (r *PolicyAcceptance) find(ctx context.Context, filter bson.M) ([]legal.Acceptance, error) {
+	cur, err := r.c.Find(ctx, filter)
 	if err != nil {
 		return nil, rerror.ErrInternalByWithContext(ctx, err)
 	}

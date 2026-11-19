@@ -19,6 +19,12 @@ SELECT * FROM users WHERE id = $1;
 -- name: UserFindByIDs :many
 SELECT * FROM users WHERE id = ANY($1::text[]);
 
+-- name: UserFindActiveIDsWithEmailAfter :many
+SELECT id FROM users
+WHERE deleted_at IS NULL AND email <> '' AND id > sqlc.arg(after)::text
+ORDER BY id
+LIMIT sqlc.arg(max)::integer;
+
 -- name: UserFindAll :many
 SELECT * FROM users ORDER BY id;
 

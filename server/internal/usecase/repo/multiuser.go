@@ -3,6 +3,8 @@ package repo
 import (
 	"context"
 	"errors"
+	"slices"
+	"strings"
 
 	"github.com/reearth/reearth-accounts/server/pkg/user"
 	"github.com/reearth/reearthx/rerror"
@@ -16,6 +18,25 @@ func NewMultiUser(users ...user.Repo) MultiUser {
 }
 
 var _ user.Repo = MultiUser{}
+
+func (u MultiUser) FindActiveIDsWithEmailAfter(ctx context.Context, after *user.ID, limit int) (user.IDList, error) {
+	seen := map[user.ID]struct{}{}
+	var res user.IDList
+	for _, r := range u {
+		ids, err := r.FindActiveIDsWithEmailAfter(ctx, after, limit)
+		if err != nil {
+			return nil, err
+		}
+		for _, id := range ids {
+			if _, ok := seen[id]; !ok {
+				seen[id] = struct{}{}
+				res = append(res, id)
+			}
+		}
+	}
+	slices.SortFunc(res, func(a, b user.ID) int { return strings.Compare(a.String(), b.String()) })
+	return res[:min(limit, len(res))], nil
+}
 
 func (u MultiUser) FindAll(ctx context.Context) (user.List, error) {
 	res := user.List{}

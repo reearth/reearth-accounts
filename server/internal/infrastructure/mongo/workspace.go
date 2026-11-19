@@ -9,6 +9,7 @@ import (
 	"github.com/reearth/reearth-accounts/server/internal/usecase/repo"
 	"github.com/reearth/reearth-accounts/server/pkg/applog"
 	"github.com/reearth/reearth-accounts/server/pkg/id"
+	"github.com/reearth/reearth-accounts/server/pkg/role"
 	"github.com/reearth/reearth-accounts/server/pkg/user"
 	"github.com/reearth/reearth-accounts/server/pkg/workspace"
 	"github.com/reearth/reearthx/mongox"
@@ -17,6 +18,7 @@ import (
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/bson/primitive"
 	"go.mongodb.org/mongo-driver/mongo"
+	"go.mongodb.org/mongo-driver/mongo/options"
 )
 
 type Workspace struct {
@@ -266,6 +268,51 @@ func (r *Workspace) RemoveAll(ctx context.Context, ids id.WorkspaceIDList) error
 	return r.client.RemoveAll(ctx, bson.M{
 		"id": bson.M{"$in": ids.Strings()},
 	})
+}
+
+func (r *Workspace) FindOrgOwnersAfter(ctx context.Context, after *workspace.ID, limit int) (user.IDList, *workspace.ID, error) {
+	filter := bson.M{"personal": bson.M{"$ne": true}, "deletedat": bson.M{"$exists": false}}
+	if after != nil {
+		filter["id"] = bson.M{"$gt": after.String()}
+	}
+	cur, err := r.client.Client().Find(ctx, filter, options.Find().
+		SetSort(bson.D{{Key: "id", Value: 1}}).
+		SetLimit(int64(limit)).
+		SetProjection(bson.M{"id": 1, "members": 1, "_id": 0}))
+	if err != nil {
+		return nil, nil, rerror.ErrInternalByWithContext(ctx, err)
+	}
+	var docs []struct {
+		ID      string `bson:"id"`
+		Members map[string]struct {
+			Disabled bool   `bson:"disabled"`
+			Role     string `bson:"role"`
+		} `bson:"members"`
+	}
+	if err := cur.All(ctx, &docs); err != nil {
+		return nil, nil, rerror.ErrInternalByWithContext(ctx, err)
+	}
+	if len(docs) == 0 {
+		return nil, nil, nil
+	}
+	var owners user.IDList
+	for _, d := range docs {
+		for k, m := range d.Members {
+			if m.Role != string(role.RoleOwner) || m.Disabled {
+				continue
+			}
+			u, err := user.IDFrom(k)
+			if err != nil {
+				return nil, nil, rerror.ErrInternalByWithContext(ctx, err)
+			}
+			owners = append(owners, u)
+		}
+	}
+	last, err := workspace.IDFrom(docs[len(docs)-1].ID)
+	if err != nil {
+		return nil, nil, rerror.ErrInternalByWithContext(ctx, err)
+	}
+	return owners, &last, nil
 }
 
 func (r *Workspace) find(ctx context.Context, filter any) (workspace.List, error) {

@@ -23,11 +23,22 @@ var indexes = map[string][]mongo.IndexModel{
 			Keys:    bson.D{{Key: "user", Value: 1}},
 			Options: options.Index().SetName("mail_outbox_user").SetPartialFilterExpression(bson.M{"user": bson.M{"$exists": true}}),
 		},
+		{
+			Keys:    bson.D{{Key: "subject.notice", Value: 1}, {Key: "state", Value: 1}},
+			Options: options.Index().SetName("mail_outbox_notice_state").SetPartialFilterExpression(bson.M{"subject.notice": bson.M{"$exists": true}}),
+		},
 	},
 	policyAcceptancesCollection: {{
 		Keys:    bson.D{{Key: "user", Value: 1}, {Key: "type", Value: 1}, {Key: "version", Value: 1}},
 		Options: options.Index().SetName("policy_acceptances_user_type_version").SetUnique(true),
 	}},
+	policyNoticesCollection: {
+		{
+			Keys:    bson.D{{Key: "type", Value: 1}, {Key: "version", Value: 1}, {Key: "audience", Value: 1}},
+			Options: options.Index().SetName("policy_notices_type_version_audience").SetUnique(true),
+		},
+		{Keys: bson.D{{Key: "fanout.done", Value: 1}, {Key: "createdAt", Value: 1}}, Options: options.Index().SetName("policy_notices_fanout")},
+	},
 	policyVersionsCollection: {{
 		Keys:    bson.D{{Key: "type", Value: 1}, {Key: "version", Value: 1}},
 		Options: options.Index().SetName("policy_versions_type_version").SetUnique(true),

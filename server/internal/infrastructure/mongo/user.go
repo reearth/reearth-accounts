@@ -31,6 +31,35 @@ func NewUserWithHost(client *mongox.Client, host string) user.Repo {
 	return &User{client: client.WithCollection("user"), host: host}
 }
 
+func (r *User) FindActiveIDsWithEmailAfter(ctx context.Context, after *user.ID, limit int) (user.IDList, error) {
+	filter := bson.M{"deletedat": bson.M{"$exists": false}, "email": bson.M{"$nin": bson.A{"", nil}}}
+	if after != nil {
+		filter["id"] = bson.M{"$gt": after.String()}
+	}
+	cur, err := r.client.Client().Find(ctx, filter, options.Find().
+		SetSort(bson.D{{Key: "id", Value: 1}}).
+		SetLimit(int64(limit)).
+		SetProjection(bson.M{"id": 1, "_id": 0}))
+	if err != nil {
+		return nil, rerror.ErrInternalByWithContext(ctx, err)
+	}
+	var docs []struct {
+		ID string `bson:"id"`
+	}
+	if err := cur.All(ctx, &docs); err != nil {
+		return nil, rerror.ErrInternalByWithContext(ctx, err)
+	}
+	ids := make(user.IDList, 0, len(docs))
+	for _, d := range docs {
+		u, err := user.IDFrom(d.ID)
+		if err != nil {
+			return nil, rerror.ErrInternalByWithContext(ctx, err)
+		}
+		ids = append(ids, u)
+	}
+	return ids, nil
+}
+
 func (r *User) FindAll(ctx context.Context) (user.List, error) {
 	res, err := r.find(ctx, bson.M{})
 	if err != nil {

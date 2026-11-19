@@ -85,6 +85,37 @@ func (q *Queries) OutboxComplete(ctx context.Context, arg OutboxCompleteParams) 
 	return result.RowsAffected(), nil
 }
 
+const outboxCountByNotice = `-- name: OutboxCountByNotice :many
+SELECT state, count(*)::integer AS n FROM mail_outbox
+WHERE subject->>'notice' = $1::text
+GROUP BY state
+`
+
+type OutboxCountByNoticeRow struct {
+	State string
+	N     int32
+}
+
+func (q *Queries) OutboxCountByNotice(ctx context.Context, notice string) ([]OutboxCountByNoticeRow, error) {
+	rows, err := q.db.Query(ctx, outboxCountByNotice, notice)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []OutboxCountByNoticeRow
+	for rows.Next() {
+		var i OutboxCountByNoticeRow
+		if err := rows.Scan(&i.State, &i.N); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const outboxDeleteRetired = `-- name: OutboxDeleteRetired :execrows
 DELETE FROM mail_outbox WHERE ended_at <= $1
 `

@@ -190,6 +190,49 @@ func (q *Queries) WorkspaceFindByName(ctx context.Context, name string) (Workspa
 	return i, err
 }
 
+const workspaceFindOrgOwnersAfter = `-- name: WorkspaceFindOrgOwnersAfter :many
+WITH page AS (
+    SELECT id FROM workspaces
+    WHERE NOT personal AND deleted_at IS NULL AND id > $1::text
+    ORDER BY id
+    LIMIT $2::integer
+)
+SELECT page.id AS workspace_id, m.user_id
+FROM page
+LEFT JOIN workspace_members m ON m.workspace_id = page.id AND m.role = 'owner' AND NOT m.disabled
+ORDER BY page.id
+`
+
+type WorkspaceFindOrgOwnersAfterParams struct {
+	After string
+	Max   int32
+}
+
+type WorkspaceFindOrgOwnersAfterRow struct {
+	WorkspaceID string
+	UserID      *string
+}
+
+func (q *Queries) WorkspaceFindOrgOwnersAfter(ctx context.Context, arg WorkspaceFindOrgOwnersAfterParams) ([]WorkspaceFindOrgOwnersAfterRow, error) {
+	rows, err := q.db.Query(ctx, workspaceFindOrgOwnersAfter, arg.After, arg.Max)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []WorkspaceFindOrgOwnersAfterRow
+	for rows.Next() {
+		var i WorkspaceFindOrgOwnersAfterRow
+		if err := rows.Scan(&i.WorkspaceID, &i.UserID); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const workspaceIDsAll = `-- name: WorkspaceIDsAll :many
 SELECT id FROM workspaces
 WHERE (NOT $1::boolean OR personal = false)

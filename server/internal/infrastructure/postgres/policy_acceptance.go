@@ -21,15 +21,22 @@ func (r *PolicyAcceptance) FindByUser(ctx context.Context, u id.UserID) ([]legal
 	if err != nil {
 		return nil, rerror.ErrInternalByWithContext(ctx, err)
 	}
-	res := make([]legal.Acceptance, 0, len(rows))
-	for _, row := range rows {
-		a, err := acceptanceModel(row)
-		if err != nil {
-			return nil, rerror.ErrInternalByWithContext(ctx, err)
-		}
-		res = append(res, a)
+	return acceptanceModels(ctx, rows)
+}
+
+func (r *PolicyAcceptance) FindByUsers(ctx context.Context, users []id.UserID, t legal.Type) ([]legal.Acceptance, error) {
+	if len(users) == 0 {
+		return nil, nil
 	}
-	return res, nil
+	ids := make([]string, len(users))
+	for i, u := range users {
+		ids[i] = u.String()
+	}
+	rows, err := r.c.queries(ctx).PolicyAcceptanceFindByUsers(ctx, gen.PolicyAcceptanceFindByUsersParams{UserIds: ids, Type: string(t)})
+	if err != nil {
+		return nil, rerror.ErrInternalByWithContext(ctx, err)
+	}
+	return acceptanceModels(ctx, rows)
 }
 
 func (r *PolicyAcceptance) FindUsersAfter(ctx context.Context, after *id.UserID, limit int) ([]id.UserID, error) {
@@ -98,6 +105,18 @@ func (r *PolicyAcceptance) RemoveByUser(ctx context.Context, u id.UserID) error 
 		return rerror.ErrInternalByWithContext(ctx, err)
 	}
 	return nil
+}
+
+func acceptanceModels(ctx context.Context, rows []gen.PolicyAcceptance) ([]legal.Acceptance, error) {
+	res := make([]legal.Acceptance, 0, len(rows))
+	for _, row := range rows {
+		a, err := acceptanceModel(row)
+		if err != nil {
+			return nil, rerror.ErrInternalByWithContext(ctx, err)
+		}
+		res = append(res, a)
+	}
+	return res, nil
 }
 
 func acceptanceModel(row gen.PolicyAcceptance) (legal.Acceptance, error) {

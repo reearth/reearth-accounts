@@ -2,6 +2,7 @@ package memory
 
 import (
 	"context"
+	"slices"
 	"sort"
 	"strings"
 
@@ -28,6 +29,21 @@ func NewUserWith(users ...*user.User) *User {
 		r.data.Store(u.ID(), u)
 	}
 	return r
+}
+
+func (r *User) FindActiveIDsWithEmailAfter(_ context.Context, after *user.ID, limit int) (user.IDList, error) {
+	if r.err != nil {
+		return nil, r.err
+	}
+	var ids user.IDList
+	r.data.Range(func(k user.ID, u *user.User) bool {
+		if !u.IsDeleted() && u.Email() != "" && (after == nil || k.String() > after.String()) {
+			ids = append(ids, k)
+		}
+		return true
+	})
+	slices.SortFunc(ids, func(a, b user.ID) int { return strings.Compare(a.String(), b.String()) })
+	return ids[:min(limit, len(ids))], nil
 }
 
 func (r *User) FindAll(ctx context.Context) (user.List, error) {
