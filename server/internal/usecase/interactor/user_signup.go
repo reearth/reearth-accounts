@@ -217,7 +217,6 @@ func (i *User) SignupOIDC(ctx context.Context, param interfaces.SignupOIDCParam)
 	if err != nil {
 		return nil, err
 	}
-	// Nothing proves a sub and email taken from the body, so the user accepts at first sign-in instead.
 	if fromIssuer {
 		i.policy.tryAcceptAtSignup(ctx, u.ID(), plan, param.Client)
 	}
