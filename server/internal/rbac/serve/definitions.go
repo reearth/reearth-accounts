@@ -24,6 +24,7 @@ const (
 	ActionDelete         = "delete"
 	ActionDeleteAsset    = "delete_asset"
 	ActionExtractAsset   = "extract_asset"
+	ActionManageCompat   = "manage_compat"
 	ActionManageHosts    = "manage_hosts"
 	ActionManageMembers  = "manage_members"
 	ActionManageWebhooks = "manage_webhooks"
@@ -43,6 +44,7 @@ var minimumRoles = map[string]map[string]role.RoleType{
 		ActionDelete:         role.RoleOwner,
 		ActionDeleteAsset:    role.RoleWriter,
 		ActionExtractAsset:   role.RoleWriter,
+		ActionManageCompat:   role.RoleMaintainer,
 		ActionManageHosts:    role.RoleWriter,
 		ActionManageWebhooks: role.RoleMaintainer,
 		ActionRead:           role.RoleReader,
