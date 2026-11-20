@@ -42,6 +42,7 @@ func TestWantMatrix(t *testing.T) {
 			"delete":          []string{"owner"},
 			"delete_asset":    []string{"writer", "maintainer", "owner"},
 			"extract_asset":   []string{"writer", "maintainer", "owner"},
+			"manage_compat":   []string{"maintainer", "owner"},
 			"manage_hosts":    []string{"writer", "maintainer", "owner"},
 			"manage_webhooks": []string{"maintainer", "owner"},
 			"read":            []string{"reader", "writer", "maintainer", "owner"},
