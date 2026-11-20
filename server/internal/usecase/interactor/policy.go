@@ -90,7 +90,7 @@ func (p *Policy) tryAcceptAtSignup(ctx context.Context, uid user.ID, plan accept
 		return
 	}
 	if _, err := p.record(ctx, uid, plan, client); err != nil {
-		applog.Warn(ctx, "could not record policy acceptance at signup", applog.UserID(uid))
+		applog.Warn(ctx, "could not record policy acceptance at signup", applog.UserID(uid), applog.Err(err))
 	}
 }
 

@@ -43,7 +43,13 @@ func applyEntry(ctx context.Context, r VersionRepo, e Entry, payloadAt time.Time
 		if err != nil {
 			return false, err
 		}
-		next, outcome := PlanApply(cur, e, payloadAt, now())
+		var newest time.Time
+		if cur.Revision == 0 {
+			if newest, err = newestApplied(ctx, r); err != nil {
+				return false, err
+			}
+		}
+		next, outcome := PlanApply(cur, e, payloadAt, newest, now())
 		if outcome != OutcomeIgnored {
 			won, err := r.CompareAndSwapHead(ctx, next)
 			if err != nil {
@@ -56,6 +62,20 @@ func applyEntry(ctx context.Context, r VersionRepo, e Entry, payloadAt time.Time
 		return outcome == OutcomeWon, r.ArchiveVersions(ctx, next)
 	}
 	return false, fmt.Errorf("legal: %s: head compare-and-set lost %d times", e.Type, maxApplyAttempts)
+}
+
+func newestApplied(ctx context.Context, r VersionRepo) (time.Time, error) {
+	heads, err := r.FindHeads(ctx)
+	if err != nil {
+		return time.Time{}, err
+	}
+	var newest time.Time
+	for _, h := range heads {
+		if h.AppliedAt.After(newest) {
+			newest = h.AppliedAt
+		}
+	}
+	return newest, nil
 }
 
 // backoff waits a random time that doubles with each lost compare-and-set, so

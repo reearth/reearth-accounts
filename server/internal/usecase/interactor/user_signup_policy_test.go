@@ -2,7 +2,10 @@ package interactor
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
+	"net/http"
+	"net/http/httptest"
 	"testing"
 	"time"
 
@@ -21,9 +24,26 @@ import (
 
 type signupFixture struct {
 	clock  time.Time
+	issuer string
 	policy *Policy
 	repos  *repo.Container
 	users  interfaces.User
+}
+
+func newUserInfoIssuer(t *testing.T, info UserInfo) string {
+	t.Helper()
+	var url string
+	mux := http.NewServeMux()
+	mux.HandleFunc("/.well-known/openid-configuration", func(w http.ResponseWriter, r *http.Request) {
+		_ = json.NewEncoder(w).Encode(OpenIDConfiguration{UserinfoEndpoint: url + "/userinfo"})
+	})
+	mux.HandleFunc("/userinfo", func(w http.ResponseWriter, r *http.Request) {
+		_ = json.NewEncoder(w).Encode(info)
+	})
+	srv := httptest.NewServer(mux)
+	t.Cleanup(srv.Close)
+	url = srv.URL
+	return url
 }
 
 func newSignupFixture(t *testing.T, secret string) *signupFixture {
@@ -34,7 +54,11 @@ func newSignupFixture(t *testing.T, secret string) *signupFixture {
 	for _, name := range []string{interfaces.RoleSelf, role.RoleOwner.String()} {
 		require.NoError(t, r.Role.Save(ctx, *role.New().NewID().Name(name).MustBuild()))
 	}
-	f := &signupFixture{clock: time.Date(2026, 11, 20, 3, 0, 0, 0, time.UTC), repos: r}
+	f := &signupFixture{
+		clock:  time.Date(2026, 11, 20, 3, 0, 0, 0, time.UTC),
+		issuer: newUserInfoIssuer(t, UserInfo{Sub: "auth0|new", Email: "new@example.com", Name: "new"}),
+		repos:  r,
+	}
 	cat := NewPolicyCatalog(r.PolicyVersion, PolicyCatalogTTL)
 	cat.now = func() time.Time { return f.clock }
 	f.policy = NewPolicy(r, legal.NewSecret(secret), cat)
@@ -68,6 +92,15 @@ func (f *signupFixture) signup(policies ...legal.RefInput) (*user.User, error) {
 }
 
 func (f *signupFixture) signupOIDC(policies ...legal.RefInput) (*user.User, error) {
+	return f.users.SignupOIDC(context.Background(), interfaces.SignupOIDCParam{
+		AccessToken: "token",
+		Client:      testClient,
+		Issuer:      f.issuer,
+		Policies:    policies,
+	})
+}
+
+func (f *signupFixture) signupOIDCWithBodyIdentity(policies ...legal.RefInput) (*user.User, error) {
 	return f.users.SignupOIDC(context.Background(), interfaces.SignupOIDCParam{
 		Client:   testClient,
 		Email:    "new@example.com",
@@ -146,6 +179,8 @@ func TestUser_SignupRejectsPoliciesBeforeCreatingTheUser(t *testing.T) {
 			assert.ErrorIs(t, err, tc.want)
 			_, err = f.signupOIDC(tc.in)
 			assert.ErrorIs(t, err, tc.want)
+			_, err = f.signupOIDCWithBodyIdentity(tc.in)
+			assert.ErrorIs(t, err, tc.want)
 			f.assertNoUser(t)
 		})
 	}
@@ -207,6 +242,16 @@ func TestUser_SignupWithoutPoliciesRecordsNothing(t *testing.T) {
 	f.publishTos(t, "1.0.0", f.clock.Add(-time.Hour))
 
 	u, err := f.signupOIDC()
+	require.NoError(t, err)
+	assert.Empty(t, f.records(t, u.ID()))
+	assert.Equal(t, []legal.Ref{tosRef("1.0.0")}, f.pending(t, u.ID()))
+}
+
+func TestUser_SignupOIDC_RecordsPoliciesOnlyForIssuerIdentity(t *testing.T) {
+	f := newSignupFixture(t, "s")
+	f.publishTos(t, "1.0.0", f.clock.Add(-time.Hour))
+
+	u, err := f.signupOIDCWithBodyIdentity(tosIn("1.0.0"))
 	require.NoError(t, err)
 	assert.Empty(t, f.records(t, u.ID()))
 	assert.Equal(t, []legal.Ref{tosRef("1.0.0")}, f.pending(t, u.ID()))

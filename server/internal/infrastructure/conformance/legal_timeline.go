@@ -1,6 +1,7 @@
 package conformance
 
 import (
+	"context"
 	"fmt"
 	"slices"
 	"testing"
@@ -8,6 +9,7 @@ import (
 
 	"github.com/reearth/reearth-accounts/server/pkg/legal"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func runLegalTimeline(t *testing.T, nc Factory) {
@@ -18,6 +20,7 @@ func runLegalTimeline(t *testing.T, nc Factory) {
 	t.Run("Legal_OlderPayloadAfterFutureStampedRevert", func(t *testing.T) { testLegalOlderAfterFutureStampedRevert(t, nc) })
 	t.Run("Legal_RepublishWithdrawnWithPastDate", func(t *testing.T) { testLegalRepublishWithdrawnPastDate(t, nc) })
 	t.Run("Legal_DelayedFirstPayloadThenRevert", func(t *testing.T) { testLegalDelayedFirstThenRevert(t, nc) })
+	t.Run("Legal_OlderPayloadAddsNoType", func(t *testing.T) { testLegalOlderPayloadAddsNoType(t, nc) })
 }
 
 var legalTimelineVersions = []string{"1.0.0", "2.0.0", "3.0.0"}
@@ -227,4 +230,40 @@ func testLegalDelayedFirstThenRevert(t *testing.T, nc Factory) {
 	for order, got := range everyOrder(t, nc, legalT0.Add(h), nil, p0, p1, p2) {
 		assert.Equal(t, want, got, "the revert keeps 1.0.0 current, order %s", order)
 	}
+}
+
+func testLegalOlderPayloadAddsNoType(t *testing.T, nc Factory) {
+	h := time.Hour
+	past := legalT0.Add(-2 * legalDay)
+	p0 := legalManifest(legalT0.Add(-3*h), legalEntry("cookie", "1.0.0", past, "c1"), legalEntry("tos", "1.0.0", past, "v1"))
+	p2 := legalManifest(legalT0.Add(-h), legalEntry("tos", "1.0.0", past, "v1"))
+	p3 := legalManifest(legalT0, legalEntry("tos", "1.0.0", past, "v1"))
+
+	c, _, done := nc(t)
+	defer done()
+	r := c.PolicyVersion
+	applyLegal(t, r, legalT0, p2)
+	res, err := legal.Apply(context.Background(), r, p0, clockAt(legalT0))
+	require.NoError(t, err)
+	assert.Equal(t, []legal.Type{"cookie", "tos"}, res.Ignored)
+	applyLegal(t, r, legalT0, p3)
+	cat := legalCatalog(t, r)
+	assert.Equal(t, []legal.Type{"tos"}, cat.Types(), "an older payload adds no type")
+	assert.Nil(t, cat.Current("cookie", legalT0))
+	recs, err := r.FindVersions(context.Background())
+	require.NoError(t, err)
+	for _, rec := range recs {
+		assert.NotEqual(t, legal.Type("cookie"), rec.Type, "nothing of the older payload is archived")
+	}
+
+	sameTime := legalManifest(legalT0, legalEntry("cookie", "1.0.0", past, "c1"))
+	newer := legalManifest(legalT0.Add(h), legalEntry("privacy", "1.0.0", past, "p1"))
+	applyLegal(t, r, legalT0.Add(h), sameTime, newer)
+	cat = legalCatalog(t, r)
+	assert.Equal(t, []legal.Type{"cookie", "privacy", "tos"}, cat.Types(), "a payload not older than the newest one adds its types")
+
+	first, _, doneFirst := nc(t)
+	defer doneFirst()
+	applyLegal(t, first.PolicyVersion, legalT0, p0)
+	assert.Equal(t, []legal.Type{"cookie", "tos"}, legalCatalog(t, first.PolicyVersion).Types(), "the first payload creates every type it names")
 }

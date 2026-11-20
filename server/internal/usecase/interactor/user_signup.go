@@ -141,6 +141,7 @@ func (i *User) SignupOIDC(ctx context.Context, param interfaces.SignupOIDCParam)
 	sub := param.Sub
 	name := param.Name
 	email := param.Email
+	fromIssuer := false
 	if sub == "" || email == "" {
 		ui, err := i.getUserInfoFromISS(ctx, param.Issuer, param.AccessToken)
 		if err != nil {
@@ -148,6 +149,7 @@ func (i *User) SignupOIDC(ctx context.Context, param interfaces.SignupOIDCParam)
 		}
 		sub = ui.Sub
 		email = ui.Email
+		fromIssuer = true
 	}
 
 	u, err := Run1(ctx, nil, i.repos, Usecase().Transaction(), func(ctx context.Context) (*user.User, error) {
@@ -215,7 +217,10 @@ func (i *User) SignupOIDC(ctx context.Context, param interfaces.SignupOIDCParam)
 	if err != nil {
 		return nil, err
 	}
-	i.policy.tryAcceptAtSignup(ctx, u.ID(), plan, param.Client)
+	// Nothing proves a sub and email taken from the body, so the user accepts at first sign-in instead.
+	if fromIssuer {
+		i.policy.tryAcceptAtSignup(ctx, u.ID(), plan, param.Client)
+	}
 	return u, nil
 }
 

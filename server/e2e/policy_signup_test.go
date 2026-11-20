@@ -8,6 +8,7 @@ import (
 	"time"
 
 	httpexpect "github.com/gavv/httpexpect/v2"
+	"github.com/jarcoal/httpmock"
 	"github.com/reearth/reearth-accounts/server/internal/app"
 	"github.com/reearth/reearth-accounts/server/internal/usecase/repo"
 	"github.com/reearth/reearth-accounts/server/pkg/id"
@@ -110,11 +111,11 @@ func testPolicySignup(t *testing.T, useMongo bool) {
 		}
 	})
 
-	t.Run("signupOIDC with the upcoming version", func(t *testing.T) {
-		signupOIDCGQL(e, "oidc@example.com", policyList("tos", tosUpcoming, "privacy", privacyCurrent)).NotContainsKey("errors")
+	t.Run("signupOIDC with a body identity records nothing", func(t *testing.T) {
+		signupOIDCGQL(e, "oidc@example.com", policyList("tos", tosCurrent, "privacy", privacyCurrent)).NotContainsKey("errors")
 		uid := signedUp(t, r, "oidc@example.com")
-		pendingOf(e, uid.String()).IsEmpty()
-		assert.Len(t, storedAcceptances(t, r, uid), 2)
+		pendingOf(e, uid.String()).Length().IsEqual(2)
+		assert.Empty(t, storedAcceptances(t, r, uid))
 	})
 
 	t.Run("REST signup", func(t *testing.T) {
@@ -145,6 +146,50 @@ func testPolicySignup(t *testing.T, useMongo bool) {
 		signupGQL(e, "stale@example.com", policyList("tos", tosStale)).Value("errors").Array().
 			Value(0).Object().Value("message").String().Contains("neither current nor upcoming")
 	})
+}
+
+func TestPolicySignup_OIDCRecordsPoliciesOnlyForIssuerIdentity(t *testing.T) {
+	for _, useMongo := range []bool{false, true} {
+		t.Run(fmt.Sprintf("mongo=%v", useMongo), func(t *testing.T) {
+			testPolicySignupOIDCFromIssuer(t, useMongo)
+		})
+	}
+}
+
+func testPolicySignupOIDCFromIssuer(t *testing.T, useMongo bool) {
+	key, cleanup := installRealJWT(t)
+	defer cleanup()
+	const sub, email = "auth0|issuer-user", "issuer-user@example.com"
+	httpmock.RegisterResponder(http.MethodGet, jwtTestIssuer+".well-known/openid-configuration",
+		httpmock.NewJsonResponderOrPanic(http.StatusOK, map[string]string{
+			"issuer":            jwtTestIssuer,
+			"jwks_uri":          jwtTestJWKSURL,
+			"userinfo_endpoint": jwtTestIssuer + "userinfo",
+		}))
+	httpmock.RegisterResponder(http.MethodGet, jwtTestIssuer+"userinfo",
+		httpmock.NewJsonResponderOrPanic(http.StatusOK, map[string]string{"sub": sub, "email": email, "name": "issuer-user"}))
+
+	cfg := realAuthConfig()
+	cfg.PolicyWebhookSecret = webhookSecret
+	now := time.Now().Truncate(time.Second)
+	e, r := StartServer(t, cfg, useMongo, seedRoles)
+	deliverPolicies(t, e, currentTosPayload(now, -2*time.Minute))
+	deliverPolicies(t, e, upcomingTosPayload(now))
+
+	e.POST("/api/users/signup-oidc").
+		WithHeader("Authorization", "Bearer "+signTestToken(t, key, sub)).
+		WithHeader("Origin", policyOrigin).
+		WithHeader("User-Agent", policyUserAgent).
+		WithJSON(map[string]any{"policies": policyList("tos", tosUpcoming, "privacy", privacyCurrent)}).
+		Expect().Status(http.StatusOK)
+
+	uid := signedUp(t, r, email)
+	as := storedAcceptances(t, r, uid)
+	require.Len(t, as, 2)
+	for _, a := range as {
+		assert.Equal(t, uid, a.UserID)
+		assert.Equal(t, policyUserAgent, a.Client.UserAgent)
+	}
 }
 
 func TestPolicySignup_WithoutSecret(t *testing.T) {
