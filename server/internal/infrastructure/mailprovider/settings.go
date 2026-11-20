@@ -36,7 +36,6 @@ type Settings struct {
 	provider mailer.Config
 }
 
-// String keeps the provider credentials out of config prints.
 func (s Settings) String() string {
 	return fmt.Sprintf("{Mode:%d}", s.Mode)
 }
