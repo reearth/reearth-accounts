@@ -34,9 +34,8 @@ func Extractor(proxies []netip.Prefix) echo.IPExtractor {
 }
 
 // ParseTrustedProxies parses CIDRs and single IPs. Empty entries are skipped.
-// A prefix that covers every IPv4 or IPv6 address is rejected, because it
-// would let every client choose its IP. ::ffff:0:0/96 counts: Echo matches
-// IPv4 peers against IPv4-mapped prefixes.
+// ::ffff:0:0/96 covers every IPv4 address: net.IPNet.Contains, which Echo's
+// trust check uses, matches IPv4 peers against IPv4-mapped prefixes.
 func ParseTrustedProxies(entries []string) ([]netip.Prefix, error) {
 	var res []netip.Prefix
 	for _, e := range entries {

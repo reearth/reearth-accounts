@@ -180,8 +180,7 @@ const (
 // version it wins a same-timestamp tie for that is withdrawn or not frozen.
 //
 // A type with no head is created only by a payload not older than newest,
-// the newest AppliedAt of all stored heads, so that a replayed payload adds
-// no type.
+// the newest AppliedAt of all stored heads.
 func PlanApply(cur TypeHead, e Entry, payloadAt, newest, now time.Time) (TypeHead, Outcome) {
 	if cur.Revision == 0 && payloadAt.Before(newest) {
 		return cur, OutcomeIgnored
