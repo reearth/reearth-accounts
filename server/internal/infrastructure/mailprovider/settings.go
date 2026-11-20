@@ -36,6 +36,11 @@ type Settings struct {
 	provider mailer.Config
 }
 
+// String keeps the provider credentials out of config prints.
+func (s Settings) String() string {
+	return fmt.Sprintf("{Mode:%d}", s.Mode)
+}
+
 func Parse(e Env, dev bool) (Settings, error) {
 	e.FromEmail = strings.TrimSpace(e.FromEmail)
 	e.SendGridAPIKey = strings.TrimSpace(e.SendGridAPIKey)
