@@ -392,24 +392,24 @@ func TestPlanApply_EqualTimestamp(t *testing.T) {
 	if a.applied().beats(b.applied()) {
 		a, b = b, a
 	}
-	first, outcome := PlanApply(TypeHead{Type: "tos"}, a, t0, t0)
+	first, outcome := PlanApply(TypeHead{Type: "tos"}, a, t0, time.Time{}, t0)
 	require.Equal(t, OutcomeWon, outcome)
 
-	_, outcome = PlanApply(first, a, t0, t0)
+	_, outcome = PlanApply(first, a, t0, time.Time{}, t0)
 	assert.Equal(t, OutcomeIgnored, outcome, "an identical entry is a replay")
 
-	next, outcome := PlanApply(first, b, t0, t0)
+	next, outcome := PlanApply(first, b, t0, time.Time{}, t0)
 	require.Equal(t, OutcomeWon, outcome, "the larger digest wins at the same version")
 	_, up := next.At(t0)
 	assert.Equal(t, b.Title, up.Title)
 
-	_, outcome = PlanApply(next, a, t0, t0)
+	_, outcome = PlanApply(next, a, t0, time.Time{}, t0)
 	assert.Equal(t, OutcomeIgnored, outcome, "the smaller digest loses after the larger")
 
-	lower, outcome := PlanApply(next, entry("1.9.0", 30*day, "lower"), t0, t0)
+	lower, outcome := PlanApply(next, entry("1.9.0", 30*day, "lower"), t0, time.Time{}, t0)
 	assert.Equal(t, OutcomeRecorded, outcome, "a lower version loses and is recorded")
 	assert.True(t, lower.IsWithdrawn(MustParseVersion("1.9.0")))
-	_, outcome = PlanApply(next, entry("2.0.0", 30*day, "v2"), t0.Add(-time.Millisecond), t0)
+	_, outcome = PlanApply(next, entry("2.0.0", 30*day, "v2"), t0.Add(-time.Millisecond), time.Time{}, t0)
 	assert.Equal(t, OutcomeIgnored, outcome, "an older payload naming a seen version changes nothing")
 }
 
@@ -451,7 +451,7 @@ func TestApply_SameTimestampTie(t *testing.T) {
 
 func TestPlanApply_FreezeMargin(t *testing.T) {
 	eff := t0.Add(day)
-	head, _ := PlanApply(TypeHead{Type: "tos"}, entry("2.0.0", day, "v2"), t0, t0)
+	head, _ := PlanApply(TypeHead{Type: "tos"}, entry("2.0.0", day, "v2"), t0, time.Time{}, t0)
 	correction := entry("2.0.0", 10*day, "corrected")
 	revert := entry("1.0.0", -day, "v1")
 	for _, tc := range []struct {
@@ -466,7 +466,7 @@ func TestPlanApply_FreezeMargin(t *testing.T) {
 		{"revert before the margin", revert, eff.Add(-2 * FreezeMargin), true},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
-			next, outcome := PlanApply(head, tc.e, t0.Add(hour), tc.now)
+			next, outcome := PlanApply(head, tc.e, t0.Add(hour), time.Time{}, tc.now)
 			require.Equal(t, OutcomeWon, outcome)
 			got := next.Versions[MustParseVersion("2.0.0")]
 			assert.Equal(t, tc.changed, got.withdrawn() || got.Title["en"] != "v2")
@@ -479,7 +479,7 @@ func TestPlanApply_FreezeMargin(t *testing.T) {
 }
 
 func TestPlanApply_LosingPayloadVersion(t *testing.T) {
-	head, _ := PlanApply(TypeHead{Type: "tos"}, entry("3.0.0", -2*day, "v3"), t0.Add(hour), t0.Add(hour))
+	head, _ := PlanApply(TypeHead{Type: "tos"}, entry("3.0.0", -2*day, "v3"), t0.Add(hour), time.Time{}, t0.Add(hour))
 	for _, tc := range []struct {
 		name      string
 		payloadAt time.Duration
@@ -497,7 +497,7 @@ func TestPlanApply_LosingPayloadVersion(t *testing.T) {
 		{"same timestamp, future at arrival", hour, day, 2 * hour, true},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
-			next, outcome := PlanApply(head, entry("2.0.0", tc.eff, "v2"), t0.Add(tc.payloadAt), t0.Add(tc.arrival))
+			next, outcome := PlanApply(head, entry("2.0.0", tc.eff, "v2"), t0.Add(tc.payloadAt), time.Time{}, t0.Add(tc.arrival))
 			require.Equal(t, OutcomeRecorded, outcome)
 			assert.Equal(t, tc.withdrawn, next.IsWithdrawn(MustParseVersion("2.0.0")))
 		})

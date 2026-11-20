@@ -122,7 +122,11 @@ func TestReadConfig_TrustedProxies(t *testing.T) {
 	assert.Contains(t, c.Print(), "TrustedProxies:[10.0.0.0/8 192.0.2.10 ::1]")
 	assert.Contains(t, c.Print(), "TrustedProxyPrefixes:[10.0.0.0/8 192.0.2.10/32 ::1/128]")
 
-	for _, v := range []string{"10.0.0.0/33", "not-an-ip", "fe80::1%eth0"} {
+	t.Setenv("REEARTH_ACCOUNTS_TRUSTED_PROXIES", "::ffff:10.0.0.0/104")
+	_, err = ReadConfig(false)
+	require.NoError(t, err)
+
+	for _, v := range []string{"10.0.0.0/33", "not-an-ip", "fe80::1%eth0", "0.0.0.0/0", "::/0", "::ffff:0:0/96", "::ffff:0.0.0.0/96", "10.0.0.0/8,0.0.0.0/0"} {
 		t.Setenv("REEARTH_ACCOUNTS_TRUSTED_PROXIES", v)
 		_, err = ReadConfig(false)
 		assert.ErrorContains(t, err, "REEARTH_ACCOUNTS_TRUSTED_PROXIES: ", v)
