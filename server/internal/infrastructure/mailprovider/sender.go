@@ -44,8 +44,7 @@ func (s *sender) Send(ctx context.Context, e mail.Envelope) error {
 	return nil
 }
 
-// reearthx formats some recipients as "name <email>" without quoting, so these
-// characters in a user-chosen name could add or change a mailbox.
+// reearthx's SES mailer writes recipients as unquoted "name <email>" (mailer/aws_ses.go formatContact).
 func displayName(name string) string {
 	return strings.Map(func(r rune) rune {
 		if unicode.IsControl(r) || strings.ContainsRune(`"<>,;:\@()[]`, r) {
