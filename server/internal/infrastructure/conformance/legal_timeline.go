@@ -2,6 +2,7 @@ package conformance
 
 import (
 	"fmt"
+	"slices"
 	"testing"
 	"time"
 
@@ -15,6 +16,8 @@ func runLegalTimeline(t *testing.T, nc Factory) {
 	t.Run("Legal_TieSameVersion", func(t *testing.T) { testLegalTieSameVersion(t, nc) })
 	t.Run("Legal_OlderPayloadAfterTwoNewer", func(t *testing.T) { testLegalOlderAfterTwoNewer(t, nc) })
 	t.Run("Legal_OlderPayloadAfterFutureStampedRevert", func(t *testing.T) { testLegalOlderAfterFutureStampedRevert(t, nc) })
+	t.Run("Legal_RepublishWithdrawnWithPastDate", func(t *testing.T) { testLegalRepublishWithdrawnPastDate(t, nc) })
+	t.Run("Legal_DelayedFirstPayloadThenRevert", func(t *testing.T) { testLegalDelayedFirstThenRevert(t, nc) })
 }
 
 var legalTimelineVersions = []string{"1.0.0", "2.0.0", "3.0.0"}
@@ -160,4 +163,68 @@ func testLegalOlderAfterFutureStampedRevert(t *testing.T, nc Factory) {
 	readAt := legalT0.Add(time.Hour)
 	assert.Equal(t, want, deliver(t, nc, readAt, base, p1, p2), "in order")
 	assert.Equal(t, want, deliver(t, nc, readAt, base, p2, p1), "the revert stamped ahead of the receiver first")
+}
+
+// everyOrder delivers base and then ps in every order, each payload at its
+// own timestamp or at the previous delivery's time if that is later, and
+// returns the state read at readAt by order.
+func everyOrder(t *testing.T, nc Factory, readAt time.Time, base []legal.Manifest, ps ...legal.Manifest) map[string]string {
+	t.Helper()
+	out := map[string]string{}
+	var walk func(order []int, rest []int)
+	walk = func(order []int, rest []int) {
+		if len(rest) == 0 {
+			var ds []delivery
+			var at time.Time
+			for _, m := range base {
+				at = maxTime(at, m.Timestamp)
+				ds = append(ds, delivery{at, m})
+			}
+			for _, i := range order {
+				at = maxTime(at, ps[i].Timestamp)
+				ds = append(ds, delivery{at, ps[i]})
+			}
+			out[fmt.Sprint(order)] = deliver(t, nc, readAt, ds...)
+			return
+		}
+		for j, i := range rest {
+			walk(append(slices.Clone(order), i), slices.Delete(slices.Clone(rest), j, j+1))
+		}
+	}
+	all := make([]int, len(ps))
+	for i := range all {
+		all[i] = i
+	}
+	walk(nil, all)
+	return out
+}
+
+func maxTime(a, b time.Time) time.Time {
+	if b.After(a) {
+		return b
+	}
+	return a
+}
+
+func testLegalRepublishWithdrawnPastDate(t *testing.T, nc Factory) {
+	h := time.Hour
+	base := legalManifest(legalT0.Add(-3*h), legalEntry("tos", "1.0.0", legalT0.Add(-30*legalDay), "v1"))
+	p1 := legalManifest(legalT0.Add(-2*h), legalEntry("tos", "2.0.0", legalT0.Add(h), "v2 planned"))
+	p2 := legalManifest(legalT0.Add(-h), legalEntry("tos", "1.0.0", legalT0.Add(-30*legalDay), "v1"))
+	p3 := legalManifest(legalT0, legalEntry("tos", "2.0.0", legalT0, "v2 now"))
+	want := `current=2.0.0@2026-11-20T03:00:00Z "v2 now" upcoming=- withdrawn=[]`
+	for order, got := range everyOrder(t, nc, legalT0.Add(2*h), []legal.Manifest{base}, p1, p2, p3) {
+		assert.Equal(t, want, got, "the newest payload republishes 2.0.0 in effect, order %s", order)
+	}
+}
+
+func testLegalDelayedFirstThenRevert(t *testing.T, nc Factory) {
+	h := time.Hour
+	p0 := legalManifest(legalT0.Add(-2*h), legalEntry("tos", "1.0.0", legalT0.Add(-30*legalDay), "v1"))
+	p1 := legalManifest(legalT0.Add(-h), legalEntry("tos", "2.0.0", legalT0.Add(30*legalDay), "v2"))
+	p2 := legalManifest(legalT0, legalEntry("tos", "1.0.0", legalT0.Add(-30*legalDay), "v1"))
+	want := `current=1.0.0@2026-10-21T03:00:00Z "v1" upcoming=- withdrawn=[2.0.0]`
+	for order, got := range everyOrder(t, nc, legalT0.Add(h), nil, p0, p1, p2) {
+		assert.Equal(t, want, got, "the revert keeps 1.0.0 current, order %s", order)
+	}
 }

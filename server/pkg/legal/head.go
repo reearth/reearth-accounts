@@ -211,7 +211,7 @@ func PlanApply(cur TypeHead, e Entry, payloadAt, now time.Time) (TypeHead, Outco
 	case !seen:
 		set(HeadVersion{}.setBy(e, payloadAt, applied))
 	case v.withdrawn():
-		set(renamedWithdrawn(v, e, payloadAt, applied, now))
+		set(renamedWithdrawn(v, e, payloadAt, applied))
 	case v.takes(payloadAt, applied.Digest, now):
 		set(v.setBy(e, payloadAt, applied))
 	}
@@ -224,16 +224,13 @@ func PlanApply(cur TypeHead, e Entry, payloadAt, now time.Time) (TypeHead, Outco
 }
 
 // renamedWithdrawn republishes a withdrawn version the newest payload names
-// again, as upcoming with the entry's content, so that it ends the same as
-// when the payloads arrive in the other order. A version that would be frozen
-// stays withdrawn, so a republish never puts a version into effect at once.
-func renamedWithdrawn(v HeadVersion, e Entry, payloadAt time.Time, a Applied, now time.Time) HeadVersion {
-	next := v.setBy(e, payloadAt, a)
-	if next.frozen(now) {
-		return v
-	}
-	next.WithdrawnAt = nil
-	return next
+// again with the entry's content, whatever its date, so that it ends the same
+// as when the payloads arrive in the other order. The freeze does not protect
+// it, since readers never saw a withdrawn version.
+func renamedWithdrawn(v HeadVersion, e Entry, payloadAt time.Time, a Applied) HeadVersion {
+	v = v.setBy(e, payloadAt, a)
+	v.WithdrawnAt = nil
+	return v
 }
 
 // losingPayloadVersion adds a version the head has not seen from a payload
