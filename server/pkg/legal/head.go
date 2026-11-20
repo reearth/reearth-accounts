@@ -178,7 +178,14 @@ const (
 // Any other payload adds its version when the head has not seen it, as
 // losingPayloadVersion decides, and otherwise only replaces the content of a
 // version it wins a same-timestamp tie for that is withdrawn or not frozen.
-func PlanApply(cur TypeHead, e Entry, payloadAt, now time.Time) (TypeHead, Outcome) {
+//
+// A type with no head is created only by a payload not older than newest,
+// the newest AppliedAt of all stored heads, so that a replayed payload adds
+// no type.
+func PlanApply(cur TypeHead, e Entry, payloadAt, newest, now time.Time) (TypeHead, Outcome) {
+	if cur.Revision == 0 && payloadAt.Before(newest) {
+		return cur, OutcomeIgnored
+	}
 	applied := e.applied()
 	won := cur.Revision == 0 || payloadAt.After(cur.AppliedAt) || payloadAt.Equal(cur.AppliedAt) && applied.beats(cur.Applied)
 	v, seen := cur.Versions[e.Version]

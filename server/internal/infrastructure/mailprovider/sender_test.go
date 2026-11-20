@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"errors"
+	netmail "net/mail"
 	"os"
 	"strings"
 	"testing"
@@ -164,4 +165,40 @@ func TestSender_DeliverableOnlyWithAProvider(t *testing.T) {
 	assert.False(t, (&sender{mode: ModeDevPrint}).Deliverable())
 	assert.True(t, (&Mock{}).Deliverable())
 	assert.False(t, (&Mock{NoProvider: true}).Deliverable())
+}
+
+func TestSender_Provider_NameCannotChangeRecipient(t *testing.T) {
+	tests := []struct {
+		name string
+		in   string
+		want string
+	}{
+		{"plain name kept", "Someone Else", "Someone Else"},
+		{"address list in name", "x <attacker@example.test>, y", "x attackerexample.test y"},
+		{"quotes and group syntax", `"a"; b: c\d`, "a b cd"},
+		{"comments and literals", "a(b)[c]", "abc"},
+		{"control characters", "a\r\nBcc: b\x00", "aBcc b"},
+		{"non-ASCII kept", "山田 太郎", "山田 太郎"},
+		{"only special characters", `<@>,;:"\()[]`, ""},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			m := mailer.NewMock()
+			s := &sender{m: m, mode: ModeProvider}
+			e := mail.Envelope{
+				Message: message(t),
+				To:      mail.ToUser(id.NewUserID(), address, tt.in),
+			}
+
+			require.NoError(t, s.Send(context.Background(), e))
+
+			mails := m.Mails()
+			require.Len(t, mails, 1)
+			assert.Equal(t, []mailer.Contact{{Email: address, Name: tt.want}}, mails[0].To)
+			sesEntry, err := netmail.ParseAddressList(mails[0].To[0].Name + " <" + address + ">")
+			require.NoError(t, err)
+			require.Len(t, sesEntry, 1)
+			assert.Equal(t, address, sesEntry[0].Address)
+		})
+	}
 }

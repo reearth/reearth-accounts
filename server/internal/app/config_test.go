@@ -78,7 +78,7 @@ func TestReadConfig_Mailer(t *testing.T) {
 }
 
 func TestConfig_Print_MasksSecrets(t *testing.T) {
-	mailerEnv := mailprovider.Env{Provider: "sendgrid", FromEmail: "noreply@example.com", SendGridAPIKey: "sendgrid-api-key-value", CloudflareAccountID: "cf-account", CloudflareAPIToken: "cloudflare-token-value"}
+	mailerEnv := mailprovider.Env{Provider: "sendgrid", FromEmail: "noreply@example.com", SendGridAPIKey: "sendgrid-api-key-value\n", CloudflareAccountID: "cf-account", CloudflareAPIToken: " cloudflare-token-value\n"}
 	mailSettings, err := mailprovider.Parse(mailerEnv, false)
 	require.NoError(t, err)
 	c := Config{
