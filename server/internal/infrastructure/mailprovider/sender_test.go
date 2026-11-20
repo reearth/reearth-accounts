@@ -177,7 +177,7 @@ func TestSender_Provider_NameCannotChangeRecipient(t *testing.T) {
 			m := mailer.NewMock()
 			s := &sender{m: m, mode: ModeProvider}
 			e := mail.Envelope{
-				Message: mail.Raw(mail.KindVerification, subject, "open "+link, ""),
+				Message: message(t),
 				To:      mail.ToUser(id.NewUserID(), address, tt.in),
 			}
 
