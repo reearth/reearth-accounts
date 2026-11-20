@@ -5,6 +5,8 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"strings"
+	"unicode"
 
 	"github.com/reearth/reearth-accounts/server/internal/usecase/gateway"
 	"github.com/reearth/reearth-accounts/server/pkg/applog"
@@ -34,12 +36,23 @@ func (s *sender) Send(ctx context.Context, e mail.Envelope) error {
 		s.drop(ctx, e)
 		return nil
 	}
-	to := []mailer.Contact{{Email: e.To.Address(), Name: e.To.Name()}}
+	to := []mailer.Contact{{Email: e.To.Address(), Name: displayName(e.To.Name())}}
 	if err := s.m.SendMail(ctx, to, e.Message.Subject(), e.Message.Text(), e.Message.HTML()); err != nil {
 		applog.Warn(ctx, "mail send failed", logFields(e)...)
 		return &mail.SendError{Err: err}
 	}
 	return nil
+}
+
+// reearthx formats some recipients as "name <email>" without quoting, so these
+// characters in a user-chosen name could add or change a mailbox.
+func displayName(name string) string {
+	return strings.Map(func(r rune) rune {
+		if unicode.IsControl(r) || strings.ContainsRune(`"<>,;:\@()[]`, r) {
+			return -1
+		}
+		return r
+	}, name)
 }
 
 func (s *sender) drop(ctx context.Context, e mail.Envelope) {
