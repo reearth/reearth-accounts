@@ -507,6 +507,103 @@ func TestPolicyNotice_CompletedNoticeOfAWithdrawnVersionReopens(t *testing.T) {
 	assert.Equal(t, legal.FanoutComplete, f.stored(t, n).Fanout.End)
 }
 
+func TestPolicyNotice_RepeatedCoveredNoticeChecksTheCoverAgain(t *testing.T) {
+	tos1Entry := legal.Entry{Ref: tos1, EffectiveAt: t0.Add(-30 * 24 * time.Hour), Required: true, Title: legal.LocalizedText{"en": "Terms"}}
+	tos2Entry := legal.Entry{Ref: tos2, EffectiveAt: t0.Add(30 * 24 * time.Hour), Required: true, Title: legal.LocalizedText{"en": "Terms of Service"}}
+	t.Run("the covering notice was withdrawn", func(t *testing.T) {
+		f := newNoticeFixture(t, 10)
+		owner := f.user(t, "owner", "en")
+		member := f.user(t, "member", "en")
+		f.org(t, owner.ID())
+		all := f.notice(t, legal.AudienceAll)
+		f.mail.noSender = true
+		f.pass(t)
+		owners := f.notice(t, legal.AudienceOwners)
+		f.pass(t)
+		require.Equal(t, legal.FanoutCovered, f.stored(t, owners).Fanout.End)
+
+		f.publish(t, tos1Entry)
+		f.mail.noSender = false
+		f.pass(t)
+		require.Equal(t, legal.FanoutWithdrawn, f.stored(t, all).Fanout.End)
+		require.Zero(t, f.mail.count())
+
+		f.publish(t, tos1Entry, tos2Entry)
+		again, outcome := f.request(t, legal.AudienceOwners)
+		assert.Equal(t, legal.NoticeReopened, outcome)
+		assert.Equal(t, owners.ID, again.ID)
+		f.pass(t)
+
+		assert.Equal(t, 1, f.mailsTo(owner.ID()), "the owners notice reaches its audience")
+		assert.Zero(t, f.mailsTo(member.ID()))
+		assert.Equal(t, legal.FanoutComplete, f.stored(t, owners).Fanout.End)
+	})
+	t.Run("the cover still holds", func(t *testing.T) {
+		f := newNoticeFixture(t, 10)
+		owner := f.user(t, "owner", "en")
+		f.user(t, "member", "en")
+		f.org(t, owner.ID())
+		f.notice(t, legal.AudienceAll)
+		f.pass(t)
+		owners := f.notice(t, legal.AudienceOwners)
+		f.pass(t)
+		require.Equal(t, legal.FanoutCovered, f.stored(t, owners).Fanout.End)
+		require.Equal(t, 2, f.mail.count())
+
+		_, outcome := f.request(t, legal.AudienceOwners)
+		assert.Equal(t, legal.NoticeReopened, outcome)
+		rep := f.pass(t)
+
+		assert.Zero(t, rep.Queued)
+		assert.Equal(t, 2, f.mail.count(), "a repeated covered notice mails no one")
+		assert.Equal(t, legal.FanoutCovered, f.stored(t, owners).Fanout.End)
+	})
+}
+
+func TestPolicyNotice_ResolverRereadsTheCatalogBeforeWithdrawing(t *testing.T) {
+	f := newNoticeFixture(t, 10)
+	tos1Entry := legal.Entry{Ref: tos1, EffectiveAt: t0.Add(-30 * 24 * time.Hour), Required: true, Title: legal.LocalizedText{"en": "Terms"}}
+	tos2Entry := legal.Entry{Ref: tos2, EffectiveAt: t0.Add(30 * 24 * time.Hour), Required: true, Title: legal.LocalizedText{"en": "Terms of Service"}}
+	a := f.user(t, "a", "en")
+	n := f.notice(t, legal.AudienceAll)
+	f.mail.noSender = true
+	f.pass(t)
+	f.publish(t, tos1Entry)
+	rec := f.record(t, a.ID())
+	require.NotNil(t, rec)
+
+	var outcome legal.CreateOutcome
+	repos := f.fanout.repos
+	repos.Versions = &republishAfterRead{VersionRepo: f.repos.PolicyVersion, republish: func() {
+		f.publish(t, tos1Entry, tos2Entry)
+		_, outcome = f.request(t, legal.AudienceAll)
+	}}
+	res := &policyNoticeResolver{now: func() time.Time { return f.clock }, repos: repos}
+	env, reason, err := res.Resolve(context.Background(), *rec)
+	require.NoError(t, err)
+
+	require.Equal(t, legal.NoticeExisting, outcome, "the repeated request found the notice open")
+	assert.Empty(t, reason)
+	assert.NotNil(t, env, "the mail is sent for the republished version")
+	assert.Equal(t, legal.FanoutComplete, f.stored(t, n).Fanout.End, "the notice the request left open is not withdrawn")
+}
+
+// republishAfterRead runs republish once, after the first catalog read.
+type republishAfterRead struct {
+	legal.VersionRepo
+	republish func()
+}
+
+func (r *republishAfterRead) FindHeads(ctx context.Context) ([]legal.TypeHead, error) {
+	heads, err := r.VersionRepo.FindHeads(ctx)
+	if r.republish != nil {
+		republish := r.republish
+		r.republish = nil
+		republish()
+	}
+	return heads, err
+}
+
 func TestPolicyNotice_TitleAndURLFollowTheTemplateLanguage(t *testing.T) {
 	f := newNoticeFixture(t, 10)
 	f.publish(t, legal.Entry{Ref: tos1, EffectiveAt: t0.Add(-30 * 24 * time.Hour), Required: true, Title: legal.LocalizedText{"en": "Terms"}},

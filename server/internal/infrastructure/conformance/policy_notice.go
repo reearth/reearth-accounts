@@ -22,7 +22,7 @@ import (
 func runPolicyNotice(t *testing.T, nc Factory) {
 	t.Run("PolicyNotice_CreateIdempotent", func(t *testing.T) { testPolicyNoticeCreateIdempotent(t, nc) })
 	t.Run("PolicyNotice_FanoutLease", func(t *testing.T) { testPolicyNoticeFanoutLease(t, nc) })
-	t.Run("PolicyNotice_ReopenWithdrawn", func(t *testing.T) { testPolicyNoticeReopenWithdrawn(t, nc) })
+	t.Run("PolicyNotice_ReopenWithdrawnOrCovered", func(t *testing.T) { testPolicyNoticeReopenWithdrawnOrCovered(t, nc) })
 	t.Run("PolicyNotice_Withdraw", func(t *testing.T) { testPolicyNoticeWithdraw(t, nc) })
 	t.Run("PolicyNotice_ClaimExclusive", func(t *testing.T) { testPolicyNoticeClaimExclusive(t, nc) })
 	t.Run("PolicyNotice_OutboxCountByNotice", func(t *testing.T) { testOutboxCountByNotice(t, nc) })
@@ -145,7 +145,7 @@ func testPolicyNoticeFanoutLease(t *testing.T, nc Factory) {
 	assert.Equal(t, newer.ID, got.ID, "a done notice is never claimed")
 }
 
-func testPolicyNoticeReopenWithdrawn(t *testing.T, nc Factory) {
+func testPolicyNoticeReopenWithdrawnOrCovered(t *testing.T, nc Factory) {
 	c, _, done := nc(t)
 	defer done()
 	ctx := context.Background()
@@ -163,12 +163,14 @@ func testPolicyNoticeReopenWithdrawn(t *testing.T, nc Factory) {
 	}
 	withdrawn := notice(tos("2.0.0"), legal.AudienceAll, now)
 	complete := notice(tos("2.0.0"), legal.AudienceOwners, now.Add(time.Second))
-	for _, n := range []legal.Notice{withdrawn, complete} {
+	covered := notice(tos("3.0.0"), legal.AudienceOwners, now.Add(2*time.Second))
+	for _, n := range []legal.Notice{withdrawn, complete, covered} {
 		_, _, err := c.PolicyNotice.Create(ctx, n)
 		require.NoError(t, err)
 	}
 	end(withdrawn, legal.FanoutWithdrawn)
 	end(complete, legal.FanoutComplete)
+	end(covered, legal.FanoutCovered)
 
 	got, outcome, err := c.PolicyNotice.Create(ctx, notice(tos("2.0.0"), legal.AudienceAll, now.Add(time.Hour)))
 	require.NoError(t, err)
@@ -182,6 +184,11 @@ func testPolicyNoticeReopenWithdrawn(t *testing.T, nc Factory) {
 	require.NoError(t, err)
 	assert.Equal(t, legal.NoticeExisting, outcome, "a complete notice is not reopened")
 	assert.Equal(t, legal.Fanout{Cursor: "u5", End: legal.FanoutComplete}, got.Fanout)
+	got, outcome, err = c.PolicyNotice.Create(ctx, notice(tos("3.0.0"), legal.AudienceOwners, now.Add(time.Hour)))
+	require.NoError(t, err)
+	assert.Equal(t, legal.NoticeReopened, outcome, "a covered notice reopens")
+	assert.Equal(t, covered.ID, got.ID)
+	assert.Equal(t, legal.Fanout{}, got.Fanout)
 
 	claimed, err := c.PolicyNotice.ClaimFanout(ctx, now, legal.Lease{Token: "u", Until: now.Add(time.Minute)})
 	require.NoError(t, err)

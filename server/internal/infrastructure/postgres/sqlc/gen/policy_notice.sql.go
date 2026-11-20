@@ -210,7 +210,7 @@ func (q *Queries) PolicyNoticeReleaseFanout(ctx context.Context, arg PolicyNotic
 const policyNoticeReopen = `-- name: PolicyNoticeReopen :one
 UPDATE policy_notices
 SET fanout_cursor = '', fanout_end = '', lease_token = NULL, lease_until = NULL
-WHERE type = $1 AND version = $2 AND audience = $3 AND fanout_end = 'withdrawn'
+WHERE type = $1 AND version = $2 AND audience = $3 AND fanout_end IN ('withdrawn', 'covered')
 RETURNING id, type, version, audience, bump, requested_by, created_at, fanout_cursor, fanout_end, lease_token, lease_until
 `
 

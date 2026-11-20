@@ -152,7 +152,10 @@ type FanoutEnd string
 const (
 	FanoutOpen     FanoutEnd = ""
 	FanoutComplete FanoutEnd = "complete"
-	FanoutCovered  FanoutEnd = "covered"
+	// FanoutCovered is a notice that an earlier notice of the other audience
+	// covered. A repeated request reopens it, and the fan-out checks the
+	// cover again, because the earlier notice may have been withdrawn since.
+	FanoutCovered FanoutEnd = "covered"
 	// FanoutWithdrawn is a notice whose version stopped being upcoming. A
 	// repeated request reopens it once the version is upcoming again.
 	FanoutWithdrawn FanoutEnd = "withdrawn"
@@ -183,9 +186,9 @@ type NoticeRepo interface {
 	// is due. Two callers never hold the same notice.
 	ClaimFanout(ctx context.Context, now time.Time, lease Lease) (*Notice, error)
 	// Create stores n unless a notice with its version and audience exists,
-	// and returns the stored notice. A stored notice that ended withdrawn
-	// restarts with an empty cursor, because the caller checked that its
-	// version is upcoming.
+	// and returns the stored notice. A stored notice that ended withdrawn or
+	// covered restarts with an empty cursor, because the caller checked that
+	// its version is upcoming.
 	Create(ctx context.Context, n Notice) (Notice, CreateOutcome, error)
 	// FindByRef returns the notices of r, oldest first.
 	FindByRef(ctx context.Context, r Ref) ([]Notice, error)

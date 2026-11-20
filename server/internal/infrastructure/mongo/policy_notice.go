@@ -90,10 +90,11 @@ func (r *PolicyNotice) Create(ctx context.Context, n legal.Notice) (legal.Notice
 		return legal.Notice{}, "", rerror.ErrInternalByWithContext(ctx, err)
 	}
 	same := bson.M{"type": d.Type, "version": d.Version, "audience": d.Audience}
-	withdrawn := bson.M{"type": d.Type, "version": d.Version, "audience": d.Audience, "fanout.end": string(legal.FanoutWithdrawn)}
+	ended := bson.M{"type": d.Type, "version": d.Version, "audience": d.Audience,
+		"fanout.end": bson.M{"$in": bson.A{string(legal.FanoutWithdrawn), string(legal.FanoutCovered)}}}
 	outcome := legal.NoticeReopened
 	var stored policyNoticeDoc
-	err = r.c.FindOneAndUpdate(ctx, withdrawn,
+	err = r.c.FindOneAndUpdate(ctx, ended,
 		bson.M{"$set": bson.M{"fanout.cursor": "", "fanout.end": string(legal.FanoutOpen)}, "$unset": bson.M{"fanout.lease": ""}},
 		options.FindOneAndUpdate().SetReturnDocument(options.After),
 	).Decode(&stored)

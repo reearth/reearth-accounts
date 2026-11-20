@@ -248,13 +248,19 @@ func (r *policyNoticeResolver) Resolve(ctx context.Context, rec outbox.Record) (
 	if u.Email() == "" {
 		return nil, outbox.ReasonNoAddress, nil
 	}
-	heads, err := r.repos.Versions.FindHeads(ctx)
+	cat, up, err := r.upcoming(ctx, s.Ref)
 	if err != nil {
 		return nil, "", err
 	}
-	cat := legal.NewCatalog(heads)
-	up := cat.Upcoming(s.Ref.Type, r.now())
-	if up == nil || up.Ref != s.Ref {
+	if up == nil {
+		// The version may have been republished and the notice requested
+		// again since the read, and a withdrawal then would end the notice
+		// that request left open.
+		if cat, up, err = r.upcoming(ctx, s.Ref); err != nil {
+			return nil, "", err
+		}
+	}
+	if up == nil {
 		if err := r.repos.Notices.Withdraw(ctx, s.Notice); err != nil {
 			return nil, "", err
 		}
@@ -280,6 +286,21 @@ func (r *policyNoticeResolver) Resolve(ctx context.Context, rec outbox.Record) (
 		return nil, "", err
 	}
 	return &mail.Envelope{To: mail.ToUser(uid, u.Email(), u.Name()), Message: msg}, "", nil
+}
+
+// upcoming reads the catalog and returns the upcoming version of ref's type
+// when it is ref.
+func (r *policyNoticeResolver) upcoming(ctx context.Context, ref legal.Ref) (legal.Catalog, *legal.VersionRecord, error) {
+	heads, err := r.repos.Versions.FindHeads(ctx)
+	if err != nil {
+		return legal.Catalog{}, nil, err
+	}
+	cat := legal.NewCatalog(heads)
+	up := cat.Upcoming(ref.Type, r.now())
+	if up == nil || up.Ref != ref {
+		return cat, nil, nil
+	}
+	return cat, up, nil
 }
 
 func cursorID[T any](cursor string, parse func(string) (T, error)) (*T, error) {

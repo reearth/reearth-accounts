@@ -61,7 +61,7 @@ func (r *PolicyNotice) Create(_ context.Context, n legal.Notice) (legal.Notice, 
 		if stored.Ref != n.Ref || stored.Audience != n.Audience {
 			continue
 		}
-		if stored.Fanout.End != legal.FanoutWithdrawn {
+		if stored.Fanout.End != legal.FanoutWithdrawn && stored.Fanout.End != legal.FanoutCovered {
 			return stored, legal.NoticeExisting, nil
 		}
 		stored.Fanout = legal.Fanout{}
