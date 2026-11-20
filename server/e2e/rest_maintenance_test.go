@@ -15,7 +15,7 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-const maintenanceKey = "e2e-maintenance-key"
+const maintenanceKey = "e2e-maintenance-key-0123456789abcdef"
 
 func maintenanceConfig(key string) *app.Config {
 	return &app.Config{MaintenanceKey: key, MailerMaxAttempts: 5, MailerOutboxTTL: 720 * time.Hour, MailerRate: 50}

@@ -7,6 +7,10 @@ import (
 
 const KeyHeader = "X-Accounts-Maintenance-Key"
 
+// MinKeyLen keeps the key out of reach of online guessing, since the route
+// has no rate limit.
+const MinKeyLen = 32
+
 type Key struct{ sum *[sha256.Size]byte }
 
 func NewKey(s string) Key {
