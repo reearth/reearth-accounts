@@ -210,6 +210,8 @@ func TestReadConfig_UserLookupLimit(t *testing.T) {
 	assert.Equal(t, 30, c.UserLookupLimit.PerMinute)
 }
 
+const testMaintenanceKey = "0123456789abcdef0123456789abcdef"
+
 func TestReadConfig_Maintenance(t *testing.T) {
 	t.Setenv("SKIP_DOTENV", "1")
 
@@ -224,14 +226,14 @@ func TestReadConfig_Maintenance(t *testing.T) {
 	assert.Equal(t, 720*time.Hour, mc.TTL)
 
 	t.Setenv("REEARTH_ACCOUNTS_MAINTENANCE_INTERVAL", "0")
-	t.Setenv("REEARTH_ACCOUNTS_MAINTENANCE_KEY", "k")
+	t.Setenv("REEARTH_ACCOUNTS_MAINTENANCE_KEY", testMaintenanceKey)
 	t.Setenv("REEARTH_ACCOUNTS_MAILER_RATE", "0.5")
 	t.Setenv("REEARTH_ACCOUNTS_MAILER_MAX_ATTEMPTS", "3")
 	t.Setenv("REEARTH_ACCOUNTS_MAILER_OUTBOX_TTL", "48h")
 	c, err = ReadConfig(false)
 	require.NoError(t, err)
 	assert.Zero(t, c.MaintenanceInterval, "0 turns the loop off")
-	assert.Equal(t, "k", c.MaintenanceKey)
+	assert.Equal(t, testMaintenanceKey, c.MaintenanceKey)
 	mc = c.Maintenance()
 	assert.Equal(t, 0.5, mc.SendsPerSecond)
 	assert.Equal(t, 3, mc.Retry.MaxAttempts)
@@ -242,11 +244,21 @@ func TestReadConfig_Maintenance(t *testing.T) {
 		"REEARTH_ACCOUNTS_MAILER_RATE":          "0",
 		"REEARTH_ACCOUNTS_MAILER_MAX_ATTEMPTS":  "0",
 		"REEARTH_ACCOUNTS_MAILER_OUTBOX_TTL":    "0s",
+		"REEARTH_ACCOUNTS_MAINTENANCE_KEY":      testMaintenanceKey[:31],
 	} {
 		t.Run(env, func(t *testing.T) {
 			t.Setenv(env, value)
 			_, err := ReadConfig(false)
 			assert.ErrorContains(t, err, env)
 		})
+	}
+}
+
+func TestReadConfig_MaintenanceKeyWithSurroundingWhitespace(t *testing.T) {
+	t.Setenv("SKIP_DOTENV", "1")
+	for _, key := range []string{testMaintenanceKey + "\n", testMaintenanceKey + " ", " " + testMaintenanceKey, "\t" + testMaintenanceKey} {
+		t.Setenv("REEARTH_ACCOUNTS_MAINTENANCE_KEY", key)
+		_, err := ReadConfig(false)
+		assert.ErrorContains(t, err, "REEARTH_ACCOUNTS_MAINTENANCE_KEY", "%q", key)
 	}
 }

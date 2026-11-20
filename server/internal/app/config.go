@@ -3,6 +3,7 @@ package app
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"net"
 	"net/netip"
@@ -335,6 +336,12 @@ func (c *Config) checkMaintenance() error {
 		return fmt.Errorf("REEARTH_ACCOUNTS_MAILER_RATE must be positive, got %v", c.MailerRate)
 	case c.MaintenanceInterval < 0:
 		return fmt.Errorf("REEARTH_ACCOUNTS_MAINTENANCE_INTERVAL must not be negative, got %s", c.MaintenanceInterval)
+	case c.MaintenanceKey == "":
+		return nil
+	case strings.TrimSpace(c.MaintenanceKey) != c.MaintenanceKey:
+		return errors.New("REEARTH_ACCOUNTS_MAINTENANCE_KEY must not start or end with whitespace")
+	case len(c.MaintenanceKey) < maintenance.MinKeyLen:
+		return fmt.Errorf("REEARTH_ACCOUNTS_MAINTENANCE_KEY must be at least %d bytes, got %d", maintenance.MinKeyLen, len(c.MaintenanceKey))
 	}
 	return nil
 }
