@@ -274,6 +274,36 @@ A signed-in user can call the accounts API directly with their own token. The ac
 
 DPoP does not stop a signed-in user from calling accounts with their own token, because that user holds both the token and the key. Only two controls stop that call: an audience that accounts does not accept on user tokens, and a downstream token that the On-Behalf-Of exchange issues to the calling service. We do not need that today, because the user gains nothing by calling accounts directly. We adopt both controls if accounts ever needs to accept a call only through one service.
 
+### Reach, identities, secrets, and accepted risks
+
+Every environment that registers a client follows these rules.
+
+| What changes | Before | After |
+|---|---|---|
+| Who can call the accounts API | A user token, or no token for public queries | Also a registered client, only as the subjects its `act_as` allows. An unregistered client, a user token with `X-Reearth-Act-As`, and a case C call outside the read list get `401` or `403`. |
+| Who can get a client token | Nobody, for the accounts audience | Only a registered client, with a `private_key_jwt` assertion and only for the accounts audience. No client secret exists. |
+| What the internal gRPC token can do | Act as any user, by sending `user-id` | Nothing on its own. The service gets the user from the user's token (decision 4). The static token is removed once all three services read the token. |
+| What a service can read from the accounts database | Every tenant's data | Nothing. Decision 10 removes the connection strings. |
+
+Identities and roles:
+
+- Each calling service gets one identity provider client per environment. Its only grant is the accounts audience. It has no access to the identity provider's management API.
+- Each service's own runtime identity can read its own private-key secret and nothing more. Terraform grants that on the one secret, never project-wide.
+- The terraform identity that creates the clients needs the right to manage clients in the identity provider. Give that right to the apply step only. Give the plan step, which runs on pull requests, a read-only credential.
+
+Secrets and data:
+
+- The service reads its private key from the secret manager by reference. The key is never an inline value in code, config, or the environment definition.
+- Tokens stay in memory and are never logged. Accounts logs the client ID, the registered name, and the subject ID, never a token or an email.
+
+These risks are accepted, each with its mitigation:
+
+1. Terraform state holds the private keys. Access to the state stays restricted. To keep keys out of state, generate the key outside terraform and give terraform only the public key, at the cost of a manual rotation step.
+2. A case C client can read any user's profile, including the email, and workspaces, not only the uploader's. Accounts logs every such call, and the grant goes away when the uploader is recorded (decision 6).
+3. Case A forwards a bearer user token until audiences split (decision 4).
+4. The static internal token stays until all three services read the user's token.
+5. If a tenant cannot use `private_key_jwt` and takes the fallback in open question 1, accounts checks replay and token lifetime in its own code. That code needs its own tests and security review.
+
 ## Open questions
 
 1. **Does each environment's identity provider tenant support `private_key_jwt` for client credentials?** On Auth0 this needs the Enterprise plan. If a tenant does not support it, one option is a self-signed assertion in the style of Atlassian's ASAP ([ASAP specification](https://s2sauth.bitbucket.io/spec/)). The service signs a short-lived JWT with its private key, and accounts verifies it against the public key in the registry. That option needs no identity provider client and no token quota, but accounts must then check `jti` for replay and enforce a short lifetime itself.
