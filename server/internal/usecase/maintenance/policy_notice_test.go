@@ -476,6 +476,37 @@ func TestPolicyNotice_WithdrawnAndRepublishedVersion(t *testing.T) {
 	assert.Equal(t, legal.FanoutComplete, f.stored(t, n).Fanout.End)
 }
 
+func TestPolicyNotice_CompletedNoticeOfAWithdrawnVersionReopens(t *testing.T) {
+	f := newNoticeFixture(t, 10)
+	users := []*user.User{f.user(t, "a", "en"), f.user(t, "b", "en"), f.user(t, "c", "ja")}
+	tos1Entry := legal.Entry{Ref: tos1, EffectiveAt: t0.Add(-30 * 24 * time.Hour), Required: true, Title: legal.LocalizedText{"en": "Terms"}}
+	tos2Entry := legal.Entry{Ref: tos2, EffectiveAt: t0.Add(30 * 24 * time.Hour), Required: true, Title: legal.LocalizedText{"en": "Terms of Service"}}
+	n := f.notice(t, legal.AudienceAll)
+	f.mail.noSender = true
+	f.pass(t)
+	require.Equal(t, legal.FanoutComplete, f.stored(t, n).Fanout.End)
+
+	f.mail.noSender = false
+	f.mail.onSend = func() {
+		f.mail.onSend = nil
+		f.publish(t, tos1Entry)
+	}
+	f.pass(t)
+	require.Equal(t, 1, f.mail.count(), "the version is withdrawn while the first mail is sent")
+	assert.Equal(t, legal.FanoutWithdrawn, f.stored(t, n).Fanout.End)
+
+	f.publish(t, tos1Entry, tos2Entry)
+	again, outcome := f.request(t, legal.AudienceAll)
+	assert.Equal(t, legal.NoticeReopened, outcome)
+	assert.Equal(t, n.ID, again.ID)
+	f.pass(t)
+
+	for _, u := range users {
+		assert.Equal(t, 1, f.mailsTo(u.ID()), u.Name())
+	}
+	assert.Equal(t, legal.FanoutComplete, f.stored(t, n).Fanout.End)
+}
+
 func TestPolicyNotice_TitleAndURLFollowTheTemplateLanguage(t *testing.T) {
 	f := newNoticeFixture(t, 10)
 	f.publish(t, legal.Entry{Ref: tos1, EffectiveAt: t0.Add(-30 * 24 * time.Hour), Required: true, Title: legal.LocalizedText{"en": "Terms"}},

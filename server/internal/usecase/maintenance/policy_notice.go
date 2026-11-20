@@ -255,6 +255,9 @@ func (r *policyNoticeResolver) Resolve(ctx context.Context, rec outbox.Record) (
 	cat := legal.NewCatalog(heads)
 	up := cat.Upcoming(s.Ref.Type, r.now())
 	if up == nil || up.Ref != s.Ref {
+		if err := r.repos.Notices.Withdraw(ctx, s.Notice); err != nil {
+			return nil, "", err
+		}
 		return nil, outbox.ReasonVersionNotUpcoming, nil
 	}
 	as, err := r.repos.Acceptances.FindByUser(ctx, uid)

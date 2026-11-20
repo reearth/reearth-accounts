@@ -23,6 +23,7 @@ func runPolicyNotice(t *testing.T, nc Factory) {
 	t.Run("PolicyNotice_CreateIdempotent", func(t *testing.T) { testPolicyNoticeCreateIdempotent(t, nc) })
 	t.Run("PolicyNotice_FanoutLease", func(t *testing.T) { testPolicyNoticeFanoutLease(t, nc) })
 	t.Run("PolicyNotice_ReopenWithdrawn", func(t *testing.T) { testPolicyNoticeReopenWithdrawn(t, nc) })
+	t.Run("PolicyNotice_Withdraw", func(t *testing.T) { testPolicyNoticeWithdraw(t, nc) })
 	t.Run("PolicyNotice_ClaimExclusive", func(t *testing.T) { testPolicyNoticeClaimExclusive(t, nc) })
 	t.Run("PolicyNotice_OutboxCountByNotice", func(t *testing.T) { testOutboxCountByNotice(t, nc) })
 	t.Run("PolicyNotice_OutboxRemoveFailedByNotice", func(t *testing.T) { testOutboxRemoveFailedByNotice(t, nc) })
@@ -186,6 +187,65 @@ func testPolicyNoticeReopenWithdrawn(t *testing.T, nc Factory) {
 	require.NoError(t, err)
 	require.NotNil(t, claimed)
 	assert.Equal(t, withdrawn.ID, claimed.ID, "a reopened notice is claimed again")
+}
+
+func testPolicyNoticeWithdraw(t *testing.T, nc Factory) {
+	c, _, done := nc(t)
+	defer done()
+	ctx := context.Background()
+	now := timeFixed()
+	open := notice(tos("2.0.0"), legal.AudienceAll, now)
+	complete := notice(tos("2.0.0"), legal.AudienceOwners, now.Add(time.Second))
+	covered := notice(tos("3.0.0"), legal.AudienceAll, now.Add(2*time.Second))
+	withdrawn := notice(tos("3.0.0"), legal.AudienceOwners, now.Add(3*time.Second))
+	for _, n := range []legal.Notice{open, complete, covered, withdrawn} {
+		_, _, err := c.PolicyNotice.Create(ctx, n)
+		require.NoError(t, err)
+	}
+	leases := map[id.PolicyNoticeID]legal.Lease{}
+	for _, e := range []legal.FanoutEnd{legal.FanoutOpen, legal.FanoutComplete, legal.FanoutCovered, legal.FanoutWithdrawn} {
+		lease := legal.Lease{Token: "t" + string(e), Until: now.Add(time.Minute)}
+		got, err := c.PolicyNotice.ClaimFanout(ctx, now, lease)
+		require.NoError(t, err)
+		require.NotNil(t, got)
+		ok, err := c.PolicyNotice.AdvanceFanout(ctx, got.ID, lease, "u5", e)
+		require.NoError(t, err)
+		require.True(t, ok)
+		leases[got.ID] = lease
+	}
+
+	for range 2 {
+		for _, n := range []legal.Notice{open, complete, covered, withdrawn} {
+			require.NoError(t, c.PolicyNotice.Withdraw(ctx, n.ID))
+		}
+		require.NoError(t, c.PolicyNotice.Withdraw(ctx, id.NewPolicyNoticeID()), "an unknown notice is no error")
+	}
+
+	ends := map[id.PolicyNoticeID]legal.Fanout{}
+	for _, r := range []legal.Ref{tos("2.0.0"), tos("3.0.0")} {
+		list, err := c.PolicyNotice.FindByRef(ctx, r)
+		require.NoError(t, err)
+		for _, n := range list {
+			ends[n.ID] = n.Fanout
+		}
+	}
+	assert.Equal(t, legal.Fanout{Cursor: "u5", End: legal.FanoutWithdrawn}, ends[open.ID], "an open notice is withdrawn and drops its lease")
+	assert.Equal(t, legal.Fanout{Cursor: "u5", End: legal.FanoutWithdrawn}, ends[complete.ID], "a complete notice is withdrawn")
+	assert.Equal(t, legal.Fanout{Cursor: "u5", End: legal.FanoutCovered}, ends[covered.ID], "a covered notice stays covered")
+	assert.Equal(t, legal.Fanout{Cursor: "u5", End: legal.FanoutWithdrawn}, ends[withdrawn.ID])
+
+	ok, err := c.PolicyNotice.AdvanceFanout(ctx, open.ID, leases[open.ID], "u9", legal.FanoutComplete)
+	require.NoError(t, err)
+	assert.False(t, ok, "the fan-out that held the open notice lost it")
+	got, err := c.PolicyNotice.ClaimFanout(ctx, now, legal.Lease{Token: "x", Until: now.Add(time.Minute)})
+	require.NoError(t, err)
+	assert.Nil(t, got, "a withdrawn notice is not claimed")
+
+	got2, outcome, err := c.PolicyNotice.Create(ctx, notice(tos("2.0.0"), legal.AudienceOwners, now.Add(time.Hour)))
+	require.NoError(t, err)
+	assert.Equal(t, legal.NoticeReopened, outcome, "a withdrawn complete notice reopens")
+	assert.Equal(t, complete.ID, got2.ID)
+	assert.Equal(t, legal.Fanout{}, got2.Fanout)
 }
 
 func testOutboxRemoveFailedByNotice(t *testing.T, nc Factory) {

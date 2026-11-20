@@ -238,3 +238,13 @@ func (q *Queries) PolicyNoticeReopen(ctx context.Context, arg PolicyNoticeReopen
 	)
 	return i, err
 }
+
+const policyNoticeWithdraw = `-- name: PolicyNoticeWithdraw :exec
+UPDATE policy_notices SET fanout_end = 'withdrawn', lease_token = NULL, lease_until = NULL
+WHERE id = $1 AND fanout_end IN ('', 'complete')
+`
+
+func (q *Queries) PolicyNoticeWithdraw(ctx context.Context, id string) error {
+	_, err := q.db.Exec(ctx, policyNoticeWithdraw, id)
+	return err
+}

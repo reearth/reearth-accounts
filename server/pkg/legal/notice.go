@@ -191,4 +191,8 @@ type NoticeRepo interface {
 	FindByRef(ctx context.Context, r Ref) ([]Notice, error)
 	// ReleaseFanout drops the lease while token holds it.
 	ReleaseFanout(ctx context.Context, n id.PolicyNoticeID, token string) error
+	// Withdraw ends n withdrawn and drops its lease when its fan-out is open
+	// or complete, so that Create reopens it. A covered or withdrawn notice
+	// stays as it is.
+	Withdraw(ctx context.Context, n id.PolicyNoticeID) error
 }

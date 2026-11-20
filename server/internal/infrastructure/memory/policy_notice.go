@@ -95,3 +95,14 @@ func (r *PolicyNotice) ReleaseFanout(_ context.Context, n id.PolicyNoticeID, tok
 	}
 	return nil
 }
+
+func (r *PolicyNotice) Withdraw(_ context.Context, n id.PolicyNoticeID) error {
+	r.lock.Lock()
+	defer r.lock.Unlock()
+	stored, ok := r.data[n]
+	if ok && (stored.Fanout.End == legal.FanoutOpen || stored.Fanout.End == legal.FanoutComplete) {
+		stored.Fanout = legal.Fanout{Cursor: stored.Fanout.Cursor, End: legal.FanoutWithdrawn}
+		r.data[n] = stored
+	}
+	return nil
+}

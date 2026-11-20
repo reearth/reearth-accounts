@@ -100,6 +100,13 @@ func (r *PolicyNotice) ReleaseFanout(ctx context.Context, n id.PolicyNoticeID, t
 	return nil
 }
 
+func (r *PolicyNotice) Withdraw(ctx context.Context, n id.PolicyNoticeID) error {
+	if err := r.c.queries(ctx).PolicyNoticeWithdraw(ctx, n.String()); err != nil {
+		return rerror.ErrInternalByWithContext(ctx, err)
+	}
+	return nil
+}
+
 func noticeModel(row gen.PolicyNotice) (legal.Notice, error) {
 	nid, err := id.PolicyNoticeIDFrom(row.ID)
 	if err != nil {

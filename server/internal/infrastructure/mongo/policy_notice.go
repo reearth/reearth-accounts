@@ -140,6 +140,16 @@ func (r *PolicyNotice) ReleaseFanout(ctx context.Context, n id.PolicyNoticeID, t
 	return nil
 }
 
+func (r *PolicyNotice) Withdraw(ctx context.Context, n id.PolicyNoticeID) error {
+	_, err := r.c.UpdateOne(ctx,
+		bson.M{"_id": n.String(), "fanout.end": bson.M{"$in": bson.A{string(legal.FanoutOpen), string(legal.FanoutComplete)}}},
+		bson.M{"$set": bson.M{"fanout.end": string(legal.FanoutWithdrawn)}, "$unset": bson.M{"fanout.lease": ""}})
+	if err != nil {
+		return rerror.ErrInternalByWithContext(ctx, err)
+	}
+	return nil
+}
+
 func newPolicyNoticeDoc(n legal.Notice) policyNoticeDoc {
 	d := policyNoticeDoc{
 		Audience:    string(n.Audience),

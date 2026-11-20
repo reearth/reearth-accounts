@@ -48,6 +48,7 @@ type Querier interface {
 	PolicyNoticeFindByVersionAudience(ctx context.Context, arg PolicyNoticeFindByVersionAudienceParams) (PolicyNotice, error)
 	PolicyNoticeReleaseFanout(ctx context.Context, arg PolicyNoticeReleaseFanoutParams) error
 	PolicyNoticeReopen(ctx context.Context, arg PolicyNoticeReopenParams) (PolicyNotice, error)
+	PolicyNoticeWithdraw(ctx context.Context, id string) error
 	PolicyTypeFind(ctx context.Context, type_ string) (PolicyType, error)
 	PolicyTypeFindAll(ctx context.Context) ([]PolicyType, error)
 	PolicyTypeInsert(ctx context.Context, arg PolicyTypeInsertParams) (int64, error)

@@ -38,3 +38,7 @@ RETURNING *;
 -- name: PolicyNoticeReleaseFanout :exec
 UPDATE policy_notices SET lease_token = NULL, lease_until = NULL
 WHERE id = sqlc.arg(id) AND lease_token = sqlc.arg(token)::text;
+
+-- name: PolicyNoticeWithdraw :exec
+UPDATE policy_notices SET fanout_end = 'withdrawn', lease_token = NULL, lease_until = NULL
+WHERE id = $1 AND fanout_end IN ('', 'complete');
