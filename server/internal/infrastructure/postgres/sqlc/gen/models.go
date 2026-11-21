@@ -42,6 +42,16 @@ type PermittableWorkspaceRole struct {
 	RoleID        string
 }
 
+type PolicyAcceptance struct {
+	UserID     string
+	Type       string
+	Version    string
+	AcceptedAt time.Time
+	Origin     string
+	UserAgent  string
+	Ip         string
+}
+
 type PolicyType struct {
 	Type           string
 	Revision       int64

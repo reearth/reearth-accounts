@@ -14,15 +14,16 @@ import (
 )
 
 type Container struct {
-	AdminUser     adminuser.Repo
-	User          user.Repo
-	Workspace     workspace.Repo
-	Role          role.Repo
-	Permittable   permittable.Repo
-	PolicyVersion legal.VersionRepo
-	Transaction   usecasex.Transaction
-	Users         []user.Repo
-	Config        config.Repo
+	AdminUser        adminuser.Repo
+	User             user.Repo
+	Workspace        workspace.Repo
+	Role             role.Repo
+	Permittable      permittable.Repo
+	PolicyAcceptance legal.AcceptanceRepo
+	PolicyVersion    legal.VersionRepo
+	Transaction      usecasex.Transaction
+	Users            []user.Repo
+	Config           config.Repo
 }
 
 var (

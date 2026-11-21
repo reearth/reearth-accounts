@@ -4,6 +4,7 @@ import (
 	"context"
 
 	"github.com/reearth/reearth-accounts/server/internal/usecase/interfaces"
+	"github.com/reearth/reearth-accounts/server/pkg/legal"
 	"github.com/reearth/reearth-accounts/server/pkg/user"
 	"github.com/reearth/reearth-accounts/server/pkg/workspace"
 	"github.com/reearth/reearthx/appx"
@@ -20,7 +21,17 @@ const (
 	contextOperator ContextKey = "operator"
 	contextUsecases ContextKey = "usecases"
 	contextConfig   ContextKey = "config"
+	contextClient   ContextKey = "client"
 )
+
+func AttachClient(ctx context.Context, c legal.Client) context.Context {
+	return context.WithValue(ctx, contextClient, c)
+}
+
+func Client(ctx context.Context) legal.Client {
+	c, _ := ctx.Value(contextClient).(legal.Client)
+	return c
+}
 
 func AttachUser(ctx context.Context, u *user.User) context.Context {
 	return context.WithValue(ctx, contextUser, u)

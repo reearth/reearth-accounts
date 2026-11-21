@@ -19,8 +19,39 @@ func (r *meResolver) MyWorkspace(ctx context.Context, obj *gqlmodel.Me) (*gqlmod
 	return dataloaders(ctx).Workspace.Load(obj.MyWorkspaceID)
 }
 
+func (r *meResolver) PendingPolicies(ctx context.Context, obj *gqlmodel.Me) ([]*gqlmodel.PolicyVersion, error) {
+	ov, err := usecases(ctx).Policy.Overview(ctx, getOperator(ctx))
+	if err != nil {
+		return nil, err
+	}
+	return gqlmodel.ToPolicyVersions(ov.Pending, langOf(obj)), nil
+}
+
+func (r *meResolver) PolicyAcceptances(ctx context.Context, obj *gqlmodel.Me) ([]*gqlmodel.PolicyAcceptance, error) {
+	ov, err := usecases(ctx).Policy.Overview(ctx, getOperator(ctx))
+	if err != nil {
+		return nil, err
+	}
+	return gqlmodel.ToPolicyAcceptances(ov.Acceptances), nil
+}
+
+func (r *meResolver) UpcomingPolicies(ctx context.Context, obj *gqlmodel.Me) ([]*gqlmodel.PolicyVersion, error) {
+	ov, err := usecases(ctx).Policy.Overview(ctx, getOperator(ctx))
+	if err != nil {
+		return nil, err
+	}
+	return gqlmodel.ToPolicyVersions(ov.Upcoming, langOf(obj)), nil
+}
+
 func (r *meResolver) Workspaces(ctx context.Context, obj *gqlmodel.Me) ([]*gqlmodel.Workspace, error) {
 	return loaders(ctx).Workspace.FindByUser(ctx, obj.ID)
+}
+
+func langOf(me *gqlmodel.Me) string {
+	if me.Metadata == nil {
+		return ""
+	}
+	return me.Metadata.Lang
 }
 
 func (r *Resolver) UserMetadata() UserMetadataResolver {

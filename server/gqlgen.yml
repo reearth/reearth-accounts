@@ -5,6 +5,7 @@ schema:
   - ./schemas/_shared.graphql
   - ./schemas/auth.graphql
   - ./schemas/cerbos.graphql
+  - ./schemas/policy.graphql
   - ./schemas/user.graphql
   - ./schemas/workspace.graphql
 exec:
@@ -20,6 +21,12 @@ models:
       workspaces:
         resolver: true
       myWorkspace:
+        resolver: true
+      pendingPolicies:
+        resolver: true
+      policyAcceptances:
+        resolver: true
+      upcomingPolicies:
         resolver: true
   User:
     model: github.com/reearth/reearth-accounts/server/internal/adapter/gql/gqlmodel.User

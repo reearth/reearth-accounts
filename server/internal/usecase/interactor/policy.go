@@ -2,11 +2,17 @@ package interactor
 
 import (
 	"context"
+	"errors"
 	"io"
 	"time"
 
+	"github.com/reearth/reearth-accounts/server/internal/usecase/interfaces"
 	"github.com/reearth/reearth-accounts/server/internal/usecase/repo"
+	"github.com/reearth/reearth-accounts/server/pkg/applog"
+	"github.com/reearth/reearth-accounts/server/pkg/id"
 	"github.com/reearth/reearth-accounts/server/pkg/legal"
+	"github.com/reearth/reearth-accounts/server/pkg/user"
+	"github.com/reearth/reearth-accounts/server/pkg/workspace"
 )
 
 type Policy struct {
@@ -18,6 +24,97 @@ type Policy struct {
 
 func NewPolicy(r *repo.Container, secret legal.Secret, catalog *PolicyCatalog) *Policy {
 	return &Policy{catalog: catalog, now: time.Now, repos: r, secret: secret}
+}
+
+func (p *Policy) Accept(ctx context.Context, in []legal.RefInput, client legal.Client, op *workspace.Operator) (*user.User, error) {
+	if !p.secret.Enabled() {
+		return nil, legal.ErrNotConfigured
+	}
+	if op == nil || op.User == nil {
+		return nil, interfaces.ErrInvalidOperator
+	}
+	refs, err := legal.ParseRefs(in)
+	if err != nil {
+		return nil, err
+	}
+	uid := *op.User
+	held, err := p.repos.PolicyAcceptance.FindByUser(ctx, uid)
+	if err != nil {
+		return nil, err
+	}
+	now := p.now().UTC().Truncate(time.Millisecond)
+	plan, err := p.planWithFreshCatalog(ctx, held, refs, now)
+	if err != nil {
+		return nil, err
+	}
+	records := make([]legal.Acceptance, len(plan))
+	for i, r := range plan {
+		records[i] = legal.Acceptance{AcceptedAt: now, Client: client, Ref: r, UserID: uid}
+	}
+	if err := p.repos.PolicyAcceptance.InsertIfAbsent(ctx, records); err != nil {
+		return nil, p.discard(ctx, uid, records, err)
+	}
+	dctx, cancel := detached(ctx)
+	defer cancel()
+	// DeleteMe may have removed the user after this request authenticated,
+	// and its sweeps may have run before the insert above.
+	u, err := p.repos.User.FindByID(dctx, uid)
+	if err != nil {
+		return nil, p.discard(ctx, uid, records, err)
+	}
+	return u, nil
+}
+
+func (p *Policy) discard(ctx context.Context, uid id.UserID, records []legal.Acceptance, cause error) error {
+	dctx, cancel := detached(ctx)
+	defer cancel()
+	if err := retry(dctx, func(ctx context.Context) error { return p.repos.PolicyAcceptance.Remove(ctx, records) }); err != nil {
+		applog.Error(ctx, "policy acceptances of a failed accept were not removed", applog.UserID(uid), applog.Err(err))
+	}
+	return cause
+}
+
+const (
+	cleanupAttempts = 3
+	cleanupTimeout  = 10 * time.Second
+)
+
+// detached outlives the request, so a client that hangs up cannot stop a
+// cleanup halfway.
+func detached(ctx context.Context) (context.Context, context.CancelFunc) {
+	return context.WithTimeout(context.WithoutCancel(ctx), cleanupTimeout)
+}
+
+func retry(ctx context.Context, f func(context.Context) error) error {
+	var err error
+	for attempt := 1; ; attempt++ {
+		if err = f(ctx); err == nil || attempt == cleanupAttempts {
+			return err
+		}
+		select {
+		case <-ctx.Done():
+			return err
+		case <-time.After(time.Duration(attempt) * 100 * time.Millisecond):
+		}
+	}
+}
+
+func (p *Policy) Overview(ctx context.Context, op *workspace.Operator) (legal.Overview, error) {
+	if op == nil || op.User == nil {
+		return legal.Overview{}, interfaces.ErrInvalidOperator
+	}
+	if !p.secret.Enabled() {
+		return legal.EmptyOverview(), nil
+	}
+	held, err := p.repos.PolicyAcceptance.FindByUser(ctx, *op.User)
+	if err != nil {
+		return legal.Overview{}, err
+	}
+	cat, err := p.catalog.Get(ctx)
+	if err != nil {
+		return legal.Overview{}, err
+	}
+	return legal.BuildOverview(cat, held, p.now()), nil
 }
 
 func (p *Policy) ReceiveWebhook(ctx context.Context, r io.Reader, signature string) (legal.ApplyResult, error) {
@@ -41,4 +138,21 @@ func (p *Policy) ReceiveWebhook(ctx context.Context, r io.Reader, signature stri
 	res, err := legal.Apply(ctx, p.repos.PolicyVersion, m, p.now)
 	p.catalog.Invalidate()
 	return res, err
+}
+
+// planWithFreshCatalog reloads the catalog once before it rejects a version,
+// because the webhook may have reached another instance within the cache TTL.
+func (p *Policy) planWithFreshCatalog(ctx context.Context, held []legal.Acceptance, refs []legal.Ref, now time.Time) ([]legal.Ref, error) {
+	cat, err := p.catalog.Get(ctx)
+	if err != nil {
+		return nil, err
+	}
+	plan, err := legal.PlanAccept(cat, held, refs, now)
+	if !errors.Is(err, legal.ErrUnknownType) && !errors.Is(err, legal.ErrNotAcceptable) {
+		return plan, err
+	}
+	if cat, err = p.catalog.Refresh(ctx); err != nil {
+		return nil, err
+	}
+	return legal.PlanAccept(cat, held, refs, now)
 }

@@ -1,5 +1,14 @@
 basePath: /
 definitions:
+  httpmodel.AcceptPoliciesRequest:
+    properties:
+      policies:
+        items:
+          $ref: '#/definitions/httpmodel.PolicyRefRequest'
+        type: array
+    required:
+    - policies
+    type: object
   httpmodel.AddIntegrationRequest:
     properties:
       integration_id:
@@ -185,6 +194,21 @@ definitions:
       success:
         type: boolean
     type: object
+  httpmodel.MyPoliciesResponse:
+    properties:
+      acceptances:
+        items:
+          $ref: '#/definitions/httpmodel.PolicyAcceptanceResponse'
+        type: array
+      pending:
+        items:
+          $ref: '#/definitions/httpmodel.PolicyVersionResponse'
+        type: array
+      upcoming:
+        items:
+          $ref: '#/definitions/httpmodel.PolicyVersionResponse'
+        type: array
+    type: object
   httpmodel.PasswordResetRequest:
     properties:
       password:
@@ -194,6 +218,40 @@ definitions:
     required:
     - password
     - token
+    type: object
+  httpmodel.PolicyAcceptanceResponse:
+    properties:
+      acceptedAt:
+        type: string
+      type:
+        type: string
+      version:
+        type: string
+    type: object
+  httpmodel.PolicyRefRequest:
+    properties:
+      type:
+        type: string
+      version:
+        type: string
+    required:
+    - type
+    - version
+    type: object
+  httpmodel.PolicyVersionResponse:
+    properties:
+      effectiveDate:
+        type: string
+      required:
+        type: boolean
+      title:
+        type: string
+      type:
+        type: string
+      url:
+        type: string
+      version:
+        type: string
     type: object
   httpmodel.PolicyWebhookResponse:
     properties:
@@ -1229,6 +1287,66 @@ paths:
       security:
       - BearerAuth: []
       summary: Replace the current user's MFA recovery code
+      tags:
+      - User
+  /api/users/me/policies:
+    get:
+      description: Every list is empty when REEARTH_ACCOUNTS_POLICY_WEBHOOK_SECRET
+        is unset.
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/httpmodel.MyPoliciesResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/internal.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Get the current user's policy acceptances, pending policies and upcoming
+        policies
+      tags:
+      - User
+  /api/users/me/policies/accept:
+    post:
+      consumes:
+      - application/json
+      description: Each version must be the current or upcoming version of its type.
+        Accepting a version the user already holds, or a lower one, records nothing.
+        Returns 404 when REEARTH_ACCOUNTS_POLICY_WEBHOOK_SECRET is unset.
+      parameters:
+      - description: versions to accept
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/httpmodel.AcceptPoliciesRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/httpmodel.MyPoliciesResponse'
+        "400":
+          description: unknown type, malformed version, or a version that is neither
+            current nor upcoming
+          schema:
+            $ref: '#/definitions/internal.ErrorResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/internal.ErrorResponse'
+        "404":
+          description: policies not configured
+          schema:
+            $ref: '#/definitions/internal.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Accept policy versions for the current user
       tags:
       - User
   /api/users/password-reset:

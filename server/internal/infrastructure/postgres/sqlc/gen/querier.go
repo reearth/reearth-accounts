@@ -24,6 +24,10 @@ type Querier interface {
 	PermittableWorkspaceRoleInsert(ctx context.Context, arg PermittableWorkspaceRoleInsertParams) error
 	PermittableWorkspaceRolesByPermittableIDs(ctx context.Context, dollar_1 []string) ([]PermittableWorkspaceRole, error)
 	PermittableWorkspaceRolesDeleteByPermittable(ctx context.Context, permittableID string) error
+	PolicyAcceptanceFindByUser(ctx context.Context, userID string) ([]PolicyAcceptance, error)
+	PolicyAcceptanceInsert(ctx context.Context, arg PolicyAcceptanceInsertParams) error
+	PolicyAcceptanceRemove(ctx context.Context, arg PolicyAcceptanceRemoveParams) error
+	PolicyAcceptanceRemoveByUser(ctx context.Context, userID string) error
 	PolicyTypeFind(ctx context.Context, type_ string) (PolicyType, error)
 	PolicyTypeFindAll(ctx context.Context) ([]PolicyType, error)
 	PolicyTypeInsert(ctx context.Context, arg PolicyTypeInsertParams) (int64, error)
