@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"net/netip"
 	"os"
 	"strings"
 	"time"
@@ -15,6 +16,7 @@ import (
 	"github.com/reearth/reearth-accounts/server/internal/admin/gateway/google"
 	authhandler "github.com/reearth/reearth-accounts/server/internal/admin/presentation/handler/auth"
 	"github.com/reearth/reearth-accounts/server/internal/admin/usecase/authuc"
+	"github.com/reearth/reearth-accounts/server/internal/app/clientip"
 	infraCerbos "github.com/reearth/reearth-accounts/server/internal/infrastructure/cerbos"
 	mongorepo "github.com/reearth/reearth-accounts/server/internal/infrastructure/mongo"
 	"github.com/reearth/reearth-accounts/server/internal/infrastructure/postgres"
@@ -39,6 +41,9 @@ type Config struct {
 	DBName   string   `default:"reearth-account" envconfig:"REEARTH_ACCOUNTS_DB_NAME"`
 	DBDriver string   `envconfig:"REEARTH_ACCOUNTS_DB_DRIVER"`
 	Origins  []string `envconfig:"REEARTH_ACCOUNTS_ADMIN_ORIGINS"`
+
+	TrustedProxies       []string       `envconfig:"REEARTH_ACCOUNTS_TRUSTED_PROXIES"`
+	TrustedProxyPrefixes []netip.Prefix `ignored:"true"`
 
 	// auth (Auth0 JWT) — mirrors the main service's auth env vars.
 	Auth0    Auth0Config
@@ -165,6 +170,11 @@ func LoadConfig() *Config {
 	if err := envconfig.Process("reearth", &cfg); err != nil {
 		applog.Fatal(context.Background(), "Error config setup", applog.Err(err))
 	}
+	proxies, err := clientip.ParseTrustedProxies(cfg.TrustedProxies)
+	if err != nil {
+		applog.Fatal(context.Background(), "REEARTH_ACCOUNTS_TRUSTED_PROXIES", applog.Err(err))
+	}
+	cfg.TrustedProxyPrefixes = proxies
 	cfg.Print()
 	return &cfg
 }

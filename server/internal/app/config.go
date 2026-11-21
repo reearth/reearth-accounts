@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"net"
+	"net/netip"
 	"os"
 	"strings"
 	"time"
@@ -13,6 +14,7 @@ import (
 	"github.com/kelseyhightower/envconfig"
 	"github.com/reearth/reearth-accounts/server/internal/adapter"
 	"github.com/reearth/reearth-accounts/server/internal/adapter/ratelimit"
+	"github.com/reearth/reearth-accounts/server/internal/app/clientip"
 	"github.com/reearth/reearth-accounts/server/internal/infrastructure/mailprovider"
 	"github.com/reearth/reearth-accounts/server/pkg/applog"
 	"github.com/reearth/reearth-accounts/server/pkg/workspace"
@@ -29,6 +31,12 @@ type Config struct {
 	DBDriver string   `envconfig:"REEARTH_ACCOUNTS_DB_DRIVER"`
 	Origins  []string `envconfig:"REEARTH_ACCOUNTS_ORIGINS"`
 	Host     string   `default:"0.0.0.0" envconfig:"HOST"`
+
+	// TrustedProxies lists the proxies (CIDRs or single IPs) whose
+	// X-Forwarded-For hop is read as the client IP. Empty means the client IP
+	// is the connection address.
+	TrustedProxies       []string       `envconfig:"REEARTH_ACCOUNTS_TRUSTED_PROXIES"`
+	TrustedProxyPrefixes []netip.Prefix `ignored:"true"`
 
 	GCPProject string `envconfig:"GOOGLE_CLOUD_PROJECT"`
 	Cert       CertConfig
@@ -284,6 +292,12 @@ func ReadConfig(debug bool) (*Config, error) {
 	if err := c.ServiceCallers.checkIssuers(c.Auths()); err != nil {
 		return nil, fmt.Errorf("REEARTH_ACCOUNTS_SERVICE_CALLERS: %w", err)
 	}
+
+	proxies, err := clientip.ParseTrustedProxies(c.TrustedProxies)
+	if err != nil {
+		return nil, fmt.Errorf("REEARTH_ACCOUNTS_TRUSTED_PROXIES: %w", err)
+	}
+	c.TrustedProxyPrefixes = proxies
 
 	ms, err := mailprovider.Parse(c.Mailer, c.Dev)
 	if err != nil {

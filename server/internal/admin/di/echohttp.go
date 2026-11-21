@@ -11,6 +11,7 @@ import (
 	"github.com/labstack/echo/v4"
 	"github.com/labstack/echo/v4/middleware"
 	"github.com/reearth/reearth-accounts/server/internal/admin/presentation"
+	"github.com/reearth/reearth-accounts/server/internal/app/clientip"
 	"github.com/reearth/reearth-accounts/server/pkg/applog"
 )
 
@@ -29,6 +30,7 @@ func NewAppEchoServer(
 	e := echo.New()
 	e.HideBanner = true
 	e.HidePort = true
+	e.IPExtractor = clientip.Extractor(cfg.TrustedProxyPrefixes)
 	e.Validator = newValidator()
 
 	e.Use(

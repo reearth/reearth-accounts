@@ -13,6 +13,7 @@ import (
 	adapterhttp "github.com/reearth/reearth-accounts/server/internal/adapter/http"
 	"github.com/reearth/reearth-accounts/server/internal/adapter/ratelimit"
 	scimadapter "github.com/reearth/reearth-accounts/server/internal/adapter/scim"
+	"github.com/reearth/reearth-accounts/server/internal/app/clientip"
 	otelapp "github.com/reearth/reearth-accounts/server/internal/app/otel"
 	"github.com/reearth/reearth-accounts/server/internal/usecase/interactor"
 	"github.com/reearth/reearth-accounts/server/pkg/applog"
@@ -35,6 +36,7 @@ func initEcho(ctx context.Context, cfg *ServerConfig) *echo.Echo {
 	e.Server.IdleTimeout = cfg.Config.ServerIdleTimeout
 	e.Server.ReadHeaderTimeout = cfg.Config.ServerReadHeaderTimeout
 	e.Server.ReadTimeout = cfg.Config.ServerReadTimeout
+	e.IPExtractor = clientip.Extractor(cfg.Config.TrustedProxyPrefixes)
 
 	logger := log.NewEcho()
 	e.Logger = logger
