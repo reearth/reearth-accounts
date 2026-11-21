@@ -1,19 +1,15 @@
 package interactor
 
 import (
-	"bytes"
 	"context"
-	_ "embed"
 	"encoding/json"
 	"errors"
 	"fmt"
-	htmlTmpl "html/template"
 	"io"
 	"net/http"
 	"net/url"
 	"path"
 	"strings"
-	textTmpl "text/template"
 	"time"
 
 	"github.com/reearth/reearth-accounts/server/internal/usecase/gateway"
@@ -30,14 +26,6 @@ import (
 	"github.com/samber/lo"
 )
 
-type mailContent struct {
-	UserName    string
-	Message     string
-	Suffix      string
-	ActionLabel string
-	ActionURL   htmlTmpl.URL
-}
-
 type OpenIDConfiguration struct {
 	UserinfoEndpoint string `json:"userinfo_endpoint"`
 }
@@ -50,29 +38,7 @@ type UserInfo struct {
 	Error    string `json:"error"`
 }
 
-var (
-	//go:embed emails/auth_html.tmpl
-	autHTMLTMPLStr string
-	//go:embed emails/auth_text.tmpl
-	authTextTMPLStr string
-
-	authTextTMPL *textTmpl.Template
-	authHTMLTMPL *htmlTmpl.Template
-
-	oidcHTTPClient = &http.Client{Timeout: 10 * time.Second}
-)
-
-func init() {
-	var err error
-	authTextTMPL, err = textTmpl.New("passwordReset").Parse(authTextTMPLStr)
-	if err != nil {
-		applog.Panic(context.Background(), "password reset email template parse error", applog.Err(err))
-	}
-	authHTMLTMPL, err = htmlTmpl.New("passwordReset").Parse(autHTMLTMPLStr)
-	if err != nil {
-		applog.Panic(context.Background(), "password reset email template parse error", applog.Err(err))
-	}
-}
+var oidcHTTPClient = &http.Client{Timeout: 10 * time.Second}
 
 func (i *User) Signup(ctx context.Context, param interfaces.SignupParam) (u *user.User, err error) {
 	if err = i.verifySignupSecret(param.Secret); err != nil {
@@ -331,7 +297,7 @@ func (i *User) SyncSSOUser(ctx context.Context, param interfaces.SyncSSOUserPara
 		return u, nil
 	}
 
-	if err = authenticator.ResendVerificationEmail(ctx, gateway.VerificationTarget{Sub: param.Sub, UserID: u.ID()}); err != nil {
+	if err = authenticator.ResendVerificationEmail(ctx, gateway.VerificationTarget{Lang: u.Metadata().Lang(), Sub: param.Sub, UserID: u.ID()}); err != nil {
 		applog.Warn(ctx, "SyncSSOUser: verification email failed, will retry on next login", applog.Err(err))
 		return u, nil
 	}
@@ -387,24 +353,15 @@ func (i *User) FindOrCreate(ctx context.Context, param interfaces.UserFindOrCrea
 }
 
 func (i *User) sendVerificationMail(ctx context.Context, u *user.User, vr *user.Verification) error {
-	var text, html bytes.Buffer
-	link := i.authSrvUIDomain + "/?user-verification-token=" + vr.Code()
-	signupMailContent := mailContent{
-		Message:     "Thank you for signing up to Re:Earth. Please verify your email address by clicking the button below.",
-		Suffix:      "You can use this email address to log in to Re:Earth account anytime.",
-		ActionLabel: "Activate your account and log in",
-		UserName:    u.Email(),
-		ActionURL:   htmlTmpl.URL(link),
-	}
-	if err := authTextTMPL.Execute(&text, signupMailContent); err != nil {
+	msg, err := mail.Render(u.Metadata().Lang(), mail.VerificationData{
+		UserName:  u.Email(),
+		ActionURL: i.authSrvUIDomain + "/?user-verification-token=" + vr.Code(),
+	})
+	if err != nil {
 		return err
 	}
-	if err := authHTMLTMPL.Execute(&html, signupMailContent); err != nil {
-		return err
-	}
-
 	return i.gateways.Mail.Send(ctx, mail.Envelope{
-		Message: mail.Raw(mail.KindVerification, "email verification", text.String(), html.String()),
+		Message: msg,
 		To:      mail.ToUser(u.ID(), u.Email(), u.Name()),
 	})
 }
@@ -613,7 +570,7 @@ func (i *User) CreateVerification(ctx context.Context, email string) error {
 				continue
 			}
 			idpAuth = auth
-			target = gateway.VerificationTarget{Sub: a.Sub, UserID: u.ID()}
+			target = gateway.VerificationTarget{Lang: u.Metadata().Lang(), Sub: a.Sub, UserID: u.ID()}
 			break
 		}
 

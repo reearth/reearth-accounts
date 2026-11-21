@@ -2,8 +2,6 @@ package cip
 
 import (
 	"context"
-	"fmt"
-	"html"
 	"net/http"
 	"time"
 
@@ -128,12 +126,13 @@ func (a *Authenticator) ResendVerificationEmail(ctx context.Context, t gateway.V
 		applog.Error(ctx, "cip: email verification link", applog.Err(err))
 		return rerror.NewE(i18n.T("failed to resend verification email"))
 	}
-	text := "Please verify your email address by opening the following link:\n" + link
-	// Treat the link as untrusted input and HTML-escape it before embedding in the
-	// href attribute to prevent accidental injection or broken markup.
-	htmlBody := fmt.Sprintf(`<p>Please verify your email address by clicking <a href="%s">this link</a>.</p>`, html.EscapeString(link))
+	msg, err := mail.Render(t.Lang, mail.VerificationResendData{ActionURL: link})
+	if err != nil {
+		applog.Error(ctx, "cip: render verification email", applog.Err(err))
+		return rerror.NewE(i18n.T("failed to resend verification email"))
+	}
 	if err := a.mail.Send(ctx, mail.Envelope{
-		Message: mail.Raw(mail.KindVerificationResend, "email verification", text, htmlBody),
+		Message: msg,
 		To:      mail.ToUser(t.UserID, rec.Email, rec.DisplayName),
 	}); err != nil {
 		applog.Error(ctx, "cip: send verification email", applog.Err(err))

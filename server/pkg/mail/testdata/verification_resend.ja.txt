@@ -1,0 +1,4 @@
+Subject: 【Re:Earth】メールアドレスの確認
+
+次のリンクを開いて、メールアドレスを確認してください。
+https://verify.example.com/?mode=verifyEmail&oobCode=CODE

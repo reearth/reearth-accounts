@@ -11,6 +11,7 @@ import (
 	"github.com/reearth/reearth-accounts/server/pkg/id"
 	"github.com/reearth/reearth-accounts/server/pkg/mail"
 	"github.com/stretchr/testify/assert"
+	"golang.org/x/text/language"
 )
 
 // fakeAuthClient implements firebaseAuthClient for tests (no SDK / network).
@@ -152,9 +153,7 @@ func TestCIP_ResendVerificationEmail_HTMLEscapesLink(t *testing.T) {
 	assert.Len(t, sent, 1)
 	// Plain-text body keeps the raw link.
 	assert.Contains(t, sent[0].Message.Text(), `https://verify.example/?token=a"b&c<d`)
-	// HTML body must contain the escaped form inside the href attribute and
-	// must NOT contain the raw unescaped quote/ampersand/angle-bracket payload.
-	assert.Contains(t, sent[0].Message.HTML(), `href="https://verify.example/?token=a&#34;b&amp;c&lt;d"`)
+	assert.Contains(t, sent[0].Message.HTML(), `href="https://verify.example/?token=a%22b&amp;c%3cd"`)
 	assert.NotContains(t, sent[0].Message.HTML(), `a"b&c<d`)
 }
 
@@ -168,6 +167,40 @@ type linkOverrideClient struct {
 func (l *linkOverrideClient) EmailVerificationLink(_ context.Context, email string) (string, error) {
 	l.fakeAuthClient.verifyLinkEmail = email
 	return l.link, nil
+}
+
+func TestCIP_ResendVerificationEmail_UserLanguage(t *testing.T) {
+	tests := []struct {
+		name        string
+		lang        language.Tag
+		wantSubject string
+		wantText    string
+	}{
+		{"ja", language.Japanese, "【Re:Earth】メールアドレスの確認", "次のリンクを開いて、メールアドレスを確認してください。"},
+		{"ja-JP", language.MustParse("ja-JP"), "【Re:Earth】メールアドレスの確認", "次のリンクを開いて、メールアドレスを確認してください。"},
+		{"en", language.English, "email verification", "Please verify your email address by opening the following link:"},
+		{"und", language.Und, "email verification", "Please verify your email address by opening the following link:"},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			fake := &fakeAuthClient{
+				getUser: func(_ context.Context, uid string) (*fbauth.UserRecord, error) {
+					return &fbauth.UserRecord{UserInfo: &fbauth.UserInfo{UID: uid, Email: "u@example.com"}}, nil
+				},
+			}
+			fm := &mailprovider.Mock{}
+			a := &Authenticator{client: fake, mail: fm}
+
+			err := a.ResendVerificationEmail(context.Background(), gateway.VerificationTarget{Lang: tt.lang, Sub: "uid-1", UserID: id.NewUserID()})
+			assert.NoError(t, err)
+			sent := fm.Envelopes()
+			if assert.Len(t, sent, 1) {
+				assert.Equal(t, tt.wantSubject, sent[0].Message.Subject())
+				assert.Contains(t, sent[0].Message.Text(), tt.wantText)
+				assert.Contains(t, sent[0].Message.Text(), "https://verify.example/u@example.com")
+			}
+		})
+	}
 }
 
 func TestCIP_ResendVerificationEmail_NoEmail(t *testing.T) {

@@ -4,6 +4,7 @@ import (
 	"context"
 
 	"github.com/reearth/reearth-accounts/server/pkg/id"
+	"golang.org/x/text/language"
 )
 
 type AuthenticatorUpdateUserParam struct {
@@ -28,6 +29,7 @@ type MFAStatus struct {
 // VerificationTarget names the user whose IdP account gets a new
 // verification mail. UserID is the accounts user, Sub the IdP subject.
 type VerificationTarget struct {
+	Lang   language.Tag
 	Sub    string
 	UserID id.UserID
 }
