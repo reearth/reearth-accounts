@@ -159,6 +159,7 @@ func (r *userRepo) FindByID(ctx context.Context, id string) (*user.User, error) 
 	return user.New().
 		ID(uid).
 		Name(string(q.User.Name)).
+		Alias(string(q.User.Alias)).
 		OptionalEmail(string(q.User.Email)).
 		Workspace(wid).
 		Metadata(gqlmodel.ToUserMetadata(q.User.Metadata)).
@@ -206,6 +207,7 @@ func (r *userRepo) FindByIDs(ctx context.Context, ids []string) ([]*user.User, e
 		userObj, err := user.New().
 			ID(uid).
 			Name(string(u.Name)).
+			Alias(string(u.Alias)).
 			OptionalEmail(string(u.Email)).
 			Workspace(wid).
 			Auths(auths2).
