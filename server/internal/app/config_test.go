@@ -1,9 +1,11 @@
 package app
 
 import (
+	"os"
 	"testing"
 	"time"
 
+	"github.com/reearth/reearth-accounts/server/internal/infrastructure/mailprovider"
 	"github.com/reearth/reearthx/appx"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -35,8 +37,53 @@ func TestReadConfig_AuthTimeClaim(t *testing.T) {
 	assert.EqualError(t, err, `REEARTH_ACCOUNTS_AUTH_TIME_CLAIM: login time claim must not be the reserved claim "iat", which does not record when the user logged in`)
 }
 
+func TestReadConfig_Mailer(t *testing.T) {
+	t.Setenv("SKIP_DOTENV", "1")
+	t.Setenv("REEARTH_DEV", "false")
+
+	c, err := ReadConfig(false)
+	require.NoError(t, err)
+	assert.Equal(t, mailprovider.ModeDrop, c.MailSettings.Mode)
+
+	t.Setenv("REEARTH_DEV", "true")
+	c, err = ReadConfig(false)
+	require.NoError(t, err)
+	assert.Equal(t, mailprovider.ModeDevPrint, c.MailSettings.Mode)
+
+	require.NoError(t, os.Unsetenv("REEARTH_DEV"))
+	c, err = ReadConfig(true)
+	require.NoError(t, err)
+	assert.True(t, c.Dev)
+	assert.Equal(t, mailprovider.ModeDrop, c.MailSettings.Mode, "a debug build alone must not print mail bodies")
+
+	t.Setenv("REEARTH_DEV", "true")
+	c, err = ReadConfig(true)
+	require.NoError(t, err)
+	assert.Equal(t, mailprovider.ModeDevPrint, c.MailSettings.Mode)
+
+	t.Setenv("REEARTH_ACCOUNTS_MAILER", "sendgrid")
+	t.Setenv("REEARTH_ACCOUNTS_MAILER_FROM_EMAIL", "noreply@example.com")
+	t.Setenv("REEARTH_ACCOUNTS_SENDGRID_API_KEY", "sg-key")
+	c, err = ReadConfig(false)
+	require.NoError(t, err)
+	assert.Equal(t, mailprovider.ModeProvider, c.MailSettings.Mode)
+
+	t.Setenv("REEARTH_ACCOUNTS_SENDGRID_API_KEY", "")
+	_, err = ReadConfig(false)
+	assert.ErrorContains(t, err, "REEARTH_ACCOUNTS_SENDGRID_API_KEY")
+
+	t.Setenv("REEARTH_ACCOUNTS_MAILER", "smtp")
+	_, err = ReadConfig(false)
+	assert.ErrorContains(t, err, "REEARTH_ACCOUNTS_MAILER")
+}
+
 func TestConfig_Print_MasksSecrets(t *testing.T) {
+	mailerEnv := mailprovider.Env{Provider: "sendgrid", FromEmail: "noreply@example.com", SendGridAPIKey: "sendgrid-api-key-value\n", CloudflareAccountID: "cf-account", CloudflareAPIToken: " cloudflare-token-value\n"}
+	mailSettings, err := mailprovider.Parse(mailerEnv, false)
+	require.NoError(t, err)
 	c := Config{
+		Mailer:           mailerEnv,
+		MailSettings:     mailSettings,
 		DB:               "mongodb://user:pass@localhost/db",
 		RestAPIKey:       "rest-api-key-value",
 		SwaggerBasicPass: "swagger-pass-value",
@@ -47,7 +94,15 @@ func TestConfig_Print_MasksSecrets(t *testing.T) {
 		},
 	}
 
-	got := c.Print()
+	cfEnv := mailerEnv
+	cfEnv.Provider = "cloudflare"
+	cfSettings, err := mailprovider.Parse(cfEnv, false)
+	require.NoError(t, err)
+	cf := c
+	cf.Mailer = cfEnv
+	cf.MailSettings = cfSettings
+
+	got := c.Print() + cf.Print()
 
 	for _, secret := range []string{
 		"mongodb://user:pass@localhost/db",
@@ -56,6 +111,8 @@ func TestConfig_Print_MasksSecrets(t *testing.T) {
 		"signup-secret-value",
 		"sync-sso-api-key-value",
 		"auth0-client-secret-value",
+		"sendgrid-api-key-value",
+		"cloudflare-token-value",
 	} {
 		assert.NotContains(t, got, secret)
 	}

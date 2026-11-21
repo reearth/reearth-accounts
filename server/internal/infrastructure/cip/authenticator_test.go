@@ -6,28 +6,12 @@ import (
 	"testing"
 
 	fbauth "firebase.google.com/go/v4/auth"
+	"github.com/reearth/reearth-accounts/server/internal/infrastructure/mailprovider"
 	"github.com/reearth/reearth-accounts/server/internal/usecase/gateway"
-	"github.com/reearth/reearthx/mailer"
+	"github.com/reearth/reearth-accounts/server/pkg/id"
+	"github.com/reearth/reearth-accounts/server/pkg/mail"
 	"github.com/stretchr/testify/assert"
 )
-
-// fakeMailer implements mailer.Mailer for tests and records the last sent message.
-type fakeMailer struct {
-	sent    bool
-	to      []mailer.Contact
-	subject string
-	text    string
-	html    string
-}
-
-func (f *fakeMailer) SendMail(_ context.Context, to []mailer.Contact, subject, text, html string) error {
-	f.sent = true
-	f.to = to
-	f.subject = subject
-	f.text = text
-	f.html = html
-	return nil
-}
 
 // fakeAuthClient implements firebaseAuthClient for tests (no SDK / network).
 type fakeAuthClient struct {
@@ -66,13 +50,13 @@ func (f *fakeAuthClient) EmailVerificationLink(ctx context.Context, email string
 }
 
 func newTestAuthenticator(c firebaseAuthClient) *Authenticator {
-	return &Authenticator{client: c, mailer: &fakeMailer{}}
+	return &Authenticator{client: c, mail: &mailprovider.Mock{}}
 }
 
 func strptr(s string) *string { return &s }
 
 func TestCIP_New_RequiresProjectID(t *testing.T) {
-	_, err := New(context.Background(), Params{}, &fakeMailer{})
+	_, err := New(context.Background(), Params{}, &mailprovider.Mock{})
 	assert.Error(t, err)
 }
 
@@ -130,18 +114,22 @@ func TestCIP_ResendVerificationEmail(t *testing.T) {
 			return &fbauth.UserRecord{UserInfo: &fbauth.UserInfo{UID: uid, Email: "u@example.com"}}, nil
 		},
 	}
-	fm := &fakeMailer{}
-	a := &Authenticator{client: fake, mailer: fm}
+	fm := &mailprovider.Mock{}
+	a := &Authenticator{client: fake, mail: fm}
+	uid := id.NewUserID()
 
-	err := a.ResendVerificationEmail(context.Background(), "uid-1")
+	err := a.ResendVerificationEmail(context.Background(), gateway.VerificationTarget{Sub: "uid-1", UserID: uid})
 	assert.NoError(t, err)
 	assert.Equal(t, "u@example.com", fake.verifyLinkEmail)
 	// The generated link must actually be emailed (Admin SDK only generates it).
-	assert.True(t, fm.sent)
-	assert.Equal(t, "u@example.com", fm.to[0].Email)
-	assert.Contains(t, fm.text, "https://verify.example/u@example.com")
+	sent := fm.Envelopes()
+	assert.Len(t, sent, 1)
+	assert.Equal(t, "u@example.com", sent[0].To.Address())
+	assert.Equal(t, &uid, sent[0].To.UserID())
+	assert.Equal(t, mail.KindVerificationResend, sent[0].Message.Kind())
+	assert.Contains(t, sent[0].Message.Text(), "https://verify.example/u@example.com")
 	// The HTML body must embed the link in the href attribute.
-	assert.Contains(t, fm.html, `href="https://verify.example/u@example.com"`)
+	assert.Contains(t, sent[0].Message.HTML(), `href="https://verify.example/u@example.com"`)
 }
 
 func TestCIP_ResendVerificationEmail_HTMLEscapesLink(t *testing.T) {
@@ -155,18 +143,19 @@ func TestCIP_ResendVerificationEmail_HTMLEscapesLink(t *testing.T) {
 	// Override EmailVerificationLink behavior via a wrapper so we can return a
 	// link containing characters that must be escaped.
 	wrapped := &linkOverrideClient{fakeAuthClient: fake, link: `https://verify.example/?token=a"b&c<d`}
-	fm := &fakeMailer{}
-	a := &Authenticator{client: wrapped, mailer: fm}
+	fm := &mailprovider.Mock{}
+	a := &Authenticator{client: wrapped, mail: fm}
 
-	err := a.ResendVerificationEmail(context.Background(), "uid-1")
+	err := a.ResendVerificationEmail(context.Background(), gateway.VerificationTarget{Sub: "uid-1", UserID: id.NewUserID()})
 	assert.NoError(t, err)
-	assert.True(t, fm.sent)
+	sent := fm.Envelopes()
+	assert.Len(t, sent, 1)
 	// Plain-text body keeps the raw link.
-	assert.Contains(t, fm.text, `https://verify.example/?token=a"b&c<d`)
+	assert.Contains(t, sent[0].Message.Text(), `https://verify.example/?token=a"b&c<d`)
 	// HTML body must contain the escaped form inside the href attribute and
 	// must NOT contain the raw unescaped quote/ampersand/angle-bracket payload.
-	assert.Contains(t, fm.html, `href="https://verify.example/?token=a&#34;b&amp;c&lt;d"`)
-	assert.NotContains(t, fm.html, `a"b&c<d`)
+	assert.Contains(t, sent[0].Message.HTML(), `href="https://verify.example/?token=a&#34;b&amp;c&lt;d"`)
+	assert.NotContains(t, sent[0].Message.HTML(), `a"b&c<d`)
 }
 
 // linkOverrideClient is a tiny wrapper around fakeAuthClient that returns a
@@ -188,6 +177,6 @@ func TestCIP_ResendVerificationEmail_NoEmail(t *testing.T) {
 		},
 	}
 	a := newTestAuthenticator(fake)
-	err := a.ResendVerificationEmail(context.Background(), "uid-1")
+	err := a.ResendVerificationEmail(context.Background(), gateway.VerificationTarget{Sub: "uid-1", UserID: id.NewUserID()})
 	assert.Error(t, err)
 }

@@ -155,7 +155,8 @@ func (a *Auth0) UpdateUser(ctx context.Context, p gateway.AuthenticatorUpdateUse
 	return
 }
 
-func (a *Auth0) ResendVerificationEmail(ctx context.Context, userID string) error {
+func (a *Auth0) ResendVerificationEmail(ctx context.Context, t gateway.VerificationTarget) error {
+	userID := t.Sub
 	parts := strings.SplitN(userID, "|", 2)
 	if len(parts) < 2 {
 		return rerror.NewE(i18n.T("invalid Auth0 subject format"))

@@ -3,6 +3,8 @@ package applog
 import (
 	"fmt"
 	"time"
+
+	"github.com/reearth/reearth-accounts/server/pkg/mail"
 )
 
 // Field is a typed log field. Its key always comes from the constructors in
@@ -68,6 +70,8 @@ func Subject(v string) Field { return field("subject", v) }
 
 func LimitKey(v string) Field { return field("limit_key", v) }
 func Enforced(v bool) Field   { return field("enforced", v) }
+
+func MailKind(v mail.Kind) Field { return field("mail_kind", v) }
 
 // Outcomes and counters.
 

@@ -1,7 +1,5 @@
 package gateway
 
-import "github.com/reearth/reearthx/mailer"
-
 // Provider is a typed identifier for an external authentication provider used
 // to key per-provider authenticators on Container.
 type Provider string
@@ -19,7 +17,7 @@ type Container struct {
 	// Authenticators holds the external IdP authenticators keyed by auth provider.
 	// Management calls are routed by each auth record's provider.
 	Authenticators map[Provider]Authenticator
-	Mailer         mailer.Mailer
+	Mail           Mail
 	Storage        Storage
 }
 

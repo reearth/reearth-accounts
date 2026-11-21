@@ -7,6 +7,7 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/reearth/reearth-accounts/server/internal/infrastructure/auth0"
 	"github.com/reearth/reearth-accounts/server/internal/infrastructure/cip"
+	"github.com/reearth/reearth-accounts/server/internal/infrastructure/mailprovider"
 	mongorepo "github.com/reearth/reearth-accounts/server/internal/infrastructure/mongo"
 	"github.com/reearth/reearth-accounts/server/internal/infrastructure/postgres"
 	"github.com/reearth/reearth-accounts/server/internal/infrastructure/storage"
@@ -14,7 +15,6 @@ import (
 	"github.com/reearth/reearth-accounts/server/internal/usecase/repo"
 	"github.com/reearth/reearth-accounts/server/pkg/applog"
 	"github.com/reearth/reearth-accounts/server/pkg/user"
-	"github.com/reearth/reearthx/mailer"
 	"github.com/reearth/reearthx/mongox"
 	"go.mongodb.org/mongo-driver/mongo"
 )
@@ -30,7 +30,10 @@ func initGateways(ctx context.Context, conf *Config) *gateway.Container {
 		applog.Fatal(ctx, "Failed to init storage", applog.Err(err))
 	}
 
-	mailerInstance := mailer.New(ctx, &mailer.Config{})
+	mail, err := mailprovider.New(ctx, conf.MailSettings)
+	if err != nil {
+		applog.Fatal(ctx, "Failed to init mailer", applog.Err(err))
+	}
 
 	// Build per-provider authenticators so management calls (UpdateUser,
 	// ResendVerificationEmail) are routed by each user's auth record provider
@@ -48,7 +51,7 @@ func initGateways(ctx context.Context, conf *Config) *gateway.Container {
 			HTTPTimeout: conf.CIP.HTTPTimeout,
 			ProjectID:   conf.CIP.ProjectID,
 			TenantID:    conf.CIP.TenantID,
-		}, mailerInstance)
+		}, mail)
 		if cipErr != nil {
 			applog.Fatal(ctx, "Failed to init CIP authenticator", applog.Err(cipErr))
 		}
@@ -56,8 +59,8 @@ func initGateways(ctx context.Context, conf *Config) *gateway.Container {
 	}
 
 	return &gateway.Container{
-		Mailer:         mailerInstance,
 		Authenticators: authenticators,
+		Mail:           mail,
 		Storage:        str,
 	}
 }

@@ -52,7 +52,7 @@ func (f *fakeMFAAuthenticator) RegenerateMFARecoveryCode(_ context.Context, _ st
 	return "recovery-123", nil
 }
 
-func (f *fakeMFAAuthenticator) ResendVerificationEmail(_ context.Context, _ string) error {
+func (f *fakeMFAAuthenticator) ResendVerificationEmail(_ context.Context, _ gateway.VerificationTarget) error {
 	return nil
 }
 

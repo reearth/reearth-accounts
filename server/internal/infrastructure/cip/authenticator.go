@@ -11,8 +11,8 @@ import (
 	fbauth "firebase.google.com/go/v4/auth"
 	"github.com/reearth/reearth-accounts/server/internal/usecase/gateway"
 	"github.com/reearth/reearth-accounts/server/pkg/applog"
+	"github.com/reearth/reearth-accounts/server/pkg/mail"
 	"github.com/reearth/reearthx/i18n"
-	"github.com/reearth/reearthx/mailer"
 	"github.com/reearth/reearthx/rerror"
 	"google.golang.org/api/option"
 )
@@ -40,14 +40,14 @@ type Params struct {
 // (the Cloud Run service account).
 type Authenticator struct {
 	client firebaseAuthClient
-	mailer mailer.Mailer
+	mail   gateway.Mail
 }
 
 var _ gateway.Authenticator = (*Authenticator)(nil)
 
 // New constructs a CIP Authenticator using Application Default Credentials.
 // When p.TenantID is set, management calls are scoped to that GCIP tenant.
-func New(ctx context.Context, p Params, m mailer.Mailer) (*Authenticator, error) {
+func New(ctx context.Context, p Params, m gateway.Mail) (*Authenticator, error) {
 	// Fail fast on an inconsistent configuration: selecting CIP without a project
 	// id means Config.Auths() never registers the CIP JWT provider (so CIP tokens
 	// would not validate) while management calls would still be routed to Firebase.
@@ -81,7 +81,7 @@ func New(ctx context.Context, p Params, m mailer.Mailer) (*Authenticator, error)
 		client = tc
 	}
 
-	return &Authenticator{client: client, mailer: m}, nil
+	return &Authenticator{client: client, mail: m}, nil
 }
 
 func (a *Authenticator) UpdateUser(ctx context.Context, p gateway.AuthenticatorUpdateUserParam) (gateway.AuthenticatorUser, error) {
@@ -111,8 +111,8 @@ func (a *Authenticator) UpdateUser(ctx context.Context, p gateway.AuthenticatorU
 	return toAuthenticatorUser(rec), nil
 }
 
-func (a *Authenticator) ResendVerificationEmail(ctx context.Context, userID string) error {
-	rec, err := a.client.GetUser(ctx, userID)
+func (a *Authenticator) ResendVerificationEmail(ctx context.Context, t gateway.VerificationTarget) error {
+	rec, err := a.client.GetUser(ctx, t.Sub)
 	if err != nil {
 		applog.Error(ctx, "cip: get user for verification", applog.Err(err))
 		return rerror.NewE(i18n.T("failed to resend verification email"))
@@ -123,22 +123,19 @@ func (a *Authenticator) ResendVerificationEmail(ctx context.Context, userID stri
 
 	// The Firebase Admin SDK's EmailVerificationLink only generates an
 	// out-of-band verification URL; it does not send any email itself.
-	// Delivery is handled below via the configured app Mailer.
 	link, err := a.client.EmailVerificationLink(ctx, rec.Email)
 	if err != nil {
 		applog.Error(ctx, "cip: email verification link", applog.Err(err))
 		return rerror.NewE(i18n.T("failed to resend verification email"))
 	}
-	if a.mailer == nil {
-		applog.Error(ctx, "cip: mailer is not configured; cannot send verification email")
-		return rerror.NewE(i18n.T("failed to resend verification email"))
-	}
-
 	text := "Please verify your email address by opening the following link:\n" + link
 	// Treat the link as untrusted input and HTML-escape it before embedding in the
 	// href attribute to prevent accidental injection or broken markup.
 	htmlBody := fmt.Sprintf(`<p>Please verify your email address by clicking <a href="%s">this link</a>.</p>`, html.EscapeString(link))
-	if err := a.mailer.SendMail(ctx, []mailer.Contact{{Email: rec.Email, Name: rec.DisplayName}}, "email verification", text, htmlBody); err != nil {
+	if err := a.mail.Send(ctx, mail.Envelope{
+		Message: mail.Raw(mail.KindVerificationResend, "email verification", text, htmlBody),
+		To:      mail.ToUser(t.UserID, rec.Email, rec.DisplayName),
+	}); err != nil {
 		applog.Error(ctx, "cip: send verification email", applog.Err(err))
 		return rerror.NewE(i18n.T("failed to resend verification email"))
 	}
