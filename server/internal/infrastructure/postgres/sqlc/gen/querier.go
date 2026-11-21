@@ -59,7 +59,17 @@ type Querier interface {
 	// Cross-tenant listing (no readable-workspace filter): pass '' for no keyword
 	// filter, and one of 'all'/'active'/'deleted' for the status filter.
 	// Set exclude_personal=true to omit per-user personal workspaces (used by /api/workspaces/all).
+	// NOTE: kept for backward compatibility; prefer WorkspaceIDsAllCursor or
+	// WorkspaceIDsAllOffset when the result set may be large.
 	WorkspaceIDsAll(ctx context.Context, arg WorkspaceIDsAllParams) ([]string, error)
+	// Count of workspaces for the cross-tenant listing (same filters as WorkspaceIDsAll).
+	WorkspaceIDsAllCount(ctx context.Context, arg WorkspaceIDsAllCountParams) (int64, error)
+	// Cursor-forward page for the cross-tenant listing. Pass '' for cursor to
+	// start from the beginning; IDs are ULIDs so lexicographic order equals
+	// insertion order.
+	WorkspaceIDsAllCursor(ctx context.Context, arg WorkspaceIDsAllCursorParams) ([]string, error)
+	// Offset page for the cross-tenant listing.
+	WorkspaceIDsAllOffset(ctx context.Context, arg WorkspaceIDsAllOffsetParams) ([]string, error)
 	WorkspaceIDsByIntegration(ctx context.Context, integrationID string) ([]string, error)
 	WorkspaceIDsByIntegrations(ctx context.Context, dollar_1 []string) ([]string, error)
 	WorkspaceIDsByUser(ctx context.Context, userID string) ([]string, error)

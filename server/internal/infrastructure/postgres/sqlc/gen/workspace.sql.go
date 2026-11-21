@@ -207,8 +207,123 @@ type WorkspaceIDsAllParams struct {
 // Cross-tenant listing (no readable-workspace filter): pass ” for no keyword
 // filter, and one of 'all'/'active'/'deleted' for the status filter.
 // Set exclude_personal=true to omit per-user personal workspaces (used by /api/workspaces/all).
+// NOTE: kept for backward compatibility; prefer WorkspaceIDsAllCursor or
+// WorkspaceIDsAllOffset when the result set may be large.
 func (q *Queries) WorkspaceIDsAll(ctx context.Context, arg WorkspaceIDsAllParams) ([]string, error) {
 	rows, err := q.db.Query(ctx, workspaceIDsAll, arg.ExcludePersonal, arg.Keyword, arg.Status)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []string
+	for rows.Next() {
+		var id string
+		if err := rows.Scan(&id); err != nil {
+			return nil, err
+		}
+		items = append(items, id)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const workspaceIDsAllCount = `-- name: WorkspaceIDsAllCount :one
+SELECT COUNT(*)::bigint FROM workspaces
+WHERE (NOT $1::boolean OR personal = false)
+  AND ($2::text = '' OR name ILIKE '%' || $2::text || '%' OR alias ILIKE '%' || $2::text || '%')
+  AND ($3::text = 'all' OR ($3::text = 'active' AND deleted_at IS NULL) OR ($3::text = 'deleted' AND deleted_at IS NOT NULL))
+`
+
+type WorkspaceIDsAllCountParams struct {
+	ExcludePersonal bool
+	Keyword         string
+	Status          string
+}
+
+// Count of workspaces for the cross-tenant listing (same filters as WorkspaceIDsAll).
+func (q *Queries) WorkspaceIDsAllCount(ctx context.Context, arg WorkspaceIDsAllCountParams) (int64, error) {
+	row := q.db.QueryRow(ctx, workspaceIDsAllCount, arg.ExcludePersonal, arg.Keyword, arg.Status)
+	var column_1 int64
+	err := row.Scan(&column_1)
+	return column_1, err
+}
+
+const workspaceIDsAllCursor = `-- name: WorkspaceIDsAllCursor :many
+SELECT id FROM workspaces
+WHERE (NOT $1::boolean OR personal = false)
+  AND ($2::text = '' OR name ILIKE '%' || $2::text || '%' OR alias ILIKE '%' || $2::text || '%')
+  AND ($3::text = 'all' OR ($3::text = 'active' AND deleted_at IS NULL) OR ($3::text = 'deleted' AND deleted_at IS NOT NULL))
+  AND ($4::text = '' OR id > $4::text)
+ORDER BY id
+LIMIT $5::int
+`
+
+type WorkspaceIDsAllCursorParams struct {
+	ExcludePersonal bool
+	Keyword         string
+	Status          string
+	Cursor          string
+	PageSize        int32
+}
+
+// Cursor-forward page for the cross-tenant listing. Pass ” for cursor to
+// start from the beginning; IDs are ULIDs so lexicographic order equals
+// insertion order.
+func (q *Queries) WorkspaceIDsAllCursor(ctx context.Context, arg WorkspaceIDsAllCursorParams) ([]string, error) {
+	rows, err := q.db.Query(ctx, workspaceIDsAllCursor,
+		arg.ExcludePersonal,
+		arg.Keyword,
+		arg.Status,
+		arg.Cursor,
+		arg.PageSize,
+	)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []string
+	for rows.Next() {
+		var id string
+		if err := rows.Scan(&id); err != nil {
+			return nil, err
+		}
+		items = append(items, id)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const workspaceIDsAllOffset = `-- name: WorkspaceIDsAllOffset :many
+SELECT id FROM workspaces
+WHERE (NOT $1::boolean OR personal = false)
+  AND ($2::text = '' OR name ILIKE '%' || $2::text || '%' OR alias ILIKE '%' || $2::text || '%')
+  AND ($3::text = 'all' OR ($3::text = 'active' AND deleted_at IS NULL) OR ($3::text = 'deleted' AND deleted_at IS NOT NULL))
+ORDER BY id
+LIMIT $5::int
+OFFSET $4::bigint
+`
+
+type WorkspaceIDsAllOffsetParams struct {
+	ExcludePersonal bool
+	Keyword         string
+	Status          string
+	OffsetVal       int64
+	PageSize        int32
+}
+
+// Offset page for the cross-tenant listing.
+func (q *Queries) WorkspaceIDsAllOffset(ctx context.Context, arg WorkspaceIDsAllOffsetParams) ([]string, error) {
+	rows, err := q.db.Query(ctx, workspaceIDsAllOffset,
+		arg.ExcludePersonal,
+		arg.Keyword,
+		arg.Status,
+		arg.OffsetVal,
+		arg.PageSize,
+	)
 	if err != nil {
 		return nil, err
 	}
