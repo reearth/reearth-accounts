@@ -183,7 +183,7 @@ func serveClientIP(t *testing.T, conf *Config, req *http.Request) string {
 		Config:   conf,
 		Repos:    memory.New(),
 		Gateways: &gateway.Container{Mail: &mailprovider.Mock{}},
-	})
+	}, nil)
 	e.GET("/test/client-ip", func(c echo.Context) error {
 		return c.String(http.StatusOK, c.RealIP())
 	})

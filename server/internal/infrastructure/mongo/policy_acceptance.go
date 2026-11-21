@@ -57,6 +57,53 @@ func (r *PolicyAcceptance) FindByUser(ctx context.Context, u id.UserID) ([]legal
 	return res, nil
 }
 
+func (r *PolicyAcceptance) FindUsersAfter(ctx context.Context, after *id.UserID, limit int) ([]id.UserID, error) {
+	var res []id.UserID
+	for len(res) < limit {
+		users, err := r.recordUsersAfter(ctx, after, limit)
+		if err != nil {
+			return nil, err
+		}
+		for _, u := range users {
+			if (len(res) == 0 || res[len(res)-1] != u) && len(res) < limit {
+				res = append(res, u)
+			}
+		}
+		if len(users) < limit || len(res) == 0 {
+			break
+		}
+		after = &res[len(res)-1]
+	}
+	return res, nil
+}
+
+func (r *PolicyAcceptance) recordUsersAfter(ctx context.Context, after *id.UserID, limit int) ([]id.UserID, error) {
+	filter := bson.M{}
+	if after != nil {
+		filter["user"] = bson.M{"$gt": after.String()}
+	}
+	cur, err := r.c.Find(ctx, filter, options.Find().
+		SetSort(bson.D{{Key: "user", Value: 1}}).
+		SetLimit(int64(limit)).
+		SetProjection(bson.M{"_id": 0, "user": 1}))
+	if err != nil {
+		return nil, rerror.ErrInternalByWithContext(ctx, err)
+	}
+	var docs []struct {
+		User string `bson:"user"`
+	}
+	if err := cur.All(ctx, &docs); err != nil {
+		return nil, rerror.ErrInternalByWithContext(ctx, err)
+	}
+	users := make([]id.UserID, len(docs))
+	for i, d := range docs {
+		if users[i], err = id.UserIDFrom(d.User); err != nil {
+			return nil, rerror.ErrInternalByWithContext(ctx, err)
+		}
+	}
+	return users, nil
+}
+
 func (r *PolicyAcceptance) InsertIfAbsent(ctx context.Context, as []legal.Acceptance) error {
 	if len(as) == 0 {
 		return nil

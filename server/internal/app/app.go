@@ -11,11 +11,13 @@ import (
 	"github.com/labstack/echo/v4/middleware"
 	"github.com/reearth/reearth-accounts/server/internal/adapter"
 	adapterhttp "github.com/reearth/reearth-accounts/server/internal/adapter/http"
+	"github.com/reearth/reearth-accounts/server/internal/adapter/http/handlers"
 	"github.com/reearth/reearth-accounts/server/internal/adapter/ratelimit"
 	scimadapter "github.com/reearth/reearth-accounts/server/internal/adapter/scim"
 	"github.com/reearth/reearth-accounts/server/internal/app/clientip"
 	otelapp "github.com/reearth/reearth-accounts/server/internal/app/otel"
 	"github.com/reearth/reearth-accounts/server/internal/usecase/interactor"
+	"github.com/reearth/reearth-accounts/server/internal/usecase/maintenance"
 	"github.com/reearth/reearth-accounts/server/pkg/applog"
 	"github.com/reearth/reearth-accounts/server/pkg/legal"
 	"github.com/reearth/reearth-accounts/server/pkg/user"
@@ -25,7 +27,7 @@ import (
 	"github.com/reearth/reearthx/rerror"
 )
 
-func initEcho(ctx context.Context, cfg *ServerConfig) *echo.Echo {
+func initEcho(ctx context.Context, cfg *ServerConfig, runner *maintenance.Runner) *echo.Echo {
 	if cfg.Config == nil {
 		applog.Fatal(ctx, "ServerConfig.Config is nil")
 	}
@@ -180,6 +182,7 @@ func initEcho(ctx context.Context, cfg *ServerConfig) *echo.Echo {
 		SwaggerUser:        cfg.Config.SwaggerBasicUser,
 		SwaggerPass:        cfg.Config.SwaggerBasicPass,
 		Debug:              cfg.Debug || cfg.Config.Dev,
+		Maintenance:        maintenanceRoute(cfg.Config, runner),
 	})
 
 	scimUC := interactor.NewScim(cfg.Repos, nil)
@@ -272,4 +275,11 @@ func cacheControl(next echo.HandlerFunc) echo.HandlerFunc {
 		c.Response().Header().Set("Cache-Control", "private")
 		return next(c)
 	}
+}
+
+func maintenanceRoute(c *Config, runner *maintenance.Runner) *handlers.MaintenanceHandler {
+	if c.MaintenanceKey == "" {
+		return nil
+	}
+	return &handlers.MaintenanceHandler{Key: maintenance.NewKey(c.MaintenanceKey), Runner: runner}
 }

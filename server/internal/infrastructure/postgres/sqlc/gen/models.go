@@ -29,6 +29,23 @@ type Config struct {
 	DefaultPolicy *string
 }
 
+type MailOutbox struct {
+	Key              string
+	Kind             string
+	Subject          []byte
+	RecipientUserID  *string
+	RecipientAddress *string
+	State            string
+	Attempts         int32
+	NextAttemptAt    time.Time
+	ClaimToken       *string
+	ClaimUntil       *time.Time
+	Reason           string
+	CreatedAt        time.Time
+	UpdatedAt        time.Time
+	EndedAt          *time.Time
+}
+
 type Permittable struct {
 	ID        string
 	UserID    string

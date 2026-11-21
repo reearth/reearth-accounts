@@ -39,10 +39,12 @@ func (s *sender) Send(ctx context.Context, e mail.Envelope) error {
 	to := []mailer.Contact{{Email: e.To.Address(), Name: displayName(e.To.Name())}}
 	if err := s.m.SendMail(ctx, to, e.Message.Subject(), e.Message.Text(), e.Message.HTML()); err != nil {
 		applog.Warn(ctx, "mail send failed", logFields(e)...)
-		return &mail.SendError{Err: err}
+		return &mail.SendError{Err: err, Permanent: permanent(err)}
 	}
 	return nil
 }
+
+func (s *sender) Deliverable() bool { return s.mode == ModeProvider }
 
 // reearthx's SES mailer writes recipients as unquoted "name <email>" (mailer/aws_ses.go formatContact).
 func displayName(name string) string {
@@ -60,6 +62,10 @@ func (s *sender) drop(ctx context.Context, e mail.Envelope) {
 		_, _ = fmt.Fprintln(s.out, e.Message.Text())
 	}
 }
+
+// reearthx returns no typed errors yet, so every error is treated as
+// transient.
+func permanent(error) bool { return false }
 
 func logFields(e mail.Envelope) []applog.Field {
 	fields := []applog.Field{applog.MailKind(e.Message.Kind())}

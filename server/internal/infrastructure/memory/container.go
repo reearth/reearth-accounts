@@ -11,6 +11,7 @@ func New() *repo.Container {
 		User:             NewUser(),
 		Workspace:        NewWorkspace(),
 		Role:             NewRole(),
+		Outbox:           NewOutbox(),
 		Permittable:      NewPermittable(),
 		PolicyAcceptance: NewPolicyAcceptance(),
 		PolicyVersion:    NewPolicyVersion(),

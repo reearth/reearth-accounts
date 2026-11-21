@@ -18,8 +18,10 @@ import (
 	"github.com/reearth/reearth-accounts/server/internal/infrastructure/postgres"
 	pgmigration "github.com/reearth/reearth-accounts/server/internal/infrastructure/postgres/migration"
 	"github.com/reearth/reearth-accounts/server/internal/usecase/gateway"
+	"github.com/reearth/reearth-accounts/server/internal/usecase/maintenance"
 	"github.com/reearth/reearth-accounts/server/internal/usecase/repo"
 	"github.com/reearth/reearth-accounts/server/pkg/applog"
+	"github.com/reearth/reearth-accounts/server/pkg/mail"
 	"github.com/reearth/reearthx/log"
 
 	otelapp "github.com/reearth/reearth-accounts/server/internal/app/otel"
@@ -164,9 +166,13 @@ func Start(debug bool) {
 	}).Run(ctx)
 }
 
+const orphanAcceptancePage = 200
+
 type WebServer struct {
-	address   string
-	appServer *echo.Echo
+	address             string
+	appServer           *echo.Echo
+	maintenance         *maintenance.Runner
+	maintenanceInterval time.Duration
 }
 
 type ServerConfig struct {
@@ -175,6 +181,7 @@ type ServerConfig struct {
 	Repos         *repo.Container
 	Gateways      *gateway.Container
 	CerbosAdapter gateway.CerbosGateway
+	Resolvers     map[mail.Kind]maintenance.Resolver
 }
 
 func NewServer(ctx context.Context, cfg *ServerConfig) *WebServer {
@@ -196,10 +203,12 @@ func NewServer(ctx context.Context, cfg *ServerConfig) *WebServer {
 	address := host + ":" + port
 
 	w := &WebServer{
-		address: address,
+		address:             address,
+		maintenanceInterval: cfg.Config.MaintenanceInterval,
 	}
-
-	w.appServer = initEcho(ctx, cfg)
+	w.maintenance = maintenance.NewRunner(cfg.Config.Maintenance(), cfg.Repos.Outbox, cfg.Gateways.Mail, cfg.Resolvers,
+		maintenance.OrphanAcceptances(cfg.Repos.PolicyAcceptance, cfg.Repos.User, orphanAcceptancePage))
+	w.appServer = initEcho(ctx, cfg, w.maintenance)
 	return w
 }
 
@@ -218,12 +227,20 @@ func (w *WebServer) Run(ctx context.Context) {
 		}
 	}()
 
+	loopCtx, stopLoop := context.WithCancel(ctx)
+	defer stopLoop()
+	go w.maintenance.Loop(loopCtx, w.maintenanceInterval)
+
 	quit := make(chan os.Signal, 1)
 	signal.Notify(quit, os.Interrupt, syscall.SIGTERM)
 	<-quit
 
+	stopLoop()
 	shutdownCtx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
+	if err := w.maintenance.Shutdown(shutdownCtx); err != nil {
+		applog.Error(ctx, "maintenance shutdown", applog.Err(err))
+	}
 	if err := w.Shutdown(shutdownCtx); err != nil {
 		applog.Error(ctx, "server shutdown", applog.Err(err))
 	}

@@ -6,6 +6,7 @@ package gen
 
 import (
 	"context"
+	"time"
 )
 
 type Querier interface {
@@ -16,6 +17,14 @@ type Querier interface {
 	ConfigLoad(ctx context.Context) (ConfigLoadRow, error)
 	ConfigUpsert(ctx context.Context, arg ConfigUpsertParams) error
 	ConfigUpsertAuth(ctx context.Context, arg ConfigUpsertAuthParams) error
+	OutboxClaimDue(ctx context.Context, arg OutboxClaimDueParams) (MailOutbox, error)
+	OutboxComplete(ctx context.Context, arg OutboxCompleteParams) (int64, error)
+	OutboxDeleteRetired(ctx context.Context, endedAt *time.Time) (int64, error)
+	OutboxEnqueue(ctx context.Context, arg OutboxEnqueueParams) error
+	OutboxExpireClaims(ctx context.Context, now *time.Time) (int64, error)
+	OutboxFailStale(ctx context.Context, arg OutboxFailStaleParams) (int64, error)
+	OutboxFindByKey(ctx context.Context, key string) (MailOutbox, error)
+	OutboxRemoveByUser(ctx context.Context, recipientUserID *string) error
 	PermittableFindByRoleID(ctx context.Context, dollar_1 string) ([]Permittable, error)
 	PermittableFindByUserID(ctx context.Context, userID string) (Permittable, error)
 	PermittableFindByUserIDs(ctx context.Context, dollar_1 []string) ([]Permittable, error)
@@ -25,6 +34,7 @@ type Querier interface {
 	PermittableWorkspaceRolesByPermittableIDs(ctx context.Context, dollar_1 []string) ([]PermittableWorkspaceRole, error)
 	PermittableWorkspaceRolesDeleteByPermittable(ctx context.Context, permittableID string) error
 	PolicyAcceptanceFindByUser(ctx context.Context, userID string) ([]PolicyAcceptance, error)
+	PolicyAcceptanceFindUsersAfter(ctx context.Context, arg PolicyAcceptanceFindUsersAfterParams) ([]string, error)
 	PolicyAcceptanceInsert(ctx context.Context, arg PolicyAcceptanceInsertParams) error
 	PolicyAcceptanceRemove(ctx context.Context, arg PolicyAcceptanceRemoveParams) error
 	PolicyAcceptanceRemoveByUser(ctx context.Context, userID string) error

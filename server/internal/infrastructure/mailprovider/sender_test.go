@@ -76,6 +76,7 @@ func TestSender_Provider_ErrorIsSendErrorWithoutAddress(t *testing.T) {
 
 	var se *mail.SendError
 	require.ErrorAs(t, err, &se)
+	assert.False(t, se.Permanent, "reearthx errors are untyped, so every error is retried")
 	assert.ErrorIs(t, err, cause)
 	assert.NotContains(t, err.Error(), address)
 
@@ -156,6 +157,14 @@ func TestNew_NilMailerFailsStartup(t *testing.T) {
 
 	assert.Nil(t, m)
 	assert.ErrorContains(t, err, "REEARTH_ACCOUNTS_MAILER: ses failed to initialize")
+}
+
+func TestSender_DeliverableOnlyWithAProvider(t *testing.T) {
+	assert.True(t, (&sender{mode: ModeProvider}).Deliverable())
+	assert.False(t, (&sender{mode: ModeDrop}).Deliverable())
+	assert.False(t, (&sender{mode: ModeDevPrint}).Deliverable())
+	assert.True(t, (&Mock{}).Deliverable())
+	assert.False(t, (&Mock{NoProvider: true}).Deliverable())
 }
 
 func TestSender_Provider_NameCannotChangeRecipient(t *testing.T) {

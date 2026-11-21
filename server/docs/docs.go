@@ -64,6 +64,47 @@ const docTemplate = `{
                 }
             }
         },
+        "/api/maintenance/run": {
+            "post": {
+                "description": "Sweeps the mail outbox, runs retention steps and sends due mail for up to 30 seconds, then reports the counts. For a scheduler. Returns 404 when REEARTH_ACCOUNTS_MAINTENANCE_KEY is unset.",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Maintenance"
+                ],
+                "summary": "Run one maintenance pass",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "the value of REEARTH_ACCOUNTS_MAINTENANCE_KEY",
+                        "name": "X-Accounts-Maintenance-Key",
+                        "in": "header",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/httpmodel.MaintenanceRunResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "missing or wrong key",
+                        "schema": {
+                            "$ref": "#/definitions/internal.ErrorResponse"
+                        }
+                    },
+                    "404": {
+                        "description": "maintenance route not configured",
+                        "schema": {
+                            "$ref": "#/definitions/internal.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
         "/api/permissions/check": {
             "post": {
                 "security": [
@@ -2520,6 +2561,41 @@ const docTemplate = `{
             "properties": {
                 "enrolled": {
                     "type": "boolean"
+                }
+            }
+        },
+        "httpmodel.MaintenanceRunResponse": {
+            "type": "object",
+            "properties": {
+                "claimsExpired": {
+                    "type": "integer"
+                },
+                "deleted": {
+                    "type": "integer"
+                },
+                "failed": {
+                    "type": "integer"
+                },
+                "lost": {
+                    "type": "integer"
+                },
+                "pendingExpired": {
+                    "type": "integer"
+                },
+                "ran": {
+                    "type": "boolean"
+                },
+                "retained": {
+                    "type": "object",
+                    "additionalProperties": {
+                        "type": "integer"
+                    }
+                },
+                "retried": {
+                    "type": "integer"
+                },
+                "sent": {
+                    "type": "integer"
                 }
             }
         },

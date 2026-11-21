@@ -11,10 +11,13 @@ import (
 var _ gateway.Mail = (*Mock)(nil)
 
 type Mock struct {
-	Err       error
-	envelopes []mail.Envelope
-	lock      sync.Mutex
+	Err        error
+	NoProvider bool
+	envelopes  []mail.Envelope
+	lock       sync.Mutex
 }
+
+func (m *Mock) Deliverable() bool { return !m.NoProvider }
 
 func (m *Mock) Envelopes() []mail.Envelope {
 	m.lock.Lock()

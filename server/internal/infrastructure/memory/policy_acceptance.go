@@ -2,6 +2,9 @@ package memory
 
 import (
 	"context"
+	"maps"
+	"slices"
+	"strings"
 	"sync"
 
 	"github.com/reearth/reearth-accounts/server/pkg/id"
@@ -32,6 +35,19 @@ func (r *PolicyAcceptance) FindByUser(_ context.Context, u id.UserID) ([]legal.A
 		}
 	}
 	return res, nil
+}
+
+func (r *PolicyAcceptance) FindUsersAfter(_ context.Context, after *id.UserID, limit int) ([]id.UserID, error) {
+	r.lock.Lock()
+	defer r.lock.Unlock()
+	seen := map[id.UserID]struct{}{}
+	for k := range r.data {
+		if after == nil || k.user.String() > after.String() {
+			seen[k.user] = struct{}{}
+		}
+	}
+	users := slices.SortedFunc(maps.Keys(seen), func(a, b id.UserID) int { return strings.Compare(a.String(), b.String()) })
+	return users[:min(limit, len(users))], nil
 }
 
 func (r *PolicyAcceptance) InsertIfAbsent(_ context.Context, as []legal.Acceptance) error {

@@ -7,5 +7,6 @@ import (
 )
 
 type Mail interface {
+	Deliverable() bool
 	Send(ctx context.Context, e mail.Envelope) error
 }

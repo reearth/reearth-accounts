@@ -33,6 +33,7 @@ func New(ctx context.Context, db *mongo.Database, useTransaction, needCompat boo
 		User:             NewUser(client),
 		Workspace:        ws,
 		Role:             NewRole(client),
+		Outbox:           NewOutbox(db),
 		Permittable:      NewPermittable(client),
 		PolicyAcceptance: NewPolicyAcceptance(db),
 		PolicyVersion:    NewPolicyVersion(db),

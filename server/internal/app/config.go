@@ -3,6 +3,7 @@ package app
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"net"
 	"net/netip"
@@ -16,7 +17,9 @@ import (
 	"github.com/reearth/reearth-accounts/server/internal/adapter/ratelimit"
 	"github.com/reearth/reearth-accounts/server/internal/app/clientip"
 	"github.com/reearth/reearth-accounts/server/internal/infrastructure/mailprovider"
+	"github.com/reearth/reearth-accounts/server/internal/usecase/maintenance"
 	"github.com/reearth/reearth-accounts/server/pkg/applog"
+	"github.com/reearth/reearth-accounts/server/pkg/outbox"
 	"github.com/reearth/reearth-accounts/server/pkg/workspace"
 	"github.com/reearth/reearthx/appx"
 )
@@ -71,6 +74,12 @@ type Config struct {
 
 	Mailer       mailprovider.Env
 	MailSettings mailprovider.Settings `ignored:"true"`
+
+	MailerMaxAttempts   int           `default:"5" envconfig:"REEARTH_ACCOUNTS_MAILER_MAX_ATTEMPTS"`
+	MailerOutboxTTL     time.Duration `default:"720h" envconfig:"REEARTH_ACCOUNTS_MAILER_OUTBOX_TTL"`
+	MailerRate          float64       `default:"2" envconfig:"REEARTH_ACCOUNTS_MAILER_RATE"`
+	MaintenanceInterval time.Duration `default:"30s" envconfig:"REEARTH_ACCOUNTS_MAINTENANCE_INTERVAL"`
+	MaintenanceKey      string        `envconfig:"REEARTH_ACCOUNTS_MAINTENANCE_KEY"`
 
 	// UserLookupLimit caps user lookups per viewer (ADR-0003 decision 6).
 	UserLookupLimit ratelimit.Config
@@ -301,6 +310,10 @@ func ReadConfig(debug bool) (*Config, error) {
 	}
 	c.TrustedProxyPrefixes = proxies
 
+	if err := c.checkMaintenance(); err != nil {
+		return nil, err
+	}
+
 	ms, err := mailprovider.Parse(c.Mailer, c.Dev)
 	if err != nil {
 		return nil, err
@@ -311,6 +324,32 @@ func ReadConfig(debug bool) (*Config, error) {
 		c.Dev = true
 	}
 	return &c, nil
+}
+
+func (c *Config) checkMaintenance() error {
+	switch {
+	case c.MailerMaxAttempts < 1:
+		return fmt.Errorf("REEARTH_ACCOUNTS_MAILER_MAX_ATTEMPTS must be at least 1, got %d", c.MailerMaxAttempts)
+	case c.MailerOutboxTTL <= 0:
+		return fmt.Errorf("REEARTH_ACCOUNTS_MAILER_OUTBOX_TTL must be positive, got %s", c.MailerOutboxTTL)
+	case c.MailerRate <= 0:
+		return fmt.Errorf("REEARTH_ACCOUNTS_MAILER_RATE must be positive, got %v", c.MailerRate)
+	case c.MaintenanceInterval < 0:
+		return fmt.Errorf("REEARTH_ACCOUNTS_MAINTENANCE_INTERVAL must not be negative, got %s", c.MaintenanceInterval)
+	case c.MaintenanceKey == "":
+		return nil
+	case strings.TrimSpace(c.MaintenanceKey) != c.MaintenanceKey:
+		return errors.New("REEARTH_ACCOUNTS_MAINTENANCE_KEY must not start or end with whitespace")
+	case len(c.MaintenanceKey) < maintenance.MinKeyLen:
+		return fmt.Errorf("REEARTH_ACCOUNTS_MAINTENANCE_KEY must be at least %d bytes, got %d", maintenance.MinKeyLen, len(c.MaintenanceKey))
+	}
+	return nil
+}
+
+func (c *Config) Maintenance() maintenance.Config {
+	retry := outbox.DefaultRetryPolicy
+	retry.MaxAttempts = c.MailerMaxAttempts
+	return maintenance.Config{Lease: outbox.ClaimLease, Retry: retry, SendsPerSecond: c.MailerRate, TTL: c.MailerOutboxTTL}
 }
 
 type GraphQLConfig struct {
@@ -327,6 +366,7 @@ func (c Config) Print() string {
 		c.DB, c.RestAPIKey, c.SwaggerBasicPass,
 		c.Auth0.ClientSecret, c.SignupSecret, c.SyncSSOAPIKey,
 		c.Mailer.SendGridAPIKey, c.Mailer.CloudflareAPIToken, c.PolicyWebhookSecret,
+		c.MaintenanceKey,
 	} {
 		if secret == "" {
 			continue

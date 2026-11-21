@@ -39,7 +39,8 @@ type RouterConfig struct {
 	LoginTime adapter.LoginTimeSource
 	// Debug enables serving /swagger without credentials (debug/dev only); in
 	// production Swagger is served only when basic-auth credentials are configured.
-	Debug bool
+	Debug       bool
+	Maintenance *handlers.MaintenanceHandler
 }
 
 // RegisterRESTRouter mounts all /api/* REST routes additively. It MUST be called after
@@ -170,6 +171,12 @@ func RegisterRESTRouter(e *echo.Echo, cfg RouterConfig) {
 
 	// No user or service auth: the HMAC signature is the only check.
 	api.POST("/policies/webhook", polh.Webhook)
+
+	maintenanceRun := echo.NotFoundHandler
+	if cfg.Maintenance != nil {
+		maintenanceRun = cfg.Maintenance.Run
+	}
+	api.POST("/maintenance/run", maintenanceRun)
 
 	// --- Swagger ---
 	// Basic-auth protected when credentials are configured (served in any environment);

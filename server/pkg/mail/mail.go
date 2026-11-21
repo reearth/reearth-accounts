@@ -46,7 +46,8 @@ type Envelope struct {
 // SendError hides the provider error text, because provider errors can quote
 // the recipient address; the cause stays reachable through Unwrap.
 type SendError struct {
-	Err error
+	Err       error
+	Permanent bool
 }
 
 func (e *SendError) Error() string { return "mail: send failed" }

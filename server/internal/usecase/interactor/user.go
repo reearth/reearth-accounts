@@ -539,6 +539,10 @@ func (i *User) DeleteMe(ctx context.Context, userID user.ID, operator *workspace
 			return err
 		}
 
+		if err := i.repos.Outbox.RemoveByUser(ctx, u.ID()); err != nil {
+			return err
+		}
+
 		// Delete user
 		if err := i.repos.User.Remove(ctx, u.ID()); err != nil {
 			return err
@@ -549,13 +553,13 @@ func (i *User) DeleteMe(ctx context.Context, userID user.ID, operator *workspace
 	if err != nil {
 		return err
 	}
-	// A policy acceptance inserted after this transaction's removal and before
-	// its commit would otherwise outlive the user; Policy.Accept removes any
-	// inserted after this sweep.
 	dctx, cancel := detached(ctx)
 	defer cancel()
 	if err := retry(dctx, func(ctx context.Context) error { return i.repos.PolicyAcceptance.RemoveByUser(ctx, userID) }); err != nil {
 		applog.Error(ctx, "policy acceptances outlived their deleted user", applog.UserID(userID), applog.Err(err))
+	}
+	if err := retry(dctx, func(ctx context.Context) error { return i.repos.Outbox.RemoveByUser(ctx, userID) }); err != nil {
+		applog.Error(ctx, "outbox records outlived their deleted user", applog.UserID(userID), applog.Err(err))
 	}
 	return nil
 }
