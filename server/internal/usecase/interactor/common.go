@@ -8,12 +8,14 @@ import (
 	"github.com/reearth/reearth-accounts/server/internal/usecase/gateway"
 	"github.com/reearth/reearth-accounts/server/internal/usecase/interfaces"
 	"github.com/reearth/reearth-accounts/server/internal/usecase/repo"
+	"github.com/reearth/reearth-accounts/server/pkg/legal"
 )
 
 type ContainerConfig struct {
 	AllowedISS            []string
 	AuthSrvUIDomain       string
 	MFARecoveryMaxAuthAge time.Duration
+	PolicySecret          legal.Secret
 	SignupSecret          string
 }
 
@@ -22,6 +24,7 @@ func NewContainer(
 	acg *gateway.Container,
 	enforcer WorkspaceMemberCountEnforcer,
 	cerbosAdapter gateway.CerbosGateway,
+	catalog *PolicyCatalog,
 	config ContainerConfig,
 ) interfaces.Container {
 	cerbos := NewCerbos(r, cerbosAdapter)
@@ -32,6 +35,7 @@ func NewContainer(
 	return interfaces.Container{
 		Cerbos:      cerbos,
 		Permittable: NewPermittable(r),
+		Policy:      NewPolicy(r, config.PolicySecret, catalog),
 		Role:        r.Role,
 		Scim:        NewScim(r, cerbos),
 		User:        u,

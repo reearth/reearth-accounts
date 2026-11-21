@@ -195,6 +195,17 @@ definitions:
     - password
     - token
     type: object
+  httpmodel.PolicyWebhookResponse:
+    properties:
+      applied:
+        items:
+          type: string
+        type: array
+      ignored:
+        items:
+          type: string
+        type: array
+    type: object
   httpmodel.RemoveIntegrationsRequest:
     properties:
       integration_ids:
@@ -633,6 +644,47 @@ paths:
       summary: Check a permission for the current user
       tags:
       - Permission
+  /api/policies/webhook:
+    post:
+      consumes:
+      - application/json
+      description: 'Takes the versions.json payload that a policy repository posts
+        when it changes. The signature is the only check: X-Policy-Signature must
+        be sha256=<hex HMAC-SHA256 of the raw body>. Returns 404 when REEARTH_ACCOUNTS_POLICY_WEBHOOK_SECRET
+        is unset. A rejected payload saves nothing.'
+      parameters:
+      - description: sha256=<hex HMAC-SHA256 of the raw body>
+        in: header
+        name: X-Policy-Signature
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/httpmodel.PolicyWebhookResponse'
+        "400":
+          description: missing or malformed field, or timestamp more than 5 minutes
+            ahead
+          schema:
+            $ref: '#/definitions/internal.ErrorResponse'
+        "401":
+          description: missing or wrong signature
+          schema:
+            $ref: '#/definitions/internal.ErrorResponse'
+        "404":
+          description: policies not configured
+          schema:
+            $ref: '#/definitions/internal.ErrorResponse'
+        "413":
+          description: body larger than 1 MiB
+          schema:
+            $ref: '#/definitions/internal.ErrorResponse'
+      summary: Receive policy versions from the policy repository
+      tags:
+      - Policies
   /api/service/workspaces/{id}/members/{user_id}:
     patch:
       consumes:

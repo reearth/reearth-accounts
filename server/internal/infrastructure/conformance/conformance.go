@@ -67,6 +67,7 @@ func Run(t *testing.T, nc Factory) {
 	t.Run("Config_LockLoadSave", func(t *testing.T) { testConfig(t, nc) })
 	t.Run("Config_SaveAuth", func(t *testing.T) { testConfigSaveAuth(t, nc) })
 	t.Run("Transaction_CommitRollback", func(t *testing.T) { testTransaction(t, nc) })
+	runLegal(t, nc)
 }
 
 func newUser(t *testing.T, name, email string) *user.User {

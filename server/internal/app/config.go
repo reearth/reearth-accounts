@@ -75,6 +75,8 @@ type Config struct {
 	// UserLookupLimit caps user lookups per viewer (ADR-0003 decision 6).
 	UserLookupLimit ratelimit.Config
 
+	PolicyWebhookSecret string `envconfig:"REEARTH_ACCOUNTS_POLICY_WEBHOOK_SECRET"`
+
 	SignupSecret   string `envconfig:"REEARTH_ACCOUNTS_SIGNUP_SECRET"`
 	HostWeb        string
 	Reearth_API    string
@@ -324,7 +326,7 @@ func (c Config) Print() string {
 	for _, secret := range []string{
 		c.DB, c.RestAPIKey, c.SwaggerBasicPass,
 		c.Auth0.ClientSecret, c.SignupSecret, c.SyncSSOAPIKey,
-		c.Mailer.SendGridAPIKey, c.Mailer.CloudflareAPIToken,
+		c.Mailer.SendGridAPIKey, c.Mailer.CloudflareAPIToken, c.PolicyWebhookSecret,
 	} {
 		if secret == "" {
 			continue

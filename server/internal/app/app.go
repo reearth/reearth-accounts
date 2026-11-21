@@ -17,6 +17,7 @@ import (
 	otelapp "github.com/reearth/reearth-accounts/server/internal/app/otel"
 	"github.com/reearth/reearth-accounts/server/internal/usecase/interactor"
 	"github.com/reearth/reearth-accounts/server/pkg/applog"
+	"github.com/reearth/reearth-accounts/server/pkg/legal"
 	"github.com/reearth/reearth-accounts/server/pkg/user"
 	"github.com/reearth/reearth-accounts/server/pkg/workspace"
 	"github.com/reearth/reearthx/appx"
@@ -108,10 +109,12 @@ func initEcho(ctx context.Context, cfg *ServerConfig) *echo.Echo {
 		cfg.Gateways,
 		nil,
 		cfg.CerbosAdapter,
+		interactor.NewPolicyCatalog(cfg.Repos.PolicyVersion, interactor.PolicyCatalogTTL),
 		interactor.ContainerConfig{
 			AllowedISS:            allowedISS,
 			AuthSrvUIDomain:       cfg.Config.HostWeb,
 			MFARecoveryMaxAuthAge: cfg.Config.MFARecoveryMaxAuthAge,
+			PolicySecret:          legal.NewSecret(cfg.Config.PolicyWebhookSecret),
 			SignupSecret:          cfg.Config.SignupSecret,
 		})
 

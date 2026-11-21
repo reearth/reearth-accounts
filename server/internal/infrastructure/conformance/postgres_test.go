@@ -17,7 +17,7 @@ import (
 )
 
 const pgTruncate = `TRUNCATE users, workspaces, workspace_members, workspace_integrations,
-	roles, permittables, permittable_workspace_roles, config RESTART IDENTITY CASCADE`
+	roles, permittables, permittable_workspace_roles, config, policy_versions, policy_types RESTART IDENTITY CASCADE`
 
 func TestPostgresConformance(t *testing.T) {
 	ctx := context.Background()

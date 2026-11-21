@@ -264,7 +264,11 @@ func provideRepoContainer(cfg *Config) (*repo.Container, func(), error) {
 	if !txAvailable {
 		applog.Warn(ctx, "[admin] mongo transactions are disabled for this DB URI; workspace ownership transfer will not be atomic")
 	}
-	repos, err := mongorepo.New(context.Background(), client.Database(cfg.DBName), txAvailable, false, []user.Repo{})
+	db := client.Database(cfg.DBName)
+	repos, err := mongorepo.New(context.Background(), db, txAvailable, false, []user.Repo{})
+	if err == nil {
+		err = mongorepo.EnsureIndexes(context.Background(), db)
+	}
 	if err != nil {
 		_ = client.Disconnect(context.Background())
 		return nil, nil, fmt.Errorf("init mongo repos: %w", err)

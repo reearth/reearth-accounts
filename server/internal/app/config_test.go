@@ -82,13 +82,14 @@ func TestConfig_Print_MasksSecrets(t *testing.T) {
 	mailSettings, err := mailprovider.Parse(mailerEnv, false)
 	require.NoError(t, err)
 	c := Config{
-		Mailer:           mailerEnv,
-		MailSettings:     mailSettings,
-		DB:               "mongodb://user:pass@localhost/db",
-		RestAPIKey:       "rest-api-key-value",
-		SwaggerBasicPass: "swagger-pass-value",
-		SignupSecret:     "signup-secret-value",
-		SyncSSOAPIKey:    "sync-sso-api-key-value",
+		Mailer:              mailerEnv,
+		MailSettings:        mailSettings,
+		DB:                  "mongodb://user:pass@localhost/db",
+		RestAPIKey:          "rest-api-key-value",
+		SwaggerBasicPass:    "swagger-pass-value",
+		SignupSecret:        "signup-secret-value",
+		SyncSSOAPIKey:       "sync-sso-api-key-value",
+		PolicyWebhookSecret: "policy-webhook-secret-value",
 		Auth0: Auth0Config{
 			ClientSecret: "auth0-client-secret-value",
 		},
@@ -112,6 +113,7 @@ func TestConfig_Print_MasksSecrets(t *testing.T) {
 		"sync-sso-api-key-value",
 		"auth0-client-secret-value",
 		"sendgrid-api-key-value",
+		"policy-webhook-secret-value",
 		"cloudflare-token-value",
 	} {
 		assert.NotContains(t, got, secret)

@@ -101,6 +101,62 @@
                 }
             }
         },
+        "/api/policies/webhook": {
+            "post": {
+                "description": "Takes the versions.json payload that a policy repository posts when it changes. The signature is the only check: X-Policy-Signature must be sha256=\u003chex HMAC-SHA256 of the raw body\u003e. Returns 404 when REEARTH_ACCOUNTS_POLICY_WEBHOOK_SECRET is unset. A rejected payload saves nothing.",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Policies"
+                ],
+                "summary": "Receive policy versions from the policy repository",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "sha256=\u003chex HMAC-SHA256 of the raw body\u003e",
+                        "name": "X-Policy-Signature",
+                        "in": "header",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/httpmodel.PolicyWebhookResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "missing or malformed field, or timestamp more than 5 minutes ahead",
+                        "schema": {
+                            "$ref": "#/definitions/internal.ErrorResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "missing or wrong signature",
+                        "schema": {
+                            "$ref": "#/definitions/internal.ErrorResponse"
+                        }
+                    },
+                    "404": {
+                        "description": "policies not configured",
+                        "schema": {
+                            "$ref": "#/definitions/internal.ErrorResponse"
+                        }
+                    },
+                    "413": {
+                        "description": "body larger than 1 MiB",
+                        "schema": {
+                            "$ref": "#/definitions/internal.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
         "/api/service/workspaces/{id}/members/{user_id}": {
             "patch": {
                 "security": [
@@ -2470,6 +2526,23 @@
                 },
                 "token": {
                     "type": "string"
+                }
+            }
+        },
+        "httpmodel.PolicyWebhookResponse": {
+            "type": "object",
+            "properties": {
+                "applied": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
+                },
+                "ignored": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
                 }
             }
         },
