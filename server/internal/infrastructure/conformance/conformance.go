@@ -70,6 +70,7 @@ func Run(t *testing.T, nc Factory) {
 	runLegal(t, nc)
 	runPolicyAcceptance(t, nc)
 	runOutbox(t, nc)
+	runPolicyNotice(t, nc)
 	runMaintenance(t, nc)
 }
 

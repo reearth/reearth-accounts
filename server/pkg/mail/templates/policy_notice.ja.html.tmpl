@@ -1,0 +1,6 @@
+{{define "html"}}{{template "layout" .}}{{end}}
+{{define "title"}}{{.PolicyTitle}}改定のお知らせ{{end}}
+{{define "greeting"}}いつも Re:Earth をご利用いただきありがとうございます。{{end}}
+{{define "message"}}{{.PolicyTitle}}を改定します。新しいバージョン {{.Version}} は {{.EffectiveDate.UTC.Format "2006年1月2日 15:04 (UTC)"}} に発効します。{{end}}
+{{define "action"}}新しいバージョンを読む{{end}}
+{{define "suffix"}}{{if .Major}}発効日以降に Re:Earth へログインすると、新しいバージョンへの同意をお願いします。{{else}}発効日以降も Re:Earth をご利用いただくと、新しいバージョンに同意したものとみなされます。{{end}}{{end}}

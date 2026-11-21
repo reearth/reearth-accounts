@@ -8,6 +8,7 @@ type MaintenanceRunResponse struct {
 	Failed         int            `json:"failed"`
 	Lost           int            `json:"lost"`
 	PendingExpired int            `json:"pendingExpired"`
+	Queued         int            `json:"queued"`
 	Ran            bool           `json:"ran"`
 	Retained       map[string]int `json:"retained"`
 	Retried        int            `json:"retried"`
@@ -25,6 +26,7 @@ func NewMaintenanceRunResponse(r maintenance.Report) MaintenanceRunResponse {
 		Failed:         r.Failed,
 		Lost:           r.Lost,
 		PendingExpired: r.Sweep.TimedOut,
+		Queued:         r.Queued,
 		Ran:            r.Ran,
 		Retained:       retained,
 		Retried:        r.Retried,

@@ -19,6 +19,38 @@ func (q *Queries) UserDelete(ctx context.Context, id string) error {
 	return err
 }
 
+const userFindActiveIDsWithEmailAfter = `-- name: UserFindActiveIDsWithEmailAfter :many
+SELECT id FROM users
+WHERE deleted_at IS NULL AND email <> '' AND id > $1::text
+ORDER BY id
+LIMIT $2::integer
+`
+
+type UserFindActiveIDsWithEmailAfterParams struct {
+	After string
+	Max   int32
+}
+
+func (q *Queries) UserFindActiveIDsWithEmailAfter(ctx context.Context, arg UserFindActiveIDsWithEmailAfterParams) ([]string, error) {
+	rows, err := q.db.Query(ctx, userFindActiveIDsWithEmailAfter, arg.After, arg.Max)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []string
+	for rows.Next() {
+		var id string
+		if err := rows.Scan(&id); err != nil {
+			return nil, err
+		}
+		items = append(items, id)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const userFindAll = `-- name: UserFindAll :many
 SELECT id, name, alias, email, workspace, password, subs, latest_logout_at, metadata, verification, password_reset, team, lang, theme, updated_at, deleted_at, created_at FROM users ORDER BY id
 `

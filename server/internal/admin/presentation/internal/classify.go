@@ -8,6 +8,7 @@ import (
 	"github.com/reearth/reearth-accounts/server/internal/admin/usecase/adminuseruc"
 	"github.com/reearth/reearth-accounts/server/internal/admin/usecase/authuc"
 	"github.com/reearth/reearth-accounts/server/internal/admin/usecase/workspaceuc"
+	"github.com/reearth/reearth-accounts/server/pkg/legal"
 	"github.com/reearth/reearth-accounts/server/pkg/user"
 	"github.com/reearth/reearth-accounts/server/pkg/workspace"
 	"github.com/reearth/reearthx/rerror"
@@ -39,6 +40,12 @@ func Classify(err error) (status int, code, msg string) {
 		return http.StatusBadRequest, http.StatusText(http.StatusBadRequest), "cannot reject the last approved admin"
 	case errors.Is(err, adminuseruc.ErrLastSystemAdmin):
 		return http.StatusBadRequest, http.StatusText(http.StatusBadRequest), "cannot demote the last system admin"
+	case errors.Is(err, legal.ErrNoUpcoming):
+		return http.StatusUnprocessableEntity, "no_upcoming_version", "policy type has no upcoming version"
+	case errors.Is(err, legal.ErrNotRequired):
+		return http.StatusUnprocessableEntity, "not_required", "policy type is not required"
+	case errors.Is(err, legal.ErrPatchNotice):
+		return http.StatusUnprocessableEntity, "patch_version", "a patch version needs no notice"
 	case errors.Is(err, user.ErrCursorPaginationUnsupported):
 		return http.StatusBadRequest, http.StatusText(http.StatusBadRequest), "cursor pagination is not supported"
 	case errors.Is(err, workspace.ErrCursorPaginationUnsupported):

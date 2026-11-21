@@ -25,7 +25,7 @@ type MaintenanceHandler struct {
 // Run godoc
 // @Tags Maintenance
 // @Summary Run one maintenance pass
-// @Description Sweeps the mail outbox, runs retention steps and sends due mail for up to 30 seconds, then reports the counts. For a scheduler. Returns 404 when REEARTH_ACCOUNTS_MAINTENANCE_KEY is unset.
+// @Description Sweeps the mail outbox, runs retention steps, queues the audiences of policy notices and sends due mail for up to 30 seconds, then reports the counts. For a scheduler. Returns 404 when REEARTH_ACCOUNTS_MAINTENANCE_KEY is unset.
 // @Produce json
 // @Param X-Accounts-Maintenance-Key header string true "the value of REEARTH_ACCOUNTS_MAINTENANCE_KEY"
 // @Success 200 {object} httpmodel.MaintenanceRunResponse

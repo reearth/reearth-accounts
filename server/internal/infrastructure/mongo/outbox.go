@@ -89,6 +89,36 @@ func (r *Outbox) Complete(ctx context.Context, k outbox.Key, token string, t out
 	return res.MatchedCount == 1, nil
 }
 
+func (r *Outbox) CountByNotice(ctx context.Context, n id.PolicyNoticeID) (map[outbox.State]int, error) {
+	cur, err := r.c.Aggregate(ctx, mongo.Pipeline{
+		{{Key: "$match", Value: bson.M{"subject." + outbox.SubjectNotice: n.String()}}},
+		{{Key: "$group", Value: bson.M{"_id": "$state", "n": bson.M{"$sum": 1}}}},
+	})
+	if err != nil {
+		return nil, rerror.ErrInternalByWithContext(ctx, err)
+	}
+	var rows []struct {
+		N     int    `bson:"n"`
+		State string `bson:"_id"`
+	}
+	if err := cur.All(ctx, &rows); err != nil {
+		return nil, rerror.ErrInternalByWithContext(ctx, err)
+	}
+	counts := outbox.EmptyCounts()
+	for _, row := range rows {
+		counts[outbox.State(row.State)] = row.N
+	}
+	return counts, nil
+}
+
+func (r *Outbox) RemoveFailedByNotice(ctx context.Context, n id.PolicyNoticeID, reason outbox.Reason) error {
+	_, err := r.c.DeleteMany(ctx, bson.M{"subject." + outbox.SubjectNotice: n.String(), "state": string(outbox.StateFailed), "reason": string(reason)})
+	if err != nil {
+		return rerror.ErrInternalByWithContext(ctx, err)
+	}
+	return nil
+}
+
 func (r *Outbox) Enqueue(ctx context.Context, rs []outbox.Record) error {
 	if len(rs) == 0 {
 		return nil

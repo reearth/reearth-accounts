@@ -237,6 +237,37 @@ func (mr *MockRepoMockRecorder) FindByUserWithPagination(ctx, id, pagination any
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "FindByUserWithPagination", reflect.TypeOf((*MockRepo)(nil).FindByUserWithPagination), ctx, id, pagination)
 }
 
+// FindOrgOwnersAfter mocks base method.
+func (m *MockRepo) FindOrgOwnersAfter(ctx context.Context, after *ID, limit int) (user.IDList, *ID, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "FindOrgOwnersAfter", ctx, after, limit)
+	ret0, _ := ret[0].(user.IDList)
+	ret1, _ := ret[1].(*ID)
+	ret2, _ := ret[2].(error)
+	return ret0, ret1, ret2
+}
+
+// FindOrgOwnersAfter indicates an expected call of FindOrgOwnersAfter.
+func (mr *MockRepoMockRecorder) FindOrgOwnersAfter(ctx, after, limit any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "FindOrgOwnersAfter", reflect.TypeOf((*MockRepo)(nil).FindOrgOwnersAfter), ctx, after, limit)
+}
+
+// FindOrgOwnersAmong mocks base method.
+func (m *MockRepo) FindOrgOwnersAmong(ctx context.Context, users user.IDList) (user.IDList, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "FindOrgOwnersAmong", ctx, users)
+	ret0, _ := ret[0].(user.IDList)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// FindOrgOwnersAmong indicates an expected call of FindOrgOwnersAmong.
+func (mr *MockRepoMockRecorder) FindOrgOwnersAmong(ctx, users any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "FindOrgOwnersAmong", reflect.TypeOf((*MockRepo)(nil).FindOrgOwnersAmong), ctx, users)
+}
+
 // Remove mocks base method.
 func (m *MockRepo) Remove(arg0 context.Context, arg1 ID) error {
 	m.ctrl.T.Helper()

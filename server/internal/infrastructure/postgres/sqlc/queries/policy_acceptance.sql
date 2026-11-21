@@ -1,6 +1,9 @@
 -- name: PolicyAcceptanceFindByUser :many
 SELECT * FROM policy_acceptances WHERE user_id = $1;
 
+-- name: PolicyAcceptanceFindByUsers :many
+SELECT * FROM policy_acceptances WHERE user_id = ANY(sqlc.arg(user_ids)::text[]) AND type = sqlc.arg(type)::text;
+
 -- name: PolicyAcceptanceFindUsersAfter :many
 SELECT DISTINCT user_id FROM policy_acceptances
 WHERE user_id > sqlc.arg(after)::text

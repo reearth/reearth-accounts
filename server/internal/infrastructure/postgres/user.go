@@ -133,6 +133,26 @@ func (r *User) FindByIDs(ctx context.Context, ids user.IDList) (user.List, error
 	return out, nil
 }
 
+func (r *User) FindActiveIDsWithEmailAfter(ctx context.Context, after *user.ID, limit int) (user.IDList, error) {
+	from := ""
+	if after != nil {
+		from = after.String()
+	}
+	rows, err := r.c.queries(ctx).UserFindActiveIDsWithEmailAfter(ctx, gen.UserFindActiveIDsWithEmailAfterParams{After: from, Max: int32(limit)})
+	if err != nil {
+		return nil, rerror.ErrInternalByWithContext(ctx, err)
+	}
+	ids := make(user.IDList, 0, len(rows))
+	for _, s := range rows {
+		u, err := user.IDFrom(s)
+		if err != nil {
+			return nil, rerror.ErrInternalByWithContext(ctx, err)
+		}
+		ids = append(ids, u)
+	}
+	return ids, nil
+}
+
 func (r *User) FindAll(ctx context.Context) (user.List, error) {
 	rows, err := r.c.queries(ctx).UserFindAll(ctx)
 	if err != nil {

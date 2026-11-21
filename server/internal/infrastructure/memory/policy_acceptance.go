@@ -37,6 +37,18 @@ func (r *PolicyAcceptance) FindByUser(_ context.Context, u id.UserID) ([]legal.A
 	return res, nil
 }
 
+func (r *PolicyAcceptance) FindByUsers(_ context.Context, users []id.UserID, t legal.Type) ([]legal.Acceptance, error) {
+	r.lock.Lock()
+	defer r.lock.Unlock()
+	res := []legal.Acceptance{}
+	for k, a := range r.data {
+		if k.Type == t && slices.Contains(users, k.user) {
+			res = append(res, a)
+		}
+	}
+	return res, nil
+}
+
 func (r *PolicyAcceptance) FindUsersAfter(_ context.Context, after *id.UserID, limit int) ([]id.UserID, error) {
 	r.lock.Lock()
 	defer r.lock.Unlock()

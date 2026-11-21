@@ -105,7 +105,7 @@ type fixture struct {
 func newFixture(t *testing.T, m *fakeMail, cfg Config, resolvers map[mail.Kind]Resolver, hooks ...Retention) *fixture {
 	t.Helper()
 	f := &fixture{clock: t0, mail: m, outbox: ctxOutbox{memory.NewOutbox()}}
-	f.runner = NewRunner(cfg, f.outbox, m, resolvers, hooks...)
+	f.runner = NewRunner(cfg, f.outbox, m, resolvers, nil, hooks...)
 	f.runner.now = func() time.Time { return f.clock }
 	f.runner.jitter = func(d time.Duration) time.Duration { return d }
 	return f

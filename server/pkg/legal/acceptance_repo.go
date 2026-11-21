@@ -10,6 +10,8 @@ import (
 type AcceptanceRepo interface {
 	// FindByUser returns every record of u in no particular order.
 	FindByUser(ctx context.Context, u id.UserID) ([]Acceptance, error)
+	// FindByUsers returns every record of type t held by one of users.
+	FindByUsers(ctx context.Context, users []id.UserID, t Type) ([]Acceptance, error)
 	// FindUsersAfter returns up to limit distinct users that hold a record,
 	// in ID order, starting after the given user (nil starts at the first).
 	FindUsersAfter(ctx context.Context, after *id.UserID, limit int) ([]id.UserID, error)

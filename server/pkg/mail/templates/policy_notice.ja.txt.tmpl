@@ -1,0 +1,10 @@
+{{define "subject"}}【Re:Earth】{{.PolicyTitle}}改定のお知らせ{{end}}
+{{define "text"}}いつも Re:Earth をご利用いただきありがとうございます。
+
+{{.PolicyTitle}}を改定します。新しいバージョン {{.Version}} は {{.EffectiveDate.UTC.Format "2006年1月2日 15:04 (UTC)"}} に発効します。
+
+{{if .Major}}発効日以降に Re:Earth へログインすると、新しいバージョンへの同意をお願いします。{{else}}発効日以降も Re:Earth をご利用いただくと、新しいバージョンに同意したものとみなされます。{{end}}
+{{with .ActionURL}}
+新しいバージョンを読む：
+{{.}}
+{{end}}{{end}}

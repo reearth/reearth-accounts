@@ -8,6 +8,7 @@ const (
 	KindVerification       Kind = "verification"
 	KindPasswordReset      Kind = "password_reset"
 	KindVerificationResend Kind = "verification_resend"
+	KindPolicyNotice       Kind = "policy_notice"
 )
 
 // The user ID is the only recipient field that may be logged.

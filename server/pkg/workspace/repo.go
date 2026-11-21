@@ -46,6 +46,15 @@ type Repo interface {
 	// aborts the second writer with a write conflict.
 	FindByIDForUpdate(context.Context, ID) (*Workspace, error)
 	FindByName(context.Context, string) (*Workspace, error)
+	// FindOrgOwnersAfter pages non-personal, non-deleted workspaces in ID
+	// order, up to limit starting after the given ID (nil starts at the
+	// first). It returns the enabled owners of the page that are not
+	// deactivated users, and the last workspace ID in it, which is nil for an
+	// empty page.
+	FindOrgOwnersAfter(ctx context.Context, after *ID, limit int) (user.IDList, *ID, error)
+	// FindOrgOwnersAmong returns the users that are enabled owners of a
+	// non-personal, non-deleted workspace.
+	FindOrgOwnersAmong(ctx context.Context, users user.IDList) (user.IDList, error)
 	FindByAlias(ctx context.Context, alias string) (*Workspace, error)
 	FindByAliases(ctx context.Context, aliases []string) (List, error)
 	FindByIDs(context.Context, IDList) (List, error)

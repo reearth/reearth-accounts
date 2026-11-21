@@ -19,12 +19,14 @@ type Querier interface {
 	ConfigUpsertAuth(ctx context.Context, arg ConfigUpsertAuthParams) error
 	OutboxClaimDue(ctx context.Context, arg OutboxClaimDueParams) (MailOutbox, error)
 	OutboxComplete(ctx context.Context, arg OutboxCompleteParams) (int64, error)
+	OutboxCountByNotice(ctx context.Context, notice string) ([]OutboxCountByNoticeRow, error)
 	OutboxDeleteRetired(ctx context.Context, endedAt *time.Time) (int64, error)
 	OutboxEnqueue(ctx context.Context, arg OutboxEnqueueParams) error
 	OutboxExpireClaims(ctx context.Context, now *time.Time) (int64, error)
 	OutboxFailStale(ctx context.Context, arg OutboxFailStaleParams) (int64, error)
 	OutboxFindByKey(ctx context.Context, key string) (MailOutbox, error)
 	OutboxRemoveByUser(ctx context.Context, recipientUserID *string) error
+	OutboxRemoveFailedByNotice(ctx context.Context, arg OutboxRemoveFailedByNoticeParams) error
 	PermittableFindByRoleID(ctx context.Context, dollar_1 string) ([]Permittable, error)
 	PermittableFindByUserID(ctx context.Context, userID string) (Permittable, error)
 	PermittableFindByUserIDs(ctx context.Context, dollar_1 []string) ([]Permittable, error)
@@ -34,10 +36,19 @@ type Querier interface {
 	PermittableWorkspaceRolesByPermittableIDs(ctx context.Context, dollar_1 []string) ([]PermittableWorkspaceRole, error)
 	PermittableWorkspaceRolesDeleteByPermittable(ctx context.Context, permittableID string) error
 	PolicyAcceptanceFindByUser(ctx context.Context, userID string) ([]PolicyAcceptance, error)
+	PolicyAcceptanceFindByUsers(ctx context.Context, arg PolicyAcceptanceFindByUsersParams) ([]PolicyAcceptance, error)
 	PolicyAcceptanceFindUsersAfter(ctx context.Context, arg PolicyAcceptanceFindUsersAfterParams) ([]string, error)
 	PolicyAcceptanceInsert(ctx context.Context, arg PolicyAcceptanceInsertParams) error
 	PolicyAcceptanceRemove(ctx context.Context, arg PolicyAcceptanceRemoveParams) error
 	PolicyAcceptanceRemoveByUser(ctx context.Context, userID string) error
+	PolicyNoticeAdvanceFanout(ctx context.Context, arg PolicyNoticeAdvanceFanoutParams) (int64, error)
+	PolicyNoticeClaimFanout(ctx context.Context, arg PolicyNoticeClaimFanoutParams) (PolicyNotice, error)
+	PolicyNoticeCreate(ctx context.Context, arg PolicyNoticeCreateParams) (PolicyNotice, error)
+	PolicyNoticeFindByRef(ctx context.Context, arg PolicyNoticeFindByRefParams) ([]PolicyNotice, error)
+	PolicyNoticeFindByVersionAudience(ctx context.Context, arg PolicyNoticeFindByVersionAudienceParams) (PolicyNotice, error)
+	PolicyNoticeReleaseFanout(ctx context.Context, arg PolicyNoticeReleaseFanoutParams) error
+	PolicyNoticeReopen(ctx context.Context, arg PolicyNoticeReopenParams) (PolicyNotice, error)
+	PolicyNoticeWithdraw(ctx context.Context, id string) error
 	PolicyTypeFind(ctx context.Context, type_ string) (PolicyType, error)
 	PolicyTypeFindAll(ctx context.Context) ([]PolicyType, error)
 	PolicyTypeInsert(ctx context.Context, arg PolicyTypeInsertParams) (int64, error)
@@ -52,6 +63,7 @@ type Querier interface {
 	RoleFindByName(ctx context.Context, name string) (Role, error)
 	RoleUpsert(ctx context.Context, arg RoleUpsertParams) error
 	UserDelete(ctx context.Context, id string) error
+	UserFindActiveIDsWithEmailAfter(ctx context.Context, arg UserFindActiveIDsWithEmailAfterParams) ([]string, error)
 	UserFindAll(ctx context.Context) ([]User, error)
 	// Case-insensitive, matching the partial unique index on lower(alias).
 	UserFindByAlias(ctx context.Context, lower string) (User, error)
@@ -77,6 +89,8 @@ type Querier interface {
 	WorkspaceFindByIDForUpdate(ctx context.Context, id string) (Workspace, error)
 	WorkspaceFindByIDs(ctx context.Context, dollar_1 []string) ([]Workspace, error)
 	WorkspaceFindByName(ctx context.Context, name string) (Workspace, error)
+	WorkspaceFindOrgOwnersAfter(ctx context.Context, arg WorkspaceFindOrgOwnersAfterParams) ([]WorkspaceFindOrgOwnersAfterRow, error)
+	WorkspaceFindOrgOwnersAmong(ctx context.Context, users []string) ([]string, error)
 	// Cross-tenant listing (no readable-workspace filter): pass '' for no keyword
 	// filter, and one of 'all'/'active'/'deleted' for the status filter.
 	// Set exclude_personal=true to omit per-user personal workspaces (used by /api/workspaces/all).

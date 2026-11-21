@@ -6,14 +6,17 @@ import (
 )
 
 func New() *repo.Container {
+	users, workspaces := NewUser(), NewWorkspace()
+	workspaces.users = users
 	return &repo.Container{
 		AdminUser:        NewAdminUser(),
-		User:             NewUser(),
-		Workspace:        NewWorkspace(),
+		User:             users,
+		Workspace:        workspaces,
 		Role:             NewRole(),
 		Outbox:           NewOutbox(),
 		Permittable:      NewPermittable(),
 		PolicyAcceptance: NewPolicyAcceptance(),
+		PolicyNotice:     NewPolicyNotice(),
 		PolicyVersion:    NewPolicyVersion(),
 		Transaction:      &usecasex.NopTransaction{},
 		Config:           NewConfig(),

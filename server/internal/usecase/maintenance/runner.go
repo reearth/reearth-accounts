@@ -29,6 +29,11 @@ type Config struct {
 	TTL            time.Duration
 }
 
+type Producer interface {
+	Name() string
+	Run(ctx context.Context, now time.Time) (int, error)
+}
+
 type Resolver interface {
 	Resolve(ctx context.Context, r outbox.Record) (*mail.Envelope, outbox.Reason, error)
 }
@@ -41,6 +46,7 @@ type Retention interface {
 type Report struct {
 	Failed   int
 	Lost     int
+	Queued   int
 	Ran      bool
 	Retained map[string]int
 	Retried  int
@@ -56,6 +62,7 @@ type Runner struct {
 	now         func() time.Time
 	outbox      outbox.Repo
 	pass        sync.Mutex
+	producers   []Producer
 	resolvers   map[mail.Kind]Resolver
 	retentions  []Retention
 	sendTimeout time.Duration
@@ -64,7 +71,7 @@ type Runner struct {
 	token       func() string
 }
 
-func NewRunner(cfg Config, ob outbox.Repo, m gateway.Mail, resolvers map[mail.Kind]Resolver, retentions ...Retention) *Runner {
+func NewRunner(cfg Config, ob outbox.Repo, m gateway.Mail, resolvers map[mail.Kind]Resolver, producers []Producer, retentions ...Retention) *Runner {
 	return &Runner{
 		cfg:         cfg,
 		jitter:      jitter,
@@ -72,6 +79,7 @@ func NewRunner(cfg Config, ob outbox.Repo, m gateway.Mail, resolvers map[mail.Ki
 		mail:        m,
 		now:         func() time.Time { return time.Now().UTC() },
 		outbox:      ob,
+		producers:   producers,
 		resolvers:   resolvers,
 		retentions:  retentions,
 		sendTimeout: sendTimeout,
@@ -121,6 +129,16 @@ func (r *Runner) RunPass(ctx context.Context) (Report, error) {
 			continue
 		}
 		rep.Retained[h.Name()] = n
+	}
+	for _, p := range r.producers {
+		if r.stopped() {
+			return rep, nil
+		}
+		n, err := p.Run(ctx, now)
+		rep.Queued += n
+		if err != nil {
+			applog.Warn(ctx, "maintenance producer failed", applog.Operation(p.Name()), applog.Err(err))
+		}
 	}
 	if !r.mail.Deliverable() {
 		return rep, nil

@@ -66,7 +66,7 @@ const docTemplate = `{
         },
         "/api/maintenance/run": {
             "post": {
-                "description": "Sweeps the mail outbox, runs retention steps and sends due mail for up to 30 seconds, then reports the counts. For a scheduler. Returns 404 when REEARTH_ACCOUNTS_MAINTENANCE_KEY is unset.",
+                "description": "Sweeps the mail outbox, runs retention steps, queues the audiences of policy notices and sends due mail for up to 30 seconds, then reports the counts. For a scheduler. Returns 404 when REEARTH_ACCOUNTS_MAINTENANCE_KEY is unset.",
                 "produces": [
                     "application/json"
                 ],
@@ -2580,6 +2580,9 @@ const docTemplate = `{
                     "type": "integer"
                 },
                 "pendingExpired": {
+                    "type": "integer"
+                },
+                "queued": {
                     "type": "integer"
                 },
                 "ran": {

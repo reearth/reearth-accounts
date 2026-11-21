@@ -190,6 +190,79 @@ func (q *Queries) WorkspaceFindByName(ctx context.Context, name string) (Workspa
 	return i, err
 }
 
+const workspaceFindOrgOwnersAfter = `-- name: WorkspaceFindOrgOwnersAfter :many
+WITH page AS (
+    SELECT id FROM workspaces
+    WHERE NOT personal AND deleted_at IS NULL AND id > $1::text
+    ORDER BY id
+    LIMIT $2::integer
+)
+SELECT page.id AS workspace_id, m.user_id
+FROM page
+LEFT JOIN workspace_members m ON m.workspace_id = page.id AND m.role = 'owner' AND NOT m.disabled
+    AND NOT EXISTS (SELECT 1 FROM users u WHERE u.id = m.user_id AND u.deleted_at IS NOT NULL)
+ORDER BY page.id
+`
+
+type WorkspaceFindOrgOwnersAfterParams struct {
+	After string
+	Max   int32
+}
+
+type WorkspaceFindOrgOwnersAfterRow struct {
+	WorkspaceID string
+	UserID      *string
+}
+
+func (q *Queries) WorkspaceFindOrgOwnersAfter(ctx context.Context, arg WorkspaceFindOrgOwnersAfterParams) ([]WorkspaceFindOrgOwnersAfterRow, error) {
+	rows, err := q.db.Query(ctx, workspaceFindOrgOwnersAfter, arg.After, arg.Max)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []WorkspaceFindOrgOwnersAfterRow
+	for rows.Next() {
+		var i WorkspaceFindOrgOwnersAfterRow
+		if err := rows.Scan(&i.WorkspaceID, &i.UserID); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const workspaceFindOrgOwnersAmong = `-- name: WorkspaceFindOrgOwnersAmong :many
+SELECT DISTINCT m.user_id
+FROM workspace_members m
+JOIN workspaces w ON w.id = m.workspace_id
+WHERE m.user_id = ANY($1::text[]) AND m.role = 'owner' AND NOT m.disabled
+    AND NOT w.personal AND w.deleted_at IS NULL
+ORDER BY m.user_id
+`
+
+func (q *Queries) WorkspaceFindOrgOwnersAmong(ctx context.Context, users []string) ([]string, error) {
+	rows, err := q.db.Query(ctx, workspaceFindOrgOwnersAmong, users)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []string
+	for rows.Next() {
+		var user_id string
+		if err := rows.Scan(&user_id); err != nil {
+			return nil, err
+		}
+		items = append(items, user_id)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const workspaceIDsAll = `-- name: WorkspaceIDsAll :many
 SELECT id FROM workspaces
 WHERE (NOT $1::boolean OR personal = false)

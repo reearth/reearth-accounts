@@ -154,6 +154,51 @@ func (r *Workspace) FindByIDForUpdate(ctx context.Context, wid id.WorkspaceID) (
 	return r.one(ctx, w, err)
 }
 
+func (r *Workspace) FindOrgOwnersAfter(ctx context.Context, after *workspace.ID, limit int) (user.IDList, *workspace.ID, error) {
+	from := ""
+	if after != nil {
+		from = after.String()
+	}
+	rows, err := r.c.queries(ctx).WorkspaceFindOrgOwnersAfter(ctx, gen.WorkspaceFindOrgOwnersAfterParams{After: from, Max: int32(limit)})
+	if err != nil {
+		return nil, nil, rerror.ErrInternalByWithContext(ctx, err)
+	}
+	if len(rows) == 0 {
+		return nil, nil, nil
+	}
+	var owners user.IDList
+	for _, row := range rows {
+		if row.UserID == nil {
+			continue
+		}
+		u, err := user.IDFrom(*row.UserID)
+		if err != nil {
+			return nil, nil, rerror.ErrInternalByWithContext(ctx, err)
+		}
+		owners = append(owners, u)
+	}
+	last, err := workspace.IDFrom(rows[len(rows)-1].WorkspaceID)
+	if err != nil {
+		return nil, nil, rerror.ErrInternalByWithContext(ctx, err)
+	}
+	return owners, &last, nil
+}
+
+func (r *Workspace) FindOrgOwnersAmong(ctx context.Context, users user.IDList) (user.IDList, error) {
+	if len(users) == 0 {
+		return nil, nil
+	}
+	rows, err := r.c.queries(ctx).WorkspaceFindOrgOwnersAmong(ctx, users.Strings())
+	if err != nil {
+		return nil, rerror.ErrInternalByWithContext(ctx, err)
+	}
+	res, err := id.UserIDListFrom(rows)
+	if err != nil {
+		return nil, rerror.ErrInternalByWithContext(ctx, err)
+	}
+	return res, nil
+}
+
 func (r *Workspace) FindByIDs(ctx context.Context, ids id.WorkspaceIDList) (workspace.List, error) {
 	if len(ids) == 0 {
 		return nil, nil

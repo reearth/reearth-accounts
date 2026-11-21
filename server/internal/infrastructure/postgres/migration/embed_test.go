@@ -217,3 +217,40 @@ func TestMigrate_MailOutboxDownUp(t *testing.T) {
 	require.NoError(t, migration.Migrate(ctx, pool))
 	assert.Equal(t, 1, tables())
 }
+
+func TestMigrate_PolicyNoticesDownUp(t *testing.T) {
+	pool, done := startPG(t)
+	defer done()
+	ctx := context.Background()
+	require.NoError(t, migration.Migrate(ctx, pool))
+
+	count := func(q string) int {
+		var n int
+		require.NoError(t, pool.QueryRow(ctx, q).Scan(&n))
+		return n
+	}
+	tables := `SELECT count(*) FROM information_schema.tables WHERE table_name = 'policy_notices'`
+	index := `SELECT count(*) FROM pg_indexes WHERE indexname = 'mail_outbox_notice_state'`
+	assert.Equal(t, 1, count(tables))
+	assert.Equal(t, 1, count(index))
+
+	insert := `INSERT INTO policy_notices (id, type, version, audience, bump, requested_by, created_at)
+		VALUES ($1, 'tos', '2.0.0', 'all', 'major', 'a', now())`
+	_, err := pool.Exec(ctx, insert, "n1")
+	require.NoError(t, err)
+	_, err = pool.Exec(ctx, insert, "n2")
+	assert.Error(t, err, "one notice per version and audience")
+
+	down, err := os.ReadFile("0010_policy_notices.down.sql")
+	require.NoError(t, err)
+	_, err = pool.Exec(ctx, string(down))
+	require.NoError(t, err)
+	assert.Equal(t, 0, count(tables))
+	assert.Equal(t, 0, count(index))
+
+	_, err = pool.Exec(ctx, `UPDATE schema_migrations SET version = 9, dirty = false`)
+	require.NoError(t, err)
+	require.NoError(t, migration.Migrate(ctx, pool))
+	assert.Equal(t, 1, count(tables))
+	assert.Equal(t, 1, count(index))
+}

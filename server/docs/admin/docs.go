@@ -395,6 +395,124 @@ const docTemplate = `{
                 }
             }
         },
+        "/policies/{type}/notices": {
+            "get": {
+                "description": "Returns each notice recorded for the upcoming version of the policy type, with the number of its mail records in each outbox state. The list is empty when the type has no upcoming version. While the accounts server has no mail provider, records stay pending.",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "policies"
+                ],
+                "summary": "List the notices of a policy's upcoming version",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "example": "tos",
+                        "description": "Policy type",
+                        "name": "type",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/ListPolicyNoticesResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "invalid type",
+                        "schema": {
+                            "$ref": "#/definitions/ErrorResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/ErrorResponse"
+                        }
+                    },
+                    "403": {
+                        "description": "not approved / forbidden",
+                        "schema": {
+                            "$ref": "#/definitions/ErrorResponse"
+                        }
+                    }
+                }
+            },
+            "post": {
+                "description": "Records a notice for the upcoming version of the policy type. The accounts server then queues one mail per user of the audience and sends it: \"all\" is every active user with an email address, \"owners\" is the owners of non-personal workspaces. A major notice skips users who already accepted the version. Each user gets at most one mail per version, so repeating the request queues nothing new and returns the recorded notice with 200. The two audiences of one version share that limit: an \"owners\" notice after an \"all\" notice ends \"covered\" and queues nothing, and an \"all\" notice after an \"owners\" notice skips the current owners. Repeating the request for a notice that ended \"withdrawn\" restarts it once the version is upcoming again. The admin API sends no mail itself.",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "policies"
+                ],
+                "summary": "Record a notice for a policy's upcoming version",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "example": "tos",
+                        "description": "Policy type",
+                        "name": "type",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "description": "Audience",
+                        "name": "body",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/CreatePolicyNoticeRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "already recorded",
+                        "schema": {
+                            "$ref": "#/definitions/CreatePolicyNoticeResponse"
+                        }
+                    },
+                    "201": {
+                        "description": "recorded",
+                        "schema": {
+                            "$ref": "#/definitions/CreatePolicyNoticeResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "invalid type / invalid request body / invalid audience",
+                        "schema": {
+                            "$ref": "#/definitions/ErrorResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/ErrorResponse"
+                        }
+                    },
+                    "403": {
+                        "description": "not approved / forbidden",
+                        "schema": {
+                            "$ref": "#/definitions/ErrorResponse"
+                        }
+                    },
+                    "422": {
+                        "description": "no_upcoming_version / not_required / patch_version",
+                        "schema": {
+                            "$ref": "#/definitions/ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
         "/users": {
             "get": {
                 "description": "Lists users, optionally filtered by a name/alias/email keyword, with offset pagination.",
@@ -755,6 +873,122 @@ const docTemplate = `{
                 }
             }
         },
+        "/workspaces/{id}/scim": {
+            "get": {
+                "description": "Returns whether the admin has enabled SCIM provisioning for the workspace (scim_available: true means a ScimConfig exists).",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "workspaces"
+                ],
+                "summary": "Get SCIM availability for a workspace",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Workspace ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/scimStateResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "invalid workspace id",
+                        "schema": {
+                            "$ref": "#/definitions/ErrorResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/ErrorResponse"
+                        }
+                    },
+                    "403": {
+                        "description": "not approved or forbidden",
+                        "schema": {
+                            "$ref": "#/definitions/ErrorResponse"
+                        }
+                    },
+                    "404": {
+                        "description": "workspace not found",
+                        "schema": {
+                            "$ref": "#/definitions/ErrorResponse"
+                        }
+                    }
+                }
+            },
+            "patch": {
+                "description": "When enabled is true and no ScimConfig exists, a blank one is created. When enabled is false, the ScimConfig (and the SCIM token) is removed.",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "workspaces"
+                ],
+                "summary": "Enable or disable SCIM for a workspace",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Workspace ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "description": "enabled flag",
+                        "name": "body",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/setScimAvailableRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/scimStateResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "invalid workspace id or request body",
+                        "schema": {
+                            "$ref": "#/definitions/ErrorResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/ErrorResponse"
+                        }
+                    },
+                    "403": {
+                        "description": "not approved or forbidden",
+                        "schema": {
+                            "$ref": "#/definitions/ErrorResponse"
+                        }
+                    },
+                    "404": {
+                        "description": "workspace not found",
+                        "schema": {
+                            "$ref": "#/definitions/ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
         "/workspaces/{id}/transfer-owner": {
             "post": {
                 "description": "Makes an existing, enabled member of a team workspace its sole owner. Every other owner becomes a maintainer. A reader may be made owner. A soft-deleted workspace is treated as not found. On PostgreSQL, and on MongoDB with transactions enabled, the role and permittable changes are committed in one transaction and concurrent changes to the same workspace are serialized (PostgreSQL) or rejected with 409 conflict (MongoDB). On MongoDB without transaction support the changes are applied one by one, and a failure part-way can leave them partially applied.",
@@ -869,6 +1103,33 @@ const docTemplate = `{
                 }
             }
         },
+        "CreatePolicyNoticeRequest": {
+            "type": "object",
+            "required": [
+                "audience"
+            ],
+            "properties": {
+                "audience": {
+                    "type": "string",
+                    "enum": [
+                        "all",
+                        "owners"
+                    ],
+                    "example": "all"
+                }
+            }
+        },
+        "CreatePolicyNoticeResponse": {
+            "type": "object",
+            "properties": {
+                "created": {
+                    "type": "boolean"
+                },
+                "notice": {
+                    "$ref": "#/definitions/PolicyNotice"
+                }
+            }
+        },
         "ErrorResponse": {
             "type": "object",
             "properties": {
@@ -927,6 +1188,17 @@ const docTemplate = `{
                 },
                 "totalCount": {
                     "type": "integer"
+                }
+            }
+        },
+        "ListPolicyNoticesResponse": {
+            "type": "object",
+            "properties": {
+                "items": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/PolicyNoticeStatus"
+                    }
                 }
             }
         },
@@ -999,6 +1271,59 @@ const docTemplate = `{
                 },
                 "updatedAt": {
                     "type": "string"
+                }
+            }
+        },
+        "PolicyNotice": {
+            "type": "object",
+            "properties": {
+                "audience": {
+                    "type": "string",
+                    "example": "all"
+                },
+                "bump": {
+                    "type": "string",
+                    "example": "major"
+                },
+                "createdAt": {
+                    "type": "string"
+                },
+                "fanout": {
+                    "type": "string",
+                    "enum": [
+                        "open",
+                        "complete",
+                        "covered",
+                        "withdrawn"
+                    ]
+                },
+                "id": {
+                    "type": "string"
+                },
+                "requestedBy": {
+                    "type": "string"
+                },
+                "type": {
+                    "type": "string",
+                    "example": "tos"
+                },
+                "version": {
+                    "type": "string",
+                    "example": "2.0.0"
+                }
+            }
+        },
+        "PolicyNoticeStatus": {
+            "type": "object",
+            "properties": {
+                "counts": {
+                    "type": "object",
+                    "additionalProperties": {
+                        "type": "integer"
+                    }
+                },
+                "notice": {
+                    "$ref": "#/definitions/PolicyNotice"
                 }
             }
         },
@@ -1173,6 +1498,22 @@ const docTemplate = `{
                 },
                 "userId": {
                     "type": "string"
+                }
+            }
+        },
+        "scimStateResponse": {
+            "type": "object",
+            "properties": {
+                "scim_enabled": {
+                    "type": "boolean"
+                }
+            }
+        },
+        "setScimAvailableRequest": {
+            "type": "object",
+            "properties": {
+                "enabled": {
+                    "type": "boolean"
                 }
             }
         }

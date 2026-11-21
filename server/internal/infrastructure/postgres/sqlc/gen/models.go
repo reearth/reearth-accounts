@@ -69,6 +69,20 @@ type PolicyAcceptance struct {
 	Ip         string
 }
 
+type PolicyNotice struct {
+	ID           string
+	Type         string
+	Version      string
+	Audience     string
+	Bump         string
+	RequestedBy  string
+	CreatedAt    time.Time
+	FanoutCursor string
+	FanoutEnd    string
+	LeaseToken   *string
+	LeaseUntil   *time.Time
+}
+
 type PolicyType struct {
 	Type           string
 	Revision       int64

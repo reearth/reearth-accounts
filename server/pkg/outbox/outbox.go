@@ -41,9 +41,16 @@ const (
 	ReasonClaimExpired Reason = "claim_expired"
 	ReasonUnknownKind  Reason = "unknown_kind"
 	ReasonUserGone     Reason = "user_gone"
+
+	ReasonAlreadyAccepted    Reason = "already_accepted"
+	ReasonNoAddress          Reason = "no_address"
+	ReasonVersionNotUpcoming Reason = "version_not_upcoming"
 )
 
-var Reasons = []Reason{ReasonTTL, ReasonMaxAttempts, ReasonPermanent, ReasonClaimExpired, ReasonUnknownKind, ReasonUserGone}
+var Reasons = []Reason{
+	ReasonTTL, ReasonMaxAttempts, ReasonPermanent, ReasonClaimExpired, ReasonUnknownKind, ReasonUserGone,
+	ReasonAlreadyAccepted, ReasonNoAddress, ReasonVersionNotUpcoming,
+}
 
 type Subject map[string]string
 
@@ -91,6 +98,14 @@ var (
 	ErrEmptyKind        = errors.New("outbox: empty mail kind")
 	ErrInvalidRecipient = errors.New("outbox: recipient must be exactly one of a user or an address")
 )
+
+func EmptyCounts() map[State]int {
+	m := make(map[State]int, len(States))
+	for _, s := range States {
+		m[s] = 0
+	}
+	return m
+}
 
 func New(k Key, kind mail.Kind, s Subject, to Recipient, now time.Time) (Record, error) {
 	switch {

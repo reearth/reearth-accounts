@@ -3,6 +3,7 @@ package app
 import (
 	"context"
 	"errors"
+	"maps"
 	"net"
 	"net/http"
 	"os"
@@ -206,7 +207,18 @@ func NewServer(ctx context.Context, cfg *ServerConfig) *WebServer {
 		address:             address,
 		maintenanceInterval: cfg.Config.MaintenanceInterval,
 	}
-	w.maintenance = maintenance.NewRunner(cfg.Config.Maintenance(), cfg.Repos.Outbox, cfg.Gateways.Mail, cfg.Resolvers,
+	notices := maintenance.PolicyNoticeRepos{
+		Acceptances: cfg.Repos.PolicyAcceptance,
+		Notices:     cfg.Repos.PolicyNotice,
+		Outbox:      cfg.Repos.Outbox,
+		Users:       cfg.Repos.User,
+		Versions:    cfg.Repos.PolicyVersion,
+		Workspaces:  cfg.Repos.Workspace,
+	}
+	resolvers := map[mail.Kind]maintenance.Resolver{mail.KindPolicyNotice: maintenance.PolicyNoticeResolver(notices)}
+	maps.Copy(resolvers, cfg.Resolvers)
+	w.maintenance = maintenance.NewRunner(cfg.Config.Maintenance(), cfg.Repos.Outbox, cfg.Gateways.Mail, resolvers,
+		[]maintenance.Producer{maintenance.PolicyNoticeFanout(notices, maintenance.FanoutPage)},
 		maintenance.OrphanAcceptances(cfg.Repos.PolicyAcceptance, cfg.Repos.User, orphanAcceptancePage))
 	w.appServer = initEcho(ctx, cfg, w.maintenance)
 	return w

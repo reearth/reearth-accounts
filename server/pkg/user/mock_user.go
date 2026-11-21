@@ -55,6 +55,21 @@ func (mr *MockRepoMockRecorder) Create(arg0, arg1 any) *gomock.Call {
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Create", reflect.TypeOf((*MockRepo)(nil).Create), arg0, arg1)
 }
 
+// FindActiveIDsWithEmailAfter mocks base method.
+func (m *MockRepo) FindActiveIDsWithEmailAfter(ctx context.Context, after *ID, limit int) (IDList, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "FindActiveIDsWithEmailAfter", ctx, after, limit)
+	ret0, _ := ret[0].(IDList)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// FindActiveIDsWithEmailAfter indicates an expected call of FindActiveIDsWithEmailAfter.
+func (mr *MockRepoMockRecorder) FindActiveIDsWithEmailAfter(ctx, after, limit any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "FindActiveIDsWithEmailAfter", reflect.TypeOf((*MockRepo)(nil).FindActiveIDsWithEmailAfter), ctx, after, limit)
+}
+
 // FindAll mocks base method.
 func (m *MockRepo) FindAll(arg0 context.Context) (List, error) {
 	m.ctrl.T.Helper()
@@ -332,6 +347,21 @@ func NewMockQuery(ctrl *gomock.Controller) *MockQuery {
 // EXPECT returns an object that allows the caller to indicate expected use.
 func (m *MockQuery) EXPECT() *MockQueryMockRecorder {
 	return m.recorder
+}
+
+// FindActiveIDsWithEmailAfter mocks base method.
+func (m *MockQuery) FindActiveIDsWithEmailAfter(ctx context.Context, after *ID, limit int) (IDList, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "FindActiveIDsWithEmailAfter", ctx, after, limit)
+	ret0, _ := ret[0].(IDList)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// FindActiveIDsWithEmailAfter indicates an expected call of FindActiveIDsWithEmailAfter.
+func (mr *MockQueryMockRecorder) FindActiveIDsWithEmailAfter(ctx, after, limit any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "FindActiveIDsWithEmailAfter", reflect.TypeOf((*MockQuery)(nil).FindActiveIDsWithEmailAfter), ctx, after, limit)
 }
 
 // FindAll mocks base method.

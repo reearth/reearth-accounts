@@ -3,6 +3,7 @@ package presentation
 import (
 	adminuserhandler "github.com/reearth/reearth-accounts/server/internal/admin/presentation/handler/adminuser"
 	"github.com/reearth/reearth-accounts/server/internal/admin/presentation/handler/auth"
+	policyhandler "github.com/reearth/reearth-accounts/server/internal/admin/presentation/handler/policy"
 	"github.com/reearth/reearth-accounts/server/internal/admin/presentation/handler/user"
 	workspacehandler "github.com/reearth/reearth-accounts/server/internal/admin/presentation/handler/workspace"
 	mw "github.com/reearth/reearth-accounts/server/internal/admin/presentation/middleware"
@@ -13,6 +14,7 @@ import (
 type Handler struct {
 	AdminUser       *adminuserhandler.Handler
 	Auth            *auth.Handler
+	Policy          *policyhandler.Handler
 	User            *user.Handler
 	Workspace       *workspacehandler.Handler
 	SessionMw       mw.SessionMiddleware
@@ -24,6 +26,7 @@ type Handler struct {
 func NewHandler(
 	adminUserHandler *adminuserhandler.Handler,
 	authHandler *auth.Handler,
+	policyHandler *policyhandler.Handler,
 	userHandler *user.Handler,
 	workspaceHandler *workspacehandler.Handler,
 	sessionMw mw.SessionMiddleware,
@@ -33,6 +36,7 @@ func NewHandler(
 	return &Handler{
 		AdminUser:       adminUserHandler,
 		Auth:            authHandler,
+		Policy:          policyHandler,
 		User:            userHandler,
 		Workspace:       workspaceHandler,
 		SessionMw:       sessionMw,
