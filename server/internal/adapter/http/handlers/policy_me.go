@@ -8,6 +8,7 @@ import (
 	"github.com/reearth/reearth-accounts/server/internal/adapter"
 	"github.com/reearth/reearth-accounts/server/internal/adapter/http/httpmodel"
 	httpinternal "github.com/reearth/reearth-accounts/server/internal/adapter/http/internal"
+	"github.com/reearth/reearth-accounts/server/internal/usecase/interfaces"
 	"github.com/reearth/reearth-accounts/server/pkg/legal"
 )
 
@@ -70,7 +71,8 @@ func policyError(err error) error {
 	switch {
 	case errors.Is(err, legal.ErrNotConfigured):
 		return httpinternal.NewError(http.StatusNotFound, err.Error(), err)
-	case errors.Is(err, legal.ErrInvalidVersion), errors.Is(err, legal.ErrNotAcceptable), errors.Is(err, legal.ErrUnknownType):
+	case errors.Is(err, legal.ErrInvalidVersion), errors.Is(err, legal.ErrNotAcceptable), errors.Is(err, legal.ErrUnknownType),
+		errors.Is(err, interfaces.ErrSignupPoliciesNotConfigured):
 		return httpinternal.NewError(http.StatusBadRequest, err.Error(), err)
 	}
 	return err

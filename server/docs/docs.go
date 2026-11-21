@@ -1094,6 +1094,7 @@ const docTemplate = `{
         },
         "/api/users/signup": {
             "post": {
+                "description": "` + "`" + `policies` + "`" + ` lists the policy versions the user accepts. Each must be the current or upcoming version of its type, and a non-empty list needs REEARTH_ACCOUNTS_POLICY_WEBHOOK_SECRET.",
                 "consumes": [
                     "application/json"
                 ],
@@ -1123,7 +1124,7 @@ const docTemplate = `{
                         }
                     },
                     "400": {
-                        "description": "Bad Request",
+                        "description": "invalid fields, or a policy that cannot be accepted",
                         "schema": {
                             "$ref": "#/definitions/internal.ErrorResponse"
                         }
@@ -1139,6 +1140,7 @@ const docTemplate = `{
         },
         "/api/users/signup-oidc": {
             "post": {
+                "description": "` + "`" + `policies` + "`" + ` lists the policy versions the user accepts. Each must be the current or upcoming version of its type, and a non-empty list needs REEARTH_ACCOUNTS_POLICY_WEBHOOK_SECRET.",
                 "consumes": [
                     "application/json"
                 ],
@@ -1165,6 +1167,12 @@ const docTemplate = `{
                         "description": "OK",
                         "schema": {
                             "$ref": "#/definitions/httpmodel.UserResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "invalid fields, or a policy that cannot be accepted",
+                        "schema": {
+                            "$ref": "#/definitions/internal.ErrorResponse"
                         }
                     }
                 }
@@ -2786,6 +2794,12 @@ const docTemplate = `{
                 "name": {
                     "type": "string"
                 },
+                "policies": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/httpmodel.PolicyRefRequest"
+                    }
+                },
                 "secret": {
                     "type": "string"
                 },
@@ -2822,6 +2836,12 @@ const docTemplate = `{
                 },
                 "password": {
                     "type": "string"
+                },
+                "policies": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/httpmodel.PolicyRefRequest"
+                    }
                 },
                 "secret": {
                     "type": "string"

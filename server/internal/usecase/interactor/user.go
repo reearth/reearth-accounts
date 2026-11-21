@@ -33,6 +33,7 @@ type User struct {
 	allowedISS            []string
 	mfaRecoveryMaxAuthAge time.Duration
 	now                   func() time.Time
+	policy                *Policy
 	query                 interfaces.UserQuery
 }
 
@@ -40,6 +41,10 @@ type UserOption func(*User)
 
 func WithAllowedISS(iss ...string) UserOption {
 	return func(u *User) { u.allowedISS = iss }
+}
+
+func WithPolicy(p *Policy) UserOption {
+	return func(u *User) { u.policy = p }
 }
 
 // WithMFARecoveryMaxAuthAge sets how recent the login behind the token must be

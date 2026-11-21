@@ -28,14 +28,16 @@ func NewContainer(
 	config ContainerConfig,
 ) interfaces.Container {
 	cerbos := NewCerbos(r, cerbosAdapter)
+	policy := NewPolicy(r, config.PolicySecret, catalog)
 	u := NewUser(r, acg, cerbos, config.SignupSecret, config.AuthSrvUIDomain,
 		WithAllowedISS(config.AllowedISS...),
 		WithMFARecoveryMaxAuthAge(config.MFARecoveryMaxAuthAge),
+		WithPolicy(policy),
 	)
 	return interfaces.Container{
 		Cerbos:      cerbos,
 		Permittable: NewPermittable(r),
-		Policy:      NewPolicy(r, config.PolicySecret, catalog),
+		Policy:      policy,
 		Role:        r.Role,
 		Scim:        NewScim(r, cerbos),
 		User:        u,

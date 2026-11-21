@@ -5,6 +5,7 @@ import (
 	"time"
 
 	"github.com/reearth/reearth-accounts/server/internal/usecase/gateway"
+	"github.com/reearth/reearth-accounts/server/pkg/legal"
 	"github.com/reearth/reearth-accounts/server/pkg/user"
 	"github.com/reearth/reearth-accounts/server/pkg/workspace"
 	"github.com/reearth/reearthx/i18n"
@@ -17,6 +18,7 @@ var (
 	ErrUserInvalidPasswordReset        = rerror.NewE(i18n.T("invalid password reset request"))
 	ErrUserInvalidLang                 = rerror.NewE(i18n.T("invalid lang"))
 	ErrSignupInvalidSecret             = rerror.NewE(i18n.T("invalid secret"))
+	ErrSignupPoliciesNotConfigured     = rerror.NewE(i18n.T("policies not configured"))
 	ErrInvalidUserEmail                = rerror.NewE(i18n.T("invalid email"))
 	ErrNotVerifiedUser                 = rerror.NewE(i18n.T("not verified user"))
 	ErrInvalidEmailOrPassword          = rerror.NewE(i18n.T("invalid email or password"))
@@ -33,6 +35,8 @@ type SignupOIDCParam struct {
 	Sub         string
 	Email       string
 	Name        string
+	Policies    []legal.RefInput
+	Client      legal.Client
 	Secret      *string
 	User        SignupUserParam
 }
@@ -64,6 +68,8 @@ type SignupParam struct {
 	UserID      *user.ID
 	WorkspaceID *workspace.ID
 	MockAuth    bool
+	Policies    []legal.RefInput
+	Client      legal.Client
 }
 
 type UserFindOrCreateParam struct {

@@ -1496,6 +1496,17 @@ type PasswordResetResponse struct {
 // GetPasswordReset returns PasswordResetResponse.PasswordReset, and is useful for accessing the field via an interface.
 func (v *PasswordResetResponse) GetPasswordReset() bool { return v.PasswordReset }
 
+type PolicyAcceptanceInput struct {
+	Type    string `json:"type"`
+	Version string `json:"version"`
+}
+
+// GetType returns PolicyAcceptanceInput.Type, and is useful for accessing the field via an interface.
+func (v *PolicyAcceptanceInput) GetType() string { return v.Type }
+
+// GetVersion returns PolicyAcceptanceInput.Version, and is useful for accessing the field via an interface.
+func (v *PolicyAcceptanceInput) GetVersion() string { return v.Version }
+
 type RemoveIntegrationFromWorkspaceInput struct {
 	WorkspaceId   string `json:"workspaceId"`
 	IntegrationId string `json:"integrationId"`
@@ -2234,15 +2245,16 @@ func (v *SearchUserSearchUser) __premarshalJSON() (*__premarshalSearchUserSearch
 }
 
 type SignupInput struct {
-	Id          string `json:"id"`
-	WorkspaceID string `json:"workspaceID"`
-	Name        string `json:"name"`
-	Email       string `json:"email"`
-	Password    string `json:"password"`
-	Secret      string `json:"secret"`
-	Lang        string `json:"lang"`
-	Theme       string `json:"theme"`
-	MockAuth    bool   `json:"mockAuth"`
+	Id          string                  `json:"id"`
+	WorkspaceID string                  `json:"workspaceID"`
+	Name        string                  `json:"name"`
+	Email       string                  `json:"email"`
+	Password    string                  `json:"password"`
+	Secret      string                  `json:"secret"`
+	Lang        string                  `json:"lang"`
+	Theme       string                  `json:"theme"`
+	MockAuth    bool                    `json:"mockAuth"`
+	Policies    []PolicyAcceptanceInput `json:"policies"`
 }
 
 // GetId returns SignupInput.Id, and is useful for accessing the field via an interface.
@@ -2272,14 +2284,18 @@ func (v *SignupInput) GetTheme() string { return v.Theme }
 // GetMockAuth returns SignupInput.MockAuth, and is useful for accessing the field via an interface.
 func (v *SignupInput) GetMockAuth() bool { return v.MockAuth }
 
+// GetPolicies returns SignupInput.Policies, and is useful for accessing the field via an interface.
+func (v *SignupInput) GetPolicies() []PolicyAcceptanceInput { return v.Policies }
+
 type SignupOIDCInput struct {
-	Id          string `json:"id"`
-	Name        string `json:"name"`
-	Email       string `json:"email"`
-	Sub         string `json:"sub"`
-	Lang        string `json:"lang"`
-	WorkspaceId string `json:"workspaceId"`
-	Secret      string `json:"secret"`
+	Id          string                  `json:"id"`
+	Name        string                  `json:"name"`
+	Email       string                  `json:"email"`
+	Sub         string                  `json:"sub"`
+	Lang        string                  `json:"lang"`
+	WorkspaceId string                  `json:"workspaceId"`
+	Secret      string                  `json:"secret"`
+	Policies    []PolicyAcceptanceInput `json:"policies"`
 }
 
 // GetId returns SignupOIDCInput.Id, and is useful for accessing the field via an interface.
@@ -2302,6 +2318,9 @@ func (v *SignupOIDCInput) GetWorkspaceId() string { return v.WorkspaceId }
 
 // GetSecret returns SignupOIDCInput.Secret, and is useful for accessing the field via an interface.
 func (v *SignupOIDCInput) GetSecret() string { return v.Secret }
+
+// GetPolicies returns SignupOIDCInput.Policies, and is useful for accessing the field via an interface.
+func (v *SignupOIDCInput) GetPolicies() []PolicyAcceptanceInput { return v.Policies }
 
 // SignupOIDCResponse is returned by SignupOIDC on success.
 type SignupOIDCResponse struct {

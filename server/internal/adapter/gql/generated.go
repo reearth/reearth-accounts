@@ -1790,6 +1790,7 @@ input SignupInput {
   lang: Lang
   theme: Theme
   mockAuth: Boolean
+  policies: [PolicyAcceptanceInput!]
 }
 
 input SignupOIDCInput {
@@ -1800,6 +1801,7 @@ input SignupOIDCInput {
   lang: Lang
   workspaceId: ID
   secret: String
+  policies: [PolicyAcceptanceInput!]
 }
 
 
@@ -10761,7 +10763,7 @@ func (ec *executionContext) unmarshalInputSignupInput(ctx context.Context, obj a
 		asMap[k] = v
 	}
 
-	fieldsInOrder := [...]string{"id", "workspaceID", "name", "email", "password", "secret", "lang", "theme", "mockAuth"}
+	fieldsInOrder := [...]string{"id", "workspaceID", "name", "email", "password", "secret", "lang", "theme", "mockAuth", "policies"}
 	for _, k := range fieldsInOrder {
 		v, ok := asMap[k]
 		if !ok {
@@ -10831,6 +10833,13 @@ func (ec *executionContext) unmarshalInputSignupInput(ctx context.Context, obj a
 				return it, err
 			}
 			it.MockAuth = data
+		case "policies":
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("policies"))
+			data, err := ec.unmarshalOPolicyAcceptanceInput2ᚕᚖgithubᚗcomᚋreearthᚋreearthᚑaccountsᚋserverᚋinternalᚋadapterᚋgqlᚋgqlmodelᚐPolicyAcceptanceInputᚄ(ctx, v)
+			if err != nil {
+				return it, err
+			}
+			it.Policies = data
 		}
 	}
 
@@ -10844,7 +10853,7 @@ func (ec *executionContext) unmarshalInputSignupOIDCInput(ctx context.Context, o
 		asMap[k] = v
 	}
 
-	fieldsInOrder := [...]string{"id", "name", "email", "sub", "lang", "workspaceId", "secret"}
+	fieldsInOrder := [...]string{"id", "name", "email", "sub", "lang", "workspaceId", "secret", "policies"}
 	for _, k := range fieldsInOrder {
 		v, ok := asMap[k]
 		if !ok {
@@ -10900,6 +10909,13 @@ func (ec *executionContext) unmarshalInputSignupOIDCInput(ctx context.Context, o
 				return it, err
 			}
 			it.Secret = data
+		case "policies":
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("policies"))
+			data, err := ec.unmarshalOPolicyAcceptanceInput2ᚕᚖgithubᚗcomᚋreearthᚋreearthᚑaccountsᚋserverᚋinternalᚋadapterᚋgqlᚋgqlmodelᚐPolicyAcceptanceInputᚄ(ctx, v)
+			if err != nil {
+				return it, err
+			}
+			it.Policies = data
 		}
 	}
 
@@ -15112,6 +15128,24 @@ func (ec *executionContext) marshalONode2ᚕgithubᚗcomᚋreearthᚋreearthᚑa
 	wg.Wait()
 
 	return ret
+}
+
+func (ec *executionContext) unmarshalOPolicyAcceptanceInput2ᚕᚖgithubᚗcomᚋreearthᚋreearthᚑaccountsᚋserverᚋinternalᚋadapterᚋgqlᚋgqlmodelᚐPolicyAcceptanceInputᚄ(ctx context.Context, v any) ([]*gqlmodel.PolicyAcceptanceInput, error) {
+	if v == nil {
+		return nil, nil
+	}
+	var vSlice []any
+	vSlice = graphql.CoerceList(v)
+	var err error
+	res := make([]*gqlmodel.PolicyAcceptanceInput, len(vSlice))
+	for i := range vSlice {
+		ctx := graphql.WithPathContext(ctx, graphql.NewPathWithIndex(i))
+		res[i], err = ec.unmarshalNPolicyAcceptanceInput2ᚖgithubᚗcomᚋreearthᚋreearthᚑaccountsᚋserverᚋinternalᚋadapterᚋgqlᚋgqlmodelᚐPolicyAcceptanceInput(ctx, vSlice[i])
+		if err != nil {
+			return nil, err
+		}
+	}
+	return res, nil
 }
 
 func (ec *executionContext) marshalOPublicWorkspace2ᚖgithubᚗcomᚋreearthᚋreearthᚑaccountsᚋserverᚋinternalᚋadapterᚋgqlᚋgqlmodelᚐPublicWorkspace(ctx context.Context, sel ast.SelectionSet, v *gqlmodel.PublicWorkspace) graphql.Marshaler {
