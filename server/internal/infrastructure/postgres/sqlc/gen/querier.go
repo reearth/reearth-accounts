@@ -64,9 +64,15 @@ type Querier interface {
 	WorkspaceIDsByIntegrations(ctx context.Context, dollar_1 []string) ([]string, error)
 	WorkspaceIDsByUser(ctx context.Context, userID string) ([]string, error)
 	WorkspaceIntegrationInsert(ctx context.Context, arg WorkspaceIntegrationInsertParams) error
+	// Bulk-insert all integrations for a workspace in one round-trip using UNNEST.
+	// All five arrays must have the same length.
+	WorkspaceIntegrationsBulkInsert(ctx context.Context, arg WorkspaceIntegrationsBulkInsertParams) error
 	WorkspaceIntegrationsByWorkspaceIDs(ctx context.Context, dollar_1 []string) ([]WorkspaceIntegration, error)
 	WorkspaceIntegrationsDeleteByWorkspace(ctx context.Context, workspaceID string) error
 	WorkspaceMemberInsert(ctx context.Context, arg WorkspaceMemberInsertParams) error
+	// Bulk-insert all members for a workspace in one round-trip using UNNEST.
+	// All six arrays must have the same length.
+	WorkspaceMembersBulkInsert(ctx context.Context, arg WorkspaceMembersBulkInsertParams) error
 	WorkspaceMembersByWorkspaceIDs(ctx context.Context, dollar_1 []string) ([]WorkspaceMember, error)
 	WorkspaceMembersDeleteByWorkspace(ctx context.Context, workspaceID string) error
 	WorkspaceScimConfigByWorkspaceID(ctx context.Context, workspaceID string) (WorkspaceScimConfig, error)

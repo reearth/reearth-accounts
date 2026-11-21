@@ -44,6 +44,18 @@ DELETE FROM workspace_members WHERE workspace_id = $1;
 -- name: WorkspaceMemberInsert :exec
 INSERT INTO workspace_members (workspace_id, user_id, role, invited_by, disabled, external_id) VALUES ($1,$2,$3,$4,$5,$6);
 
+-- name: WorkspaceMembersBulkInsert :exec
+-- Bulk-insert all members for a workspace in one round-trip using UNNEST.
+-- All six arrays must have the same length.
+INSERT INTO workspace_members (workspace_id, user_id, role, invited_by, disabled, external_id)
+SELECT
+  unnest($1::text[]),
+  unnest($2::text[]),
+  unnest($3::text[]),
+  unnest($4::text[]),
+  unnest($5::boolean[]),
+  unnest($6::text[]);
+
 -- name: WorkspaceMembersByWorkspaceIDs :many
 SELECT * FROM workspace_members WHERE workspace_id = ANY($1::text[]);
 
@@ -52,6 +64,17 @@ DELETE FROM workspace_integrations WHERE workspace_id = $1;
 
 -- name: WorkspaceIntegrationInsert :exec
 INSERT INTO workspace_integrations (workspace_id, integration_id, role, invited_by, disabled) VALUES ($1,$2,$3,$4,$5);
+
+-- name: WorkspaceIntegrationsBulkInsert :exec
+-- Bulk-insert all integrations for a workspace in one round-trip using UNNEST.
+-- All five arrays must have the same length.
+INSERT INTO workspace_integrations (workspace_id, integration_id, role, invited_by, disabled)
+SELECT
+  unnest($1::text[]),
+  unnest($2::text[]),
+  unnest($3::text[]),
+  unnest($4::text[]),
+  unnest($5::boolean[]);
 
 -- name: WorkspaceIntegrationsByWorkspaceIDs :many
 SELECT * FROM workspace_integrations WHERE workspace_id = ANY($1::text[]);

@@ -204,7 +204,7 @@ type WorkspaceIDsAllParams struct {
 	Status          string
 }
 
-// Cross-tenant listing (no readable-workspace filter): pass ” for no keyword
+// Cross-tenant listing (no readable-workspace filter): pass “ for no keyword
 // filter, and one of 'all'/'active'/'deleted' for the status filter.
 // Set exclude_personal=true to omit per-user personal workspaces (used by /api/workspaces/all).
 func (q *Queries) WorkspaceIDsAll(ctx context.Context, arg WorkspaceIDsAllParams) ([]string, error) {
@@ -322,6 +322,37 @@ func (q *Queries) WorkspaceIntegrationInsert(ctx context.Context, arg WorkspaceI
 	return err
 }
 
+const workspaceIntegrationsBulkInsert = `-- name: WorkspaceIntegrationsBulkInsert :exec
+INSERT INTO workspace_integrations (workspace_id, integration_id, role, invited_by, disabled)
+SELECT
+  unnest($1::text[]),
+  unnest($2::text[]),
+  unnest($3::text[]),
+  unnest($4::text[]),
+  unnest($5::boolean[])
+`
+
+type WorkspaceIntegrationsBulkInsertParams struct {
+	Column1 []string
+	Column2 []string
+	Column3 []string
+	Column4 []string
+	Column5 []bool
+}
+
+// Bulk-insert all integrations for a workspace in one round-trip using UNNEST.
+// All five arrays must have the same length.
+func (q *Queries) WorkspaceIntegrationsBulkInsert(ctx context.Context, arg WorkspaceIntegrationsBulkInsertParams) error {
+	_, err := q.db.Exec(ctx, workspaceIntegrationsBulkInsert,
+		arg.Column1,
+		arg.Column2,
+		arg.Column3,
+		arg.Column4,
+		arg.Column5,
+	)
+	return err
+}
+
 const workspaceIntegrationsByWorkspaceIDs = `-- name: WorkspaceIntegrationsByWorkspaceIDs :many
 SELECT workspace_id, integration_id, role, invited_by, disabled FROM workspace_integrations WHERE workspace_id = ANY($1::text[])
 `
@@ -382,6 +413,40 @@ func (q *Queries) WorkspaceMemberInsert(ctx context.Context, arg WorkspaceMember
 		arg.InvitedBy,
 		arg.Disabled,
 		arg.ExternalID,
+	)
+	return err
+}
+
+const workspaceMembersBulkInsert = `-- name: WorkspaceMembersBulkInsert :exec
+INSERT INTO workspace_members (workspace_id, user_id, role, invited_by, disabled, external_id)
+SELECT
+  unnest($1::text[]),
+  unnest($2::text[]),
+  unnest($3::text[]),
+  unnest($4::text[]),
+  unnest($5::boolean[]),
+  unnest($6::text[])
+`
+
+type WorkspaceMembersBulkInsertParams struct {
+	Column1 []string
+	Column2 []string
+	Column3 []string
+	Column4 []string
+	Column5 []bool
+	Column6 []string
+}
+
+// Bulk-insert all members for a workspace in one round-trip using UNNEST.
+// All six arrays must have the same length.
+func (q *Queries) WorkspaceMembersBulkInsert(ctx context.Context, arg WorkspaceMembersBulkInsertParams) error {
+	_, err := q.db.Exec(ctx, workspaceMembersBulkInsert,
+		arg.Column1,
+		arg.Column2,
+		arg.Column3,
+		arg.Column4,
+		arg.Column5,
+		arg.Column6,
 	)
 	return err
 }
