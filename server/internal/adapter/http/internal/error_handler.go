@@ -2,6 +2,7 @@ package internal
 
 import (
 	"errors"
+	"fmt"
 	"net/http"
 
 	"github.com/go-playground/validator/v10"
@@ -17,6 +18,9 @@ var ErrUnauthorized = errors.New("unauthorized")
 
 // ErrForbidden is returned when the operator lacks permission.
 var ErrForbidden = errors.New("forbidden")
+
+// ErrClientRouteClosed refuses a client token on a route that is not open to it.
+var ErrClientRouteClosed = fmt.Errorf("%w: this route is not open to client tokens", ErrForbidden)
 
 // ErrorResponse is the structured error body returned for all REST failures.
 type ErrorResponse struct {

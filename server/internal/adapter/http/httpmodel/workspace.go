@@ -129,7 +129,7 @@ func newWorkspaceResponse(w *workspace.Workspace, users map[user.ID]*user.User, 
 // billingEmail shows a workspace's billing email only to its members, as
 // GraphQL does, unless the route already limits who gets the record.
 func (v EmailViewer) billingEmail(w *workspace.Workspace) string {
-	if v.all || (v.member && v.self != nil && w.Members().HasUser(*v.self)) {
+	if v.all || (v.billingEmailAsMember && v.self != nil && w.Members().HasUser(*v.self)) {
 		return w.Metadata().BillingEmail()
 	}
 	return ""

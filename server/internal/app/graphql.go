@@ -15,7 +15,6 @@ import (
 	"github.com/reearth/reearth-accounts/server/internal/infrastructure/storage"
 	"github.com/reearth/reearth-accounts/server/internal/usecase/gateway"
 	"github.com/reearth/reearth-accounts/server/pkg/applog"
-	"github.com/reearth/reearth-accounts/server/pkg/workspace"
 
 	"github.com/labstack/echo/v4"
 	"github.com/vektah/gqlparser/v2/ast"
@@ -115,11 +114,7 @@ func GraphqlAPI(conf *Config, photos adapter.PhotoSigner, loginTime adapter.Logi
 		ctx = gql.AttachUsecases(ctx, usecases, photos, enableDataLoaders)
 		ctx = adapter.AttachConfig(ctx, conf)
 		ctx = withResponseStatus(ctx, c.Response())
-		var client *workspace.Client
-		if cc := adapter.ClientCallOf(ctx); cc != nil {
-			client = cc.Client
-		}
-		ctx = withLookupViewer(ctx, ratelimit.ViewerKey(client, adapter.User(ctx), c.RealIP()))
+		ctx = withLookupViewer(ctx, ratelimit.ViewerKey(adapter.ClientCallOf(ctx), adapter.User(ctx), c.RealIP()))
 		c.SetRequest(req.WithContext(ctx))
 
 		srv.ServeHTTP(c.Response(), c.Request())

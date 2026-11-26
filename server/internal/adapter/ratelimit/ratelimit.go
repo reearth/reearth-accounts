@@ -6,12 +6,13 @@ package ratelimit
 
 import (
 	"context"
+	"fmt"
 	"sync"
 	"time"
 
+	"github.com/reearth/reearth-accounts/server/internal/adapter"
 	"github.com/reearth/reearth-accounts/server/pkg/applog"
 	"github.com/reearth/reearth-accounts/server/pkg/user"
-	"github.com/reearth/reearth-accounts/server/pkg/workspace"
 	"golang.org/x/time/rate"
 )
 
@@ -96,9 +97,9 @@ func (l *Limiter) take(viewer string, n int) bool {
 // ViewerKey identifies who is looking users up: the registered client for a
 // client call, so a client cannot buy fresh buckets by acting for many users;
 // otherwise the signed-in user, or the client IP for an anonymous caller.
-func ViewerKey(c *workspace.Client, u *user.User, clientIP string) string {
-	if c != nil {
-		return "client:" + c.ID
+func ViewerKey(cc *adapter.ClientCall, u *user.User, clientIP string) string {
+	if cc != nil {
+		return fmt.Sprintf("client:%q|%q", cc.Issuer, cc.Client.ID)
 	}
 	if u != nil {
 		return "user:" + u.ID().String()

@@ -22,8 +22,6 @@ var (
 	ErrForbidden    = httpinternal.ErrForbidden
 )
 
-var errClientRouteClosed = fmt.Errorf("%w: this route is not open to client tokens", httpinternal.ErrForbidden)
-
 // ClientGate is where REST classifies a client call. It runs on the whole /api
 // group before every route middleware, so it also covers the routes that have
 // no auth middleware.
@@ -45,7 +43,7 @@ func ClientGate(resolve ClientResolver, routes map[string]adapter.ClientAccess) 
 			admitted := routes[c.Request().Method+" "+c.Path()].Admits(cc.Subject.Kind())
 			adapter.LogClientVerdict(ctx, admitted)
 			if !admitted {
-				return errClientRouteClosed
+				return httpinternal.ErrClientRouteClosed
 			}
 			return next(c)
 		}

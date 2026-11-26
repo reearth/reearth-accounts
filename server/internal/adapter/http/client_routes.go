@@ -11,15 +11,11 @@ import (
 // here answers 403 to every client token, so a route added later stays closed
 // until someone lists it. The SCIM token and config routes are absent on
 // purpose: a client must not mint a workspace credential.
-//
-// A client acting for a user reads that user's profile and workspaces, and
-// nothing else (ADR-0002 decision 6). GET /api/workspaces is safe for it only
-// because the interactor scopes every client call's workspace reads to the
-// subject's memberships and refuses a user_id that is not the subject.
 var clientRoutes = map[string]adapter.ClientAccess{
 	"GET /api/auth/config": adapter.AnonymousClients | adapter.IntegrationClients,
 
-	"GET /api/users/me":   adapter.UserClients,
+	"GET /api/users/me": adapter.UserClients,
+	// The interactor scopes it to the subject, pinned by TestWorkspace_ReadsForAClientActingForAUserAreScoped and TestActAsUser_ReadList.
 	"GET /api/workspaces": adapter.IntegrationClients | adapter.UserClients,
 
 	"GET /api/workspaces/:id":                                 adapter.IntegrationClients,

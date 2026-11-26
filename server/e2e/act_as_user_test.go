@@ -33,8 +33,6 @@ const (
 	auBilling      = "act-as-billing-sentinel@e2e.com"
 )
 
-// The subject owns a personal workspace and shares auShared with the privacy
-// target; privTargetWS, privTargetTeamWS and privStrangerWS are not its own.
 func seedActAsUser(ctx context.Context, r *repo.Container) error {
 	if err := seedPrivacy(ctx, r); err != nil {
 		return err
@@ -67,13 +65,13 @@ func seedActAsUser(ctx context.Context, r *repo.Container) error {
 }
 
 type actAsUserServer struct {
-	e       *httpexpect.Expect
-	url     string
-	idp     *svcIdP
-	users   map[string]string // the user-only client acting for the subject
-	both    map[string]string // the client with both kinds acting for the subject
-	own     map[string]string // the subject's own token
-	intOnly string            // a token of the client with only "integration"
+	e                     *httpexpect.Expect
+	url                   string
+	idp                   *svcIdP
+	userOnlyClientTokens  map[string]string
+	bothKindsClientTokens map[string]string
+	ownTokens             map[string]string
+	integrationOnlyToken  string
 }
 
 func startActAsUserServer(t *testing.T, useMongo bool) actAsUserServer {
@@ -91,13 +89,13 @@ func startActAsUserServer(t *testing.T, useMongo bool) actAsUserServer {
 	url := startServerURL(t, cfg, seededRepos(t, useMongo, seedActAsUser), nil, false)
 	asSubject := "user:" + auSubject.String()
 	return actAsUserServer{
-		e:       httpexpect.Default(t, url),
-		url:     url,
-		idp:     idp,
-		users:   actingFor(idp.clientToken(t, "svc-users"), asSubject),
-		both:    actingFor(idp.clientToken(t, "svc-flow"), asSubject),
-		own:     actingFor(idp.token(t, jwt.MapClaims{"sub": auSubjectSub})),
-		intOnly: idp.clientToken(t, "svc-int"),
+		e:                     httpexpect.Default(t, url),
+		url:                   url,
+		idp:                   idp,
+		userOnlyClientTokens:  actingFor(idp.clientToken(t, "svc-users"), asSubject),
+		bothKindsClientTokens: actingFor(idp.clientToken(t, "svc-flow"), asSubject),
+		ownTokens:             actingFor(idp.token(t, jwt.MapClaims{"sub": auSubjectSub})),
+		integrationOnlyToken:  idp.clientToken(t, "svc-int"),
 	}
 }
 
@@ -107,7 +105,7 @@ func (s actAsUserServer) at(t *testing.T) actAsUserServer {
 }
 
 func (s actAsUserServer) callers() map[string]map[string]string {
-	return map[string]map[string]string{"user-only client": s.users, "client with both kinds": s.both}
+	return map[string]map[string]string{"user-only client": s.userOnlyClientTokens, "client with both kinds": s.bothKindsClientTokens}
 }
 
 func (s actAsUserServer) gql(h map[string]string, q string) (*httpexpect.Object, string) {
@@ -227,7 +225,7 @@ func TestActAsUser_RefusedSubjects(t *testing.T) {
 		t.Run(name, func(t *testing.T) {
 			s := startActAsUserServer(t, useMongo)
 			refused := map[string]map[string]string{
-				"a client without user in act_as": actingFor(s.intOnly, "user:"+auSubject.String()),
+				"a client without user in act_as": actingFor(s.integrationOnlyToken, "user:"+auSubject.String()),
 				"an unknown user":                 actingFor(s.idp.clientToken(t, "svc-users"), "user:"+id.NewUserID().String()),
 				"a deactivated user":              actingFor(s.idp.clientToken(t, "svc-users"), "user:"+auDeleted.String()),
 			}
@@ -337,36 +335,155 @@ func TestActAsUser_EverythingElseIsClosed(t *testing.T) {
 	}
 
 	t.Run("the subject's own token is not stopped by the gate", func(t *testing.T) {
-		s := s.at(t)
+		wantREST := ownTokenStatusREST()
 		for _, r := range closedToUserClientsREST() {
-			body := s.e.Request(r[0], r[1]).WithHeaders(s.own).WithJSON(map[string]any{}).Expect().Body().Raw()
+			want, ok := wantREST[r]
+			require.True(t, ok, "no expected status for %s %s", r[0], r[1])
+			s := startActAsUserServer(t, false)
+			body := s.e.Request(r[0], r[1]).WithHeaders(s.ownTokens).WithJSON(map[string]any{}).
+				Expect().Status(want).Body().Raw()
 			assert.NotContains(t, body, clientGateRefusal, "%s %s", r[0], r[1])
 		}
+		wantGQL := ownTokenErrorGQL()
 		for _, q := range closedToUserClientsGQL() {
-			body := s.e.POST("/api/graphql").WithHeaders(s.own).WithJSON(GraphQLRequest{Query: q}).Expect().Body().Raw()
-			assert.NotContains(t, body, clientGateRefusal, q)
+			want, ok := wantGQL[q]
+			require.True(t, ok, "no expected result for %s", q)
+			s := startActAsUserServer(t, false)
+			o, raw := s.gql(s.ownTokens, q)
+			if want == "" {
+				assert.Nil(t, o.Raw()["errors"], raw)
+				continue
+			}
+			o.Value("errors").Array().Value(0).Object().HasValue("message", want)
 		}
 	})
 }
 
+func ownTokenStatusREST() map[[2]string]int {
+	ws := "/api/workspaces/" + auShared.String()
+	foreignWS := "/api/workspaces/" + svcWsOwned.String()
+	return map[[2]string]int{
+		{http.MethodPost, "/api/users/signup"}:                                                                 http.StatusBadRequest,
+		{http.MethodPost, "/api/users/signup-oidc"}:                                                            http.StatusInternalServerError,
+		{http.MethodPost, "/api/users/verifications"}:                                                          http.StatusBadRequest,
+		{http.MethodPost, "/api/users/verify"}:                                                                 http.StatusBadRequest,
+		{http.MethodPost, "/api/users/password-reset/start"}:                                                   http.StatusBadRequest,
+		{http.MethodPost, "/api/users/password-reset"}:                                                         http.StatusBadRequest,
+		{http.MethodPatch, "/api/users/me"}:                                                                    http.StatusOK,
+		{http.MethodDelete, "/api/users/me"}:                                                                   http.StatusNoContent,
+		{http.MethodDelete, "/api/users/me/auths/auth0|svc-owner"}:                                             http.StatusOK,
+		{http.MethodGet, "/api/users/me/mfa"}:                                                                  http.StatusOK,
+		{http.MethodPost, "/api/users/me/mfa"}:                                                                 http.StatusBadRequest,
+		{http.MethodDelete, "/api/users/me/mfa"}:                                                               http.StatusBadRequest,
+		{http.MethodPost, "/api/users/me/mfa/recovery-code"}:                                                   http.StatusBadRequest,
+		{http.MethodPost, "/api/auth/logout"}:                                                                  http.StatusOK,
+		{http.MethodGet, "/api/users/search"}:                                                                  http.StatusBadRequest,
+		{http.MethodGet, "/api/users/by-alias"}:                                                                http.StatusBadRequest,
+		{http.MethodGet, "/api/users/by-name-or-email"}:                                                        http.StatusBadRequest,
+		{http.MethodGet, "/api/users/by-name-or-alias"}:                                                        http.StatusBadRequest,
+		{http.MethodGet, "/api/users"}:                                                                         http.StatusOK,
+		{http.MethodGet, "/api/users/all"}:                                                                     http.StatusForbidden,
+		{http.MethodGet, "/api/users/" + svcOwnerUID.String()}:                                                 http.StatusNotFound,
+		{http.MethodPost, foreignWS + "/scim/token"}:                                                           http.StatusForbidden,
+		{http.MethodDelete, foreignWS + "/scim/token"}:                                                         http.StatusForbidden,
+		{http.MethodPut, foreignWS + "/scim/config"}:                                                           http.StatusForbidden,
+		{http.MethodGet, foreignWS + "/scim/config"}:                                                           http.StatusForbidden,
+		{http.MethodGet, "/api/auth/config"}:                                                                   http.StatusOK,
+		{http.MethodPost, "/api/permissions/check"}:                                                            http.StatusBadRequest,
+		{http.MethodPost, "/api/users/" + privTarget.String() + "/deactivate"}:                                 http.StatusForbidden,
+		{http.MethodPost, "/api/users/" + privTarget.String() + "/restore"}:                                    http.StatusForbidden,
+		{http.MethodPatch, "/api/users/by-sub/x"}:                                                              http.StatusForbidden,
+		{http.MethodPut, "/api/users/by-sub/x/platform-roles"}:                                                 http.StatusForbidden,
+		{http.MethodPost, "/api/users/sync-sso"}:                                                               http.StatusBadRequest,
+		{http.MethodPost, "/api/users/find-or-create"}:                                                         http.StatusBadRequest,
+		{http.MethodPost, "/api/workspaces"}:                                                                   http.StatusBadRequest,
+		{http.MethodGet, "/api/workspaces/all"}:                                                                http.StatusForbidden,
+		{http.MethodGet, ws}:                                                                                   http.StatusOK,
+		{http.MethodPatch, ws}:                                                                                 http.StatusForbidden,
+		{http.MethodDelete, ws}:                                                                                http.StatusForbidden,
+		{http.MethodPost, ws + "/deactivate"}:                                                                  http.StatusForbidden,
+		{http.MethodPost, ws + "/restore"}:                                                                     http.StatusForbidden,
+		{http.MethodPost, ws + "/members"}:                                                                     http.StatusBadRequest,
+		{http.MethodPatch, ws + "/members/" + privTarget.String()}:                                             http.StatusBadRequest,
+		{http.MethodDelete, ws + "/members/" + privTarget.String()}:                                            http.StatusForbidden,
+		{http.MethodDelete, ws + "/members"}:                                                                   http.StatusBadRequest,
+		{http.MethodPost, ws + "/integrations"}:                                                                http.StatusBadRequest,
+		{http.MethodPatch, ws + "/integrations/" + svcIntegration.String()}:                                    http.StatusBadRequest,
+		{http.MethodDelete, ws + "/integrations/" + svcIntegration.String()}:                                   http.StatusForbidden,
+		{http.MethodDelete, ws + "/integrations"}:                                                              http.StatusBadRequest,
+		{http.MethodPost, ws + "/transfer-ownership"}:                                                          http.StatusBadRequest,
+		{http.MethodGet, ws + "/scim"}:                                                                         http.StatusForbidden,
+		{http.MethodPatch, ws + "/scim"}:                                                                       http.StatusForbidden,
+		{http.MethodPatch, "/api/service/workspaces/" + auShared.String() + "/members/" + privTarget.String()}: http.StatusBadRequest,
+	}
+}
+
+func ownTokenErrorGQL() map[string]string {
+	want := map[string]string{
+		`mutation { signup(input: {name: "x", email: "x@e2e.com", password: "x"}) { user { id } } }`: "password at least 8 characters",
+		`mutation { signupOIDC(input: {}) { user { id } } }`:                                         `Get "": unsupported protocol scheme ""`,
+		`mutation { createVerification(input: {email: "svc-owner@e2e.com"}) }`:                       "not found",
+		`mutation { verifyUser(input: {code: "x"}) { user { id } } }`:                                "not found",
+		`mutation { startPasswordReset(input: {email: "svc-owner@e2e.com"}) }`:                       "not found",
+		`mutation { passwordReset(input: {password: "x", token: "x"}) }`:                             "not found",
+		`mutation { updateMe(input: {name: "x"}) { me { id } } }`:                                    "",
+		`mutation { removeMyAuth(input: {auth: "auth0"}) { me { id } } }`:                            "",
+		`mutation { deleteMe(input: {userId: "x"}) { userId } }`:                                     "invalid ID",
+		`mutation { enableMFA { enrollmentUrl } }`:                                                   "no authenticator found",
+		`mutation { disableMFA }`:                                                                    "no authenticator found",
+		`mutation { regenerateMFARecoveryCode { recoveryCode } }`:                                    "no authenticator found",
+		`mutation { logout { id } }`:                                                                 "",
+		`{ mfaStatus { enrolled } }`:                                                                 "",
+		`{ searchUser(keyword: "svc") { id } }`:                                                      "",
+		`{ userByNameOrEmail(nameOrEmail: "svc-owner") { id } }`:                                     "not found",
+		`{ findUserByAlias(alias: "x") { id } }`:                                                     "not found",
+		`{ authConfig { __typename } }`:                                                              "",
+		`{ checkPermission(input: {service: "s", resource: "r", action: "read"}) { allowed } }`:      "internal system error",
+		`{ userByNameOrAlias(nameOrAlias: "x") { id } }`:                                             "not found",
+		`{ findByName(name: "shared") { id } }`:                                                      "",
+		`{ findByAlias(alias: "act-as-shared") { id } }`:                                             "",
+		`mutation { createWorkspace(input: {alias: "x", name: "x"}) { workspace { id } } }`:          "invalid alias",
+		`mutation { findOrCreate(input: {sub: "x", iss: "x", token: "x"}) { user { id } } }`:         "",
+	}
+	ws, target := auShared.String(), privTarget.String()
+	for q, msg := range map[string]string{
+		`{ node(id: "` + target + `", type: USER) { id } }`:                                                                                   "",
+		`{ nodes(id: ["` + target + `"], type: USER) { id } }`:                                                                                "",
+		`{ node(id: "` + ws + `", type: WORKSPACE) { id } }`:                                                                                  "",
+		`{ user(id: "` + target + `") { id } }`:                                                                                               "",
+		`{ findUsersByIDs(ids: ["` + target + `"]) { id } }`:                                                                                  "",
+		`{ findUsersByIDsWithPagination(ids: ["` + target + `"], pagination: {page: 1, size: 1}) { totalCount } }`:                            "",
+		`{ findByID(id: "` + ws + `") { id } }`:                                                                                               "",
+		`{ findByIDs(ids: ["` + ws + `"]) { id } }`:                                                                                           "",
+		`{ publicWorkspace(id: "` + ws + `") { id } }`:                                                                                        "",
+		`mutation { updateWorkspace(input: {workspaceId: "` + ws + `", name: "x"}) { workspace { id } } }`:                                    "operation denied",
+		`mutation { deleteWorkspace(input: {workspaceId: "` + ws + `"}) { workspaceId } }`:                                                    "operation denied",
+		`mutation { addUsersToWorkspace(input: {workspaceId: "` + ws + `", users: []}) { workspace { id } } }`:                                "operation denied",
+		`mutation { addIntegrationToWorkspace(input: {workspaceId: "` + ws + `", integrationId: "x", role: reader}) { workspace { id } } }`:   "invalid ID",
+		`mutation { removeUserFromWorkspace(input: {workspaceId: "` + ws + `", userId: "` + target + `"}) { workspace { id } } }`:             "operation denied",
+		`mutation { updateUserOfWorkspace(input: {workspaceId: "` + ws + `", userId: "` + target + `", role: reader}) { workspace { id } } }`: "operation denied",
+		`mutation { transferWorkspaceOwnership(input: {workspaceId: "` + ws + `", newOwnerId: "` + target + `"}) { workspace { id } } }`:      "operation denied",
+	} {
+		want[q] = msg
+	}
+	return want
+}
+
 func TestActAsUser_OwnTokenUnchanged(t *testing.T) {
 	s := startActAsUserServer(t, false)
-	s.e.GET("/api/users/me").WithHeaders(s.own).Expect().Status(http.StatusOK).JSON().Object().HasValue("email", auSubjectEmail)
+	s.e.GET("/api/users/me").WithHeaders(s.ownTokens).Expect().Status(http.StatusOK).JSON().Object().HasValue("email", auSubjectEmail)
 
-	raw := s.e.GET("/api/workspaces").WithHeaders(s.own).WithQuery("ids", privTargetTeamWS.String()+","+auShared.String()).
+	raw := s.e.GET("/api/workspaces").WithHeaders(s.ownTokens).WithQuery("ids", privTargetTeamWS.String()+","+auShared.String()).
 		Expect().Status(http.StatusOK).Body().Raw()
 	assert.Contains(t, raw, privTargetTeamWS.String(), "a user's own lookups stay unscoped")
 	assert.Contains(t, raw, auBilling, "a member's own token still sees the billing email")
 
-	o, raw := s.gql(s.own, `{ findByUser(userId: "`+privTarget.String()+`") { id metadata { billingEmail } } }`)
+	o, raw := s.gql(s.ownTokens, `{ findByUser(userId: "`+privTarget.String()+`") { id metadata { billingEmail } } }`)
 	assert.Equal(t, []string{auShared.String()}, idsOf(o.Value("data").Object().Value("findByUser").Array()))
 	assert.Contains(t, raw, auBilling)
-	s.e.GET("/api/workspaces").WithHeaders(s.own).WithQuery("user_id", privTarget.String()).Expect().Status(http.StatusOK)
+	s.e.GET("/api/workspaces").WithHeaders(s.ownTokens).WithQuery("user_id", privTarget.String()).Expect().Status(http.StatusOK)
 }
 
-// Every selection the schema allows below the three read-list fields, as in
-// TestGQLPrivacy_NoTargetPrivateFieldsForOthers, run as a client acting for
-// the subject, who shares a workspace with the privacy target.
 func TestActAsUser_NestedSelectionsReachNoCoMemberData(t *testing.T) {
 	s := startActAsUserServer(t, false)
 	g := privacyGen{s: gql.NewExecutableSchema(gql.Config{}).Schema()}
@@ -404,13 +521,13 @@ func TestActAsUser_NestedSelectionsReachNoCoMemberData(t *testing.T) {
 func TestActAsUser_Logs(t *testing.T) {
 	s := startActAsUserServer(t, false)
 	logs := captureLogs(t)
-	tok := s.users["Authorization"]
+	tok := s.userOnlyClientTokens["Authorization"]
 
 	for _, do := range []func(){
-		func() { s.e.GET("/api/users/me").WithHeaders(s.users).Expect().Status(http.StatusOK) },
-		func() { s.gql(s.users, `{ me { id email } }`) },
+		func() { s.e.GET("/api/users/me").WithHeaders(s.userOnlyClientTokens).Expect().Status(http.StatusOK) },
+		func() { s.gql(s.userOnlyClientTokens, `{ me { id email } }`) },
 		func() {
-			s.e.PATCH("/api/users/me").WithHeaders(s.users).WithJSON(map[string]any{}).Expect().Status(http.StatusForbidden)
+			s.e.PATCH("/api/users/me").WithHeaders(s.userOnlyClientTokens).WithJSON(map[string]any{}).Expect().Status(http.StatusForbidden)
 		},
 	} {
 		before := len(logs.String())

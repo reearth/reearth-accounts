@@ -72,15 +72,18 @@ func (i *Workspace) Fetch(ctx context.Context, ids workspace.IDList, operator *w
 }
 
 func (i *Workspace) FetchByID(ctx context.Context, id workspace.ID, operator *workspace.Operator) (*workspace.Workspace, error) {
-	return scopeForService(i.repos.Workspace.FindByID(ctx, id))(operator)
+	ws, err := i.repos.Workspace.FindByID(ctx, id)
+	return scopeToClientSubject(operator, ws, err)
 }
 
 func (i *Workspace) FetchByName(ctx context.Context, name string, operator *workspace.Operator) (*workspace.Workspace, error) {
-	return scopeForService(i.repos.Workspace.FindByName(ctx, name))(operator)
+	ws, err := i.repos.Workspace.FindByName(ctx, name)
+	return scopeToClientSubject(operator, ws, err)
 }
 
 func (i *Workspace) FetchByAlias(ctx context.Context, alias string, operator *workspace.Operator) (*workspace.Workspace, error) {
-	return scopeForService(i.repos.Workspace.FindByAlias(ctx, alias))(operator)
+	ws, err := i.repos.Workspace.FindByAlias(ctx, alias)
+	return scopeToClientSubject(operator, ws, err)
 }
 
 func (i *Workspace) FindByUser(ctx context.Context, id workspace.UserID, operator *workspace.Operator) (workspace.List, error) {
@@ -135,18 +138,17 @@ func refuseAnotherUser(operator *workspace.Operator, uid workspace.UserID) error
 	return nil
 }
 
-// scopeForService hides a workspace from a client call whose subject is not a
-// member of it (ADR-0002 decisions 5 and 6). A user's own lookups stay unscoped.
-func scopeForService(ws *workspace.Workspace, err error) func(*workspace.Operator) (*workspace.Workspace, error) {
-	return func(operator *workspace.Operator) (*workspace.Workspace, error) {
-		if err != nil || !operator.ViaClient() {
-			return ws, err
-		}
-		if ws == nil || !operator.IsReadableWorkspace(ws.ID()) {
-			return nil, rerror.ErrNotFound
-		}
-		return ws, nil
+// scopeToClientSubject hides a workspace from a client call whose subject is
+// not a member of it (ADR-0002 decisions 5 and 6). A user's own lookups stay
+// unscoped.
+func scopeToClientSubject(operator *workspace.Operator, ws *workspace.Workspace, err error) (*workspace.Workspace, error) {
+	if err != nil || !operator.ViaClient() {
+		return ws, err
 	}
+	if ws == nil || !operator.IsReadableWorkspace(ws.ID()) {
+		return nil, rerror.ErrNotFound
+	}
+	return ws, nil
 }
 
 // FindAll lists workspaces across all tenants, unfiltered by any operator's

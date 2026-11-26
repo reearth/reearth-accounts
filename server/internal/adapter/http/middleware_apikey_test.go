@@ -1,12 +1,17 @@
 package http
 
 import (
+	"context"
 	"net/http"
 	"net/http/httptest"
 	"testing"
 
 	"github.com/labstack/echo/v4"
+	"github.com/reearth/reearth-accounts/server/internal/adapter"
 	httpinternal "github.com/reearth/reearth-accounts/server/internal/adapter/http/internal"
+	"github.com/reearth/reearth-accounts/server/pkg/id"
+	"github.com/reearth/reearth-accounts/server/pkg/user"
+	"github.com/reearth/reearth-accounts/server/pkg/workspace"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -114,4 +119,39 @@ func TestAPIKeyOrAuth(t *testing.T) {
 	t.Run("token without Bearer prefix is rejected", func(t *testing.T) {
 		assert.Equal(t, http.StatusUnauthorized, call("secret", "secret"))
 	})
+}
+
+func TestAPIKeyOrAuth_RefusesClientCalls(t *testing.T) {
+	u := user.New().NewID().Name("u").Email("u@example.com").MustBuild()
+	uid := u.ID()
+	iid := id.NewIntegrationID()
+	svc := &workspace.Client{ID: "svc", Name: "svc"}
+	ok := func(c echo.Context) error { return c.String(http.StatusOK, "ok") }
+	call := func(ctx context.Context, authHeader string) int {
+		req := httptest.NewRequest(http.MethodPost, "/", nil).WithContext(ctx)
+		if authHeader != "" {
+			req.Header.Set(echo.HeaderAuthorization, authHeader)
+		}
+		rec := httptest.NewRecorder()
+		c := echo.New().NewContext(req, rec)
+		if err := APIKeyOrAuth("secret")(ok)(c); err != nil {
+			httpinternal.CustomHTTPErrorHandler(err, c)
+		}
+		return rec.Code
+	}
+	bg := context.Background()
+	actingForUser := (&adapter.ClientCall{
+		Client: svc, Subject: workspace.UserSubject(uid), User: u,
+		Operator: &workspace.Operator{User: &uid, Client: svc},
+	}).Attach(bg)
+	actingForIntegration := (&adapter.ClientCall{
+		Client: svc, Subject: workspace.IntegrationSubject(iid),
+		Operator: &workspace.Operator{Integration: &iid, Client: svc},
+	}).Attach(bg)
+	plainUser := adapter.AttachOperator(adapter.AttachUser(bg, u), &workspace.Operator{User: &uid})
+
+	assert.Equal(t, http.StatusForbidden, call(actingForUser, ""), "a client acting for a user")
+	assert.Equal(t, http.StatusForbidden, call(actingForIntegration, ""), "a client acting for an integration")
+	assert.Equal(t, http.StatusOK, call(plainUser, ""), "a user's own token")
+	assert.Equal(t, http.StatusOK, call(bg, bearerPrefix+"secret"), "the static key")
 }

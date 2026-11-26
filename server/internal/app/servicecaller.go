@@ -377,9 +377,7 @@ func generateIntegrationOperator(ctx context.Context, cfg *ServerConfig, iid id.
 	}, nil
 }
 
-// actAsUserOperator builds the operator for a client acting for a user: the
-// user's own operator, marked as a client call. A deleted (deactivated) user
-// is refused like one that does not exist, since FindByID returns both.
+// actAsUserOperator refuses a deactivated user like an unknown one, because the lookup by ID returns both.
 func actAsUserOperator(ctx context.Context, cfg *ServerConfig, uid id.UserID, c *workspace.Client) (*user.User, *workspace.Operator, error) {
 	u, err := cfg.Repos.User.FindByID(ctx, uid)
 	if errors.Is(err, rerror.ErrNotFound) || (err == nil && (u == nil || u.IsDeleted())) {
@@ -408,7 +406,7 @@ func resolveClientCall(ctx context.Context, cfg *ServerConfig, ai *appx.AuthInfo
 	}
 
 	client := ca.client.Client
-	cc := &adapter.ClientCall{Client: &client, Subject: ca.subject}
+	cc := &adapter.ClientCall{Issuer: ca.client.Issuer, Client: &client, Subject: ca.subject}
 	if iid, ok := ca.subject.Integration(); ok {
 		if cc.Operator, err = generateIntegrationOperator(ctx, cfg, iid, cc.Client); err != nil {
 			return nil, err

@@ -172,7 +172,7 @@ func (i *Scim) DeprovisionScimUserByUserID(ctx context.Context, workspaceID work
 }
 
 func (i *Scim) GenerateScimToken(ctx context.Context, workspaceID workspace.ID, operator *workspace.Operator) (string, error) {
-	if !operator.IsUserSelfOrService() {
+	if !operator.IsUserSelf() {
 		return "", interfaces.ErrInvalidOperator
 	}
 	return Run1(ctx, operator, i.repos, Usecase().Transaction().WithMaintainableWorkspaces(workspaceID), func(ctx context.Context) (string, error) {
@@ -211,7 +211,7 @@ func (i *Scim) GenerateScimToken(ctx context.Context, workspaceID workspace.ID, 
 }
 
 func (i *Scim) GetScimConfig(ctx context.Context, workspaceID workspace.ID, operator *workspace.Operator) (*workspace.ScimConfig, error) {
-	if !operator.IsUserSelfOrService() {
+	if !operator.IsUserSelf() {
 		return nil, interfaces.ErrInvalidOperator
 	}
 	return Run1(ctx, operator, i.repos, Usecase().WithMaintainableWorkspaces(workspaceID), func(ctx context.Context) (*workspace.ScimConfig, error) {
@@ -507,7 +507,7 @@ func (i *Scim) ReactivateScimUserByUserID(ctx context.Context, workspaceID works
 }
 
 func (i *Scim) RevokeScimToken(ctx context.Context, workspaceID workspace.ID, operator *workspace.Operator) error {
-	if !operator.IsUserSelfOrService() {
+	if !operator.IsUserSelf() {
 		return interfaces.ErrInvalidOperator
 	}
 	return Run0(ctx, operator, i.repos, Usecase().Transaction().WithMaintainableWorkspaces(workspaceID), func(ctx context.Context) error {
@@ -684,7 +684,7 @@ func (i *Scim) SyncScimGroup(ctx context.Context, workspaceID workspace.ID, _, g
 }
 
 func (i *Scim) UpdateScimConfig(ctx context.Context, workspaceID workspace.ID, enabled bool, groupRoleMapping map[string]role.RoleType, operator *workspace.Operator) (*workspace.ScimConfig, error) {
-	if !operator.IsUserSelfOrService() {
+	if !operator.IsUserSelf() {
 		return nil, interfaces.ErrInvalidOperator
 	}
 	return Run1(ctx, operator, i.repos, Usecase().Transaction().WithMaintainableWorkspaces(workspaceID), func(ctx context.Context) (*workspace.ScimConfig, error) {

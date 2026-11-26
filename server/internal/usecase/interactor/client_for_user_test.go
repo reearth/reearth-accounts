@@ -178,18 +178,18 @@ func writeCalls() map[string]operatorCall {
 		"User.SetPlatformRolesBySub": {invalid, true, func(ctx context.Context, f clientForUserFixture, op *workspace.Operator) error {
 			return f.users.SetPlatformRolesBySub(ctx, "auth0|peer", nil, op)
 		}},
-		"Scim.GenerateScimToken": {invalid, false, func(ctx context.Context, f clientForUserFixture, op *workspace.Operator) error {
+		"Scim.GenerateScimToken": {invalid, true, func(ctx context.Context, f clientForUserFixture, op *workspace.Operator) error {
 			_, err := f.scim.GenerateScimToken(ctx, f.team, op)
 			return err
 		}},
-		"Scim.GetScimConfig": {invalid, false, func(ctx context.Context, f clientForUserFixture, op *workspace.Operator) error {
+		"Scim.GetScimConfig": {invalid, true, func(ctx context.Context, f clientForUserFixture, op *workspace.Operator) error {
 			_, err := f.scim.GetScimConfig(ctx, f.team, op)
 			return err
 		}},
-		"Scim.RevokeScimToken": {invalid, false, func(ctx context.Context, f clientForUserFixture, op *workspace.Operator) error {
+		"Scim.RevokeScimToken": {invalid, true, func(ctx context.Context, f clientForUserFixture, op *workspace.Operator) error {
 			return f.scim.RevokeScimToken(ctx, f.team, op)
 		}},
-		"Scim.UpdateScimConfig": {invalid, false, func(ctx context.Context, f clientForUserFixture, op *workspace.Operator) error {
+		"Scim.UpdateScimConfig": {invalid, true, func(ctx context.Context, f clientForUserFixture, op *workspace.Operator) error {
 			_, err := f.scim.UpdateScimConfig(ctx, f.team, true, nil, op)
 			return err
 		}},
@@ -222,4 +222,40 @@ func TestClientForUser_WritesAreRefusedWithoutTheGate(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestScim_MaintainersOwnTokenIsServed(t *testing.T) {
+	ctx := context.Background()
+	f := newClientForUserFixture(t)
+	maintainer, err := f.db.User.FindByID(ctx, f.newcomer)
+	require.NoError(t, err)
+	team, err := f.db.Workspace.FindByID(ctx, f.team)
+	require.NoError(t, err)
+	require.NoError(t, team.Members().Join(maintainer, role.RoleMaintainer, f.subject))
+	require.NoError(t, f.db.Workspace.Save(ctx, team))
+	op := &workspace.Operator{
+		User:                   &f.newcomer,
+		ReadableWorkspaces:     id.WorkspaceIDList{f.team},
+		WritableWorkspaces:     id.WorkspaceIDList{f.team},
+		MaintainableWorkspaces: id.WorkspaceIDList{f.team},
+	}
+
+	available, err := f.scim.SetWorkspaceScimAvailable(ctx, f.team, true, op)
+	require.NoError(t, err)
+	assert.True(t, available)
+	available, err = f.scim.GetWorkspaceScimState(ctx, f.team, op)
+	require.NoError(t, err)
+	assert.True(t, available)
+	_, err = f.scim.UpdateScimConfig(ctx, f.team, true, nil, op)
+	require.NoError(t, err)
+	token, err := f.scim.GenerateScimToken(ctx, f.team, op)
+	require.NoError(t, err)
+	assert.NotEmpty(t, token)
+	cfg, err := f.scim.GetScimConfig(ctx, f.team, op)
+	require.NoError(t, err)
+	assert.True(t, cfg.Enabled())
+	require.NoError(t, f.scim.RevokeScimToken(ctx, f.team, op))
+	cfg, err = f.scim.GetScimConfig(ctx, f.team, op)
+	require.NoError(t, err)
+	assert.False(t, cfg.Enabled())
 }

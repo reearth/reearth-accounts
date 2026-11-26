@@ -121,10 +121,9 @@ func metadataResponse(u *user.User) *UserMetadataResponse {
 // EmailViewer decides whose email a user response carries. GraphQL shows a
 // user's email only to that user (userResolver.Email), and REST follows it.
 type EmailViewer struct {
-	all  bool
-	self *user.ID
-	// member shows the billing email of the workspaces self is a member of.
-	member bool
+	all                  bool
+	self                 *user.ID
+	billingEmailAsMember bool
 }
 
 // ViewerOf shows the caller's own email only. A nil caller sees none. A
@@ -136,7 +135,7 @@ func ViewerOf(caller *user.User, op *workspace.Operator) EmailViewer {
 		return EmailViewer{}
 	}
 	uid := caller.ID()
-	return EmailViewer{self: &uid, member: op.IsUserSelf()}
+	return EmailViewer{self: &uid, billingEmailAsMember: op.IsUserSelf()}
 }
 
 // UnrestrictedViewer shows every email. Use it only where the route already
