@@ -281,9 +281,13 @@ func ReadConfig(debug bool) (*Config, error) {
 		return nil, fmt.Errorf("REEARTH_ACCOUNTS_SERVICE_CALLERS: %w", err)
 	}
 
-	if debug {
-		c.Dev = true
+	dev := debug || c.Dev
+	if !dev {
+		if err := checkTrustedURLs(c.Auths(), c.ServiceCallers); err != nil {
+			return nil, fmt.Errorf("untrusted token URL (ADR-0002 decision 11.6); fix the setting, do not set REEARTH_DEV in a deployed environment: %w", err)
+		}
 	}
+	c.Dev = dev
 	return &c, nil
 }
 
