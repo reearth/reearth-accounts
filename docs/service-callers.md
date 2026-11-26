@@ -160,19 +160,21 @@ On a laptop, a service can make client calls to accounts with tokens from a loca
 
    The command creates one RSA key for each local client in `server/.dev/service-callers/`, which git ignores. The default client is `cms`, with `act_as` `["integration"]`. To add clients, pass them as flags, such as `make dev-seed ARGS='-client cms=integration -client flow=integration'`. A second run keeps the existing keys. To replace them, run `make dev-seed ARGS=-rotate`.
 
-3. Load the accounts config. The command writes `server/.dev/service-callers/accounts.env`, which sets `REEARTH_ACCOUNTS_LOCAL_ISSUER=true`, a `REEARTH_AUTH` entry for the mock issuer, and one `REEARTH_ACCOUNTS_SERVICE_CALLERS` entry for each client.
-   - `reearth-accounts-dev` in `docker-compose.dev.yml` loads this file after `server/.env.docker`, so its `REEARTH_AUTH` replaces the one in `.env.docker`.
-   - For a server that runs on the host, load the file into the shell first, such as `set -a; . ./.dev/service-callers/accounts.env; set +a`.
+3. Load the accounts config. The command writes `server/.dev/service-callers/accounts.env`, which sets three variables: `REEARTH_ACCOUNTS_LOCAL_ISSUER=true`, `REEARTH_AUTH` with one entry for the mock issuer, and `REEARTH_ACCOUNTS_SERVICE_CALLERS` with one entry for each client.
+   - `reearth-accounts-dev` in `docker-compose.dev.yml` loads this file after `server/.env.docker` on every start once the file exists. The optional `env_file` entry needs Docker Compose 2.24 or later.
+   - Accounts adds `REEARTH_AUTH` entries after the providers that the Auth0, `REEARTH_AUTH_ISS`, and CIP variables configure, so the mock issuer is added to those providers and does not replace them. A `REEARTH_AUTH` value in `.env.docker` is replaced by the one in this file.
+   - For a server that runs on the host, load the file into the shell first, such as `set -a; . ./.dev/service-callers/accounts.env; set +a`. That server fetches the mock's keys by its service name, so the host also needs the hosts-file line in [Use one issuer URL](#use-one-issuer-url).
+   - To turn the local issuer off, delete `server/.dev/service-callers/accounts.env` and restart accounts.
 
 4. Turn off `REEARTH_MOCK_AUTH`. Mock auth skips token validation and has no client path, so accounts refuses every client call while it is on (decision 11.9).
 
-5. Configure each calling service with the `servicetoken` settings that the command prints: the token URL, the client ID, the audience, and the path of the private key file. A service that runs in a container mounts the key file read-only.
+5. Configure each calling service with the `servicetoken` settings that the command prints: the token URL, the client ID, the audience, and the key file. `servicetoken.Config.Key` takes a parsed key, so the service reads the key file and passes its bytes to `servicetoken.ParsePrivateKeyPEM`. A service that runs in a container mounts the key file read-only.
 
 ### Use one issuer URL
 
 The mock builds the `iss` claim from the host of the token request, and accounts compares `iss` exactly. Accounts and every caller must therefore reach the mock as `http://mock-oauth2:8091`. A token fetched through another host name, such as `localhost`, gets `401`.
 
-A caller that runs outside compose needs this line in its hosts file:
+Accounts, or a caller, that runs outside compose needs this line in its hosts file:
 
 ```
 127.0.0.1 mock-oauth2
@@ -182,8 +184,10 @@ A caller that runs outside compose needs this line in its hosts file:
 
 The mock gives a client credentials token the same claims as a deployed issuer: `sub` is `<client ID>@clients`, `azp` is the client ID, `gty` is `client-credentials`, and `aud` is the requested audience. The token has no `email` and lasts one hour. An authorization code login on the same issuer gives a user token with `email` and no `gty`, which accounts treats as a user token.
 
-The local path does not test the identity provider's check of the client assertion. The mock accepts any assertion, so any process on the laptop that reaches port 8091 can get a token for any local client (ADR-0002, accepted risk 6).
+The other grant types that the mock offers (`password`, `urn:ietf:params:oauth:grant-type:jwt-bearer`, `refresh_token`, and token exchange) are not mapped in the config. The mock gives them a token whose `sub` the requester chooses (or no `sub` for `refresh_token`), with no `aud`, `azp`, `gty`, or `email`. Accounts refuses these tokens with `401` on the client path and on the user path, because they have no `aud`.
+
+The local path does not test the identity provider's check of the client assertion. The mock accepts any assertion, so any process on the laptop that reaches port 8091 can get a client token for any local client. It can also get an authorization code user token, whose `sub` is `local-user`, and tokens with a `sub` it chooses from the unmapped grant types. Accounts does not accept those tokens today only because they have no `aud`. For these reasons, compose publishes the mock on `127.0.0.1` only, and accounts trusts the mock only with `REEARTH_ACCOUNTS_LOCAL_ISSUER` (ADR-0002, accepted risk 6).
 
 The keys are for development only. Never register them, or the mock issuer, in a deployed environment. A deployed server refuses the mock issuer. The issuer is an `http` URL on a single-label host, which passes only with `REEARTH_ACCOUNTS_LOCAL_ISSUER`, and the server refuses that switch on Cloud Run and Kubernetes.
 
-`make test-integration` runs `TestLocalIssuer`, which starts the pinned image with this config and checks the token shape, a call that acts for an integration, the refusal without the switch, the refusal of a token fetched through another host name, and the refusal of a user token with `X-Reearth-Act-As`.
+`make test-integration` runs `TestLocalIssuer`, which starts the pinned image with this config and checks the token shape, a call that acts for an integration, the refusal without the switch, the refusal of a token fetched through another host name, a user token that is accepted as its user without `X-Reearth-Act-As` and refused with it, and the refusal of tokens from the unmapped grant types.

@@ -15,10 +15,15 @@ import (
 	"fmt"
 	"io"
 	"net"
+	"net/netip"
 	"os"
 	"path/filepath"
 	"regexp"
 	"strings"
+	"unicode"
+
+	"github.com/reearth/reearth-accounts/server/internal/app"
+	"github.com/reearth/reearth-accounts/server/pkg/servicetoken"
 )
 
 const (
@@ -106,7 +111,6 @@ func run(args []string, out io.Writer) error {
 	return seed(o, out)
 }
 
-// serverRoot finds the server module's directory from the working directory.
 func serverRoot() (string, error) {
 	d, err := os.Getwd()
 	if err != nil {
@@ -177,7 +181,65 @@ func within(base, p string) bool {
 	return err == nil && rel != ".." && !strings.HasPrefix(rel, ".."+string(filepath.Separator))
 }
 
+var (
+	issuerIDPattern = regexp.MustCompile(`^[A-Za-z0-9-]+$`)
+	localHostLabel  = regexp.MustCompile(`^[a-z][a-z0-9-]*$`)
+)
+
+// validate refuses, by rule, the values the accounts decoders in envFragment
+// do not check, so that nothing printed or written can carry a control
+// character.
+func (o options) validate() error {
+	if o.port < 1 || o.port > 65535 {
+		return fmt.Errorf("port %d is outside 1..65535", o.port)
+	}
+	if !issuerIDPattern.MatchString(o.issuerID) {
+		return errors.New("issuer ID must be ASCII letters, digits and hyphens")
+	}
+	if o.audience == "" {
+		return errors.New("audience is empty")
+	}
+	if strings.ContainsFunc(o.audience, unicode.IsControl) {
+		return errors.New("audience contains a control character")
+	}
+	if strings.ContainsFunc(o.dir, unicode.IsControl) {
+		return errors.New("dir contains a control character")
+	}
+	return checkLocalHost(o.host)
+}
+
+// checkLocalHost mirrors what accounts accepts as a local issuer host with
+// REEARTH_ACCOUNTS_LOCAL_ISSUER on: a loopback address, localhost, or a
+// single-label name other than a cloud metadata alias.
+func checkLocalHost(h string) error {
+	if a, err := netip.ParseAddr(h); err == nil && a.Unmap().IsLoopback() {
+		return nil
+	}
+	if h == "localhost" || (localHostLabel.MatchString(h) && h != "metadata" && h != "instance-data") {
+		return nil
+	}
+	return errors.New("host must be a loopback address, localhost, or a lower-case single-label name")
+}
+
 func seed(o options, out io.Writer) error {
+	if err := o.validate(); err != nil {
+		return err
+	}
+	env, err := envFragment(o)
+	if err != nil {
+		return err
+	}
+	var missing []client
+	for _, c := range o.clients {
+		keep, err := keepKey(o.keyPath(c), o.rotate)
+		if err != nil {
+			return fmt.Errorf("client %s: %w", c.id, err)
+		}
+		if !keep {
+			missing = append(missing, c)
+		}
+	}
+
 	if err := os.MkdirAll(o.dir, 0o700); err != nil {
 		return err
 	}
@@ -185,13 +247,14 @@ func seed(o options, out io.Writer) error {
 		return err
 	}
 	for _, c := range o.clients {
-		if err := ensureKey(o.keyPath(c), o.rotate); err != nil {
-			return fmt.Errorf("client %s: %w", c.id, err)
+		if err := os.Chmod(o.keyPath(c), 0o600); err != nil && !errors.Is(err, os.ErrNotExist) {
+			return err
 		}
 	}
-	env, err := envFragment(o)
-	if err != nil {
-		return err
+	for _, c := range missing {
+		if err := writeKey(o.keyPath(c)); err != nil {
+			return fmt.Errorf("client %s: %w", c.id, err)
+		}
 	}
 	envPath := filepath.Join(o.dir, envFileName)
 	if err := writeFileAtomic(envPath, []byte(env)); err != nil {
@@ -201,16 +264,31 @@ func seed(o options, out io.Writer) error {
 	return nil
 }
 
-func ensureKey(path string, rotate bool) error {
+// keepKey reports whether path holds a key to keep. It never returns the
+// file's contents in an error.
+func keepKey(path string, rotate bool) (bool, error) {
 	fi, err := os.Lstat(path)
 	switch {
-	case err == nil && !fi.Mode().IsRegular():
-		return fmt.Errorf("%s exists and is not a regular file", path)
-	case err == nil && !rotate:
-		return os.Chmod(path, 0o600)
-	case err != nil && !errors.Is(err, os.ErrNotExist):
-		return err
+	case errors.Is(err, os.ErrNotExist):
+		return false, nil
+	case err != nil:
+		return false, err
+	case !fi.Mode().IsRegular():
+		return false, fmt.Errorf("%s exists and is not a regular file", path)
+	case rotate:
+		return false, nil
 	}
+	data, err := os.ReadFile(path)
+	if err != nil {
+		return false, err
+	}
+	if _, err := servicetoken.ParsePrivateKeyPEM(data); err != nil {
+		return false, fmt.Errorf("%s is not a PEM RSA private key; rerun with -rotate to replace it", path)
+	}
+	return true, nil
+}
+
+func writeKey(path string) error {
 	key, err := rsa.GenerateKey(rand.Reader, 2048)
 	if err != nil {
 		return err
@@ -271,6 +349,14 @@ func envFragment(o options) (string, error) {
 			return "", errors.New("a value contains a single quote")
 		}
 	}
+	var authCfg app.AuthConfigs
+	if err := authCfg.Decode(string(auth)); err != nil {
+		return "", err
+	}
+	var registry app.ServiceCallers
+	if err := registry.Decode(string(callers)); err != nil {
+		return "", err
+	}
 	return fmt.Sprintf(`# Written by make dev-seed for the local mock issuer. Dev-only: never use in a deployed environment.
 REEARTH_ACCOUNTS_LOCAL_ISSUER=true
 REEARTH_AUTH='%s'
@@ -287,5 +373,6 @@ func printSettings(out io.Writer, o options, envPath string) {
 		_, _ = fmt.Fprintf(out, "  audience:  %s\n", o.audience)
 		_, _ = fmt.Fprintf(out, "  key file:  %s\n\n", o.keyPath(c))
 	}
-	_, _ = fmt.Fprintf(out, "A caller that runs outside compose needs this line in its hosts file:\n  127.0.0.1 %s\n", o.host)
+	_, _ = fmt.Fprintln(out, "A caller reads its key file and passes the bytes to servicetoken.ParsePrivateKeyPEM for servicetoken.Config.Key.")
+	_, _ = fmt.Fprintf(out, "Accounts or a caller that runs outside compose needs this line in its hosts file:\n  127.0.0.1 %s\n", o.host)
 }

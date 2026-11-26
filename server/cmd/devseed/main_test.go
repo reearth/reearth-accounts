@@ -8,6 +8,7 @@ import (
 
 	"github.com/joho/godotenv"
 	"github.com/reearth/reearth-accounts/server/internal/app"
+	"github.com/reearth/reearth-accounts/server/pkg/servicetoken"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -48,6 +49,10 @@ func TestSeed_WritesKeysAndEnvWithPrivateModes(t *testing.T) {
 		require.NoError(t, err)
 		assert.Equal(t, os.FileMode(0o600), fi.Mode().Perm(), c.id)
 		assert.Greater(t, fi.Size(), int64(1000), c.id)
+		data, err := os.ReadFile(o.keyPath(c))
+		require.NoError(t, err)
+		_, err = servicetoken.ParsePrivateKeyPEM(data)
+		assert.NoError(t, err, c.id)
 	}
 	assert.Equal(t, os.FileMode(0o600), mode(t, filepath.Join(dir, envFileName)))
 
@@ -66,6 +71,7 @@ func TestSeed_WritesKeysAndEnvWithPrivateModes(t *testing.T) {
 	assert.Contains(t, out, "audience:  reearth-accounts-local")
 	assert.Contains(t, out, "key file:  "+filepath.Join(dir, "cms.key"))
 	assert.Contains(t, out, "127.0.0.1 mock-oauth2")
+	assert.Contains(t, out, "servicetoken.ParsePrivateKeyPEM")
 }
 
 func TestSeed_KeepsKeysUnlessRotate(t *testing.T) {
@@ -99,6 +105,75 @@ func TestSeed_RefusesSymlinkKey(t *testing.T) {
 	o := testOptions(dir)
 	require.NoError(t, os.Symlink(filepath.Join(t.TempDir(), "elsewhere"), o.keyPath(o.clients[0])))
 	assert.ErrorContains(t, seed(o, &bytes.Buffer{}), "not a regular file")
+}
+
+func TestSeed_RefusesInvalidValuesBeforeWritingAnything(t *testing.T) {
+	cases := map[string]func(*options){
+		"act_as in upper case":   func(o *options) { o.clients[0].actAs = []string{"Integration"} },
+		"act_as twice":           func(o *options) { o.clients[0].actAs = []string{"user", "user"} },
+		"act_as empty element":   func(o *options) { o.clients[0].actAs = []string{"integration", ""} },
+		"act_as with whitespace": func(o *options) { o.clients[0].actAs = []string{" user"} },
+		"act_as unknown":         func(o *options) { o.clients[0].actAs = []string{"integ\nration"} },
+		"duplicate client":       func(o *options) { o.clients = append(o.clients, client{id: "cms", actAs: []string{}}) },
+		"port zero":              func(o *options) { o.port = 0 },
+		"port too high":          func(o *options) { o.port = 65536 },
+		"empty audience":         func(o *options) { o.audience = "" },
+		"audience with newline":  func(o *options) { o.audience = "aud\nclient ID: forged" },
+		"audience with quote":    func(o *options) { o.audience = "it's" },
+		"empty issuer ID":        func(o *options) { o.issuerID = "" },
+		"issuer ID with slash":   func(o *options) { o.issuerID = "a/b" },
+		"issuer ID non-ASCII":    func(o *options) { o.issuerID = "caf\u00e9" },
+		"issuer ID with control": func(o *options) { o.issuerID = "a\x1b[2J" },
+		"host with a dot":        func(o *options) { o.host = "issuer.example.com" },
+		"metadata host":          func(o *options) { o.host = "metadata" },
+		"host with control":      func(o *options) { o.host = "mock\r" },
+		"dir with control":       func(o *options) { o.dir += "\n" },
+	}
+	for name, mutate := range cases {
+		t.Run(name, func(t *testing.T) {
+			parent := t.TempDir()
+			o := testOptions(filepath.Join(parent, "service-callers"))
+			mutate(&o)
+			var out bytes.Buffer
+			require.Error(t, seed(o, &out))
+			assert.Empty(t, out.String())
+			entries, err := os.ReadDir(parent)
+			require.NoError(t, err)
+			assert.Empty(t, entries, "a refused run writes nothing")
+		})
+	}
+}
+
+func TestSeed_AcceptsLocalHosts(t *testing.T) {
+	for _, h := range []string{"mock-oauth2", "localhost", "127.0.0.1", "::1"} {
+		o := testOptions(t.TempDir())
+		o.host = h
+		seedInto(t, o)
+	}
+}
+
+func TestSeed_RefusesExistingKeyThatIsNotAKey(t *testing.T) {
+	dir := t.TempDir()
+	o := testOptions(dir)
+	const junk = "not a key 0123456789"
+	require.NoError(t, os.WriteFile(o.keyPath(o.clients[0]), []byte(junk), 0o600))
+
+	var out bytes.Buffer
+	err := seed(o, &out)
+	require.ErrorContains(t, err, "-rotate")
+	assert.NotContains(t, err.Error(), junk)
+	assert.Empty(t, out.String())
+	_, err = os.Stat(o.keyPath(o.clients[1]))
+	assert.ErrorIs(t, err, os.ErrNotExist, "no key is written for the other client")
+	_, err = os.Stat(filepath.Join(dir, envFileName))
+	assert.ErrorIs(t, err, os.ErrNotExist)
+
+	o.rotate = true
+	seedInto(t, o)
+	data, err := os.ReadFile(o.keyPath(o.clients[0]))
+	require.NoError(t, err)
+	_, err = servicetoken.ParsePrivateKeyPEM(data)
+	assert.NoError(t, err)
 }
 
 func loadEnv(t *testing.T, path string) map[string]string {

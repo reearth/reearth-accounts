@@ -16,8 +16,14 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/golang-jwt/jwt/v5"
 	"github.com/reearth/reearth-accounts/server/internal/app"
+	"github.com/reearth/reearth-accounts/server/internal/usecase/repo"
+	"github.com/reearth/reearth-accounts/server/pkg/id"
+	"github.com/reearth/reearth-accounts/server/pkg/role"
 	"github.com/reearth/reearth-accounts/server/pkg/servicetoken"
+	"github.com/reearth/reearth-accounts/server/pkg/user"
+	"github.com/reearth/reearth-accounts/server/pkg/workspace"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/testcontainers/testcontainers-go"
@@ -29,7 +35,23 @@ const (
 	localAudience       = "reearth-accounts-local"
 	localClientID       = "cms"
 	localIssuerPortSpec = "8091/tcp"
+	localUserSub        = "local-user"
+	chosenUserSub       = "chosen-user"
 )
+
+var localUID = id.NewUserID()
+
+func seedLocalIssuer(ctx context.Context, r *repo.Container) error {
+	if err := seedServiceCallers(ctx, r); err != nil {
+		return err
+	}
+	u := user.New().ID(localUID).Name(localUserSub).Email("local-user@e2e.com").Auths([]user.Auth{user.AuthFrom(localUserSub)}).MustBuild()
+	if err := r.User.Save(ctx, u); err != nil {
+		return err
+	}
+	return r.Workspace.Save(ctx, workspace.New().NewID().Name(localUserSub).Alias("a-"+localUID.String()).Personal(true).
+		Members(map[workspace.UserID]workspace.Member{localUID: {Role: role.RoleOwner, InvitedBy: localUID}}).MustBuild())
+}
 
 func mockIssuerImage(t *testing.T) string {
 	t.Helper()
@@ -85,13 +107,32 @@ func clientCredentialsToken(t *testing.T, tokenURL string) string {
 	return tok
 }
 
-func authorizationCodeToken(t *testing.T, issuer string) string {
+func tokenResponse(t *testing.T, issuer string, form url.Values, basicAuthClient string) map[string]any {
+	t.Helper()
+	req, err := http.NewRequest(http.MethodPost, issuer+"/token", strings.NewReader(form.Encode()))
+	require.NoError(t, err)
+	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+	if basicAuthClient != "" {
+		req.SetBasicAuth(basicAuthClient, "any")
+	}
+	res, err := http.DefaultClient.Do(req)
+	require.NoError(t, err)
+	defer func() { _ = res.Body.Close() }()
+	b, err := io.ReadAll(res.Body)
+	require.NoError(t, err)
+	require.Equal(t, http.StatusOK, res.StatusCode, string(b))
+	var tr map[string]any
+	require.NoError(t, json.Unmarshal(b, &tr))
+	return tr
+}
+
+func authorizationCode(t *testing.T, issuer string) map[string]any {
 	t.Helper()
 	const redirect = "http://localhost/callback"
 	noFollow := &http.Client{CheckRedirect: func(*http.Request, []*http.Request) error { return http.ErrUseLastResponse }}
 	res, err := noFollow.Get(issuer + "/authorize?" + url.Values{
 		"client_id": {"local-web"}, "response_type": {"code"}, "redirect_uri": {redirect},
-		"scope": {"openid"}, "state": {"s"}, "nonce": {"n"},
+		"scope": {"openid offline_access"}, "state": {"s"}, "nonce": {"n"},
 	}.Encode())
 	require.NoError(t, err)
 	_ = res.Body.Close()
@@ -100,18 +141,24 @@ func authorizationCodeToken(t *testing.T, issuer string) string {
 	code := loc.Query().Get("code")
 	require.NotEmpty(t, code)
 
-	res, err = http.PostForm(issuer+"/token", url.Values{
+	return tokenResponse(t, issuer, url.Values{
 		"grant_type": {"authorization_code"}, "code": {code}, "client_id": {"local-web"},
 		"redirect_uri": {redirect}, "audience": {localAudience},
-	})
+	}, "")
+}
+
+func authorizationCodeToken(t *testing.T, issuer string) string {
+	t.Helper()
+	return authorizationCode(t, issuer)["access_token"].(string)
+}
+
+func selfSignedJWT(t *testing.T, claims jwt.MapClaims) string {
+	t.Helper()
+	key, err := rsa.GenerateKey(rand.Reader, 2048)
 	require.NoError(t, err)
-	defer func() { _ = res.Body.Close() }()
-	require.Equal(t, http.StatusOK, res.StatusCode)
-	var tr struct {
-		AccessToken string `json:"access_token"`
-	}
-	require.NoError(t, json.NewDecoder(res.Body).Decode(&tr))
-	return tr.AccessToken
+	s, err := jwt.NewWithClaims(jwt.SigningMethodRS256, claims).SignedString(key)
+	require.NoError(t, err)
+	return s
 }
 
 func jwtClaims(t *testing.T, tok string) map[string]any {
@@ -156,7 +203,7 @@ func TestLocalIssuer(t *testing.T) {
 	t.Setenv("REEARTH_ACCOUNTS_LOCAL_ISSUER", "true")
 	cfg, err := app.ReadConfig(false)
 	require.NoError(t, err)
-	host := startServerURL(t, cfg, seededMemoryRepos(t, seedServiceCallers), nil, false)
+	host := startServerURL(t, cfg, seededMemoryRepos(t, seedLocalIssuer), nil, false)
 
 	asIntegration := "integration:" + svcIntegration.String()
 	byUser := `{ findByUser(userId: "` + svcOwnerUID.String() + `") { id } }`
@@ -198,16 +245,78 @@ func TestLocalIssuer(t *testing.T) {
 		assert.Equal(t, http.StatusUnauthorized, status, body)
 	})
 
+	me := `{ me { id } }`
+	meID := func(t *testing.T, body string) string {
+		t.Helper()
+		var res struct {
+			Data struct {
+				Me struct{ ID string } `json:"me"`
+			} `json:"data"`
+		}
+		require.NoError(t, json.Unmarshal([]byte(body), &res), body)
+		return res.Data.Me.ID
+	}
+
 	t.Run("user token from the mock is not a client token", func(t *testing.T) {
 		user := authorizationCodeToken(t, issuer)
 		c := jwtClaims(t, user)
 		assert.Equal(t, issuer, c["iss"])
+		assert.Equal(t, localUserSub, c["sub"])
 		assert.Equal(t, localAudience, c["aud"])
 		assert.NotEmpty(t, c["email"])
 		assert.NotContains(t, c, "gty")
 
-		status, body := postGraphQL(t, host, user, asIntegration, byUser)
+		status, body := postGraphQL(t, host, user, "", me)
+		require.Equal(t, http.StatusOK, status, body)
+		assert.Equal(t, localUID.String(), meID(t, body))
+
+		status, body = postGraphQL(t, host, user, asIntegration, byUser)
 		assert.Equal(t, http.StatusUnauthorized, status, body)
-		assert.NotContains(t, body, "JWT is invalid", "the token validates, and the act-as header is refused because it is not a client token")
+	})
+
+	t.Run("grant types the config does not map never give a client call", func(t *testing.T) {
+		code := authorizationCode(t, issuer)
+		require.NotEmpty(t, code["refresh_token"])
+		chosen := selfSignedJWT(t, jwt.MapClaims{"sub": chosenUserSub, "aud": localAudience, "iss": "anyone", "exp": 4102444800})
+		password := func(username string) url.Values {
+			return url.Values{"grant_type": {"password"}, "username": {username}, "password": {"x"}, "client_id": {"local-web"}, "scope": {"openid"}, "audience": {localAudience}}
+		}
+
+		cases := []struct {
+			name      string
+			form      url.Values
+			basicAuth string
+			sub       any
+		}{
+			{"password", password(chosenUserSub), "", chosenUserSub},
+			{"password imitating a client", password(localClientID + "@clients"), "", localClientID + "@clients"},
+			{"jwt-bearer", url.Values{
+				"grant_type": {"urn:ietf:params:oauth:grant-type:jwt-bearer"}, "assertion": {chosen},
+				"client_id": {localClientID}, "scope": {"openid"}, "audience": {localAudience},
+			}, "", chosenUserSub},
+			{"token exchange", url.Values{
+				"grant_type": {"urn:ietf:params:oauth:grant-type:token-exchange"}, "subject_token": {chosen},
+				"subject_token_type": {"urn:ietf:params:oauth:token-type:jwt"}, "audience": {localAudience},
+			}, localClientID, chosenUserSub},
+			{"refresh_token", url.Values{
+				"grant_type": {"refresh_token"}, "refresh_token": {code["refresh_token"].(string)}, "client_id": {"local-web"},
+			}, "", nil},
+		}
+		for _, tc := range cases {
+			t.Run(tc.name, func(t *testing.T) {
+				tok := tokenResponse(t, issuer, tc.form, tc.basicAuth)["access_token"].(string)
+				c := jwtClaims(t, tok)
+				assert.Equal(t, issuer, c["iss"])
+				assert.Equal(t, tc.sub, c["sub"])
+				for _, claim := range []string{"aud", "azp", "gty", "client_id", "email"} {
+					assert.NotContains(t, c, claim)
+				}
+
+				status, body := postGraphQL(t, host, tok, asIntegration, byUser)
+				assert.Equal(t, http.StatusUnauthorized, status, body)
+				status, body = postGraphQL(t, host, tok, "", me)
+				assert.Equal(t, http.StatusUnauthorized, status, body)
+			})
+		}
 	})
 }
