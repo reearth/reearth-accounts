@@ -77,6 +77,9 @@ func Code(v string) Field   { return field("code", v) }
 func Reason(v string) Field { return field("reason", v) }
 func Count(v int) Field     { return field("count", v) }
 
+func RemovedCount(v int) Field { return field("removed_count", v) }
+func FailedCount(v int) Field  { return field("failed_count", v) }
+
 // Infrastructure.
 
 func LockName(v string) Field            { return field("lock_name", v) }

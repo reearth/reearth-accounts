@@ -95,6 +95,37 @@ definitions:
     - sub
     - token
     type: object
+  httpmodel.IntegrationWorkspaceResponse:
+    properties:
+      alias:
+        type: string
+      id:
+        type: string
+      name:
+        type: string
+      role:
+        type: string
+    type: object
+  httpmodel.IntegrationWorkspacesResponse:
+    properties:
+      integration_id:
+        type: string
+      workspaces:
+        items:
+          $ref: '#/definitions/httpmodel.IntegrationWorkspaceResponse'
+        type: array
+    type: object
+  httpmodel.LeaveAllWorkspacesResponse:
+    properties:
+      failed_workspace_ids:
+        items:
+          type: string
+        type: array
+      removed_workspace_ids:
+        items:
+          type: string
+        type: array
+    type: object
   httpmodel.MFAEnrollResponse:
     properties:
       enrollment_url:
@@ -606,6 +637,68 @@ paths:
       summary: Log out the current user
       tags:
       - Auth
+  /api/integrations/self/workspaces:
+    delete:
+      description: 'Call this when the integration is deleted. Each workspace is left
+        on its own, so the response is 200 even when some fail: they are listed in
+        failed_workspace_ids. Retrying is safe and removes only what is left. Leaving
+        needs no role. Only a registered client token with X-Reearth-Act-As: integration:<id>
+        may call this.'
+      parameters:
+      - description: integration:<id>
+        in: header
+        name: X-Reearth-Act-As
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/httpmodel.LeaveAllWorkspacesResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/internal.ErrorResponse'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/internal.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Remove the acting integration from all its workspaces
+      tags:
+      - Integration
+    get:
+      description: 'Only a registered client token with X-Reearth-Act-As: integration:<id>
+        may call this.'
+      parameters:
+      - description: integration:<id>
+        in: header
+        name: X-Reearth-Act-As
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/httpmodel.IntegrationWorkspacesResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/internal.ErrorResponse'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/internal.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: List the acting integration's workspaces and roles
+      tags:
+      - Integration
   /api/permissions/check:
     post:
       consumes:

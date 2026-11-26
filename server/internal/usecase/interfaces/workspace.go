@@ -3,6 +3,7 @@ package interfaces
 import (
 	"context"
 
+	"github.com/reearth/reearth-accounts/server/pkg/id"
 	"github.com/reearth/reearth-accounts/server/pkg/role"
 	"github.com/reearth/reearth-accounts/server/pkg/user"
 	"github.com/reearth/reearth-accounts/server/pkg/workspace"
@@ -52,6 +53,19 @@ type UpdateWorkspaceParam struct {
 	PhotoURL    *string
 }
 
+// IntegrationMembership is one workspace the acting integration belongs to,
+// with its role there.
+type IntegrationMembership struct {
+	Workspace *workspace.Workspace
+	Role      role.RoleType
+}
+
+// LeaveAllResult lists, by workspace, what LeaveAllAsIntegration did.
+type LeaveAllResult struct {
+	Removed id.WorkspaceIDList
+	Failed  id.WorkspaceIDList
+}
+
 type Workspace interface {
 	Fetch(context.Context, workspace.IDList, *workspace.Operator) (workspace.List, error)
 	FetchByID(context.Context, workspace.ID, *workspace.Operator) (*workspace.Workspace, error)
@@ -84,4 +98,16 @@ type Workspace interface {
 	Deactivate(ctx context.Context, id workspace.ID, operator *workspace.Operator) (*workspace.Workspace, error)
 	Restore(ctx context.Context, id workspace.ID, operator *workspace.Operator) (*workspace.Workspace, error)
 	TransferOwnership(ctx context.Context, workspaceID workspace.ID, newOwnerID workspace.UserID, operator *workspace.Operator) (*workspace.Workspace, error)
+	// ActingIntegrationMemberships lists the workspaces of the integration a
+	// client call acts for, and its role in each. It takes no integration ID:
+	// the operator's subject is the only identity, so a client cannot ask
+	// about an integration it does not act for (ADR-0002 decision 5).
+	ActingIntegrationMemberships(ctx context.Context, operator *workspace.Operator) ([]IntegrationMembership, error)
+	// LeaveAllAsIntegration removes the integration a client call acts for
+	// from every workspace it belongs to, each in its own transaction. It
+	// needs membership only, not a role, because leaving lowers privilege. A
+	// workspace that fails is listed in Failed and the rest still run, so a
+	// retry finishes the job. The error is set only when the memberships
+	// cannot be read.
+	LeaveAllAsIntegration(ctx context.Context, operator *workspace.Operator) (LeaveAllResult, error)
 }

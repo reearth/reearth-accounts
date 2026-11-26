@@ -99,6 +99,11 @@ func seedServiceCallers(ctx context.Context, r *repo.Container) error {
 
 func startServiceCallerServer(t *testing.T) (*httpexpect.Expect, *svcIdP) {
 	t.Helper()
+	return startServiceCallerServerWith(t, seedServiceCallers)
+}
+
+func startServiceCallerServerWith(t *testing.T, seed Seeder) (*httpexpect.Expect, *svcIdP) {
+	t.Helper()
 	idp := newSvcIdP(t)
 	jwks := idp.srv.URL + "/jwks.json"
 	cfg := &app.Config{Auth: app.AuthConfigs{{ISS: idp.issuer(), AUD: []string{svcAudience}, JWKSURI: &jwks}}}
@@ -109,7 +114,7 @@ func startServiceCallerServer(t *testing.T) (*httpexpect.Expect, *svcIdP) {
 	})
 	require.NoError(t, err)
 	require.NoError(t, cfg.ServiceCallers.Decode(string(callers)))
-	e, _ := StartServerNoDebug(t, cfg, false, seedServiceCallers)
+	e, _ := StartServerNoDebug(t, cfg, false, seed)
 	return e, idp
 }
 

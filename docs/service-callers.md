@@ -140,6 +140,39 @@ A refused REST call gets `403` with the message `forbidden: this route is not op
 
 A route mounted outside the `/api` REST group does not pass through the gate. A client token on such a route resolves to no user and no operator, so a route that requires authentication answers 401.
 
+### The acting integration's workspaces
+
+Two endpoints let an app work with the integration it acts for without reading the accounts database. Neither takes an integration ID: the integration is the one in `X-Reearth-Act-As`, so a client cannot read or change another integration's memberships.
+
+Only a client token acting for an integration may call them. Without a token the response is 401. A user's own token gets 401 on REST and an `invalid operator` error on GraphQL. A client token without the header gets 403.
+
+To list the workspaces and the integration's role in each:
+
+```
+GET /api/integrations/self/workspaces
+```
+
+```json
+{
+  "integration_id": "<integration ID>",
+  "workspaces": [{"id": "<workspace ID>", "name": "...", "alias": "...", "role": "writer"}]
+}
+```
+
+The GraphQL query is `actingIntegration { id workspaces { role workspace { id name alias } } }`. `workspace` shows the same fields as `findByID` does for the integration.
+
+To remove the integration from every workspace it belongs to, for example when the integration is deleted:
+
+```
+DELETE /api/integrations/self/workspaces
+```
+
+```json
+{"removed_workspace_ids": ["<workspace ID>"], "failed_workspace_ids": []}
+```
+
+The GraphQL mutation is `leaveAllWorkspaces { removedWorkspaceIds failedWorkspaceIds }`. Leaving needs no role, because it lowers the integration's access. Accounts leaves each workspace in its own transaction. When a workspace fails, accounts lists it in `failed_workspace_ids`, continues with the others, and still answers 200. A retry is safe: it removes only the memberships that are left, and when none are left it returns two empty lists. A 5xx means accounts could not read the memberships and changed nothing.
+
 ### What is logged
 
 The client gate writes one entry for every valid client call: `auth: client call` when the route or field admits it, and `auth: rejected client call` with the reason `not_open_to_client` when it answers 403. That entry, every later entry of the request, and the request log line carry these fields, on a 403 too:

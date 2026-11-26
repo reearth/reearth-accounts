@@ -19,6 +19,12 @@ type WorkspaceMember interface {
 	IsWorkspaceMember()
 }
 
+// The integration a client token acts for through X-Reearth-Act-As.
+type ActingIntegration struct {
+	ID         ID                      `json:"id"`
+	Workspaces []*IntegrationWorkspace `json:"workspaces"`
+}
+
 type AddIntegrationToWorkspaceInput struct {
 	WorkspaceID   ID   `json:"workspaceId"`
 	IntegrationID ID   `json:"integrationId"`
@@ -100,6 +106,19 @@ type FindOrCreateInput struct {
 	Sub   string `json:"sub"`
 	Iss   string `json:"iss"`
 	Token string `json:"token"`
+}
+
+// A workspace the acting integration belongs to, with its role there.
+type IntegrationWorkspace struct {
+	Workspace *Workspace `json:"workspace"`
+	Role      Role       `json:"role"`
+}
+
+// The workspaces leaveAllWorkspaces removed the acting integration from, and
+// those it could not. Retrying the mutation removes only what is left.
+type LeaveAllWorkspacesPayload struct {
+	RemovedWorkspaceIds []ID `json:"removedWorkspaceIds"`
+	FailedWorkspaceIds  []ID `json:"failedWorkspaceIds"`
 }
 
 type MFAEnrollResult struct {

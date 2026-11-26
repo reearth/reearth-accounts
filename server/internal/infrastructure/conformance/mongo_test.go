@@ -8,7 +8,12 @@ import (
 
 	"github.com/google/uuid"
 	mongorepo "github.com/reearth/reearth-accounts/server/internal/infrastructure/mongo"
+	"github.com/reearth/reearth-accounts/server/internal/infrastructure/mongo/mongodoc"
+	"github.com/reearth/reearth-accounts/server/internal/usecase/interactor"
 	"github.com/reearth/reearth-accounts/server/internal/usecase/repo"
+	"github.com/reearth/reearth-accounts/server/pkg/id"
+	"github.com/reearth/reearth-accounts/server/pkg/workspace"
+	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	tcmongo "github.com/testcontainers/testcontainers-go/modules/mongodb"
 	"go.mongodb.org/mongo-driver/bson"
@@ -48,5 +53,27 @@ func TestMongoConformance(t *testing.T) {
 			SubstringSearch: true,
 			UniqueEmail:     true,
 		}, func() { _ = db.Drop(ctx) }
+	})
+
+	t.Run("Workspace_LeaveAllAsIntegration_MembersHash", func(t *testing.T) {
+		db := cli.Database("conf_" + uuid.NewString())
+		t.Cleanup(func() { _ = db.Drop(ctx) })
+		repos, err := mongorepo.New(ctx, db, false, false, nil)
+		require.NoError(t, err)
+		iid, other := id.NewIntegrationID(), id.NewIntegrationID()
+		member, _ := seedLeaveAllWorkspaces(t, repos, iid, other)
+
+		_, err = interactor.NewWorkspace(repos, nil, nil).
+			LeaveAllAsIntegration(ctx, &workspace.Operator{Integration: &iid, Client: &workspace.Client{ID: "c"}})
+		require.NoError(t, err)
+
+		for _, wid := range member {
+			var doc mongodoc.WorkspaceDocument
+			require.NoError(t, db.Collection("workspace").FindOne(ctx, bson.M{"id": wid.String()}).Decode(&doc))
+			assert.NotContains(t, doc.Integrations, iid.String())
+			want, err := mongodoc.ComputeWorkspaceMembersHash(doc.Members, doc.Integrations)
+			require.NoError(t, err)
+			assert.Equal(t, want, doc.MembersHash)
+		}
 	})
 }
