@@ -14,7 +14,7 @@ We listed every call that Flow, Visualizer, and CMS make without a user token. T
 2. Calls made for a CMS integration.
 3. Calls made for a user who is not present.
 
-This amendment replaces old decision 4 with decisions 4, 5, and 6. It adds decision 7 (rules for every client token) and decision 9 (CLIs and agents), and renumbers the rest. Decisions 1, 2, and 3 stay as they were, with one change: the registry entry now lists what a client may act for, instead of naming a fixed integration.
+This amendment replaces old decision 4 with decisions 4, 5, and 6. It adds decision 7 (rules for every client token), decision 9 (CLIs and agents), and decision 11 (local development), and renumbers the rest. Decisions 1, 2, and 3 stay as they were, with one change: the registry entry now lists what a client may act for, instead of naming a fixed integration.
 
 ## Context
 
@@ -87,6 +87,8 @@ We rejected these options:
 - **SPIFFE and SPIRE.** They need their own infrastructure on every platform.
 - **One fixed integration per client, as in this ADR's first version.** A platform service works across tenants, so its integration would need a membership in every workspace.
 - **Any registered client may name any user in a header.** Netflix and Atlassian moved away from this kind of field. One leaked key could act as every user.
+- **A debug header that names the client, for local development.** It skips every client-token check, so a laptop never tests them. It also widens `REEARTH_MOCK_AUTH`, a flag that already skips authentication.
+- **One identity provider client for each developer.** Each tenant needs a plan that supports `private_key_jwt`. The clients share the tenant's token quota, and developer keys end up in a shared tenant.
 - **One identity provider client per agent.** The number of clients grows with every agent, and a client has no workspace scope.
 - **OAuth Transaction Tokens ([draft-ietf-oauth-transaction-tokens](https://datatracker.ietf.org/doc/draft-ietf-oauth-transaction-tokens/)).** A transaction token service exchanges the inbound credential for a short-lived signed token that every service in the call chain forwards unchanged. It solves case A and case C cleanly. It is still an Internet-Draft, and it needs a token service that we would run in every environment. We revisit it when it becomes an RFC and an identity provider we use offers it.
 
@@ -249,6 +251,24 @@ This decision sets the direction. Building it is separate work.
 1. We remove the two static keys one release after this ADR ships.
 2. Each service that reads the accounts database directly moves to the accounts API, in its own repository. A call without a user follows decisions 4, 5, and 6. A call that a user started carries that user's token.
 
+### 11. Local development uses a local issuer
+
+No product uses the static keys on a laptop today. Locally, Flow, Visualizer, and CMS forward the user's token, run accounts with `REEARTH_MOCK_AUTH`, or read the accounts database directly. Decision 10 removes the database reads, so a laptop needs another way to make case B and case C calls. Without one, every developer would need a client in an identity provider tenant that supports `private_key_jwt`.
+
+1. `docker-compose.dev.yml` runs [mock-oauth2-server](https://github.com/navikt/mock-oauth2-server) (`ghcr.io/navikt/mock-oauth2-server`), pinned to an exact version and digest, starting at 7.0.1. It serves the client credentials grant and publishes discovery and a JWKS for one issuer. It runs on the compose network, and compose publishes its port on `127.0.0.1` only, so nothing outside the laptop can reach it.
+2. Its config makes each client credentials token match a deployed issuer's: `sub` is `<client_id>@clients`, `azp` is the client ID, `gty` is `client-credentials`, and `aud` is the requested audience. The token has no `email`. Accounts then tells a local client token from a user token in the same way as a deployed one.
+3. The local issuer is one more entry in `REEARTH_AUTH`. Each local client is an entry in `REEARTH_ACCOUNTS_SERVICE_CALLERS` that names that issuer. Every check in decision 2 runs, and accounts has no separate code path for local tokens.
+4. A service reaches the local issuer through the same `servicetoken` settings as in a deployed environment: the token URL, the client ID, the private key, and the accounts audience. `servicetoken` already takes the token URL as config and does not require `https`.
+5. Accounts and every caller use one issuer URL, built on the mock's compose service name. The mock builds `iss` from the host in the request, and accounts matches `iss` exactly, so a token fetched through another hostname gets `401`. A caller that runs outside compose maps the service name to `127.0.0.1` in its hosts file.
+6. Unless `Config.Dev` is on, accounts refuses to start when any URL it trusts for tokens fails an allowlist. That covers every configured issuer, every issuer that a service caller names, and every `JWKSURI` in `REEARTH_AUTH`, because accounts fetches signing keys from that URL instead of the issuer's. A URL passes only when its parsed scheme is `https` and its host is a DNS name with at least one dot, not an IP address, and not `localhost` or a name under it. The check runs on the parsed URL, so `HTTP://` counts as `http`.
+7. `REEARTH_DEV` turns on `Config.Dev`, and so does any build without the `release` tag. The production image builds with that tag. `REEARTH_ACCOUNTS_DEV`, which accounts reads outside its config, does not open the local issuer. Accounts checks this when it reads its config, so a wrong setting stops the deploy instead of failing at the first request. Accounts accepts an `http` issuer, and a `JWKSURI` of any scheme, in any environment today, so this check is new code.
+8. A seed step generates one dev-only key pair for each local client into a directory that git ignores. It writes the local `REEARTH_AUTH` and `REEARTH_ACCOUNTS_SERVICE_CALLERS` for accounts, and it prints each service's client settings. No deployed environment registers these keys.
+9. `REEARTH_MOCK_AUTH` stays user-only and gets no client path. It skips token validation, so a laptop that tests client calls runs accounts with mock auth off. The local issuer adds nothing to mock auth or to the debug headers.
+
+The mock does not check the client assertion. Its documentation says that it identifies clients without checking their credentials against a registry. The local path therefore tests the caller's token request and every accounts check, but not the identity provider's client authentication. Keycloak does check the assertion. Its client tokens need protocol mappers before they carry `gty` and a `sub` equal to the client ID, and it is heavier to seed. We move to an issuer like it if a local test ever needs the assertion check itself.
+
+Local development does not decide open question 1. If services keep client credentials, they use the local issuer above. If they move to self-signed assertions, a laptop needs no mock. The seed step puts each local client's public key in the local registry, and accounts runs the checks that open question 1 lists, as in a deployed environment.
+
 ## Consequences
 
 - A service that needs only case A has no identity provider client and no secret.
@@ -256,7 +276,9 @@ This decision sets the direction. Building it is separate work.
 - Terraform state holds the private keys, so access to the state stays restricted.
 - Accounts stores no secret for clients. It caches the issuers' public keys.
 - Identity providers can meter client credentials tokens. Each instance fetches a token only when it needs one and caches it, so the count stays low.
-- Removing the static keys breaks any caller of them that we do not know about.
+- Removing the static keys breaks any caller of them that we do not know about. No local setup uses them.
+- A laptop makes case B and case C calls against a local issuer, and every accounts check runs. The laptop does not test the identity provider's check of the client assertion.
+- An `http`, IP-address, or `localhost` issuer or key URL in a deployed environment stops accounts at startup.
 - A service that stops reading the database directly can see less data than before, because accounts now authorizes its calls.
 - A leaked key of a case B client can act for any integration that the client can name. A leaked key of a case C client can read any user's profile and workspaces, and nothing more (decision 6). Both leaks expose less than a leaked database connection string or the static gRPC token, and accounts logs the client on every call.
 
@@ -284,6 +306,7 @@ Every environment that registers a client follows these rules.
 | Who can get a client token | Nobody, for the accounts audience | Only a registered client, with a `private_key_jwt` assertion and only for the accounts audience. No client secret exists. |
 | What the internal gRPC token can do | Act as any user, by sending `user-id` | Nothing on its own. The service gets the user from the user's token (decision 4). The static token is removed once all three services read the token. |
 | What a service can read from the accounts database | Every tenant's data | Nothing. Decision 10 removes the connection strings. |
+| Where accounts gets the keys it trusts | Any configured issuer or `JWKSURI`, `http` and IP addresses included, in any environment | Outside dev mode, only `https` URLs on a DNS name. Accounts refuses to start otherwise (decision 11). |
 
 Identities and roles:
 
@@ -294,6 +317,7 @@ Identities and roles:
 Secrets and data:
 
 - The service reads its private key from the secret manager by reference. The key is never an inline value in code, config, or the environment definition.
+- Local clients use dev-only keys that the seed step writes to a directory that git ignores (decision 11). No deployed environment registers them.
 - Tokens stay in memory and are never logged. Accounts logs the client ID, the registered name, and the subject ID, never a token or an email.
 
 These risks are accepted, each with its mitigation:
@@ -303,8 +327,9 @@ These risks are accepted, each with its mitigation:
 3. Case A forwards a bearer user token until audiences split (decision 4).
 4. The static internal token stays until all three services read the user's token.
 5. If a tenant cannot use `private_key_jwt` and takes the fallback in open question 1, accounts checks replay and token lifetime in its own code. That code needs its own tests and security review.
+6. On a laptop, any process that reaches the local issuer can get a token for any local client, because the mock does not check the client assertion. The issuer listens on loopback only, and accounts trusts it only in dev mode (decision 11).
 
 ## Open questions
 
-1. **Does each environment's identity provider tenant support `private_key_jwt` for client credentials?** On Auth0 this needs the Enterprise plan. If a tenant does not support it, one option is a self-signed assertion in the style of Atlassian's ASAP ([ASAP specification](https://s2sauth.bitbucket.io/spec/)). The service signs a short-lived JWT with its private key, and accounts verifies it against the public key in the registry. That option needs no identity provider client and no token quota, but accounts must then check `jti` for replay and enforce a short lifetime itself.
+1. **Does each environment's identity provider tenant support `private_key_jwt` for client credentials?** On Auth0 this needs the Enterprise plan. If a tenant does not support it, one option is a self-signed assertion in the style of Atlassian's ASAP ([ASAP specification](https://s2sauth.bitbucket.io/spec/)). The service signs a short-lived JWT with its private key, and accounts verifies it against the public key in the registry. That option needs no identity provider client and no token quota, but accounts must then check `jti` for replay and enforce a short lifetime itself. Local development works under either answer (decision 11).
 2. **Should case B limit a client to the integrations it created?** Stripe lets a platform name only accounts connected to it. Accounts could record the client that created each integration and allow case B only for those. Existing integrations would need a backfill.
