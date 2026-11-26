@@ -40,10 +40,7 @@ func (cc *ClientCall) LogFields() []applog.Field {
 	}
 }
 
-// LogClientVerdict logs a client gate's decision on the call that ctx carries,
-// once per call (ADR-0002 decision 8). The entry gets the call's fields from
-// ctx, where Attach put them. A refusal here means the route or field does not
-// admit what the call acts for.
+// LogClientVerdict logs a client gate's decision once per call (ADR-0002 decision 8).
 func LogClientVerdict(ctx context.Context, admitted bool) {
 	if ClientCallOf(ctx) == nil {
 		return

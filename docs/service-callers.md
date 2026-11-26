@@ -2,7 +2,7 @@
 
 ## Startup check on trusted URLs
 
-The server refuses to start when a URL that it trusts for tokens is not an `https` URL on a DNS name. The check implements ADR-0002 decision 11.6 and runs every time the server reads its configuration, in every build.
+The server refuses to start when a URL that it trusts for tokens is not an `https` URL on a DNS name. The check implements ADR-0002 decision 11, items 6 and 7, and runs every time the server reads its configuration, in every build.
 
 The check covers these URLs:
 
@@ -48,10 +48,6 @@ The switch is for a developer machine. Do not set it in a deployed environment:
 - Only the variable `REEARTH_ACCOUNTS_LOCAL_ISSUER` sets the switch. A value that is not a boolean stops startup.
 
 `REEARTH_DEV`, `REEARTH_ACCOUNTS_DEV`, and `REEARTH_MOCK_AUTH` have no effect on this check, and neither does the build tag. A local setup that runs with `REEARTH_MOCK_AUTH` and a placeholder issuer, such as `http://localhost:8080/`, needs the switch too, or an `https` issuer.
-
-### Difference from ADR-0002
-
-ADR-0002 decisions 11.6 and 11.7 say that the check is off when dev mode is on. The server is stricter: dev mode has no effect, and only the local issuer switch relaxes the check. The reason is that a deployed development environment can run with dev mode on.
 
 ## Registering a service caller
 
@@ -137,7 +133,9 @@ To open a route or field, add the table entry or the directive and run `go test 
 
 Today a client acting for an integration may use the workspace routes and fields that a service caller could use before this rule, still limited by the integration's role in each workspace. The SCIM token and SCIM config routes stay closed: a client cannot create a workspace credential. Signup, verification, password reset, writes to `/users/me`, MFA, account deletion, login removal, the user directory, and permission checks are closed to every client token.
 
-A refused REST call gets `403` with the message `forbidden: this route is not open to client tokens`. A refused GraphQL operation gets HTTP `403` and one error with the code `FORBIDDEN`. The gate checks every root field of the selected operation, including fields inside fragments and behind aliases, and refuses the whole operation before any resolver runs. `__typename` is allowed. The introspection fields are closed to client tokens.
+`GET /api/auth/config` and the `authConfig` query are open to anonymous clients and to clients acting for an integration, so a caller that sends the header on every call can still read the public configuration. They are closed to clients acting for a user. The `@public` query `findUsersByIDsWithPagination` is open to anonymous clients only: the user directory is closed to integrations.
+
+A refused REST call gets `403` with the message `forbidden: this route is not open to client tokens`. A refused GraphQL operation gets HTTP `403` and one error with the code `FORBIDDEN`. The gate checks every root field of the selected operation, including fields inside fragments and behind aliases, and refuses the whole operation before any resolver runs. `__typename` is allowed. The introspection fields are closed to client tokens. A field under `@skip` or `@include` counts as selected whatever the condition, so an operation that names a closed field is refused even when that field would be skipped.
 
 A route mounted outside the `/api` REST group does not pass through the gate. A client token on such a route resolves to no user and no operator, so a route that requires authentication answers 401.
 
@@ -152,15 +150,17 @@ A client whose registry entry lists `"user"` in `act_as` may send `X-Reearth-Act
 | GraphQL `me` | The user's profile and personal workspace. |
 | GraphQL `findByUser`, `findByUserWithPagination` | The user's workspaces with member IDs and roles; `userId` must be the user, or the field returns a permission error. |
 
-Everywhere on the read list, a client call sees what the user can see of the user's own record, but not what the user sees only as a member of a workspace. Co-members' emails and other `SELF` and `WORKSPACE` fields stay hidden, as for an anonymous caller, and so does every workspace's billing email. Their `PUBLIC` fields, such as name, alias, login providers, and profile metadata, are visible, as they are to any caller.
+Everywhere on the read list, a client call sees the user's own record as the user would, and sees co-members only as any caller would. Of a co-member, it sees the user ID, the role in each shared workspace, and the user fields marked `PUBLIC` in the schema, such as name, alias, login providers, and profile metadata. It never sees a co-member's email or any other `SELF` or `WORKSPACE` field. It never sees a workspace's billing email, also for the user's own workspaces. For a client call, a `WORKSPACE` field reads as `SELF`. No schema field uses `WORKSPACE` today, so this rule guards fields added later.
 
 Every other route and field answers 403: every write, MFA, account deletion, login removal, signup, verification, password reset, `GET /api/auth/config` and `authConfig`, the user directory, `node` and `nodes`, workspace lookups by ID, permission checks, SCIM, and every workspace write and member change. The user-lookup rate limit counts a client call against the client, not the user it acts for, so naming many users does not give a client more lookups. A Cerbos check made during a client call does not forward the client's token as the user's.
+
+The gate is not the only check. The workspace, user administration, and SCIM interactors refuse a client acting for a user on every operation outside the read list, also when the gate is bypassed. They accept a user's own token and, where an integration may act, a client acting for an integration.
 
 To remove the grant, delete `"user"` from the client's `act_as` in the registry. Its `user:` calls then get 401.
 
 ### What is logged
 
-The client gate writes one entry for every valid client call: `auth: client call` when the route or field admits it, and `auth: rejected client call` with the reason `not_open_to_client` when it answers 403. That entry, every later entry of the request, and the request log line carry these fields, on a 403 too:
+The client gate writes one entry for every valid client call it checks: `auth: client call` when the route or field admits it, and `auth: rejected client call` with the reason `not_open_to_client` when it answers 403. An anonymous GraphQL call whose operation is not made only of `@public` fields is refused before the GraphQL handler, with the same 403 and the same single entry. Any other GraphQL request that fails decoding, parsing, validation, or a persisted-query lookup never reaches the gate and gets no verdict entry. Its request log line still names the caller. The verdict entry, every later entry of the request, and the request log line carry these fields, on a 403 too:
 
 - `caller_client_id`: the client ID.
 - `caller_name`: the registered name.

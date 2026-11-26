@@ -91,6 +91,13 @@ func TestWorkspace_ReadsForAClientActingForAUserAreScoped(t *testing.T) {
 	assert.ErrorIs(t, err, interfaces.ErrPermissionDenied)
 	_, err = uc.FetchByUserWithPagination(ctx, other, interfaces.FetchByUserWithPaginationParam{Page: 1, Size: 10}, &client)
 	assert.ErrorIs(t, err, interfaces.ErrPermissionDenied)
+	page, err := uc.FetchByUserWithPagination(ctx, subject, interfaces.FetchByUserWithPaginationParam{Page: 1, Size: 10}, &client)
+	require.NoError(t, err)
+	assert.ElementsMatch(t, id.WorkspaceIDList{mine.ID(), shared.ID()}, page.Workspaces.IDs())
+	assert.EqualValues(t, 2, page.TotalCount)
+	ws, err = uc.Fetch(ctx, id.WorkspaceIDList{theirs.ID()}, &client)
+	require.NoError(t, err)
+	assert.Empty(t, ws)
 
 	t.Run("the user's own token is unscoped as before", func(t *testing.T) {
 		got, err := uc.FetchByID(ctx, theirs.ID(), own)

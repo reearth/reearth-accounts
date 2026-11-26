@@ -4,7 +4,7 @@ graphql mutation removeUserFromWorkspace                             integration
 graphql mutation updateIntegrationOfWorkspace                        integration
 graphql mutation updateUserOfWorkspace                               integration
 graphql mutation updateWorkspace                                     integration
-graphql query authConfig                                             anonymous
+graphql query authConfig                                             anonymous,integration
 graphql query findByAlias                                            anonymous,integration
 graphql query findByID                                               anonymous,integration
 graphql query findByIDs                                              anonymous,integration
@@ -21,7 +21,7 @@ rest    DELETE /api/workspaces/:id/integrations                      integration
 rest    DELETE /api/workspaces/:id/integrations/:integration_id      integration
 rest    DELETE /api/workspaces/:id/members                           integration
 rest    DELETE /api/workspaces/:id/members/:user_id                  integration
-rest    GET /api/auth/config                                         anonymous
+rest    GET /api/auth/config                                         anonymous,integration
 rest    GET /api/users/me                                            user
 rest    GET /api/workspaces                                          integration,user
 rest    GET /api/workspaces/:id                                      integration

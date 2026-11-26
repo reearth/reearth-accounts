@@ -68,6 +68,7 @@ func seedActAsUser(ctx context.Context, r *repo.Container) error {
 
 type actAsUserServer struct {
 	e       *httpexpect.Expect
+	url     string
 	idp     *svcIdP
 	users   map[string]string // the user-only client acting for the subject
 	both    map[string]string // the client with both kinds acting for the subject
@@ -87,16 +88,22 @@ func startActAsUserServer(t *testing.T, useMongo bool) actAsUserServer {
 	})
 	require.NoError(t, err)
 	require.NoError(t, cfg.ServiceCallers.Decode(string(callers)))
-	e, _ := StartServerNoDebug(t, cfg, useMongo, seedActAsUser)
+	url := startServerURL(t, cfg, seededRepos(t, useMongo, seedActAsUser), nil, false)
 	asSubject := "user:" + auSubject.String()
 	return actAsUserServer{
-		e:       e,
+		e:       httpexpect.Default(t, url),
+		url:     url,
 		idp:     idp,
 		users:   actingFor(idp.clientToken(t, "svc-users"), asSubject),
 		both:    actingFor(idp.clientToken(t, "svc-flow"), asSubject),
 		own:     actingFor(idp.token(t, jwt.MapClaims{"sub": auSubjectSub})),
 		intOnly: idp.clientToken(t, "svc-int"),
 	}
+}
+
+func (s actAsUserServer) at(t *testing.T) actAsUserServer {
+	s.e = httpexpect.Default(t, s.url)
+	return s
 }
 
 func (s actAsUserServer) callers() map[string]map[string]string {
@@ -137,6 +144,7 @@ func TestActAsUser_ReadList(t *testing.T) {
 	}
 	for name, h := range s.callers() {
 		t.Run(name+" reads the subject's profile on REST", func(t *testing.T) {
+			s := s.at(t)
 			me := s.e.GET("/api/users/me").WithHeaders(h).Expect().Status(http.StatusOK).JSON().Object()
 			me.HasValue("id", auSubject.String()).HasValue("email", auSubjectEmail)
 			ws := s.e.GET("/api/users/me").WithHeaders(h).WithQuery("expand", "my_workspace").
@@ -146,6 +154,7 @@ func TestActAsUser_ReadList(t *testing.T) {
 		})
 
 		t.Run(name+" reads the subject's profile on GraphQL", func(t *testing.T) {
+			s := s.at(t)
 			o, _ := s.gql(h, `{ me { id email myWorkspaceId myWorkspace { id metadata { billingEmail } } } }`)
 			me := o.Value("data").Object().Value("me").Object()
 			me.HasValue("id", auSubject.String()).HasValue("email", auSubjectEmail).HasValue("myWorkspaceId", auSubjectWS.String())
@@ -153,6 +162,7 @@ func TestActAsUser_ReadList(t *testing.T) {
 		})
 
 		t.Run(name+" reads the subject's workspaces and roles on REST", func(t *testing.T) {
+			s := s.at(t)
 			raw := s.e.GET("/api/workspaces").WithHeaders(h).WithQuery("user_id", auSubject.String()).WithQuery("expand", "members.user").
 				Expect().Status(http.StatusOK).Body().Raw()
 			assert.Equal(t, wantRoles, memberRoles(t, raw))
@@ -166,6 +176,7 @@ func TestActAsUser_ReadList(t *testing.T) {
 		})
 
 		t.Run(name+" reads the subject's workspaces and roles on GraphQL", func(t *testing.T) {
+			s := s.at(t)
 			q := `query { findByUser(userId: "` + auSubject.String() + `") { id metadata { billingEmail } members { ... on WorkspaceUserMember { userId role user { id email } } } }
 				findByUserWithPagination(userId: "` + auSubject.String() + `", pagination: {page: 1, size: 10}) { totalCount } }`
 			o, raw := s.gql(h, q)
@@ -179,6 +190,7 @@ func TestActAsUser_ReadList(t *testing.T) {
 		})
 
 		t.Run(name+" cannot name another user's workspaces", func(t *testing.T) {
+			s := s.at(t)
 			s.e.GET("/api/workspaces").WithHeaders(h).WithQuery("user_id", privTarget.String()).Expect().Status(http.StatusForbidden)
 			s.e.GET("/api/workspaces").WithHeaders(h).WithQuery("user_id", privTarget.String()).WithQuery("page", "1").Expect().Status(http.StatusForbidden)
 			for _, q := range []string{
@@ -192,6 +204,7 @@ func TestActAsUser_ReadList(t *testing.T) {
 		})
 
 		t.Run(name+" sees nothing of a workspace the subject is not in", func(t *testing.T) {
+			s := s.at(t)
 			raw := s.e.GET("/api/workspaces").WithHeaders(h).WithQuery("ids", privTargetTeamWS.String()+","+auShared.String()).
 				Expect().Status(http.StatusOK).Body().Raw()
 			assert.Contains(t, raw, auShared.String())
@@ -220,6 +233,7 @@ func TestActAsUser_RefusedSubjects(t *testing.T) {
 			}
 			for why, h := range refused {
 				t.Run(why, func(t *testing.T) {
+					s := s.at(t)
 					s.e.GET("/api/users/me").WithHeaders(h).Expect().Status(http.StatusUnauthorized)
 					s.e.POST("/api/graphql").WithHeaders(h).WithJSON(GraphQLRequest{Query: `{ me { id } }`}).Expect().Status(http.StatusUnauthorized)
 				})
@@ -307,6 +321,7 @@ func TestActAsUser_EverythingElseIsClosed(t *testing.T) {
 	s := startActAsUserServer(t, false)
 	for name, h := range s.callers() {
 		t.Run("REST "+name, func(t *testing.T) {
+			s := s.at(t)
 			for _, r := range closedToUserClientsREST() {
 				body := s.e.Request(r[0], r[1]).WithHeaders(h).WithJSON(map[string]any{}).
 					Expect().Status(http.StatusForbidden).Body().Raw()
@@ -314,6 +329,7 @@ func TestActAsUser_EverythingElseIsClosed(t *testing.T) {
 			}
 		})
 		t.Run("GraphQL "+name, func(t *testing.T) {
+			s := s.at(t)
 			for _, q := range closedToUserClientsGQL() {
 				refusedGQL(t, s.e, h, q, nil)
 			}
@@ -321,6 +337,7 @@ func TestActAsUser_EverythingElseIsClosed(t *testing.T) {
 	}
 
 	t.Run("the subject's own token is not stopped by the gate", func(t *testing.T) {
+		s := s.at(t)
 		for _, r := range closedToUserClientsREST() {
 			body := s.e.Request(r[0], r[1]).WithHeaders(s.own).WithJSON(map[string]any{}).Expect().Body().Raw()
 			assert.NotContains(t, body, clientGateRefusal, "%s %s", r[0], r[1])
@@ -364,6 +381,7 @@ func TestActAsUser_NestedSelectionsReachNoCoMemberData(t *testing.T) {
 	foreign := []string{privTargetTeamWS.String(), privStrangerWS.String(), privStranger.String(), "target personal", "target team"}
 	for name, h := range s.callers() {
 		t.Run(name, func(t *testing.T) {
+			s := s.at(t)
 			c := &privacyCheck{g: g}
 			for field, call := range calls {
 				c.operationKey = call

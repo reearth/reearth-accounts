@@ -2,6 +2,7 @@ package app
 
 import (
 	"context"
+	"encoding/json"
 	"net/http"
 
 	"github.com/99designs/gqlgen/graphql"
@@ -42,12 +43,26 @@ func (g clientFieldGate) MutateOperationContext(ctx context.Context, oc *graphql
 		return nil
 	}
 	setResponseStatus(ctx, http.StatusForbidden)
+	return clientRefusal()
+}
+
+func clientRefusal() *gqlerror.Error {
 	err := gqlerror.Errorf("this operation is not open to client tokens")
 	errcode.Set(err, errForbidden)
 	return err
 }
 
+// writeClientRefusal answers as the gate does, for a refusal made before the
+// GraphQL executor runs.
+func writeClientRefusal(w http.ResponseWriter) {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusForbidden)
+	_ = json.NewEncoder(w).Encode(graphql.Response{Errors: gqlerror.List{clientRefusal()}})
+}
+
 func (g clientFieldGate) admits(op ast.Operation, set ast.SelectionSet, k workspace.SubjectKind) bool {
+	// A field under @skip or @include counts as selected whatever the condition,
+	// so the gate never decides on a variable's value.
 	for _, sel := range set {
 		switch s := sel.(type) {
 		case *ast.Field:

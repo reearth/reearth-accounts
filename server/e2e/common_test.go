@@ -82,6 +82,12 @@ func StartServerWithRepos(
 
 func StartServerNoDebug(t *testing.T, cfg *app.Config, useMongo bool, seeder Seeder) (*httpexpect.Expect, *repo.Container) {
 	t.Helper()
+	repos := seededRepos(t, useMongo, seeder)
+	return StartServerWithGateways(t, cfg, repos, nil, false), repos
+}
+
+func seededRepos(t *testing.T, useMongo bool, seeder Seeder) *repo.Container {
+	t.Helper()
 
 	ctx := context.Background()
 	var repos *repo.Container
@@ -102,8 +108,7 @@ func StartServerNoDebug(t *testing.T, cfg *app.Config, useMongo bool, seeder See
 			t.Fatalf("failed to seed the db: %s", err)
 		}
 	}
-
-	return StartServerWithGateways(t, cfg, repos, nil, false), repos
+	return repos
 }
 
 func StartServerWithAuthenticator(

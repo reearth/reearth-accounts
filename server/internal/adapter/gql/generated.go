@@ -1562,7 +1562,7 @@ extend type Query {
   Get authentication configuration for client applications.
   This endpoint does not require authentication and returns public auth configuration.
   """
-  authConfig: AuthConfig @public
+  authConfig: AuthConfig @public @client(as: [INTEGRATION])
 }
 `, BuiltIn: false},
 	{Name: "../../../schemas/cerbos.graphql", Input: `input CheckPermissionInput {

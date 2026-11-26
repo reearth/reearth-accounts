@@ -124,23 +124,34 @@ func concretePath(p string) string {
 func TestClientGate_RESTDeniesEveryUnlistedRoute(t *testing.T) {
 	s := newClientSurface(t)
 	table := adapterhttp.ClientRoutes()
-	checked := 0
+	paths := map[string]struct{}{}
 	for _, r := range s.e.Routes() {
-		if r.Method == echo.RouteNotFound || !strings.HasPrefix(r.Path, "/api/") || r.Path == "/api/graphql" {
-			continue
-		}
-		key := r.Method + " " + r.Path
-		for kind, k := range s.kinds {
-			if table[key].Admits(k) {
-				continue
-			}
-			checked++
-			rr := s.do(r.Method, concretePath(r.Path), "{}", s.tokenFor(kind))
-			assert.Equal(t, http.StatusForbidden, rr.Code, "%s as %s", key, kind)
-			assert.Contains(t, rr.Body.String(), "not open to client tokens", "%s as %s", key, kind)
+		if r.Method != echo.RouteNotFound && strings.HasPrefix(r.Path, "/api/") && r.Path != "/api/graphql" {
+			paths[r.Path] = struct{}{}
 		}
 	}
-	assert.Greater(t, checked, 40)
+	methods := []string{http.MethodGet, http.MethodHead, http.MethodPost, http.MethodPut, http.MethodPatch, http.MethodDelete, http.MethodOptions}
+	checked := 0
+	for p := range paths {
+		for _, m := range methods {
+			path := concretePath(p)
+			c := s.e.NewContext(httptest.NewRequest(m, path, nil), httptest.NewRecorder())
+			s.e.Router().Find(m, path, c)
+			key := m + " " + c.Path()
+			for kind, k := range s.kinds {
+				if table[key].Admits(k) {
+					continue
+				}
+				checked++
+				rr := s.do(m, path, "{}", s.tokenFor(kind))
+				assert.Equal(t, http.StatusForbidden, rr.Code, "%s as %s", key, kind)
+				if m != http.MethodHead {
+					assert.Contains(t, rr.Body.String(), "not open to client tokens", "%s as %s", key, kind)
+				}
+			}
+		}
+	}
+	assert.Greater(t, checked, 300)
 }
 
 func TestClientGate_GraphQLDeniesEveryUnlistedField(t *testing.T) {
