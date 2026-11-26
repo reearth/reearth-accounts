@@ -107,13 +107,15 @@ func TestClientGate_GraphQLDocumentShapes(t *testing.T) {
 	byUser := `findByUser(userId: "` + svcOwnerUID.String() + `") { id }`
 
 	for name, q := range map[string]string{
-		"an allowed and a closed field":     `{ ` + byUser + ` me { id } }`,
-		"a closed field behind an alias":    `{ ws: ` + byUser + ` findByUser: searchUser(keyword: "svc") { id } }`,
-		"a closed field in a spread":        `query { ` + byUser + ` ...F } fragment F on Query { searchUser(keyword: "svc") { id } }`,
-		"a closed field in a nested spread": `query { ...A } fragment A on Query { ...B } fragment B on Query { me { id } }`,
-		"a closed field in a fragment":      `{ ` + byUser + ` ... on Query { me { id } } }`,
-		"a closed mutation":                 `mutation { logout { id } }`,
-		"an introspection field":            `{ __schema { queryType { name } } }`,
+		"an allowed and a closed field":            `{ ` + byUser + ` me { id } }`,
+		"a closed field behind an alias":           `{ ws: ` + byUser + ` findByUser: searchUser(keyword: "svc") { id } }`,
+		"a closed field in a spread":               `query { ` + byUser + ` ...F } fragment F on Query { searchUser(keyword: "svc") { id } }`,
+		"a closed field in a nested spread":        `query { ...A } fragment A on Query { ...B } fragment B on Query { me { id } }`,
+		"a closed field in a fragment":             `{ ` + byUser + ` ... on Query { me { id } } }`,
+		"a closed mutation":                        `mutation { logout { id } }`,
+		"a closed field under @skip(if: true)":     `{ ` + byUser + ` me @skip(if: true) { id } }`,
+		"a closed field under @include(if: false)": `{ ` + byUser + ` me @include(if: false) { id } }`,
+		"an introspection field":                   `{ __schema { queryType { name } } }`,
 	} {
 		t.Run(name+" is refused as a whole", func(t *testing.T) {
 			refusedGQL(t, e, flow, q, nil)
@@ -148,4 +150,38 @@ func TestClientGate_ActAsOnRoutesWithoutAuthMiddleware(t *testing.T) {
 			e.GET("/api/auth/config").WithHeaders(h).Expect().Status(http.StatusUnauthorized)
 		})
 	}
+}
+
+func TestClientGate_UnroutedAPIPathsAre403(t *testing.T) {
+	e, idp := startServiceCallerServer(t)
+	tok := idp.clientToken(t, "svc-flow")
+	callers := map[string]map[string]string{
+		"acting for an integration": actingFor(tok, "integration:"+svcIntegration.String()),
+		"with no header":            actingFor(tok),
+	}
+	for _, r := range [][2]string{
+		{http.MethodGet, "/api"},
+		{http.MethodGet, "/api/graphql"},
+		{http.MethodPost, "/api/graphql/x"},
+		{http.MethodOptions, "/api/graphql"},
+	} {
+		for name, h := range callers {
+			t.Run(r[0]+" "+r[1]+" "+name, func(t *testing.T) {
+				e.Request(r[0], r[1]).WithHeaders(h).Expect().
+					Status(http.StatusForbidden).Body().Contains(clientGateRefusal)
+			})
+		}
+		t.Run(r[0]+" "+r[1]+" with no token", func(t *testing.T) {
+			e.Request(r[0], r[1]).Expect().Status(http.StatusNotFound)
+		})
+	}
+}
+
+func TestClientGate_AuthConfigIsOpenToIntegrations(t *testing.T) {
+	e, idp := startServiceCallerServer(t)
+	flow := actingFor(idp.clientToken(t, "svc-flow"), "integration:"+svcIntegration.String())
+	e.GET("/api/auth/config").WithHeaders(flow).Expect().Status(http.StatusOK)
+	publicGraphQL(e, flow).Status(http.StatusOK).JSON().Object().Value("data").Object().ContainsKey("authConfig")
+	refusedGQL(t, e, flow, `query($u: [ID!]!) { findUsersByIDsWithPagination(ids: $u, pagination: {page: 1, size: 1}) { totalCount } }`,
+		map[string]any{"u": []string{svcOwnerUID.String()}})
 }

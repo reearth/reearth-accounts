@@ -250,9 +250,17 @@ func identityProviderAuthMiddleware(cfg *ServerConfig) func(http.Handler) http.H
 				return
 			}
 			if cc != nil {
-				// The client field gate decides what the call may select; the
-				// bypass and the debug headers never apply to it.
-				next.ServeHTTP(w, req.WithContext(cc.Attach(ctx)))
+				// The bypass and the debug headers never apply to a client call.
+				ctx = cc.Attach(ctx)
+				// An anonymous call has no operator, so denyClient cannot refuse
+				// it; this keeps a second layer behind the field gate.
+				if cc.Operator == nil && !isBypassed(req) {
+					adapter.LogClientVerdict(ctx, false)
+					recordRefusedClientCall(ctx, cc)
+					writeClientRefusal(w)
+					return
+				}
+				next.ServeHTTP(w, req.WithContext(ctx))
 				return
 			}
 

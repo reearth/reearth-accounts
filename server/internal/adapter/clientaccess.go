@@ -7,7 +7,7 @@ import (
 )
 
 // ClientAccess is the set of client subject kinds a REST route or GraphQL root
-// field admits (ADR-0002 decision 7.4). The zero value admits no client token,
+// field admits (ADR-0002 decision 7). The zero value admits no client token,
 // which is the default for every route and field.
 type ClientAccess uint8
 

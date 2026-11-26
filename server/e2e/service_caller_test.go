@@ -505,7 +505,7 @@ func TestServiceCaller_RequestLogNamesTheClient(t *testing.T) {
 			reason: "not_open_to_client",
 		},
 		{
-			name: "anonymous call refused by the GraphQL gate",
+			name: "anonymous call refused on GraphQL",
 			do: func() {
 				e.POST("/api/graphql").WithHeaders(actingFor(flow)).WithJSON(findByName).Expect().Status(http.StatusForbidden)
 			},

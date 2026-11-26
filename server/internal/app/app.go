@@ -184,8 +184,7 @@ func initEcho(ctx context.Context, cfg *ServerConfig) *echo.Echo {
 	return e
 }
 
-// restClientResolver classifies a REST client call for the client gate, which
-// runs on every /api route before the route's own auth middleware.
+// restClientResolver classifies a REST client call for the client gate.
 func restClientResolver(cfg *ServerConfig) adapterhttp.ClientResolver {
 	return func(c echo.Context, ai *appx.AuthInfo) (*adapter.ClientCall, error) {
 		ctx := c.Request().Context()
@@ -269,6 +268,10 @@ func errorMessage(err error, logInternal func(error)) (int, string) {
 	} else if errors.Is(err, rerror.ErrNotFound) {
 		code = http.StatusNotFound
 		msg = "not found"
+	} else if errors.Is(err, adapterhttp.ErrForbidden) {
+		code = http.StatusForbidden
+	} else if errors.Is(err, adapterhttp.ErrUnauthorized) {
+		code = http.StatusUnauthorized
 	} else {
 		if ierr := rerror.UnwrapErrInternal(err); ierr != nil {
 			code = http.StatusInternalServerError

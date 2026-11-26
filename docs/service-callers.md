@@ -136,13 +136,15 @@ To open a route or field, add the table entry or the directive and run `go test 
 
 Today a client acting for an integration may use the workspace routes and fields that a service caller could use before this rule, still limited by the integration's role in each workspace. The SCIM token and SCIM config routes stay closed: a client cannot create a workspace credential. Signup, verification, password reset, `/users/me`, MFA, account deletion, login removal, the user directory, and permission checks are closed to every client token.
 
-A refused REST call gets `403` with the message `forbidden: this route is not open to client tokens`. A refused GraphQL operation gets HTTP `403` and one error with the code `FORBIDDEN`. The gate checks every root field of the selected operation, including fields inside fragments and behind aliases, and refuses the whole operation before any resolver runs. `__typename` is allowed. The introspection fields are closed to client tokens.
+`GET /api/auth/config` and the `authConfig` query are open to anonymous clients and to clients acting for an integration, so a caller that sends the header on every call can still read the public configuration. The `@public` query `findUsersByIDsWithPagination` is open to anonymous clients only: the user directory is closed to integrations.
+
+A refused REST call gets `403` with the message `forbidden: this route is not open to client tokens`. A refused GraphQL operation gets HTTP `403` and one error with the code `FORBIDDEN`. The gate checks every root field of the selected operation, including fields inside fragments and behind aliases, and refuses the whole operation before any resolver runs. `__typename` is allowed. The introspection fields are closed to client tokens. A field under `@skip` or `@include` counts as selected whatever the condition, so an operation that names a closed field is refused even when that field would be skipped.
 
 A route mounted outside the `/api` REST group does not pass through the gate. A client token on such a route resolves to no user and no operator, so a route that requires authentication answers 401.
 
 ### What is logged
 
-The client gate writes one entry for every valid client call: `auth: client call` when the route or field admits it, and `auth: rejected client call` with the reason `not_open_to_client` when it answers 403. That entry, every later entry of the request, and the request log line carry these fields, on a 403 too:
+The client gate writes one entry for every valid client call it checks: `auth: client call` when the route or field admits it, and `auth: rejected client call` with the reason `not_open_to_client` when it answers 403. An anonymous GraphQL call whose operation is not made only of `@public` fields is refused before the GraphQL handler, with the same 403 and the same single entry. Any other GraphQL request that fails decoding, parsing, validation, or a persisted-query lookup never reaches the gate and gets no verdict entry. Its request log line still names the caller. The verdict entry, every later entry of the request, and the request log line carry these fields, on a 403 too:
 
 - `caller_client_id`: the client ID.
 - `caller_name`: the registered name.
