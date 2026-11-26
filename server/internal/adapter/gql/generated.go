@@ -1466,6 +1466,22 @@ requires authentication. The auth middleware reads this directive at startup.
 directive @public on FIELD_DEFINITION
 
 """
+What a registered client token acts for (ADR-0002).
+"""
+enum ClientSubject {
+  INTEGRATION
+  USER
+}
+
+"""
+Opens a Query or Mutation field to calls made with a registered client token,
+for the subject kinds listed. A field without it is closed to every client
+token, @public or not. A client token without X-Reearth-Act-As may call @public
+Query fields only. The auth layer reads this directive at startup.
+"""
+directive @client(as: [ClientSubject!]!) on FIELD_DEFINITION
+
+"""
 Who may read a field that carries user data. The owner is the user the
 enclosing object describes. A hidden field returns its empty value.
 """
@@ -1501,8 +1517,8 @@ enum Theme {
 }
 
 type Query {
-  node(id: ID!, type: NodeType!): Node
-  nodes(id: [ID!]!, type: NodeType!): [Node]
+  node(id: ID!, type: NodeType!): Node @client(as: [INTEGRATION])
+  nodes(id: [ID!]!, type: NodeType!): [Node] @client(as: [INTEGRATION])
 }
 
 type Mutation
@@ -1907,28 +1923,28 @@ type DeleteWorkspacePayload {
 
 # TODO: rename it to findWorkspace** as a prefix to avoid conflict with other entities
 extend type Query {
-    findByID(id: ID!): Workspace! @public
-    findByIDs(ids: [ID!]!): [Workspace!]! @public
-    findByName(name: String!): Workspace
-    findByAlias(alias: String!): Workspace @public
-    findByUser(userId: ID!): [Workspace]
-    findByUserWithPagination(userId: ID!, pagination: Pagination!): WorkspacesWithPagination!
+    findByID(id: ID!): Workspace! @public @client(as: [INTEGRATION])
+    findByIDs(ids: [ID!]!): [Workspace!]! @public @client(as: [INTEGRATION])
+    findByName(name: String!): Workspace @client(as: [INTEGRATION])
+    findByAlias(alias: String!): Workspace @public @client(as: [INTEGRATION])
+    findByUser(userId: ID!): [Workspace] @client(as: [INTEGRATION])
+    findByUserWithPagination(userId: ID!, pagination: Pagination!): WorkspacesWithPagination! @client(as: [INTEGRATION])
     "Looks a workspace up by exactly one of id or alias. Returns null when none matches."
-    publicWorkspace(id: ID, alias: String): PublicWorkspace @public
+    publicWorkspace(id: ID, alias: String): PublicWorkspace @public @client(as: [INTEGRATION])
 }
 
 extend type Mutation {
     createWorkspace(input: CreateWorkspaceInput!): CreateWorkspacePayload
-    deleteWorkspace(input: DeleteWorkspaceInput!): DeleteWorkspacePayload
-    updateWorkspace(input: UpdateWorkspaceInput!): UpdateWorkspacePayload
+    deleteWorkspace(input: DeleteWorkspaceInput!): DeleteWorkspacePayload @client(as: [INTEGRATION])
+    updateWorkspace(input: UpdateWorkspaceInput!): UpdateWorkspacePayload @client(as: [INTEGRATION])
     addUsersToWorkspace(input: AddUsersToWorkspaceInput!): AddUsersToWorkspacePayload
     addIntegrationToWorkspace(input: AddIntegrationToWorkspaceInput!): AddUsersToWorkspacePayload
-    removeUserFromWorkspace(input: RemoveUserFromWorkspaceInput!): RemoveMemberFromWorkspacePayload
+    removeUserFromWorkspace(input: RemoveUserFromWorkspaceInput!): RemoveMemberFromWorkspacePayload @client(as: [INTEGRATION])
     removeMultipleUsersFromWorkspace(input: RemoveMultipleUsersFromWorkspaceInput!): RemoveMultipleMembersFromWorkspacePayload
-    removeIntegrationFromWorkspace(input: RemoveIntegrationFromWorkspaceInput!): RemoveMemberFromWorkspacePayload
+    removeIntegrationFromWorkspace(input: RemoveIntegrationFromWorkspaceInput!): RemoveMemberFromWorkspacePayload @client(as: [INTEGRATION])
     removeIntegrationsFromWorkspace(input: RemoveIntegrationsFromWorkspaceInput!): RemoveIntegrationsFromWorkspacePayload
-    updateUserOfWorkspace(input: UpdateUserOfWorkspaceInput!): UpdateMemberOfWorkspacePayload
-    updateIntegrationOfWorkspace(input: UpdateIntegrationOfWorkspaceInput!): UpdateMemberOfWorkspacePayload
+    updateUserOfWorkspace(input: UpdateUserOfWorkspaceInput!): UpdateMemberOfWorkspacePayload @client(as: [INTEGRATION])
+    updateIntegrationOfWorkspace(input: UpdateIntegrationOfWorkspaceInput!): UpdateMemberOfWorkspacePayload @client(as: [INTEGRATION])
     transferWorkspaceOwnership(input: TransferWorkspaceOwnershipInput!): UpdateMemberOfWorkspacePayload
 }`, BuiltIn: false},
 }
@@ -12837,6 +12853,75 @@ func (ec *executionContext) marshalNBoolean2bool(ctx context.Context, sel ast.Se
 func (ec *executionContext) unmarshalNCheckPermissionInput2githubᚗcomᚋreearthᚋreearthᚑaccountsᚋserverᚋinternalᚋadapterᚋgqlᚋgqlmodelᚐCheckPermissionInput(ctx context.Context, v any) (gqlmodel.CheckPermissionInput, error) {
 	res, err := ec.unmarshalInputCheckPermissionInput(ctx, v)
 	return res, graphql.ErrorOnPath(ctx, err)
+}
+
+func (ec *executionContext) unmarshalNClientSubject2githubᚗcomᚋreearthᚋreearthᚑaccountsᚋserverᚋinternalᚋadapterᚋgqlᚋgqlmodelᚐClientSubject(ctx context.Context, v any) (gqlmodel.ClientSubject, error) {
+	var res gqlmodel.ClientSubject
+	err := res.UnmarshalGQL(v)
+	return res, graphql.ErrorOnPath(ctx, err)
+}
+
+func (ec *executionContext) marshalNClientSubject2githubᚗcomᚋreearthᚋreearthᚑaccountsᚋserverᚋinternalᚋadapterᚋgqlᚋgqlmodelᚐClientSubject(ctx context.Context, sel ast.SelectionSet, v gqlmodel.ClientSubject) graphql.Marshaler {
+	return v
+}
+
+func (ec *executionContext) unmarshalNClientSubject2ᚕgithubᚗcomᚋreearthᚋreearthᚑaccountsᚋserverᚋinternalᚋadapterᚋgqlᚋgqlmodelᚐClientSubjectᚄ(ctx context.Context, v any) ([]gqlmodel.ClientSubject, error) {
+	var vSlice []any
+	vSlice = graphql.CoerceList(v)
+	var err error
+	res := make([]gqlmodel.ClientSubject, len(vSlice))
+	for i := range vSlice {
+		ctx := graphql.WithPathContext(ctx, graphql.NewPathWithIndex(i))
+		res[i], err = ec.unmarshalNClientSubject2githubᚗcomᚋreearthᚋreearthᚑaccountsᚋserverᚋinternalᚋadapterᚋgqlᚋgqlmodelᚐClientSubject(ctx, vSlice[i])
+		if err != nil {
+			return nil, err
+		}
+	}
+	return res, nil
+}
+
+func (ec *executionContext) marshalNClientSubject2ᚕgithubᚗcomᚋreearthᚋreearthᚑaccountsᚋserverᚋinternalᚋadapterᚋgqlᚋgqlmodelᚐClientSubjectᚄ(ctx context.Context, sel ast.SelectionSet, v []gqlmodel.ClientSubject) graphql.Marshaler {
+	ret := make(graphql.Array, len(v))
+	var wg sync.WaitGroup
+	isLen1 := len(v) == 1
+	if !isLen1 {
+		wg.Add(len(v))
+	}
+	for i := range v {
+		i := i
+		fc := &graphql.FieldContext{
+			Index:  &i,
+			Result: &v[i],
+		}
+		ctx := graphql.WithFieldContext(ctx, fc)
+		f := func(i int) {
+			defer func() {
+				if r := recover(); r != nil {
+					ec.Error(ctx, ec.Recover(ctx, r))
+					ret = nil
+				}
+			}()
+			if !isLen1 {
+				defer wg.Done()
+			}
+			ret[i] = ec.marshalNClientSubject2githubᚗcomᚋreearthᚋreearthᚑaccountsᚋserverᚋinternalᚋadapterᚋgqlᚋgqlmodelᚐClientSubject(ctx, sel, v[i])
+		}
+		if isLen1 {
+			f(i)
+		} else {
+			go f(i)
+		}
+
+	}
+	wg.Wait()
+
+	for _, e := range ret {
+		if e == graphql.Null {
+			return graphql.Null
+		}
+	}
+
+	return ret
 }
 
 func (ec *executionContext) unmarshalNCreateVerificationInput2githubᚗcomᚋreearthᚋreearthᚑaccountsᚋserverᚋinternalᚋadapterᚋgqlᚋgqlmodelᚐCreateVerificationInput(ctx context.Context, v any) (gqlmodel.CreateVerificationInput, error) {

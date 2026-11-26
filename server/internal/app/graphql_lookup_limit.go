@@ -41,15 +41,15 @@ func (userLookupLimit) ExtensionName() string { return "UserLookupLimit" }
 func (userLookupLimit) Validate(graphql.ExecutableSchema) error { return nil }
 
 func (u userLookupLimit) MutateOperationContext(ctx context.Context, oc *graphql.OperationContext) *gqlerror.Error {
-	st, _ := ctx.Value(lookupStateKey{}).(*lookupState)
-	if st == nil {
+	viewer, ok := ctx.Value(lookupViewerKey{}).(string)
+	if !ok {
 		return nil
 	}
 	n := countLookupFields(oc.Operation.SelectionSet)
-	if u.limiter.Allow(ctx, st.viewer, "graphql", n) {
+	if u.limiter.Allow(ctx, viewer, "graphql", n) {
 		return nil
 	}
-	st.limited = true
+	setResponseStatus(ctx, http.StatusTooManyRequests)
 	err := gqlerror.Errorf("too many user lookups; retry later")
 	errcode.Set(err, errRateLimited)
 	return err
@@ -72,21 +72,30 @@ func countLookupFields(set ast.SelectionSet) int {
 	return n
 }
 
-type lookupStateKey struct{}
+type lookupViewerKey struct{}
 
-// lookupState carries the viewer into the extension and its verdict back out,
-// so the handler can answer 429 instead of gqlgen's 200.
-type lookupState struct {
-	viewer  string
-	limited bool
+func withLookupViewer(ctx context.Context, viewer string) context.Context {
+	return context.WithValue(ctx, lookupViewerKey{}, viewer)
 }
 
-func withLookupState(ctx context.Context, viewer string, res *echo.Response) context.Context {
-	st := &lookupState{viewer: viewer}
+type responseStatusKey struct{}
+
+type responseStatus struct{ code int }
+
+// withResponseStatus lets a GraphQL extension answer a status other than
+// gqlgen's 200, such as 429 or 403, for an operation it refuses.
+func withResponseStatus(ctx context.Context, res *echo.Response) context.Context {
+	st := &responseStatus{}
 	res.Before(func() {
-		if st.limited {
-			res.Status = http.StatusTooManyRequests
+		if st.code != 0 {
+			res.Status = st.code
 		}
 	})
-	return context.WithValue(ctx, lookupStateKey{}, st)
+	return context.WithValue(ctx, responseStatusKey{}, st)
+}
+
+func setResponseStatus(ctx context.Context, code int) {
+	if st, _ := ctx.Value(responseStatusKey{}).(*responseStatus); st != nil {
+		st.code = code
+	}
 }

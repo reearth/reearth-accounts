@@ -250,12 +250,8 @@ func identityProviderAuthMiddleware(cfg *ServerConfig) func(http.Handler) http.H
 				return
 			}
 			if cc != nil {
-				// An anonymous client call gets what a request with no token gets,
-				// without the debug headers.
-				if cc.Operator == nil && !isBypassed(req) {
-					http.Error(w, http.StatusText(http.StatusUnauthorized), http.StatusUnauthorized)
-					return
-				}
+				// The client field gate decides what the call may select; the
+				// bypass and the debug headers never apply to it.
 				next.ServeHTTP(w, req.WithContext(cc.Attach(ctx)))
 				return
 			}

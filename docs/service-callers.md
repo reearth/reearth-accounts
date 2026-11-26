@@ -93,7 +93,7 @@ Accounts then authorizes the call as that integration: the workspaces where the 
 
 `user:<user ID>` is parsed, but accounts refuses it for now, even when `act_as` lists `"user"`. Acting for a user opens once every route closed to client tokens is enforced.
 
-A client token without the header is anonymous. It gets what a request with no token gets.
+A client token without the header is anonymous. It reaches only what the next section lists for anonymous clients.
 
 ### Responses
 
@@ -101,6 +101,7 @@ A client token without the header is anonymous. It gets what a request with no t
 |---|---|
 | Client token, registered, `integration:<id>` allowed by `act_as` | Authorized as the integration |
 | Client token, no header | Anonymous |
+| Client token on a route or field not open to its subject kind | 403 |
 | Client token, unregistered or with invalid claims | 401 |
 | Client token from an unconfigured issuer, with the wrong audience, or expired | 401 |
 | Header with a user token or with no token | 401 |
@@ -110,7 +111,22 @@ A client token without the header is anonymous. It gets what a request with no t
 | Header with `REEARTH_MOCK_AUTH` on | 401 |
 | User token without the header | Unchanged |
 
-REST routes that read no credentials at all, such as `GET /api/auth/config` and the password reset routes, do not check the header yet.
+Every REST route under `/api` checks the header, including the routes that read no credentials, such as `GET /api/auth/config` and the password reset routes.
+
+### What a client token can reach
+
+Every REST route and every GraphQL Query or Mutation field is closed to client tokens unless it is listed. A route or field added later is closed until someone opens it. The rule does not depend on whether the operator has a user.
+
+- REST: the table `clientRoutes` in `server/internal/adapter/http/client_routes.go` lists each open route as `"METHOD /path"`, with the path as the route pattern in `router.go`, and the subject kinds it admits. The server refuses to start when a key names a route that does not exist.
+- GraphQL: the directive `@client(as: [INTEGRATION])` on a root field opens it to clients acting for an integration. A client token without the header may call the `@public` Query fields. No client token may call a `@public` Mutation, so signup, verification, and password reset are closed to client tokens.
+
+To open a route or field, add the table entry or the directive and run `go test ./internal/app -run TestClientSurface -update`. The test writes `server/internal/app/testdata/client_surface.golden`, which lists every open route and field with the kinds it admits. Review the diff of that file with the change.
+
+Today a client acting for an integration may use the workspace routes and fields that a service caller could use before this rule, still limited by the integration's role in each workspace. The SCIM token and SCIM config routes stay closed: a client cannot create a workspace credential. Signup, verification, password reset, `/users/me`, MFA, account deletion, login removal, the user directory, and permission checks are closed to every client token.
+
+A refused REST call gets `403` with the message `forbidden: this route is not open to client tokens`. A refused GraphQL operation gets HTTP `403` and one error with the code `FORBIDDEN`. The gate checks every root field of the selected operation, including fields inside fragments and behind aliases, and refuses the whole operation before any resolver runs. `__typename` is allowed. The introspection fields are closed to client tokens.
+
+A route mounted outside the `/api` REST group does not pass through the gate. A client token on such a route resolves to no user and no operator, so a route that requires authentication answers 401.
 
 ### What is logged
 

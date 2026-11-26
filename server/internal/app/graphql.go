@@ -66,6 +66,7 @@ func GraphqlAPI(conf *Config, photos adapter.PhotoSigner, loginTime adapter.Logi
 	srv.AroundOperations(detailedOperationTracer())
 	srv.AroundOperations(recordGraphQLOperation)
 
+	srv.Use(clientFieldGate{fields: clientFields})
 	if conf.GraphQL.ComplexityLimit > 0 {
 		srv.Use(extension.FixedComplexityLimit(conf.GraphQL.ComplexityLimit))
 	}
@@ -112,7 +113,8 @@ func GraphqlAPI(conf *Config, photos adapter.PhotoSigner, loginTime adapter.Logi
 		usecases := adapter.Usecases(ctx)
 		ctx = gql.AttachUsecases(ctx, usecases, photos, enableDataLoaders)
 		ctx = adapter.AttachConfig(ctx, conf)
-		ctx = withLookupState(ctx, ratelimit.ViewerKey(adapter.User(ctx), c.RealIP()), c.Response())
+		ctx = withResponseStatus(ctx, c.Response())
+		ctx = withLookupViewer(ctx, ratelimit.ViewerKey(adapter.User(ctx), c.RealIP()))
 		c.SetRequest(req.WithContext(ctx))
 
 		srv.ServeHTTP(c.Response(), c.Request())

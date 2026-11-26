@@ -201,7 +201,7 @@ func TestServiceCaller_REST(t *testing.T) {
 			if q[0] != "" {
 				r = r.WithQuery(q[0], q[1])
 			}
-			r.Expect().Status(http.StatusUnauthorized)
+			r.Expect().Status(http.StatusForbidden)
 		}
 	})
 
@@ -249,7 +249,7 @@ func TestServiceCaller_GraphQL(t *testing.T) {
 			`{ userByNameOrEmail(nameOrEmail: "svc-owner") { id } }`,
 			`query($u: ID!) { findUsersByIDs(ids: [$u]) { id } }`,
 		} {
-			serviceGQL(e, flow, q, map[string]any{"u": svcOwnerUID.String()}).Value("errors").Array().NotEmpty()
+			refusedGQL(t, e, flow, q, map[string]any{"u": svcOwnerUID.String()})
 		}
 	})
 
@@ -264,6 +264,16 @@ func TestServiceCaller_GraphQL(t *testing.T) {
 			Value("errors").Array().NotEmpty()
 	})
 
+}
+
+// refusedGQL asserts the client field gate refused the whole operation.
+func refusedGQL(t *testing.T, e *httpexpect.Expect, auth map[string]string, query string, vars map[string]any) {
+	t.Helper()
+	o := e.POST("/api/graphql").WithHeaders(auth).
+		WithJSON(GraphQLRequest{Query: query, Variables: vars}).
+		Expect().Status(http.StatusForbidden).JSON().Object()
+	assert.Nil(t, o.Raw()["data"], "no resolver ran")
+	o.Value("errors").Array().Value(0).Object().Value("extensions").Object().HasValue("code", "FORBIDDEN")
 }
 
 const publicGQL = `{ authConfig { __typename } }`
@@ -341,14 +351,15 @@ func TestServiceCaller_ClientTokenWithoutHeaderIsAnonymous(t *testing.T) {
 	for _, cid := range []string{"svc-flow", "svc-anon"} {
 		h := actingFor(idp.clientToken(t, cid))
 		t.Run(cid+" on REST", func(t *testing.T) {
-			optionalREST(e, h).Status(http.StatusBadRequest)
-			e.GET("/api/workspaces/" + svcWsOwned.String()).WithHeaders(h).Expect().Status(http.StatusUnauthorized)
+			e.GET("/api/auth/config").WithHeaders(h).Expect().Status(http.StatusOK)
+			optionalREST(e, h).Status(http.StatusForbidden)
+			e.GET("/api/workspaces/" + svcWsOwned.String()).WithHeaders(h).Expect().Status(http.StatusForbidden)
 			e.GET("/api/workspaces/" + svcWsOwned.String()).Expect().Status(http.StatusUnauthorized)
 		})
 		t.Run(cid+" on GraphQL", func(t *testing.T) {
 			publicGraphQL(e, h).Status(http.StatusOK).JSON().Object().Value("data").Object().ContainsKey("authConfig")
 			byName := GraphQLRequest{Query: `query($n: String!) { findByName(name: $n) { id } }`, Variables: map[string]any{"n": "ws-" + svcWsOwned.String()}}
-			e.POST("/api/graphql").WithHeaders(h).WithJSON(byName).Expect().Status(http.StatusUnauthorized)
+			refusedGQL(t, e, h, byName.Query, byName.Variables)
 			e.POST("/api/graphql").WithJSON(byName).Expect().Status(http.StatusUnauthorized)
 		})
 	}

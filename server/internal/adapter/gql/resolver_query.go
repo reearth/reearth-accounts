@@ -26,7 +26,7 @@ func (r *queryResolver) Node(ctx context.Context, i gqlmodel.ID, typeArg gqlmode
 	dataloaders := dataloaders(ctx)
 	switch typeArg {
 	case gqlmodel.NodeTypeUser:
-		if err := denyServiceCaller(ctx); err != nil {
+		if err := denyClient(ctx); err != nil {
 			return nil, err
 		}
 		result, err := dataloaders.User.Load(i)
@@ -48,7 +48,7 @@ func (r *queryResolver) Nodes(ctx context.Context, ids []gqlmodel.ID, typeArg gq
 	dataloaders := dataloaders(ctx)
 	switch typeArg {
 	case gqlmodel.NodeTypeUser:
-		if err := denyServiceCaller(ctx); err != nil {
+		if err := denyClient(ctx); err != nil {
 			return nil, err
 		}
 		data, err := dataloaders.User.LoadAll(ids)
@@ -75,7 +75,7 @@ func (r *queryResolver) Nodes(ctx context.Context, ids []gqlmodel.ID, typeArg gq
 }
 
 func (r *queryResolver) User(ctx context.Context, id gqlmodel.ID) (*gqlmodel.User, error) {
-	if err := denyServiceCaller(ctx); err != nil {
+	if err := denyClient(ctx); err != nil {
 		return nil, err
 	}
 	res, err := loaders(ctx).User.FetchByID(ctx, id)
@@ -86,7 +86,7 @@ func (r *queryResolver) User(ctx context.Context, id gqlmodel.ID) (*gqlmodel.Use
 }
 
 func (r *queryResolver) UserByNameOrEmail(ctx context.Context, nameOrEmail string) (*gqlmodel.User, error) {
-	if err := denyServiceCaller(ctx); err != nil {
+	if err := denyClient(ctx); err != nil {
 		return nil, err
 	}
 	res, err := loaders(ctx).User.UserByNameOrEmail(ctx, nameOrEmail)
@@ -97,7 +97,7 @@ func (r *queryResolver) UserByNameOrEmail(ctx context.Context, nameOrEmail strin
 }
 
 func (r *queryResolver) UserByNameOrAlias(ctx context.Context, nameOrAlias string) ([]*gqlmodel.User, error) {
-	if err := denyServiceCaller(ctx); err != nil {
+	if err := denyClient(ctx); err != nil {
 		return nil, err
 	}
 	res, err := loaders(ctx).User.FetchByNameOrAlias(ctx, nameOrAlias)
@@ -111,14 +111,14 @@ func (r *queryResolver) UserByNameOrAlias(ctx context.Context, nameOrAlias strin
 // This resolver was added to avoid compile-time errors.
 // Will be implemented if needed, or removed if unused after migration.
 func (r *queryResolver) SearchUser(ctx context.Context, keyword string) ([]*gqlmodel.User, error) {
-	if err := denyServiceCaller(ctx); err != nil {
+	if err := denyClient(ctx); err != nil {
 		return nil, err
 	}
 	return loaders(ctx).User.SearchUser(ctx, keyword)
 }
 
 func (r *queryResolver) FindUserByAlias(ctx context.Context, alias string) (*gqlmodel.User, error) {
-	if err := denyServiceCaller(ctx); err != nil {
+	if err := denyClient(ctx); err != nil {
 		return nil, err
 	}
 	return loaders(ctx).User.FetchByAlias(ctx, alias)

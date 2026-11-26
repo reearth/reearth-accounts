@@ -196,8 +196,9 @@ func TestServiceCallerAuth(t *testing.T) {
 		require.Equal(t, http.StatusOK, rr.Code)
 		assert.Nil(t, op)
 
-		rr, _ = callWith(h, idp.sign(t, clientClaims("svc-flow")))
-		assert.Equal(t, http.StatusUnauthorized, rr.Code, "a non-public operation gets what a request with no token gets")
+		rr, op = callWith(h, idp.sign(t, clientClaims("svc-flow")))
+		require.Equal(t, http.StatusOK, rr.Code)
+		assert.Nil(t, op)
 	})
 
 	t.Run("unregistered client is 401", func(t *testing.T) {

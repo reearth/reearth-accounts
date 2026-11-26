@@ -6,6 +6,22 @@ requires authentication. The auth middleware reads this directive at startup.
 directive @public on FIELD_DEFINITION
 
 """
+What a registered client token acts for (ADR-0002).
+"""
+enum ClientSubject {
+  INTEGRATION
+  USER
+}
+
+"""
+Opens a Query or Mutation field to calls made with a registered client token,
+for the subject kinds listed. A field without it is closed to every client
+token, @public or not. A client token without X-Reearth-Act-As may call @public
+Query fields only. The auth layer reads this directive at startup.
+"""
+directive @client(as: [ClientSubject!]!) on FIELD_DEFINITION
+
+"""
 Who may read a field that carries user data. The owner is the user the
 enclosing object describes. A hidden field returns its empty value.
 """
@@ -41,8 +57,8 @@ enum Theme {
 }
 
 type Query {
-  node(id: ID!, type: NodeType!): Node
-  nodes(id: [ID!]!, type: NodeType!): [Node]
+  node(id: ID!, type: NodeType!): Node @client(as: [INTEGRATION])
+  nodes(id: [ID!]!, type: NodeType!): [Node] @client(as: [INTEGRATION])
 }
 
 type Mutation

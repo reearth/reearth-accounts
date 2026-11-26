@@ -346,6 +346,62 @@ type WorkspacesWithPagination struct {
 	TotalCount int          `json:"totalCount"`
 }
 
+// What a registered client token acts for (ADR-0002).
+type ClientSubject string
+
+const (
+	ClientSubjectIntegration ClientSubject = "INTEGRATION"
+	ClientSubjectUser        ClientSubject = "USER"
+)
+
+var AllClientSubject = []ClientSubject{
+	ClientSubjectIntegration,
+	ClientSubjectUser,
+}
+
+func (e ClientSubject) IsValid() bool {
+	switch e {
+	case ClientSubjectIntegration, ClientSubjectUser:
+		return true
+	}
+	return false
+}
+
+func (e ClientSubject) String() string {
+	return string(e)
+}
+
+func (e *ClientSubject) UnmarshalGQL(v any) error {
+	str, ok := v.(string)
+	if !ok {
+		return fmt.Errorf("enums must be strings")
+	}
+
+	*e = ClientSubject(str)
+	if !e.IsValid() {
+		return fmt.Errorf("%s is not a valid ClientSubject", str)
+	}
+	return nil
+}
+
+func (e ClientSubject) MarshalGQL(w io.Writer) {
+	fmt.Fprint(w, strconv.Quote(e.String()))
+}
+
+func (e *ClientSubject) UnmarshalJSON(b []byte) error {
+	s, err := strconv.Unquote(string(b))
+	if err != nil {
+		return err
+	}
+	return e.UnmarshalGQL(s)
+}
+
+func (e ClientSubject) MarshalJSON() ([]byte, error) {
+	var buf bytes.Buffer
+	e.MarshalGQL(&buf)
+	return buf.Bytes(), nil
+}
+
 type NodeType string
 
 const (

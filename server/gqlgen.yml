@@ -14,6 +14,8 @@ model:
 directives:
   public:
     skip_runtime: true
+  client:
+    skip_runtime: true
 models:
   Me:
     fields:
