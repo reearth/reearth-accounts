@@ -63,7 +63,7 @@ func (i *Workspace) Fetch(ctx context.Context, ids workspace.IDList, operator *w
 		return nil, interfaces.ErrTooManyWorkspaceIDs
 	}
 	ws, err := i.repos.Workspace.FindByIDs(ctx, ids)
-	if err != nil || !operator.IsService() {
+	if err != nil || !operator.ViaClient() {
 		return ws, err
 	}
 	return lo.Filter(ws, func(w *workspace.Workspace, _ int) bool {
@@ -84,13 +84,16 @@ func (i *Workspace) FetchByAlias(ctx context.Context, alias string, operator *wo
 }
 
 func (i *Workspace) FindByUser(ctx context.Context, id workspace.UserID, operator *workspace.Operator) (workspace.List, error) {
+	if err := refuseAnotherUser(operator, id); err != nil {
+		return nil, err
+	}
 	res, err := i.repos.Workspace.FindByUser(ctx, id)
 	return filterWorkspaces(res, operator, err, true, true)
 }
 
 func (i *Workspace) FetchByUserWithPagination(ctx context.Context, userID workspace.UserID, input interfaces.FetchByUserWithPaginationParam, operator *workspace.Operator) (interfaces.FetchByUserWithPaginationResult, error) {
 	p := pagination.ToPagination(input.Page, input.Size)
-	if operator.IsService() {
+	if operator.ViaClient() {
 		ws, err := i.FindByUser(ctx, userID, operator)
 		if err != nil {
 			return interfaces.FetchByUserWithPaginationResult{}, err
@@ -122,11 +125,21 @@ func pageBounds(offset, limit int64, n int) (int, int) {
 	return int(offset), int(min(offset+limit, int64(n)))
 }
 
-// scopeForService hides a workspace from a service caller that is not a member
-// of it (ADR-0002 decision 4). Lookups by users stay unscoped.
+// refuseAnotherUser keeps a client acting for a user to that user's own
+// workspace list (ADR-0002 decision 6). A user's own token may still ask about
+// another user, filtered to the workspaces it can read.
+func refuseAnotherUser(operator *workspace.Operator, uid workspace.UserID) error {
+	if operator.ViaClient() && operator.User != nil && *operator.User != uid {
+		return interfaces.ErrPermissionDenied
+	}
+	return nil
+}
+
+// scopeForService hides a workspace from a client call whose subject is not a
+// member of it (ADR-0002 decisions 5 and 6). A user's own lookups stay unscoped.
 func scopeForService(ws *workspace.Workspace, err error) func(*workspace.Operator) (*workspace.Workspace, error) {
 	return func(operator *workspace.Operator) (*workspace.Workspace, error) {
-		if err != nil || !operator.IsService() {
+		if err != nil || !operator.ViaClient() {
 			return ws, err
 		}
 		if ws == nil || !operator.IsReadableWorkspace(ws.ID()) {

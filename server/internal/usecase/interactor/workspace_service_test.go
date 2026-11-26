@@ -9,6 +9,7 @@ import (
 	"github.com/reearth/reearth-accounts/server/pkg/id"
 	"github.com/reearth/reearth-accounts/server/pkg/role"
 	"github.com/reearth/reearth-accounts/server/pkg/workspace"
+	"github.com/reearth/reearthx/rerror"
 	"github.com/samber/lo"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -49,4 +50,57 @@ func TestWorkspace_ServiceCallerIsJudgedByIntegrationRole(t *testing.T) {
 
 	_, err = uc.Create(ctx, "new", "new", "", owner, false, op)
 	assert.ErrorIs(t, err, interfaces.ErrInvalidOperator, "creating records a user")
+}
+
+func TestWorkspace_ReadsForAClientActingForAUserAreScoped(t *testing.T) {
+	ctx := context.Background()
+	db := memory.New()
+	subject, other := id.NewUserID(), id.NewUserID()
+	member := func(name string, users ...id.UserID) *workspace.Workspace {
+		m := map[workspace.UserID]workspace.Member{}
+		for _, u := range users {
+			m[u] = workspace.Member{Role: role.RoleOwner}
+		}
+		return workspace.New().NewID().Name(name).Alias(name).Members(m).MustBuild()
+	}
+	mine, shared, theirs := member("mine", subject), member("shared", subject, other), member("theirs", other)
+	require.NoError(t, db.Workspace.SaveAll(ctx, workspace.List{mine, shared, theirs}))
+	uc := NewWorkspace(db, nil, &fakeCerbos{allowed: true})
+
+	own := &workspace.Operator{User: &subject, OwningWorkspaces: id.WorkspaceIDList{mine.ID(), shared.ID()}}
+	client := *own
+	client.Client = &workspace.Client{ID: "svc", Name: "svc"}
+
+	ws, err := uc.Fetch(ctx, id.WorkspaceIDList{mine.ID(), theirs.ID()}, &client)
+	require.NoError(t, err)
+	assert.ElementsMatch(t, id.WorkspaceIDList{mine.ID()}, ws.IDs())
+	_, err = uc.FetchByID(ctx, theirs.ID(), &client)
+	assert.ErrorIs(t, err, rerror.ErrNotFound)
+	_, err = uc.FetchByName(ctx, "theirs", &client)
+	assert.ErrorIs(t, err, rerror.ErrNotFound)
+	_, err = uc.FetchByAlias(ctx, "theirs", &client)
+	assert.ErrorIs(t, err, rerror.ErrNotFound)
+	got, err := uc.FetchByID(ctx, shared.ID(), &client)
+	require.NoError(t, err)
+	assert.Equal(t, shared.ID(), got.ID())
+
+	ws, err = uc.FindByUser(ctx, subject, &client)
+	require.NoError(t, err)
+	assert.ElementsMatch(t, id.WorkspaceIDList{mine.ID(), shared.ID()}, ws.IDs())
+	_, err = uc.FindByUser(ctx, other, &client)
+	assert.ErrorIs(t, err, interfaces.ErrPermissionDenied)
+	_, err = uc.FetchByUserWithPagination(ctx, other, interfaces.FetchByUserWithPaginationParam{Page: 1, Size: 10}, &client)
+	assert.ErrorIs(t, err, interfaces.ErrPermissionDenied)
+
+	t.Run("the user's own token is unscoped as before", func(t *testing.T) {
+		got, err := uc.FetchByID(ctx, theirs.ID(), own)
+		require.NoError(t, err)
+		assert.Equal(t, theirs.ID(), got.ID())
+		ws, err := uc.Fetch(ctx, id.WorkspaceIDList{mine.ID(), theirs.ID()}, own)
+		require.NoError(t, err)
+		assert.Len(t, ws, 2)
+		ws, err = uc.FindByUser(ctx, other, own)
+		require.NoError(t, err)
+		assert.ElementsMatch(t, id.WorkspaceIDList{shared.ID()}, ws.IDs())
+	})
 }

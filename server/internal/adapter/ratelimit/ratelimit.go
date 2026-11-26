@@ -11,6 +11,7 @@ import (
 
 	"github.com/reearth/reearth-accounts/server/pkg/applog"
 	"github.com/reearth/reearth-accounts/server/pkg/user"
+	"github.com/reearth/reearth-accounts/server/pkg/workspace"
 	"golang.org/x/time/rate"
 )
 
@@ -92,9 +93,13 @@ func (l *Limiter) take(viewer string, n int) bool {
 	return b.tokens.AllowN(now, n)
 }
 
-// ViewerKey identifies who is looking users up: the signed-in user, or the
-// client IP for an anonymous caller.
-func ViewerKey(u *user.User, clientIP string) string {
+// ViewerKey identifies who is looking users up: the registered client for a
+// client call, so a client cannot buy fresh buckets by acting for many users;
+// otherwise the signed-in user, or the client IP for an anonymous caller.
+func ViewerKey(c *workspace.Client, u *user.User, clientIP string) string {
+	if c != nil {
+		return "client:" + c.ID
+	}
 	if u != nil {
 		return "user:" + u.ID().String()
 	}

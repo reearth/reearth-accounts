@@ -14,6 +14,7 @@ import (
 	"github.com/reearth/reearth-accounts/server/pkg/applog"
 	"github.com/reearth/reearth-accounts/server/pkg/id"
 	"github.com/reearth/reearth-accounts/server/pkg/role"
+	"github.com/reearth/reearth-accounts/server/pkg/user"
 	"github.com/reearth/reearth-accounts/server/pkg/workspace"
 	"github.com/reearth/reearthx/appx"
 	"github.com/reearth/reearthx/rerror"
@@ -193,12 +194,12 @@ func (s ServiceCallers) checkIssuers(providers []appx.JWTProvider) error {
 type rejectReason string
 
 const (
-	reasonBadClaims             rejectReason = "bad_client_claims"
-	reasonUnregistered          rejectReason = "unregistered_client"
-	reasonActAsWithoutClient    rejectReason = "act_as_without_client_token"
-	reasonMalformedActAs        rejectReason = "malformed_act_as"
-	reasonKindNotAllowed        rejectReason = "act_as_kind_not_allowed"
-	reasonActAsUserNotAvailable rejectReason = "act_as_user_not_available"
+	reasonBadClaims          rejectReason = "bad_client_claims"
+	reasonUnregistered       rejectReason = "unregistered_client"
+	reasonActAsWithoutClient rejectReason = "act_as_without_client_token"
+	reasonMalformedActAs     rejectReason = "malformed_act_as"
+	reasonKindNotAllowed     rejectReason = "act_as_kind_not_allowed"
+	reasonUnknownUser        rejectReason = "act_as_unknown_user"
 )
 
 // clientRejected always becomes a 401.
@@ -277,12 +278,6 @@ func (s ServiceCallers) authenticate(ai *appx.AuthInfo, actAs []string) (*client
 	}
 	if !c.ActAs.Allows(sub.Kind()) {
 		return nil, reject(reasonKindNotAllowed)
-	}
-	// Acting for a user (ADR-0002 decision 6) is not available yet, so a user
-	// subject is refused here even when act_as allows it. Without a route gate,
-	// an operator with both a user and a client would pass every user-only guard.
-	if sub.Kind() == workspace.SubjectUser {
-		return nil, reject(reasonActAsUserNotAvailable)
 	}
 	return &clientAuth{client: c, subject: sub}, nil
 }
@@ -382,6 +377,25 @@ func generateIntegrationOperator(ctx context.Context, cfg *ServerConfig, iid id.
 	}, nil
 }
 
+// actAsUserOperator builds the operator for a client acting for a user: the
+// user's own operator, marked as a client call. A deleted (deactivated) user
+// is refused like one that does not exist, since FindByID returns both.
+func actAsUserOperator(ctx context.Context, cfg *ServerConfig, uid id.UserID, c *workspace.Client) (*user.User, *workspace.Operator, error) {
+	u, err := cfg.Repos.User.FindByID(ctx, uid)
+	if errors.Is(err, rerror.ErrNotFound) || (err == nil && (u == nil || u.IsDeleted())) {
+		return nil, nil, &clientRejected{reason: reasonUnknownUser, clientID: c.ID}
+	}
+	if err != nil {
+		return nil, nil, err
+	}
+	op, err := generateUserOperator(ctx, cfg, u)
+	if err != nil {
+		return nil, nil, err
+	}
+	op.Client = c
+	return u, op, nil
+}
+
 // resolveClientCall turns a request into a client call for both transports.
 func resolveClientCall(ctx context.Context, cfg *ServerConfig, ai *appx.AuthInfo, actAs []string) (*adapter.ClientCall, error) {
 	ca, err := cfg.Config.ServiceCallers.authenticate(ai, actAs)
@@ -397,6 +411,12 @@ func resolveClientCall(ctx context.Context, cfg *ServerConfig, ai *appx.AuthInfo
 	cc := &adapter.ClientCall{Client: &client, Subject: ca.subject}
 	if iid, ok := ca.subject.Integration(); ok {
 		if cc.Operator, err = generateIntegrationOperator(ctx, cfg, iid, cc.Client); err != nil {
+			return nil, err
+		}
+	}
+	if uid, ok := ca.subject.User(); ok {
+		if cc.User, cc.Operator, err = actAsUserOperator(ctx, cfg, uid, cc.Client); err != nil {
+			logRejection(ctx, ai, err)
 			return nil, err
 		}
 	}

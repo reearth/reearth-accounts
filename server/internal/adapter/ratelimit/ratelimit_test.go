@@ -6,6 +6,8 @@ import (
 	"testing"
 	"time"
 
+	"github.com/reearth/reearth-accounts/server/pkg/user"
+	"github.com/reearth/reearth-accounts/server/pkg/workspace"
 	"github.com/reearth/reearthx/log"
 	"github.com/stretchr/testify/assert"
 )
@@ -63,4 +65,16 @@ func TestLimiter_ViewersHaveSeparateBudgets(t *testing.T) {
 func TestLimiter_DisabledAllowsEverything(t *testing.T) {
 	var l *Limiter = New(Config{PerMinute: 0, Enforce: true})
 	assert.True(t, l.Allow(context.Background(), "user:a", "op", 1000))
+}
+
+func TestViewerKey(t *testing.T) {
+	a := user.New().NewID().Name("a").Email("a@example.com").MustBuild()
+	b := user.New().NewID().Name("b").Email("b@example.com").MustBuild()
+	c := &workspace.Client{ID: "svc", Name: "svc"}
+
+	assert.Equal(t, "client:svc", ViewerKey(c, a, "10.0.0.1"))
+	assert.Equal(t, ViewerKey(c, a, "10.0.0.1"), ViewerKey(c, b, "10.0.0.2"), "acting for another user shares the client's bucket")
+	assert.Equal(t, ViewerKey(c, nil, "10.0.0.1"), ViewerKey(c, a, "10.0.0.1"))
+	assert.Equal(t, "user:"+a.ID().String(), ViewerKey(nil, a, "10.0.0.1"))
+	assert.Equal(t, "ip:10.0.0.1", ViewerKey(nil, nil, "10.0.0.1"))
 }

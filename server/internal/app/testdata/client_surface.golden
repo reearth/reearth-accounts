@@ -9,9 +9,10 @@ graphql query findByAlias                                            anonymous,i
 graphql query findByID                                               anonymous,integration
 graphql query findByIDs                                              anonymous,integration
 graphql query findByName                                             integration
-graphql query findByUser                                             integration
-graphql query findByUserWithPagination                               integration
+graphql query findByUser                                             integration,user
+graphql query findByUserWithPagination                               integration,user
 graphql query findUsersByIDsWithPagination                           anonymous
+graphql query me                                                     user
 graphql query node                                                   integration
 graphql query nodes                                                  integration
 graphql query publicWorkspace                                        anonymous,integration
@@ -21,7 +22,8 @@ rest    DELETE /api/workspaces/:id/integrations/:integration_id      integration
 rest    DELETE /api/workspaces/:id/members                           integration
 rest    DELETE /api/workspaces/:id/members/:user_id                  integration
 rest    GET /api/auth/config                                         anonymous
-rest    GET /api/workspaces                                          integration
+rest    GET /api/users/me                                            user
+rest    GET /api/workspaces                                          integration,user
 rest    GET /api/workspaces/:id                                      integration
 rest    PATCH /api/service/workspaces/:id/members/:user_id           integration
 rest    PATCH /api/workspaces/:id                                    integration
