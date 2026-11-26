@@ -16,6 +16,7 @@ help:
 	@echo "  generate          Run go generate"
 	@echo "  sqlc              Regenerate sqlc query code for the postgres backend"
 	@echo "  test-integration  Run testcontainers integration tests (postgres + mongo)"
+	@echo "  dev-seed          Write dev-only service-caller keys and accounts config for the local mock issuer"
 	@echo "  gen-policies      Generate Cerbos policy files"
 
 TARGET_TEST :=./...
@@ -33,7 +34,12 @@ test-integration:
 		./internal/infrastructure/conformance/... \
 		./e2e/... \
 		./internal/admin/usecase/workspaceuc/... \
-		-run 'Conformance|TestMigrate|TestTransaction|TestResolveDBTX|TestPostgresE2E_GetAndUpdateMe|TestTransferOwner_Postgres'
+		-run 'Conformance|TestMigrate|TestTransaction|TestResolveDBTX|TestPostgresE2E_GetAndUpdateMe|TestTransferOwner_Postgres|TestLocalIssuer'
+
+# Dev-only keys and accounts config for service callers that use the mock
+# issuer in docker-compose.dev.yml. Pass ARGS, such as ARGS=-rotate.
+dev-seed:
+	go run ./cmd/devseed $(ARGS)
 
 # Regenerate the sqlc query package for the PostgreSQL backend after editing
 # any *.sql under internal/infrastructure/postgres/sqlc. Requires sqlc v1.27+.
@@ -112,4 +118,4 @@ swag-admin:
 run-admin:
 	go run ./cmd/reearth-accounts-admin
 
-.PHONY: dev-install dev run down run-app run-cerbos run-migration gql gen-policies update-schema-json test test-integration sqlc swag wire-admin swag-admin run-admin
+.PHONY: dev-install dev run down run-app run-cerbos run-migration gql gen-policies update-schema-json test test-integration dev-seed sqlc swag wire-admin swag-admin run-admin
