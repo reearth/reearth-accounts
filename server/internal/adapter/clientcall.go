@@ -13,6 +13,8 @@ type clientCallKey struct{}
 // ClientCall is the auth layer's verdict for a request made with a registered
 // client token (ADR-0002).
 type ClientCall struct {
+	// Issuer is the token's issuer. Client IDs are unique only within one.
+	Issuer   string
 	Client   *workspace.Client
 	Subject  workspace.Subject
 	Operator *workspace.Operator
@@ -40,10 +42,7 @@ func (cc *ClientCall) LogFields() []applog.Field {
 	}
 }
 
-// LogClientVerdict logs a client gate's decision on the call that ctx carries,
-// once per call (ADR-0002 decision 8). The entry gets the call's fields from
-// ctx, where Attach put them. A refusal here means the route or field does not
-// admit what the call acts for.
+// LogClientVerdict logs a client gate's decision once per call (ADR-0002 decision 8).
 func LogClientVerdict(ctx context.Context, admitted bool) {
 	if ClientCallOf(ctx) == nil {
 		return

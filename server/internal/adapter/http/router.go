@@ -72,8 +72,9 @@ func RegisterRESTRouter(e *echo.Echo, cfg RouterConfig) {
 	if cfg.ClientResolver == nil {
 		panic("RouterConfig.ClientResolver is required")
 	}
-	// After the usecase middleware, so the repos stay unfiltered by the operator
-	// as before and the interactors keep doing the workspace scoping.
+	// After the usecase middleware, which filters the repos when the context
+	// already carries an operator. The gate attaches the client's operator, so
+	// with the gate first an integration's GET /api/workspaces?ids= answers 404.
 	base = append(base, ClientGate(cfg.ClientResolver, clientRoutes))
 	if cfg.CacheControl != nil {
 		base = append(base, cfg.CacheControl)

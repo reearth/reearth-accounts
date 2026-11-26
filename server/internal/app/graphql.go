@@ -114,7 +114,7 @@ func GraphqlAPI(conf *Config, photos adapter.PhotoSigner, loginTime adapter.Logi
 		ctx = gql.AttachUsecases(ctx, usecases, photos, enableDataLoaders)
 		ctx = adapter.AttachConfig(ctx, conf)
 		ctx = withResponseStatus(ctx, c.Response())
-		ctx = withLookupViewer(ctx, ratelimit.ViewerKey(adapter.User(ctx), c.RealIP()))
+		ctx = withLookupViewer(ctx, ratelimit.ViewerKey(adapter.ClientCallOf(ctx), adapter.User(ctx), c.RealIP()))
 		c.SetRequest(req.WithContext(ctx))
 
 		srv.ServeHTTP(c.Response(), c.Request())

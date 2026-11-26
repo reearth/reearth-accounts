@@ -318,8 +318,7 @@ func TestServiceCaller_RefusedRequests(t *testing.T) {
 		"unknown kind":                             actingFor(flowTok, "team:"+svcIntegration.String()),
 		"kind not in act_as":                       actingFor(idp.clientToken(t, "svc-anon"), asInt),
 		"integration for a user-only client":       actingFor(idp.clientToken(t, "svc-users"), asInt),
-		"user subject":                             actingFor(flowTok, asUser),
-		"user subject for a user-only client":      actingFor(idp.clientToken(t, "svc-users"), asUser),
+		"user subject for a client without user":   actingFor(idp.clientToken(t, "svc-anon"), asUser),
 		"unregistered client":                      actingFor(idp.clientToken(t, "svc-unknown"), asInt),
 		"unregistered client with no header":       actingFor(idp.clientToken(t, "svc-unknown")),
 		"client token from an unconfigured issuer": actingFor(other.token(t, jwt.MapClaims{"iss": other.issuer(), "sub": "svc-flow@clients", "azp": "svc-flow", "gty": "client-credentials"}), asInt),
@@ -510,7 +509,7 @@ func TestServiceCaller_RequestLogNamesTheClient(t *testing.T) {
 			reason: "not_open_to_client",
 		},
 		{
-			name: "anonymous call refused by the GraphQL gate",
+			name: "anonymous call refused on GraphQL",
 			do: func() {
 				e.POST("/api/graphql").WithHeaders(actingFor(flow)).WithJSON(findByName).Expect().Status(http.StatusForbidden)
 			},

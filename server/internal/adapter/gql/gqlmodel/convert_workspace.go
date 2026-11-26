@@ -42,7 +42,7 @@ func ToWorkspace(
 		Website:     t.Metadata().Website(),
 		Location:    t.Metadata().Location(),
 	}
-	if viewer := adapter.User(ctx); viewer != nil && t.Members().HasUser(viewer.ID()) {
+	if viewer := adapter.User(ctx); viewer != nil && adapter.Operator(ctx).IsUserSelf() && t.Members().HasUser(viewer.ID()) {
 		metadata.BillingEmail = t.Metadata().BillingEmail()
 	}
 

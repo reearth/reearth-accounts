@@ -10,12 +10,17 @@ import (
 	"github.com/reearth/reearthx/appx"
 )
 
-// ClientResolver classifies a request as a client call (ADR-0002). It returns
-// (nil, nil) when the request is not one, and an error that renders as 401 when
-// the call is refused. The app layer provides it.
+// ClientResolver classifies a request as a client call. It returns (nil, nil)
+// when the request is not one, and an error that renders as 401 when the call
+// is refused.
 type ClientResolver func(c echo.Context, ai *appx.AuthInfo) (*adapter.ClientCall, error)
 
-var errClientRouteClosed = fmt.Errorf("%w: this route is not open to client tokens", httpinternal.ErrForbidden)
+// ErrUnauthorized and ErrForbidden are the REST middleware's refusals, for the
+// error handler that renders the /api paths outside the REST handlers.
+var (
+	ErrUnauthorized = httpinternal.ErrUnauthorized
+	ErrForbidden    = httpinternal.ErrForbidden
+)
 
 // ClientGate is where REST classifies a client call. It runs on the whole /api
 // group before every route middleware, so it also covers the routes that have
@@ -38,7 +43,7 @@ func ClientGate(resolve ClientResolver, routes map[string]adapter.ClientAccess) 
 			admitted := routes[c.Request().Method+" "+c.Path()].Admits(cc.Subject.Kind())
 			adapter.LogClientVerdict(ctx, admitted)
 			if !admitted {
-				return errClientRouteClosed
+				return httpinternal.ErrClientRouteClosed
 			}
 			return next(c)
 		}

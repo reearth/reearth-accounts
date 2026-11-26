@@ -86,5 +86,5 @@ func memberUsersFor(c echo.Context) httpmodel.MemberUsers {
 	if !requestedExpansions(c).has(ExpandMemberUsers) {
 		return httpmodel.MemberUsers{}
 	}
-	return httpmodel.MemberUsers{Embed: true, Viewer: httpmodel.ViewerOf(httpinternal.User(c))}
+	return httpmodel.MemberUsers{Embed: true, Viewer: httpmodel.ViewerOf(httpinternal.User(c), httpinternal.Operator(c))}
 }

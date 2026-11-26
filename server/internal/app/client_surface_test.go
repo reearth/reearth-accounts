@@ -31,11 +31,9 @@ var updateGolden = flag.Bool("update", false, "rewrite testdata golden files")
 func TestClientSurface(t *testing.T) {
 	var lines []string
 	for k, a := range adapterhttp.ClientRoutes() {
-		assert.False(t, a.Admits(workspace.SubjectUser), "%s must not admit a client acting for a user yet", k)
 		lines = append(lines, fmt.Sprintf("rest    %-60s %s", k, a))
 	}
 	for f, a := range clientFields {
-		assert.False(t, a.Admits(workspace.SubjectUser), "%s %s must not admit a client acting for a user yet", f.op, f.name)
 		lines = append(lines, fmt.Sprintf("graphql %-60s %s", string(f.op)+" "+f.name, a))
 	}
 	sort.Strings(lines)
@@ -51,6 +49,26 @@ func TestClientSurface(t *testing.T) {
 	assert.Equal(t, string(want), got, "the client surface changed; rerun with -update and review the diff")
 }
 
+// TestClientSurface_UserReadList pins what a client acting for a user may
+// reach to the ADR-0002 decision 6 read list, apart from the golden file, so
+// opening anything else to it fails here even after an -update.
+func TestClientSurface_UserReadList(t *testing.T) {
+	var rest []string
+	for k, a := range adapterhttp.ClientRoutes() {
+		if a.Admits(workspace.SubjectUser) {
+			rest = append(rest, k)
+		}
+	}
+	var fields []string
+	for f, a := range clientFields {
+		if a.Admits(workspace.SubjectUser) {
+			fields = append(fields, string(f.op)+" "+f.name)
+		}
+	}
+	assert.ElementsMatch(t, []string{"GET /api/users/me", "GET /api/workspaces"}, rest)
+	assert.ElementsMatch(t, []string{"query me", "query findByUser", "query findByUserWithPagination"}, fields)
+}
+
 type clientSurface struct {
 	e        *echo.Echo
 	cfg      *ServerConfig
@@ -62,17 +80,20 @@ func newClientSurface(t *testing.T) clientSurface {
 	t.Helper()
 	idp := newTestIdP(t)
 	f := newServiceFixture(t)
-	cfg := serviceConfig(t, f.repos, []*testIdP{idp}, callersJSON(idp.issuer(), "svc-flow", "integration"))
+	cfg := serviceConfig(t, f.repos, []*testIdP{idp}, callersJSON(idp.issuer(), "svc-flow", "integration", "user"))
 	cfg.Gateways = &gateway.Container{}
 	tok := idp.sign(t, clientClaims("svc-flow"))
 	return clientSurface{
 		e:     initEcho(context.Background(), cfg),
 		cfg:   cfg,
-		kinds: map[string]workspace.SubjectKind{"anonymous": workspace.SubjectNone, "integration": workspace.SubjectIntegration},
+		kinds: map[string]workspace.SubjectKind{"anonymous": workspace.SubjectNone, "integration": workspace.SubjectIntegration, "user": workspace.SubjectUser},
 		tokenFor: func(kind string) map[string]string {
 			h := map[string]string{"Authorization": "Bearer " + tok}
-			if kind == "integration" {
+			switch kind {
+			case "integration":
 				h[ActAsHeader] = f.actAs()
+			case "user":
+				h[ActAsHeader] = "user:" + f.userID.String()
 			}
 			return h
 		},
@@ -103,23 +124,34 @@ func concretePath(p string) string {
 func TestClientGate_RESTDeniesEveryUnlistedRoute(t *testing.T) {
 	s := newClientSurface(t)
 	table := adapterhttp.ClientRoutes()
-	checked := 0
+	paths := map[string]struct{}{}
 	for _, r := range s.e.Routes() {
-		if r.Method == echo.RouteNotFound || !strings.HasPrefix(r.Path, "/api/") || r.Path == "/api/graphql" {
-			continue
-		}
-		key := r.Method + " " + r.Path
-		for kind, k := range s.kinds {
-			if table[key].Admits(k) {
-				continue
-			}
-			checked++
-			rr := s.do(r.Method, concretePath(r.Path), "{}", s.tokenFor(kind))
-			assert.Equal(t, http.StatusForbidden, rr.Code, "%s as %s", key, kind)
-			assert.Contains(t, rr.Body.String(), "not open to client tokens", "%s as %s", key, kind)
+		if r.Method != echo.RouteNotFound && strings.HasPrefix(r.Path, "/api/") && r.Path != "/api/graphql" {
+			paths[r.Path] = struct{}{}
 		}
 	}
-	assert.Greater(t, checked, 40)
+	methods := []string{http.MethodGet, http.MethodHead, http.MethodPost, http.MethodPut, http.MethodPatch, http.MethodDelete, http.MethodOptions}
+	checked := 0
+	for p := range paths {
+		for _, m := range methods {
+			path := concretePath(p)
+			c := s.e.NewContext(httptest.NewRequest(m, path, nil), httptest.NewRecorder())
+			s.e.Router().Find(m, path, c)
+			key := m + " " + c.Path()
+			for kind, k := range s.kinds {
+				if table[key].Admits(k) {
+					continue
+				}
+				checked++
+				rr := s.do(m, path, "{}", s.tokenFor(kind))
+				assert.Equal(t, http.StatusForbidden, rr.Code, "%s as %s", key, kind)
+				if m != http.MethodHead {
+					assert.Contains(t, rr.Body.String(), "not open to client tokens", "%s as %s", key, kind)
+				}
+			}
+		}
+	}
+	assert.Greater(t, checked, 300)
 }
 
 func TestClientGate_GraphQLDeniesEveryUnlistedField(t *testing.T) {

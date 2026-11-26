@@ -131,6 +131,18 @@ func TestVisibility(t *testing.T) {
 		assert.Equal(t, "viewer@example.com", resolveEmail(viewerCtx(viewer), self, gqlmodel.VisibilityLevelWorkspace))
 	})
 
+	t.Run("a client acting for the viewer sees the viewer's own fields but no co-member's", func(t *testing.T) {
+		ctx := viewerCtx(viewer, viewersOnly, shared)
+		op := *adapter.Operator(ctx)
+		op.Client = &workspace.Client{ID: "svc", Name: "svc"}
+		ctx = adapter.AttachOperator(ctx, &op)
+		self := &gqlmodel.User{ID: gqlmodel.IDFrom(viewer.ID()), Email: "viewer@example.com"}
+		assert.Equal(t, "", resolveEmail(ctx, owner, gqlmodel.VisibilityLevelWorkspace))
+		assert.Equal(t, "", resolveEmail(ctx, owner, gqlmodel.VisibilityLevelSelf))
+		assert.Equal(t, "viewer@example.com", resolveEmail(ctx, self, gqlmodel.VisibilityLevelWorkspace))
+		assert.Equal(t, "viewer@example.com", resolveEmail(ctx, self, gqlmodel.VisibilityLevelSelf))
+	})
+
 	t.Run("a field below the owner finds it through the parent field", func(t *testing.T) {
 		ctx := graphql.WithFieldContext(viewerCtx(nil), &graphql.FieldContext{Result: &owner})
 		meta := &gqlmodel.UserMetadata{Lang: "ja"}

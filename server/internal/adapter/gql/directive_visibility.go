@@ -72,7 +72,10 @@ func canSee(ctx context.Context, level gqlmodel.VisibilityLevel, owner gqlmodel.
 	if gqlmodel.ID(viewer.ID().String()) == owner.UserID {
 		return true
 	}
-	if level == gqlmodel.VisibilityLevelWorkspace {
+	// A client acting for a user reads that user's own data, not what the user
+	// could see as a member of a workspace (ADR-0002 decision 6), so WORKSPACE
+	// means SELF for it.
+	if level == gqlmodel.VisibilityLevelWorkspace && !getOperator(ctx).ViaClient() {
 		return sharesWorkspace(ctx, owner.UserID)
 	}
 	return false
