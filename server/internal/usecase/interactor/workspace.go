@@ -12,6 +12,7 @@ import (
 	"github.com/reearth/reearth-accounts/server/internal/usecase/interfaces"
 	"github.com/reearth/reearth-accounts/server/internal/usecase/repo"
 	"github.com/reearth/reearth-accounts/server/pkg/applog"
+	"github.com/reearth/reearth-accounts/server/pkg/id"
 	"github.com/reearth/reearth-accounts/server/pkg/membership"
 	"github.com/reearth/reearth-accounts/server/pkg/pagination"
 	"github.com/reearth/reearth-accounts/server/pkg/permittable"
@@ -63,7 +64,7 @@ func (i *Workspace) Fetch(ctx context.Context, ids workspace.IDList, operator *w
 		return nil, interfaces.ErrTooManyWorkspaceIDs
 	}
 	ws, err := i.repos.Workspace.FindByIDs(ctx, ids)
-	if err != nil || !operator.IsService() {
+	if err != nil || !operator.ViaClient() {
 		return ws, err
 	}
 	return lo.Filter(ws, func(w *workspace.Workspace, _ int) bool {
@@ -72,25 +73,31 @@ func (i *Workspace) Fetch(ctx context.Context, ids workspace.IDList, operator *w
 }
 
 func (i *Workspace) FetchByID(ctx context.Context, id workspace.ID, operator *workspace.Operator) (*workspace.Workspace, error) {
-	return scopeForService(i.repos.Workspace.FindByID(ctx, id))(operator)
+	ws, err := i.repos.Workspace.FindByID(ctx, id)
+	return scopeToClientSubject(operator, ws, err)
 }
 
 func (i *Workspace) FetchByName(ctx context.Context, name string, operator *workspace.Operator) (*workspace.Workspace, error) {
-	return scopeForService(i.repos.Workspace.FindByName(ctx, name))(operator)
+	ws, err := i.repos.Workspace.FindByName(ctx, name)
+	return scopeToClientSubject(operator, ws, err)
 }
 
 func (i *Workspace) FetchByAlias(ctx context.Context, alias string, operator *workspace.Operator) (*workspace.Workspace, error) {
-	return scopeForService(i.repos.Workspace.FindByAlias(ctx, alias))(operator)
+	ws, err := i.repos.Workspace.FindByAlias(ctx, alias)
+	return scopeToClientSubject(operator, ws, err)
 }
 
 func (i *Workspace) FindByUser(ctx context.Context, id workspace.UserID, operator *workspace.Operator) (workspace.List, error) {
+	if err := refuseAnotherUser(operator, id); err != nil {
+		return nil, err
+	}
 	res, err := i.repos.Workspace.FindByUser(ctx, id)
 	return filterWorkspaces(res, operator, err, true, true)
 }
 
 func (i *Workspace) FetchByUserWithPagination(ctx context.Context, userID workspace.UserID, input interfaces.FetchByUserWithPaginationParam, operator *workspace.Operator) (interfaces.FetchByUserWithPaginationResult, error) {
 	p := pagination.ToPagination(input.Page, input.Size)
-	if operator.IsService() {
+	if operator.ViaClient() {
 		ws, err := i.FindByUser(ctx, userID, operator)
 		if err != nil {
 			return interfaces.FetchByUserWithPaginationResult{}, err
@@ -122,25 +129,34 @@ func pageBounds(offset, limit int64, n int) (int, int) {
 	return int(offset), int(min(offset+limit, int64(n)))
 }
 
-// scopeForService hides a workspace from a service caller that is not a member
-// of it (ADR-0002 decision 4). Lookups by users stay unscoped.
-func scopeForService(ws *workspace.Workspace, err error) func(*workspace.Operator) (*workspace.Workspace, error) {
-	return func(operator *workspace.Operator) (*workspace.Workspace, error) {
-		if err != nil || !operator.IsService() {
-			return ws, err
-		}
-		if ws == nil || !operator.IsReadableWorkspace(ws.ID()) {
-			return nil, rerror.ErrNotFound
-		}
-		return ws, nil
+// refuseAnotherUser keeps a client acting for a user to that user's own
+// workspace list (ADR-0002 decision 6). A user's own token may still ask about
+// another user, filtered to the workspaces it can read.
+func refuseAnotherUser(operator *workspace.Operator, uid workspace.UserID) error {
+	if operator.ViaClient() && operator.User != nil && *operator.User != uid {
+		return interfaces.ErrPermissionDenied
 	}
+	return nil
+}
+
+// scopeToClientSubject hides a workspace from a client call whose subject is
+// not a member of it (ADR-0002 decisions 5 and 6). A user's own lookups stay
+// unscoped.
+func scopeToClientSubject(operator *workspace.Operator, ws *workspace.Workspace, err error) (*workspace.Workspace, error) {
+	if err != nil || !operator.ViaClient() {
+		return ws, err
+	}
+	if ws == nil || !operator.IsReadableWorkspace(ws.ID()) {
+		return nil, rerror.ErrNotFound
+	}
+	return ws, nil
 }
 
 // FindAll lists workspaces across all tenants, unfiltered by any operator's
 // readable-workspace set. Restricted to the owner role (see
 // checkMaintainerPermission) since it exposes every workspace across every tenant.
 func (i *Workspace) FindAll(ctx context.Context, input interfaces.FindAllWorkspacesParam, operator *workspace.Operator) (interfaces.FindAllWorkspacesResult, error) {
-	if operator == nil || operator.User == nil {
+	if !operator.IsUserSelf() {
 		return interfaces.FindAllWorkspacesResult{}, interfaces.ErrInvalidOperator
 	}
 	if err := i.checkMaintainerPermission(ctx, operator, rbac.ActionManage); err != nil {
@@ -163,7 +179,7 @@ func (i *Workspace) FindAll(ctx context.Context, input interfaces.FindAllWorkspa
 }
 
 func (i *Workspace) Create(ctx context.Context, alias, name, description string, firstUser workspace.UserID, skipOwnerMembership bool, operator *workspace.Operator) (_ *workspace.Workspace, err error) {
-	if operator.User == nil {
+	if !operator.IsUserSelf() {
 		return nil, interfaces.ErrInvalidOperator
 	}
 
@@ -230,7 +246,7 @@ func (i *Workspace) Create(ctx context.Context, alias, name, description string,
 }
 
 func (i *Workspace) Update(ctx context.Context, param interfaces.UpdateWorkspaceParam, operator *workspace.Operator) (_ *workspace.Workspace, err error) {
-	if !actsAsUserOrService(operator) {
+	if !operator.IsUserSelfOrService() {
 		return nil, interfaces.ErrInvalidOperator
 	}
 
@@ -319,7 +335,7 @@ func (i *Workspace) Update(ctx context.Context, param interfaces.UpdateWorkspace
 }
 
 func (i *Workspace) AddUserMember(ctx context.Context, workspaceID workspace.ID, users map[workspace.UserID]role.RoleType, operator *workspace.Operator) (_ *workspace.Workspace, err error) {
-	if operator.User == nil {
+	if !operator.IsUserSelf() {
 		return nil, interfaces.ErrInvalidOperator
 	}
 
@@ -380,7 +396,7 @@ func (i *Workspace) AddUserMember(ctx context.Context, workspaceID workspace.ID,
 }
 
 func (i *Workspace) AddIntegrationMember(ctx context.Context, wId workspace.ID, iId workspace.IntegrationID, role role.RoleType, operator *workspace.Operator) (_ *workspace.Workspace, err error) {
-	if operator.User == nil {
+	if !operator.IsUserSelf() {
 		return nil, interfaces.ErrInvalidOperator
 	}
 
@@ -410,7 +426,7 @@ func (i *Workspace) RemoveUserMember(ctx context.Context, id workspace.ID, u wor
 }
 
 func (i *Workspace) RemoveMultipleUserMembers(ctx context.Context, id workspace.ID, userIds workspace.UserIDList, operator *workspace.Operator) (_ *workspace.Workspace, err error) {
-	if !actsAsUserOrService(operator) {
+	if !operator.IsUserSelfOrService() {
 		return nil, interfaces.ErrInvalidOperator
 	}
 
@@ -461,7 +477,7 @@ func (i *Workspace) RemoveMultipleUserMembers(ctx context.Context, id workspace.
 }
 
 func (i *Workspace) RemoveIntegration(ctx context.Context, wId workspace.ID, iId workspace.IntegrationID, operator *workspace.Operator) (_ *workspace.Workspace, err error) {
-	if !actsAsUserOrService(operator) {
+	if !operator.IsUserSelfOrService() {
 		return nil, interfaces.ErrInvalidOperator
 	}
 
@@ -487,7 +503,7 @@ func (i *Workspace) RemoveIntegration(ctx context.Context, wId workspace.ID, iId
 }
 
 func (i *Workspace) RemoveIntegrations(ctx context.Context, wId workspace.ID, iIDs workspace.IntegrationIDList, operator *workspace.Operator) (_ *workspace.Workspace, err error) {
-	if !actsAsUserOrService(operator) {
+	if !operator.IsUserSelfOrService() {
 		return nil, interfaces.ErrInvalidOperator
 	}
 
@@ -513,7 +529,7 @@ func (i *Workspace) RemoveIntegrations(ctx context.Context, wId workspace.ID, iI
 }
 
 func (i *Workspace) UpdateUserMember(ctx context.Context, id workspace.ID, u workspace.UserID, newRole role.RoleType, operator *workspace.Operator) (_ *workspace.Workspace, err error) {
-	if !actsAsUserOrService(operator) {
+	if !operator.IsUserSelfOrService() {
 		return nil, interfaces.ErrInvalidOperator
 	}
 
@@ -557,7 +573,7 @@ func (i *Workspace) UpdateUserMember(ctx context.Context, id workspace.ID, u wor
 
 // UpdateUserMemberViaService sets a member's role without the self-promotion guard applied in UpdateUserMember
 func (i *Workspace) UpdateUserMemberViaService(ctx context.Context, id workspace.ID, u workspace.UserID, newRole role.RoleType, operator *workspace.Operator) (_ *workspace.Workspace, err error) {
-	if !actsAsUserOrService(operator) {
+	if !operator.IsUserSelfOrService() {
 		return nil, interfaces.ErrInvalidOperator
 	}
 	if newRole == role.RoleOwner {
@@ -597,7 +613,7 @@ func (i *Workspace) UpdateUserMemberViaService(ctx context.Context, id workspace
 }
 
 func (i *Workspace) UpdateIntegration(ctx context.Context, wId workspace.ID, iId workspace.IntegrationID, role role.RoleType, operator *workspace.Operator) (_ *workspace.Workspace, err error) {
-	if !actsAsUserOrService(operator) {
+	if !operator.IsUserSelfOrService() {
 		return nil, interfaces.ErrInvalidOperator
 	}
 
@@ -623,7 +639,7 @@ func (i *Workspace) UpdateIntegration(ctx context.Context, wId workspace.ID, iId
 }
 
 func (i *Workspace) Remove(ctx context.Context, id workspace.ID, operator *workspace.Operator) error {
-	if !actsAsUserOrService(operator) {
+	if !operator.IsUserSelfOrService() {
 		return interfaces.ErrInvalidOperator
 	}
 
@@ -660,7 +676,7 @@ func (i *Workspace) Remove(ctx context.Context, id workspace.ID, operator *works
 // Remove, so a trusted global-owner account (e.g. LINKS-Veda) can deactivate
 // workspaces it manages without being a member.
 func (i *Workspace) Deactivate(ctx context.Context, id workspace.ID, operator *workspace.Operator) (*workspace.Workspace, error) {
-	if !actsAsUserOrService(operator) {
+	if !operator.IsUserSelfOrService() {
 		return nil, interfaces.ErrInvalidOperator
 	}
 
@@ -691,7 +707,7 @@ func (i *Workspace) Deactivate(ctx context.Context, id workspace.ID, operator *w
 // Restore reverses Deactivate (clears deleted_at). Same permission model as
 // Deactivate.
 func (i *Workspace) Restore(ctx context.Context, id workspace.ID, operator *workspace.Operator) (*workspace.Workspace, error) {
-	if !actsAsUserOrService(operator) {
+	if !operator.IsUserSelfOrService() {
 		return nil, interfaces.ErrInvalidOperator
 	}
 
@@ -720,7 +736,7 @@ func (i *Workspace) Restore(ctx context.Context, id workspace.ID, operator *work
 }
 
 func (i *Workspace) TransferOwnership(ctx context.Context, workspaceID workspace.ID, newOwnerID workspace.UserID, operator *workspace.Operator) (*workspace.Workspace, error) {
-	if operator.User == nil {
+	if !operator.IsUserSelf() {
 		return nil, interfaces.ErrInvalidOperator
 	}
 
@@ -999,9 +1015,132 @@ func (i *Workspace) checkMaintainerPermission(ctx context.Context, operator *wor
 	return interfaces.ErrPermissionDenied
 }
 
-// actsAsUserOrService admits a user operator or a service caller (ADR-0002
-// decision 5). Operations that record a user, such as a creator or an inviter,
-// still require a user.
-func actsAsUserOrService(operator *workspace.Operator) bool {
-	return operator != nil && (operator.User != nil || operator.IsService())
+func actingIntegration(operator *workspace.Operator) (workspace.IntegrationID, bool) {
+	if !operator.IsService() || !operator.ViaClient() {
+		return workspace.IntegrationID{}, false
+	}
+	return *operator.Integration, true
+}
+
+// integrationWorkspaces reads the memberships from the repository, sorted by
+// ID, because the operator's role lists were computed when the request started
+// and can be stale.
+func (i *Workspace) integrationWorkspaces(ctx context.Context, iid workspace.IntegrationID) (workspace.List, error) {
+	ws, err := i.repos.Workspace.FindByIntegration(ctx, iid)
+	if errors.Is(err, rerror.ErrNotFound) {
+		return nil, nil
+	}
+	if err != nil {
+		return nil, err
+	}
+	ws = slices.Clone(ws)
+	slices.SortFunc(ws, func(a, b *workspace.Workspace) int { return a.ID().Compare(b.ID()) })
+	return ws, nil
+}
+
+func (i *Workspace) ActingIntegrationMemberships(ctx context.Context, operator *workspace.Operator) ([]interfaces.IntegrationMembership, error) {
+	iid, ok := actingIntegration(operator)
+	if !ok {
+		return nil, interfaces.ErrInvalidOperator
+	}
+	ws, err := i.integrationWorkspaces(ctx, iid)
+	if err != nil {
+		return nil, err
+	}
+	res := make([]interfaces.IntegrationMembership, 0, len(ws))
+	for _, w := range ws {
+		m := w.Members().Integration(iid)
+		if m == nil {
+			continue
+		}
+		res = append(res, interfaces.IntegrationMembership{Workspace: w, Role: m.Role})
+	}
+	return res, nil
+}
+
+func (i *Workspace) LeaveAllAsIntegration(ctx context.Context, operator *workspace.Operator) (interfaces.LeaveAllResult, error) {
+	iid, ok := actingIntegration(operator)
+	if !ok {
+		return interfaces.LeaveAllResult{}, interfaces.ErrInvalidOperator
+	}
+	ws, err := i.integrationWorkspaces(ctx, iid)
+	if err != nil {
+		return interfaces.LeaveAllResult{}, err
+	}
+
+	res := interfaces.LeaveAllResult{Removed: id.WorkspaceIDList{}, Failed: id.WorkspaceIDList{}}
+	for n, w := range ws {
+		if err := ctx.Err(); err != nil {
+			rest := ws[n:].IDs()
+			applog.Warn(ctx, "integration stopped leaving its workspaces: request cancelled", applog.IntegrationID(iid), applog.WorkspaceIDs(rest), applog.Err(err))
+			res.Failed = append(res.Failed, rest...)
+			break
+		}
+		removed, err := i.leaveAndConfirm(ctx, w.ID(), iid, operator)
+		switch {
+		case err != nil:
+			applog.Error(ctx, "integration failed to leave a workspace", applog.IntegrationID(iid), applog.WorkspaceID(w.ID()), applog.Err(err))
+			res.Failed = append(res.Failed, w.ID())
+		case removed:
+			applog.Info(ctx, "integration left a workspace", applog.IntegrationID(iid), applog.WorkspaceID(w.ID()))
+			res.Removed = append(res.Removed, w.ID())
+		}
+	}
+	applog.Info(ctx, "integration left its workspaces", applog.IntegrationID(iid), applog.RemovedCount(len(res.Removed)), applog.FailedCount(len(res.Failed)))
+	return res, nil
+}
+
+const leaveAttempts = 3
+
+var errStillMember = errors.New("integration is still a member after leaving")
+
+// leaveAndConfirm reads the workspace again after each leave. On MongoDB
+// without transactions, a concurrent Save of the same workspace built from an
+// earlier read can put the integration back. A Save that lands after the
+// confirming read is not caught.
+func (i *Workspace) leaveAndConfirm(ctx context.Context, wid workspace.ID, iid workspace.IntegrationID, operator *workspace.Operator) (bool, error) {
+	left := false
+	for range leaveAttempts {
+		removed, err := i.leaveAsIntegration(ctx, wid, iid, operator)
+		if err != nil {
+			return false, err
+		}
+		left = left || removed
+		if !left {
+			return false, nil
+		}
+		ws, err := i.repos.Workspace.FindByID(ctx, wid)
+		if errors.Is(err, rerror.ErrNotFound) {
+			return true, nil
+		}
+		if err != nil {
+			return false, err
+		}
+		if !ws.Members().HasIntegration(iid) {
+			return true, nil
+		}
+	}
+	return false, errStillMember
+}
+
+// leaveAsIntegration goes through Save rather than a bulk update across
+// workspaces: on MongoDB, Save recomputes the stored members hash, which a
+// bulk $unset of the integration would leave stale.
+func (i *Workspace) leaveAsIntegration(ctx context.Context, wid workspace.ID, iid workspace.IntegrationID, operator *workspace.Operator) (bool, error) {
+	return Run1(ctx, operator, i.repos, Usecase().Transaction(), func(ctx context.Context) (bool, error) {
+		ws, err := i.repos.Workspace.FindByIDForUpdate(ctx, wid)
+		if errors.Is(err, rerror.ErrNotFound) {
+			return false, nil
+		}
+		if err != nil {
+			return false, err
+		}
+		if !ws.Members().HasIntegration(iid) {
+			return false, nil
+		}
+		if err := ws.Members().DeleteIntegration(iid); err != nil {
+			return false, err
+		}
+		return true, i.repos.Workspace.Save(ctx, ws)
+	})
 }

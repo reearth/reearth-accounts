@@ -21,8 +21,10 @@ func (c *CerbosAdapter) CheckPermissions(ctx context.Context, principal *cerbos.
 		batch.Add(resource, actions...)
 	}
 
+	// A client call's token is the client's, never the user's, so it is not
+	// forwarded as the principal's JWT.
 	authInfo := adapter.GetAuthInfo(ctx)
-	if authInfo != nil {
+	if authInfo != nil && adapter.ClientCallOf(ctx) == nil {
 		return c.client.With(cerbos.AuxDataJWT(authInfo.Token, "jwt")).CheckResources(ctx, principal, batch)
 	}
 

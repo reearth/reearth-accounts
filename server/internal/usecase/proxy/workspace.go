@@ -218,3 +218,11 @@ func (w *Workspace) TransferOwnership(ctx context.Context, id workspace.ID, newO
 	}
 	return ToWorkspace(res.TransferWorkspaceOwnership.Workspace.FragmentWorkspace)
 }
+
+func (w *Workspace) ActingIntegrationMemberships(ctx context.Context, op *workspace.Operator) ([]interfaces.IntegrationMembership, error) {
+	return nil, workspace.ErrNotImplemented
+}
+
+func (w *Workspace) LeaveAllAsIntegration(ctx context.Context, op *workspace.Operator) (interfaces.LeaveAllResult, error) {
+	return interfaces.LeaveAllResult{}, workspace.ErrNotImplemented
+}

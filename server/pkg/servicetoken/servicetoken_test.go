@@ -179,6 +179,49 @@ func TestTransport_AddsServiceTokenOnlyWithoutUser(t *testing.T) {
 	assert.Equal(t, []string{"Bearer token-1", "Bearer user-token"}, seen)
 }
 
+func TestTransport_SendsTheSubjectFromTheContext(t *testing.T) {
+	s, _ := newSource(t)
+	var seen [][]string
+	api := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		seen = append(seen, r.Header.Values(ActAsHeader))
+	}))
+	defer api.Close()
+	c := &http.Client{Transport: &Transport{Source: s}}
+	do := func(ctx context.Context, header string) *http.Request {
+		req, _ := http.NewRequestWithContext(ctx, http.MethodGet, api.URL, nil)
+		if header != "" {
+			req.Header.Set(ActAsHeader, header)
+		}
+		_, err := c.Do(req)
+		require.NoError(t, err)
+		return req
+	}
+	bg := context.Background()
+
+	do(bg, "")
+	orig := do(WithActAs(bg, IntegrationSubject("i1")), "")
+	do(WithActAs(bg, ""), "integration:preset")
+	do(WithActAs(bg, IntegrationSubject("i2")), "integration:preset")
+
+	assert.Equal(t, [][]string{nil, {"integration:i1"}, {"integration:preset"}, {"integration:i2"}}, seen)
+	assert.Empty(t, orig.Header.Values(ActAsHeader), "the caller's request is not mutated")
+	assert.Equal(t, "integration:i1", IntegrationSubject("i1"))
+}
+
+func TestTransport_SendsNoSubjectWithAUserToken(t *testing.T) {
+	s, _ := newSource(t)
+	var seen []string
+	api := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		seen = append(seen, r.Header.Get(ActAsHeader))
+	}))
+	defer api.Close()
+	req, _ := http.NewRequestWithContext(WithActAs(context.Background(), "integration:i1"), http.MethodGet, api.URL, nil)
+	req.Header.Set("Authorization", "Bearer user-token")
+	_, err := (&http.Client{Transport: &Transport{Source: s}}).Do(req)
+	require.NoError(t, err)
+	assert.Equal(t, []string{""}, seen)
+}
+
 func TestSource_WaiterHonoursItsOwnContext(t *testing.T) {
 	key, _ := rsa.GenerateKey(rand.Reader, 2048)
 	release := make(chan struct{})

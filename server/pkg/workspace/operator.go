@@ -21,22 +21,25 @@ type Operator struct {
 	DefaultPolicy          *PolicyID
 }
 
-// IsService reports whether the operator is a service caller with no user.
 func (o *Operator) IsService() bool {
 	return o != nil && o.User == nil && o.Integration != nil
 }
 
-// ViaClient reports whether a registered client token made the call.
 func (o *Operator) ViaClient() bool {
 	return o != nil && o.Client != nil
 }
 
-// IsUserSelf reports whether a user is calling with their own token.
 func (o *Operator) IsUserSelf() bool {
 	return o != nil && o.User != nil && o.Client == nil
 }
 
-// Subject is derived from User and Integration rather than stored twice.
+// IsUserSelfOrService reports whether the operator may change anything: a
+// user's own token or a service caller. A client acting for a user only reads
+// (ADR-0002 decision 6), so it is neither.
+func (o *Operator) IsUserSelfOrService() bool {
+	return o.IsUserSelf() || o.IsService()
+}
+
 func (o *Operator) Subject() Subject {
 	switch {
 	case o == nil:

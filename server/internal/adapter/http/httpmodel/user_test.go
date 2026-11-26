@@ -95,9 +95,9 @@ func TestNewUserResponse_Email(t *testing.T) {
 		viewer EmailViewer
 		want   string
 	}{
-		{"owner sees own email", ViewerOf(alice), "alice@example.com"},
-		{"other user sees none", ViewerOf(bob), ""},
-		{"anonymous sees none", ViewerOf(nil), ""},
+		{"owner sees own email", ViewerOf(alice, nil), "alice@example.com"},
+		{"other user sees none", ViewerOf(bob, nil), ""},
+		{"anonymous sees none", ViewerOf(nil, nil), ""},
 		{"zero viewer sees none", EmailViewer{}, ""},
 		{"unrestricted route", UnrestrictedViewer(), "alice@example.com"},
 	}

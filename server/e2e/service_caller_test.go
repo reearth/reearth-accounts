@@ -99,6 +99,11 @@ func seedServiceCallers(ctx context.Context, r *repo.Container) error {
 
 func startServiceCallerServer(t *testing.T) (*httpexpect.Expect, *svcIdP) {
 	t.Helper()
+	return startServiceCallerServerWith(t, seedServiceCallers)
+}
+
+func startServiceCallerServerWith(t *testing.T, seed Seeder) (*httpexpect.Expect, *svcIdP) {
+	t.Helper()
 	idp := newSvcIdP(t)
 	jwks := idp.srv.URL + "/jwks.json"
 	cfg := &app.Config{Auth: app.AuthConfigs{{ISS: idp.issuer(), AUD: []string{svcAudience}, JWKSURI: &jwks}}}
@@ -109,7 +114,7 @@ func startServiceCallerServer(t *testing.T) (*httpexpect.Expect, *svcIdP) {
 	})
 	require.NoError(t, err)
 	require.NoError(t, cfg.ServiceCallers.Decode(string(callers)))
-	e, _ := StartServerNoDebug(t, cfg, false, seedServiceCallers)
+	e, _ := StartServerNoDebug(t, cfg, false, seed)
 	return e, idp
 }
 
@@ -313,8 +318,7 @@ func TestServiceCaller_RefusedRequests(t *testing.T) {
 		"unknown kind":                             actingFor(flowTok, "team:"+svcIntegration.String()),
 		"kind not in act_as":                       actingFor(idp.clientToken(t, "svc-anon"), asInt),
 		"integration for a user-only client":       actingFor(idp.clientToken(t, "svc-users"), asInt),
-		"user subject":                             actingFor(flowTok, asUser),
-		"user subject for a user-only client":      actingFor(idp.clientToken(t, "svc-users"), asUser),
+		"user subject for a client without user":   actingFor(idp.clientToken(t, "svc-anon"), asUser),
 		"unregistered client":                      actingFor(idp.clientToken(t, "svc-unknown"), asInt),
 		"unregistered client with no header":       actingFor(idp.clientToken(t, "svc-unknown")),
 		"client token from an unconfigured issuer": actingFor(other.token(t, jwt.MapClaims{"iss": other.issuer(), "sub": "svc-flow@clients", "azp": "svc-flow", "gty": "client-credentials"}), asInt),
@@ -422,4 +426,136 @@ func TestServiceCaller_LogsWhoCalled(t *testing.T) {
 	assert.NotContains(t, out, tok)
 	assert.NotContains(t, out, "act-as-probe-value")
 	assert.NotContains(t, out, "svc-owner@e2e.com")
+}
+
+func TestServiceCaller_EmptyRegistryRefusesClientTokens(t *testing.T) {
+	idp := newSvcIdP(t)
+	jwks := idp.srv.URL + "/jwks.json"
+	e, _ := StartServerNoDebug(t, &app.Config{Auth: app.AuthConfigs{{ISS: idp.issuer(), AUD: []string{svcAudience}, JWKSURI: &jwks}}}, false, seedServiceCallers)
+	logs := captureLogs(t)
+	tok := idp.clientToken(t, "svc-flow")
+
+	for name, h := range map[string]map[string]string{
+		"without the header": actingFor(tok),
+		"with the header":    actingFor(tok, "integration:"+svcIntegration.String()),
+	} {
+		t.Run(name+" on REST", func(t *testing.T) {
+			optionalREST(e, h).Status(http.StatusUnauthorized)
+		})
+		t.Run(name+" on GraphQL", func(t *testing.T) {
+			publicGraphQL(e, h).Status(http.StatusUnauthorized)
+		})
+	}
+	assert.Equal(t, 4, strings.Count(logs.String(), `"reason": "unregistered_client"`), logs.String())
+	assert.NotContains(t, logs.String(), "act_as_without_client_token")
+
+	userTok := actingFor(idp.token(t, jwt.MapClaims{"sub": "auth0|svc-owner"}))
+	e.GET("/api/users/me").WithHeaders(userTok).Expect().Status(http.StatusOK)
+	publicGraphQL(e, userTok).Status(http.StatusOK)
+}
+
+func TestServiceCaller_RequestLogNamesTheClient(t *testing.T) {
+	e, idp := startServiceCallerServer(t)
+	logs := captureLogs(t)
+	flow := idp.clientToken(t, "svc-flow")
+	unknown := idp.clientToken(t, "svc-unknown")
+	asInt := "integration:" + svcIntegration.String()
+	findByName := GraphQLRequest{Query: `query($n: String!) { findByName(name: $n) { id } }`, Variables: map[string]any{"n": "ws-" + svcWsOwned.String()}}
+
+	named := []string{`"caller_client_id": "svc-flow"`, `"caller_name": "flow-app"`}
+	for _, tc := range []struct {
+		name   string
+		do     func()
+		line   []string
+		reason string
+	}{
+		{
+			name: "integration call on an open REST route",
+			do: func() {
+				e.GET("/api/workspaces/" + svcWsOwned.String()).WithHeaders(actingFor(flow, asInt)).Expect().Status(http.StatusOK)
+			},
+			line: append(named, `"acting_for": "`+asInt+`"`),
+		},
+		{
+			name: "anonymous call on an open REST route",
+			do:   func() { e.GET("/api/auth/config").WithHeaders(actingFor(flow)).Expect().Status(http.StatusOK) },
+			line: append(named, `"acting_for": "none"`),
+		},
+		{
+			name: "anonymous call on a public GraphQL operation",
+			do:   func() { publicGraphQL(e, actingFor(flow)).Status(http.StatusOK) },
+			line: append(named, `"acting_for": "none"`),
+		},
+		{
+			name:   "integration call refused by the REST gate",
+			do:     func() { optionalREST(e, actingFor(flow, asInt)).Status(http.StatusForbidden) },
+			line:   append(named, `"acting_for": "`+asInt+`"`),
+			reason: "not_open_to_client",
+		},
+		{
+			name: "integration call refused by the GraphQL gate",
+			do: func() {
+				e.POST("/api/graphql").WithHeaders(actingFor(flow, asInt)).WithJSON(GraphQLRequest{Query: `{ me { id } }`}).Expect().Status(http.StatusForbidden)
+			},
+			line:   append(named, `"acting_for": "`+asInt+`"`),
+			reason: "not_open_to_client",
+		},
+		{
+			name: "anonymous call refused by the REST gate",
+			do: func() {
+				e.GET("/api/workspaces/" + svcWsOwned.String()).WithHeaders(actingFor(flow)).Expect().Status(http.StatusForbidden)
+			},
+			line:   append(named, `"acting_for": "none"`),
+			reason: "not_open_to_client",
+		},
+		{
+			name: "anonymous call refused on GraphQL",
+			do: func() {
+				e.POST("/api/graphql").WithHeaders(actingFor(flow)).WithJSON(findByName).Expect().Status(http.StatusForbidden)
+			},
+			line:   append(named, `"acting_for": "none"`),
+			reason: "not_open_to_client",
+		},
+		{
+			name:   "refused call on REST",
+			do:     func() { optionalREST(e, actingFor(unknown, asInt)).Status(http.StatusUnauthorized) },
+			line:   []string{`"caller_client_id": "svc-unknown"`},
+			reason: "unregistered_client",
+		},
+		{
+			name:   "refused call on GraphQL",
+			do:     func() { publicGraphQL(e, actingFor(unknown, asInt)).Status(http.StatusUnauthorized) },
+			line:   []string{`"caller_client_id": "svc-unknown"`},
+			reason: "unregistered_client",
+		},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			before := len(logs.String())
+			tc.do()
+			out := logs.String()[before:]
+			entries := requestEntries(out)
+			require.Len(t, entries, 1, out)
+			for _, w := range tc.line {
+				assert.Contains(t, entries[0], w)
+			}
+			var verdicts []string
+			for _, l := range strings.Split(out, "\n") {
+				if strings.Contains(l, "\tauth: client call\t") || strings.Contains(l, "\tauth: rejected client call\t") {
+					verdicts = append(verdicts, l)
+				}
+			}
+			require.Len(t, verdicts, 1, out)
+			for _, w := range tc.line {
+				assert.Contains(t, verdicts[0], w)
+			}
+			if tc.reason == "" {
+				assert.Contains(t, verdicts[0], "\tauth: client call\t")
+			} else {
+				assert.Contains(t, verdicts[0], "\tauth: rejected client call\t")
+				assert.Contains(t, verdicts[0], `"reason": "`+tc.reason+`"`)
+			}
+			assert.NotContains(t, out, flow)
+			assert.NotContains(t, out, unknown)
+		})
+	}
 }

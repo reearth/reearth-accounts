@@ -106,7 +106,7 @@ func (i *User) FetchByIDsWithPagination(ctx context.Context, ids user.IDList, al
 // FindAll lists users across all tenants. Restricted to the owner
 // role (see checkOwnerPermission) since it exposes every user across every tenant.
 func (i *User) FindAll(ctx context.Context, param interfaces.FindAllUsersParam) (interfaces.FindAllUsersResult, error) {
-	if param.Operator == nil || param.Operator.User == nil {
+	if !param.Operator.IsUserSelf() {
 		return interfaces.FindAllUsersResult{}, interfaces.ErrInvalidOperator
 	}
 	if err := i.checkMaintainerPermission(ctx, param.Operator, rbac.ActionManage); err != nil {
@@ -553,7 +553,7 @@ func (i *User) DeleteMe(ctx context.Context, userID user.ID, operator *workspace
 // Deactivate soft-deletes a user (sets deleted_at). Same permission model as
 // workspace's Deactivate: Cerbos, falling back to a maintainer-role check.
 func (i *User) Deactivate(ctx context.Context, id user.ID, operator *workspace.Operator) (*user.User, error) {
-	if operator.User == nil {
+	if !operator.IsUserSelf() {
 		return nil, interfaces.ErrInvalidOperator
 	}
 
@@ -580,7 +580,7 @@ func (i *User) Deactivate(ctx context.Context, id user.ID, operator *workspace.O
 // Restore reverses Deactivate (clears deleted_at). Same permission model as
 // Deactivate.
 func (i *User) Restore(ctx context.Context, id user.ID, operator *workspace.Operator) (*user.User, error) {
-	if operator.User == nil {
+	if !operator.IsUserSelf() {
 		return nil, interfaces.ErrInvalidOperator
 	}
 
@@ -896,7 +896,7 @@ func (q *UserQuery) FetchByNameOrAlias(ctx context.Context, nameOrAlias string) 
 // The caller must hold the maintainer role (see checkMaintainerPermission).
 // The personal workspace is renamed in sync when its name still matches the old user name.
 func (i *User) UpdateUserBySub(ctx context.Context, sub string, name *string, operator *workspace.Operator) error {
-	if operator == nil || operator.User == nil {
+	if !operator.IsUserSelf() {
 		return interfaces.ErrInvalidOperator
 	}
 	if err := i.checkMaintainerPermission(ctx, operator, rbac.ActionManage); err != nil {
@@ -940,7 +940,7 @@ func (i *User) UpdateUserBySub(ctx context.Context, sub string, name *string, op
 // The caller must hold the maintainer role (see checkMaintainerPermission). An empty
 // roleNames slice clears all platform roles.
 func (i *User) SetPlatformRolesBySub(ctx context.Context, sub string, roleNames []string, operator *workspace.Operator) error {
-	if operator == nil || operator.User == nil {
+	if !operator.IsUserSelf() {
 		return interfaces.ErrInvalidOperator
 	}
 	if err := i.checkMaintainerPermission(ctx, operator, rbac.ActionManage); err != nil {

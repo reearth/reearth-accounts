@@ -9,6 +9,7 @@ import (
 	"github.com/reearth/reearth-accounts/server/pkg/dregexp"
 	"github.com/reearth/reearth-accounts/server/pkg/permittable"
 	"github.com/reearth/reearth-accounts/server/pkg/user"
+	"github.com/reearth/reearth-accounts/server/pkg/workspace"
 	"github.com/reearth/reearthx/util"
 )
 
@@ -120,17 +121,21 @@ func metadataResponse(u *user.User) *UserMetadataResponse {
 // EmailViewer decides whose email a user response carries. GraphQL shows a
 // user's email only to that user (userResolver.Email), and REST follows it.
 type EmailViewer struct {
-	all  bool
-	self *user.ID
+	all                  bool
+	self                 *user.ID
+	billingEmailAsMember bool
 }
 
-// ViewerOf shows the caller's own email only. A nil caller sees none.
-func ViewerOf(caller *user.User) EmailViewer {
+// ViewerOf shows the caller's own email only. A nil caller sees none. A
+// client acting for the caller sees the caller's own fields but nothing the
+// caller sees only as a workspace member, such as a billing email (ADR-0002
+// decision 6).
+func ViewerOf(caller *user.User, op *workspace.Operator) EmailViewer {
 	if caller == nil {
 		return EmailViewer{}
 	}
 	uid := caller.ID()
-	return EmailViewer{self: &uid}
+	return EmailViewer{self: &uid, billingEmailAsMember: op.IsUserSelf()}
 }
 
 // UnrestrictedViewer shows every email. Use it only where the route already

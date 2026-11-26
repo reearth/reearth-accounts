@@ -51,6 +51,11 @@ type DirectiveRoot struct {
 }
 
 type ComplexityRoot struct {
+	ActingIntegration struct {
+		ID         func(childComplexity int) int
+		Workspaces func(childComplexity int) int
+	}
+
 	AddUsersToWorkspacePayload struct {
 		Workspace func(childComplexity int) int
 	}
@@ -80,6 +85,16 @@ type ComplexityRoot struct {
 
 	DeleteWorkspacePayload struct {
 		WorkspaceID func(childComplexity int) int
+	}
+
+	IntegrationWorkspace struct {
+		Role      func(childComplexity int) int
+		Workspace func(childComplexity int) int
+	}
+
+	LeaveAllWorkspacesPayload struct {
+		FailedWorkspaceIds  func(childComplexity int) int
+		RemovedWorkspaceIds func(childComplexity int) int
 	}
 
 	MFAEnrollResult struct {
@@ -117,6 +132,7 @@ type ComplexityRoot struct {
 		DisableMfa                       func(childComplexity int) int
 		EnableMfa                        func(childComplexity int) int
 		FindOrCreate                     func(childComplexity int, input gqlmodel.FindOrCreateInput) int
+		LeaveAllWorkspaces               func(childComplexity int) int
 		Logout                           func(childComplexity int) int
 		PasswordReset                    func(childComplexity int, input gqlmodel.PasswordResetInput) int
 		RegenerateMFARecoveryCode        func(childComplexity int) int
@@ -150,6 +166,7 @@ type ComplexityRoot struct {
 	}
 
 	Query struct {
+		ActingIntegration            func(childComplexity int) int
 		AuthConfig                   func(childComplexity int) int
 		CheckPermission              func(childComplexity int, input gqlmodel.CheckPermissionInput) int
 		FindByAlias                  func(childComplexity int, alias string) int
@@ -298,6 +315,7 @@ type MutationResolver interface {
 	UpdateUserOfWorkspace(ctx context.Context, input gqlmodel.UpdateUserOfWorkspaceInput) (*gqlmodel.UpdateMemberOfWorkspacePayload, error)
 	UpdateIntegrationOfWorkspace(ctx context.Context, input gqlmodel.UpdateIntegrationOfWorkspaceInput) (*gqlmodel.UpdateMemberOfWorkspacePayload, error)
 	TransferWorkspaceOwnership(ctx context.Context, input gqlmodel.TransferWorkspaceOwnershipInput) (*gqlmodel.UpdateMemberOfWorkspacePayload, error)
+	LeaveAllWorkspaces(ctx context.Context) (*gqlmodel.LeaveAllWorkspacesPayload, error)
 }
 type QueryResolver interface {
 	Node(ctx context.Context, id gqlmodel.ID, typeArg gqlmodel.NodeType) (gqlmodel.Node, error)
@@ -320,6 +338,7 @@ type QueryResolver interface {
 	FindByUser(ctx context.Context, userID gqlmodel.ID) ([]*gqlmodel.Workspace, error)
 	FindByUserWithPagination(ctx context.Context, userID gqlmodel.ID, pagination gqlmodel.Pagination) (*gqlmodel.WorkspacesWithPagination, error)
 	PublicWorkspace(ctx context.Context, id *gqlmodel.ID, alias *string) (*gqlmodel.PublicWorkspace, error)
+	ActingIntegration(ctx context.Context) (*gqlmodel.ActingIntegration, error)
 }
 type UserMetadataResolver interface {
 	PhotoURL(ctx context.Context, obj *gqlmodel.UserMetadata) (string, error)
@@ -346,6 +365,19 @@ func (e *executableSchema) Complexity(ctx context.Context, typeName, field strin
 	ec := executionContext{nil, e, 0, 0, nil}
 	_ = ec
 	switch typeName + "." + field {
+
+	case "ActingIntegration.id":
+		if e.complexity.ActingIntegration.ID == nil {
+			break
+		}
+
+		return e.complexity.ActingIntegration.ID(childComplexity), true
+	case "ActingIntegration.workspaces":
+		if e.complexity.ActingIntegration.Workspaces == nil {
+			break
+		}
+
+		return e.complexity.ActingIntegration.Workspaces(childComplexity), true
 
 	case "AddUsersToWorkspacePayload.workspace":
 		if e.complexity.AddUsersToWorkspacePayload.Workspace == nil {
@@ -430,6 +462,32 @@ func (e *executableSchema) Complexity(ctx context.Context, typeName, field strin
 		}
 
 		return e.complexity.DeleteWorkspacePayload.WorkspaceID(childComplexity), true
+
+	case "IntegrationWorkspace.role":
+		if e.complexity.IntegrationWorkspace.Role == nil {
+			break
+		}
+
+		return e.complexity.IntegrationWorkspace.Role(childComplexity), true
+	case "IntegrationWorkspace.workspace":
+		if e.complexity.IntegrationWorkspace.Workspace == nil {
+			break
+		}
+
+		return e.complexity.IntegrationWorkspace.Workspace(childComplexity), true
+
+	case "LeaveAllWorkspacesPayload.failedWorkspaceIds":
+		if e.complexity.LeaveAllWorkspacesPayload.FailedWorkspaceIds == nil {
+			break
+		}
+
+		return e.complexity.LeaveAllWorkspacesPayload.FailedWorkspaceIds(childComplexity), true
+	case "LeaveAllWorkspacesPayload.removedWorkspaceIds":
+		if e.complexity.LeaveAllWorkspacesPayload.RemovedWorkspaceIds == nil {
+			break
+		}
+
+		return e.complexity.LeaveAllWorkspacesPayload.RemovedWorkspaceIds(childComplexity), true
 
 	case "MFAEnrollResult.enrollmentUrl":
 		if e.complexity.MFAEnrollResult.EnrollmentURL == nil {
@@ -602,6 +660,12 @@ func (e *executableSchema) Complexity(ctx context.Context, typeName, field strin
 		}
 
 		return e.complexity.Mutation.FindOrCreate(childComplexity, args["input"].(gqlmodel.FindOrCreateInput)), true
+	case "Mutation.leaveAllWorkspaces":
+		if e.complexity.Mutation.LeaveAllWorkspaces == nil {
+			break
+		}
+
+		return e.complexity.Mutation.LeaveAllWorkspaces(childComplexity), true
 	case "Mutation.logout":
 		if e.complexity.Mutation.Logout == nil {
 			break
@@ -824,6 +888,12 @@ func (e *executableSchema) Complexity(ctx context.Context, typeName, field strin
 
 		return e.complexity.PublicWorkspaceMember.PhotoURL(childComplexity), true
 
+	case "Query.actingIntegration":
+		if e.complexity.Query.ActingIntegration == nil {
+			break
+		}
+
+		return e.complexity.Query.ActingIntegration(childComplexity), true
 	case "Query.authConfig":
 		if e.complexity.Query.AuthConfig == nil {
 			break
@@ -1562,7 +1632,7 @@ extend type Query {
   Get authentication configuration for client applications.
   This endpoint does not require authentication and returns public auth configuration.
   """
-  authConfig: AuthConfig @public
+  authConfig: AuthConfig @public @client(as: [INTEGRATION])
 }
 `, BuiltIn: false},
 	{Name: "../../../schemas/cerbos.graphql", Input: `input CheckPermissionInput {
@@ -1706,7 +1776,7 @@ extend type Query {
   findUserByAlias(alias: String!): User
   findUsersByIDsWithPagination(ids: [ID!]!, alias: String, pagination: Pagination!): UsersWithPagination! @public
   findUsersByIDs(ids: [ID!]!): [User!]!
-  me: Me
+  me: Me @client(as: [USER])
   mfaStatus: MFAStatus!
   searchUser(keyword: String!): [User!]!
   user(id: ID!): User
@@ -1927,8 +1997,8 @@ extend type Query {
     findByIDs(ids: [ID!]!): [Workspace!]! @public @client(as: [INTEGRATION])
     findByName(name: String!): Workspace @client(as: [INTEGRATION])
     findByAlias(alias: String!): Workspace @public @client(as: [INTEGRATION])
-    findByUser(userId: ID!): [Workspace] @client(as: [INTEGRATION])
-    findByUserWithPagination(userId: ID!, pagination: Pagination!): WorkspacesWithPagination! @client(as: [INTEGRATION])
+    findByUser(userId: ID!): [Workspace] @client(as: [INTEGRATION, USER])
+    findByUserWithPagination(userId: ID!, pagination: Pagination!): WorkspacesWithPagination! @client(as: [INTEGRATION, USER])
     "Looks a workspace up by exactly one of id or alias. Returns null when none matches."
     publicWorkspace(id: ID, alias: String): PublicWorkspace @public @client(as: [INTEGRATION])
 }
@@ -1947,6 +2017,50 @@ extend type Mutation {
     updateIntegrationOfWorkspace(input: UpdateIntegrationOfWorkspaceInput!): UpdateMemberOfWorkspacePayload @client(as: [INTEGRATION])
     transferWorkspaceOwnership(input: TransferWorkspaceOwnershipInput!): UpdateMemberOfWorkspacePayload
 }`, BuiltIn: false},
+	{Name: "../../../schemas/integration.graphql", Input: `"""
+A workspace the acting integration belongs to, with its role there.
+"""
+type IntegrationWorkspace {
+    workspace: Workspace!
+    role: Role!
+}
+
+"""
+The integration a client token acts for through X-Reearth-Act-As.
+"""
+type ActingIntegration {
+    id: ID!
+    workspaces: [IntegrationWorkspace!]!
+}
+
+"""
+The workspaces leaveAllWorkspaces removed the acting integration from, and
+those it could not. Retrying the mutation removes only what is left.
+"""
+type LeaveAllWorkspacesPayload {
+    removedWorkspaceIds: [ID!]!
+    failedWorkspaceIds: [ID!]!
+}
+
+extend type Query {
+    """
+    The integration this call acts for, and its workspaces and roles. Only a
+    registered client token with X-Reearth-Act-As: integration:<id> may call it.
+    """
+    actingIntegration: ActingIntegration! @client(as: [INTEGRATION])
+}
+
+extend type Mutation {
+    """
+    Removes the acting integration from every workspace it belongs to, for
+    when the integration is deleted. Each workspace is left on its own: one
+    that fails is listed in failedWorkspaceIds and the rest still run, so a
+    retry is safe. Leaving needs no role. Only a registered client token with
+    X-Reearth-Act-As: integration:<id> may call it.
+    """
+    leaveAllWorkspaces: LeaveAllWorkspacesPayload! @client(as: [INTEGRATION])
+}
+`, BuiltIn: false},
 }
 var parsedSchema = gqlparser.MustLoadSchema(sources...)
 
@@ -2487,6 +2601,70 @@ func (ec *executionContext) field___Type_fields_args(ctx context.Context, rawArg
 
 // region    **************************** field.gotpl *****************************
 
+func (ec *executionContext) _ActingIntegration_id(ctx context.Context, field graphql.CollectedField, obj *gqlmodel.ActingIntegration) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		ec.fieldContext_ActingIntegration_id,
+		func(ctx context.Context) (any, error) {
+			return obj.ID, nil
+		},
+		nil,
+		ec.marshalNID2githubᚗcomᚋreearthᚋreearthᚑaccountsᚋserverᚋinternalᚋadapterᚋgqlᚋgqlmodelᚐID,
+		true,
+		true,
+	)
+}
+
+func (ec *executionContext) fieldContext_ActingIntegration_id(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "ActingIntegration",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type ID does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _ActingIntegration_workspaces(ctx context.Context, field graphql.CollectedField, obj *gqlmodel.ActingIntegration) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		ec.fieldContext_ActingIntegration_workspaces,
+		func(ctx context.Context) (any, error) {
+			return obj.Workspaces, nil
+		},
+		nil,
+		ec.marshalNIntegrationWorkspace2ᚕᚖgithubᚗcomᚋreearthᚋreearthᚑaccountsᚋserverᚋinternalᚋadapterᚋgqlᚋgqlmodelᚐIntegrationWorkspaceᚄ,
+		true,
+		true,
+	)
+}
+
+func (ec *executionContext) fieldContext_ActingIntegration_workspaces(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "ActingIntegration",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			switch field.Name {
+			case "workspace":
+				return ec.fieldContext_IntegrationWorkspace_workspace(ctx, field)
+			case "role":
+				return ec.fieldContext_IntegrationWorkspace_role(ctx, field)
+			}
+			return nil, fmt.Errorf("no field named %q was found under type IntegrationWorkspace", field.Name)
+		},
+	}
+	return fc, nil
+}
+
 func (ec *executionContext) _AddUsersToWorkspacePayload_workspace(ctx context.Context, field graphql.CollectedField, obj *gqlmodel.AddUsersToWorkspacePayload) (ret graphql.Marshaler) {
 	return graphql.ResolveField(
 		ctx,
@@ -2882,6 +3060,136 @@ func (ec *executionContext) _DeleteWorkspacePayload_workspaceId(ctx context.Cont
 func (ec *executionContext) fieldContext_DeleteWorkspacePayload_workspaceId(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
 	fc = &graphql.FieldContext{
 		Object:     "DeleteWorkspacePayload",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type ID does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _IntegrationWorkspace_workspace(ctx context.Context, field graphql.CollectedField, obj *gqlmodel.IntegrationWorkspace) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		ec.fieldContext_IntegrationWorkspace_workspace,
+		func(ctx context.Context) (any, error) {
+			return obj.Workspace, nil
+		},
+		nil,
+		ec.marshalNWorkspace2ᚖgithubᚗcomᚋreearthᚋreearthᚑaccountsᚋserverᚋinternalᚋadapterᚋgqlᚋgqlmodelᚐWorkspace,
+		true,
+		true,
+	)
+}
+
+func (ec *executionContext) fieldContext_IntegrationWorkspace_workspace(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "IntegrationWorkspace",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			switch field.Name {
+			case "id":
+				return ec.fieldContext_Workspace_id(ctx, field)
+			case "name":
+				return ec.fieldContext_Workspace_name(ctx, field)
+			case "alias":
+				return ec.fieldContext_Workspace_alias(ctx, field)
+			case "members":
+				return ec.fieldContext_Workspace_members(ctx, field)
+			case "metadata":
+				return ec.fieldContext_Workspace_metadata(ctx, field)
+			case "personal":
+				return ec.fieldContext_Workspace_personal(ctx, field)
+			}
+			return nil, fmt.Errorf("no field named %q was found under type Workspace", field.Name)
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _IntegrationWorkspace_role(ctx context.Context, field graphql.CollectedField, obj *gqlmodel.IntegrationWorkspace) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		ec.fieldContext_IntegrationWorkspace_role,
+		func(ctx context.Context) (any, error) {
+			return obj.Role, nil
+		},
+		nil,
+		ec.marshalNRole2githubᚗcomᚋreearthᚋreearthᚑaccountsᚋserverᚋinternalᚋadapterᚋgqlᚋgqlmodelᚐRole,
+		true,
+		true,
+	)
+}
+
+func (ec *executionContext) fieldContext_IntegrationWorkspace_role(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "IntegrationWorkspace",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type Role does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _LeaveAllWorkspacesPayload_removedWorkspaceIds(ctx context.Context, field graphql.CollectedField, obj *gqlmodel.LeaveAllWorkspacesPayload) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		ec.fieldContext_LeaveAllWorkspacesPayload_removedWorkspaceIds,
+		func(ctx context.Context) (any, error) {
+			return obj.RemovedWorkspaceIds, nil
+		},
+		nil,
+		ec.marshalNID2ᚕgithubᚗcomᚋreearthᚋreearthᚑaccountsᚋserverᚋinternalᚋadapterᚋgqlᚋgqlmodelᚐIDᚄ,
+		true,
+		true,
+	)
+}
+
+func (ec *executionContext) fieldContext_LeaveAllWorkspacesPayload_removedWorkspaceIds(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "LeaveAllWorkspacesPayload",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type ID does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _LeaveAllWorkspacesPayload_failedWorkspaceIds(ctx context.Context, field graphql.CollectedField, obj *gqlmodel.LeaveAllWorkspacesPayload) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		ec.fieldContext_LeaveAllWorkspacesPayload_failedWorkspaceIds,
+		func(ctx context.Context) (any, error) {
+			return obj.FailedWorkspaceIds, nil
+		},
+		nil,
+		ec.marshalNID2ᚕgithubᚗcomᚋreearthᚋreearthᚑaccountsᚋserverᚋinternalᚋadapterᚋgqlᚋgqlmodelᚐIDᚄ,
+		true,
+		true,
+	)
+}
+
+func (ec *executionContext) fieldContext_LeaveAllWorkspacesPayload_failedWorkspaceIds(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "LeaveAllWorkspacesPayload",
 		Field:      field,
 		IsMethod:   false,
 		IsResolver: false,
@@ -4599,6 +4907,41 @@ func (ec *executionContext) fieldContext_Mutation_transferWorkspaceOwnership(ctx
 	return fc, nil
 }
 
+func (ec *executionContext) _Mutation_leaveAllWorkspaces(ctx context.Context, field graphql.CollectedField) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		ec.fieldContext_Mutation_leaveAllWorkspaces,
+		func(ctx context.Context) (any, error) {
+			return ec.resolvers.Mutation().LeaveAllWorkspaces(ctx)
+		},
+		nil,
+		ec.marshalNLeaveAllWorkspacesPayload2ᚖgithubᚗcomᚋreearthᚋreearthᚑaccountsᚋserverᚋinternalᚋadapterᚋgqlᚋgqlmodelᚐLeaveAllWorkspacesPayload,
+		true,
+		true,
+	)
+}
+
+func (ec *executionContext) fieldContext_Mutation_leaveAllWorkspaces(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "Mutation",
+		Field:      field,
+		IsMethod:   true,
+		IsResolver: true,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			switch field.Name {
+			case "removedWorkspaceIds":
+				return ec.fieldContext_LeaveAllWorkspacesPayload_removedWorkspaceIds(ctx, field)
+			case "failedWorkspaceIds":
+				return ec.fieldContext_LeaveAllWorkspacesPayload_failedWorkspaceIds(ctx, field)
+			}
+			return nil, fmt.Errorf("no field named %q was found under type LeaveAllWorkspacesPayload", field.Name)
+		},
+	}
+	return fc, nil
+}
+
 func (ec *executionContext) _PublicWorkspace_id(ctx context.Context, field graphql.CollectedField, obj *gqlmodel.PublicWorkspace) (ret graphql.Marshaler) {
 	return graphql.ResolveField(
 		ctx,
@@ -5904,6 +6247,41 @@ func (ec *executionContext) fieldContext_Query_publicWorkspace(ctx context.Conte
 	if fc.Args, err = ec.field_Query_publicWorkspace_args(ctx, field.ArgumentMap(ec.Variables)); err != nil {
 		ec.Error(ctx, err)
 		return fc, err
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _Query_actingIntegration(ctx context.Context, field graphql.CollectedField) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		ec.fieldContext_Query_actingIntegration,
+		func(ctx context.Context) (any, error) {
+			return ec.resolvers.Query().ActingIntegration(ctx)
+		},
+		nil,
+		ec.marshalNActingIntegration2ᚖgithubᚗcomᚋreearthᚋreearthᚑaccountsᚋserverᚋinternalᚋadapterᚋgqlᚋgqlmodelᚐActingIntegration,
+		true,
+		true,
+	)
+}
+
+func (ec *executionContext) fieldContext_Query_actingIntegration(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "Query",
+		Field:      field,
+		IsMethod:   true,
+		IsResolver: true,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			switch field.Name {
+			case "id":
+				return ec.fieldContext_ActingIntegration_id(ctx, field)
+			case "workspaces":
+				return ec.fieldContext_ActingIntegration_workspaces(ctx, field)
+			}
+			return nil, fmt.Errorf("no field named %q was found under type ActingIntegration", field.Name)
+		},
 	}
 	return fc, nil
 }
@@ -10480,6 +10858,50 @@ func (ec *executionContext) _WorkspaceMember(ctx context.Context, sel ast.Select
 
 // region    **************************** object.gotpl ****************************
 
+var actingIntegrationImplementors = []string{"ActingIntegration"}
+
+func (ec *executionContext) _ActingIntegration(ctx context.Context, sel ast.SelectionSet, obj *gqlmodel.ActingIntegration) graphql.Marshaler {
+	fields := graphql.CollectFields(ec.OperationContext, sel, actingIntegrationImplementors)
+
+	out := graphql.NewFieldSet(fields)
+	deferred := make(map[string]*graphql.FieldSet)
+	for i, field := range fields {
+		switch field.Name {
+		case "__typename":
+			out.Values[i] = graphql.MarshalString("ActingIntegration")
+		case "id":
+			out.Values[i] = ec._ActingIntegration_id(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "workspaces":
+			out.Values[i] = ec._ActingIntegration_workspaces(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		default:
+			panic("unknown field " + strconv.Quote(field.Name))
+		}
+	}
+	out.Dispatch(ctx)
+	if out.Invalids > 0 {
+		return graphql.Null
+	}
+
+	atomic.AddInt32(&ec.deferred, int32(len(deferred)))
+
+	for label, dfs := range deferred {
+		ec.processDeferredGroup(graphql.DeferredGroup{
+			Label:    label,
+			Path:     graphql.GetPath(ctx),
+			FieldSet: dfs,
+			Context:  ctx,
+		})
+	}
+
+	return out
+}
+
 var addUsersToWorkspacePayloadImplementors = []string{"AddUsersToWorkspacePayload"}
 
 func (ec *executionContext) _AddUsersToWorkspacePayload(ctx context.Context, sel ast.SelectionSet, obj *gqlmodel.AddUsersToWorkspacePayload) graphql.Marshaler {
@@ -10699,6 +11121,94 @@ func (ec *executionContext) _DeleteWorkspacePayload(ctx context.Context, sel ast
 			out.Values[i] = graphql.MarshalString("DeleteWorkspacePayload")
 		case "workspaceId":
 			out.Values[i] = ec._DeleteWorkspacePayload_workspaceId(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		default:
+			panic("unknown field " + strconv.Quote(field.Name))
+		}
+	}
+	out.Dispatch(ctx)
+	if out.Invalids > 0 {
+		return graphql.Null
+	}
+
+	atomic.AddInt32(&ec.deferred, int32(len(deferred)))
+
+	for label, dfs := range deferred {
+		ec.processDeferredGroup(graphql.DeferredGroup{
+			Label:    label,
+			Path:     graphql.GetPath(ctx),
+			FieldSet: dfs,
+			Context:  ctx,
+		})
+	}
+
+	return out
+}
+
+var integrationWorkspaceImplementors = []string{"IntegrationWorkspace"}
+
+func (ec *executionContext) _IntegrationWorkspace(ctx context.Context, sel ast.SelectionSet, obj *gqlmodel.IntegrationWorkspace) graphql.Marshaler {
+	fields := graphql.CollectFields(ec.OperationContext, sel, integrationWorkspaceImplementors)
+
+	out := graphql.NewFieldSet(fields)
+	deferred := make(map[string]*graphql.FieldSet)
+	for i, field := range fields {
+		switch field.Name {
+		case "__typename":
+			out.Values[i] = graphql.MarshalString("IntegrationWorkspace")
+		case "workspace":
+			out.Values[i] = ec._IntegrationWorkspace_workspace(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "role":
+			out.Values[i] = ec._IntegrationWorkspace_role(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		default:
+			panic("unknown field " + strconv.Quote(field.Name))
+		}
+	}
+	out.Dispatch(ctx)
+	if out.Invalids > 0 {
+		return graphql.Null
+	}
+
+	atomic.AddInt32(&ec.deferred, int32(len(deferred)))
+
+	for label, dfs := range deferred {
+		ec.processDeferredGroup(graphql.DeferredGroup{
+			Label:    label,
+			Path:     graphql.GetPath(ctx),
+			FieldSet: dfs,
+			Context:  ctx,
+		})
+	}
+
+	return out
+}
+
+var leaveAllWorkspacesPayloadImplementors = []string{"LeaveAllWorkspacesPayload"}
+
+func (ec *executionContext) _LeaveAllWorkspacesPayload(ctx context.Context, sel ast.SelectionSet, obj *gqlmodel.LeaveAllWorkspacesPayload) graphql.Marshaler {
+	fields := graphql.CollectFields(ec.OperationContext, sel, leaveAllWorkspacesPayloadImplementors)
+
+	out := graphql.NewFieldSet(fields)
+	deferred := make(map[string]*graphql.FieldSet)
+	for i, field := range fields {
+		switch field.Name {
+		case "__typename":
+			out.Values[i] = graphql.MarshalString("LeaveAllWorkspacesPayload")
+		case "removedWorkspaceIds":
+			out.Values[i] = ec._LeaveAllWorkspacesPayload_removedWorkspaceIds(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "failedWorkspaceIds":
+			out.Values[i] = ec._LeaveAllWorkspacesPayload_failedWorkspaceIds(ctx, field, obj)
 			if out.Values[i] == graphql.Null {
 				out.Invalids++
 			}
@@ -11083,6 +11593,13 @@ func (ec *executionContext) _Mutation(ctx context.Context, sel ast.SelectionSet)
 			out.Values[i] = ec.OperationContext.RootResolverMiddleware(innerCtx, func(ctx context.Context) (res graphql.Marshaler) {
 				return ec._Mutation_transferWorkspaceOwnership(ctx, field)
 			})
+		case "leaveAllWorkspaces":
+			out.Values[i] = ec.OperationContext.RootResolverMiddleware(innerCtx, func(ctx context.Context) (res graphql.Marshaler) {
+				return ec._Mutation_leaveAllWorkspaces(ctx, field)
+			})
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
 		default:
 			panic("unknown field " + strconv.Quote(field.Name))
 		}
@@ -11623,6 +12140,28 @@ func (ec *executionContext) _Query(ctx context.Context, sel ast.SelectionSet) gr
 					}
 				}()
 				res = ec._Query_publicWorkspace(ctx, field)
+				return res
+			}
+
+			rrm := func(ctx context.Context) graphql.Marshaler {
+				return ec.OperationContext.RootResolverMiddleware(ctx,
+					func(ctx context.Context) graphql.Marshaler { return innerFunc(ctx, out) })
+			}
+
+			out.Concurrently(i, func(ctx context.Context) graphql.Marshaler { return rrm(innerCtx) })
+		case "actingIntegration":
+			field := field
+
+			innerFunc := func(ctx context.Context, fs *graphql.FieldSet) (res graphql.Marshaler) {
+				defer func() {
+					if r := recover(); r != nil {
+						ec.Error(ctx, ec.Recover(ctx, r))
+					}
+				}()
+				res = ec._Query_actingIntegration(ctx, field)
+				if res == graphql.Null {
+					atomic.AddUint32(&fs.Invalids, 1)
+				}
 				return res
 			}
 
@@ -12824,6 +13363,20 @@ func (ec *executionContext) ___Type(ctx context.Context, sel ast.SelectionSet, o
 
 // region    ***************************** type.gotpl *****************************
 
+func (ec *executionContext) marshalNActingIntegration2githubᚗcomᚋreearthᚋreearthᚑaccountsᚋserverᚋinternalᚋadapterᚋgqlᚋgqlmodelᚐActingIntegration(ctx context.Context, sel ast.SelectionSet, v gqlmodel.ActingIntegration) graphql.Marshaler {
+	return ec._ActingIntegration(ctx, sel, &v)
+}
+
+func (ec *executionContext) marshalNActingIntegration2ᚖgithubᚗcomᚋreearthᚋreearthᚑaccountsᚋserverᚋinternalᚋadapterᚋgqlᚋgqlmodelᚐActingIntegration(ctx context.Context, sel ast.SelectionSet, v *gqlmodel.ActingIntegration) graphql.Marshaler {
+	if v == nil {
+		if !graphql.HasFieldError(ctx, graphql.GetFieldContext(ctx)) {
+			graphql.AddErrorf(ctx, "the requested element is null which the schema does not allow")
+		}
+		return graphql.Null
+	}
+	return ec._ActingIntegration(ctx, sel, v)
+}
+
 func (ec *executionContext) unmarshalNAddIntegrationToWorkspaceInput2githubᚗcomᚋreearthᚋreearthᚑaccountsᚋserverᚋinternalᚋadapterᚋgqlᚋgqlmodelᚐAddIntegrationToWorkspaceInput(ctx context.Context, v any) (gqlmodel.AddIntegrationToWorkspaceInput, error) {
 	res, err := ec.unmarshalInputAddIntegrationToWorkspaceInput(ctx, v)
 	return res, graphql.ErrorOnPath(ctx, err)
@@ -13012,6 +13565,60 @@ func (ec *executionContext) marshalNInt2int(ctx context.Context, sel ast.Selecti
 	return res
 }
 
+func (ec *executionContext) marshalNIntegrationWorkspace2ᚕᚖgithubᚗcomᚋreearthᚋreearthᚑaccountsᚋserverᚋinternalᚋadapterᚋgqlᚋgqlmodelᚐIntegrationWorkspaceᚄ(ctx context.Context, sel ast.SelectionSet, v []*gqlmodel.IntegrationWorkspace) graphql.Marshaler {
+	ret := make(graphql.Array, len(v))
+	var wg sync.WaitGroup
+	isLen1 := len(v) == 1
+	if !isLen1 {
+		wg.Add(len(v))
+	}
+	for i := range v {
+		i := i
+		fc := &graphql.FieldContext{
+			Index:  &i,
+			Result: &v[i],
+		}
+		ctx := graphql.WithFieldContext(ctx, fc)
+		f := func(i int) {
+			defer func() {
+				if r := recover(); r != nil {
+					ec.Error(ctx, ec.Recover(ctx, r))
+					ret = nil
+				}
+			}()
+			if !isLen1 {
+				defer wg.Done()
+			}
+			ret[i] = ec.marshalNIntegrationWorkspace2ᚖgithubᚗcomᚋreearthᚋreearthᚑaccountsᚋserverᚋinternalᚋadapterᚋgqlᚋgqlmodelᚐIntegrationWorkspace(ctx, sel, v[i])
+		}
+		if isLen1 {
+			f(i)
+		} else {
+			go f(i)
+		}
+
+	}
+	wg.Wait()
+
+	for _, e := range ret {
+		if e == graphql.Null {
+			return graphql.Null
+		}
+	}
+
+	return ret
+}
+
+func (ec *executionContext) marshalNIntegrationWorkspace2ᚖgithubᚗcomᚋreearthᚋreearthᚑaccountsᚋserverᚋinternalᚋadapterᚋgqlᚋgqlmodelᚐIntegrationWorkspace(ctx context.Context, sel ast.SelectionSet, v *gqlmodel.IntegrationWorkspace) graphql.Marshaler {
+	if v == nil {
+		if !graphql.HasFieldError(ctx, graphql.GetFieldContext(ctx)) {
+			graphql.AddErrorf(ctx, "the requested element is null which the schema does not allow")
+		}
+		return graphql.Null
+	}
+	return ec._IntegrationWorkspace(ctx, sel, v)
+}
+
 func (ec *executionContext) unmarshalNLang2string(ctx context.Context, v any) (string, error) {
 	res, err := graphql.UnmarshalString(v)
 	return res, graphql.ErrorOnPath(ctx, err)
@@ -13026,6 +13633,20 @@ func (ec *executionContext) marshalNLang2string(ctx context.Context, sel ast.Sel
 		}
 	}
 	return res
+}
+
+func (ec *executionContext) marshalNLeaveAllWorkspacesPayload2githubᚗcomᚋreearthᚋreearthᚑaccountsᚋserverᚋinternalᚋadapterᚋgqlᚋgqlmodelᚐLeaveAllWorkspacesPayload(ctx context.Context, sel ast.SelectionSet, v gqlmodel.LeaveAllWorkspacesPayload) graphql.Marshaler {
+	return ec._LeaveAllWorkspacesPayload(ctx, sel, &v)
+}
+
+func (ec *executionContext) marshalNLeaveAllWorkspacesPayload2ᚖgithubᚗcomᚋreearthᚋreearthᚑaccountsᚋserverᚋinternalᚋadapterᚋgqlᚋgqlmodelᚐLeaveAllWorkspacesPayload(ctx context.Context, sel ast.SelectionSet, v *gqlmodel.LeaveAllWorkspacesPayload) graphql.Marshaler {
+	if v == nil {
+		if !graphql.HasFieldError(ctx, graphql.GetFieldContext(ctx)) {
+			graphql.AddErrorf(ctx, "the requested element is null which the schema does not allow")
+		}
+		return graphql.Null
+	}
+	return ec._LeaveAllWorkspacesPayload(ctx, sel, v)
 }
 
 func (ec *executionContext) marshalNMFAEnrollResult2githubᚗcomᚋreearthᚋreearthᚑaccountsᚋserverᚋinternalᚋadapterᚋgqlᚋgqlmodelᚐMFAEnrollResult(ctx context.Context, sel ast.SelectionSet, v gqlmodel.MFAEnrollResult) graphql.Marshaler {

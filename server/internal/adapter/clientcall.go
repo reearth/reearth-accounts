@@ -13,9 +13,10 @@ type clientCallKey struct{}
 // ClientCall is the auth layer's verdict for a request made with a registered
 // client token (ADR-0002).
 type ClientCall struct {
-	Client  *workspace.Client
-	Subject workspace.Subject
-	// Operator is nil when the call acts for no one: such a call is anonymous.
+	// Issuer is the token's issuer. Client IDs are unique only within one.
+	Issuer   string
+	Client   *workspace.Client
+	Subject  workspace.Subject
 	Operator *workspace.Operator
 	User     *user.User
 }
@@ -33,13 +34,24 @@ func (cc *ClientCall) Attach(ctx context.Context) context.Context {
 	return applog.With(ctx, cc.LogFields()...)
 }
 
-// LogFields are the decision 8 fields: client ID, registered name and subject.
 func (cc *ClientCall) LogFields() []applog.Field {
 	return []applog.Field{
 		applog.CallerClientID(cc.Client.ID),
 		applog.CallerName(cc.Client.Name),
 		applog.ActingFor(cc.Subject.String()),
 	}
+}
+
+// LogClientVerdict logs a client gate's decision once per call (ADR-0002 decision 8).
+func LogClientVerdict(ctx context.Context, admitted bool) {
+	if ClientCallOf(ctx) == nil {
+		return
+	}
+	if admitted {
+		applog.Info(ctx, "auth: client call")
+		return
+	}
+	applog.Warn(ctx, "auth: rejected client call", applog.Reason("not_open_to_client"))
 }
 
 func ClientCallOf(ctx context.Context) *ClientCall {

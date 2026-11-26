@@ -57,6 +57,108 @@
                 }
             }
         },
+        "/api/integrations/self/workspaces": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Only a registered client token with X-Reearth-Act-As: integration:\u003cid\u003e may call this.",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Integration"
+                ],
+                "summary": "List the acting integration's workspaces and roles",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "integration:\u003cid\u003e",
+                        "name": "X-Reearth-Act-As",
+                        "in": "header",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/httpmodel.IntegrationWorkspacesResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/internal.ErrorResponse"
+                        }
+                    },
+                    "403": {
+                        "description": "Forbidden",
+                        "schema": {
+                            "$ref": "#/definitions/internal.ErrorResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/internal.ErrorResponse"
+                        }
+                    }
+                }
+            },
+            "delete": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Call this when the integration is deleted. Each workspace is left on its own, so the response is 200 even when some fail: they are listed in failed_workspace_ids. Retrying is safe and removes only what is left. Leaving needs no role. Only a registered client token with X-Reearth-Act-As: integration:\u003cid\u003e may call this.",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Integration"
+                ],
+                "summary": "Remove the acting integration from all its workspaces",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "integration:\u003cid\u003e",
+                        "name": "X-Reearth-Act-As",
+                        "in": "header",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/httpmodel.LeaveAllWorkspacesResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/internal.ErrorResponse"
+                        }
+                    },
+                    "403": {
+                        "description": "Forbidden",
+                        "schema": {
+                            "$ref": "#/definitions/internal.ErrorResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/internal.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
         "/api/permissions/check": {
             "post": {
                 "security": [
@@ -2323,6 +2425,54 @@
                 },
                 "token": {
                     "type": "string"
+                }
+            }
+        },
+        "httpmodel.IntegrationWorkspaceResponse": {
+            "type": "object",
+            "properties": {
+                "alias": {
+                    "type": "string"
+                },
+                "id": {
+                    "type": "string"
+                },
+                "name": {
+                    "type": "string"
+                },
+                "role": {
+                    "type": "string"
+                }
+            }
+        },
+        "httpmodel.IntegrationWorkspacesResponse": {
+            "type": "object",
+            "properties": {
+                "integration_id": {
+                    "type": "string"
+                },
+                "workspaces": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/httpmodel.IntegrationWorkspaceResponse"
+                    }
+                }
+            }
+        },
+        "httpmodel.LeaveAllWorkspacesResponse": {
+            "type": "object",
+            "properties": {
+                "failed_workspace_ids": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
+                },
+                "removed_workspace_ids": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
                 }
             }
         },

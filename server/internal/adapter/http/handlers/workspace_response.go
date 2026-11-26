@@ -51,7 +51,7 @@ func workspaceResponses(c echo.Context, photos adapter.PhotoSigner, ws workspace
 }
 
 func (h *WorkspaceHandler) writeWorkspace(c echo.Context, w *workspace.Workspace, embed httpmodel.MemberUsers) error {
-	res, err := workspaceResponses(c, h.photos, workspace.List{w}, embed, httpmodel.ViewerOf(httpinternal.User(c)))
+	res, err := workspaceResponses(c, h.photos, workspace.List{w}, embed, httpmodel.ViewerOf(httpinternal.User(c), httpinternal.Operator(c)))
 	if err != nil {
 		return err
 	}
@@ -59,7 +59,7 @@ func (h *WorkspaceHandler) writeWorkspace(c echo.Context, w *workspace.Workspace
 }
 
 func (h *WorkspaceHandler) writeWorkspaces(c echo.Context, ws workspace.List, embed httpmodel.MemberUsers) error {
-	res, err := workspaceResponses(c, h.photos, ws, embed, httpmodel.ViewerOf(httpinternal.User(c)))
+	res, err := workspaceResponses(c, h.photos, ws, embed, httpmodel.ViewerOf(httpinternal.User(c), httpinternal.Operator(c)))
 	if err != nil {
 		return err
 	}

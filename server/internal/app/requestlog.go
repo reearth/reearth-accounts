@@ -32,6 +32,9 @@ type requestRecord struct {
 	operation     string
 	operationType string
 	fields        []string
+	// refused is a client call the auth middleware refused without handing
+	// the request on, so the final context does not carry it.
+	refused *adapter.ClientCall
 }
 
 type requestRecordKey struct{}
@@ -90,6 +93,7 @@ func requestFields(c echo.Context, ctx context.Context, rec *requestRecord, late
 	if len(rec.fields) > 0 {
 		fields = append(fields, applog.Fields(rec.fields))
 	}
+	refused := rec.refused
 	rec.mu.Unlock()
 
 	if u := adapter.User(ctx); u != nil {
@@ -100,6 +104,10 @@ func requestFields(c echo.Context, ctx context.Context, rec *requestRecord, late
 	}
 	if cc := adapter.ClientCallOf(ctx); cc != nil {
 		fields = append(fields, cc.LogFields()...)
+	} else if refused != nil {
+		fields = append(fields, refused.LogFields()...)
+	} else if cid := callerClientID(adapter.GetAuthInfo(ctx)); cid != "" {
+		fields = append(fields, applog.CallerClientID(cid))
 	}
 	return fields
 }
@@ -123,6 +131,14 @@ func newRequestID() string {
 	var b [16]byte
 	_, _ = rand.Read(b[:])
 	return hex.EncodeToString(b[:])
+}
+
+func recordRefusedClientCall(ctx context.Context, cc *adapter.ClientCall) {
+	if rec, ok := ctx.Value(requestRecordKey{}).(*requestRecord); ok {
+		rec.mu.Lock()
+		rec.refused = cc
+		rec.mu.Unlock()
+	}
 }
 
 func callerFrom(ctx context.Context) string {

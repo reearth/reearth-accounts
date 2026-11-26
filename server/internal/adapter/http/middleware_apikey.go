@@ -5,6 +5,7 @@ import (
 	"strings"
 
 	"github.com/labstack/echo/v4"
+	"github.com/reearth/reearth-accounts/server/internal/adapter"
 	httpinternal "github.com/reearth/reearth-accounts/server/internal/adapter/http/internal"
 )
 
@@ -51,6 +52,9 @@ func skipJWTOnAPIKey(jwt echo.MiddlewareFunc, apiKeys ...string) echo.Middleware
 func APIKeyOrAuth(cfgKey string) echo.MiddlewareFunc {
 	return func(next echo.HandlerFunc) echo.HandlerFunc {
 		return func(c echo.Context) error {
+			if adapter.ClientCallOf(c.Request().Context()) != nil {
+				return httpinternal.ErrClientRouteClosed
+			}
 			if httpinternal.User(c) != nil {
 				return next(c)
 			}

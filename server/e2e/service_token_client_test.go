@@ -70,13 +70,13 @@ func TestServiceToken_GQLClientCallsAccountsAsService(t *testing.T) {
 
 	src, err := servicetoken.New(servicetoken.Config{TokenURL: idp.URL + "/oauth/token", ClientID: "svc-flow", Audience: svcAudience, Key: clientKey})
 	require.NoError(t, err)
-	client := gqlclient.NewClient(host, 10, actAsTransport{
-		actAs: "integration:" + svcIntegration.String(),
-		next:  &servicetoken.Transport{Source: src},
-	})
+	client := gqlclient.NewClient(host, 10, &servicetoken.Transport{Source: src})
+	ctx := servicetoken.WithActAs(context.Background(), servicetoken.IntegrationSubject(svcIntegration.String()))
 
+	_, err = client.WorkspaceRepo.FindByUser(context.Background(), svcOwnerUID.String())
+	require.Error(t, err, "a client token without a subject is anonymous")
 	for range 3 {
-		ws, err := client.WorkspaceRepo.FindByUser(context.Background(), svcOwnerUID.String())
+		ws, err := client.WorkspaceRepo.FindByUser(ctx, svcOwnerUID.String())
 		require.NoError(t, err)
 		var ids []string
 		for _, w := range ws {
@@ -92,15 +92,4 @@ func seededMemoryRepos(t *testing.T, seed Seeder) *repo.Container {
 	r := memory.New()
 	require.NoError(t, seed(context.Background(), r))
 	return r
-}
-
-type actAsTransport struct {
-	actAs string
-	next  http.RoundTripper
-}
-
-func (t actAsTransport) RoundTrip(req *http.Request) (*http.Response, error) {
-	req = req.Clone(req.Context())
-	req.Header.Set(app.ActAsHeader, t.actAs)
-	return t.next.RoundTrip(req)
 }

@@ -6,6 +6,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/reearth/reearth-accounts/server/internal/usecase/interactor"
 	"github.com/reearth/reearth-accounts/server/internal/usecase/repo"
 	"github.com/reearth/reearth-accounts/server/pkg/config"
 	"github.com/reearth/reearth-accounts/server/pkg/id"
@@ -55,6 +56,7 @@ func Run(t *testing.T, nc Factory) {
 	t.Run("Workspace_FindByIDs", func(t *testing.T) { testWorkspaceFindByIDs(t, nc) })
 	t.Run("Workspace_FindByUser", func(t *testing.T) { testWorkspaceFindByUser(t, nc) })
 	t.Run("Workspace_FindByIntegration", func(t *testing.T) { testWorkspaceFindByIntegration(t, nc) })
+	t.Run("Workspace_LeaveAllAsIntegration", func(t *testing.T) { testWorkspaceLeaveAllAsIntegration(t, nc) })
 	t.Run("Workspace_SaveAll_RemoveAll", func(t *testing.T) { testWorkspaceSaveAllRemoveAll(t, nc) })
 	t.Run("Workspace_Remove", func(t *testing.T) { testWorkspaceRemove(t, nc) })
 	t.Run("Workspace_Filtered", func(t *testing.T) { testWorkspaceFiltered(t, nc) })
@@ -484,6 +486,64 @@ func testWorkspaceFindByIntegration(t *testing.T, nc Factory) {
 	require.NoError(t, err)
 	require.Len(t, many, 1)
 	assert.Equal(t, ws.ID(), many[0].ID())
+}
+
+func seedLeaveAllWorkspaces(t *testing.T, c *repo.Container, iid, other id.IntegrationID) (member id.WorkspaceIDList, untouched id.WorkspaceID) {
+	t.Helper()
+	ctx := context.Background()
+	uid := id.NewUserID()
+	build := func(name string, integrations map[id.IntegrationID]workspace.Member) *workspace.Workspace {
+		ws, err := workspace.New().NewID().Name(name).Alias(name + "-" + id.NewWorkspaceID().String()).
+			Members(map[id.UserID]workspace.Member{uid: {Role: role.RoleOwner, InvitedBy: uid}}).
+			Integrations(integrations).Build()
+		require.NoError(t, err)
+		require.NoError(t, c.Workspace.Save(ctx, ws))
+		return ws
+	}
+	a := build("la", map[id.IntegrationID]workspace.Member{iid: {Role: role.RoleWriter, InvitedBy: uid}, other: {Role: role.RoleReader, InvitedBy: uid}})
+	b := build("lb", map[id.IntegrationID]workspace.Member{iid: {Role: role.RoleMaintainer, InvitedBy: uid}})
+	o := build("lo", map[id.IntegrationID]workspace.Member{other: {Role: role.RoleOwner, InvitedBy: uid}})
+	return id.WorkspaceIDList{a.ID(), b.ID()}, o.ID()
+}
+
+func testWorkspaceLeaveAllAsIntegration(t *testing.T, nc Factory) {
+	c, _, done := nc(t)
+	defer done()
+	ctx := context.Background()
+	iid, other := id.NewIntegrationID(), id.NewIntegrationID()
+	member, untouched := seedLeaveAllWorkspaces(t, c, iid, other)
+	uc := interactor.NewWorkspace(c, nil, nil)
+	op := &workspace.Operator{Integration: &iid, Client: &workspace.Client{ID: "c"}}
+
+	ms, err := uc.ActingIntegrationMemberships(ctx, op)
+	require.NoError(t, err)
+	roles := map[id.WorkspaceID]role.RoleType{}
+	for _, m := range ms {
+		roles[m.Workspace.ID()] = m.Role
+	}
+	assert.Equal(t, map[id.WorkspaceID]role.RoleType{member[0]: role.RoleWriter, member[1]: role.RoleMaintainer}, roles)
+
+	res, err := uc.LeaveAllAsIntegration(ctx, op)
+	require.NoError(t, err)
+	assert.ElementsMatch(t, member, res.Removed)
+	assert.Empty(t, res.Failed)
+
+	left, err := c.Workspace.FindByIntegration(ctx, iid)
+	if err != nil {
+		require.ErrorIs(t, err, rerror.ErrNotFound)
+	}
+	assert.Empty(t, left)
+	a, err := c.Workspace.FindByID(ctx, member[0])
+	require.NoError(t, err)
+	assert.Equal(t, role.RoleReader, a.Members().IntegrationRole(other))
+	o, err := c.Workspace.FindByID(ctx, untouched)
+	require.NoError(t, err)
+	assert.Equal(t, role.RoleOwner, o.Members().IntegrationRole(other))
+
+	again, err := uc.LeaveAllAsIntegration(ctx, op)
+	require.NoError(t, err)
+	assert.Empty(t, again.Removed)
+	assert.Empty(t, again.Failed)
 }
 
 func testWorkspaceSaveAllRemoveAll(t *testing.T, nc Factory) {
