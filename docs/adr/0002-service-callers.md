@@ -1,7 +1,7 @@
 # ADR-0002: Service callers for the accounts API
 
-- **Status:** Accepted 2026-11-10. Amendment proposed 2026-11-19.
-- **Date:** 2026-11-10 (amended 2026-11-19)
+- **Status:** Accepted 2026-11-10. Amended 2026-11-19. Decision 11 items 6 and 7 amended 2026-11-27.
+- **Date:** 2026-11-10 (amended 2026-11-19 and 2026-11-27)
 - **Deciders:** @pyshx
 
 ## Amendment summary
@@ -260,8 +260,8 @@ No product uses the static keys on a laptop today. Locally, Flow, Visualizer, an
 3. The local issuer is one more entry in `REEARTH_AUTH`. Each local client is an entry in `REEARTH_ACCOUNTS_SERVICE_CALLERS` that names that issuer. Every check in decision 2 runs, and accounts has no separate code path for local tokens.
 4. A service reaches the local issuer through the same `servicetoken` settings as in a deployed environment: the token URL, the client ID, the private key, and the accounts audience. `servicetoken` already takes the token URL as config and does not require `https`.
 5. Accounts and every caller use one issuer URL, built on the mock's compose service name. The mock builds `iss` from the host in the request, and accounts matches `iss` exactly, so a token fetched through another hostname gets `401`. A caller that runs outside compose maps the service name to `127.0.0.1` in its hosts file.
-6. Unless `Config.Dev` is on, accounts refuses to start when any URL it trusts for tokens fails an allowlist. That covers every configured issuer, every issuer that a service caller names, and every `JWKSURI` in `REEARTH_AUTH`, because accounts fetches signing keys from that URL instead of the issuer's. A URL passes only when its parsed scheme is `https` and its host is a DNS name with at least one dot, not an IP address, and not `localhost` or a name under it. The check runs on the parsed URL, so `HTTP://` counts as `http`.
-7. `REEARTH_DEV` turns on `Config.Dev`, and so does any build without the `release` tag. The production image builds with that tag. `REEARTH_ACCOUNTS_DEV`, which accounts reads outside its config, does not open the local issuer. Accounts checks this when it reads its config, so a wrong setting stops the deploy instead of failing at the first request. Accounts accepts an `http` issuer, and a `JWKSURI` of any scheme, in any environment today, so this check is new code.
+6. At every startup, in every build, accounts refuses to start when any URL it trusts for tokens fails an allowlist. That covers every configured issuer, every issuer that a service caller names, and every `JWKSURI` in `REEARTH_AUTH`, because accounts fetches signing keys from that URL instead of the issuer's. A URL passes only when its parsed scheme is `https` and its host is a DNS name with at least one dot, not an IP address, and not `localhost` or a name under it. The check runs on the parsed URL, so `HTTP://` counts as `http`.
+7. Dev mode does not relax the check. A deployed development environment can run with `REEARTH_DEV` on, so `Config.Dev`, the build tag, `REEARTH_ACCOUNTS_DEV`, and `REEARTH_MOCK_AUTH` have no effect on it. Only a dedicated switch, `REEARTH_ACCOUNTS_LOCAL_ISSUER`, relaxes it, and only for a URL whose host is a loopback address, `localhost`, or a single-label name such as a compose service. Every other URL must still pass item 6 with the switch on. Accounts refuses the switch on a managed platform, and it logs a warning at startup when the switch is on. Accounts checks all of this when it reads its config, so a wrong setting stops the deploy instead of failing at the first request. Accounts accepted an `http` issuer, and a `JWKSURI` of any scheme, in any environment before this check.
 8. A seed step generates one dev-only key pair for each local client into a directory that git ignores. It writes the local `REEARTH_AUTH` and `REEARTH_ACCOUNTS_SERVICE_CALLERS` for accounts, and it prints each service's client settings. No deployed environment registers these keys.
 9. `REEARTH_MOCK_AUTH` stays user-only and gets no client path. It skips token validation, so a laptop that tests client calls runs accounts with mock auth off. The local issuer adds nothing to mock auth or to the debug headers.
 
@@ -278,7 +278,7 @@ Local development does not decide open question 1. If services keep client crede
 - Identity providers can meter client credentials tokens. Each instance fetches a token only when it needs one and caches it, so the count stays low.
 - Removing the static keys breaks any caller of them that we do not know about. No local setup uses them.
 - A laptop makes case B and case C calls against a local issuer, and every accounts check runs. The laptop does not test the identity provider's check of the client assertion.
-- An `http`, IP-address, or `localhost` issuer or key URL in a deployed environment stops accounts at startup.
+- An `http`, IP-address, or `localhost` issuer or key URL stops accounts at startup, unless the local issuer switch is on and the host is local.
 - A service that stops reading the database directly can see less data than before, because accounts now authorizes its calls.
 - A leaked key of a case B client can act for any integration that the client can name. A leaked key of a case C client can read any user's profile and workspaces, and nothing more (decision 6). Both leaks expose less than a leaked database connection string or the static gRPC token, and accounts logs the client on every call.
 
@@ -306,7 +306,7 @@ Every environment that registers a client follows these rules.
 | Who can get a client token | Nobody, for the accounts audience | Only a registered client, with a `private_key_jwt` assertion and only for the accounts audience. No client secret exists. |
 | What the internal gRPC token can do | Act as any user, by sending `user-id` | Nothing on its own. The service gets the user from the user's token (decision 4). The static token is removed once all three services read the token. |
 | What a service can read from the accounts database | Every tenant's data | Nothing. Decision 10 removes the connection strings. |
-| Where accounts gets the keys it trusts | Any configured issuer or `JWKSURI`, `http` and IP addresses included, in any environment | Outside dev mode, only `https` URLs on a DNS name. Accounts refuses to start otherwise (decision 11). |
+| Where accounts gets the keys it trusts | Any configured issuer or `JWKSURI`, `http` and IP addresses included, in any environment | Only `https` URLs on a DNS name. With the local issuer switch on, also loopback and single-label hosts. Accounts refuses to start otherwise (decision 11). |
 
 Identities and roles:
 
@@ -327,7 +327,7 @@ These risks are accepted, each with its mitigation:
 3. Case A forwards a bearer user token until audiences split (decision 4).
 4. The static internal token stays until all three services read the user's token.
 5. If a tenant cannot use `private_key_jwt` and takes the fallback in open question 1, accounts checks replay and token lifetime in its own code. That code needs its own tests and security review.
-6. On a laptop, any process that reaches the local issuer can get a token for any local client, because the mock does not check the client assertion. The issuer listens on loopback only, and accounts trusts it only in dev mode (decision 11).
+6. On a laptop, any process that reaches the local issuer can get a token for any local client, because the mock does not check the client assertion. The issuer listens on loopback only, and accounts trusts it only with the local issuer switch on (decision 11).
 
 ## Open questions
 
