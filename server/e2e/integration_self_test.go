@@ -16,9 +16,9 @@ import (
 )
 
 var (
-	selfOther    = id.NewIntegrationID()
-	selfWsShared = id.NewWorkspaceID() // svcIntegration is reader, selfOther is writer
-	selfWsOther  = id.NewWorkspaceID() // only selfOther, as owner
+	selfOther            = id.NewIntegrationID()
+	selfWsReaderAWriterB = id.NewWorkspaceID()
+	selfWsOwnerBOnly     = id.NewWorkspaceID()
 )
 
 func seedIntegrationSelf(ctx context.Context, r *repo.Container) error {
@@ -27,11 +27,11 @@ func seedIntegrationSelf(ctx context.Context, r *repo.Container) error {
 	}
 	owner := map[workspace.UserID]workspace.Member{svcOwnerUID: {Role: role.RoleOwner, InvitedBy: svcOwnerUID}}
 	for wid, ints := range map[id.WorkspaceID]map[workspace.IntegrationID]workspace.Member{
-		selfWsShared: {
+		selfWsReaderAWriterB: {
 			svcIntegration: {Role: role.RoleReader, InvitedBy: svcOwnerUID},
 			selfOther:      {Role: role.RoleWriter, InvitedBy: svcOwnerUID},
 		},
-		selfWsOther: {selfOther: {Role: role.RoleOwner, InvitedBy: svcOwnerUID}},
+		selfWsOwnerBOnly: {selfOther: {Role: role.RoleOwner, InvitedBy: svcOwnerUID}},
 	} {
 		ws := workspace.New().ID(wid).Name("ws-" + wid.String()).Alias("a-" + wid.String()).
 			Members(owner).Integrations(ints).MustBuild()
@@ -74,7 +74,7 @@ func restRoles(e *httpexpect.Expect, h map[string]string) map[string]string {
 func TestIntegrationSelf_REST(t *testing.T) {
 	e, c := startIntegrationSelfServer(t)
 	const path = "/api/integrations/self/workspaces"
-	bRoles := map[string]string{selfWsShared.String(): "writer", selfWsOther.String(): "owner"}
+	bRoles := map[string]string{selfWsReaderAWriterB.String(): "writer", selfWsOwnerBOnly.String(): "owner"}
 
 	t.Run("refused callers", func(t *testing.T) {
 		for _, m := range []string{http.MethodGet, http.MethodDelete} {
@@ -89,11 +89,25 @@ func TestIntegrationSelf_REST(t *testing.T) {
 		e.GET(path).WithHeaders(c.a).Expect().Status(http.StatusOK).JSON().Object().
 			HasValue("integration_id", svcIntegration.String())
 		assert.Equal(t, map[string]string{
-			svcWsOwned.String():    "owner",
-			svcWsWritable.String(): "writer",
-			selfWsShared.String():  "reader",
+			svcWsOwned.String():           "owner",
+			svcWsWritable.String():        "writer",
+			selfWsReaderAWriterB.String(): "reader",
 		}, restRoles(e, c.a))
 		assert.Equal(t, bRoles, restRoles(e, c.b))
+	})
+
+	t.Run("a caller cannot name another integration", func(t *testing.T) {
+		e.GET(path).WithHeaders(c.a).WithQuery("integration_id", selfOther.String()).
+			Expect().Status(http.StatusOK).JSON().Object().HasValue("integration_id", svcIntegration.String()).
+			Value("workspaces").Array().Length().IsEqual(3)
+		e.GET(path).WithHeaders(c.a).WithJSON(map[string]string{"integration_id": selfOther.String()}).
+			Expect().Status(http.StatusOK).JSON().Object().HasValue("integration_id", svcIntegration.String())
+		for _, m := range []string{http.MethodGet, http.MethodDelete} {
+			e.Request(m, "/api/integrations/"+selfOther.String()+"/workspaces").WithHeaders(c.a).
+				Expect().Status(http.StatusForbidden).Body().Contains(clientGateRefusal)
+		}
+		assert.Equal(t, bRoles, restRoles(e, c.b))
+		assert.Len(t, restRoles(e, c.a), 3)
 	})
 
 	t.Run("an integration with no memberships gets empty results", func(t *testing.T) {
@@ -105,12 +119,14 @@ func TestIntegrationSelf_REST(t *testing.T) {
 	})
 
 	t.Run("leaves only the acting integration's workspaces", func(t *testing.T) {
-		o := e.DELETE(path).WithHeaders(c.a).Expect().Status(http.StatusOK).JSON().Object()
+		o := e.DELETE(path).WithHeaders(c.a).WithQuery("integration_id", selfOther.String()).
+			WithJSON(map[string]string{"integration_id": selfOther.String()}).
+			Expect().Status(http.StatusOK).JSON().Object()
 		var removed []string
 		for _, v := range o.Value("removed_workspace_ids").Array().Iter() {
 			removed = append(removed, v.String().Raw())
 		}
-		require.ElementsMatch(t, []string{svcWsOwned.String(), svcWsWritable.String(), selfWsShared.String()}, removed)
+		require.ElementsMatch(t, []string{svcWsOwned.String(), svcWsWritable.String(), selfWsReaderAWriterB.String()}, removed)
 		o.Value("failed_workspace_ids").Array().IsEmpty()
 
 		assert.Empty(t, restRoles(e, c.a))
@@ -140,6 +156,13 @@ func gqlRoles(e *httpexpect.Expect, h map[string]string) map[string]string {
 	return roles
 }
 
+func gqlNamingOther(e *httpexpect.Expect, h map[string]string, query string) *httpexpect.Object {
+	naming := map[string]any{"integrationId": selfOther.String(), "id": selfOther.String(), "actAs": "integration:" + selfOther.String()}
+	return e.POST("/api/graphql").WithHeaders(h).
+		WithJSON(map[string]any{"query": query, "variables": naming, "extensions": naming}).
+		Expect().Status(http.StatusOK).JSON().Object()
+}
+
 func gqlIDs(arr *httpexpect.Array) []string {
 	ids := []string{}
 	for _, v := range arr.Iter() {
@@ -150,7 +173,7 @@ func gqlIDs(arr *httpexpect.Array) []string {
 
 func TestIntegrationSelf_GraphQL(t *testing.T) {
 	e, c := startIntegrationSelfServer(t)
-	bRoles := map[string]string{selfWsShared.String(): "writer", selfWsOther.String(): "owner"}
+	bRoles := map[string]string{selfWsReaderAWriterB.String(): "writer", selfWsOwnerBOnly.String(): "owner"}
 
 	t.Run("refused callers", func(t *testing.T) {
 		for _, q := range []string{actingIntegrationQuery, leaveAllMutation} {
@@ -167,17 +190,23 @@ func TestIntegrationSelf_GraphQL(t *testing.T) {
 		serviceGQL(e, c.a, actingIntegrationQuery, nil).Value("data").Object().Value("actingIntegration").Object().
 			HasValue("id", svcIntegration.String())
 		assert.Equal(t, map[string]string{
-			svcWsOwned.String():    "owner",
-			svcWsWritable.String(): "writer",
-			selfWsShared.String():  "reader",
+			svcWsOwned.String():           "owner",
+			svcWsWritable.String():        "writer",
+			selfWsReaderAWriterB.String(): "reader",
 		}, gqlRoles(e, c.a))
 		assert.Equal(t, bRoles, gqlRoles(e, c.b))
 		assert.Empty(t, gqlRoles(e, c.lonely))
 	})
 
+	t.Run("a caller cannot name another integration", func(t *testing.T) {
+		ai := gqlNamingOther(e, c.a, actingIntegrationQuery).Value("data").Object().Value("actingIntegration").Object()
+		ai.HasValue("id", svcIntegration.String())
+		ai.Value("workspaces").Array().Length().IsEqual(3)
+	})
+
 	t.Run("leaves only the acting integration's workspaces", func(t *testing.T) {
-		p := serviceGQL(e, c.a, leaveAllMutation, nil).Value("data").Object().Value("leaveAllWorkspaces").Object()
-		require.ElementsMatch(t, []string{svcWsOwned.String(), svcWsWritable.String(), selfWsShared.String()},
+		p := gqlNamingOther(e, c.a, leaveAllMutation).Value("data").Object().Value("leaveAllWorkspaces").Object()
+		require.ElementsMatch(t, []string{svcWsOwned.String(), svcWsWritable.String(), selfWsReaderAWriterB.String()},
 			gqlIDs(p.Value("removedWorkspaceIds").Array()))
 		p.Value("failedWorkspaceIds").Array().IsEmpty()
 		assert.Empty(t, gqlRoles(e, c.a))

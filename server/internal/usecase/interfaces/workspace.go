@@ -101,13 +101,15 @@ type Workspace interface {
 	// ActingIntegrationMemberships lists the workspaces of the integration a
 	// client call acts for, and its role in each. It takes no integration ID:
 	// the operator's subject is the only identity, so a client cannot ask
-	// about an integration it does not act for (ADR-0002 decision 5).
+	// about an integration it does not act for.
 	ActingIntegrationMemberships(ctx context.Context, operator *workspace.Operator) ([]IntegrationMembership, error)
 	// LeaveAllAsIntegration removes the integration a client call acts for
 	// from every workspace it belongs to, each in its own transaction. It
 	// needs membership only, not a role, because leaving lowers privilege. A
-	// workspace that fails is listed in Failed and the rest still run, so a
-	// retry finishes the job. The error is set only when the memberships
-	// cannot be read.
+	// workspace that fails, or still has the integration after a few
+	// attempts, is listed in Failed and the rest still run. When ctx is
+	// cancelled, the workspaces not yet tried are listed in Failed. A retry
+	// finishes the job. The error is set only when the memberships cannot be
+	// read.
 	LeaveAllAsIntegration(ctx context.Context, operator *workspace.Operator) (LeaveAllResult, error)
 }

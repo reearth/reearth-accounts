@@ -10,8 +10,6 @@ import (
 	"github.com/samber/lo"
 )
 
-// ActingIntegration returns each workspace through the same converter as
-// findByID, so it shows an integration nothing findByID would not.
 func (r *queryResolver) ActingIntegration(ctx context.Context) (*gqlmodel.ActingIntegration, error) {
 	op := getOperator(ctx)
 	ms, err := usecases(ctx).Workspace.ActingIntegrationMemberships(ctx, op)

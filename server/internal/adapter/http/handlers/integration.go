@@ -27,6 +27,7 @@ func NewIntegrationHandler() *IntegrationHandler {
 // @Success 200 {object} httpmodel.IntegrationWorkspacesResponse
 // @Failure 401 {object} internal.ErrorResponse
 // @Failure 403 {object} internal.ErrorResponse
+// @Failure 500 {object} internal.ErrorResponse
 // @Router /api/integrations/self/workspaces [get]
 func (h *IntegrationHandler) Workspaces(c echo.Context) error {
 	op := httpinternal.Operator(c)
@@ -47,6 +48,7 @@ func (h *IntegrationHandler) Workspaces(c echo.Context) error {
 // @Success 200 {object} httpmodel.LeaveAllWorkspacesResponse
 // @Failure 401 {object} internal.ErrorResponse
 // @Failure 403 {object} internal.ErrorResponse
+// @Failure 500 {object} internal.ErrorResponse
 // @Router /api/integrations/self/workspaces [delete]
 func (h *IntegrationHandler) LeaveAll(c echo.Context) error {
 	res, err := httpinternal.Usecases(c).Workspace.LeaveAllAsIntegration(c.Request().Context(), httpinternal.Operator(c))

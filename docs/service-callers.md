@@ -171,7 +171,15 @@ DELETE /api/integrations/self/workspaces
 {"removed_workspace_ids": ["<workspace ID>"], "failed_workspace_ids": []}
 ```
 
-The GraphQL mutation is `leaveAllWorkspaces { removedWorkspaceIds failedWorkspaceIds }`. Leaving needs no role, because it lowers the integration's access. Accounts leaves each workspace in its own transaction. When a workspace fails, accounts lists it in `failed_workspace_ids`, continues with the others, and still answers 200. A retry is safe: it removes only the memberships that are left, and when none are left it returns two empty lists. A 5xx means accounts could not read the memberships and changed nothing.
+The GraphQL mutation is `leaveAllWorkspaces { removedWorkspaceIds failedWorkspaceIds }`.
+
+Leaving needs membership only, whatever the integration's role. It does not go through the per-workspace permission check, because it only lowers the caller's own access.
+
+Accounts reads the memberships once, then leaves the workspaces one at a time, each in its own transaction, so a call for many workspaces can take a while. When a workspace fails, accounts lists it in `failed_workspace_ids`, continues with the others, and still answers 200. When the caller gives up on the request, accounts stops before the next workspace. A retry is safe, also after a timeout: it removes only the memberships that are left, and when none are left it returns two empty lists. A 5xx means accounts could not read the memberships and changed nothing.
+
+Leave-all removes the memberships that exist when it reads them. A membership added afterwards stays. To delete an integration, first stop adding it to workspaces, then call leave-all again until both lists are empty.
+
+After each leave, accounts reads the workspace again. If the integration is still a member, accounts leaves again, up to three attempts in all, and then lists the workspace in `failed_workspace_ids`. On MongoDB without a replica set, accounts writes without transactions, so a concurrent write to the same workspace can overwrite a leave. The second read does not catch a write that lands after it, so a workspace in `removed_workspace_ids` can still have the integration. Retry the workspaces in `failed_workspace_ids`, and call again until both lists are empty.
 
 ### What is logged
 

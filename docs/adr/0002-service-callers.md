@@ -190,6 +190,8 @@ Accounts adds two endpoints for this case, in both REST and GraphQL:
 - A lookup of the acting integration's workspaces and roles.
 - A removal of the acting integration from all its workspaces, for use when the integration is deleted.
 
+The removal needs only membership, whatever the integration's role, because it lowers the caller's own access.
+
 ### 6. Acting for a user who is not present is a rare, explicit grant
 
 A client registered with `"user"` in `act_as` may send `X-Reearth-Act-As: user:<id>`. Accounts then authorizes the call as that user, on a short list of read operations only: the user's profile, and the user's workspaces and roles. Every other route returns `403` to a case C call. Google's domain-wide delegation shows the risk of an unlimited grant, and Atlassian Forge limits offline impersonation in the same way. We give this grant only where no user token can exist. Today the only such caller is the Visualizer project import, which a storage event starts. The better fix is to record the uploader's identity while the user is present, so that no client needs the grant. When that fix ships, we remove the grant.

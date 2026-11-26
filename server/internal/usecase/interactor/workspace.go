@@ -1014,8 +1014,9 @@ func actingIntegration(operator *workspace.Operator) (workspace.IntegrationID, b
 	return *operator.Integration, true
 }
 
-// integrationWorkspaces reads the integration's workspaces fresh, not from the
-// operator's role lists, sorted by ID.
+// integrationWorkspaces reads the memberships from the repository, sorted by
+// ID, because the operator's role lists were computed when the request started
+// and can be stale.
 func (i *Workspace) integrationWorkspaces(ctx context.Context, iid workspace.IntegrationID) (workspace.List, error) {
 	ws, err := i.repos.Workspace.FindByIntegration(ctx, iid)
 	if errors.Is(err, rerror.ErrNotFound) {
@@ -1060,18 +1061,58 @@ func (i *Workspace) LeaveAllAsIntegration(ctx context.Context, operator *workspa
 	}
 
 	res := interfaces.LeaveAllResult{Removed: id.WorkspaceIDList{}, Failed: id.WorkspaceIDList{}}
-	for _, w := range ws {
-		removed, err := i.leaveAsIntegration(ctx, w.ID(), iid, operator)
+	for n, w := range ws {
+		if err := ctx.Err(); err != nil {
+			rest := ws[n:].IDs()
+			applog.Warn(ctx, "integration stopped leaving its workspaces: request cancelled", applog.IntegrationID(iid), applog.WorkspaceIDs(rest), applog.Err(err))
+			res.Failed = append(res.Failed, rest...)
+			break
+		}
+		removed, err := i.leaveAndConfirm(ctx, w.ID(), iid, operator)
 		switch {
 		case err != nil:
 			applog.Error(ctx, "integration failed to leave a workspace", applog.IntegrationID(iid), applog.WorkspaceID(w.ID()), applog.Err(err))
 			res.Failed = append(res.Failed, w.ID())
 		case removed:
+			applog.Info(ctx, "integration left a workspace", applog.IntegrationID(iid), applog.WorkspaceID(w.ID()))
 			res.Removed = append(res.Removed, w.ID())
 		}
 	}
 	applog.Info(ctx, "integration left its workspaces", applog.IntegrationID(iid), applog.RemovedCount(len(res.Removed)), applog.FailedCount(len(res.Failed)))
 	return res, nil
+}
+
+const leaveAttempts = 3
+
+var errStillMember = errors.New("integration is still a member after leaving")
+
+// leaveAndConfirm reads the workspace again after each leave. On MongoDB
+// without transactions, a concurrent Save of the same workspace built from an
+// earlier read can put the integration back. A Save that lands after the
+// confirming read is not caught.
+func (i *Workspace) leaveAndConfirm(ctx context.Context, wid workspace.ID, iid workspace.IntegrationID, operator *workspace.Operator) (bool, error) {
+	left := false
+	for range leaveAttempts {
+		removed, err := i.leaveAsIntegration(ctx, wid, iid, operator)
+		if err != nil {
+			return false, err
+		}
+		left = left || removed
+		if !left {
+			return false, nil
+		}
+		ws, err := i.repos.Workspace.FindByID(ctx, wid)
+		if errors.Is(err, rerror.ErrNotFound) {
+			return true, nil
+		}
+		if err != nil {
+			return false, err
+		}
+		if !ws.Members().HasIntegration(iid) {
+			return true, nil
+		}
+	}
+	return false, errStillMember
 }
 
 // leaveAsIntegration goes through Save rather than a bulk update across

@@ -488,8 +488,6 @@ func testWorkspaceFindByIntegration(t *testing.T, nc Factory) {
 	assert.Equal(t, ws.ID(), many[0].ID())
 }
 
-// seedLeaveAllWorkspaces seeds two workspaces the integration belongs
-// to, one where only another integration is a member, and returns their IDs.
 func seedLeaveAllWorkspaces(t *testing.T, c *repo.Container, iid, other id.IntegrationID) (member id.WorkspaceIDList, untouched id.WorkspaceID) {
 	t.Helper()
 	ctx := context.Background()

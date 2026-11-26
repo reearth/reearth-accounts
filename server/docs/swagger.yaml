@@ -665,6 +665,10 @@ paths:
           description: Forbidden
           schema:
             $ref: '#/definitions/internal.ErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/internal.ErrorResponse'
       security:
       - BearerAuth: []
       summary: Remove the acting integration from all its workspaces
@@ -692,6 +696,10 @@ paths:
             $ref: '#/definitions/internal.ErrorResponse'
         "403":
           description: Forbidden
+          schema:
+            $ref: '#/definitions/internal.ErrorResponse'
+        "500":
+          description: Internal Server Error
           schema:
             $ref: '#/definitions/internal.ErrorResponse'
       security:
