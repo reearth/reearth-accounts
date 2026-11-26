@@ -41,6 +41,9 @@ func Start(debug bool) {
 		applog.Fatal(ctx, "failed to read config", applog.Err(cerr))
 	}
 	applog.Info(ctx, "config", applog.Config(conf.Print()))
+	if conf.LocalIssuer {
+		applog.Warn(ctx, "REEARTH_ACCOUNTS_LOCAL_ISSUER is on: token issuers on loopback and single-label hosts are trusted. Never use it in a deployed environment")
+	}
 	log.GCPProject = gcpProject(ctx, conf)
 
 	// Init OpenTelemetry tracer
