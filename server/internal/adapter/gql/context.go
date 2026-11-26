@@ -48,7 +48,7 @@ func dataloaders(ctx context.Context) *DataLoaders {
 }
 
 // denyServiceCaller keeps the user directory closed to service callers, which are
-// scoped to the workspaces their integration belongs to (ADR-0002 decision 4).
+// scoped to the workspaces their integration belongs to (ADR-0002 decision 5).
 func denyServiceCaller(ctx context.Context) error {
 	if getOperator(ctx).IsService() {
 		return interfaces.ErrInvalidOperator

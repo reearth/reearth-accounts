@@ -59,7 +59,7 @@ A service caller is an OAuth client that calls accounts with a client credential
 
 ### The registry entry
 
-`REEARTH_ACCOUNTS_SERVICE_CALLERS` is a JSON array. Each entry has exactly these keys:
+`REEARTH_ACCOUNTS_SERVICE_CALLERS` must be a JSON array. An unset or blank variable registers no caller; `null`, an object, a string, or a number stops startup. Each entry is an object with exactly these keys, each written once, in lower case:
 
 ```json
 [
@@ -77,7 +77,7 @@ A service caller is an OAuth client that calls accounts with a client credential
 - `name` is the name that accounts logs for the client. It must match `^[a-z0-9][a-z0-9-]{0,62}$`.
 - `act_as` lists the kinds of subject the client may act for: `"integration"`, `"user"`, or both. The key is required. An empty list, `[]`, registers a client that can only make anonymous calls.
 
-The server refuses to start when an entry has a missing or unknown key, a duplicate `act_as` value, an invalid `name`, or a repeated `(issuer, client_id)` pair.
+Keys are case-sensitive: `"ACT_AS"` or `"Name"` is an unknown key. The server refuses to start when an entry has a missing, unknown, or repeated key, a duplicate `act_as` value, an invalid `name`, or a repeated `(issuer, client_id)` pair.
 
 **Breaking change.** The earlier shape, `{"issuer","client_id","integration_id"}`, is no longer accepted. An entry with `integration_id` stops startup with an error that names `act_as`. To migrate, replace `integration_id` with `"name"` and `"act_as": ["integration"]`, and make the client send `X-Reearth-Act-As: integration:<integration ID>` on every call.
 
@@ -95,13 +95,25 @@ Accounts then authorizes the call as that integration: the workspaces where the 
 
 A client token without the header is anonymous. It gets what a request with no token gets.
 
+A Go client that uses `pkg/servicetoken` names the subject on each request's context, and `servicetoken.Transport` sends the header:
+
+```go
+ctx = servicetoken.WithActAs(ctx, servicetoken.IntegrationSubject(integrationID))
+```
+
+The transport sends the header only with the service token. A request that already carries a user token gets neither.
+
+### Migrating
+
+Change a caller in this order. First, make the caller send `X-Reearth-Act-As` on every call. Then change its registry entry. A caller that sends no header becomes anonymous as soon as the new entry is in place, and anonymous calls get 401 on every route that is not public.
+
 ### Responses
 
 | Request | Result |
 |---|---|
 | Client token, registered, `integration:<id>` allowed by `act_as` | Authorized as the integration |
 | Client token, no header | Anonymous |
-| Client token, unregistered or with invalid claims | 401 |
+| Client token, unregistered or with invalid claims, with or without the header | 401, also when no caller is registered |
 | Client token from an unconfigured issuer, with the wrong audience, or expired | 401 |
 | Header with a user token or with no token | 401 |
 | Header empty, repeated, malformed, or with an unknown kind | 401 |
@@ -120,4 +132,6 @@ Every accepted client call writes one `auth: client call` entry. That entry, eve
 - `caller_name`: the registered name.
 - `acting_for`: `integration:<id>`, or `none` for an anonymous call.
 
-Every refused call writes one `auth: rejected client call` entry with a `reason` code, the token's `issuer`, and `caller_client_id` when the token names a client. No entry contains the token, the raw header value, or an email address.
+Every refused call writes one `auth: rejected client call` entry with a `reason` code and `caller_client_id` when the token names a client. A refusal made while reading the token or the header also carries the token's `issuer`. An anonymous call to a route or operation that is not public is refused with `anonymous_call_not_public`; its entry and its request log line carry all three fields above, and it is not also logged as accepted.
+
+The request log line of any request made with a client token carries `caller_client_id`, also when the call is refused or the route reads no credentials. No entry contains the token, the raw header value, or an email address.

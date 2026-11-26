@@ -207,7 +207,6 @@ func restAuthResolver(cfg *ServerConfig) adapterhttp.AuthResolver {
 				return nil, nil, ccErr
 			}
 			if cc != nil {
-				// The middleware attaches the returned operator onto this context.
 				c.SetRequest(c.Request().WithContext(cc.Attach(ctx)))
 				return nil, cc.Operator, nil
 			}

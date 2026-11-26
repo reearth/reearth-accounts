@@ -38,6 +38,7 @@ func RequiredAuth(resolve AuthResolver) echo.MiddlewareFunc {
 				return err
 			}
 			if u == nil && op == nil {
+				logAnonymousClient(c, false)
 				return httpinternal.ErrUnauthorized
 			}
 			c.SetRequest(c.Request().WithContext(attach(c.Request().Context(), u, op)))
@@ -58,6 +59,7 @@ func RequiredUser(resolve AuthResolver) echo.MiddlewareFunc {
 				return err
 			}
 			if u == nil {
+				logAnonymousClient(c, false)
 				return httpinternal.ErrUnauthorized
 			}
 			c.SetRequest(c.Request().WithContext(attach(c.Request().Context(), u, op)))
@@ -81,9 +83,21 @@ func OptionalAuth(resolve AuthResolver) echo.MiddlewareFunc {
 			}
 			if u != nil || op != nil {
 				c.SetRequest(c.Request().WithContext(attach(c.Request().Context(), u, op)))
+			} else {
+				logAnonymousClient(c, true)
 			}
 			return next(c)
 		}
+	}
+}
+
+// logAnonymousClient logs the verdict on an anonymous client call, which the
+// resolver attaches without an operator because only the route knows whether it
+// admits an anonymous caller.
+func logAnonymousClient(c echo.Context, accepted bool) {
+	ctx := c.Request().Context()
+	if cc := adapter.ClientCallOf(ctx); cc != nil && cc.Operator == nil {
+		cc.LogVerdict(ctx, accepted)
 	}
 }
 

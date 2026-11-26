@@ -252,9 +252,16 @@ func identityProviderAuthMiddleware(cfg *ServerConfig) func(http.Handler) http.H
 			if cc != nil {
 				// An anonymous client call gets what a request with no token gets,
 				// without the debug headers.
-				if cc.Operator == nil && !isBypassed(req) {
-					http.Error(w, http.StatusText(http.StatusUnauthorized), http.StatusUnauthorized)
-					return
+				if cc.Operator == nil {
+					public := isBypassed(req)
+					cc.LogVerdict(ctx, public)
+					if !public {
+						// The refusal never reaches echo's context, so the request
+						// log learns the caller here.
+						recordClientCall(ctx, cc)
+						http.Error(w, http.StatusText(http.StatusUnauthorized), http.StatusUnauthorized)
+						return
+					}
 				}
 				next.ServeHTTP(w, req.WithContext(cc.Attach(ctx)))
 				return

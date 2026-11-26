@@ -1,6 +1,7 @@
 package app
 
 import (
+	"bytes"
 	"context"
 	"encoding/base64"
 	"encoding/json"
@@ -32,7 +33,6 @@ type serviceCallerKey struct {
 }
 
 // ActAs is the set of subject kinds a client may act for (ADR-0002 decision 3).
-// The empty set is valid: such a client can only make anonymous calls.
 type ActAs uint8
 
 const (
@@ -76,37 +76,31 @@ type serviceCallerEntry struct {
 	ActAs *[]string `json:"act_as"`
 }
 
+var serviceCallerKeys = map[string]struct{}{"issuer": {}, "client_id": {}, "name": {}, "act_as": {}}
+
 // The name is logged verbatim, so its charset is fixed.
 var serviceCallerName = regexp.MustCompile(`^[a-z0-9][a-z0-9-]{0,62}$`)
 
 // Decode parses REEARTH_ACCOUNTS_SERVICE_CALLERS, a JSON array of
-// {"issuer","client_id","name","act_as"} objects. Unknown keys are an error, so
-// a registry written for an older shape stops startup instead of being misread.
+// {"issuer","client_id","name","act_as"} objects. Keys must match exactly and
+// appear once, so a registry written for an older shape, or edited into an
+// ambiguous one, stops startup instead of being misread.
 func (s *ServiceCallers) Decode(value string) error {
 	if strings.TrimSpace(value) == "" {
 		*s = nil
 		return nil
 	}
-	var loose []map[string]json.RawMessage
-	if err := json.Unmarshal([]byte(value), &loose); err != nil {
+	var raw []json.RawMessage
+	if err := json.Unmarshal([]byte(value), &raw); err != nil {
 		return fmt.Errorf("invalid service callers json: %w", err)
 	}
-	for i, e := range loose {
-		if _, old := e["integration_id"]; old {
-			return fmt.Errorf("service caller %d uses integration_id, which is no longer supported: replace it with act_as and send X-Reearth-Act-As (ADR-0002 decision 3)", i+1)
-		}
+	if raw == nil {
+		return errors.New("invalid service callers json: the value must be an array")
 	}
 
-	dec := json.NewDecoder(strings.NewReader(value))
-	dec.DisallowUnknownFields()
-	var entries []serviceCallerEntry
-	if err := dec.Decode(&entries); err != nil {
-		return fmt.Errorf("invalid service callers json: %w", err)
-	}
-
-	res := make(ServiceCallers, len(entries))
-	for i, e := range entries {
-		c, err := e.parse()
+	res := make(ServiceCallers, len(raw))
+	for i, r := range raw {
+		c, err := decodeServiceCaller(r)
 		if err != nil {
 			return fmt.Errorf("service caller %d: %w", i+1, err)
 		}
@@ -118,6 +112,42 @@ func (s *ServiceCallers) Decode(value string) error {
 	}
 	*s = res
 	return nil
+}
+
+// decodeServiceCaller walks the entry's tokens before decoding it, because
+// encoding/json matches keys case-insensitively and lets a repeated key win.
+func decodeServiceCaller(raw json.RawMessage) (ServiceClient, error) {
+	dec := json.NewDecoder(bytes.NewReader(raw))
+	if t, err := dec.Token(); err != nil || t != json.Delim('{') {
+		return ServiceClient{}, errors.New("must be an object")
+	}
+	seen := make(map[string]struct{}, len(serviceCallerKeys))
+	for dec.More() {
+		t, err := dec.Token()
+		if err != nil {
+			return ServiceClient{}, err
+		}
+		k, _ := t.(string)
+		if k == "integration_id" {
+			return ServiceClient{}, errors.New("integration_id is no longer supported: replace it with act_as and send X-Reearth-Act-As (ADR-0002 decision 3)")
+		}
+		if _, ok := serviceCallerKeys[k]; !ok {
+			return ServiceClient{}, fmt.Errorf("unknown key %q", k)
+		}
+		if _, dup := seen[k]; dup {
+			return ServiceClient{}, fmt.Errorf("key %q appears twice", k)
+		}
+		seen[k] = struct{}{}
+		var v json.RawMessage
+		if err := dec.Decode(&v); err != nil {
+			return ServiceClient{}, err
+		}
+	}
+	var e serviceCallerEntry
+	if err := json.Unmarshal(raw, &e); err != nil {
+		return ServiceClient{}, err
+	}
+	return e.parse()
 }
 
 func (e serviceCallerEntry) parse() (ServiceClient, error) {
@@ -217,10 +247,9 @@ type clientAuth struct {
 // authenticate decides, with no I/O, whether a request is a registered client
 // call and what it acts for. actAs is every X-Reearth-Act-As value the request
 // carries, so an empty or repeated header is refused rather than read as absent.
-// It returns (nil, nil) for a request that is not a client call and has no
-// header, so the user path handles it unchanged.
+// It returns (nil, nil) when the user path should handle the request.
 func (s ServiceCallers) authenticate(ai *appx.AuthInfo, actAs []string) (*clientAuth, error) {
-	clientID, err := s.clientID(ai)
+	clientID, err := tokenClientID(ai)
 	if err != nil {
 		return nil, err
 	}
@@ -249,9 +278,9 @@ func (s ServiceCallers) authenticate(ai *appx.AuthInfo, actAs []string) (*client
 	if !c.ActAs.Allows(sub.Kind()) {
 		return nil, reject(reasonKindNotAllowed)
 	}
-	// Acting for a user stays closed until the route gate exists: without it, an
-	// operator with both a user and a client passes every user-only guard.
-	// Removing this check is what opens ADR-0002 decision 6.
+	// Acting for a user (ADR-0002 decision 6) is not available yet, so a user
+	// subject is refused here even when act_as allows it. Without a route gate,
+	// an operator with both a user and a client would pass every user-only guard.
 	if sub.Kind() == workspace.SubjectUser {
 		return nil, reject(reasonActAsUserNotAvailable)
 	}
@@ -272,12 +301,13 @@ func (c tokenClaims) str(name string) (v string, ok bool) {
 	return v, json.Unmarshal(raw, &v) == nil
 }
 
-// clientID classifies a token appx has already validated (issuer, signature,
-// audience, expiry). It returns "" for a token that does not claim to be a
-// client credentials token, so the user path handles it unchanged. A token that
-// claims to be one must carry no user (ADR-0002 decision 2).
-func (s ServiceCallers) clientID(ai *appx.AuthInfo) (string, error) {
-	if len(s) == 0 || ai == nil || ai.Token == "" {
+// tokenClientID classifies a token appx has already validated (issuer,
+// signature, audience, expiry), whatever the registry holds. It returns "" for a
+// token that does not claim to be a client credentials token, so the user path
+// handles it unchanged. A token that claims to be one must carry no user
+// (ADR-0002 decision 2).
+func tokenClientID(ai *appx.AuthInfo) (string, error) {
+	if ai == nil || ai.Token == "" {
 		return "", nil
 	}
 	c, err := decodeTokenClaims(ai.Token)
@@ -336,7 +366,7 @@ func decodeTokenClaims(token string) (tokenClaims, error) {
 
 // generateIntegrationOperator builds the operator for a client acting for an
 // integration: no user, and the workspaces where the integration is a member,
-// by role. An integration with no memberships gets empty lists.
+// by role.
 func generateIntegrationOperator(ctx context.Context, cfg *ServerConfig, iid id.IntegrationID, c *workspace.Client) (*workspace.Operator, error) {
 	ws, err := cfg.Repos.Workspace.FindByIntegration(ctx, iid)
 	if err != nil && !errors.Is(err, rerror.ErrNotFound) {
@@ -352,15 +382,7 @@ func generateIntegrationOperator(ctx context.Context, cfg *ServerConfig, iid id.
 	}, nil
 }
 
-// integrationScope is the seam for ADR-0002 open question 2 (limit a client to integrations it may act for).
-func integrationScope(_ ServiceClient, _ id.IntegrationID) error {
-	return nil
-}
-
-// resolveClientCall is the one place both transports turn a request into a
-// client call. It returns (nil, nil) when the request is not a client call, a
-// *clientRejected for any refusal, and other errors as they come from the repo.
-// It logs every accepted call and every refusal once (ADR-0002 decision 8).
+// resolveClientCall turns a request into a client call for both transports.
 func resolveClientCall(ctx context.Context, cfg *ServerConfig, ai *appx.AuthInfo, actAs []string) (*adapter.ClientCall, error) {
 	ca, err := cfg.Config.ServiceCallers.authenticate(ai, actAs)
 	if err != nil {
@@ -374,16 +396,25 @@ func resolveClientCall(ctx context.Context, cfg *ServerConfig, ai *appx.AuthInfo
 	client := ca.client.Client
 	cc := &adapter.ClientCall{Client: &client, Subject: ca.subject}
 	if iid, ok := ca.subject.Integration(); ok {
-		if err := integrationScope(ca.client, iid); err != nil {
-			logRejection(ctx, ai, err)
-			return nil, err
-		}
 		if cc.Operator, err = generateIntegrationOperator(ctx, cfg, iid, cc.Client); err != nil {
 			return nil, err
 		}
+		cc.LogVerdict(ctx, true)
 	}
-	applog.Info(ctx, "auth: client call", cc.LogFields()...)
+	// An anonymous call is logged by the transport, which knows whether the
+	// operation is public.
 	return cc, nil
+}
+
+// callerClientID is the client ID a request's token names, for the request log
+// when no client call is attached: a refused call, or a route with no auth.
+func callerClientID(ai *appx.AuthInfo) string {
+	cid, err := tokenClientID(ai)
+	var r *clientRejected
+	if errors.As(err, &r) {
+		return r.clientID
+	}
+	return cid
 }
 
 func logRejection(ctx context.Context, ai *appx.AuthInfo, err error) {

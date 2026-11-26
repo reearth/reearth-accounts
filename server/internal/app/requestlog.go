@@ -29,6 +29,7 @@ type requestRecord struct {
 	caller string
 
 	mu            sync.Mutex
+	client        *adapter.ClientCall
 	operation     string
 	operationType string
 	fields        []string
@@ -90,6 +91,10 @@ func requestFields(c echo.Context, ctx context.Context, rec *requestRecord, late
 	if len(rec.fields) > 0 {
 		fields = append(fields, applog.Fields(rec.fields))
 	}
+	cc := adapter.ClientCallOf(ctx)
+	if cc == nil {
+		cc = rec.client
+	}
 	rec.mu.Unlock()
 
 	if u := adapter.User(ctx); u != nil {
@@ -98,10 +103,20 @@ func requestFields(c echo.Context, ctx context.Context, rec *requestRecord, late
 	if rec.caller != "" {
 		fields = append(fields, applog.Caller(rec.caller))
 	}
-	if cc := adapter.ClientCallOf(ctx); cc != nil {
+	if cc != nil {
 		fields = append(fields, cc.LogFields()...)
+	} else if cid := callerClientID(adapter.GetAuthInfo(ctx)); cid != "" {
+		fields = append(fields, applog.CallerClientID(cid))
 	}
 	return fields
+}
+
+func recordClientCall(ctx context.Context, cc *adapter.ClientCall) {
+	if rec, ok := ctx.Value(requestRecordKey{}).(*requestRecord); ok {
+		rec.mu.Lock()
+		rec.client = cc
+		rec.mu.Unlock()
+	}
 }
 
 // callerLabel keeps the caller-chosen X-Internal-Service value short and
