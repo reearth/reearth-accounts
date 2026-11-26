@@ -14,7 +14,10 @@ import (
 var clientRoutes = map[string]adapter.ClientAccess{
 	"GET /api/auth/config": adapter.AnonymousClients | adapter.IntegrationClients,
 
-	"GET /api/workspaces":                                     adapter.IntegrationClients,
+	"GET /api/users/me": adapter.UserClients,
+	// The interactor scopes it to the subject, pinned by TestWorkspace_ReadsForAClientActingForAUserAreScoped and TestActAsUser_ReadList.
+	"GET /api/workspaces": adapter.IntegrationClients | adapter.UserClients,
+
 	"GET /api/workspaces/:id":                                 adapter.IntegrationClients,
 	"PATCH /api/workspaces/:id":                               adapter.IntegrationClients,
 	"DELETE /api/workspaces/:id":                              adapter.IntegrationClients,

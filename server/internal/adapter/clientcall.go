@@ -13,6 +13,8 @@ type clientCallKey struct{}
 // ClientCall is the auth layer's verdict for a request made with a registered
 // client token (ADR-0002).
 type ClientCall struct {
+	// Issuer is the token's issuer. Client IDs are unique only within one.
+	Issuer   string
 	Client   *workspace.Client
 	Subject  workspace.Subject
 	Operator *workspace.Operator

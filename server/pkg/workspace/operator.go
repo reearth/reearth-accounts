@@ -33,6 +33,13 @@ func (o *Operator) IsUserSelf() bool {
 	return o != nil && o.User != nil && o.Client == nil
 }
 
+// IsUserSelfOrService reports whether the operator may change anything: a
+// user's own token or a service caller. A client acting for a user only reads
+// (ADR-0002 decision 6), so it is neither.
+func (o *Operator) IsUserSelfOrService() bool {
+	return o.IsUserSelf() || o.IsService()
+}
+
 func (o *Operator) Subject() Subject {
 	switch {
 	case o == nil:

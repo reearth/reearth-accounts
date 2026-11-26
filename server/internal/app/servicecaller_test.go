@@ -256,6 +256,48 @@ func TestServiceCallerAuth(t *testing.T) {
 	})
 }
 
+func TestServiceCallerActingForAUser(t *testing.T) {
+	idp := newTestIdP(t)
+	f := newServiceFixture(t)
+	gone := user.New().NewID().Name("gone").Email("gone@example.com").MustBuild()
+	gone.Deactivate()
+	require.NoError(t, f.repos.User.Save(context.Background(), gone))
+	callers, _ := json.Marshal([]map[string]any{
+		{"issuer": idp.issuer(), "client_id": "svc-users", "name": "svc-users", "act_as": []string{"user"}},
+		{"issuer": idp.issuer(), "client_id": "svc-int", "name": "svc-int", "act_as": []string{"integration"}},
+	})
+	h := authStack(t, serviceConfig(t, f.repos, []*testIdP{idp}, string(callers)))
+	tok := idp.sign(t, clientClaims("svc-users"))
+
+	t.Run("the operator is the user's own, marked as a client call", func(t *testing.T) {
+		_, own := callWith(h, idp.sign(t, jwt.MapClaims{"sub": f.userSub}))
+		rr, op := callWith(h, tok, "user:"+f.userID.String())
+		require.Equal(t, http.StatusOK, rr.Code)
+		require.NotNil(t, op)
+		assert.Equal(t, &workspace.Client{ID: "svc-users", Name: "svc-users"}, op.Client)
+		own.Client = op.Client
+		assert.Equal(t, own, op)
+		assert.True(t, op.ViaClient())
+		assert.False(t, op.IsUserSelf())
+		assert.False(t, op.IsService())
+	})
+
+	for name, actAs := range map[string]string{
+		"an unknown user":    "user:" + user.NewID().String(),
+		"a deactivated user": "user:" + gone.ID().String(),
+	} {
+		t.Run(name+" is 401", func(t *testing.T) {
+			rr, _ := callWith(h, tok, actAs)
+			assert.Equal(t, http.StatusUnauthorized, rr.Code)
+		})
+	}
+
+	t.Run("a client without user in act_as is 401", func(t *testing.T) {
+		rr, _ := callWith(h, idp.sign(t, clientClaims("svc-int")), "user:"+f.userID.String())
+		assert.Equal(t, http.StatusUnauthorized, rr.Code)
+	})
+}
+
 func TestServiceCallerIssuerIsPartOfTheRegistration(t *testing.T) {
 	registered, other := newTestIdP(t), newTestIdP(t)
 	f := newServiceFixture(t)
@@ -397,6 +439,8 @@ func TestAuthenticate(t *testing.T) {
 	}{
 		{"integration subject", client("int"), []string{asInt}, workspace.IntegrationSubject(iid)},
 		{"integration subject, client with both kinds", client("both"), []string{asInt}, workspace.IntegrationSubject(iid)},
+		{"user subject", client("usr"), []string{asUser}, workspace.UserSubject(uid)},
+		{"user subject, client with both kinds", client("both"), []string{asUser}, workspace.UserSubject(uid)},
 		{"no header is anonymous", client("int"), nil, workspace.Subject{}},
 		{"no header is anonymous, act_as []", client("anon"), nil, workspace.Subject{}},
 	}
@@ -438,8 +482,6 @@ func TestAuthenticate(t *testing.T) {
 		{"integration not in act_as", client("usr"), []string{asInt}, reasonKindNotAllowed},
 		{"integration with act_as []", client("anon"), []string{asInt}, reasonKindNotAllowed},
 		{"user not in act_as", client("int"), []string{asUser}, reasonKindNotAllowed},
-		{"user allowed by act_as", client("both"), []string{asUser}, reasonActAsUserNotAvailable},
-		{"user only client", client("usr"), []string{asUser}, reasonActAsUserNotAvailable},
 	}
 	for _, tc := range rejected {
 		t.Run("rejects "+tc.name, func(t *testing.T) {

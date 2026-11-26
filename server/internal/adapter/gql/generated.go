@@ -1706,7 +1706,7 @@ extend type Query {
   findUserByAlias(alias: String!): User
   findUsersByIDsWithPagination(ids: [ID!]!, alias: String, pagination: Pagination!): UsersWithPagination! @public
   findUsersByIDs(ids: [ID!]!): [User!]!
-  me: Me
+  me: Me @client(as: [USER])
   mfaStatus: MFAStatus!
   searchUser(keyword: String!): [User!]!
   user(id: ID!): User
@@ -1927,8 +1927,8 @@ extend type Query {
     findByIDs(ids: [ID!]!): [Workspace!]! @public @client(as: [INTEGRATION])
     findByName(name: String!): Workspace @client(as: [INTEGRATION])
     findByAlias(alias: String!): Workspace @public @client(as: [INTEGRATION])
-    findByUser(userId: ID!): [Workspace] @client(as: [INTEGRATION])
-    findByUserWithPagination(userId: ID!, pagination: Pagination!): WorkspacesWithPagination! @client(as: [INTEGRATION])
+    findByUser(userId: ID!): [Workspace] @client(as: [INTEGRATION, USER])
+    findByUserWithPagination(userId: ID!, pagination: Pagination!): WorkspacesWithPagination! @client(as: [INTEGRATION, USER])
     "Looks a workspace up by exactly one of id or alias. Returns null when none matches."
     publicWorkspace(id: ID, alias: String): PublicWorkspace @public @client(as: [INTEGRATION])
 }
