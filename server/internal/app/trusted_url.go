@@ -91,6 +91,10 @@ func checkLocalURL(raw string) error {
 	if strings.TrimSuffix(name, ".") == "localhost" {
 		return nil
 	}
+	// Cloud resolvers expand these single labels to the metadata address.
+	if name == "metadata" || name == "instance-data" {
+		return fmt.Errorf("host %q is a metadata service name", host)
+	}
 	if name != "" && isLetter(rune(name[0])) &&
 		!strings.ContainsFunc(name, func(r rune) bool { return !isLetter(r) && !isDigit(r) && r != '-' }) {
 		return nil
@@ -109,7 +113,7 @@ func checkTrustedURLs(providers []appx.JWTProvider, callers ServiceCallers, loca
 			if localIssuer {
 				return
 			}
-			err = fmt.Errorf("%w (REEARTH_ACCOUNTS_LOCAL_ISSUER=true allows loopback and single-label hosts for local development)", err)
+			err = fmt.Errorf("%w (on a developer machine only, REEARTH_ACCOUNTS_LOCAL_ISSUER=true allows loopback and single-label hosts)", err)
 		}
 		errs = append(errs, fmt.Errorf("%s: %w", source, err))
 	}

@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"net"
 	"os"
+	"strconv"
 	"strings"
 	"time"
 
@@ -36,7 +37,9 @@ type Config struct {
 	// mock
 	Mock_Auth bool `envconfig:"REEARTH_MOCK_AUTH" pp:",omitempty"`
 
-	LocalIssuer bool `envconfig:"REEARTH_ACCOUNTS_LOCAL_ISSUER" pp:",omitempty"`
+	// LocalIssuer is read by ReadConfig from REEARTH_ACCOUNTS_LOCAL_ISSUER
+	// alone. envconfig would also accept a prefixed spelling of the name.
+	LocalIssuer bool `ignored:"true" pp:",omitempty"`
 
 	// auth
 	Auth     AuthConfigs `pp:",omitempty"`
@@ -283,6 +286,18 @@ func ReadConfig(debug bool) (*Config, error) {
 		return nil, fmt.Errorf("REEARTH_ACCOUNTS_SERVICE_CALLERS: %w", err)
 	}
 
+	if v := os.Getenv(localIssuerEnv); v != "" {
+		on, err := strconv.ParseBool(v)
+		if err != nil {
+			return nil, fmt.Errorf("%s: not a boolean", localIssuerEnv)
+		}
+		c.LocalIssuer = on
+	}
+	if c.LocalIssuer {
+		if p := managedPlatform(); p != "" {
+			return nil, fmt.Errorf("%s is for a developer machine and must not be set on %s", localIssuerEnv, p)
+		}
+	}
 	if err := checkTrustedURLs(c.Auths(), c.ServiceCallers, c.LocalIssuer); err != nil {
 		return nil, fmt.Errorf("untrusted token URL (ADR-0002 decision 11.6); each issuer and JWKS URI must be https on a DNS name: %w", err)
 	}
@@ -295,6 +310,21 @@ func ReadConfig(debug bool) (*Config, error) {
 type GraphQLConfig struct {
 	ComplexityLimit int `default:"6000"`
 	DepthLimit      int `default:"10"`
+}
+
+const localIssuerEnv = "REEARTH_ACCOUNTS_LOCAL_ISSUER"
+
+// managedPlatform names the hosting platform when its runtime sets a marker
+// variable. A single-label host resolves through the platform's search
+// domains there, so the local issuer switch could reach in-cluster services.
+func managedPlatform() string {
+	switch {
+	case os.Getenv("K_SERVICE") != "":
+		return "Cloud Run"
+	case os.Getenv("KUBERNETES_SERVICE_HOST") != "":
+		return "Kubernetes"
+	}
+	return ""
 }
 
 func (c Config) Print() string {

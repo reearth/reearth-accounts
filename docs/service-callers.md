@@ -35,10 +35,20 @@ With the switch on, a URL that fails the check above still passes when all of th
 - The host is one of these:
   - A loopback IP address, such as `127.0.0.1`, any other `127.x.y.z` address, `::1`, or `::ffff:127.0.0.1`. The addresses `0.0.0.0` and `::`, private ranges, link-local addresses, and metadata addresses do not pass.
   - The name `localhost`, in any case, with or without one trailing dot. Names under it, such as `app.localhost`, do not pass.
-  - A name with one label that starts with an ASCII letter and uses only ASCII letters, digits, and hyphens, such as `mock-oauth2`. Short numeric forms such as `127.1` do not pass.
+  - A name with one label that starts with an ASCII letter and uses only ASCII letters, digits, and hyphens, such as `mock-oauth2`. Short numeric forms such as `127.1` do not pass. The names `metadata` and `instance-data` do not pass, because cloud resolvers expand them to the metadata address.
 
 Every other URL must still be an `https` URL on a DNS name. For example, `http://idp.example.com/` and `https://10.0.0.1/` fail with the switch on.
 
 When the switch is off and a failing URL would pass with the switch on, the error says so.
 
-The switch is for a developer machine. Do not set it in a deployed environment. `REEARTH_DEV`, `REEARTH_ACCOUNTS_DEV`, and `REEARTH_MOCK_AUTH` have no effect on this check, and neither does the build tag.
+The switch is for a developer machine. Do not set it in a deployed environment:
+
+- The server refuses to start with the switch on when it runs on Cloud Run or Kubernetes. It detects them by the `K_SERVICE` and `KUBERNETES_SERVICE_HOST` variables that those platforms set. A single-label host resolves to in-cluster services there.
+- The server logs a warning at startup whenever the switch is on.
+- Only the variable `REEARTH_ACCOUNTS_LOCAL_ISSUER` sets the switch. A value that is not a boolean stops startup.
+
+`REEARTH_DEV`, `REEARTH_ACCOUNTS_DEV`, and `REEARTH_MOCK_AUTH` have no effect on this check, and neither does the build tag. A local setup that runs with `REEARTH_MOCK_AUTH` and a placeholder issuer, such as `http://localhost:8080/`, needs the switch too, or an `https` issuer.
+
+### Difference from ADR-0002
+
+ADR-0002 decisions 11.6 and 11.7 say that the check is off when dev mode is on. The server is stricter: dev mode has no effect, and only the local issuer switch relaxes the check. The reason is that a deployed development environment can run with dev mode on.

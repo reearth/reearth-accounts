@@ -120,6 +120,9 @@ func TestCheckLocalURL(t *testing.T) {
 		"http://0x7f000001/",
 		"http://2130706433/",
 		"http://foo.localhost/",
+		"http://metadata/computeMetadata/v1/",
+		"http://METADATA/",
+		"http://instance-data/latest/meta-data/",
 		"http://localhost.localdomain/",
 		"http://mock-oauth2./",
 		"http://1mock/",
@@ -156,7 +159,7 @@ func TestCheckTrustedURLs(t *testing.T) {
 		{issuer: "https://localhost/", clientID: "svc-b"}:         id.NewIntegrationID(),
 		{issuer: "https://example.auth0.com/", clientID: "svc-a"}: id.NewIntegrationID(),
 	}
-	hint := " (REEARTH_ACCOUNTS_LOCAL_ISSUER=true allows loopback and single-label hosts for local development)"
+	hint := " (on a developer machine only, REEARTH_ACCOUNTS_LOCAL_ISSUER=true allows loopback and single-label hosts)"
 
 	err := checkTrustedURLs(providers, callers, false)
 	require.Error(t, err)
@@ -261,7 +264,7 @@ func TestReadConfig_TrustedURLs(t *testing.T) {
 				"REEARTH_ACCOUNTS_DEV": "true",
 				"REEARTH_AUTH":         providers(t, appx.JWTProvider{ISS: "http://mock-oauth2/"}),
 			},
-			wantError: "auth provider 1 issuer: scheme must be https (REEARTH_ACCOUNTS_LOCAL_ISSUER=true",
+			wantError: "auth provider 1 issuer: scheme must be https (on a developer machine only, REEARTH_ACCOUNTS_LOCAL_ISSUER=true",
 		},
 		{
 			name: "REEARTH_MOCK_AUTH does not turn the check off",
@@ -296,6 +299,44 @@ func TestReadConfig_TrustedURLs(t *testing.T) {
 				"REEARTH_ACCOUNTS_SERVICE_CALLERS": callers("http://mock-oauth2/"),
 			},
 			wantLocalIssuer: true,
+		},
+		{
+			name: "a prefixed spelling of the switch does not turn it on",
+			env: map[string]string{
+				"REEARTH_REEARTH_ACCOUNTS_LOCAL_ISSUER": "true",
+				"REEARTH_AUTH":                          providers(t, appx.JWTProvider{ISS: "http://mock-oauth2/"}),
+			},
+			wantError: "auth provider 1 issuer: scheme must be https",
+		},
+		{
+			name: "local issuer switch with a value that is not a boolean",
+			env: map[string]string{
+				"REEARTH_ACCOUNTS_LOCAL_ISSUER": "yes please",
+			},
+			wantError: "REEARTH_ACCOUNTS_LOCAL_ISSUER: not a boolean",
+		},
+		{
+			name: "local issuer switch is refused on Cloud Run",
+			env: map[string]string{
+				"REEARTH_ACCOUNTS_LOCAL_ISSUER": "true",
+				"K_SERVICE":                     "accounts",
+			},
+			wantError: "must not be set on Cloud Run",
+		},
+		{
+			name: "local issuer switch is refused on Kubernetes",
+			env: map[string]string{
+				"REEARTH_ACCOUNTS_LOCAL_ISSUER": "true",
+				"KUBERNETES_SERVICE_HOST":       "10.0.0.1",
+			},
+			wantError: "must not be set on Kubernetes",
+		},
+		{
+			name: "a managed platform without the switch starts",
+			env: map[string]string{
+				"K_SERVICE":    "accounts",
+				"REEARTH_AUTH": providers(t, appx.JWTProvider{ISS: "https://idp.example.com/"}),
+			},
 		},
 		{
 			name:  "local issuer switch with dev mode",
@@ -341,7 +382,7 @@ func TestReadConfig_TrustedURLs(t *testing.T) {
 			for _, k := range []string{
 				"REEARTH_AUTH0_DOMAIN", "REEARTH_AUTH_ISS",
 				"REEARTH_ACCOUNTS_CIP_PROJECT_ID", "REEARTH_ACCOUNTS_SERVICE_CALLERS",
-				"REEARTH_ACCOUNTS_DEV",
+				"REEARTH_ACCOUNTS_DEV", "K_SERVICE", "KUBERNETES_SERVICE_HOST",
 			} {
 				t.Setenv(k, "")
 			}
