@@ -67,12 +67,55 @@ func isLetter(r rune) bool { return 'a' <= r && r <= 'z' }
 
 func isDigit(r rune) bool { return '0' <= r && r <= '9' }
 
-func checkTrustedURLs(providers []appx.JWTProvider, callers ServiceCallers) error {
+// checkLocalURL passes only an http or https URL whose host is a loopback
+// address, localhost, or a single-label name such as a compose service.
+func checkLocalURL(raw string) error {
+	u, err := url.Parse(raw)
+	if err != nil {
+		return errors.New("not a valid URL")
+	}
+	if u.Scheme != "http" && u.Scheme != "https" {
+		return errors.New("scheme must be http or https")
+	}
+	if u.User != nil {
+		return errors.New("must not contain userinfo")
+	}
+	host := u.Hostname()
+	if a, err := netip.ParseAddr(host); err == nil {
+		if a.Unmap().IsLoopback() {
+			return nil
+		}
+		return fmt.Errorf("host %q is not a loopback address", host)
+	}
+	name := strings.ToLower(host)
+	if strings.TrimSuffix(name, ".") == "localhost" {
+		return nil
+	}
+	// Cloud resolvers expand these single labels to the metadata address.
+	if name == "metadata" || name == "instance-data" {
+		return fmt.Errorf("host %q is a metadata service name", host)
+	}
+	if name != "" && isLetter(rune(name[0])) &&
+		!strings.ContainsFunc(name, func(r rune) bool { return !isLetter(r) && !isDigit(r) && r != '-' }) {
+		return nil
+	}
+	return fmt.Errorf("host %q is not loopback, localhost, or a single-label name", host)
+}
+
+func checkTrustedURLs(providers []appx.JWTProvider, callers ServiceCallers, localIssuer bool) error {
 	var errs []error
 	check := func(source, raw string) {
-		if err := checkTrustedURL(raw); err != nil {
-			errs = append(errs, fmt.Errorf("%s: %w", source, err))
+		err := checkTrustedURL(raw)
+		if err == nil {
+			return
 		}
+		if checkLocalURL(raw) == nil {
+			if localIssuer {
+				return
+			}
+			err = fmt.Errorf("%w (on a developer machine only, REEARTH_ACCOUNTS_LOCAL_ISSUER=true allows loopback and single-label hosts)", err)
+		}
+		errs = append(errs, fmt.Errorf("%s: %w", source, err))
 	}
 	for i, p := range providers {
 		check(fmt.Sprintf("auth provider %d issuer", i+1), p.ISS)
