@@ -41,7 +41,14 @@ func cacheControlMiddleware(next echo.HandlerFunc) echo.HandlerFunc {
 	}
 }
 
+func noClients(_ echo.Context, _ *appx.AuthInfo) (*adapter.ClientCall, error) {
+	return nil, nil
+}
+
 func newRESTEcho(cfg adapterhttp.RouterConfig) *echo.Echo {
+	if cfg.ClientResolver == nil {
+		cfg.ClientResolver = noClients
+	}
 	e := echo.New()
 	adapterhttp.RegisterRESTRouter(e, cfg)
 	return e

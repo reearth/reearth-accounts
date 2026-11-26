@@ -47,10 +47,12 @@ func dataloaders(ctx context.Context) *DataLoaders {
 	return ctx.Value(contextDataloaders).(*DataLoaders)
 }
 
-// denyServiceCaller keeps the user directory closed to service callers, which are
-// scoped to the workspaces their integration belongs to (ADR-0002 decision 5).
-func denyServiceCaller(ctx context.Context) error {
-	if getOperator(ctx).IsService() {
+// denyClient keeps the user directory closed to a client call that carries an
+// operator, in case a transport skips the client gate: a client is scoped to the
+// workspaces of what it acts for (ADR-0002 decision 5). An anonymous client call
+// has no operator and gets what a request with no token gets.
+func denyClient(ctx context.Context) error {
+	if getOperator(ctx).ViaClient() {
 		return interfaces.ErrInvalidOperator
 	}
 	return nil

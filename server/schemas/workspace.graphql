@@ -178,27 +178,27 @@ type DeleteWorkspacePayload {
 
 # TODO: rename it to findWorkspace** as a prefix to avoid conflict with other entities
 extend type Query {
-    findByID(id: ID!): Workspace! @public
-    findByIDs(ids: [ID!]!): [Workspace!]! @public
-    findByName(name: String!): Workspace
-    findByAlias(alias: String!): Workspace @public
-    findByUser(userId: ID!): [Workspace]
-    findByUserWithPagination(userId: ID!, pagination: Pagination!): WorkspacesWithPagination!
+    findByID(id: ID!): Workspace! @public @client(as: [INTEGRATION])
+    findByIDs(ids: [ID!]!): [Workspace!]! @public @client(as: [INTEGRATION])
+    findByName(name: String!): Workspace @client(as: [INTEGRATION])
+    findByAlias(alias: String!): Workspace @public @client(as: [INTEGRATION])
+    findByUser(userId: ID!): [Workspace] @client(as: [INTEGRATION])
+    findByUserWithPagination(userId: ID!, pagination: Pagination!): WorkspacesWithPagination! @client(as: [INTEGRATION])
     "Looks a workspace up by exactly one of id or alias. Returns null when none matches."
-    publicWorkspace(id: ID, alias: String): PublicWorkspace @public
+    publicWorkspace(id: ID, alias: String): PublicWorkspace @public @client(as: [INTEGRATION])
 }
 
 extend type Mutation {
     createWorkspace(input: CreateWorkspaceInput!): CreateWorkspacePayload
-    deleteWorkspace(input: DeleteWorkspaceInput!): DeleteWorkspacePayload
-    updateWorkspace(input: UpdateWorkspaceInput!): UpdateWorkspacePayload
+    deleteWorkspace(input: DeleteWorkspaceInput!): DeleteWorkspacePayload @client(as: [INTEGRATION])
+    updateWorkspace(input: UpdateWorkspaceInput!): UpdateWorkspacePayload @client(as: [INTEGRATION])
     addUsersToWorkspace(input: AddUsersToWorkspaceInput!): AddUsersToWorkspacePayload
     addIntegrationToWorkspace(input: AddIntegrationToWorkspaceInput!): AddUsersToWorkspacePayload
-    removeUserFromWorkspace(input: RemoveUserFromWorkspaceInput!): RemoveMemberFromWorkspacePayload
+    removeUserFromWorkspace(input: RemoveUserFromWorkspaceInput!): RemoveMemberFromWorkspacePayload @client(as: [INTEGRATION])
     removeMultipleUsersFromWorkspace(input: RemoveMultipleUsersFromWorkspaceInput!): RemoveMultipleMembersFromWorkspacePayload
-    removeIntegrationFromWorkspace(input: RemoveIntegrationFromWorkspaceInput!): RemoveMemberFromWorkspacePayload
+    removeIntegrationFromWorkspace(input: RemoveIntegrationFromWorkspaceInput!): RemoveMemberFromWorkspacePayload @client(as: [INTEGRATION])
     removeIntegrationsFromWorkspace(input: RemoveIntegrationsFromWorkspaceInput!): RemoveIntegrationsFromWorkspacePayload
-    updateUserOfWorkspace(input: UpdateUserOfWorkspaceInput!): UpdateMemberOfWorkspacePayload
-    updateIntegrationOfWorkspace(input: UpdateIntegrationOfWorkspaceInput!): UpdateMemberOfWorkspacePayload
+    updateUserOfWorkspace(input: UpdateUserOfWorkspaceInput!): UpdateMemberOfWorkspacePayload @client(as: [INTEGRATION])
+    updateIntegrationOfWorkspace(input: UpdateIntegrationOfWorkspaceInput!): UpdateMemberOfWorkspacePayload @client(as: [INTEGRATION])
     transferWorkspaceOwnership(input: TransferWorkspaceOwnershipInput!): UpdateMemberOfWorkspacePayload
 }

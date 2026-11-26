@@ -40,15 +40,16 @@ func (cc *ClientCall) LogFields() []applog.Field {
 	}
 }
 
-// LogVerdict logs the call once, as accepted or as refused. Only an anonymous
-// call can be refused after it is resolved: a route or operation that is not
-// public refuses it (ADR-0002 decision 7.1).
-func (cc *ClientCall) LogVerdict(ctx context.Context, accepted bool) {
-	if accepted {
-		applog.Info(ctx, "auth: client call", cc.LogFields()...)
+// LogClientVerdict logs a client gate's decision once per call (ADR-0002 decision 8).
+func LogClientVerdict(ctx context.Context, admitted bool) {
+	if ClientCallOf(ctx) == nil {
 		return
 	}
-	applog.Warn(ctx, "auth: rejected client call", append(cc.LogFields(), applog.Reason("anonymous_call_not_public"))...)
+	if admitted {
+		applog.Info(ctx, "auth: client call")
+		return
+	}
+	applog.Warn(ctx, "auth: rejected client call", applog.Reason("not_open_to_client"))
 }
 
 func ClientCallOf(ctx context.Context) *ClientCall {

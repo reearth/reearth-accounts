@@ -17,6 +17,8 @@ import (
 type RouterConfig struct {
 	// AuthResolver reuses app/auth.go's FindBySub + operator builder pipeline.
 	AuthResolver AuthResolver
+	// ClientResolver classifies client calls for ClientGate. Required.
+	ClientResolver ClientResolver
 	// CacheControl sets response cache headers (e.g. Cache-Control: private) on all REST responses.
 	CacheControl echo.MiddlewareFunc
 	// UsecaseMiddleware attaches *interfaces.Container to context (same as GraphQL path).
@@ -67,6 +69,13 @@ func RegisterRESTRouter(e *echo.Echo, cfg RouterConfig) {
 	if cfg.UsecaseMiddleware != nil {
 		base = append(base, cfg.UsecaseMiddleware)
 	}
+	if cfg.ClientResolver == nil {
+		panic("RouterConfig.ClientResolver is required")
+	}
+	// After the usecase middleware, which filters the repos when the context
+	// already carries an operator. The gate attaches the client's operator, so
+	// with the gate first an integration's GET /api/workspaces?ids= answers 404.
+	base = append(base, ClientGate(cfg.ClientResolver, clientRoutes))
 	if cfg.CacheControl != nil {
 		base = append(base, cfg.CacheControl)
 	}
@@ -182,6 +191,10 @@ func RegisterRESTRouter(e *echo.Echo, cfg RouterConfig) {
 		}))
 	case cfg.Debug:
 		e.GET("/swagger/*", echoSwagger.WrapHandler)
+	}
+
+	if err := checkClientRoutes(e, clientRoutes); err != nil {
+		panic(err)
 	}
 }
 

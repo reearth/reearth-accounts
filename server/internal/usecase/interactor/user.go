@@ -168,7 +168,7 @@ func (i *User) GetUserBySubject(ctx context.Context, sub string) (u *user.User, 
 }
 
 func (i *User) Logout(ctx context.Context, operator *workspace.Operator) (*user.User, error) {
-	if operator.User == nil {
+	if !operator.IsUserSelf() {
 		return nil, interfaces.ErrInvalidOperator
 	}
 
@@ -189,7 +189,7 @@ func (i *User) Logout(ctx context.Context, operator *workspace.Operator) (*user.
 }
 
 func (i *User) UpdateMe(ctx context.Context, p interfaces.UpdateMeParam, operator *workspace.Operator) (u *user.User, err error) {
-	if operator.User == nil {
+	if !operator.IsUserSelf() {
 		return nil, interfaces.ErrInvalidOperator
 	}
 	if p.PhotoURL != nil {
@@ -339,7 +339,7 @@ func (i *User) UpdateMe(ctx context.Context, p interfaces.UpdateMeParam, operato
 }
 
 func (i *User) RemoveMyAuth(ctx context.Context, authProvider string, operator *workspace.Operator) (u *user.User, err error) {
-	if operator.User == nil {
+	if !operator.IsUserSelf() {
 		return nil, interfaces.ErrInvalidOperator
 	}
 
@@ -366,7 +366,7 @@ func (i *User) RemoveMyAuth(ctx context.Context, authProvider string, operator *
 // mutations like this is planned to be covered by MFA confirmation in a
 // future change, not now.
 func (i *User) DisableMFA(ctx context.Context, operator *workspace.Operator) error {
-	if operator == nil || operator.User == nil {
+	if !operator.IsUserSelf() {
 		return interfaces.ErrInvalidOperator
 	}
 	return Run0(ctx, operator, i.repos, Usecase(), func(ctx context.Context) error {
@@ -387,7 +387,7 @@ func (i *User) DisableMFA(ctx context.Context, operator *workspace.Operator) err
 }
 
 func (i *User) EnableMFA(ctx context.Context, operator *workspace.Operator) (string, error) {
-	if operator == nil || operator.User == nil {
+	if !operator.IsUserSelf() {
 		return "", interfaces.ErrInvalidOperator
 	}
 	return Run1(ctx, operator, i.repos, Usecase(), func(ctx context.Context) (string, error) {
@@ -408,7 +408,7 @@ func (i *User) EnableMFA(ctx context.Context, operator *workspace.Operator) (str
 }
 
 func (i *User) GetMFAStatus(ctx context.Context, operator *workspace.Operator) (gateway.MFAStatus, error) {
-	if operator == nil || operator.User == nil {
+	if !operator.IsUserSelf() {
 		return gateway.MFAStatus{}, interfaces.ErrInvalidOperator
 	}
 	return Run1(ctx, operator, i.repos, Usecase(), func(ctx context.Context) (gateway.MFAStatus, error) {
@@ -438,7 +438,7 @@ func (i *User) GetMFAStatus(ctx context.Context, operator *workspace.Operator) (
 // turned on once the IdP emits auth_time and the web client can force a
 // fresh login.
 func (i *User) RegenerateMFARecoveryCode(ctx context.Context, operator *workspace.Operator, authTime *time.Time) (string, error) {
-	if operator == nil || operator.User == nil {
+	if !operator.IsUserSelf() {
 		return "", interfaces.ErrInvalidOperator
 	}
 	return Run1(ctx, operator, i.repos, Usecase(), func(ctx context.Context) (string, error) {
@@ -477,7 +477,7 @@ func (i *User) loggedInRecently(authTime *time.Time) bool {
 }
 
 func (i *User) DeleteMe(ctx context.Context, userID user.ID, operator *workspace.Operator) (err error) {
-	if operator.User == nil {
+	if !operator.IsUserSelf() {
 		return interfaces.ErrInvalidOperator
 	}
 	return Run0(ctx, operator, i.repos, Usecase().Transaction(), func(ctx context.Context) error {

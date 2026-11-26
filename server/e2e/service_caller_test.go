@@ -201,7 +201,7 @@ func TestServiceCaller_REST(t *testing.T) {
 			if q[0] != "" {
 				r = r.WithQuery(q[0], q[1])
 			}
-			r.Expect().Status(http.StatusUnauthorized)
+			r.Expect().Status(http.StatusForbidden)
 		}
 	})
 
@@ -249,7 +249,7 @@ func TestServiceCaller_GraphQL(t *testing.T) {
 			`{ userByNameOrEmail(nameOrEmail: "svc-owner") { id } }`,
 			`query($u: ID!) { findUsersByIDs(ids: [$u]) { id } }`,
 		} {
-			serviceGQL(e, flow, q, map[string]any{"u": svcOwnerUID.String()}).Value("errors").Array().NotEmpty()
+			refusedGQL(t, e, flow, q, map[string]any{"u": svcOwnerUID.String()})
 		}
 	})
 
@@ -264,6 +264,16 @@ func TestServiceCaller_GraphQL(t *testing.T) {
 			Value("errors").Array().NotEmpty()
 	})
 
+}
+
+// refusedGQL asserts the client field gate refused the whole operation.
+func refusedGQL(t *testing.T, e *httpexpect.Expect, auth map[string]string, query string, vars map[string]any) {
+	t.Helper()
+	o := e.POST("/api/graphql").WithHeaders(auth).
+		WithJSON(GraphQLRequest{Query: query, Variables: vars}).
+		Expect().Status(http.StatusForbidden).JSON().Object()
+	assert.Nil(t, o.Raw()["data"], "no resolver ran")
+	o.Value("errors").Array().Value(0).Object().Value("extensions").Object().HasValue("code", "FORBIDDEN")
 }
 
 const publicGQL = `{ authConfig { __typename } }`
@@ -341,14 +351,15 @@ func TestServiceCaller_ClientTokenWithoutHeaderIsAnonymous(t *testing.T) {
 	for _, cid := range []string{"svc-flow", "svc-anon"} {
 		h := actingFor(idp.clientToken(t, cid))
 		t.Run(cid+" on REST", func(t *testing.T) {
-			optionalREST(e, h).Status(http.StatusBadRequest)
-			e.GET("/api/workspaces/" + svcWsOwned.String()).WithHeaders(h).Expect().Status(http.StatusUnauthorized)
+			e.GET("/api/auth/config").WithHeaders(h).Expect().Status(http.StatusOK)
+			optionalREST(e, h).Status(http.StatusForbidden)
+			e.GET("/api/workspaces/" + svcWsOwned.String()).WithHeaders(h).Expect().Status(http.StatusForbidden)
 			e.GET("/api/workspaces/" + svcWsOwned.String()).Expect().Status(http.StatusUnauthorized)
 		})
 		t.Run(cid+" on GraphQL", func(t *testing.T) {
 			publicGraphQL(e, h).Status(http.StatusOK).JSON().Object().Value("data").Object().ContainsKey("authConfig")
 			byName := GraphQLRequest{Query: `query($n: String!) { findByName(name: $n) { id } }`, Variables: map[string]any{"n": "ws-" + svcWsOwned.String()}}
-			e.POST("/api/graphql").WithHeaders(h).WithJSON(byName).Expect().Status(http.StatusUnauthorized)
+			refusedGQL(t, e, h, byName.Query, byName.Variables)
 			e.POST("/api/graphql").WithJSON(byName).Expect().Status(http.StatusUnauthorized)
 		})
 	}
@@ -449,45 +460,57 @@ func TestServiceCaller_RequestLogNamesTheClient(t *testing.T) {
 
 	named := []string{`"caller_client_id": "svc-flow"`, `"caller_name": "flow-app"`}
 	for _, tc := range []struct {
-		name     string
-		do       func()
-		line     []string
-		accepted int
-		reason   string
+		name   string
+		do     func()
+		line   []string
+		reason string
 	}{
 		{
-			name:     "integration call on an optional-auth REST route",
-			do:       func() { optionalREST(e, actingFor(flow, asInt)).Status(http.StatusBadRequest) },
-			line:     append(named, `"acting_for": "`+asInt+`"`),
-			accepted: 1,
-		},
-		{
-			name:     "anonymous call on an optional-auth REST route",
-			do:       func() { optionalREST(e, actingFor(flow)).Status(http.StatusBadRequest) },
-			line:     append(named, `"acting_for": "none"`),
-			accepted: 1,
-		},
-		{
-			name:     "anonymous call on a public GraphQL operation",
-			do:       func() { publicGraphQL(e, actingFor(flow)).Status(http.StatusOK) },
-			line:     append(named, `"acting_for": "none"`),
-			accepted: 1,
-		},
-		{
-			name: "anonymous call refused on REST",
+			name: "integration call on an open REST route",
 			do: func() {
-				e.GET("/api/workspaces/" + svcWsOwned.String()).WithHeaders(actingFor(flow)).Expect().Status(http.StatusUnauthorized)
+				e.GET("/api/workspaces/" + svcWsOwned.String()).WithHeaders(actingFor(flow, asInt)).Expect().Status(http.StatusOK)
+			},
+			line: append(named, `"acting_for": "`+asInt+`"`),
+		},
+		{
+			name: "anonymous call on an open REST route",
+			do:   func() { e.GET("/api/auth/config").WithHeaders(actingFor(flow)).Expect().Status(http.StatusOK) },
+			line: append(named, `"acting_for": "none"`),
+		},
+		{
+			name: "anonymous call on a public GraphQL operation",
+			do:   func() { publicGraphQL(e, actingFor(flow)).Status(http.StatusOK) },
+			line: append(named, `"acting_for": "none"`),
+		},
+		{
+			name:   "integration call refused by the REST gate",
+			do:     func() { optionalREST(e, actingFor(flow, asInt)).Status(http.StatusForbidden) },
+			line:   append(named, `"acting_for": "`+asInt+`"`),
+			reason: "not_open_to_client",
+		},
+		{
+			name: "integration call refused by the GraphQL gate",
+			do: func() {
+				e.POST("/api/graphql").WithHeaders(actingFor(flow, asInt)).WithJSON(GraphQLRequest{Query: `{ me { id } }`}).Expect().Status(http.StatusForbidden)
+			},
+			line:   append(named, `"acting_for": "`+asInt+`"`),
+			reason: "not_open_to_client",
+		},
+		{
+			name: "anonymous call refused by the REST gate",
+			do: func() {
+				e.GET("/api/workspaces/" + svcWsOwned.String()).WithHeaders(actingFor(flow)).Expect().Status(http.StatusForbidden)
 			},
 			line:   append(named, `"acting_for": "none"`),
-			reason: "anonymous_call_not_public",
+			reason: "not_open_to_client",
 		},
 		{
 			name: "anonymous call refused on GraphQL",
 			do: func() {
-				e.POST("/api/graphql").WithHeaders(actingFor(flow)).WithJSON(findByName).Expect().Status(http.StatusUnauthorized)
+				e.POST("/api/graphql").WithHeaders(actingFor(flow)).WithJSON(findByName).Expect().Status(http.StatusForbidden)
 			},
 			line:   append(named, `"acting_for": "none"`),
-			reason: "anonymous_call_not_public",
+			reason: "not_open_to_client",
 		},
 		{
 			name:   "refused call on REST",
@@ -501,11 +524,6 @@ func TestServiceCaller_RequestLogNamesTheClient(t *testing.T) {
 			line:   []string{`"caller_client_id": "svc-unknown"`},
 			reason: "unregistered_client",
 		},
-		{
-			name: "client token on a route with no auth",
-			do:   func() { e.GET("/api/auth/config").WithHeaders(actingFor(flow)).Expect().Status(http.StatusOK) },
-			line: []string{`"caller_client_id": "svc-flow"`},
-		},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			before := len(logs.String())
@@ -516,12 +534,21 @@ func TestServiceCaller_RequestLogNamesTheClient(t *testing.T) {
 			for _, w := range tc.line {
 				assert.Contains(t, entries[0], w)
 			}
-			assert.Equal(t, tc.accepted, strings.Count(out, "auth: client call"), out)
+			var verdicts []string
+			for _, l := range strings.Split(out, "\n") {
+				if strings.Contains(l, "\tauth: client call\t") || strings.Contains(l, "\tauth: rejected client call\t") {
+					verdicts = append(verdicts, l)
+				}
+			}
+			require.Len(t, verdicts, 1, out)
+			for _, w := range tc.line {
+				assert.Contains(t, verdicts[0], w)
+			}
 			if tc.reason == "" {
-				assert.NotContains(t, out, "auth: rejected client call")
+				assert.Contains(t, verdicts[0], "\tauth: client call\t")
 			} else {
-				assert.Equal(t, 1, strings.Count(out, "auth: rejected client call"), out)
-				assert.Contains(t, out, `"reason": "`+tc.reason+`"`)
+				assert.Contains(t, verdicts[0], "\tauth: rejected client call\t")
+				assert.Contains(t, verdicts[0], `"reason": "`+tc.reason+`"`)
 			}
 			assert.NotContains(t, out, flow)
 			assert.NotContains(t, out, unknown)

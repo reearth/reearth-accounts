@@ -163,6 +163,7 @@ func initEcho(ctx context.Context, cfg *ServerConfig) *echo.Echo {
 	}
 	adapterhttp.RegisterRESTRouter(e, adapterhttp.RouterConfig{
 		AuthResolver:       restAuthResolver(cfg),
+		ClientResolver:     restClientResolver(cfg),
 		CacheControl:       cacheControl,
 		UsecaseMiddleware:  usecaseMiddleware,
 		JWTMiddleware:      restJWT,
@@ -183,33 +184,41 @@ func initEcho(ctx context.Context, cfg *ServerConfig) *echo.Echo {
 	return e
 }
 
+// restClientResolver classifies a REST client call for the client gate.
+func restClientResolver(cfg *ServerConfig) adapterhttp.ClientResolver {
+	return func(c echo.Context, ai *appx.AuthInfo) (*adapter.ClientCall, error) {
+		ctx := c.Request().Context()
+		if cfg.Config.Mock_Auth {
+			if refuseActAsUnderMockAuth(ctx, c.Request().Header) {
+				return nil, echo.NewHTTPError(http.StatusUnauthorized)
+			}
+			return nil, nil
+		}
+		cc, err := resolveClientCall(ctx, cfg, ai, c.Request().Header.Values(ActAsHeader))
+		if isClientRejected(err) {
+			return nil, echo.NewHTTPError(http.StatusUnauthorized)
+		}
+		return cc, err
+	}
+}
+
 // restAuthResolver reuses the existing auth pipeline (FindByName for mock auth,
 // FindBySub for real auth) plus generateUserOperator to turn an AuthInfo into a
 // domain user + operator for the REST middleware. It returns (nil, nil, nil) for an
 // unauthenticated request (no token, or the resolved subject has no user) so that
-// RequiredAuth can answer 401 and OptionalAuth can proceed anonymously.
+// RequiredAuth can answer 401 and OptionalAuth can proceed anonymously. A client
+// call was already classified and admitted by the client gate.
 func restAuthResolver(cfg *ServerConfig) adapterhttp.AuthResolver {
 	return func(c echo.Context, ai *appx.AuthInfo) (*user.User, *workspace.Operator, error) {
 		ctx := c.Request().Context()
+		if cc := adapter.ClientCallOf(ctx); cc != nil {
+			return cc.User, cc.Operator, nil
+		}
 		var u *user.User
 		var err error
 		if cfg.Config.Mock_Auth {
-			if refuseActAsUnderMockAuth(ctx, c.Request().Header) {
-				return nil, nil, echo.NewHTTPError(http.StatusUnauthorized)
-			}
 			u, err = cfg.Repos.User.FindByName(ctx, FIXED_MOCK_USERNAME)
 		} else {
-			cc, ccErr := resolveClientCall(ctx, cfg, ai, c.Request().Header.Values(ActAsHeader))
-			if isClientRejected(ccErr) {
-				return nil, nil, echo.NewHTTPError(http.StatusUnauthorized)
-			}
-			if ccErr != nil {
-				return nil, nil, ccErr
-			}
-			if cc != nil {
-				c.SetRequest(c.Request().WithContext(cc.Attach(ctx)))
-				return nil, cc.Operator, nil
-			}
 			if ai == nil || ai.Sub == "" {
 				return nil, nil, nil
 			}
@@ -259,6 +268,10 @@ func errorMessage(err error, logInternal func(error)) (int, string) {
 	} else if errors.Is(err, rerror.ErrNotFound) {
 		code = http.StatusNotFound
 		msg = "not found"
+	} else if errors.Is(err, adapterhttp.ErrForbidden) {
+		code = http.StatusForbidden
+	} else if errors.Is(err, adapterhttp.ErrUnauthorized) {
+		code = http.StatusUnauthorized
 	} else {
 		if ierr := rerror.UnwrapErrInternal(err); ierr != nil {
 			code = http.StatusInternalServerError

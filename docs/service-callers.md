@@ -89,7 +89,7 @@ Accounts then authorizes the call as that integration: the workspaces where the 
 
 `user:<user ID>` is parsed, but accounts refuses it for now, even when `act_as` lists `"user"`. Acting for a user opens once every route closed to client tokens is enforced.
 
-A client token without the header is anonymous. It gets what a request with no token gets.
+A client token without the header is anonymous. It reaches only what the next section lists for anonymous clients.
 
 A Go client that uses `pkg/servicetoken` names the subject on each request's context, and `servicetoken.Transport` sends the header:
 
@@ -101,7 +101,7 @@ The transport sends the header only with the service token. A request that alrea
 
 ### Migrating
 
-Change a caller in this order. First, make the caller send `X-Reearth-Act-As` on every call. Then change its registry entry. A caller that sends no header becomes anonymous as soon as the new entry is in place, and anonymous calls get 401 on every route that is not public.
+Change a caller in this order. First, make the caller send `X-Reearth-Act-As` on every call. Then change its registry entry. A caller that sends no header becomes anonymous as soon as the new entry is in place, and anonymous calls get 403 on every route and field that is not open to anonymous clients.
 
 ### Responses
 
@@ -109,6 +109,7 @@ Change a caller in this order. First, make the caller send `X-Reearth-Act-As` on
 |---|---|
 | Client token, registered, `integration:<id>` allowed by `act_as` | Authorized as the integration |
 | Client token, no header | Anonymous |
+| Client token on a route or field not open to its subject kind | 403 |
 | Client token, unregistered or with invalid claims, with or without the header | 401, also when no caller is registered |
 | Client token from an unconfigured issuer, with the wrong audience, or expired | 401 |
 | Header with a user token or with no token | 401 |
@@ -118,16 +119,33 @@ Change a caller in this order. First, make the caller send `X-Reearth-Act-As` on
 | Header with `REEARTH_MOCK_AUTH` on | 401 |
 | User token without the header | Unchanged |
 
-REST routes that read no credentials at all, such as `GET /api/auth/config` and the password reset routes, do not check the header yet.
+Every REST route under `/api` checks the header, including the routes that read no credentials, such as `GET /api/auth/config` and the password reset routes.
+
+### What a client token can reach
+
+Every REST route and every GraphQL Query or Mutation field is closed to client tokens unless it is listed. A route or field added later is closed until someone opens it. The rule does not depend on whether the operator has a user.
+
+- REST: the table `clientRoutes` in `server/internal/adapter/http/client_routes.go` lists each open route as `"METHOD /path"`, with the path as the route pattern in `router.go`, and the subject kinds it admits. The server refuses to start when a key names a route that does not exist.
+- GraphQL: the directive `@client(as: [INTEGRATION])` on a root field opens it to clients acting for an integration. A client token without the header may call the `@public` Query fields. No client token may call a `@public` Mutation, so signup, verification, and password reset are closed to client tokens.
+
+To open a route or field, add the table entry or the directive and run `go test ./internal/app -run TestClientSurface -update`. The test writes `server/internal/app/testdata/client_surface.golden`, which lists every open route and field with the kinds it admits. Review the diff of that file with the change.
+
+Today a client acting for an integration may use the workspace routes and fields that a service caller could use before this rule, still limited by the integration's role in each workspace. The SCIM token and SCIM config routes stay closed: a client cannot create a workspace credential. Signup, verification, password reset, `/users/me`, MFA, account deletion, login removal, the user directory, and permission checks are closed to every client token.
+
+`GET /api/auth/config` and the `authConfig` query are open to anonymous clients and to clients acting for an integration, so a caller that sends the header on every call can still read the public configuration. The `@public` query `findUsersByIDsWithPagination` is open to anonymous clients only: the user directory is closed to integrations.
+
+A refused REST call gets `403` with the message `forbidden: this route is not open to client tokens`. A refused GraphQL operation gets HTTP `403` and one error with the code `FORBIDDEN`. The gate checks every root field of the selected operation, including fields inside fragments and behind aliases, and refuses the whole operation before any resolver runs. `__typename` is allowed. The introspection fields are closed to client tokens. A field under `@skip` or `@include` counts as selected whatever the condition, so an operation that names a closed field is refused even when that field would be skipped.
+
+A route mounted outside the `/api` REST group does not pass through the gate. A client token on such a route resolves to no user and no operator, so a route that requires authentication answers 401.
 
 ### What is logged
 
-Every accepted client call writes one `auth: client call` entry. That entry, every later entry of the request, and the request log line carry these fields:
+The client gate writes one entry for every valid client call it checks: `auth: client call` when the route or field admits it, and `auth: rejected client call` with the reason `not_open_to_client` when it answers 403. An anonymous GraphQL call whose operation is not made only of `@public` fields is refused before the GraphQL handler, with the same 403 and the same single entry. Any other GraphQL request that fails decoding, parsing, validation, or a persisted-query lookup never reaches the gate and gets no verdict entry. Its request log line still names the caller. The verdict entry, every later entry of the request, and the request log line carry these fields, on a 403 too:
 
 - `caller_client_id`: the client ID.
 - `caller_name`: the registered name.
 - `acting_for`: `integration:<id>`, or `none` for an anonymous call.
 
-Every refused call writes one `auth: rejected client call` entry with a `reason` code and `caller_client_id` when the token names a client. A refusal made while reading the token or the header also carries the token's `issuer`. An anonymous call to a route or operation that is not public is refused with `anonymous_call_not_public`; its entry and its request log line carry all three fields above, and it is not also logged as accepted.
+A call refused with 401 writes one `auth: rejected client call` entry with a `reason` code and `caller_client_id` when the token names a client. A refusal made while reading the token or the header also carries the token's `issuer`. No call is logged both as accepted and as refused.
 
 The request log line of any request made with a client token carries `caller_client_id`, also when the call is refused or the route reads no credentials. No entry contains the token, the raw header value, or an email address.

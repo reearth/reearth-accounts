@@ -40,7 +40,7 @@ func (r *userMetadataResolver) PhotoURL(ctx context.Context, obj *gqlmodel.UserM
 }
 
 func (r *queryResolver) FindUsersByIDs(ctx context.Context, userIds []gqlmodel.ID) ([]*gqlmodel.User, error) {
-	if err := denyServiceCaller(ctx); err != nil {
+	if err := denyClient(ctx); err != nil {
 		return nil, err
 	}
 	uids, err := gqlmodel.ToIDs[id.User](userIds)
@@ -57,7 +57,7 @@ func (r *queryResolver) FindUsersByIDs(ctx context.Context, userIds []gqlmodel.I
 }
 
 func (r *queryResolver) FindUsersByIDsWithPagination(ctx context.Context, userIds []gqlmodel.ID, alias *string, pagination gqlmodel.Pagination) (*gqlmodel.UsersWithPagination, error) {
-	if err := denyServiceCaller(ctx); err != nil {
+	if err := denyClient(ctx); err != nil {
 		return nil, err
 	}
 	uids, err := gqlmodel.ToIDs[id.User](userIds)

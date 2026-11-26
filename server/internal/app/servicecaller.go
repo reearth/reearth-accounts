@@ -399,10 +399,9 @@ func resolveClientCall(ctx context.Context, cfg *ServerConfig, ai *appx.AuthInfo
 		if cc.Operator, err = generateIntegrationOperator(ctx, cfg, iid, cc.Client); err != nil {
 			return nil, err
 		}
-		cc.LogVerdict(ctx, true)
 	}
-	// An anonymous call is logged by the transport, which knows whether the
-	// operation is public.
+	// The client gate logs the verdict, since only it knows whether the route
+	// or field admits the call.
 	return cc, nil
 }
 
