@@ -45,11 +45,11 @@ func TestNewClient_CallsProduceSpansWithoutPersonalData(t *testing.T) {
 			found = true
 		}
 		for _, kv := range s.Attributes {
-			assert.NotContains(t, kv.Value.Emit(), email, string(kv.Key))
+			assert.NotContains(t, kv.Value.String(), email, string(kv.Key))
 		}
 		for _, ev := range s.Events {
 			for _, kv := range ev.Attributes {
-				assert.NotContains(t, kv.Value.Emit(), email, string(kv.Key))
+				assert.NotContains(t, kv.Value.String(), email, string(kv.Key))
 			}
 		}
 	}

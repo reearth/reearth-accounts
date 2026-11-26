@@ -24,7 +24,7 @@ func (m *AppMiddlewares) Middlewares() []echo.MiddlewareFunc {
 func NewAppMiddlewares() *AppMiddlewares {
 	return &AppMiddlewares{
 		CacheControl:  cacheControlMiddleware,
-		RequestLogger: middleware.Logger(),
+		RequestLogger: middleware.RequestLogger(),
 	}
 }
 

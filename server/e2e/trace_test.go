@@ -48,7 +48,7 @@ func TestTracing_SpansCarryOperationButNoPersonalData(t *testing.T) {
 		}
 		for _, kv := range s.Attributes {
 			for _, v := range forbidden {
-				assert.NotContains(t, kv.Value.Emit(), v, "span %q attribute %s", s.Name, kv.Key)
+				assert.NotContains(t, kv.Value.String(), v, "span %q attribute %s", s.Name, kv.Key)
 			}
 		}
 	}
