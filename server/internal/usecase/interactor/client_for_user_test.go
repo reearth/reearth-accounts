@@ -88,116 +88,132 @@ func (f clientForUserFixture) clientForIntegration() *workspace.Operator {
 	}
 }
 
+type admits int
+
+const (
+	admitsUserOrService admits = iota
+	admitsUser
+	admitsIntegration
+)
+
 type operatorCall struct {
-	refusal   error
-	needsUser bool
-	call      func(context.Context, clientForUserFixture, *workspace.Operator) error
+	refusal error
+	admits  admits
+	call    func(context.Context, clientForUserFixture, *workspace.Operator) error
 }
 
 func writeCalls() map[string]operatorCall {
 	invalid := interfaces.ErrInvalidOperator
 	return map[string]operatorCall{
-		"Workspace.FindAll": {invalid, true, func(ctx context.Context, f clientForUserFixture, op *workspace.Operator) error {
+		"Workspace.FindAll": {invalid, admitsUser, func(ctx context.Context, f clientForUserFixture, op *workspace.Operator) error {
 			_, err := f.ws.FindAll(ctx, interfaces.FindAllWorkspacesParam{}, op)
 			return err
 		}},
-		"Workspace.Create": {invalid, true, func(ctx context.Context, f clientForUserFixture, op *workspace.Operator) error {
+		"Workspace.Create": {invalid, admitsUser, func(ctx context.Context, f clientForUserFixture, op *workspace.Operator) error {
 			_, err := f.ws.Create(ctx, "new", "new", "", f.subject, false, op)
 			return err
 		}},
-		"Workspace.Update": {invalid, false, func(ctx context.Context, f clientForUserFixture, op *workspace.Operator) error {
+		"Workspace.Update": {invalid, admitsUserOrService, func(ctx context.Context, f clientForUserFixture, op *workspace.Operator) error {
 			_, err := f.ws.Update(ctx, interfaces.UpdateWorkspaceParam{ID: f.team, Name: lo.ToPtr("renamed")}, op)
 			return err
 		}},
-		"Workspace.AddUserMember": {invalid, true, func(ctx context.Context, f clientForUserFixture, op *workspace.Operator) error {
+		"Workspace.AddUserMember": {invalid, admitsUser, func(ctx context.Context, f clientForUserFixture, op *workspace.Operator) error {
 			_, err := f.ws.AddUserMember(ctx, f.team, map[workspace.UserID]role.RoleType{f.newcomer: role.RoleReader}, op)
 			return err
 		}},
-		"Workspace.AddIntegrationMember": {invalid, true, func(ctx context.Context, f clientForUserFixture, op *workspace.Operator) error {
+		"Workspace.AddIntegrationMember": {invalid, admitsUser, func(ctx context.Context, f clientForUserFixture, op *workspace.Operator) error {
 			_, err := f.ws.AddIntegrationMember(ctx, f.team, f.spare, role.RoleReader, op)
 			return err
 		}},
-		"Workspace.RemoveUserMember": {invalid, false, func(ctx context.Context, f clientForUserFixture, op *workspace.Operator) error {
+		"Workspace.RemoveUserMember": {invalid, admitsUserOrService, func(ctx context.Context, f clientForUserFixture, op *workspace.Operator) error {
 			_, err := f.ws.RemoveUserMember(ctx, f.team, f.peer, op)
 			return err
 		}},
-		"Workspace.RemoveMultipleUserMembers": {invalid, false, func(ctx context.Context, f clientForUserFixture, op *workspace.Operator) error {
+		"Workspace.RemoveMultipleUserMembers": {invalid, admitsUserOrService, func(ctx context.Context, f clientForUserFixture, op *workspace.Operator) error {
 			_, err := f.ws.RemoveMultipleUserMembers(ctx, f.team, workspace.UserIDList{f.peer}, op)
 			return err
 		}},
-		"Workspace.RemoveIntegration": {invalid, false, func(ctx context.Context, f clientForUserFixture, op *workspace.Operator) error {
+		"Workspace.RemoveIntegration": {invalid, admitsUserOrService, func(ctx context.Context, f clientForUserFixture, op *workspace.Operator) error {
 			_, err := f.ws.RemoveIntegration(ctx, f.team, f.integration, op)
 			return err
 		}},
-		"Workspace.RemoveIntegrations": {invalid, false, func(ctx context.Context, f clientForUserFixture, op *workspace.Operator) error {
+		"Workspace.RemoveIntegrations": {invalid, admitsUserOrService, func(ctx context.Context, f clientForUserFixture, op *workspace.Operator) error {
 			_, err := f.ws.RemoveIntegrations(ctx, f.team, workspace.IntegrationIDList{f.integration}, op)
 			return err
 		}},
-		"Workspace.UpdateUserMember": {invalid, false, func(ctx context.Context, f clientForUserFixture, op *workspace.Operator) error {
+		"Workspace.UpdateUserMember": {invalid, admitsUserOrService, func(ctx context.Context, f clientForUserFixture, op *workspace.Operator) error {
 			_, err := f.ws.UpdateUserMember(ctx, f.team, f.peer, role.RoleWriter, op)
 			return err
 		}},
-		"Workspace.UpdateUserMemberViaService": {invalid, false, func(ctx context.Context, f clientForUserFixture, op *workspace.Operator) error {
+		"Workspace.UpdateUserMemberViaService": {invalid, admitsUserOrService, func(ctx context.Context, f clientForUserFixture, op *workspace.Operator) error {
 			_, err := f.ws.UpdateUserMemberViaService(ctx, f.team, f.peer, role.RoleWriter, op)
 			return err
 		}},
-		"Workspace.UpdateIntegration": {invalid, false, func(ctx context.Context, f clientForUserFixture, op *workspace.Operator) error {
+		"Workspace.UpdateIntegration": {invalid, admitsUserOrService, func(ctx context.Context, f clientForUserFixture, op *workspace.Operator) error {
 			_, err := f.ws.UpdateIntegration(ctx, f.team, f.integration, role.RoleWriter, op)
 			return err
 		}},
-		"Workspace.Remove": {invalid, false, func(ctx context.Context, f clientForUserFixture, op *workspace.Operator) error {
+		"Workspace.Remove": {invalid, admitsUserOrService, func(ctx context.Context, f clientForUserFixture, op *workspace.Operator) error {
 			return f.ws.Remove(ctx, f.team, op)
 		}},
-		"Workspace.Deactivate": {invalid, false, func(ctx context.Context, f clientForUserFixture, op *workspace.Operator) error {
+		"Workspace.Deactivate": {invalid, admitsUserOrService, func(ctx context.Context, f clientForUserFixture, op *workspace.Operator) error {
 			_, err := f.ws.Deactivate(ctx, f.team, op)
 			return err
 		}},
-		"Workspace.Restore": {invalid, false, func(ctx context.Context, f clientForUserFixture, op *workspace.Operator) error {
+		"Workspace.Restore": {invalid, admitsUserOrService, func(ctx context.Context, f clientForUserFixture, op *workspace.Operator) error {
 			_, err := f.ws.Restore(ctx, f.team, op)
 			return err
 		}},
-		"Workspace.TransferOwnership": {invalid, true, func(ctx context.Context, f clientForUserFixture, op *workspace.Operator) error {
+		"Workspace.TransferOwnership": {invalid, admitsUser, func(ctx context.Context, f clientForUserFixture, op *workspace.Operator) error {
 			_, err := f.ws.TransferOwnership(ctx, f.team, f.peer, op)
 			return err
 		}},
-		"User.FindAll": {invalid, true, func(ctx context.Context, f clientForUserFixture, op *workspace.Operator) error {
+		"User.FindAll": {invalid, admitsUser, func(ctx context.Context, f clientForUserFixture, op *workspace.Operator) error {
 			_, err := f.users.FindAll(ctx, interfaces.FindAllUsersParam{Operator: op})
 			return err
 		}},
-		"User.Deactivate": {invalid, true, func(ctx context.Context, f clientForUserFixture, op *workspace.Operator) error {
+		"User.Deactivate": {invalid, admitsUser, func(ctx context.Context, f clientForUserFixture, op *workspace.Operator) error {
 			_, err := f.users.Deactivate(ctx, f.peer, op)
 			return err
 		}},
-		"User.Restore": {invalid, true, func(ctx context.Context, f clientForUserFixture, op *workspace.Operator) error {
+		"User.Restore": {invalid, admitsUser, func(ctx context.Context, f clientForUserFixture, op *workspace.Operator) error {
 			_, err := f.users.Restore(ctx, f.peer, op)
 			return err
 		}},
-		"User.UpdateUserBySub": {invalid, true, func(ctx context.Context, f clientForUserFixture, op *workspace.Operator) error {
+		"User.UpdateUserBySub": {invalid, admitsUser, func(ctx context.Context, f clientForUserFixture, op *workspace.Operator) error {
 			return f.users.UpdateUserBySub(ctx, "auth0|peer", lo.ToPtr("renamed"), op)
 		}},
-		"User.SetPlatformRolesBySub": {invalid, true, func(ctx context.Context, f clientForUserFixture, op *workspace.Operator) error {
+		"User.SetPlatformRolesBySub": {invalid, admitsUser, func(ctx context.Context, f clientForUserFixture, op *workspace.Operator) error {
 			return f.users.SetPlatformRolesBySub(ctx, "auth0|peer", nil, op)
 		}},
-		"Scim.GenerateScimToken": {invalid, true, func(ctx context.Context, f clientForUserFixture, op *workspace.Operator) error {
+		"Scim.GenerateScimToken": {invalid, admitsUser, func(ctx context.Context, f clientForUserFixture, op *workspace.Operator) error {
 			_, err := f.scim.GenerateScimToken(ctx, f.team, op)
 			return err
 		}},
-		"Scim.GetScimConfig": {invalid, true, func(ctx context.Context, f clientForUserFixture, op *workspace.Operator) error {
+		"Scim.GetScimConfig": {invalid, admitsUser, func(ctx context.Context, f clientForUserFixture, op *workspace.Operator) error {
 			_, err := f.scim.GetScimConfig(ctx, f.team, op)
 			return err
 		}},
-		"Scim.RevokeScimToken": {invalid, true, func(ctx context.Context, f clientForUserFixture, op *workspace.Operator) error {
+		"Scim.RevokeScimToken": {invalid, admitsUser, func(ctx context.Context, f clientForUserFixture, op *workspace.Operator) error {
 			return f.scim.RevokeScimToken(ctx, f.team, op)
 		}},
-		"Scim.UpdateScimConfig": {invalid, true, func(ctx context.Context, f clientForUserFixture, op *workspace.Operator) error {
+		"Scim.UpdateScimConfig": {invalid, admitsUser, func(ctx context.Context, f clientForUserFixture, op *workspace.Operator) error {
 			_, err := f.scim.UpdateScimConfig(ctx, f.team, true, nil, op)
 			return err
 		}},
-		"Scim.GetWorkspaceScimState": {interfaces.ErrPermissionDenied, true, func(ctx context.Context, f clientForUserFixture, op *workspace.Operator) error {
+		"Workspace.ActingIntegrationMemberships": {invalid, admitsIntegration, func(ctx context.Context, f clientForUserFixture, op *workspace.Operator) error {
+			_, err := f.ws.ActingIntegrationMemberships(ctx, op)
+			return err
+		}},
+		"Workspace.LeaveAllAsIntegration": {invalid, admitsIntegration, func(ctx context.Context, f clientForUserFixture, op *workspace.Operator) error {
+			_, err := f.ws.LeaveAllAsIntegration(ctx, op)
+			return err
+		}},
+		"Scim.GetWorkspaceScimState": {interfaces.ErrPermissionDenied, admitsUser, func(ctx context.Context, f clientForUserFixture, op *workspace.Operator) error {
 			_, err := f.scim.GetWorkspaceScimState(ctx, f.team, op)
 			return err
 		}},
-		"Scim.SetWorkspaceScimAvailable": {interfaces.ErrPermissionDenied, true, func(ctx context.Context, f clientForUserFixture, op *workspace.Operator) error {
+		"Scim.SetWorkspaceScimAvailable": {interfaces.ErrPermissionDenied, admitsUser, func(ctx context.Context, f clientForUserFixture, op *workspace.Operator) error {
 			_, err := f.scim.SetWorkspaceScimAvailable(ctx, f.team, true, op)
 			return err
 		}},
@@ -213,9 +229,14 @@ func TestClientForUser_WritesAreRefusedWithoutTheGate(t *testing.T) {
 	for name, c := range writeCalls() {
 		t.Run(name, func(t *testing.T) {
 			assert.ErrorIs(t, run(t, c, clientForUserFixture.clientForUser), c.refusal, "a client acting for the subject")
-			assert.NotErrorIs(t, run(t, c, clientForUserFixture.own), c.refusal, "the subject's own token")
-			err := run(t, c, clientForUserFixture.clientForIntegration)
-			if c.needsUser {
+			err := run(t, c, clientForUserFixture.own)
+			if c.admits == admitsIntegration {
+				assert.ErrorIs(t, err, c.refusal, "the subject's own token")
+			} else {
+				assert.NotErrorIs(t, err, c.refusal, "the subject's own token")
+			}
+			err = run(t, c, clientForUserFixture.clientForIntegration)
+			if c.admits == admitsUser {
 				assert.ErrorIs(t, err, c.refusal, "a client acting for an integration")
 			} else {
 				assert.NotErrorIs(t, err, c.refusal, "a client acting for an integration")

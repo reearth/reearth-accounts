@@ -12,6 +12,7 @@ import (
 	"github.com/reearth/reearth-accounts/server/internal/usecase/interfaces"
 	"github.com/reearth/reearth-accounts/server/internal/usecase/repo"
 	"github.com/reearth/reearth-accounts/server/pkg/applog"
+	"github.com/reearth/reearth-accounts/server/pkg/id"
 	"github.com/reearth/reearth-accounts/server/pkg/membership"
 	"github.com/reearth/reearth-accounts/server/pkg/pagination"
 	"github.com/reearth/reearth-accounts/server/pkg/permittable"
@@ -1012,4 +1013,134 @@ func (i *Workspace) checkMaintainerPermission(ctx context.Context, operator *wor
 	}
 
 	return interfaces.ErrPermissionDenied
+}
+
+func actingIntegration(operator *workspace.Operator) (workspace.IntegrationID, bool) {
+	if !operator.IsService() || !operator.ViaClient() {
+		return workspace.IntegrationID{}, false
+	}
+	return *operator.Integration, true
+}
+
+// integrationWorkspaces reads the memberships from the repository, sorted by
+// ID, because the operator's role lists were computed when the request started
+// and can be stale.
+func (i *Workspace) integrationWorkspaces(ctx context.Context, iid workspace.IntegrationID) (workspace.List, error) {
+	ws, err := i.repos.Workspace.FindByIntegration(ctx, iid)
+	if errors.Is(err, rerror.ErrNotFound) {
+		return nil, nil
+	}
+	if err != nil {
+		return nil, err
+	}
+	ws = slices.Clone(ws)
+	slices.SortFunc(ws, func(a, b *workspace.Workspace) int { return a.ID().Compare(b.ID()) })
+	return ws, nil
+}
+
+func (i *Workspace) ActingIntegrationMemberships(ctx context.Context, operator *workspace.Operator) ([]interfaces.IntegrationMembership, error) {
+	iid, ok := actingIntegration(operator)
+	if !ok {
+		return nil, interfaces.ErrInvalidOperator
+	}
+	ws, err := i.integrationWorkspaces(ctx, iid)
+	if err != nil {
+		return nil, err
+	}
+	res := make([]interfaces.IntegrationMembership, 0, len(ws))
+	for _, w := range ws {
+		m := w.Members().Integration(iid)
+		if m == nil {
+			continue
+		}
+		res = append(res, interfaces.IntegrationMembership{Workspace: w, Role: m.Role})
+	}
+	return res, nil
+}
+
+func (i *Workspace) LeaveAllAsIntegration(ctx context.Context, operator *workspace.Operator) (interfaces.LeaveAllResult, error) {
+	iid, ok := actingIntegration(operator)
+	if !ok {
+		return interfaces.LeaveAllResult{}, interfaces.ErrInvalidOperator
+	}
+	ws, err := i.integrationWorkspaces(ctx, iid)
+	if err != nil {
+		return interfaces.LeaveAllResult{}, err
+	}
+
+	res := interfaces.LeaveAllResult{Removed: id.WorkspaceIDList{}, Failed: id.WorkspaceIDList{}}
+	for n, w := range ws {
+		if err := ctx.Err(); err != nil {
+			rest := ws[n:].IDs()
+			applog.Warn(ctx, "integration stopped leaving its workspaces: request cancelled", applog.IntegrationID(iid), applog.WorkspaceIDs(rest), applog.Err(err))
+			res.Failed = append(res.Failed, rest...)
+			break
+		}
+		removed, err := i.leaveAndConfirm(ctx, w.ID(), iid, operator)
+		switch {
+		case err != nil:
+			applog.Error(ctx, "integration failed to leave a workspace", applog.IntegrationID(iid), applog.WorkspaceID(w.ID()), applog.Err(err))
+			res.Failed = append(res.Failed, w.ID())
+		case removed:
+			applog.Info(ctx, "integration left a workspace", applog.IntegrationID(iid), applog.WorkspaceID(w.ID()))
+			res.Removed = append(res.Removed, w.ID())
+		}
+	}
+	applog.Info(ctx, "integration left its workspaces", applog.IntegrationID(iid), applog.RemovedCount(len(res.Removed)), applog.FailedCount(len(res.Failed)))
+	return res, nil
+}
+
+const leaveAttempts = 3
+
+var errStillMember = errors.New("integration is still a member after leaving")
+
+// leaveAndConfirm reads the workspace again after each leave. On MongoDB
+// without transactions, a concurrent Save of the same workspace built from an
+// earlier read can put the integration back. A Save that lands after the
+// confirming read is not caught.
+func (i *Workspace) leaveAndConfirm(ctx context.Context, wid workspace.ID, iid workspace.IntegrationID, operator *workspace.Operator) (bool, error) {
+	left := false
+	for range leaveAttempts {
+		removed, err := i.leaveAsIntegration(ctx, wid, iid, operator)
+		if err != nil {
+			return false, err
+		}
+		left = left || removed
+		if !left {
+			return false, nil
+		}
+		ws, err := i.repos.Workspace.FindByID(ctx, wid)
+		if errors.Is(err, rerror.ErrNotFound) {
+			return true, nil
+		}
+		if err != nil {
+			return false, err
+		}
+		if !ws.Members().HasIntegration(iid) {
+			return true, nil
+		}
+	}
+	return false, errStillMember
+}
+
+// leaveAsIntegration goes through Save rather than a bulk update across
+// workspaces: on MongoDB, Save recomputes the stored members hash, which a
+// bulk $unset of the integration would leave stale.
+func (i *Workspace) leaveAsIntegration(ctx context.Context, wid workspace.ID, iid workspace.IntegrationID, operator *workspace.Operator) (bool, error) {
+	return Run1(ctx, operator, i.repos, Usecase().Transaction(), func(ctx context.Context) (bool, error) {
+		ws, err := i.repos.Workspace.FindByIDForUpdate(ctx, wid)
+		if errors.Is(err, rerror.ErrNotFound) {
+			return false, nil
+		}
+		if err != nil {
+			return false, err
+		}
+		if !ws.Members().HasIntegration(iid) {
+			return false, nil
+		}
+		if err := ws.Members().DeleteIntegration(iid); err != nil {
+			return false, err
+		}
+		return true, i.repos.Workspace.Save(ctx, ws)
+	})
 }

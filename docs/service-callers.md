@@ -131,7 +131,7 @@ Every REST route and every GraphQL Query or Mutation field is closed to client t
 
 To open a route or field, add the table entry or the directive and run `go test ./internal/app -run TestClientSurface -update`. The test writes `server/internal/app/testdata/client_surface.golden`, which lists every open route and field with the kinds it admits. Review the diff of that file with the change. `TestClientSurface_UserReadList` pins the routes and fields open to a client acting for a user to the read list below, and fails without `-update` if anything else admits it.
 
-Today a client acting for an integration may use the workspace routes and fields that a service caller could use before this rule, still limited by the integration's role in each workspace. The SCIM token and SCIM config routes stay closed: a client cannot create a workspace credential. The SCIM interactor also refuses these operations to every client call, so they need the user's own token. Signup, verification, password reset, writes to `/users/me`, MFA, account deletion, login removal, the user directory, and permission checks are closed to every client token.
+Today a client acting for an integration may use the workspace routes and fields that a service caller could use before this rule, still limited by the integration's role in each workspace. It may also use the two endpoints in "The acting integration's workspaces". The SCIM token and SCIM config routes stay closed: a client cannot create a workspace credential. The SCIM interactor also refuses these operations to every client call, so they need the user's own token. Signup, verification, password reset, writes to `/users/me`, MFA, account deletion, login removal, the user directory, and permission checks are closed to every client token.
 
 `GET /api/auth/config` and the `authConfig` query are open to anonymous clients and to clients acting for an integration, so a caller that sends the header on every call can still read the public configuration. They are closed to clients acting for a user. The `@public` query `findUsersByIDsWithPagination` is open to anonymous clients only: the user directory is closed to integrations.
 
@@ -156,9 +156,50 @@ Everywhere on the read list, a client call sees the user's own record as the use
 
 Every other route and field answers 403: every write, MFA, account deletion, login removal, signup, verification, password reset, `GET /api/auth/config` and `authConfig`, the user directory, `node` and `nodes`, workspace lookups by ID, permission checks, SCIM, and every workspace write and member change. A Cerbos check made during a client call does not forward the client's token as the user's.
 
-Most of the surface has a second check behind the gate, which refuses a client acting for a user outside the read list also when the gate is bypassed. These have it: the account operations (writes to `/users/me`, MFA, account deletion, login removal), the workspace, member, integration, SCIM, and user administration interactors, the user directory resolvers, the permission check, and the static-key routes `POST /api/users/sync-sso` and `POST /api/users/find-or-create`. The permission check and the static-key routes refuse every client call. The others accept a user's own token and, where an integration may act, a client acting for an integration. Signup, verification, and password reset rely on the gate alone: they take no operator and are open to anonymous callers anyway.
+Most of the surface has a second check behind the gate, which refuses a client acting for a user outside the read list also when the gate is bypassed. These have it: the account operations (writes to `/users/me`, MFA, account deletion, login removal), the workspace, member, integration, SCIM, and user administration interactors, the user directory resolvers, the permission check, and the static-key routes `POST /api/users/sync-sso` and `POST /api/users/find-or-create`. The permission check and the static-key routes refuse every client call. The others accept a user's own token and, where an integration may act, a client acting for an integration. The two operations in "The acting integration's workspaces" accept only a client acting for an integration. Signup, verification, and password reset rely on the gate alone: they take no operator and are open to anonymous callers anyway.
 
 To remove the grant, delete `"user"` from the client's `act_as` in the registry. Its `user:` calls then get 401.
+
+### The acting integration's workspaces
+
+Two endpoints let an app work with the integration it acts for without reading the accounts database. Neither takes an integration ID: the integration is the one in `X-Reearth-Act-As`, so a client cannot read or change another integration's memberships.
+
+Only a client token acting for an integration may call them. Without a token the response is 401. A user's own token gets 401 on REST and an `invalid operator` error on GraphQL. A client token without the header, or acting for a user, gets 403.
+
+To list the workspaces and the integration's role in each:
+
+```
+GET /api/integrations/self/workspaces
+```
+
+```json
+{
+  "integration_id": "<integration ID>",
+  "workspaces": [{"id": "<workspace ID>", "name": "...", "alias": "...", "role": "writer"}]
+}
+```
+
+The GraphQL query is `actingIntegration { id workspaces { role workspace { id name alias } } }`. `workspace` shows the same fields as `findByID` does for the integration.
+
+To remove the integration from every workspace it belongs to, for example when the integration is deleted:
+
+```
+DELETE /api/integrations/self/workspaces
+```
+
+```json
+{"removed_workspace_ids": ["<workspace ID>"], "failed_workspace_ids": []}
+```
+
+The GraphQL mutation is `leaveAllWorkspaces { removedWorkspaceIds failedWorkspaceIds }`.
+
+Leaving needs membership only, whatever the integration's role. It does not go through the per-workspace permission check, because it only lowers the caller's own access.
+
+Accounts reads the memberships once, then leaves the workspaces one at a time, each in its own transaction, so a call for many workspaces can take a while. When a workspace fails, accounts lists it in `failed_workspace_ids`, continues with the others, and still answers 200. When the caller gives up on the request, accounts stops before the next workspace. A retry is safe, also after a timeout: it removes only the memberships that are left, and when none are left it returns two empty lists. A 5xx means accounts could not read the memberships and changed nothing.
+
+Leave-all removes the memberships that exist when it reads them. A membership added afterwards stays. To delete an integration, first stop adding it to workspaces, then call leave-all again until both lists are empty.
+
+After each leave, accounts reads the workspace again. If the integration is still a member, accounts leaves again, up to three attempts in all, and then lists the workspace in `failed_workspace_ids`. On MongoDB without a replica set, accounts writes without transactions, so a concurrent write to the same workspace can overwrite a leave. The second read does not catch a write that lands after it, so a workspace in `removed_workspace_ids` can still have the integration. Retry the workspaces in `failed_workspace_ids`, and call again until both lists are empty.
 
 ### What is logged
 

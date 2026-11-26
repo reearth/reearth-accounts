@@ -1,0 +1,43 @@
+"""
+A workspace the acting integration belongs to, with its role there.
+"""
+type IntegrationWorkspace {
+    workspace: Workspace!
+    role: Role!
+}
+
+"""
+The integration a client token acts for through X-Reearth-Act-As.
+"""
+type ActingIntegration {
+    id: ID!
+    workspaces: [IntegrationWorkspace!]!
+}
+
+"""
+The workspaces leaveAllWorkspaces removed the acting integration from, and
+those it could not. Retrying the mutation removes only what is left.
+"""
+type LeaveAllWorkspacesPayload {
+    removedWorkspaceIds: [ID!]!
+    failedWorkspaceIds: [ID!]!
+}
+
+extend type Query {
+    """
+    The integration this call acts for, and its workspaces and roles. Only a
+    registered client token with X-Reearth-Act-As: integration:<id> may call it.
+    """
+    actingIntegration: ActingIntegration! @client(as: [INTEGRATION])
+}
+
+extend type Mutation {
+    """
+    Removes the acting integration from every workspace it belongs to, for
+    when the integration is deleted. Each workspace is left on its own: one
+    that fails is listed in failedWorkspaceIds and the rest still run, so a
+    retry is safe. Leaving needs no role. Only a registered client token with
+    X-Reearth-Act-As: integration:<id> may call it.
+    """
+    leaveAllWorkspaces: LeaveAllWorkspacesPayload! @client(as: [INTEGRATION])
+}

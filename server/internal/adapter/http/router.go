@@ -168,6 +168,11 @@ func RegisterRESTRouter(e *echo.Echo, cfg RouterConfig) {
 	// This can bypass the self-promotion guard that PATCH .../members/:user_id enforces.
 	api.PATCH("/service/workspaces/:id/members/:user_id", wh.UpdateMemberViaService, required, wsExpand)
 
+	// --- Integrations ---
+	ih := handlers.NewIntegrationHandler()
+	api.GET("/integrations/self/workspaces", ih.Workspaces, required)
+	api.DELETE("/integrations/self/workspaces", ih.LeaveAll, required)
+
 	// --- Permission ---
 	ph := handlers.NewPermissionHandler()
 	// OptionalAuth resolves a JWT/mock user (attaching it for APIKeyOrAuth and the

@@ -30,6 +30,9 @@ var clientRoutes = map[string]adapter.ClientAccess{
 	"DELETE /api/workspaces/:id/integrations/:integration_id": adapter.IntegrationClients,
 	"DELETE /api/workspaces/:id/integrations":                 adapter.IntegrationClients,
 	"PATCH /api/service/workspaces/:id/members/:user_id":      adapter.IntegrationClients,
+
+	"GET /api/integrations/self/workspaces":    adapter.IntegrationClients,
+	"DELETE /api/integrations/self/workspaces": adapter.IntegrationClients,
 }
 
 // ClientRoutes returns a copy of the REST client table.
