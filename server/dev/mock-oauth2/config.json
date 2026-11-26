@@ -1,0 +1,31 @@
+{
+  "interactiveLogin": false,
+  "httpServer": "NettyWrapper",
+  "tokenCallbacks": [
+    {
+      "issuerId": "accounts-local",
+      "tokenExpiry": 3600,
+      "requestMappings": [
+        {
+          "requestParam": "grant_type",
+          "match": "client_credentials",
+          "claims": {
+            "sub": "${clientId}@clients",
+            "azp": "${clientId}",
+            "gty": "client-credentials",
+            "aud": ["${audience}"]
+          }
+        },
+        {
+          "requestParam": "grant_type",
+          "match": "authorization_code",
+          "claims": {
+            "sub": "local-user",
+            "email": "local-user@example.com",
+            "aud": ["${audience}"]
+          }
+        }
+      ]
+    }
+  ]
+}
