@@ -49,6 +49,13 @@ func detailedOperationTracer() graphql.OperationMiddleware {
 		if u := adapter.User(ctx); u != nil {
 			span.SetAttributes(semconv.EnduserID(u.ID().String()))
 		}
+		if cc := adapter.ClientCallOf(ctx); cc != nil {
+			span.SetAttributes(
+				attribute.String("accounts.client.id", cc.Client.ID),
+				attribute.String("accounts.client.name", cc.Client.Name),
+				attribute.String("accounts.act_as", cc.Subject.String()),
+			)
+		}
 		if caller := callerFrom(ctx); caller != "" {
 			span.SetAttributes(attribute.String("accounts.caller", caller))
 		}

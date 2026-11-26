@@ -9,7 +9,11 @@ import (
 type Operator struct {
 	User *id.UserID
 	// Integration is set, and User is nil, for a service caller (ADR-0002).
-	Integration            *id.IntegrationID
+	Integration *id.IntegrationID
+	// Client is set when a registered client token made the call. It is nil
+	// for a user's own token. The auth layer sets it once and nothing clears
+	// it, so the call stays marked as a client call for its whole life.
+	Client                 *Client
 	ReadableWorkspaces     id.WorkspaceIDList
 	WritableWorkspaces     id.WorkspaceIDList
 	OwningWorkspaces       id.WorkspaceIDList
@@ -17,9 +21,29 @@ type Operator struct {
 	DefaultPolicy          *PolicyID
 }
 
-// IsService reports whether the operator is a service caller with no user.
 func (o *Operator) IsService() bool {
 	return o != nil && o.User == nil && o.Integration != nil
+}
+
+func (o *Operator) ViaClient() bool {
+	return o != nil && o.Client != nil
+}
+
+func (o *Operator) IsUserSelf() bool {
+	return o != nil && o.User != nil && o.Client == nil
+}
+
+func (o *Operator) Subject() Subject {
+	switch {
+	case o == nil:
+		return Subject{}
+	case o.User != nil:
+		return UserSubject(*o.User)
+	case o.Integration != nil:
+		return IntegrationSubject(*o.Integration)
+	default:
+		return Subject{}
+	}
 }
 
 func (o *Operator) Workspaces(r role.RoleType) id.WorkspaceIDList {

@@ -1,13 +1,16 @@
 package app
 
 import (
+	"bytes"
 	"context"
 	"encoding/base64"
 	"encoding/json"
 	"errors"
 	"fmt"
+	"regexp"
 	"strings"
 
+	"github.com/reearth/reearth-accounts/server/internal/adapter"
 	"github.com/reearth/reearth-accounts/server/pkg/applog"
 	"github.com/reearth/reearth-accounts/server/pkg/id"
 	"github.com/reearth/reearth-accounts/server/pkg/role"
@@ -19,54 +22,156 @@ import (
 const (
 	grantTypeClientCredentials = "client-credentials"
 	clientSubjectSuffix        = "@clients"
-)
 
-var errServiceCallerRejected = errors.New("service caller rejected")
+	// ActAsHeader names the subject a client call acts for (ADR-0002 decision 5).
+	ActAsHeader = "X-Reearth-Act-As"
+)
 
 type serviceCallerKey struct {
 	issuer   string
 	clientID string
 }
 
-// ServiceCallers maps an (issuer, client ID) pair to the integration it acts as
-// (ADR-0002 decision 3). Client IDs are unique only within one identity provider,
-// so the issuer is part of the key.
-type ServiceCallers map[serviceCallerKey]id.IntegrationID
+// ActAs is the set of subject kinds a client may act for (ADR-0002 decision 3).
+type ActAs uint8
 
-type serviceCallerEntry struct {
-	Issuer        string `json:"issuer"`
-	ClientID      string `json:"client_id"`
-	IntegrationID string `json:"integration_id"`
+const (
+	ActAsIntegration ActAs = 1 << iota
+	ActAsUser
+)
+
+var actAsNames = map[string]ActAs{"integration": ActAsIntegration, "user": ActAsUser}
+
+// Allows reports whether a client may act for kind. A call that acts for no
+// one is anonymous and always allowed (decision 7.1).
+func (a ActAs) Allows(k workspace.SubjectKind) bool {
+	switch k {
+	case workspace.SubjectNone:
+		return true
+	case workspace.SubjectIntegration:
+		return a&ActAsIntegration != 0
+	case workspace.SubjectUser:
+		return a&ActAsUser != 0
+	default:
+		return false
+	}
 }
 
+// ServiceClient is one registry entry after parsing.
+type ServiceClient struct {
+	Issuer string
+	workspace.Client
+	ActAs ActAs
+}
+
+// ServiceCallers maps (issuer, client ID) to its registry entry. Client IDs are
+// unique only within one identity provider, so the issuer is part of the key.
+type ServiceCallers map[serviceCallerKey]ServiceClient
+
+type serviceCallerEntry struct {
+	Issuer   string `json:"issuer"`
+	ClientID string `json:"client_id"`
+	Name     string `json:"name"`
+	// A pointer, so that a missing key is an error and [] means "neither".
+	ActAs *[]string `json:"act_as"`
+}
+
+var serviceCallerKeys = map[string]struct{}{"issuer": {}, "client_id": {}, "name": {}, "act_as": {}}
+
+// The name is logged verbatim, so its charset is fixed.
+var serviceCallerName = regexp.MustCompile(`^[a-z0-9][a-z0-9-]{0,62}$`)
+
 // Decode parses REEARTH_ACCOUNTS_SERVICE_CALLERS, a JSON array of
-// {"issuer","client_id","integration_id"} objects.
+// {"issuer","client_id","name","act_as"} objects. Keys must match exactly and
+// appear once, so a registry written for an older shape, or edited into an
+// ambiguous one, stops startup instead of being misread.
 func (s *ServiceCallers) Decode(value string) error {
 	if strings.TrimSpace(value) == "" {
 		*s = nil
 		return nil
 	}
-	var entries []serviceCallerEntry
-	if err := json.Unmarshal([]byte(value), &entries); err != nil {
+	var raw []json.RawMessage
+	if err := json.Unmarshal([]byte(value), &raw); err != nil {
 		return fmt.Errorf("invalid service callers json: %w", err)
 	}
-	res := make(ServiceCallers, len(entries))
-	for _, e := range entries {
-		if e.Issuer == "" || e.ClientID == "" {
-			return fmt.Errorf("service caller needs issuer and client_id: %+v", e)
-		}
-		iid, err := id.IntegrationIDFrom(e.IntegrationID)
+	if raw == nil {
+		return errors.New("invalid service callers json: the value must be an array")
+	}
+
+	res := make(ServiceCallers, len(raw))
+	for i, r := range raw {
+		c, err := decodeServiceCaller(r)
 		if err != nil {
-			return fmt.Errorf("service caller %q: invalid integration_id %q", e.ClientID, e.IntegrationID)
+			return fmt.Errorf("service caller %d: %w", i+1, err)
 		}
-		k := serviceCallerKey{issuer: e.Issuer, clientID: e.ClientID}
+		k := serviceCallerKey{issuer: c.Issuer, clientID: c.ID}
 		if _, dup := res[k]; dup {
-			return fmt.Errorf("service caller %q is registered twice for issuer %q", e.ClientID, e.Issuer)
+			return fmt.Errorf("service caller %q is registered twice for issuer %q", c.ID, c.Issuer)
 		}
-		res[k] = iid
+		res[k] = c
 	}
 	*s = res
 	return nil
+}
+
+// decodeServiceCaller walks the entry's tokens before decoding it, because
+// encoding/json matches keys case-insensitively and lets a repeated key win.
+func decodeServiceCaller(raw json.RawMessage) (ServiceClient, error) {
+	dec := json.NewDecoder(bytes.NewReader(raw))
+	if t, err := dec.Token(); err != nil || t != json.Delim('{') {
+		return ServiceClient{}, errors.New("must be an object")
+	}
+	seen := make(map[string]struct{}, len(serviceCallerKeys))
+	for dec.More() {
+		t, err := dec.Token()
+		if err != nil {
+			return ServiceClient{}, err
+		}
+		k, _ := t.(string)
+		if k == "integration_id" {
+			return ServiceClient{}, errors.New("integration_id is no longer supported: replace it with act_as and send X-Reearth-Act-As (ADR-0002 decision 3)")
+		}
+		if _, ok := serviceCallerKeys[k]; !ok {
+			return ServiceClient{}, fmt.Errorf("unknown key %q", k)
+		}
+		if _, dup := seen[k]; dup {
+			return ServiceClient{}, fmt.Errorf("key %q appears twice", k)
+		}
+		seen[k] = struct{}{}
+		var v json.RawMessage
+		if err := dec.Decode(&v); err != nil {
+			return ServiceClient{}, err
+		}
+	}
+	var e serviceCallerEntry
+	if err := json.Unmarshal(raw, &e); err != nil {
+		return ServiceClient{}, err
+	}
+	return e.parse()
+}
+
+func (e serviceCallerEntry) parse() (ServiceClient, error) {
+	if e.Issuer == "" || e.ClientID == "" || e.Name == "" {
+		return ServiceClient{}, errors.New("issuer, client_id and name are required")
+	}
+	if !serviceCallerName.MatchString(e.Name) {
+		return ServiceClient{}, fmt.Errorf("name %q must match %s", e.Name, serviceCallerName)
+	}
+	if e.ActAs == nil {
+		return ServiceClient{}, errors.New(`act_as is required; use [] for a client that only makes anonymous calls`)
+	}
+	var actAs ActAs
+	for _, v := range *e.ActAs {
+		bit, ok := actAsNames[v]
+		if !ok {
+			return ServiceClient{}, fmt.Errorf(`act_as value %q must be "integration" or "user"`, v)
+		}
+		if actAs&bit != 0 {
+			return ServiceClient{}, fmt.Errorf("act_as lists %q twice", v)
+		}
+		actAs |= bit
+	}
+	return ServiceClient{Issuer: e.Issuer, Client: workspace.Client{ID: e.ClientID, Name: e.Name}, ActAs: actAs}, nil
 }
 
 // checkIssuers fails when a caller names an issuer accounts does not validate
@@ -84,9 +189,102 @@ func (s ServiceCallers) checkIssuers(providers []appx.JWTProvider) error {
 	return nil
 }
 
-type ServiceCaller struct {
-	ClientID    string
-	Integration id.IntegrationID
+// rejectReason is logged. The raw header and the token never are.
+type rejectReason string
+
+const (
+	reasonBadClaims             rejectReason = "bad_client_claims"
+	reasonUnregistered          rejectReason = "unregistered_client"
+	reasonActAsWithoutClient    rejectReason = "act_as_without_client_token"
+	reasonMalformedActAs        rejectReason = "malformed_act_as"
+	reasonKindNotAllowed        rejectReason = "act_as_kind_not_allowed"
+	reasonActAsUserNotAvailable rejectReason = "act_as_user_not_available"
+)
+
+// clientRejected always becomes a 401.
+type clientRejected struct {
+	reason   rejectReason
+	clientID string
+}
+
+func (e *clientRejected) Error() string { return "client call rejected: " + string(e.reason) }
+
+func isClientRejected(err error) bool {
+	var r *clientRejected
+	return errors.As(err, &r)
+}
+
+// parseActAs parses one X-Reearth-Act-As value: exactly "integration:<id>" or
+// "user:<id>", with a lower-case kind and an ID the id package accepts.
+func parseActAs(v string) (workspace.Subject, error) {
+	kind, raw, ok := strings.Cut(v, ":")
+	if !ok || raw == "" || strings.Contains(raw, ":") {
+		return workspace.Subject{}, errors.New("act-as must be <kind>:<id>")
+	}
+	switch kind {
+	case "integration":
+		iid, err := id.IntegrationIDFrom(raw)
+		if err != nil {
+			return workspace.Subject{}, errors.New("act-as has an invalid integration id")
+		}
+		return workspace.IntegrationSubject(iid), nil
+	case "user":
+		uid, err := id.UserIDFrom(raw)
+		if err != nil {
+			return workspace.Subject{}, errors.New("act-as has an invalid user id")
+		}
+		return workspace.UserSubject(uid), nil
+	default:
+		return workspace.Subject{}, errors.New("act-as has an unknown kind")
+	}
+}
+
+type clientAuth struct {
+	client  ServiceClient
+	subject workspace.Subject
+}
+
+// authenticate decides, with no I/O, whether a request is a registered client
+// call and what it acts for. actAs is every X-Reearth-Act-As value the request
+// carries, so an empty or repeated header is refused rather than read as absent.
+// It returns (nil, nil) when the user path should handle the request.
+func (s ServiceCallers) authenticate(ai *appx.AuthInfo, actAs []string) (*clientAuth, error) {
+	clientID, err := tokenClientID(ai)
+	if err != nil {
+		return nil, err
+	}
+	if clientID == "" {
+		if len(actAs) > 0 {
+			return nil, &clientRejected{reason: reasonActAsWithoutClient}
+		}
+		return nil, nil
+	}
+	reject := func(r rejectReason) error { return &clientRejected{reason: r, clientID: clientID} }
+
+	c, ok := s[serviceCallerKey{issuer: ai.Iss, clientID: clientID}]
+	if !ok {
+		return nil, reject(reasonUnregistered)
+	}
+	var sub workspace.Subject
+	switch len(actAs) {
+	case 0:
+	case 1:
+		if sub, err = parseActAs(actAs[0]); err != nil {
+			return nil, reject(reasonMalformedActAs)
+		}
+	default:
+		return nil, reject(reasonMalformedActAs)
+	}
+	if !c.ActAs.Allows(sub.Kind()) {
+		return nil, reject(reasonKindNotAllowed)
+	}
+	// Acting for a user (ADR-0002 decision 6) is not available yet, so a user
+	// subject is refused here even when act_as allows it. Without a route gate,
+	// an operator with both a user and a client would pass every user-only guard.
+	if sub.Kind() == workspace.SubjectUser {
+		return nil, reject(reasonActAsUserNotAvailable)
+	}
+	return &clientAuth{client: c, subject: sub}, nil
 }
 
 // tokenClaims holds the raw claims of a token appx has already verified. Claims
@@ -103,57 +301,53 @@ func (c tokenClaims) str(name string) (v string, ok bool) {
 	return v, json.Unmarshal(raw, &v) == nil
 }
 
-// resolve classifies a token appx has already validated (issuer, signature,
-// audience, expiry). It returns (nil, nil) for a token that does not claim to be a
-// client credentials token, so the user path handles it unchanged. A token that
-// claims to be one is accepted only when it carries no user and its client is
-// registered for its exact issuer; anything else is errServiceCallerRejected
+// tokenClientID classifies a token appx has already validated (issuer,
+// signature, audience, expiry), whatever the registry holds. It returns "" for a
+// token that does not claim to be a client credentials token, so the user path
+// handles it unchanged. A token that claims to be one must carry no user
 // (ADR-0002 decision 2).
-func (s ServiceCallers) resolve(ai appx.AuthInfo) (*ServiceCaller, error) {
-	if len(s) == 0 || ai.Token == "" {
-		return nil, nil
+func tokenClientID(ai *appx.AuthInfo) (string, error) {
+	if ai == nil || ai.Token == "" {
+		return "", nil
 	}
 	c, err := decodeTokenClaims(ai.Token)
 	if err != nil {
-		return nil, nil
+		return "", nil
 	}
 	sub, subOK := c.str("sub")
 	gty, gtyOK := c.str("gty")
 	if !(gtyOK && gty == grantTypeClientCredentials) && !(subOK && strings.HasSuffix(sub, clientSubjectSuffix)) {
-		return nil, nil
+		return "", nil
 	}
 
+	bad := &clientRejected{reason: reasonBadClaims}
 	azp, azpOK := c.str("azp")
 	clientIDClaim, cidOK := c.str("client_id")
 	email, emailOK := c.str("email")
 	if !subOK || !gtyOK || !azpOK || !cidOK || !emailOK {
-		return nil, errServiceCallerRejected
+		return "", bad
 	}
 	clientID := azp
 	if clientIDClaim != "" {
 		if clientID != "" && clientID != clientIDClaim {
-			return nil, errServiceCallerRejected
+			return "", bad
 		}
 		clientID = clientIDClaim
 	}
 	if clientID == "" {
-		return nil, errServiceCallerRejected
+		return "", bad
 	}
+	bad.clientID = clientID
 	if gty != "" && gty != grantTypeClientCredentials {
-		return nil, errServiceCallerRejected
+		return "", bad
 	}
 	if sub != clientID+clientSubjectSuffix && sub != clientID {
-		return nil, errServiceCallerRejected
+		return "", bad
 	}
 	if email != "" || ai.Email != "" {
-		return nil, errServiceCallerRejected
+		return "", bad
 	}
-
-	iid, ok := s[serviceCallerKey{issuer: ai.Iss, clientID: clientID}]
-	if !ok {
-		return nil, errServiceCallerRejected
-	}
-	return &ServiceCaller{ClientID: clientID, Integration: iid}, nil
+	return clientID, nil
 }
 
 func decodeTokenClaims(token string) (tokenClaims, error) {
@@ -170,16 +364,17 @@ func decodeTokenClaims(token string) (tokenClaims, error) {
 	return c, err
 }
 
-// generateServiceOperator builds the operator for a service caller: no user, and
-// the workspaces where its integration is a member, by role (ADR-0002 decision 4).
-func generateServiceOperator(ctx context.Context, cfg *ServerConfig, sc *ServiceCaller) (*workspace.Operator, error) {
-	iid := sc.Integration
+// generateIntegrationOperator builds the operator for a client acting for an
+// integration: no user, and the workspaces where the integration is a member,
+// by role.
+func generateIntegrationOperator(ctx context.Context, cfg *ServerConfig, iid id.IntegrationID, c *workspace.Client) (*workspace.Operator, error) {
 	ws, err := cfg.Repos.Workspace.FindByIntegration(ctx, iid)
 	if err != nil && !errors.Is(err, rerror.ErrNotFound) {
 		return nil, err
 	}
 	return &workspace.Operator{
 		Integration:            &iid,
+		Client:                 c,
 		ReadableWorkspaces:     ws.FilterByIntegrationRole(iid, role.RoleReader).IDs(),
 		WritableWorkspaces:     ws.FilterByIntegrationRole(iid, role.RoleWriter).IDs(),
 		MaintainableWorkspaces: ws.FilterByIntegrationRole(iid, role.RoleMaintainer).IDs(),
@@ -187,25 +382,52 @@ func generateServiceOperator(ctx context.Context, cfg *ServerConfig, sc *Service
 	}, nil
 }
 
-// resolveServiceOperator returns (nil, nil) when the request is not a service
-// call. It logs the client and integration of every accepted call (ADR-0002
-// decision 6).
-func resolveServiceOperator(ctx context.Context, cfg *ServerConfig, ai *appx.AuthInfo) (*workspace.Operator, error) {
-	if ai == nil {
-		return nil, nil
-	}
-	sc, err := cfg.Config.ServiceCallers.resolve(*ai)
+// resolveClientCall turns a request into a client call for both transports.
+func resolveClientCall(ctx context.Context, cfg *ServerConfig, ai *appx.AuthInfo, actAs []string) (*adapter.ClientCall, error) {
+	ca, err := cfg.Config.ServiceCallers.authenticate(ai, actAs)
 	if err != nil {
-		applog.Warn(ctx, "auth: rejected client credentials token", applog.Issuer(ai.Iss), applog.Subject(ai.Sub))
+		logRejection(ctx, ai, err)
 		return nil, err
 	}
-	if sc == nil {
+	if ca == nil {
 		return nil, nil
 	}
-	op, err := generateServiceOperator(ctx, cfg, sc)
-	if err != nil {
-		return nil, err
+
+	client := ca.client.Client
+	cc := &adapter.ClientCall{Client: &client, Subject: ca.subject}
+	if iid, ok := ca.subject.Integration(); ok {
+		if cc.Operator, err = generateIntegrationOperator(ctx, cfg, iid, cc.Client); err != nil {
+			return nil, err
+		}
+		cc.LogVerdict(ctx, true)
 	}
-	applog.Info(ctx, "auth: service caller", applog.CallerClientID(sc.ClientID), applog.IntegrationID(sc.Integration))
-	return op, nil
+	// An anonymous call is logged by the transport, which knows whether the
+	// operation is public.
+	return cc, nil
+}
+
+// callerClientID is the client ID a request's token names, for the request log
+// when no client call is attached: a refused call, or a route with no auth.
+func callerClientID(ai *appx.AuthInfo) string {
+	cid, err := tokenClientID(ai)
+	var r *clientRejected
+	if errors.As(err, &r) {
+		return r.clientID
+	}
+	return cid
+}
+
+func logRejection(ctx context.Context, ai *appx.AuthInfo, err error) {
+	var r *clientRejected
+	if !errors.As(err, &r) {
+		return
+	}
+	fields := []applog.Field{applog.Reason(string(r.reason))}
+	if ai != nil && ai.Iss != "" {
+		fields = append(fields, applog.Issuer(ai.Iss))
+	}
+	if r.clientID != "" {
+		fields = append(fields, applog.CallerClientID(r.clientID))
+	}
+	applog.Warn(ctx, "auth: rejected client call", fields...)
 }
