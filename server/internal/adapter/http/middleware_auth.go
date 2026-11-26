@@ -22,6 +22,8 @@ import (
 // non-nil user for a resolved request, (nil, operator, nil) for a service caller
 // (ADR-0002), or a non-nil error for an unexpected failure.
 // This lets mock-auth mode (which has no AuthInfo) still resolve the fixed mock user.
+// The resolver may replace c's request context, so the middlewares attach onto
+// the context it leaves behind.
 type AuthResolver func(c echo.Context, ai *appx.AuthInfo) (*user.User, *workspace.Operator, error)
 
 // RequiredAuth attaches User+Operator to context; returns 401 when the request cannot
@@ -38,7 +40,7 @@ func RequiredAuth(resolve AuthResolver) echo.MiddlewareFunc {
 			if u == nil && op == nil {
 				return httpinternal.ErrUnauthorized
 			}
-			c.SetRequest(c.Request().WithContext(attach(ctx, u, op)))
+			c.SetRequest(c.Request().WithContext(attach(c.Request().Context(), u, op)))
 			return next(c)
 		}
 	}
@@ -46,7 +48,7 @@ func RequiredAuth(resolve AuthResolver) echo.MiddlewareFunc {
 
 // RequiredUser is RequiredAuth for routes a service caller may not use, such as the
 // user directory: a service caller is scoped to its integration's workspaces
-// (ADR-0002 decision 4).
+// (ADR-0002 decision 5).
 func RequiredUser(resolve AuthResolver) echo.MiddlewareFunc {
 	return func(next echo.HandlerFunc) echo.HandlerFunc {
 		return func(c echo.Context) error {
@@ -58,7 +60,7 @@ func RequiredUser(resolve AuthResolver) echo.MiddlewareFunc {
 			if u == nil {
 				return httpinternal.ErrUnauthorized
 			}
-			c.SetRequest(c.Request().WithContext(attach(ctx, u, op)))
+			c.SetRequest(c.Request().WithContext(attach(c.Request().Context(), u, op)))
 			return next(c)
 		}
 	}
@@ -78,7 +80,7 @@ func OptionalAuth(resolve AuthResolver) echo.MiddlewareFunc {
 				return err
 			}
 			if u != nil || op != nil {
-				c.SetRequest(c.Request().WithContext(attach(ctx, u, op)))
+				c.SetRequest(c.Request().WithContext(attach(c.Request().Context(), u, op)))
 			}
 			return next(c)
 		}

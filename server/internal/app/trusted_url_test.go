@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"testing"
 
-	"github.com/reearth/reearth-accounts/server/pkg/id"
 	"github.com/reearth/reearthx/appx"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -98,8 +97,8 @@ func TestCheckTrustedURLs(t *testing.T) {
 		{ISS: "https://ok.example.com/", JWKSURI: &emptyJWKS},
 	}
 	callers := ServiceCallers{
-		{issuer: "https://localhost/", clientID: "svc-b"}:         id.NewIntegrationID(),
-		{issuer: "https://example.auth0.com/", clientID: "svc-a"}: id.NewIntegrationID(),
+		{issuer: "https://localhost/", clientID: "svc-b"}:         {},
+		{issuer: "https://example.auth0.com/", clientID: "svc-a"}: {},
 	}
 
 	err := checkTrustedURLs(providers, callers)
@@ -112,7 +111,7 @@ func TestCheckTrustedURLs(t *testing.T) {
 
 	assert.NoError(t, checkTrustedURLs(nil, nil))
 	assert.NoError(t, checkTrustedURLs(providers[:1], ServiceCallers{
-		{issuer: "https://example.auth0.com/", clientID: "svc-a"}: id.NewIntegrationID(),
+		{issuer: "https://example.auth0.com/", clientID: "svc-a"}: {},
 	}))
 }
 
@@ -125,7 +124,7 @@ func TestReadConfig_TrustedURLs(t *testing.T) {
 	}
 	str := func(s string) *string { return &s }
 	callers := func(issuer string) string {
-		return fmt.Sprintf(`[{"issuer":%q,"client_id":"svc","integration_id":%q}]`, issuer, id.NewIntegrationID().String())
+		return fmt.Sprintf(`[{"issuer":%q,"client_id":"svc","name":"svc","act_as":["integration"]}]`, issuer)
 	}
 
 	tests := []struct {

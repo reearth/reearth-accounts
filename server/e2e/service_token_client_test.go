@@ -63,14 +63,17 @@ func TestServiceToken_GQLClientCallsAccountsAsService(t *testing.T) {
 
 	jwks := idp.URL + "/jwks.json"
 	cfg := &app.Config{Auth: app.AuthConfigs{{ISS: idp.URL + "/", AUD: []string{svcAudience}, JWKSURI: &jwks}}}
-	callers, _ := json.Marshal([]map[string]string{{"issuer": idp.URL + "/", "client_id": "svc-flow", "integration_id": svcIntegration.String()}})
+	callers, _ := json.Marshal([]map[string]any{{"issuer": idp.URL + "/", "client_id": "svc-flow", "name": "flow-app", "act_as": []string{"integration"}}})
 	require.NoError(t, cfg.ServiceCallers.Decode(string(callers)))
 	repos := seededMemoryRepos(t, seedServiceCallers)
 	host := startServerURL(t, cfg, repos, nil, false)
 
 	src, err := servicetoken.New(servicetoken.Config{TokenURL: idp.URL + "/oauth/token", ClientID: "svc-flow", Audience: svcAudience, Key: clientKey})
 	require.NoError(t, err)
-	client := gqlclient.NewClient(host, 10, &servicetoken.Transport{Source: src})
+	client := gqlclient.NewClient(host, 10, actAsTransport{
+		actAs: "integration:" + svcIntegration.String(),
+		next:  &servicetoken.Transport{Source: src},
+	})
 
 	for range 3 {
 		ws, err := client.WorkspaceRepo.FindByUser(context.Background(), svcOwnerUID.String())
@@ -89,4 +92,15 @@ func seededMemoryRepos(t *testing.T, seed Seeder) *repo.Container {
 	r := memory.New()
 	require.NoError(t, seed(context.Background(), r))
 	return r
+}
+
+type actAsTransport struct {
+	actAs string
+	next  http.RoundTripper
+}
+
+func (t actAsTransport) RoundTrip(req *http.Request) (*http.Response, error) {
+	req = req.Clone(req.Context())
+	req.Header.Set(app.ActAsHeader, t.actAs)
+	return t.next.RoundTrip(req)
 }

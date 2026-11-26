@@ -194,14 +194,22 @@ func restAuthResolver(cfg *ServerConfig) adapterhttp.AuthResolver {
 		var u *user.User
 		var err error
 		if cfg.Config.Mock_Auth {
-			u, err = cfg.Repos.User.FindByName(ctx, FIXED_MOCK_USERNAME)
-		} else {
-			op, svcErr := resolveServiceOperator(ctx, cfg, ai)
-			if errors.Is(svcErr, errServiceCallerRejected) {
+			if refuseActAsUnderMockAuth(ctx, c.Request().Header) {
 				return nil, nil, echo.NewHTTPError(http.StatusUnauthorized)
 			}
-			if svcErr != nil || op != nil {
-				return nil, op, svcErr
+			u, err = cfg.Repos.User.FindByName(ctx, FIXED_MOCK_USERNAME)
+		} else {
+			cc, ccErr := resolveClientCall(ctx, cfg, ai, c.Request().Header.Values(ActAsHeader))
+			if isClientRejected(ccErr) {
+				return nil, nil, echo.NewHTTPError(http.StatusUnauthorized)
+			}
+			if ccErr != nil {
+				return nil, nil, ccErr
+			}
+			if cc != nil {
+				// The middleware attaches the returned operator onto this context.
+				c.SetRequest(c.Request().WithContext(cc.Attach(ctx)))
+				return nil, cc.Operator, nil
 			}
 			if ai == nil || ai.Sub == "" {
 				return nil, nil, nil

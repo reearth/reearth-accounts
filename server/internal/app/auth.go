@@ -159,6 +159,11 @@ func mockAuthMiddleware(cfg *ServerConfig) func(http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
 			ctx := req.Context()
 
+			if refuseActAsUnderMockAuth(ctx, req.Header) {
+				http.Error(w, http.StatusText(http.StatusUnauthorized), http.StatusUnauthorized)
+				return
+			}
+
 			applog.Debug(ctx, "[mockAuthMiddleware] Using mock authentication")
 
 			// bypass some queries & mutations
@@ -212,17 +217,20 @@ func mockAuthMiddleware(cfg *ServerConfig) func(http.Handler) http.Handler {
 	}
 }
 
+// refuseActAsUnderMockAuth keeps mock auth from passing a client test as the
+// demo user: mock auth has no client path (ADR-0002 decision 11.9).
+func refuseActAsUnderMockAuth(ctx context.Context, h http.Header) bool {
+	if len(h.Values(ActAsHeader)) == 0 {
+		return false
+	}
+	applog.Warn(ctx, "auth: rejected client call", applog.Reason("act_as_under_mock_auth"))
+	return true
+}
+
 func identityProviderAuthMiddleware(cfg *ServerConfig) func(http.Handler) http.Handler {
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
 			ctx := req.Context()
-
-			// bypass some queries & mutations
-			if isBypassed(req) {
-				applog.Debug(ctx, "[authMiddleware] Skipping auth for signup mutation")
-				next.ServeHTTP(w, req.WithContext(ctx))
-				return
-			}
 
 			var usr *user.User
 			var ai appx.AuthInfo
@@ -231,15 +239,31 @@ func identityProviderAuthMiddleware(cfg *ServerConfig) func(http.Handler) http.H
 				ai = a
 			}
 
-			if op, err := resolveServiceOperator(ctx, cfg, &ai); err != nil {
+			// Before the bypass, so a public operation cannot carry an unchecked act-as header.
+			cc, err := resolveClientCall(ctx, cfg, &ai, req.Header.Values(ActAsHeader))
+			if err != nil {
 				status := http.StatusInternalServerError
-				if errors.Is(err, errServiceCallerRejected) {
+				if isClientRejected(err) {
 					status = http.StatusUnauthorized
 				}
 				http.Error(w, http.StatusText(status), status)
 				return
-			} else if op != nil {
-				next.ServeHTTP(w, req.WithContext(adapter.AttachOperator(ctx, op)))
+			}
+			if cc != nil {
+				// An anonymous client call gets what a request with no token gets,
+				// without the debug headers.
+				if cc.Operator == nil && !isBypassed(req) {
+					http.Error(w, http.StatusText(http.StatusUnauthorized), http.StatusUnauthorized)
+					return
+				}
+				next.ServeHTTP(w, req.WithContext(cc.Attach(ctx)))
+				return
+			}
+
+			// bypass some queries & mutations
+			if isBypassed(req) {
+				applog.Debug(ctx, "[authMiddleware] Skipping auth for signup mutation")
+				next.ServeHTTP(w, req.WithContext(ctx))
 				return
 			}
 

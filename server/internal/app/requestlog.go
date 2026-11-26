@@ -21,7 +21,6 @@ const (
 	internalServiceHeader = "X-Internal-Service"
 	maxCallerLabelLen     = 64
 	maxLoggedFields       = 32
-	m2mSubSuffix          = "@clients"
 )
 
 // requestRecord collects what inner handlers learn about a request, so the
@@ -99,8 +98,8 @@ func requestFields(c echo.Context, ctx context.Context, rec *requestRecord, late
 	if rec.caller != "" {
 		fields = append(fields, applog.Caller(rec.caller))
 	}
-	if ai := adapter.GetAuthInfo(ctx); ai != nil && strings.HasSuffix(ai.Sub, m2mSubSuffix) {
-		fields = append(fields, applog.CallerClientID(strings.TrimSuffix(ai.Sub, m2mSubSuffix)))
+	if cc := adapter.ClientCallOf(ctx); cc != nil {
+		fields = append(fields, cc.LogFields()...)
 	}
 	return fields
 }

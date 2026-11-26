@@ -30,6 +30,8 @@ func RequestID(v string) Field        { return field("request_id", v) }
 func ViewerID(v string) Field         { return field("viewer_id", v) }
 func Caller(v string) Field           { return field("caller", v) }
 func CallerClientID(v string) Field   { return field("caller_client_id", v) }
+func CallerName(v string) Field       { return field("caller_name", v) }
+func ActingFor(v string) Field        { return field("acting_for", v) }
 func Operation(v string) Field        { return field("operation", v) }
 func OperationType(v string) Field    { return field("operation_type", v) }
 func Fields(v []string) Field         { return field("fields", v) }
@@ -59,10 +61,9 @@ func Action(v string) Field { return field("action", v) }
 func Actions(v any) Field   { return field("actions", v) }
 func Allowed(v bool) Field  { return field("allowed", v) }
 
-// Token claims of a rejected client credentials token.
+// Token claims of a rejected client call.
 
-func Issuer(v string) Field  { return field("issuer", v) }
-func Subject(v string) Field { return field("subject", v) }
+func Issuer(v string) Field { return field("issuer", v) }
 
 // Rate limiting. LimitKey is the bucket key: user:<id>, or ip:<client IP> for an anonymous caller.
 

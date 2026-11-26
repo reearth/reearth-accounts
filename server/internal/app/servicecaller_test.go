@@ -7,6 +7,7 @@ import (
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 	"time"
 
@@ -84,9 +85,20 @@ func authStack(t *testing.T, cfg *ServerConfig) http.Handler {
 	})))
 }
 
-func callWith(h http.Handler, token string) (*httptest.ResponseRecorder, *workspace.Operator) {
-	req := httptest.NewRequest(http.MethodPost, "/api/graphql", nil)
-	req.Header.Set("Authorization", "Bearer "+token)
+const publicQuery = `{"query":"{ authConfig { __typename } }"}`
+
+func callWith(h http.Handler, token string, actAs ...string) (*httptest.ResponseRecorder, *workspace.Operator) {
+	return callBody(h, token, "", actAs...)
+}
+
+func callBody(h http.Handler, token, body string, actAs ...string) (*httptest.ResponseRecorder, *workspace.Operator) {
+	req := httptest.NewRequest(http.MethodPost, "/api/graphql", strings.NewReader(body))
+	if token != "" {
+		req.Header.Set("Authorization", "Bearer "+token)
+	}
+	for _, v := range actAs {
+		req.Header.Add(ActAsHeader, v)
+	}
 	rr := httptest.NewRecorder()
 	h.ServeHTTP(rr, req)
 	if rr.Code != http.StatusOK {
@@ -106,6 +118,8 @@ type serviceFixture struct {
 	userSub     string
 	userID      id.UserID
 }
+
+func (f serviceFixture) actAs() string { return "integration:" + f.integration.String() }
 
 func newServiceFixture(t *testing.T) serviceFixture {
 	t.Helper()
@@ -144,23 +158,27 @@ func serviceConfig(t *testing.T, repos *repo.Container, idps []*testIdP, callers
 	return &ServerConfig{Config: c, Repos: repos}
 }
 
-func callersJSON(issuer, clientID string, iid id.IntegrationID) string {
-	b, _ := json.Marshal([]serviceCallerEntry{{Issuer: issuer, ClientID: clientID, IntegrationID: iid.String()}})
+func callersJSON(issuer, clientID string, actAs ...string) string {
+	if actAs == nil {
+		actAs = []string{}
+	}
+	b, _ := json.Marshal([]map[string]any{{"issuer": issuer, "client_id": clientID, "name": clientID, "act_as": actAs}})
 	return string(b)
 }
 
 func TestServiceCallerAuth(t *testing.T) {
 	idp := newTestIdP(t)
 	f := newServiceFixture(t)
-	cfg := serviceConfig(t, f.repos, []*testIdP{idp}, callersJSON(idp.issuer(), "svc-flow", f.integration))
+	cfg := serviceConfig(t, f.repos, []*testIdP{idp}, callersJSON(idp.issuer(), "svc-flow", "integration"))
 	h := authStack(t, cfg)
 
-	t.Run("registered client gets a userless operator scoped to its memberships", func(t *testing.T) {
-		rr, op := callWith(h, idp.sign(t, clientClaims("svc-flow")))
+	t.Run("client acting for an integration gets a userless operator scoped to its memberships", func(t *testing.T) {
+		rr, op := callWith(h, idp.sign(t, clientClaims("svc-flow")), f.actAs())
 		require.Equal(t, http.StatusOK, rr.Code)
 		require.NotNil(t, op)
 		assert.Nil(t, op.User)
 		assert.Equal(t, &f.integration, op.Integration)
+		assert.Equal(t, &workspace.Client{ID: "svc-flow", Name: "svc-flow"}, op.Client)
 		assert.Equal(t, id.WorkspaceIDList{f.readable}, op.ReadableWorkspaces)
 		assert.Equal(t, id.WorkspaceIDList{f.writable}, op.WritableWorkspaces)
 		assert.False(t, op.IsReadableWorkspace(f.other))
@@ -168,13 +186,22 @@ func TestServiceCallerAuth(t *testing.T) {
 	})
 
 	t.Run("RFC 9068 shaped token with client_id and no gty is accepted", func(t *testing.T) {
-		rr, op := callWith(h, idp.sign(t, jwt.MapClaims{"sub": "svc-flow@clients", "client_id": "svc-flow"}))
+		rr, op := callWith(h, idp.sign(t, jwt.MapClaims{"sub": "svc-flow@clients", "client_id": "svc-flow"}), f.actAs())
 		require.Equal(t, http.StatusOK, rr.Code)
 		assert.Equal(t, &f.integration, op.Integration)
 	})
 
+	t.Run("client token without the header is anonymous", func(t *testing.T) {
+		rr, op := callBody(h, idp.sign(t, clientClaims("svc-flow")), publicQuery)
+		require.Equal(t, http.StatusOK, rr.Code)
+		assert.Nil(t, op)
+
+		rr, _ = callWith(h, idp.sign(t, clientClaims("svc-flow")))
+		assert.Equal(t, http.StatusUnauthorized, rr.Code, "a non-public operation gets what a request with no token gets")
+	})
+
 	t.Run("unregistered client is 401", func(t *testing.T) {
-		rr, _ := callWith(h, idp.sign(t, clientClaims("svc-unknown")))
+		rr, _ := callWith(h, idp.sign(t, clientClaims("svc-unknown")), f.actAs())
 		assert.Equal(t, http.StatusUnauthorized, rr.Code)
 	})
 
@@ -184,12 +211,25 @@ func TestServiceCallerAuth(t *testing.T) {
 		require.NotNil(t, op.User)
 		assert.Equal(t, f.userID, *op.User)
 		assert.Nil(t, op.Integration)
+		assert.Nil(t, op.Client)
 	})
 
 	t.Run("user token with non-string claims is unchanged", func(t *testing.T) {
 		rr, op := callWith(h, idp.sign(t, jwt.MapClaims{"sub": f.userSub, "gty": []string{"refresh_token", "password"}, "client_id": 42}))
 		require.Equal(t, http.StatusOK, rr.Code)
 		assert.Equal(t, f.userID, *op.User)
+	})
+
+	t.Run("user token with the header is 401, even on a public operation", func(t *testing.T) {
+		rr, _ := callBody(h, idp.sign(t, jwt.MapClaims{"sub": f.userSub, "azp": "spa"}), publicQuery, f.actAs())
+		assert.Equal(t, http.StatusUnauthorized, rr.Code)
+	})
+
+	t.Run("header without a token is 401, even on a public operation", func(t *testing.T) {
+		rr, _ := callBody(h, "", publicQuery)
+		require.Equal(t, http.StatusOK, rr.Code)
+		rr, _ = callBody(h, "", publicQuery, f.actAs())
+		assert.Equal(t, http.StatusUnauthorized, rr.Code)
 	})
 
 	mixed := map[string]jwt.MapClaims{
@@ -202,7 +242,7 @@ func TestServiceCallerAuth(t *testing.T) {
 	}
 	for name, claims := range mixed {
 		t.Run("rejects "+name, func(t *testing.T) {
-			rr, _ := callWith(h, idp.sign(t, claims))
+			rr, _ := callWith(h, idp.sign(t, claims), f.actAs())
 			assert.Equal(t, http.StatusUnauthorized, rr.Code)
 		})
 	}
@@ -210,7 +250,7 @@ func TestServiceCallerAuth(t *testing.T) {
 	t.Run("token from an unconfigured issuer is 401", func(t *testing.T) {
 		claims := clientClaims("svc-flow")
 		claims["iss"] = idp.server.URL // no trailing slash: not an exact match
-		rr, _ := callWith(h, idp.sign(t, claims))
+		rr, _ := callWith(h, idp.sign(t, claims), f.actAs())
 		assert.Equal(t, http.StatusUnauthorized, rr.Code)
 	})
 }
@@ -218,45 +258,194 @@ func TestServiceCallerAuth(t *testing.T) {
 func TestServiceCallerIssuerIsPartOfTheRegistration(t *testing.T) {
 	registered, other := newTestIdP(t), newTestIdP(t)
 	f := newServiceFixture(t)
-	cfg := serviceConfig(t, f.repos, []*testIdP{registered, other}, callersJSON(registered.issuer(), "svc-flow", f.integration))
+	cfg := serviceConfig(t, f.repos, []*testIdP{registered, other}, callersJSON(registered.issuer(), "svc-flow", "integration"))
 	h := authStack(t, cfg)
 
-	rr, _ := callWith(h, other.sign(t, clientClaims("svc-flow")))
+	rr, _ := callWith(h, other.sign(t, clientClaims("svc-flow")), f.actAs())
 	assert.Equal(t, http.StatusUnauthorized, rr.Code, "same client id from another trusted issuer")
 
-	rr, _ = callWith(h, registered.sign(t, clientClaims("svc-flow")))
+	rr, _ = callWith(h, registered.sign(t, clientClaims("svc-flow")), f.actAs())
 	assert.Equal(t, http.StatusOK, rr.Code)
 }
 
-func TestServiceCallerWithoutMembershipSeesNothing(t *testing.T) {
+func TestServiceCallerIntegrationWithoutMembershipSeesNothing(t *testing.T) {
 	idp := newTestIdP(t)
 	f := newServiceFixture(t)
-	lonely := id.NewIntegrationID()
-	cfg := serviceConfig(t, f.repos, []*testIdP{idp}, callersJSON(idp.issuer(), "svc-lonely", lonely))
+	cfg := serviceConfig(t, f.repos, []*testIdP{idp}, callersJSON(idp.issuer(), "svc-flow", "integration"))
 
-	rr, op := callWith(authStack(t, cfg), idp.sign(t, clientClaims("svc-lonely")))
+	rr, op := callWith(authStack(t, cfg), idp.sign(t, clientClaims("svc-flow")), "integration:"+id.NewIntegrationID().String())
 	require.Equal(t, http.StatusOK, rr.Code)
+	require.NotNil(t, op)
 	assert.Empty(t, op.AllReadableWorkspaces())
 	assert.False(t, op.IsReadableWorkspace(f.readable, f.writable, f.other))
 }
 
 func TestServiceCallersDecode(t *testing.T) {
-	iid := id.NewIntegrationID()
 	var s ServiceCallers
 	require.NoError(t, s.Decode(""))
 	assert.Empty(t, s)
 
-	require.NoError(t, s.Decode(callersJSON("https://idp/", "c1", iid)))
-	assert.Equal(t, iid, s[serviceCallerKey{issuer: "https://idp/", clientID: "c1"}])
+	require.NoError(t, s.Decode(`[{"issuer":"https://idp/","client_id":"c1","name":"svc-one","act_as":["integration","user"]},
+		{"issuer":"https://idp/","client_id":"c2","name":"anon","act_as":[]},
+		{"issuer":"https://other/","client_id":"c1","name":"svc-one","act_as":["user"]}]`))
+	assert.Equal(t, ServiceCallers{
+		{issuer: "https://idp/", clientID: "c1"}:   {Issuer: "https://idp/", Client: workspace.Client{ID: "c1", Name: "svc-one"}, ActAs: ActAsIntegration | ActAsUser},
+		{issuer: "https://idp/", clientID: "c2"}:   {Issuer: "https://idp/", Client: workspace.Client{ID: "c2", Name: "anon"}},
+		{issuer: "https://other/", clientID: "c1"}: {Issuer: "https://other/", Client: workspace.Client{ID: "c1", Name: "svc-one"}, ActAs: ActAsUser},
+	}, s)
 
-	assert.Error(t, s.Decode(`[{"issuer":"https://idp/","client_id":"c1","integration_id":"nope"}]`))
-	assert.Error(t, s.Decode(`[{"client_id":"c1","integration_id":"`+iid.String()+`"}]`))
-	dup := `{"issuer":"https://idp/","client_id":"c1","integration_id":"` + iid.String() + `"}`
-	assert.Error(t, s.Decode("["+dup+","+dup+"]"))
+	entry := func(fields string) string { return `[{"issuer":"https://idp/","client_id":"c1",` + fields + `}]` }
+	for name, tc := range map[string]struct{ value, msg string }{
+		"pre-amendment shape":  {`[{"issuer":"https://idp/","client_id":"c1","integration_id":"` + id.NewIntegrationID().String() + `"}]`, "act_as"},
+		"unknown key":          {entry(`"name":"a","act_as":[],"extra":1`), `unknown field "extra"`},
+		"not json":             {`{`, "invalid service callers json"},
+		"not an array":         {`{"issuer":"x"}`, "invalid service callers json"},
+		"trailing data":        {entry(`"name":"a","act_as":[]`) + `[]`, "invalid service callers json"},
+		"missing issuer":       {`[{"client_id":"c1","name":"a","act_as":[]}]`, "issuer, client_id and name are required"},
+		"missing client_id":    {`[{"issuer":"https://idp/","name":"a","act_as":[]}]`, "issuer, client_id and name are required"},
+		"missing name":         {entry(`"act_as":[]`), "issuer, client_id and name are required"},
+		"missing act_as":       {entry(`"name":"a"`), "act_as is required"},
+		"null act_as":          {entry(`"name":"a","act_as":null`), "act_as is required"},
+		"unknown act_as value": {entry(`"name":"a","act_as":["admin"]`), `"admin"`},
+		"upper-case act_as":    {entry(`"name":"a","act_as":["User"]`), `"User"`},
+		"duplicate act_as":     {entry(`"name":"a","act_as":["user","user"]`), "twice"},
+		"upper-case name":      {entry(`"name":"Svc","act_as":[]`), "must match"},
+		"name with a space":    {entry(`"name":"svc one","act_as":[]`), "must match"},
+		"name with a newline":  {entry(`"name":"svc\nx","act_as":[]`), "must match"},
+		"name starting with -": {entry(`"name":"-svc","act_as":[]`), "must match"},
+		"name over 63 chars":   {entry(`"name":"` + strings.Repeat("a", 64) + `","act_as":[]`), "must match"},
+		"duplicate (iss, cid)": {`[{"issuer":"https://idp/","client_id":"c1","name":"a","act_as":[]},{"issuer":"https://idp/","client_id":"c1","name":"b","act_as":["user"]}]`, "registered twice"},
+	} {
+		t.Run(name, func(t *testing.T) {
+			var s ServiceCallers
+			err := s.Decode(tc.value)
+			require.Error(t, err)
+			assert.Contains(t, err.Error(), tc.msg)
+		})
+	}
 
-	require.NoError(t, s.Decode(callersJSON("https://idp/", "c1", iid)))
+	require.NoError(t, s.Decode(entry(`"name":"`+strings.Repeat("a", 63)+`","act_as":[]`)))
 	assert.Error(t, s.checkIssuers([]appx.JWTProvider{{ISS: "https://idp"}}), "issuer must match exactly")
 	assert.NoError(t, s.checkIssuers([]appx.JWTProvider{{ISS: "https://idp/"}}))
+}
+
+func TestParseActAs(t *testing.T) {
+	iid, uid := id.NewIntegrationID(), id.NewUserID()
+
+	sub, err := parseActAs("integration:" + iid.String())
+	require.NoError(t, err)
+	assert.Equal(t, workspace.IntegrationSubject(iid), sub)
+	assert.Equal(t, "integration:"+iid.String(), sub.String())
+
+	sub, err = parseActAs("user:" + uid.String())
+	require.NoError(t, err)
+	assert.Equal(t, workspace.UserSubject(uid), sub)
+
+	for _, v := range []string{
+		"",
+		"integration",
+		"integration:",
+		"user:",
+		":" + iid.String(),
+		"INTEGRATION:" + iid.String(),
+		"User:" + uid.String(),
+		"team:" + iid.String(),
+		"integration:" + iid.String() + ":x",
+		"integration::" + iid.String(),
+		"integration:" + strings.ToUpper(iid.String()),
+		"integration: " + iid.String(),
+		"integration:nope",
+		"user:" + uid.String() + ",user:" + uid.String(),
+	} {
+		_, err := parseActAs(v)
+		assert.Error(t, err, "%q", v)
+	}
+}
+
+func TestAuthenticate(t *testing.T) {
+	idp := newTestIdP(t)
+	iid, uid := id.NewIntegrationID(), id.NewUserID()
+	var s ServiceCallers
+	require.NoError(t, s.Decode(`[
+		{"issuer":"`+idp.issuer()+`","client_id":"both","name":"both","act_as":["integration","user"]},
+		{"issuer":"`+idp.issuer()+`","client_id":"int","name":"int","act_as":["integration"]},
+		{"issuer":"`+idp.issuer()+`","client_id":"usr","name":"usr","act_as":["user"]},
+		{"issuer":"`+idp.issuer()+`","client_id":"anon","name":"anon","act_as":[]}]`))
+	client := func(cid string) *appx.AuthInfo {
+		return &appx.AuthInfo{Token: idp.sign(t, clientClaims(cid)), Iss: idp.issuer(), Sub: cid + "@clients"}
+	}
+	userAI := &appx.AuthInfo{Token: idp.sign(t, jwt.MapClaims{"sub": "auth0|u1"}), Iss: idp.issuer(), Sub: "auth0|u1"}
+	asInt := "integration:" + iid.String()
+	asUser := "user:" + uid.String()
+
+	accepted := []struct {
+		name  string
+		ai    *appx.AuthInfo
+		actAs []string
+		want  workspace.Subject
+	}{
+		{"integration subject", client("int"), []string{asInt}, workspace.IntegrationSubject(iid)},
+		{"integration subject, client with both kinds", client("both"), []string{asInt}, workspace.IntegrationSubject(iid)},
+		{"no header is anonymous", client("int"), nil, workspace.Subject{}},
+		{"no header is anonymous, act_as []", client("anon"), nil, workspace.Subject{}},
+	}
+	for _, tc := range accepted {
+		t.Run("accepts "+tc.name, func(t *testing.T) {
+			ca, err := s.authenticate(tc.ai, tc.actAs)
+			require.NoError(t, err)
+			require.NotNil(t, ca)
+			assert.Equal(t, tc.want, ca.subject)
+			assert.Equal(t, tc.ai.Sub, ca.client.ID+"@clients")
+		})
+	}
+
+	for name, ai := range map[string]*appx.AuthInfo{"no token": nil, "empty token": {}, "user token": userAI} {
+		t.Run(name+" without a header is not a client call", func(t *testing.T) {
+			ca, err := s.authenticate(ai, nil)
+			assert.NoError(t, err)
+			assert.Nil(t, ca)
+		})
+	}
+
+	rejected := []struct {
+		name   string
+		ai     *appx.AuthInfo
+		actAs  []string
+		reason rejectReason
+	}{
+		{"user token with the header", userAI, []string{asInt}, reasonActAsWithoutClient},
+		{"no token with the header", nil, []string{asInt}, reasonActAsWithoutClient},
+		{"no token with an empty header", nil, []string{""}, reasonActAsWithoutClient},
+		{"bad claims", &appx.AuthInfo{Token: idp.sign(t, jwt.MapClaims{"sub": "int@clients", "azp": "int", "gty": "password"}), Iss: idp.issuer()}, []string{asInt}, reasonBadClaims},
+		{"unregistered client", client("ghost"), []string{asInt}, reasonUnregistered},
+		{"registered client from another issuer", &appx.AuthInfo{Token: idp.sign(t, clientClaims("int")), Iss: "https://other.example.com/"}, []string{asInt}, reasonUnregistered},
+		{"empty header", client("int"), []string{""}, reasonMalformedActAs},
+		{"repeated header", client("int"), []string{asInt, asInt}, reasonMalformedActAs},
+		{"malformed header", client("int"), []string{"integration:nope"}, reasonMalformedActAs},
+		{"unknown kind", client("both"), []string{"team:" + iid.String()}, reasonMalformedActAs},
+		{"integration not in act_as", client("usr"), []string{asInt}, reasonKindNotAllowed},
+		{"integration with act_as []", client("anon"), []string{asInt}, reasonKindNotAllowed},
+		{"user not in act_as", client("int"), []string{asUser}, reasonKindNotAllowed},
+		{"user allowed by act_as", client("both"), []string{asUser}, reasonActAsUserNotAvailable},
+		{"user only client", client("usr"), []string{asUser}, reasonActAsUserNotAvailable},
+	}
+	for _, tc := range rejected {
+		t.Run("rejects "+tc.name, func(t *testing.T) {
+			ca, err := s.authenticate(tc.ai, tc.actAs)
+			assert.Nil(t, ca)
+			var r *clientRejected
+			require.ErrorAs(t, err, &r)
+			assert.Equal(t, tc.reason, r.reason)
+		})
+	}
+
+	t.Run("an empty registry recognizes no client, but still refuses the header", func(t *testing.T) {
+		ca, err := ServiceCallers(nil).authenticate(client("int"), nil)
+		assert.NoError(t, err)
+		assert.Nil(t, ca)
+		_, err = ServiceCallers(nil).authenticate(client("int"), []string{asInt})
+		assert.True(t, isClientRejected(err))
+	})
 }
 
 func TestServiceCallersDisabledLeavesUserTokensAlone(t *testing.T) {
@@ -270,4 +459,13 @@ func TestServiceCallersDisabledLeavesUserTokensAlone(t *testing.T) {
 
 	rr, _ = callWith(h, idp.sign(t, clientClaims("svc-flow")))
 	assert.Equal(t, http.StatusUnauthorized, rr.Code, "an unregistered client still has no user")
+}
+
+func TestMockAuthRefusesTheActAsHeader(t *testing.T) {
+	f := newServiceFixture(t)
+	h := authMiddleware(&ServerConfig{Config: &Config{Mock_Auth: true}, Repos: f.repos})(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {}))
+	rr, _ := callBody(h, "", publicQuery, f.actAs())
+	assert.Equal(t, http.StatusUnauthorized, rr.Code)
+	rr, _ = callBody(h, "", publicQuery)
+	assert.Equal(t, http.StatusOK, rr.Code)
 }
