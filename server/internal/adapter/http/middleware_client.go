@@ -31,10 +31,15 @@ func ClientGate(resolve ClientResolver, routes map[string]adapter.ClientAccess) 
 			if cc == nil {
 				return next(c)
 			}
-			if !routes[c.Request().Method+" "+c.Path()].Admits(cc.Subject.Kind()) {
+			// Attached before the check, so the request log names the caller on
+			// a refusal too.
+			ctx = cc.Attach(ctx)
+			c.SetRequest(c.Request().WithContext(ctx))
+			admitted := routes[c.Request().Method+" "+c.Path()].Admits(cc.Subject.Kind())
+			adapter.LogClientVerdict(ctx, admitted)
+			if !admitted {
 				return errClientRouteClosed
 			}
-			c.SetRequest(c.Request().WithContext(cc.Attach(ctx)))
 			return next(c)
 		}
 	}

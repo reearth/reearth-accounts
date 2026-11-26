@@ -2,6 +2,11 @@
 // accounts API with no user behind the call (ADR-0002 decision 1). The client
 // authenticates with private_key_jwt (RFC 7523), fetches a token on first use and
 // caches it in memory until shortly before it expires.
+//
+// A client token alone is anonymous. To act for an integration, name it on each
+// request's context, and Transport sends it as X-Reearth-Act-As:
+//
+//	ctx = servicetoken.WithActAs(ctx, servicetoken.IntegrationSubject(integrationID))
 package servicetoken
 
 import (
@@ -31,7 +36,21 @@ const (
 	// fetchTimeout bounds one token fetch, so a hung identity provider cannot
 	// hold the shared in-flight fetch forever when HTTPClient has no timeout.
 	fetchTimeout = 30 * time.Second
+
+	ActAsHeader = "X-Reearth-Act-As"
 )
+
+type actAsKey struct{}
+
+// WithActAs names the subject the service token acts for on requests made with
+// ctx, such as IntegrationSubject(id). An empty subject is ignored.
+func WithActAs(ctx context.Context, subject string) context.Context {
+	return context.WithValue(ctx, actAsKey{}, subject)
+}
+
+func IntegrationSubject(id string) string {
+	return "integration:" + id
+}
 
 type Config struct {
 	// TokenURL is the identity provider's token endpoint, such as
@@ -208,9 +227,10 @@ func (s *Source) assertion() (string, error) {
 	return t.SignedString(s.cfg.Key)
 }
 
-// Transport adds the service token to requests that carry no Authorization
-// header, so calls made for a user keep the user's token. Place it inside any
-// transport that sets the user's token, so it sees the final headers.
+// Transport adds the service token, and the subject named by WithActAs, to
+// requests that carry no Authorization header, so calls made for a user keep
+// the user's token and send no act-as header. Place it inside any transport
+// that sets the user's token, so it sees the final headers.
 type Transport struct {
 	Source *Source
 	// Base defaults to http.DefaultTransport.
@@ -234,5 +254,8 @@ func (t *Transport) RoundTrip(req *http.Request) (*http.Response, error) {
 	}
 	req2 := req.Clone(req.Context())
 	req2.Header.Set("Authorization", "Bearer "+tok)
+	if sub, _ := req.Context().Value(actAsKey{}).(string); sub != "" {
+		req2.Header.Set(ActAsHeader, sub)
+	}
 	return base.RoundTrip(req2)
 }

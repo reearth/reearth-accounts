@@ -33,7 +33,12 @@ func (clientFieldGate) Validate(graphql.ExecutableSchema) error { return nil }
 
 func (g clientFieldGate) MutateOperationContext(ctx context.Context, oc *graphql.OperationContext) *gqlerror.Error {
 	cc := adapter.ClientCallOf(ctx)
-	if cc == nil || g.admits(oc.Operation.Operation, oc.Operation.SelectionSet, cc.Subject.Kind()) {
+	if cc == nil {
+		return nil
+	}
+	admitted := g.admits(oc.Operation.Operation, oc.Operation.SelectionSet, cc.Subject.Kind())
+	adapter.LogClientVerdict(ctx, admitted)
+	if admitted {
 		return nil
 	}
 	setResponseStatus(ctx, http.StatusForbidden)

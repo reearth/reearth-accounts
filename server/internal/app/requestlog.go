@@ -100,6 +100,8 @@ func requestFields(c echo.Context, ctx context.Context, rec *requestRecord, late
 	}
 	if cc := adapter.ClientCallOf(ctx); cc != nil {
 		fields = append(fields, cc.LogFields()...)
+	} else if cid := callerClientID(adapter.GetAuthInfo(ctx)); cid != "" {
+		fields = append(fields, applog.CallerClientID(cid))
 	}
 	return fields
 }

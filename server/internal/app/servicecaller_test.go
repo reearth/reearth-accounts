@@ -297,25 +297,35 @@ func TestServiceCallersDecode(t *testing.T) {
 
 	entry := func(fields string) string { return `[{"issuer":"https://idp/","client_id":"c1",` + fields + `}]` }
 	for name, tc := range map[string]struct{ value, msg string }{
-		"pre-amendment shape":  {`[{"issuer":"https://idp/","client_id":"c1","integration_id":"` + id.NewIntegrationID().String() + `"}]`, "act_as"},
-		"unknown key":          {entry(`"name":"a","act_as":[],"extra":1`), `unknown field "extra"`},
-		"not json":             {`{`, "invalid service callers json"},
-		"not an array":         {`{"issuer":"x"}`, "invalid service callers json"},
-		"trailing data":        {entry(`"name":"a","act_as":[]`) + `[]`, "invalid service callers json"},
-		"missing issuer":       {`[{"client_id":"c1","name":"a","act_as":[]}]`, "issuer, client_id and name are required"},
-		"missing client_id":    {`[{"issuer":"https://idp/","name":"a","act_as":[]}]`, "issuer, client_id and name are required"},
-		"missing name":         {entry(`"act_as":[]`), "issuer, client_id and name are required"},
-		"missing act_as":       {entry(`"name":"a"`), "act_as is required"},
-		"null act_as":          {entry(`"name":"a","act_as":null`), "act_as is required"},
-		"unknown act_as value": {entry(`"name":"a","act_as":["admin"]`), `"admin"`},
-		"upper-case act_as":    {entry(`"name":"a","act_as":["User"]`), `"User"`},
-		"duplicate act_as":     {entry(`"name":"a","act_as":["user","user"]`), "twice"},
-		"upper-case name":      {entry(`"name":"Svc","act_as":[]`), "must match"},
-		"name with a space":    {entry(`"name":"svc one","act_as":[]`), "must match"},
-		"name with a newline":  {entry(`"name":"svc\nx","act_as":[]`), "must match"},
-		"name starting with -": {entry(`"name":"-svc","act_as":[]`), "must match"},
-		"name over 63 chars":   {entry(`"name":"` + strings.Repeat("a", 64) + `","act_as":[]`), "must match"},
-		"duplicate (iss, cid)": {`[{"issuer":"https://idp/","client_id":"c1","name":"a","act_as":[]},{"issuer":"https://idp/","client_id":"c1","name":"b","act_as":["user"]}]`, "registered twice"},
+		"pre-amendment shape":   {`[{"issuer":"https://idp/","client_id":"c1","integration_id":"` + id.NewIntegrationID().String() + `"}]`, "act_as"},
+		"unknown key":           {entry(`"name":"a","act_as":[],"extra":1`), `unknown key "extra"`},
+		"upper-case act_as key": {entry(`"name":"a","ACT_AS":[]`), `unknown key "ACT_AS"`},
+		"capitalized issuer":    {`[{"Issuer":"https://idp/","client_id":"c1","name":"a","act_as":[]}]`, `unknown key "Issuer"`},
+		"upper-case client_id":  {`[{"issuer":"https://idp/","CLIENT_ID":"c1","name":"a","act_as":[]}]`, `unknown key "CLIENT_ID"`},
+		"capitalized name":      {entry(`"Name":"a","act_as":[]`), `unknown key "Name"`},
+		"repeated act_as":       {entry(`"name":"a","act_as":["user"],"act_as":[]`), `key "act_as" appears twice`},
+		"repeated name":         {entry(`"name":"a","name":"b","act_as":[]`), `key "name" appears twice`},
+		"entry not an object":   {`[null]`, "must be an object"},
+		"not json":              {`{`, "invalid service callers json"},
+		"not an array":          {`{"issuer":"x"}`, "invalid service callers json"},
+		"null":                  {`null`, "must be an array"},
+		"a string":              {`"x"`, "invalid service callers json"},
+		"a number":              {`1`, "invalid service callers json"},
+		"trailing data":         {entry(`"name":"a","act_as":[]`) + `[]`, "invalid service callers json"},
+		"missing issuer":        {`[{"client_id":"c1","name":"a","act_as":[]}]`, "issuer, client_id and name are required"},
+		"missing client_id":     {`[{"issuer":"https://idp/","name":"a","act_as":[]}]`, "issuer, client_id and name are required"},
+		"missing name":          {entry(`"act_as":[]`), "issuer, client_id and name are required"},
+		"missing act_as":        {entry(`"name":"a"`), "act_as is required"},
+		"null act_as":           {entry(`"name":"a","act_as":null`), "act_as is required"},
+		"unknown act_as value":  {entry(`"name":"a","act_as":["admin"]`), `"admin"`},
+		"upper-case act_as":     {entry(`"name":"a","act_as":["User"]`), `"User"`},
+		"duplicate act_as":      {entry(`"name":"a","act_as":["user","user"]`), "twice"},
+		"upper-case name":       {entry(`"name":"Svc","act_as":[]`), "must match"},
+		"name with a space":     {entry(`"name":"svc one","act_as":[]`), "must match"},
+		"name with a newline":   {entry(`"name":"svc\nx","act_as":[]`), "must match"},
+		"name starting with -":  {entry(`"name":"-svc","act_as":[]`), "must match"},
+		"name over 63 chars":    {entry(`"name":"` + strings.Repeat("a", 64) + `","act_as":[]`), "must match"},
+		"duplicate (iss, cid)":  {`[{"issuer":"https://idp/","client_id":"c1","name":"a","act_as":[]},{"issuer":"https://idp/","client_id":"c1","name":"b","act_as":["user"]}]`, "registered twice"},
 	} {
 		t.Run(name, func(t *testing.T) {
 			var s ServiceCallers
@@ -417,6 +427,7 @@ func TestAuthenticate(t *testing.T) {
 		{"user token with the header", userAI, []string{asInt}, reasonActAsWithoutClient},
 		{"no token with the header", nil, []string{asInt}, reasonActAsWithoutClient},
 		{"no token with an empty header", nil, []string{""}, reasonActAsWithoutClient},
+		{"azp and client_id disagree", &appx.AuthInfo{Token: idp.sign(t, jwt.MapClaims{"sub": "int@clients", "azp": "int", "client_id": "both", "gty": "client-credentials"}), Iss: idp.issuer()}, nil, reasonBadClaims},
 		{"bad claims", &appx.AuthInfo{Token: idp.sign(t, jwt.MapClaims{"sub": "int@clients", "azp": "int", "gty": "password"}), Iss: idp.issuer()}, []string{asInt}, reasonBadClaims},
 		{"unregistered client", client("ghost"), []string{asInt}, reasonUnregistered},
 		{"registered client from another issuer", &appx.AuthInfo{Token: idp.sign(t, clientClaims("int")), Iss: "https://other.example.com/"}, []string{asInt}, reasonUnregistered},
@@ -440,12 +451,17 @@ func TestAuthenticate(t *testing.T) {
 		})
 	}
 
-	t.Run("an empty registry recognizes no client, but still refuses the header", func(t *testing.T) {
-		ca, err := ServiceCallers(nil).authenticate(client("int"), nil)
+	t.Run("an empty registry refuses every client token as unregistered", func(t *testing.T) {
+		for _, actAs := range [][]string{nil, {asInt}} {
+			ca, err := ServiceCallers(nil).authenticate(client("int"), actAs)
+			assert.Nil(t, ca)
+			var r *clientRejected
+			require.ErrorAs(t, err, &r)
+			assert.Equal(t, reasonUnregistered, r.reason)
+		}
+		ca, err := ServiceCallers(nil).authenticate(userAI, nil)
 		assert.NoError(t, err)
 		assert.Nil(t, ca)
-		_, err = ServiceCallers(nil).authenticate(client("int"), []string{asInt})
-		assert.True(t, isClientRejected(err))
 	})
 }
 
@@ -458,8 +474,13 @@ func TestServiceCallersDisabledLeavesUserTokensAlone(t *testing.T) {
 	require.Equal(t, http.StatusOK, rr.Code)
 	assert.Equal(t, f.userID, *op.User)
 
+	rr, _ = callBody(h, idp.sign(t, jwt.MapClaims{"sub": f.userSub}), publicQuery)
+	assert.Equal(t, http.StatusOK, rr.Code)
+
 	rr, _ = callWith(h, idp.sign(t, clientClaims("svc-flow")))
-	assert.Equal(t, http.StatusUnauthorized, rr.Code, "an unregistered client still has no user")
+	assert.Equal(t, http.StatusUnauthorized, rr.Code)
+	rr, _ = callBody(h, idp.sign(t, clientClaims("svc-flow")), publicQuery)
+	assert.Equal(t, http.StatusUnauthorized, rr.Code, "an unregistered client is refused even on a public operation")
 }
 
 func TestMockAuthRefusesTheActAsHeader(t *testing.T) {
