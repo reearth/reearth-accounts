@@ -2,7 +2,7 @@
 
 ## Startup check on trusted URLs
 
-The server refuses to start when a URL that it trusts for tokens is not an `https` URL on a DNS name. The check implements ADR-0002 decision 11.6 and runs every time the server reads its configuration, in every build.
+The server refuses to start when a URL that it trusts for tokens is not an `https` URL on a DNS name. The check implements ADR-0002 decision 11, items 6 and 7, and runs every time the server reads its configuration, in every build.
 
 The check covers these URLs:
 
@@ -49,6 +49,3 @@ The switch is for a developer machine. Do not set it in a deployed environment:
 
 `REEARTH_DEV`, `REEARTH_ACCOUNTS_DEV`, and `REEARTH_MOCK_AUTH` have no effect on this check, and neither does the build tag. A local setup that runs with `REEARTH_MOCK_AUTH` and a placeholder issuer, such as `http://localhost:8080/`, needs the switch too, or an `https` issuer.
 
-### Difference from ADR-0002
-
-ADR-0002 decisions 11.6 and 11.7 say that the check is off when dev mode is on. The server is stricter: dev mode has no effect, and only the local issuer switch relaxes the check. The reason is that a deployed development environment can run with dev mode on.
