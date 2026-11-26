@@ -36,6 +36,8 @@ type Config struct {
 	// mock
 	Mock_Auth bool `envconfig:"REEARTH_MOCK_AUTH" pp:",omitempty"`
 
+	LocalIssuer bool `envconfig:"REEARTH_ACCOUNTS_LOCAL_ISSUER" pp:",omitempty"`
+
 	// auth
 	Auth     AuthConfigs `pp:",omitempty"`
 	Auth_ISS string      `pp:",omitempty"`
@@ -281,13 +283,12 @@ func ReadConfig(debug bool) (*Config, error) {
 		return nil, fmt.Errorf("REEARTH_ACCOUNTS_SERVICE_CALLERS: %w", err)
 	}
 
-	dev := debug || c.Dev
-	if !dev {
-		if err := checkTrustedURLs(c.Auths(), c.ServiceCallers); err != nil {
-			return nil, fmt.Errorf("untrusted token URL (ADR-0002 decision 11.6); fix the setting, do not set REEARTH_DEV in a deployed environment: %w", err)
-		}
+	if err := checkTrustedURLs(c.Auths(), c.ServiceCallers, c.LocalIssuer); err != nil {
+		return nil, fmt.Errorf("untrusted token URL (ADR-0002 decision 11.6); each issuer and JWKS URI must be https on a DNS name: %w", err)
 	}
-	c.Dev = dev
+	if debug {
+		c.Dev = true
+	}
 	return &c, nil
 }
 

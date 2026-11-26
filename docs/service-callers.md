@@ -2,7 +2,7 @@
 
 ## Startup check on trusted URLs
 
-Outside dev mode, the server refuses to start when a URL that it trusts for tokens is not an `https` URL on a DNS name. The check implements ADR-0002 decision 11.6 and runs when the server reads its configuration.
+The server refuses to start when a URL that it trusts for tokens is not an `https` URL on a DNS name. The check implements ADR-0002 decision 11.6 and runs every time the server reads its configuration, in every build.
 
 The check covers these URLs:
 
@@ -24,8 +24,21 @@ The check looks at the URL, not at the address the name resolves to. A DNS name 
 
 When the check fails, the error lists every failing URL by its source, such as `auth provider 2 jwks uri` or `service caller "<client id>" issuer`, with the reason. The provider number follows the order above. The errors from this check never include a user name, password, path, or query.
 
-## Dev mode
+## Local issuers
 
-Dev mode turns the check off. Dev mode is on when `REEARTH_DEV` is `true` or when the server is built without the `release` build tag. The release image is built with that tag. `REEARTH_ACCOUNTS_DEV` and `REEARTH_MOCK_AUTH` do not turn the check off.
+A local identity provider, such as a mock OAuth server in Docker Compose, often runs over `http` on a loopback address or a service name. To trust such a provider on a laptop, set `REEARTH_ACCOUNTS_LOCAL_ISSUER=true`. The default is `false`.
 
-Do not set `REEARTH_DEV` in a deployed environment to get past this check. Dev mode also makes the GraphQL API accept the `X-Reearth-Debug-*` headers, which name a user without a token. Fix the URL instead.
+With the switch on, a URL that fails the check above still passes when all of these are true:
+
+- The scheme is `http` or `https`.
+- The URL has no user name or password.
+- The host is one of these:
+  - A loopback IP address, such as `127.0.0.1`, any other `127.x.y.z` address, `::1`, or `::ffff:127.0.0.1`. The addresses `0.0.0.0` and `::`, private ranges, link-local addresses, and metadata addresses do not pass.
+  - The name `localhost`, in any case, with or without one trailing dot. Names under it, such as `app.localhost`, do not pass.
+  - A name with one label that starts with an ASCII letter and uses only ASCII letters, digits, and hyphens, such as `mock-oauth2`. Short numeric forms such as `127.1` do not pass.
+
+Every other URL must still be an `https` URL on a DNS name. For example, `http://idp.example.com/` and `https://10.0.0.1/` fail with the switch on.
+
+When the switch is off and a failing URL would pass with the switch on, the error says so.
+
+The switch is for a developer machine. Do not set it in a deployed environment. `REEARTH_DEV`, `REEARTH_ACCOUNTS_DEV`, and `REEARTH_MOCK_AUTH` have no effect on this check, and neither does the build tag.
