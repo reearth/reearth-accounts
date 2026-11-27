@@ -213,6 +213,7 @@ func (w *WebServer) Run(ctx context.Context) {
 	applog.Info(ctx, msg, applog.Address(w.address))
 
 	go func() {
+		//nolint:staticcheck // echo v4 StartH2CServer takes *http2.Server
 		if err := w.appServer.StartH2CServer(w.address, &http2.Server{}); err != nil && !errors.Is(err, http.ErrServerClosed) {
 			applog.Fatal(ctx, "server stopped", applog.Err(err))
 		}

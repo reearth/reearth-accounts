@@ -38,7 +38,7 @@ func TestAuth0_CallsProduceSpansWithoutPersonalData(t *testing.T) {
 	for _, s := range spans {
 		assert.Equal(t, trace.SpanKindClient, s.SpanKind)
 		for _, kv := range s.Attributes {
-			v := kv.Value.Emit()
+			v := kv.Value.String()
 			assert.False(t, strings.Contains(v, sub) || strings.Contains(v, email), "%s=%s", kv.Key, v)
 		}
 		assert.False(t, strings.Contains(s.Name, sub))

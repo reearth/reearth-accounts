@@ -24,6 +24,7 @@ func (m *AppMiddlewares) Middlewares() []echo.MiddlewareFunc {
 func NewAppMiddlewares() *AppMiddlewares {
 	return &AppMiddlewares{
 		CacheControl:  cacheControlMiddleware,
+		//nolint:staticcheck // RequestLogger() logs text to stderr via slog; Logger() keeps the JSON stdout format
 		RequestLogger: middleware.Logger(),
 	}
 }
